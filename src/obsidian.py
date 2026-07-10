@@ -10,25 +10,42 @@ from datetime import date, datetime
 
 from src import vault
 
-JOURNAL_DIR = os.path.join(vault.VAULT, "Calendar", "Journal")
 MASTER_TODO = os.path.join(vault.VAULT, "Master To-Do.md")
 
 
-def _journal_path(d=None):
+def _daily_title(d=None):
     d = d or date.today()
-    return os.path.join(JOURNAL_DIR, f"Journal {vault._ordinal(d.day)} {d.strftime('%B')}.md")
+    return f"{d.strftime('%A')} {vault._ordinal(d.day)} {d.strftime('%B')}"
 
 
-def append_journal(text, d=None, dry_run=False):
-    """Append a timestamped entry to today's Journal note, creating it if needed."""
-    path = _journal_path(d)
-    stamp = datetime.now().strftime("%H:%M")
-    entry = f"\n**{stamp}** {text.strip()}\n"
-    preview = f"append to Journal: {entry.strip()}"
+def _append_to_section(path, header, entry, title):
+    """Append `entry` under `header` in the daily note, creating file/section as needed."""
+    content = vault.read(path) or f"# {title}\n"
+    if header in content:
+        content = content.rstrip() + "\n" + entry + "\n"
+    else:
+        content = content.rstrip() + f"\n\n{header}\n" + entry + "\n"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def append_reflection(text, d=None, dry_run=False):
+    """Add a timestamped reflection under the Daily Note's Reflections section."""
+    path = vault.daily_note_path(d)
+    entry = f"**{datetime.now().strftime('%H:%M')}** {text.strip()}"
+    preview = f"add to Daily Note › Reflections: {entry}"
     if not dry_run:
-        header = "" if os.path.exists(path) else f"# Journal {vault._ordinal((d or date.today()).day)} {(d or date.today()).strftime('%B')}\n"
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(header + entry)
+        _append_to_section(path, vault.REFLECTIONS_HEADER, entry, _daily_title(d))
+    return path, preview
+
+
+def append_note(text, d=None, dry_run=False):
+    """Add a work/to-do-related note under the Daily Note's Notes section."""
+    path = vault.daily_note_path(d)
+    entry = f"- {text.strip()}"
+    preview = f"add to Daily Note › Notes: {entry}"
+    if not dry_run:
+        _append_to_section(path, "Notes:", entry, _daily_title(d))
     return path, preview
 
 

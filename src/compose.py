@@ -71,11 +71,12 @@ def morning(d=None):
         parts += ["", fancy.bold("Health"), _bullets(health, "  ")]
     if reminder:
         parts += ["", fancy.bold("Reminders"), "  • " + reminder]
-    parts += ["", _questions([
+    qs = vault.random_prompts("Morning", 3) or [
         "What task do you want to start with today?",
         "Is anything missing from the to do list?",
         "What is your intention for today?",
-    ])]
+    ]
+    parts += ["", _questions(qs)]
     return "\n".join(parts)
 
 
@@ -99,14 +100,15 @@ def midday(d=None):
 
 def evening(d=None):
     mani = vault.random_manifestation() or "I am proud of myself for showing up today."
-    parts = [fancy.bold_italic("Good evening"), "",
-             fancy.italic("let's close the day gently, no scorekeeping."), ""]
-    parts += [_questions([
+    qs = vault.random_prompts("Reflection", 4) or [
         "How did today go? what did you get done, however small?",
         "Was any of it difficult? how are you feeling tonight?",
         "One thing that went well, or that you appreciated?",
         "What do you want to get done tomorrow?",
-    ])]
+    ]
+    parts = [fancy.bold_italic("Good evening"), "",
+             fancy.italic("let's close the day gently, no scorekeeping."), ""]
+    parts += [_questions(qs)]
     parts += ["", fancy.italic(mani)]
     return "\n".join(parts)
 

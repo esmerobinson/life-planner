@@ -13,6 +13,10 @@ VAULT = os.path.expanduser("~/Desktop/Esme's Brain")
 DAILY_DIR = os.path.join(VAULT, "Calendar", "To Do Lists")
 KIT = os.path.join(VAULT, "Mind & Wellbeing", "Motivation & Manifestation Kit.md")
 DAILY_REMINDERS = os.path.join(VAULT, "Daily reminders.md")
+JOURNAL_PROMPTS = os.path.join(VAULT, "Calendar", "Journal Prompts.md")
+
+# The section headers used inside a unified Daily Note (fancy unicode).
+REFLECTIONS_HEADER = "𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬"
 
 
 def _ordinal(n):
@@ -122,3 +126,14 @@ def random_manifestation():
 def random_coping_line():
     items = kit_bullets("Coping bank")
     return random.choice(items) if items else None
+
+
+def prompts(section):
+    """Journal prompts from the shared bank, under 'Morning' or 'Reflection'."""
+    return bullets_under_heading(read(JOURNAL_PROMPTS), section)
+
+
+def random_prompts(section, n):
+    items = prompts(section)
+    random.shuffle(items)
+    return items[:n]
