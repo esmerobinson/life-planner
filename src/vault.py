@@ -28,9 +28,9 @@ def _ordinal(n):
 
 
 def daily_note_filename(d=None):
-    """Match Esme's naming, e.g. 'Thursday 9th July.md'."""
+    """Date-prefixed so notes sort chronologically, e.g. '2026-07-09 Thursday 9th July.md'."""
     d = d or date.today()
-    return f"{d.strftime('%A')} {_ordinal(d.day)} {d.strftime('%B')}.md"
+    return f"{d.isoformat()} {d.strftime('%A')} {_ordinal(d.day)} {d.strftime('%B')}.md"
 
 
 def daily_note_path(d=None):
@@ -133,7 +133,12 @@ def prompts(section):
     return bullets_under_heading(read(JOURNAL_PROMPTS), section)
 
 
-def random_prompts(section, n):
-    items = prompts(section)
-    random.shuffle(items)
-    return items[:n]
+def select_prompts(section, n):
+    """Pick up to n prompts. Any marked '(MUST INCLUDE)' are always kept (marker
+    stripped); the rest fill the remaining slots at random."""
+    raw = prompts(section)
+    clean = lambda s: re.sub(r"\s*\(MUST INCLUDE\)\s*", "", s).strip()
+    must = [clean(p) for p in raw if "MUST INCLUDE" in p.upper()]
+    rest = [clean(p) for p in raw if "MUST INCLUDE" not in p.upper()]
+    random.shuffle(rest)
+    return must + rest[: max(0, n - len(must))]
