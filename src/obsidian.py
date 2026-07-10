@@ -8,7 +8,7 @@ import os
 import re
 from datetime import date, datetime
 
-from src import vault
+from src import fancy, vault
 
 MASTER_TODO = os.path.join(vault.VAULT, "Master To-Do.md")
 

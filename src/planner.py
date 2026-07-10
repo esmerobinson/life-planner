@@ -73,7 +73,7 @@ def build(d=None, carry_from=None):
     checks = lambda items: "\n".join(f"- [ ] {i}" for i in items)
     dog = DOGS[d.weekday()]
     parts = [
-        f"![[Attachments/dogs/{dog}|200]]",
+        f"![[{dog}|200]]",
         "",
         f"# {obsidian._daily_title(d)}",
         "",
