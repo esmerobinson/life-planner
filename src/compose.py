@@ -1,87 +1,127 @@
-"""Compose the daily messages — three slots, each with its own job.
+"""Compose the daily messages in Esme's template.
 
-    morning (08:30)  set the intention: today's 3-4, a manifestation, a reminder, a why-it-matters
-    midday  (13:00)  light nudge: how's it going, one thing to move this afternoon, a coping/practice line
-    evening (17:00)  reflect: priorities moved? one win? energy? one appreciation? anything to park?
+Layout (from her spec):
+    [random cute header]
 
-Right now this assembles the message from the vault + the Kit deterministically, so it's
-testable with `--dry-run` before any API keys exist. Phase 1b wires Gemini in as a final pass
-to smooth it into Esme's own from-me-to-me voice (never guilt). The source material stays the
-same either way — Gemini only rephrases, it doesn't invent tasks.
+    𝑮𝒐𝒐𝒅 𝒎𝒐𝒓𝒏𝒊𝒏𝒈 <3
+    𝑖𝑡𝑎𝑙𝑖𝑐 manifestation / motivation line
+    𝐓𝐨 𝐝𝐨 𝐭𝐨𝐝𝐚𝐲  (generated from the vault / goals)
+    𝐇𝐞𝐚𝐥𝐭𝐡
+    𝐑𝐞𝐦𝐢𝐧𝐝𝐞𝐫𝐬  (one random line from Daily reminders)
+    𝐐𝐮𝐞𝐬𝐭𝐢𝐨𝐧𝐬 𝐟𝐨𝐫 𝐲𝐨𝐮:  (morning = intention; midday = emotional + task check-in;
+                              evening = how it went, was it hard, tomorrow)
+
+Section headers use fancy unicode so they render styled in WhatsApp.
+Task punchiness is basic here (prefix-stripping); Gemini polish comes in Phase 1b.
 
 Run:
     python3 -m src.compose morning --dry-run
-    python3 -m src.compose midday  --dry-run
-    python3 -m src.compose evening --dry-run
 """
 
 import sys
 
-from src import vault
+from src import fancy, headers, vault
 
 SLOTS = ("morning", "midday", "evening")
 
-
-def _priorities_block():
-    items = vault.unchecked_priorities()
-    if not items:
-        return "- (no priorities set yet — what are the 3-4 that matter today?)"
-    return "\n".join(f"- {p}" for p in items[:4])  # 3-4 max, never the full list
-
-
-def morning():
-    lines = [
-        "morning, Esme — it's you, from you.",
-        "",
-        "today's few (just these — not the whole list):",
-        _priorities_block(),
-    ]
-    mani = vault.random_manifestation()
-    if mani:
-        lines += ["", f"remember: {mani}"]
-    why = vault.random_why_it_matters()
-    if why:
-        lines += ["", why]
-    rem = vault.random_reminder()
-    if rem:
-        lines += ["", f"and one to hold today: {rem}"]
-    lines += ["", "reply with your intention for the day — I'll hold you to it (gently) x"]
-    return "\n".join(lines)
+# leading "Area:" labels we recognise, so we can strip them and route Health out
+AREA_WORDS = (
+    "work", "mental", "physical", "health", "enrichment", "creative", "mind",
+    "wellbeing", "relationship", "money", "career", "admin", "learning",
+)
 
 
-def midday():
-    items = vault.unchecked_priorities()
-    focus = items[0] if items else "the one that matters most"
-    lines = [
-        "midday check-in — no pressure, just a look up.",
-        "",
-        f"how's it going? if the morning got away from you, that's ok.",
-        f"what's *one* thing you can move this afternoon? (even the 10-min version of: {focus})",
-    ]
+def _split_task(p):
+    """Return (area_label_or_'', clean_text). Only strips a recognised area prefix."""
+    label, sep, rest = p.partition(":")
+    low = label.lower().strip()
+    if sep and rest.strip() and any(low.startswith(w) for w in AREA_WORDS):
+        return low, rest.strip()
+    return "", p.strip()
+
+
+def _categorize(priorities):
+    todo, health = [], []
+    for p in priorities:
+        label, text = _split_task(p)
+        if any(w in label for w in ("physical", "health")):
+            health.append(text)
+        else:
+            todo.append(text)
+    return todo, health
+
+
+def _bullets(items, indent=""):
+    return "\n".join(f"{indent}• {i}" for i in items)
+
+
+def _questions(items):
+    return fancy.bold("Questions for you:") + "\n" + _bullets(items, "    ")
+
+
+def morning(d=None):
+    todo, health = _categorize(vault.unchecked_priorities(d))
+    mani = vault.random_manifestation() or "I am building the life I want, one honest day at a time."
+    reminder = vault.random_reminder()
+
+    parts = [fancy.bold_italic("Good morning") + " <3", "", fancy.italic(mani), ""]
+    parts += [fancy.bold("To do today")]
+    parts += [_bullets(todo[:5]) if todo else "• (let's set today's few, reply with what matters)"]
+    if health:
+        parts += ["", fancy.bold("Health"), _bullets(health, "  ")]
+    if reminder:
+        parts += ["", fancy.bold("Reminders"), "  • " + reminder]
+    parts += ["", _questions([
+        "What task do you want to start with today?",
+        "Is anything missing from the to do list?",
+        "What is your intention for today?",
+    ])]
+    return "\n".join(parts)
+
+
+def midday(d=None):
+    todo, _ = _categorize(vault.unchecked_priorities(d))
     coping = vault.random_coping_line()
+
+    parts = [fancy.bold_italic("Afternoon check in"), "",
+             fancy.italic("small and kind beats big and harsh, just a look up at the day."), ""]
+    parts += [fancy.bold("Still on today")]
+    parts += [_bullets(todo[:5]) if todo else "• whatever you can move, counts"]
     if coping:
-        lines += ["", coping]
-    lines += ["", "tell me what you'll do next and I'll check back x"]
-    return "\n".join(lines)
+        parts += ["", fancy.bold("Reminders"), "  • " + coping]
+    parts += ["", _questions([
+        "How are you feeling this afternoon?",
+        "How is it going with today's tasks?",
+        "What is one thing you can move before this evening?",
+    ])]
+    return "\n".join(parts)
 
 
-def evening():
-    lines = [
-        "evening, love. let's close the day kindly.",
-        "",
-        "- did you move any of your priorities? what got done? (however small counts)",
-        "- one thing that went well today:",
-        "- energy & mood, 1-5, and why:",
-        "- one thing you appreciated — in yourself or someone else:",
-        "- anything bothering you? can you park it, or let it go?",
-        "",
-        "reply however you like — I'll write it into your journal and carry what's left to tomorrow x",
-    ]
-    return "\n".join(lines)
+def evening(d=None):
+    mani = vault.random_manifestation() or "I am proud of myself for showing up today."
+    parts = [fancy.bold_italic("Good evening"), "",
+             fancy.italic("let's close the day gently, no scorekeeping."), ""]
+    parts += [_questions([
+        "How did today go? what did you get done, however small?",
+        "Was any of it difficult? how are you feeling tonight?",
+        "One thing that went well, or that you appreciated?",
+        "What do you want to get done tomorrow?",
+    ])]
+    parts += ["", fancy.italic(mani)]
+    return "\n".join(parts)
 
 
-def render(slot):
-    return {"morning": morning, "midday": midday, "evening": evening}[slot]()
+def render(slot, d=None):
+    body = {"morning": morning, "midday": midday, "evening": evening}[slot](d)
+    return headers.random_header() + "\n\n" + body
+
+
+def nudge():
+    """The 'annoying' follow-up if she hasn't replied. Sent by the scheduler
+    when Phase 2 reply-detection sees no answer within the wait window."""
+    return headers.random_header() + "\n\n" + fancy.italic(
+        "text me back if you want to make some progress on your life today xox"
+    )
 
 
 def main():
@@ -93,7 +133,6 @@ def main():
     if "--dry-run" in sys.argv:
         print(f"===== {slot} =====\n{msg}")
     else:
-        # Phase 1: actually send via WhatsApp once pipes are live.
         import os
         from src import whatsapp
         whatsapp.send_text(os.environ["MY_NUMBER"], msg)

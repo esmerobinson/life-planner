@@ -14,6 +14,18 @@ GRAPH_VERSION = "v21.0"
 BASE = f"https://graph.facebook.com/{GRAPH_VERSION}"
 
 
+def sanitize(text):
+    """Esme dislikes em/en dashes, swap them for a comma. Kept space-safe on
+    purpose so multi-line ASCII-art headers keep their alignment."""
+    if not text:
+        return text
+    text = text.replace(" -- ", ", ")
+    for dash in ("—", "–"):
+        text = text.replace(dash, ",")
+    text = text.replace(" ,", ",")  # tidy the space the em dash left behind
+    return text
+
+
 def _config():
     token = os.environ["WHATSAPP_TOKEN"]
     phone_number_id = os.environ["PHONE_NUMBER_ID"]
@@ -43,7 +55,7 @@ def send_text(to, body):
         "messaging_product": "whatsapp",
         "to": to,
         "type": "text",
-        "text": {"body": body},
+        "text": {"body": sanitize(body)},
     })
 
 
@@ -51,7 +63,7 @@ def send_image(to, image_url, caption=None):
     """Send an image by public URL (used for vision-board imagery)."""
     image = {"link": image_url}
     if caption:
-        image["caption"] = caption
+        image["caption"] = sanitize(caption)
     return _post({
         "messaging_product": "whatsapp",
         "to": to,
