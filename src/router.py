@@ -7,7 +7,41 @@ mixed messages like "ugh today was hard but I did the walk" (journal + tick).
 
 import re
 
-from src import obsidian
+from src import llm, obsidian
+
+ROUTER_SYSTEM = (
+    "You parse a WhatsApp reply Esme sent to her personal planner bot, and break it "
+    "into actions to file in her notes. A single message can yield several actions. "
+    "Always capture any reflective, emotional, or diary-like content as a journal action "
+    "so nothing she says is ever lost. Never invent content. "
+    "Output a JSON array of objects, each with a 'type' and its fields:\n"
+    '  {"type":"journal","text":"..."}   a thought, feeling, or reflection (verbatim-ish)\n'
+    '  {"type":"tick","task":"..."}       she reports finishing something (task = a few keywords)\n'
+    '  {"type":"todo","text":"..."}       a new idea/task to remember\n'
+    '  {"type":"intention","text":"..."}  her stated focus/intention for the day\n'
+    '  {"type":"mood","note":"..."}       a mood or energy check-in'
+)
+
+
+def smart_route(message, dry_run=False):
+    """Gemini-parsed routing; returns action previews, or None to fall back."""
+    actions = llm.generate_json(message, system=ROUTER_SYSTEM)
+    if not isinstance(actions, list):
+        return None
+    done = []
+    for a in actions:
+        t = a.get("type")
+        if t == "journal":
+            done.append(obsidian.append_journal(a.get("text", ""), dry_run=dry_run)[1])
+        elif t == "tick":
+            done.append(obsidian.tick_task(a.get("task", ""), dry_run=dry_run)[1])
+        elif t == "todo":
+            done.append(obsidian.add_to_master_todo(a.get("text", ""), dry_run=dry_run)[1])
+        elif t == "intention":
+            done.append(obsidian.set_intention(a.get("text", ""), dry_run=dry_run)[1])
+        elif t == "mood":
+            done.append(obsidian.append_journal("mood: " + a.get("note", ""), dry_run=dry_run)[1])
+    return done or None
 
 DONE_RE = re.compile(r"\b(done|did|finished|completed|sent|posted|wrote)\b", re.I)
 IDEA_RE = re.compile(r"\b(idea|remember to|note to self|todo|need to|should)\b", re.I)
@@ -15,6 +49,10 @@ INTENT_RE = re.compile(r"\b(my intention|intention is|today i (will|want)|i'm go
 
 
 def route(message, dry_run=False):
+    smart = smart_route(message, dry_run=dry_run)
+    if smart is not None:
+        return smart
+
     msg = message.strip()
     actions = []
 
