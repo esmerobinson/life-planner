@@ -123,6 +123,17 @@ def random_coping_line():
     return random.choice(items) if items else None
 
 
+def daily_health(d=None):
+    """Every day: a movement item (30 min walk OR 1 hr calisthenics) plus the
+    standing nutrition reminder. Seeded by the date so the planner and the morning
+    message pick the same movement for a given day."""
+    d = d or date.today()
+    rng = random.Random(d.toordinal())
+    movement = rng.choice(["A 30 minute walk", "1 hour of calisthenics"])
+    nutrition = "Fill your body with healthy, nutritious food today, and don't overeat"
+    return [movement, nutrition]
+
+
 def prompts(section):
     """Journal prompts from the shared bank, under 'Morning' or 'Reflection'."""
     return bullets_under_heading(read(JOURNAL_PROMPTS), section)

@@ -60,10 +60,8 @@ def build(d=None, carry_from=None):
     d = d or date.today()
     carry_from = carry_from or (d - timedelta(days=1))
     carried = vault.unchecked_priorities(carry_from)
-    todo_c, health_c = compose._categorize(carried)
-
-    todo = [_age(t) for t in todo_c] + SPINE + _backlog(2, exclude=set(todo_c))
-    health = health_c or ["A short walk, just to move and reset, not a workout to hit"]
+    todo = [_age(t) for t in carried] + SPINE + _backlog(2, exclude=set(carried))
+    health = vault.daily_health(d)
     reminder = vault.random_reminder()
 
     checks = lambda items: "\n".join(f"- [ ] {i}" for i in items)

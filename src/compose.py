@@ -67,8 +67,7 @@ def morning(d=None):
     parts = [fancy.bold_italic("Good morning") + " <3", "", fancy.italic(mani), ""]
     parts += [fancy.bold("To do today")]
     parts += [_bullets(todo[:5]) if todo else "• (let's set today's few, reply with what matters)"]
-    if health:
-        parts += ["", fancy.bold("Health"), _bullets(health, "  ")]
+    parts += ["", fancy.bold("Health"), _bullets(vault.daily_health(d), "  ")]
     if reminder:
         parts += ["", fancy.bold("Reminders"), "  • " + reminder]
     qs = vault.select_prompts("Morning", 3) or [
