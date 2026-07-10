@@ -116,6 +116,28 @@ def render(slot, d=None):
     return headers.random_header() + "\n\n" + body
 
 
+ACK_SYSTEM = (
+    "You are Esme's warm personal planner, replying to her on WhatsApp right after "
+    "filing her message into her Obsidian notes. Write a SHORT confirmation (1 to 2 "
+    "sentences), lowercase, in her gentle from-me-to-me voice. Warmly acknowledge what "
+    "you saved and give a little kind encouragement. Never use em dashes or en dashes. "
+    "No preamble, no quotes, just the message."
+)
+
+
+def acknowledge(message, actions):
+    """A kind, slightly-custom reply after her message is processed."""
+    from src import llm
+    summary = "; ".join(actions)
+    reply = llm.generate(
+        f"Her message: {message}\nWhat I just saved: {summary}\nWrite her confirmation reply.",
+        system=ACK_SYSTEM,
+    )
+    if not reply:
+        reply = "got it, love. saved and safe. you've got this xox"
+    return headers.random_header() + "\n\n" + reply
+
+
 def nudge():
     """The 'annoying' follow-up if she hasn't replied. Sent by the scheduler
     when Phase 2 reply-detection sees no answer within the wait window."""

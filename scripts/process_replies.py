@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import requests
 from dotenv import load_dotenv
 
-from src import router
+from src import compose, router, whatsapp
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
@@ -31,8 +31,14 @@ def main():
         if not text:
             continue  # media handling comes in Phase 2c
         print(f"\nREPLY: {text}")
-        for action in router.route(text, dry_run=dry):
+        actions = router.route(text, dry_run=dry)
+        for action in actions:
             print("  ->", action)
+        # warm confirmation back to her
+        ack = compose.acknowledge(text, actions)
+        print("  ack:", ack.splitlines()[-1])
+        if not dry:
+            whatsapp.send_text(m.get("from") or os.environ["MY_NUMBER"], ack)
 
 
 if __name__ == "__main__":
