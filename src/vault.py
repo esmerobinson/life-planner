@@ -45,22 +45,17 @@ def read(path):
 
 
 def unchecked_priorities(d=None):
-    """The '- [ ] ...' lines under '## Priorities today' in today's note."""
+    """All unchecked '- [ ] ...' task lines in the day's note. In the unified
+    Daily Note, checkboxes only appear under To do / Health, so this cleanly
+    returns the day's open tasks (and still works on the old '## Priorities' notes)."""
     text = read(daily_note_path(d))
     if not text:
         return []
-    lines = text.splitlines()
-    out, in_section = [], False
-    for line in lines:
-        if line.strip().startswith("## Priorities"):
-            in_section = True
-            continue
-        if in_section and line.startswith("## "):
-            break
-        if in_section:
-            m = re.match(r"\s*-\s*\[ \]\s*(.+)", line)
-            if m:
-                out.append(m.group(1).strip())
+    out = []
+    for line in text.splitlines():
+        m = re.match(r"\s*-\s*\[ \]\s*(.+)", line)
+        if m:
+            out.append(m.group(1).strip())
     return out
 
 
