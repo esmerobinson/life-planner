@@ -1,0 +1,8 @@
+{
+  "name": "life-planner",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2024-11-01",
+  "kv_namespaces": [
+    { "binding": "MESSAGES", "id": "6c6de25ed51f41ef9797d2156f566f35" }
+  ]
+}
