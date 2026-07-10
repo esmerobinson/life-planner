@@ -56,7 +56,7 @@ def _bullets(items, indent=""):
 
 
 def _questions(items):
-    return fancy.bold("Questions for you:") + "\n" + _bullets(items, "    ")
+    return fancy.heading("Questions for you:") + "\n" + _bullets(items, "    ")
 
 
 def morning(d=None):
@@ -65,11 +65,11 @@ def morning(d=None):
     reminder = vault.random_reminder()
 
     parts = [fancy.bold_italic("Good morning") + " <3", "", fancy.italic(mani), ""]
-    parts += [fancy.bold("To do today")]
+    parts += [fancy.heading("To do today")]
     parts += [_bullets(todo[:5]) if todo else "• (let's set today's few, reply with what matters)"]
-    parts += ["", fancy.bold("Health"), _bullets(vault.daily_health(d), "  ")]
+    parts += ["", fancy.heading("Health"), _bullets(vault.daily_health(d), "  ")]
     if reminder:
-        parts += ["", fancy.bold("Reminders"), "  • " + reminder]
+        parts += ["", fancy.heading("Reminders"), "  • " + reminder]
     qs = vault.select_prompts("Morning", 3) or [
         "What task do you want to start with today?",
         "Is anything missing from the to do list?",
@@ -85,10 +85,10 @@ def midday(d=None):
 
     parts = [fancy.bold_italic("Afternoon check in"), "",
              fancy.italic("small and kind beats big and harsh, just a look up at the day."), ""]
-    parts += [fancy.bold("Still on today")]
+    parts += [fancy.heading("Still on today")]
     parts += [_bullets(todo[:5]) if todo else "• whatever you can move, counts"]
     if coping:
-        parts += ["", fancy.bold("Reminders"), "  • " + coping]
+        parts += ["", fancy.heading("Reminders"), "  • " + coping]
     parts += ["", _questions([
         "How are you feeling this afternoon?",
         "How is it going with today's tasks?",

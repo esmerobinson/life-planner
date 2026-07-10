@@ -18,13 +18,14 @@ def _daily_title(d=None):
     return f"{d.strftime('%A')} {vault._ordinal(d.day)} {d.strftime('%B')}"
 
 
-def _append_to_section(path, header, entry, title):
-    """Append `entry` under `header` in the daily note, creating file/section as needed."""
+def _append_to_section(path, search, create_header, entry, title):
+    """Append `entry` under the section matching `search`; create it (with the
+    decorated `create_header`) if the day's note has no such section yet."""
     content = vault.read(path) or f"# {title}\n"
-    if header in content:
+    if search in content:
         content = content.rstrip() + "\n" + entry + "\n"
     else:
-        content = content.rstrip() + f"\n\n{header}\n" + entry + "\n"
+        content = content.rstrip() + f"\n\n{create_header}\n" + entry + "\n"
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
 
@@ -35,7 +36,7 @@ def append_reflection(text, d=None, dry_run=False):
     entry = f"**{datetime.now().strftime('%H:%M')}** {text.strip()}"
     preview = f"add to Daily Note › Reflections: {entry}"
     if not dry_run:
-        _append_to_section(path, vault.REFLECTIONS_HEADER, entry, _daily_title(d))
+        _append_to_section(path, vault.REFLECTIONS_HEADER, fancy.heading("Reflections"), entry, _daily_title(d))
     return path, preview
 
 
@@ -45,7 +46,7 @@ def append_note(text, d=None, dry_run=False):
     entry = f"- {text.strip()}"
     preview = f"add to Daily Note › Notes: {entry}"
     if not dry_run:
-        _append_to_section(path, "Notes:", entry, _daily_title(d))
+        _append_to_section(path, "𝐍𝐨𝐭𝐞𝐬", fancy.heading("Notes"), entry, _daily_title(d))
     return path, preview
 
 

@@ -31,3 +31,21 @@ def bold_italic(s):
 def italic(s):
     """𝑖𝑡𝑎𝑙𝑖𝑐 serif. Unicode reserves italic small 'h', so patch it to ℎ."""
     return _map(s, 0x1D434, 0x1D44E).replace(chr(0x1D455), "ℎ")
+
+
+# A few cute symbols framing each section header (kept light on purpose).
+_DECOR = {
+    "To do today": ("˚₊✩", "✩₊˚"),
+    "Still on today": ("˚₊✩", "✩₊˚"),
+    "Notes": ("˖᯽", "᯽˖"),
+    "Health": ("✿", "✿"),
+    "Reminders": ("♡", "♡"),
+    "Reflections": ("☾", "☽"),
+    "Questions for you:": ("✧", "✧"),
+}
+
+
+def heading(name):
+    """Decorated section header, e.g. '˚₊✩ 𝐓𝐨 𝐝𝐨 𝐭𝐨𝐝𝐚𝐲 ✩₊˚'."""
+    left, right = _DECOR.get(name, ("⋆", "⋆"))
+    return f"{left} {bold(name)} {right}"

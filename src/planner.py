@@ -31,6 +31,12 @@ SPINE = [
     "Touch content today: post, edit, or capture one thing",
 ]
 
+# one funny dog per weekday (Monday=0 .. Sunday=6), embedded small at the top
+DOGS = [
+    "angel.png", "birthdaydog.jpg", "borzoidog.png", "jotchuaclown.jpg",
+    "jotchualove.gif", "puppyfriends.png", "sillychuwawa.gif",
+]
+
 
 def _age(task):
     """Bump a carry counter and flag commit-or-kill after 3 days. No em dashes."""
@@ -65,21 +71,24 @@ def build(d=None, carry_from=None):
     reminder = vault.random_reminder()
 
     checks = lambda items: "\n".join(f"- [ ] {i}" for i in items)
+    dog = DOGS[d.weekday()]
     parts = [
+        f"![[Attachments/dogs/{dog}|200]]",
+        "",
         f"# {obsidian._daily_title(d)}",
         "",
-        fancy.bold("To do today"),
+        fancy.heading("To do today"),
         checks(todo),
         "",
-        "Notes:",
+        fancy.heading("Notes"),
         "",
-        fancy.bold("Health"),
+        fancy.heading("Health"),
         checks(health),
         "",
-        fancy.bold("Reminders"),
+        fancy.heading("Reminders"),
         f"  • {reminder}" if reminder else "",
         "",
-        vault.REFLECTIONS_HEADER,
+        fancy.heading("Reflections"),
         "",
     ]
     return "\n".join(parts)
