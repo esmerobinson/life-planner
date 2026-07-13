@@ -1,16 +1,18 @@
-"""Generate the daily note. Four sections only, kept short on purpose:
+"""Generate the daily note. Four sections only, kept short and calm:
 
     ˚₊✩ To do today ✩₊˚   focus (pinned) + a few carried + a rotating couple from the backlog
-    ✿ Health ✿           movement + nutrition (from vault.daily_health, never duplicated in To do)
+    ✿ Health ✿           movement + nutrition (from vault.daily_health)
     ♡ Reminders ♡        one line
-    ☾ Reflections ☽      empty, filled through the day
+    ☾ Reflections ☽      wellbeing/mental prompts + space for her own writing
 
-Design rules that keep it calm:
+Rules that keep it clean:
   - Focus lives in Calendar/Focus.md and is pinned first every day.
-  - Everything is de-duplicated (ignoring the '(carried Nd)' tag and area prefixes).
-  - Health/movement items never appear in To do (they belong only under Health).
-  - The backlog rotates by date so lower-priority tasks cycle in and out instead of repeating.
-  - No 'Notes', no separate 'Priorities', no separate 'Carried over' list.
+  - ONE task per line: compound items ("A; B; C") are split apart.
+  - Health/movement items live only under Health; mental/wellbeing items go to Reflections,
+    not To do.
+  - De-duplication is semantic (via Gemini), so "two chapters of the Jeff biography" and
+    "1-2 rough draft chapters of the Jeff biography" collapse to one.
+  - The backlog rotates by date so lower-priority tasks cycle in and out.
 
 Run:  python3 -m src.planner --dry-run [date] [carry-from]
 """
@@ -35,6 +37,9 @@ AREA_WORDS = (
 )
 HEALTH_WORDS = ("walk", "calisthenic", "gym", "workout", "exercise", "movement",
                 "nutrition", "food tracker", "macro")
+MIND_WORDS = ("self-compassion", "self compassion", "anger pause", "self soothe",
+              "self-soothe", "kind to myself", "gratitude", "meditat", "dbt workbook",
+              "self-hate", "self hate", "how i deal with negative", "rotating practice")
 
 CAP_CARRIED = 4
 CAP_BACKLOG = 2
@@ -48,22 +53,35 @@ def _strip_prefix(t):
 
 
 def _base(t):
-    """Normalised form for de-duplication: no carried tag, no prefix, lowercased."""
     t = re.sub(r"\s*\(carried[^)]*\)", "", t)
     return " ".join(_strip_prefix(t).lower().split())
 
 
-def _is_health(t):
-    head = t.lower().split(":")[0]
-    return "physical" in head or "health" in head or any(w in t.lower() for w in HEALTH_WORDS)
+def _classify(t):
+    low = t.lower()
+    head = low.split(":")[0]
+    if "physical" in head or "health" in head or any(w in low for w in HEALTH_WORDS):
+        return "health"
+    if any(w in low for w in MIND_WORDS):
+        return "mind"
+    return "todo"
 
 
-def _age(task):
-    m = re.search(r"\s*\(carried (\d+)d[^)]*\)", task)
-    base = task[: m.start()].strip() if m else task.strip()
-    n = (int(m.group(1)) + 1) if m else 1
+def _explode(raw):
+    """One task per line: drop the carried tag + area prefix, split compound ';' items."""
+    txt = re.sub(r"\s*\(carried[^)]*\)", "", _strip_prefix(raw)).strip()
+    return [p.strip().rstrip(".") for p in re.split(r"\s*;\s*", txt) if len(p.strip()) > 3]
+
+
+def _carry_n(raw):
+    m = re.search(r"\(carried (\d+)d", raw)
+    return int(m.group(1)) if m else 0
+
+
+def _age(sub, raw):
+    n = _carry_n(raw) + 1
     flag = ", commit or kill?" if n >= 3 else ""
-    return f"{base} (carried {n}d{flag})"
+    return f"{sub} (carried {n}d{flag})"
 
 
 def _focus():
@@ -71,23 +89,39 @@ def _focus():
             for ln in vault.read(FOCUS_FILE).splitlines() if ln.strip().startswith("- ")]
 
 
-def _backlog(d, n, seen):
-    """A rotating window of backlog items, so different ones surface each day."""
+def _backlog_raw(d, n, seen):
     items = []
     for ln in vault.read(obsidian.MASTER_TODO).splitlines():
         m = re.match(r"\s*-\s*(?:\[[ x]\]\s*)?(.+)", ln)
         if not m:
             continue
-        t = _strip_prefix(m.group(1).strip().strip("*"))
-        b = _base(t)
-        if len(t) <= 6 or _is_health(t) or b in seen:
+        raw = m.group(1).strip().strip("*")
+        if _base(raw) in seen or len(raw) <= 6:
             continue
-        seen.add(b)
-        items.append(t)
+        items.append(raw)
     if not items:
         return []
     start = (d.toordinal() * n) % len(items)
-    return [items[(start + i) % len(items)] for i in range(min(n, len(items)))]
+    return [items[(start + i) % len(items)] for i in range(min(n * 3, len(items)))]
+
+
+def _dedupe(items):
+    """Semantic de-dup via Gemini; falls back to the list unchanged."""
+    if len(items) < 2:
+        return items
+    from src import llm
+    result = llm.generate_json(
+        "De-duplicate this to-do list. If two lines are about the SAME underlying piece of "
+        "work, even if one adds extra detail or wording (e.g. 'two chapters of the book' vs "
+        "'1-2 rough draft chapters of the book'), keep ONLY the first one, using its exact "
+        "text. Keep all genuinely different tasks. Do not reword or invent tasks. Return a "
+        "JSON array of the kept strings in the original order. List:\n"
+        + "\n".join(f"- {x}" for x in items),
+        system="You de-duplicate task lists. Output only a JSON array of strings.",
+    )
+    if isinstance(result, list) and result and all(isinstance(x, str) for x in result):
+        return result
+    return items
 
 
 def build(d=None, carry_from=None):
@@ -96,25 +130,44 @@ def build(d=None, carry_from=None):
 
     focus = _focus()
     seen = {_base(f) for f in focus}
+    todo, mind = list(focus), []
 
-    carried = []
-    for t in vault.unchecked_priorities(carry_from):
-        if _is_health(t):
-            continue
-        b = _base(t)
-        if b in seen:
-            continue
-        seen.add(b)
-        carried.append(_age(_strip_prefix(t)))
-    carried = carried[:CAP_CARRIED]
+    def take(raw, aged):
+        for sub in _explode(raw):
+            b = _base(sub)
+            if b in seen:
+                continue
+            seen.add(b)
+            cls = _classify(sub)
+            if cls == "health":
+                continue
+            if cls == "mind":
+                mind.append(sub)
+            else:
+                todo.append(_age(sub, raw) if aged else sub)
 
-    todo = focus + carried + _backlog(d, CAP_BACKLOG, seen)
+    carried_before = len(todo)
+    for raw in vault.unchecked_priorities(carry_from):
+        if len(todo) - carried_before >= CAP_CARRIED:
+            break
+        take(raw, aged=True)
+
+    backlog_before = len(todo)
+    for raw in _backlog_raw(d, CAP_BACKLOG, seen):
+        if len(todo) - backlog_before >= CAP_BACKLOG:
+            break
+        take(raw, aged=False)
+
+    todo = _dedupe(todo)
 
     checks = lambda items: "\n".join(f"- [ ] {i}" for i in items)
+    refl = "\n".join(f"- {m}" for m in mind[:2])
     parts = [
         f"![[{DOGS[d.weekday()]}|200]]",
         "",
         f"# {obsidian._daily_title(d)}",
+        "",
+        fancy.italic(vault.random_manifestation() or "I am building the life I want, one honest day at a time."),
         "",
         fancy.heading("To do today"),
         checks(todo) if todo else "- [ ] (set today's focus in Calendar/Focus.md)",
@@ -126,6 +179,7 @@ def build(d=None, carry_from=None):
         f"  • {vault.random_reminder()}",
         "",
         fancy.heading("Reflections"),
+        refl,
         "",
     ]
     return "\n".join(parts)
