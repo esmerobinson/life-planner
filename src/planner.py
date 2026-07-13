@@ -105,23 +105,27 @@ def _backlog_raw(d, n, seen):
     return [items[(start + i) % len(items)] for i in range(min(n * 3, len(items)))]
 
 
-def _dedupe(items):
-    """Semantic de-dup via Gemini; falls back to the list unchanged."""
-    if len(items) < 2:
-        return items
-    from src import llm
-    result = llm.generate_json(
-        "De-duplicate this to-do list. If two lines are about the SAME underlying piece of "
-        "work, even if one adds extra detail or wording (e.g. 'two chapters of the book' vs "
-        "'1-2 rough draft chapters of the book'), keep ONLY the first one, using its exact "
-        "text. Keep all genuinely different tasks. Do not reword or invent tasks. Return a "
-        "JSON array of the kept strings in the original order. List:\n"
-        + "\n".join(f"- {x}" for x in items),
-        system="You de-duplicate task lists. Output only a JSON array of strings.",
-    )
-    if isinstance(result, list) and result and all(isinstance(x, str) for x in result):
-        return result
-    return items
+_STOP = {"the", "a", "an", "of", "to", "and", "or", "for", "in", "on", "my", "is", "it",
+         "two", "one", "some", "do", "get", "out", "up", "with", "into", "not", "plan"}
+
+
+def _keywords(t):
+    t = re.sub(r"\(carried[^)]*\)", "", t.lower())
+    return {w for w in re.findall(r"[a-z]+", t) if len(w) > 2 and w not in _STOP}
+
+
+def _dedupe(items, threshold=0.55):
+    """Deterministic de-dup by keyword overlap, so differently-worded versions of the
+    same task ('two chapters of the biography' vs '1-2 rough draft chapters of the
+    biography') collapse to the first one. Reliable and fast, no LLM."""
+    kept, kept_kw = [], []
+    for it in items:
+        kw = _keywords(it)
+        if any(kw and k and len(kw & k) / len(kw | k) >= threshold for k in kept_kw):
+            continue
+        kept.append(it)
+        kept_kw.append(kw)
+    return kept
 
 
 def build(d=None, carry_from=None):
@@ -167,7 +171,7 @@ def build(d=None, carry_from=None):
         "",
         f"# {obsidian._daily_title(d)}",
         "",
-        fancy.italic(vault.random_manifestation() or "I am building the life I want, one honest day at a time."),
+        f"*{vault.random_manifestation() or 'I am building the life I want, one honest day at a time.'}*",
         "",
         fancy.heading("To do today"),
         checks(todo) if todo else "- [ ] (set today's focus in Calendar/Focus.md)",

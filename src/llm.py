@@ -45,7 +45,7 @@ def generate(prompt, system=None):
         return None
 
 
-def generate_json(prompt, system=None):
+def generate_json(prompt, system=None, temperature=None):
     client = _get_client()
     if not client:
         return None
@@ -54,6 +54,7 @@ def generate_json(prompt, system=None):
         cfg = types.GenerateContentConfig(
             system_instruction=system,
             response_mime_type="application/json",
+            temperature=temperature,
         )
         r = client.models.generate_content(model=MODEL, contents=prompt, config=cfg)
         return json.loads(r.text)
