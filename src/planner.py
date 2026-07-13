@@ -17,12 +17,15 @@ Rules that keep it clean:
 Run:  python3 -m src.planner --dry-run [date] [carry-from]
 """
 
+import json
 import os
 import re
 import sys
 from datetime import date, timedelta
 
 from src import fancy, obsidian, vault
+
+DONE_LOG = os.path.join(os.path.dirname(__file__), "..", "logs", "done.json")
 
 DOGS = [
     "angel.png", "birthdaydog.jpg", "borzoidog.png", "jotchuaclown.jpg",
@@ -89,6 +92,53 @@ def _focus():
             for ln in vault.read(FOCUS_FILE).splitlines() if ln.strip().startswith("- ")]
 
 
+def _load_done():
+    try:
+        with open(DONE_LOG) as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+
+def _save_done(s):
+    os.makedirs(os.path.dirname(DONE_LOG), exist_ok=True)
+    with open(DONE_LOG, "w") as f:
+        json.dump(sorted(s), f)
+
+
+def _note_tasks(d, status):
+    """Task lines of a given checkbox status (' ' open, 'x' done, '>' deferred) in d's note."""
+    pat = re.compile(r"\s*-\s*\[" + re.escape(status) + r"\]\s*(.+)")
+    out = []
+    for ln in vault.read(vault.daily_note_path(d)).splitlines():
+        m = pat.match(ln)
+        if m:
+            out.append(m.group(1).strip())
+    return out
+
+
+def reconcile(carry_from):
+    """Learn from the previous note: permanently remember tasks she ticked off (so they
+    never resurface, even from the backlog), and push genuinely new tasks she added by
+    hand into Master To-Do. Reflections and other prose are never touched."""
+    done = _load_done()
+    for raw in _note_tasks(carry_from, "x"):
+        for sub in _explode(raw):
+            done.add(_base(sub))
+    _save_done(done)
+
+    master_bases = {_base(m.group(1))
+                    for m in re.finditer(r"-\s*(?:\[[ x]\]\s*)?(.+)", vault.read(obsidian.MASTER_TODO))}
+    focus_bases = {_base(f) for f in _focus()}
+    for raw in _note_tasks(carry_from, " "):
+        for sub in _explode(raw):
+            b = _base(sub)
+            if b and b not in master_bases and b not in focus_bases and b not in done:
+                master_bases.add(b)
+                obsidian.add_to_master_todo(sub)
+    return done
+
+
 def _backlog_raw(d, n, seen):
     items = []
     for ln in vault.read(obsidian.MASTER_TODO).splitlines():
@@ -128,12 +178,13 @@ def _dedupe(items, threshold=0.55):
     return kept
 
 
-def build(d=None, carry_from=None):
+def build(d=None, carry_from=None, done=None):
     d = d or date.today()
     carry_from = carry_from or (d - timedelta(days=1))
+    done = _load_done() if done is None else done
 
-    focus = _focus()
-    seen = {_base(f) for f in focus}
+    focus = [f for f in _focus() if _base(f) not in done]  # drop focus items already ticked off
+    seen = set(done) | {_base(f) for f in focus}            # ticked tasks never come back
     todo, mind = list(focus), []
 
     def take(raw, aged):
@@ -191,10 +242,13 @@ def build(d=None, carry_from=None):
 
 def generate(d=None, carry_from=None, write=False):
     d = d or date.today()
+    cf = carry_from or (d - timedelta(days=1))
     path = vault.daily_note_path(d)
     if write and os.path.exists(path):
         return path, None
-    text = build(d, carry_from)
+    if write:
+        reconcile(cf)  # only touch state (done log, Master To-Do) on a real generation
+    text = build(d, cf)
     if write:
         with open(path, "w", encoding="utf-8") as f:
             f.write(text + "\n")

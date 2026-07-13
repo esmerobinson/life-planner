@@ -17,11 +17,12 @@ PYTHON = sys.executable
 LA = os.path.expanduser("~/Library/LaunchAgents")
 LOGS = os.path.join(PROJECT, "logs")
 
+# Old fixed-time jobs, replaced by the windowed tick (unloaded on install).
+LEGACY = ["com.esme.planner.morning", "com.esme.planner.midday", "com.esme.planner.evening"]
+
 # label -> (script args, schedule dict-or-interval)
 JOBS = {
-    "com.esme.planner.morning": (["scripts/run.py", "morning"], {"Hour": 8, "Minute": 30}),
-    "com.esme.planner.midday": (["scripts/run.py", "midday"], {"Hour": 13, "Minute": 0}),
-    "com.esme.planner.evening": (["scripts/run.py", "evening"], {"Hour": 17, "Minute": 0}),
+    "com.esme.planner.tick": (["scripts/tick.py"], 1200),  # windowed sender, every 20 min
     "com.esme.planner.replies": (["scripts/process_replies.py"], 900),  # every 15 min
 }
 
@@ -52,6 +53,11 @@ def _plist(label, args, sched):
 def install():
     os.makedirs(LA, exist_ok=True)
     os.makedirs(LOGS, exist_ok=True)
+    for label in LEGACY:  # retire the old fixed-time jobs
+        path = os.path.join(LA, f"{label}.plist")
+        subprocess.run(["launchctl", "unload", path], capture_output=True)
+        if os.path.exists(path):
+            os.remove(path)
     for label, (args, sched) in JOBS.items():
         path = os.path.join(LA, f"{label}.plist")
         with open(path, "w") as f:
