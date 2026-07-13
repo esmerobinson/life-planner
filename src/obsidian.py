@@ -89,6 +89,26 @@ def tick_task(keywords, d=None, dry_run=False):
     return path, f"no matching task found for: {keywords}"
 
 
+def defer_task(keywords, d=None, dry_run=False):
+    """Mark a matching task '- [>]' (not today). It won't carry to tomorrow, but it
+    stays in the backlog and cycles back another day."""
+    path = vault.daily_note_path(d)
+    text = vault.read(path)
+    if not text:
+        return path, "no daily note yet, nothing to defer"
+    kws = [k.lower() for k in keywords.split() if len(k) > 3]
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        if re.match(r"\s*-\s*\[ \]", ln) and any(k in ln.lower() for k in kws):
+            preview = f"defer to another day: {ln.strip()}"
+            if not dry_run:
+                lines[i] = ln.replace("[ ]", "[>]", 1)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write("\n".join(lines) + "\n")
+            return path, preview
+    return path, f"no matching task to defer for: {keywords}"
+
+
 def set_intention(text, d=None, dry_run=False):
     """Record the morning intention into today's daily note."""
     path = vault.daily_note_path(d)

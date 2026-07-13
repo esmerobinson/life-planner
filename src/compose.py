@@ -84,7 +84,7 @@ def midday(d=None):
     coping = vault.random_coping_line()
 
     parts = [fancy.bold_italic("Afternoon check in"), "",
-             fancy.italic("small and kind beats big and harsh, just a look up at the day."), ""]
+             fancy.italic("just checking in. how's it going so far?"), ""]
     parts += [fancy.heading("Still on today")]
     parts += [_bullets(todo[:5]) if todo else "• whatever you can move, counts"]
     if coping:
@@ -106,7 +106,7 @@ def evening(d=None):
         "What do you want to get done tomorrow?",
     ]
     parts = [fancy.bold_italic("Good evening"), "",
-             fancy.italic("let's close the day gently, no scorekeeping."), ""]
+             fancy.italic("winding down. no scorekeeping tonight."), ""]
     parts += [_questions(qs)]
     parts += ["", fancy.italic(mani)]
     return "\n".join(parts)
@@ -117,25 +117,20 @@ def render(slot, d=None):
     return headers.random_header() + "\n\n" + body
 
 
-ACK_SYSTEM = (
-    "You are Esme's warm personal planner, replying to her on WhatsApp right after "
-    "filing her message into her Obsidian notes. Write a SHORT confirmation (1 to 2 "
-    "sentences), lowercase, in her gentle from-me-to-me voice. Warmly acknowledge what "
-    "you saved and give a little kind encouragement. Never use em dashes or en dashes. "
-    "No preamble, no quotes, just the message."
-)
-
-
 def acknowledge(message, actions):
-    """A kind, slightly-custom reply after her message is processed."""
+    """A short, human reply after her message is processed."""
     from src import llm
-    summary = "; ".join(actions)
+    system = (
+        "You are Esme replying to herself on WhatsApp after her note got filed. "
+        "One or two short lowercase sentences. Say plainly what you saved and, if it "
+        "fits, one warm real line. Not a coach. " + llm.HUMANIZE
+    )
     reply = llm.generate(
-        f"Her message: {message}\nWhat I just saved: {summary}\nWrite her confirmation reply.",
-        system=ACK_SYSTEM,
+        f"Her message: {message}\nWhat got saved: {'; '.join(actions)}\nWrite the reply.",
+        system=system,
     )
     if not reply:
-        reply = "got it, love. saved and safe. you've got this xox"
+        reply = "saved. that's in your notes now x"
     return headers.random_header() + "\n\n" + reply
 
 

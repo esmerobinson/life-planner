@@ -1,92 +1,129 @@
-"""Phase 3: generate the full Daily Note each morning.
+"""Generate the daily note. Four sections only, kept short on purpose:
 
-Pulls the day's plan from the vault (never Google Tasks, which feeds the longer-term
-backlog instead): yesterday's unchecked tasks carry over (and age toward commit-or-kill),
-the daily spine (write + content) is always there, and a few backlog items from Master
-To-Do round it out. Every task is its own checkbox line so it's tickable by her or the bot.
+    ˚₊✩ To do today ✩₊˚   focus (pinned) + a few carried + a rotating couple from the backlog
+    ✿ Health ✿           movement + nutrition (from vault.daily_health, never duplicated in To do)
+    ♡ Reminders ♡        one line
+    ☾ Reflections ☽      empty, filled through the day
 
-Structure written (her spec):
-    # Weekday Nth Month
-    𝐓𝐨 𝐝𝐨 𝐭𝐨𝐝𝐚𝐲   (checkbox line items)
-    Notes:
-    𝐇𝐞𝐚𝐥𝐭𝐡
-    𝐑𝐞𝐦𝐢𝐧𝐝𝐞𝐫𝐬
-    𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬
+Design rules that keep it calm:
+  - Focus lives in Calendar/Focus.md and is pinned first every day.
+  - Everything is de-duplicated (ignoring the '(carried Nd)' tag and area prefixes).
+  - Health/movement items never appear in To do (they belong only under Health).
+  - The backlog rotates by date so lower-priority tasks cycle in and out instead of repeating.
+  - No 'Notes', no separate 'Priorities', no separate 'Carried over' list.
 
-Run:
-    python3 -m src.planner --dry-run           # today, print only
-    python3 -m src.planner --dry-run 2026-07-11 2026-07-09   # date + carry-from
+Run:  python3 -m src.planner --dry-run [date] [carry-from]
 """
 
 import os
 import re
-import random
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
-from src import compose, fancy, obsidian, vault
+from src import fancy, obsidian, vault
 
-SPINE = [
-    "Write something today, even 15 rough minutes",
-    "Touch content today: post, edit, or capture one thing",
-]
-
-# one funny dog per weekday (Monday=0 .. Sunday=6), embedded small at the top
 DOGS = [
     "angel.png", "birthdaydog.jpg", "borzoidog.png", "jotchuaclown.jpg",
     "jotchualove.gif", "puppyfriends.png", "sillychuwawa.gif",
 ]
 
+FOCUS_FILE = os.path.join(vault.VAULT, "Calendar", "Focus.md")
+
+AREA_WORDS = (
+    "work", "mental", "physical", "health", "enrichment", "creative", "mind",
+    "wellbeing", "relationship", "money", "career", "admin", "learning",
+)
+HEALTH_WORDS = ("walk", "calisthenic", "gym", "workout", "exercise", "movement",
+                "nutrition", "food tracker", "macro")
+
+CAP_CARRIED = 4
+CAP_BACKLOG = 2
+
+
+def _strip_prefix(t):
+    label, sep, rest = t.partition(":")
+    if sep and rest.strip() and any(label.lower().strip().startswith(w) for w in AREA_WORDS):
+        return rest.strip()
+    return t.strip()
+
+
+def _base(t):
+    """Normalised form for de-duplication: no carried tag, no prefix, lowercased."""
+    t = re.sub(r"\s*\(carried[^)]*\)", "", t)
+    return " ".join(_strip_prefix(t).lower().split())
+
+
+def _is_health(t):
+    head = t.lower().split(":")[0]
+    return "physical" in head or "health" in head or any(w in t.lower() for w in HEALTH_WORDS)
+
 
 def _age(task):
-    """Bump a carry counter and flag commit-or-kill after 3 days. No em dashes."""
     m = re.search(r"\s*\(carried (\d+)d[^)]*\)", task)
-    if m:
-        n = int(m.group(1)) + 1
-        base = task[: m.start()].strip()
-        flag = ", commit or kill?" if n >= 3 else ""
-        return f"{base} (carried {n}d{flag})"
-    return f"{task} (carried 1d)"
+    base = task[: m.start()].strip() if m else task.strip()
+    n = (int(m.group(1)) + 1) if m else 1
+    flag = ", commit or kill?" if n >= 3 else ""
+    return f"{base} (carried {n}d{flag})"
 
 
-def _backlog(n, exclude):
-    text = vault.read(obsidian.MASTER_TODO)
+def _focus():
+    return [ln.strip()[2:].strip()
+            for ln in vault.read(FOCUS_FILE).splitlines() if ln.strip().startswith("- ")]
+
+
+def _backlog(d, n, seen):
+    """A rotating window of backlog items, so different ones surface each day."""
     items = []
-    for ln in text.splitlines():
+    for ln in vault.read(obsidian.MASTER_TODO).splitlines():
         m = re.match(r"\s*-\s*(?:\[[ x]\]\s*)?(.+)", ln)
-        if m:
-            t = m.group(1).strip().strip("*")
-            if t and len(t) > 6 and not t.startswith("#") and t not in exclude:
-                items.append(t)
-    random.shuffle(items)
-    return items[:n]
+        if not m:
+            continue
+        t = _strip_prefix(m.group(1).strip().strip("*"))
+        b = _base(t)
+        if len(t) <= 6 or _is_health(t) or b in seen:
+            continue
+        seen.add(b)
+        items.append(t)
+    if not items:
+        return []
+    start = (d.toordinal() * n) % len(items)
+    return [items[(start + i) % len(items)] for i in range(min(n, len(items)))]
 
 
 def build(d=None, carry_from=None):
     d = d or date.today()
     carry_from = carry_from or (d - timedelta(days=1))
-    carried = vault.unchecked_priorities(carry_from)
-    todo = [_age(t) for t in carried] + SPINE + _backlog(2, exclude=set(carried))
-    health = vault.daily_health(d)
-    reminder = vault.random_reminder()
+
+    focus = _focus()
+    seen = {_base(f) for f in focus}
+
+    carried = []
+    for t in vault.unchecked_priorities(carry_from):
+        if _is_health(t):
+            continue
+        b = _base(t)
+        if b in seen:
+            continue
+        seen.add(b)
+        carried.append(_age(_strip_prefix(t)))
+    carried = carried[:CAP_CARRIED]
+
+    todo = focus + carried + _backlog(d, CAP_BACKLOG, seen)
 
     checks = lambda items: "\n".join(f"- [ ] {i}" for i in items)
-    dog = DOGS[d.weekday()]
     parts = [
-        f"![[{dog}|200]]",
+        f"![[{DOGS[d.weekday()]}|200]]",
         "",
         f"# {obsidian._daily_title(d)}",
         "",
         fancy.heading("To do today"),
-        checks(todo),
-        "",
-        fancy.heading("Notes"),
+        checks(todo) if todo else "- [ ] (set today's focus in Calendar/Focus.md)",
         "",
         fancy.heading("Health"),
-        checks(health),
+        checks(vault.daily_health(d)),
         "",
         fancy.heading("Reminders"),
-        f"  • {reminder}" if reminder else "",
+        f"  • {vault.random_reminder()}",
         "",
         fancy.heading("Reflections"),
         "",
@@ -98,7 +135,7 @@ def generate(d=None, carry_from=None, write=False):
     d = d or date.today()
     path = vault.daily_note_path(d)
     if write and os.path.exists(path):
-        return path, None  # never clobber a day that already has content
+        return path, None
     text = build(d, carry_from)
     if write:
         with open(path, "w", encoding="utf-8") as f:

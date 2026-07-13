@@ -9,6 +9,15 @@ import os
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
+# Anti-AI-tells, adapted from blader/humanizer, for any text we generate.
+HUMANIZE = (
+    "Sound like a real person texting, not an assistant. Simple words. Vary sentence "
+    "length. Be specific, not generic. No em dashes or en dashes. No emoji. "
+    "Never use cliche closings or pep-talk phrases like 'you've got this', 'exciting "
+    "times', 'I hope this helps', 'let me know'. No forced upbeat energy. A little "
+    "plain and unpolished is good."
+)
+
 _client = None
 
 

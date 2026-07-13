@@ -10,6 +10,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from datetime import datetime
+
 from dotenv import load_dotenv
 
 from src import compose, planner, whatsapp
@@ -17,8 +19,19 @@ from src import compose, planner, whatsapp
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 
+def slot_for_now():
+    """Pick the message that matches the time of day, so a morning message never
+    goes out in the evening."""
+    h = datetime.now().hour
+    if h < 11:
+        return "morning"
+    if h < 16:
+        return "midday"
+    return "evening"
+
+
 def main():
-    slot = sys.argv[1] if len(sys.argv) > 1 else "morning"
+    slot = sys.argv[1] if len(sys.argv) > 1 else slot_for_now()
     if slot == "morning":
         path, text = planner.generate(write=True)
         print("daily note:", "created" if text else "already existed", os.path.basename(path))
