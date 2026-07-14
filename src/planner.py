@@ -32,7 +32,7 @@ DOGS = [
     "jotchualove.gif", "puppyfriends.png", "sillychuwawa.gif",
 ]
 
-FOCUS_FILE = os.path.join(vault.VAULT, "Calendar", "Focus.md")
+FOCUS_FILE = os.path.join(vault.VAULT, "Daily", "Focus.md")
 
 AREA_WORDS = (
     "work", "mental", "physical", "health", "enrichment", "creative", "mind",

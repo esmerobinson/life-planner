@@ -10,10 +10,10 @@ import re
 from datetime import date
 
 VAULT = os.path.expanduser("~/Desktop/Esme's Brain")
-DAILY_DIR = os.path.join(VAULT, "Calendar", "To Do Lists")
+DAILY_DIR = os.path.join(VAULT, "Daily", "Daily Notes")
 KIT = os.path.join(VAULT, "Mind & Wellbeing", "Motivation & Manifestation Kit.md")
-DAILY_REMINDERS = os.path.join(VAULT, "Daily reminders.md")
-JOURNAL_PROMPTS = os.path.join(VAULT, "Calendar", "Journal Prompts.md")
+DAILY_REMINDERS = os.path.join(VAULT, "Daily", "Daily reminders.md")
+JOURNAL_PROMPTS = os.path.join(VAULT, "Daily", "Journal Prompts.md")
 
 # The section headers used inside a unified Daily Note (fancy unicode).
 REFLECTIONS_HEADER = "𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬"

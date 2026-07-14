@@ -10,7 +10,7 @@ from datetime import date, datetime
 
 from src import fancy, vault
 
-MASTER_TODO = os.path.join(vault.VAULT, "Master To-Do.md")
+MASTER_TODO = os.path.join(vault.VAULT, "Goals & Direction", "Master To-Do.md")
 
 
 def _daily_title(d=None):
