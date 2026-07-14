@@ -18,9 +18,16 @@ Run:
     python3 -m src.compose morning --dry-run
 """
 
+import re
 import sys
 
 from src import fancy, headers, vault
+
+
+def _plain(t):
+    """Strip Obsidian wikilinks for WhatsApp, which shows them as raw [[..]] text."""
+    t = re.sub(r"\[\[[^\]|]*\|([^\]]*)\]\]", r"\1", t)  # [[Hub|alias]] -> alias
+    return re.sub(r"\[\[([^\]]*)\]\]", r"\1", t)         # [[Note]] -> Note
 
 SLOTS = ("morning", "midday", "evening")
 
@@ -66,7 +73,7 @@ def morning(d=None):
 
     parts = [fancy.bold_italic("Good morning") + " <3", "", fancy.italic(mani), ""]
     parts += [fancy.heading("To do today")]
-    parts += [_bullets(todo[:5]) if todo else "• (let's set today's few, reply with what matters)"]
+    parts += [_bullets([_plain(t) for t in todo[:5]]) if todo else "• (let's set today's few, reply with what matters)"]
     parts += ["", fancy.heading("Health"), _bullets(vault.daily_health(d), "  ")]
     if reminder:
         parts += ["", fancy.heading("Reminders"), "  • " + reminder]
@@ -86,7 +93,7 @@ def midday(d=None):
     parts = [fancy.bold_italic("Afternoon check in"), "",
              fancy.italic("just checking in. how's it going so far?"), ""]
     parts += [fancy.heading("Still on today")]
-    parts += [_bullets(todo[:5]) if todo else "• whatever you can move, counts"]
+    parts += [_bullets([_plain(t) for t in todo[:5]]) if todo else "• whatever you can move, counts"]
     if coping:
         parts += ["", fancy.heading("Reminders"), "  • " + coping]
     parts += ["", _questions([

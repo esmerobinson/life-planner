@@ -47,6 +47,30 @@ MIND_WORDS = ("self-compassion", "self compassion", "anger pause", "self soothe"
 CAP_CARRIED = 4
 CAP_BACKLOG = 2
 
+# keyword -> project/program hub note. The task keeps its full wording; only the matched
+# phrase becomes an aliased link, e.g. "2 chapters of [[Jeff Ullman Biography|Jeff biography]]".
+LINK_MAP = [
+    (r"jeff ullman(?: biography| autobiography)?|jeff bio\w*", "Jeff Ullman Biography"),
+    (r"story of our relationship|oliver'?s (?:birthday )?(?:present )?book", "The Story of Our Relationship"),
+    (r"substack", "Substack Studio"),
+    (r"escape the internet|\beti\b", "Escape The Internet"),
+    (r"wedding shoot|varvara|\bproduction\b", "Production"),
+    (r"reel analyzer|vibecod\w*|estelle'?s tool", "Vibecoding"),
+    (r"content(?: studio)?|posting schedule|\breel\b|carousel", "Content Studio"),
+    (r"calisthenics?", "Calisthenics"),
+    (r"nutritious food|nutrition|overeat", "Food & Nutrition"),
+    (r"\bpainting\b|\bart\b", "Art - Home"),
+]
+
+
+def _link(task):
+    """Wrap the first project/program mention as an aliased link, keeping the task's words."""
+    for pat, hub in LINK_MAP:
+        m = re.search(pat, task, re.I)
+        if m:
+            return task[: m.start()] + f"[[{hub}|{m.group(0)}]]" + task[m.end():]
+    return task
+
 
 def _strip_prefix(t):
     label, sep, rest = t.partition(":")
@@ -213,7 +237,8 @@ def build(d=None, carry_from=None, done=None):
             break
         take(raw, aged=False)
 
-    todo = _dedupe(todo)
+    todo = [_link(t) for t in _dedupe(todo)]
+    health = [_link(h) for h in vault.daily_health(d)]
 
     checks = lambda items: "\n".join(f"- [ ] {i}" for i in items)
     refl = "\n".join(f"- {m}" for m in mind[:2])
@@ -228,7 +253,7 @@ def build(d=None, carry_from=None, done=None):
         checks(todo) if todo else "- [ ] (set today's focus in Calendar/Focus.md)",
         "",
         fancy.heading("Health"),
-        checks(vault.daily_health(d)),
+        checks(health),
         "",
         fancy.heading("Reminders"),
         f"  • {vault.random_reminder()}",
