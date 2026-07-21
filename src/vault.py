@@ -4,16 +4,18 @@ Later phases will edit the vault via the Google Drive API so it works when the M
 is off; for local building and dry-runs we read the mounted files directly.
 """
 
-import os
 import random
 import re
 from datetime import date
 
-VAULT = os.path.expanduser("~/Desktop/Esme's Brain")
-DAILY_DIR = os.path.join(VAULT, "Daily", "Daily Notes")
-KIT = os.path.join(VAULT, "Mind & Wellbeing", "Motivation & Manifestation Kit.md")
-DAILY_REMINDERS = os.path.join(VAULT, "Daily", "Daily reminders.md")
-JOURNAL_PROMPTS = os.path.join(VAULT, "Daily", "Journal Prompts.md")
+from src import storage
+
+# Vault-relative paths (storage maps them to local files or Google Drive).
+VAULT = storage.VAULT
+DAILY_DIR = "Daily/Daily Notes"
+KIT = "Mind & Wellbeing/Motivation & Manifestation Kit.md"
+DAILY_REMINDERS = "Daily/Daily reminders.md"
+JOURNAL_PROMPTS = "Daily/Journal Prompts.md"
 
 # The section headers used inside a unified Daily Note (fancy unicode).
 REFLECTIONS_HEADER = "𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬"
@@ -34,14 +36,11 @@ def daily_note_filename(d=None):
 
 
 def daily_note_path(d=None):
-    return os.path.join(DAILY_DIR, daily_note_filename(d))
+    return f"{DAILY_DIR}/{daily_note_filename(d)}"
 
 
-def read(path):
-    if not os.path.exists(path):
-        return ""
-    with open(path, encoding="utf-8") as f:
-        return f.read()
+def read(relpath):
+    return storage.read(relpath)
 
 
 def unchecked_priorities(d=None):

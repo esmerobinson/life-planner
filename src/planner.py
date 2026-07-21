@@ -23,16 +23,17 @@ import re
 import sys
 from datetime import date, timedelta
 
-from src import fancy, obsidian, vault
+from src import fancy, obsidian, storage, vault
 
-DONE_LOG = os.path.join(os.path.dirname(__file__), "..", "logs", "done.json")
+# lives in the vault so it persists across cloud runs
+DONE_LOG = "Daily/planner-done.json"
 
 DOGS = [
     "angel.png", "birthdaydog.jpg", "borzoidog.png", "jotchuaclown.jpg",
     "jotchualove.gif", "puppyfriends.png", "sillychuwawa.gif",
 ]
 
-FOCUS_FILE = os.path.join(vault.VAULT, "Daily", "Focus.md")
+FOCUS_FILE = "Daily/Focus.md"
 
 AREA_WORDS = (
     "work", "mental", "physical", "health", "enrichment", "creative", "mind",
@@ -118,16 +119,13 @@ def _focus():
 
 def _load_done():
     try:
-        with open(DONE_LOG) as f:
-            return set(json.load(f))
+        return set(json.loads(vault.read(DONE_LOG) or "[]"))
     except Exception:
         return set()
 
 
 def _save_done(s):
-    os.makedirs(os.path.dirname(DONE_LOG), exist_ok=True)
-    with open(DONE_LOG, "w") as f:
-        json.dump(sorted(s), f)
+    storage.write(DONE_LOG, json.dumps(sorted(s)))
 
 
 def _note_tasks(d, status):
@@ -269,14 +267,13 @@ def generate(d=None, carry_from=None, write=False):
     d = d or date.today()
     cf = carry_from or (d - timedelta(days=1))
     path = vault.daily_note_path(d)
-    if write and os.path.exists(path):
+    if write and storage.exists(path):
         return path, None
     if write:
         reconcile(cf)  # only touch state (done log, Master To-Do) on a real generation
     text = build(d, cf)
     if write:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(text + "\n")
+        storage.write(path, text + "\n")
     return path, text
 
 

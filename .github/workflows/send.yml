@@ -1,0 +1,27 @@
+name: Life Planner - daily messages
+
+on:
+  schedule:
+    - cron: "30 7 * * *"    # ~08:30 London  (morning: generates the note + sends)
+    - cron: "0 12 * * *"    # ~13:00 London  (midday)
+    - cron: "0 16 * * *"    # ~17:00 London  (evening)
+  workflow_dispatch:         # lets you run it by hand from the Actions tab
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/London
+      WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+      PHONE_NUMBER_ID: ${{ secrets.PHONE_NUMBER_ID }}
+      MY_NUMBER: ${{ secrets.MY_NUMBER }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+      VAULT_DRIVE_FOLDER_ID: ${{ secrets.VAULT_DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/run.py    # picks morning/midday/evening by the time of day

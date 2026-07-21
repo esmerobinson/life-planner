@@ -1,0 +1,27 @@
+name: Life Planner - process replies
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 min: file your WhatsApp replies into the vault
+  workflow_dispatch:
+
+jobs:
+  replies:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/London
+      WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+      PHONE_NUMBER_ID: ${{ secrets.PHONE_NUMBER_ID }}
+      MY_NUMBER: ${{ secrets.MY_NUMBER }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      WORKER_URL: ${{ secrets.WORKER_URL }}
+      PULL_TOKEN: ${{ secrets.PULL_TOKEN }}
+      GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+      VAULT_DRIVE_FOLDER_ID: ${{ secrets.VAULT_DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/process_replies.py

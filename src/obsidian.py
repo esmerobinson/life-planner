@@ -1,16 +1,14 @@
 """Write side of the two-way loop: file a message into the right place in the
-vault. Local file writes for now; Phase 3 swaps in the Google Drive API so it
-works when the Mac is off. Every function is safe to dry-run (returns a
-(path, preview) describing what it would do) before it writes.
+vault, through the storage layer (local files or Google Drive). Every function is
+safe to dry-run (returns a (path, preview)) before it writes.
 """
 
-import os
 import re
 from datetime import date, datetime
 
-from src import fancy, vault
+from src import fancy, storage, vault
 
-MASTER_TODO = os.path.join(vault.VAULT, "Goals & Direction", "Master To-Do.md")
+MASTER_TODO = "Goals & Direction/Master To-Do.md"
 
 
 def _daily_title(d=None):
@@ -26,8 +24,7 @@ def _append_to_section(path, search, create_header, entry, title):
         content = content.rstrip() + "\n" + entry + "\n"
     else:
         content = content.rstrip() + f"\n\n{create_header}\n" + entry + "\n"
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
+    storage.write(path, content)
 
 
 def append_reflection(text, d=None, dry_run=False):
@@ -52,61 +49,46 @@ def append_note(text, d=None, dry_run=False):
 
 def add_to_master_todo(text, dry_run=False):
     """Append a captured idea under the '## Brain Dump' section of Master To-Do."""
-    path = MASTER_TODO
     line = f"- {text.strip()}"
     preview = f"add to Master To-Do › Brain Dump: {line}"
     if not dry_run:
-        content = vault.read(path).splitlines()
         out, inserted = [], False
-        for i, ln in enumerate(content):
+        for ln in vault.read(MASTER_TODO).splitlines():
             out.append(ln)
             if ln.strip().startswith("## Brain Dump") and not inserted:
                 out.append(line)
                 inserted = True
         if not inserted:
             out += ["", "## Brain Dump", line]
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("\n".join(out) + "\n")
-    return path, preview
+        storage.write(MASTER_TODO, "\n".join(out) + "\n")
+    return MASTER_TODO, preview
+
+
+def _flip_checkbox(keywords, mark, d, dry_run, verb):
+    path = vault.daily_note_path(d)
+    text = vault.read(path)
+    if not text:
+        return path, f"no daily note yet, nothing to {verb}"
+    kws = [k.lower() for k in keywords.split() if len(k) > 3]
+    lines = text.splitlines()
+    for i, ln in enumerate(lines):
+        if re.match(r"\s*-\s*\[ \]", ln) and any(k in ln.lower() for k in kws):
+            preview = f"{verb}: {ln.strip()}"
+            if not dry_run:
+                lines[i] = ln.replace("[ ]", mark, 1)
+                storage.write(path, "\n".join(lines) + "\n")
+            return path, preview
+    return path, f"no matching task to {verb} for: {keywords}"
 
 
 def tick_task(keywords, d=None, dry_run=False):
-    """Check off the first unchecked task in today's daily note matching keywords."""
-    path = vault.daily_note_path(d)
-    text = vault.read(path)
-    if not text:
-        return path, "no daily note yet, nothing to tick"
-    kws = [k.lower() for k in keywords.split() if len(k) > 3]
-    lines = text.splitlines()
-    for i, ln in enumerate(lines):
-        if re.match(r"\s*-\s*\[ \]", ln) and any(k in ln.lower() for k in kws):
-            preview = f"tick off: {ln.strip()}"
-            if not dry_run:
-                lines[i] = ln.replace("[ ]", "[x]", 1)
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write("\n".join(lines) + "\n")
-            return path, preview
-    return path, f"no matching task found for: {keywords}"
+    """Check off the first unchecked task matching keywords."""
+    return _flip_checkbox(keywords, "[x]", d, dry_run, "tick off")
 
 
 def defer_task(keywords, d=None, dry_run=False):
-    """Mark a matching task '- [>]' (not today). It won't carry to tomorrow, but it
-    stays in the backlog and cycles back another day."""
-    path = vault.daily_note_path(d)
-    text = vault.read(path)
-    if not text:
-        return path, "no daily note yet, nothing to defer"
-    kws = [k.lower() for k in keywords.split() if len(k) > 3]
-    lines = text.splitlines()
-    for i, ln in enumerate(lines):
-        if re.match(r"\s*-\s*\[ \]", ln) and any(k in ln.lower() for k in kws):
-            preview = f"defer to another day: {ln.strip()}"
-            if not dry_run:
-                lines[i] = ln.replace("[ ]", "[>]", 1)
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write("\n".join(lines) + "\n")
-            return path, preview
-    return path, f"no matching task to defer for: {keywords}"
+    """Mark a matching task '- [>]' (not today): drops off tomorrow, cycles back later."""
+    return _flip_checkbox(keywords, "[>]", d, dry_run, "defer")
 
 
 def set_intention(text, d=None, dry_run=False):
@@ -115,7 +97,7 @@ def set_intention(text, d=None, dry_run=False):
     preview = f"record intention in daily note: {text.strip()}"
     if not dry_run:
         existing = vault.read(path)
-        block = f"\n## Intention\n{text.strip()}\n"
-        with open(path, "a", encoding="utf-8") as f:
-            f.write((existing and "" or f"# {os.path.basename(path)[:-3]}\n") + block)
+        header = "" if existing else f"# {_daily_title(d)}\n"
+        storage.write(path, existing.rstrip() + f"\n\n## Intention\n{text.strip()}\n" if existing
+                      else header + f"\n## Intention\n{text.strip()}\n")
     return path, preview
