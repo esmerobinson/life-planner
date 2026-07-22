@@ -20,6 +20,7 @@ ROUTER_SYSTEM = (
     '  {"type":"todo","text":"..."}       a new idea/task to remember\n'
     '  {"type":"intention","text":"..."}  her stated focus/intention for the day\n'
     '  {"type":"defer","task":"..."}      she does not want to do a task today but keep it (task = a few keywords)\n'
+    '  {"type":"habit","name":"..."}      she did a tracked daily habit (name = affirmations / movement / write / kind thing)\n'
     '  {"type":"note","text":"..."}       a work/task-related note or a new backlog item\n'
     '  {"type":"mood","note":"..."}       a mood or energy check-in'
 )
@@ -43,6 +44,8 @@ def smart_route(message, dry_run=False):
             done.append(obsidian.set_intention(a.get("text", ""), dry_run=dry_run)[1])
         elif t == "defer":
             done.append(obsidian.defer_task(a.get("task", ""), dry_run=dry_run)[1])
+        elif t == "habit":
+            done.append(obsidian.log_habit(a.get("name", ""), dry_run=dry_run)[1])
         elif t == "note":
             done.append(obsidian.add_to_master_todo(a.get("text", ""), dry_run=dry_run)[1])
         elif t == "mood":

@@ -11,6 +11,23 @@ from src import fancy, storage, vault
 MASTER_TODO = "Goals & Direction/Master To-Do.md"
 
 
+def log_habit(name, d=None, dry_run=False):
+    """Record a completed daily habit (for dashboard streaks) in Daily/habits.json."""
+    import json
+    day = (d or date.today()).isoformat()
+    preview = f"logged habit: {name}"
+    if not dry_run:
+        try:
+            log = json.loads(vault.read("Daily/habits.json") or "{}")
+        except Exception:
+            log = {}
+        log.setdefault(day, [])
+        if name not in log[day]:
+            log[day].append(name)
+        storage.write("Daily/habits.json", json.dumps(log))
+    return "Daily/habits.json", preview
+
+
 def _daily_title(d=None):
     d = d or date.today()
     return f"{d.strftime('%A')} {vault._ordinal(d.day)} {d.strftime('%B')}"

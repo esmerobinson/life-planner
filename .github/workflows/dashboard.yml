@@ -1,0 +1,32 @@
+name: Life Planner - dashboard
+
+on:
+  schedule:
+    - cron: "0 7 * * *"      # rebuild each morning
+    - cron: "30 16 * * *"    # and after the work day
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/London
+      GDRIVE_OAUTH_JSON: ${{ secrets.GDRIVE_OAUTH_JSON }}
+      GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+      VAULT_DRIVE_FOLDER_ID: ${{ secrets.VAULT_DRIVE_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scripts/build_dashboard.py
+      - name: publish if changed
+        run: |
+          git config user.name "planner-bot"
+          git config user.email "planner-bot@users.noreply.github.com"
+          git add docs/index.html
+          git diff --staged --quiet || (git commit -m "dashboard: daily refresh" && git push)
