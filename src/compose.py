@@ -124,21 +124,46 @@ def render(slot, d=None):
     return headers.random_header() + "\n\n" + body
 
 
-def acknowledge(message, actions):
-    """A short, human reply after her message is processed."""
-    from src import llm
-    system = (
-        "You are Esme replying to herself on WhatsApp after her note got filed. "
-        "One or two short lowercase sentences. Say plainly what you saved and, if it "
-        "fits, one warm real line. Not a coach. " + llm.HUMANIZE
-    )
-    reply = llm.generate(
-        f"Her message: {message}\nWhat got saved: {'; '.join(actions)}\nWrite the reply.",
+COACH_SYSTEM = (
+    "You are Esme's own warm inner voice, replying to her on WhatsApp. She struggles with "
+    "moods that swing through the day and focus that scatters a lot. Read her CURRENT state "
+    "from her message and meet her exactly there, then give ONE small, concrete, doable next "
+    "step tailored to it. The spirit:\n"
+    "- stuck / unproductive / can't focus: break the cycle first (a 5 min walk or one song), "
+    "then just the first tiny piece of one task.\n"
+    "- focused / energised: great, ride it, point her at her single top priority to pour it into.\n"
+    "- woke up low: gentle, action comes before mood not after, one kind line, one 10-minute thing.\n"
+    "- an argument wrecked her mood: remind her the day is not ruined, one small thing resets it, "
+    "and nod to her repair framework (pause, say what she wants not blame).\n"
+    "- overwhelmed / flooded: her coping tools (it passes, self-soothe, step away gently, legs over head "
+    "or a rubber band over hitting herself).\n"
+    "If she only reported doing tasks with no feeling, a short warm confirmation is enough. "
+    "Never guilt. From-me-to-me, lowercase, 2 to 4 short sentences. If she sounds in real distress or "
+    "mentions hurting herself, gently remind her she can lean on real support too, warmly."
+)
+
+
+def reply(message, actions):
+    """A mood-adaptive reply: meets her where she is, one tailored step from her own tools."""
+    from src import llm, vault
+    focus = [ln.strip()[2:].strip() for ln in vault.read("Daily/Focus.md").splitlines()
+             if ln.strip().startswith("- ")]
+    coping = vault.kit_bullets("Coping bank")[:4]
+    system = COACH_SYSTEM + " " + llm.HUMANIZE
+    out = llm.generate(
+        f"Her message: {message}\n"
+        f"Her top priorities right now: {focus}\n"
+        f"Her own coping lines to draw from: {coping}\n"
+        f"What I just filed for her: {'; '.join(actions)}\n"
+        f"Write her reply.",
         system=system,
     )
-    if not reply:
-        reply = "saved. that's in your notes now x"
-    return headers.random_header() + "\n\n" + reply
+    return headers.random_header() + "\n\n" + (out or "i've got you. one small thing first, then we go from there x")
+
+
+# kept as a thin alias so older callers still work
+def acknowledge(message, actions):
+    return reply(message, actions)
 
 
 def nudge():

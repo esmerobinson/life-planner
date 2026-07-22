@@ -34,11 +34,11 @@ def main():
         actions = router.route(text, dry_run=dry)
         for action in actions:
             print("  ->", action)
-        # warm confirmation back to her
-        ack = compose.acknowledge(text, actions)
-        print("  ack:", ack.splitlines()[-1])
+        # mood-adaptive reply: meets her where she is, one tailored step
+        response = compose.reply(text, actions)
+        print("  reply:", response.splitlines()[-1])
         if not dry:
-            whatsapp.send_text(m.get("from") or os.environ["MY_NUMBER"], ack)
+            whatsapp.send_text(m.get("from") or os.environ["MY_NUMBER"], response)
 
 
 if __name__ == "__main__":
