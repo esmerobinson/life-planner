@@ -35,16 +35,16 @@ def main():
     if now - log[-1]["ts"] > 20 * 60:
         return print("signal is stale (Mac likely off)")
 
-    recent = [e for e in log if now - e["ts"] <= 40 * 60]
+    recent = [e for e in log if now - e["ts"] <= 30 * 60]
     if len(recent) < 4:
         return print("not enough recent data")
 
     drifted = sum(1 for e in recent if any(d in e["app"].lower() for d in DISTRACTIONS))
-    if drifted < len(recent) * 0.6:
+    if drifted < len(recent) * 0.5:
         return print("looks focused enough")
 
     state = json.loads(vault.read(STATE) or "{}")
-    if now - state.get("last_nudge", 0) < 2 * 3600:
+    if now - state.get("last_nudge", 0) < 1 * 3600:
         return print("nudged recently, holding off")
 
     whatsapp.send_text(os.environ["MY_NUMBER"], compose.proactive_nudge(log[-1]["app"]))

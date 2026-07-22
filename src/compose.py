@@ -77,6 +77,9 @@ def morning(d=None):
     parts += ["", fancy.heading("Health"), _bullets(vault.daily_health(d), "  ")]
     if reminder:
         parts += ["", fancy.heading("Reminders"), "  • " + reminder]
+        disc = vault.random_discipline()
+        if disc:
+            parts += ["  • " + disc]
     qs = vault.select_prompts("Morning", 3) or [
         "What task do you want to start with today?",
         "Is anything missing from the to do list?",
@@ -149,11 +152,15 @@ def reply(message, actions):
     focus = [ln.strip()[2:].strip() for ln in vault.read("Daily/Focus.md").splitlines()
              if ln.strip().startswith("- ")]
     coping = vault.kit_bullets("Coping bank")[:4]
-    system = COACH_SYSTEM + " " + llm.HUMANIZE
+    system = COACH_SYSTEM + (
+        " When what she lacks is motivation, gently remind her: motivation is fleeting, "
+        "discipline is just keeping the appointment with herself, so do the tiny version anyway "
+        "and let the feeling catch up. " + llm.HUMANIZE)
     out = llm.generate(
         f"Her message: {message}\n"
         f"Her top priorities right now: {focus}\n"
-        f"Her own coping lines to draw from: {coping}\n"
+        f"Her own coping lines: {coping}\n"
+        f"A discipline line she believes in: {vault.random_discipline()}\n"
         f"What I just filed for her: {'; '.join(actions)}\n"
         f"Write her reply.",
         system=system,

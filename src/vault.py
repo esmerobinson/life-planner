@@ -16,6 +16,7 @@ DAILY_DIR = "Daily/Daily Notes"
 KIT = "Mind & Wellbeing/Motivation & Manifestation Kit.md"
 DAILY_REMINDERS = "Daily/Daily reminders.md"
 JOURNAL_PROMPTS = "Daily/Journal Prompts.md"
+DISCIPLINE = "Mind & Wellbeing/Discipline - Stoic Reminders.md"
 
 # The section headers used inside a unified Daily Note (fancy unicode).
 REFLECTIONS_HEADER = "𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬"
@@ -84,6 +85,13 @@ def random_reminder():
         for ln in text.splitlines()
         if re.match(r"\s*\d+\.", ln)
     ]
+    return random.choice(items) if items else None
+
+
+def random_discipline():
+    """A random Stoic / discipline line from the Discipline bank."""
+    items = [ln.strip()[2:].strip() for ln in read(DISCIPLINE).splitlines()
+             if ln.strip().startswith("- ")]
     return random.choice(items) if items else None
 
 
