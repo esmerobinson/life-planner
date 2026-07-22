@@ -17,13 +17,13 @@ PYTHON = sys.executable
 LA = os.path.expanduser("~/Library/LaunchAgents")
 LOGS = os.path.join(PROJECT, "logs")
 
-# Old fixed-time jobs, replaced by the windowed tick (unloaded on install).
-LEGACY = ["com.esme.planner.morning", "com.esme.planner.midday", "com.esme.planner.evening"]
+# Everything else moved to the cloud (GitHub Actions); these old local jobs are retired.
+LEGACY = ["com.esme.planner.morning", "com.esme.planner.midday", "com.esme.planner.evening",
+          "com.esme.planner.tick", "com.esme.planner.replies"]
 
-# label -> (script args, schedule dict-or-interval)
+# The only job that must stay local: report the vague activity signal (which app is in front).
 JOBS = {
-    "com.esme.planner.tick": (["scripts/tick.py"], 1200),  # windowed sender, every 20 min
-    "com.esme.planner.replies": (["scripts/process_replies.py"], 900),  # every 15 min
+    "com.esme.planner.activity": (["scripts/activity.py"], 600),  # every 10 min
 }
 
 

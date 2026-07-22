@@ -166,6 +166,23 @@ def acknowledge(message, actions):
     return reply(message, actions)
 
 
+def proactive_nudge(app):
+    """A gentle, unprompted nudge when focus has drifted during a work block."""
+    from src import llm, vault
+    focus = [ln.strip()[2:].strip() for ln in vault.read("Daily/Focus.md").splitlines()
+             if ln.strip().startswith("- ")]
+    system = (
+        "You are Esme's warm inner voice. You noticed her focus has drifted (she has been on "
+        f"{app}) for a while during a work block. Nudge her GENTLY with zero guilt: name that "
+        "drifting is normal and human, suggest breaking the cycle (a 5 minute walk or one song), "
+        "then one tiny step on her top priority. from-me-to-me, lowercase, 2 to 3 short sentences. "
+        + llm.HUMANIZE)
+    out = llm.generate(f"App she has been on: {app}\nHer top priorities: {focus}\nWrite the nudge.",
+                       system=system)
+    return headers.random_header() + "\n\n" + (out or
+        "hey, focus drifted, that's so normal. take five, a walk or a song, then come back to just one small thing x")
+
+
 def nudge():
     """The 'annoying' follow-up if she hasn't replied. Sent by the scheduler
     when Phase 2 reply-detection sees no answer within the wait window."""
