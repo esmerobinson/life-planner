@@ -2,7 +2,7 @@ name: Life Planner - process replies
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 min: file your WhatsApp replies into the vault
+    - cron: "*/5 * * * *"   # every 30 min: file your WhatsApp replies into the vault
   workflow_dispatch:
 
 jobs:
