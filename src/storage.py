@@ -15,7 +15,10 @@ import json
 import os
 
 VAULT = os.path.expanduser("~/Desktop/Esme's Brain")
-_DRIVE = bool(os.environ.get("GOOGLE_CREDENTIALS_JSON") and os.environ.get("VAULT_DRIVE_FOLDER_ID"))
+SCOPES = ["https://www.googleapis.com/auth/drive"]
+_DRIVE = bool(
+    (os.environ.get("GDRIVE_OAUTH_JSON") or os.environ.get("GOOGLE_CREDENTIALS_JSON"))
+    and os.environ.get("VAULT_DRIVE_FOLDER_ID"))
 
 _svc = None
 _folder_cache = {}  # relpath -> folder id
@@ -25,11 +28,15 @@ _folder_cache = {}  # relpath -> folder id
 def _service():
     global _svc
     if _svc is None:
-        from google.oauth2 import service_account
         from googleapiclient.discovery import build
-        info = json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"])
-        creds = service_account.Credentials.from_service_account_info(
-            info, scopes=["https://www.googleapis.com/auth/drive"])
+        oauth = os.environ.get("GDRIVE_OAUTH_JSON")
+        if oauth:  # act AS Esme, so files it creates are owned by her (has quota)
+            from google.oauth2.credentials import Credentials
+            creds = Credentials.from_authorized_user_info(json.loads(oauth), SCOPES)
+        else:      # service account: read-only in practice (can't create in My Drive)
+            from google.oauth2 import service_account
+            creds = service_account.Credentials.from_service_account_info(
+                json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"]), scopes=SCOPES)
         _svc = build("drive", "v3", credentials=creds, cache_discovery=False)
     return _svc
 
