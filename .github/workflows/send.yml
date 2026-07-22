@@ -16,6 +16,7 @@ jobs:
       PHONE_NUMBER_ID: ${{ secrets.PHONE_NUMBER_ID }}
       MY_NUMBER: ${{ secrets.MY_NUMBER }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GDRIVE_OAUTH_JSON: ${{ secrets.GDRIVE_OAUTH_JSON }}
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
       VAULT_DRIVE_FOLDER_ID: ${{ secrets.VAULT_DRIVE_FOLDER_ID }}
     steps:

@@ -16,6 +16,7 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       WORKER_URL: ${{ secrets.WORKER_URL }}
       PULL_TOKEN: ${{ secrets.PULL_TOKEN }}
+      GDRIVE_OAUTH_JSON: ${{ secrets.GDRIVE_OAUTH_JSON }}
       GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
       VAULT_DRIVE_FOLDER_ID: ${{ secrets.VAULT_DRIVE_FOLDER_ID }}
     steps:
