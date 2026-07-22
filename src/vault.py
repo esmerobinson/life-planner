@@ -95,6 +95,25 @@ def random_discipline():
     return random.choice(items) if items else None
 
 
+_FUTURE_SELF = [
+    "Who are you becoming? The version of you who is financially free, published, strong. What would she do with this hour?",
+    "Pick someone already where you want to be. They started exactly here, with an ordinary day like this one.",
+    "Study the people you admire. Their success was built from unremarkable days done well, over and over.",
+    "The you of three years from now is watching this day. Make her proud, not perfect.",
+]
+
+
+def random_inspiration():
+    """A line from her Inspiration notes, or a 'who you're becoming' future-self prompt."""
+    items = []
+    for note in ("Resources/Inspiration & motivation.md", "Resources/Inspiration - Creators & References.md"):
+        items += [ln.strip()[2:].strip().strip("*") for ln in read(note).splitlines()
+                  if ln.strip().startswith("- ") and len(ln.strip()) > 20]
+    if items and random.random() < 0.6:
+        return random.choice(items)
+    return random.choice(_FUTURE_SELF)
+
+
 def _clean(s):
     """Turn a raw Kit bullet into clean message text: prefer the quoted part,
     drop bold labels and the '→ action' tail, strip markdown emphasis."""

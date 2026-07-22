@@ -80,6 +80,9 @@ def morning(d=None):
         disc = vault.random_discipline()
         if disc:
             parts += ["  • " + disc]
+        insp = vault.random_inspiration()
+        if insp:
+            parts += ["  • " + _plain(insp)]
     qs = vault.select_prompts("Morning", 3) or [
         "What task do you want to start with today?",
         "Is anything missing from the to do list?",
