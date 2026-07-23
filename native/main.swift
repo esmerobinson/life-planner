@@ -142,7 +142,7 @@ final class Model: ObservableObject {
         reminder = rem.isEmpty ? "" : rem[(seed * 7) % rem.count]
 
         let cfg = read("Goals & Direction/Goals & Habits.md")
-        goals = section(cfg, "2026").compactMap { line in
+        goals = section(cfg, section(cfg, "2026").isEmpty ? "big goals" : "2026").compactMap { line in
             let parts = line.components(separatedBy: ":")
             guard parts.count >= 2 else { return nil }
             let nums = parts[1].components(separatedBy: "/").map {

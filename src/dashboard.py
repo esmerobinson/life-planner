@@ -57,7 +57,7 @@ def build_html():
         log = {}
 
     goals = []
-    for g in _section(cfg, "2026"):
+    for g in (_section(cfg, "2026") or _section(cfg, "Big goals")):
         m = re.match(r"(.+?):\s*([\d,]+)\s*/\s*([\d,]+)", g)
         if not m:
             continue
