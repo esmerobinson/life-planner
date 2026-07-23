@@ -39,6 +39,20 @@ def main():
     whatsapp.send_text(os.environ["MY_NUMBER"], msg)
     print(f"sent {slot} message")
 
+    # record the send so the nudge loop can chase an unanswered check-in
+    import json
+    import time
+    from datetime import date
+    from src import storage, vault
+    state = {}
+    try:
+        state = json.loads(vault.read("Daily/planner-sent.json") or "{}")
+    except Exception:
+        pass
+    today = date.today().isoformat()
+    state = {today: {**state.get(today, {}), slot: int(time.time())}}
+    storage.write("Daily/planner-sent.json", json.dumps(state))
+
 
 if __name__ == "__main__":
     main()
