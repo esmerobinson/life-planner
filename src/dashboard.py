@@ -88,6 +88,16 @@ def build_html():
         habits.append(f'<div class="line"><span class="{ "on" if did else "dim" }">{mark}</span>  {h}'
                       f'   <span class="dim">·</span>   {streak}</div>')
 
+    try:
+        stars = json.loads(vault.read("Daily/stars.json") or "{}")
+    except Exception:
+        stars = {}
+    monday = date.today() - timedelta(days=date.today().weekday())
+    week_stars = sum(n for ds, n in stars.items() if date.fromisoformat(ds) >= monday)
+    today_stars = stars.get(date.today().isoformat(), 0)
+    star_row = (f'<div class="line"><span class="on">{"★" * min(today_stars, 12) or "·"}</span>'
+                f'  today <span class="dim">·</span> {week_stars} this week</div>')
+
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>esme's day</title><style>
@@ -111,6 +121,9 @@ a{{color:#7ea2b0;text-decoration:none}}
 
 <h2>// this week</h2>
 {''.join(weekly) or '<p class="dim">add weekly targets</p>'}
+
+<h2>// star chart</h2>
+{star_row}
 
 <h2>// daily habits</h2>
 {''.join(habits) or '<p class="dim">add daily habits</p>'}

@@ -215,15 +215,36 @@ def _schedule(todo):
 
 
 def build(d=None, carry_from=None, done=None):
+    from src import backlog as bl
+
     d = d or date.today()
     carry_from = carry_from or (d - timedelta(days=1))
     done = _load_done() if done is None else done
 
     focus = [f for f in _focus() if _base(f) not in done]  # drop focus items already ticked off
     seen = set(done) | {_base(f) for f in focus}            # ticked tasks never come back
-    todo, mind = list(focus), []
+    todo, mind, health = list(focus), [], []
 
-    def take(raw, aged):
+    # 1) today's recurring rhythm + triaged backlog picks (due-first, then priority)
+    rhythm, picks = bl.plan_for(d, done=seen)
+    for t in rhythm:
+        b = _base(t["text"])
+        if b in seen:
+            continue
+        seen.add(b)
+        (health if "health" in t["tags"] else todo).append(t["text"])
+    for t in picks:
+        b = _base(t["text"])
+        if b in seen:
+            continue
+        seen.add(b)
+        todo.append(bl.format_task(t, d))
+
+    # 2) a couple of carried items from yesterday, aged toward commit-or-kill
+    carried = 0
+    for raw in vault.unchecked_priorities(carry_from):
+        if carried >= CAP_CARRIED - 2:
+            break
         for sub in _explode(raw):
             b = _base(sub)
             if b in seen:
@@ -235,22 +256,16 @@ def build(d=None, carry_from=None, done=None):
             if cls == "mind":
                 mind.append(sub)
             else:
-                todo.append(_age(sub, raw) if aged else sub)
+                todo.append(_age(sub, raw))
+                carried += 1
 
-    carried_before = len(todo)
-    for raw in vault.unchecked_priorities(carry_from):
-        if len(todo) - carried_before >= CAP_CARRIED:
-            break
-        take(raw, aged=True)
-
-    backlog_before = len(todo)
-    for raw in _backlog_raw(d, CAP_BACKLOG, seen):
-        if len(todo) - backlog_before >= CAP_BACKLOG:
-            break
-        take(raw, aged=False)
-
-    todo = [_link(t) for t in _dedupe(todo)]
-    health = [_link(h) for h in vault.daily_health(d)]
+    todo = [_link(t) for t in _dedupe(todo, threshold=0.4)][:8]
+    if d.weekday() == 6:
+        todo.append("rest counts as progress today, Sunday is kept light on purpose")
+    if not health:
+        health = [vault.daily_health(d)[0]]
+    health.append("Fill your body with healthy, nutritious food today, and don't overeat")
+    health = [_link(h) for h in health]
 
     checks = lambda items: "\n".join(f"- [ ] {i}" for i in items)
     refl = "\n".join(f"- {m}" for m in mind[:2])

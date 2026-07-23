@@ -37,7 +37,10 @@ def smart_route(message, dry_run=False):
         if t == "journal":
             done.append(obsidian.append_reflection(a.get("text", ""), dry_run=dry_run)[1])
         elif t == "tick":
-            done.append(obsidian.tick_task(a.get("task", ""), dry_run=dry_run)[1])
+            preview = obsidian.tick_task(a.get("task", ""), dry_run=dry_run)[1]
+            done.append(preview)
+            if preview.startswith("tick off"):
+                done.append(obsidian.award_star(a.get("task", ""), dry_run=dry_run)[1])
         elif t == "todo":
             done.append(obsidian.add_to_master_todo(a.get("text", ""), dry_run=dry_run)[1])
         elif t == "intention":
@@ -46,6 +49,7 @@ def smart_route(message, dry_run=False):
             done.append(obsidian.defer_task(a.get("task", ""), dry_run=dry_run)[1])
         elif t == "habit":
             done.append(obsidian.log_habit(a.get("name", ""), dry_run=dry_run)[1])
+            done.append(obsidian.award_star(a.get("name", ""), dry_run=dry_run)[1])
         elif t == "note":
             done.append(obsidian.add_to_master_todo(a.get("text", ""), dry_run=dry_run)[1])
         elif t == "mood":

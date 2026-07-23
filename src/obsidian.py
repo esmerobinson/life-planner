@@ -11,6 +11,21 @@ from src import fancy, storage, vault
 MASTER_TODO = "Goals & Direction/Master To-Do.md"
 
 
+def award_star(reason, d=None, dry_run=False):
+    """Add a star to Daily/stars.json (the star chart's data)."""
+    import json
+    day = (d or date.today()).isoformat()
+    preview = f"⭐ star earned: {reason}"
+    if not dry_run:
+        try:
+            stars = json.loads(vault.read("Daily/stars.json") or "{}")
+        except Exception:
+            stars = {}
+        stars[day] = stars.get(day, 0) + 1
+        storage.write("Daily/stars.json", json.dumps(stars))
+    return "Daily/stars.json", preview
+
+
 def log_habit(name, d=None, dry_run=False):
     """Record a completed daily habit (for dashboard streaks) in Daily/habits.json."""
     import json
