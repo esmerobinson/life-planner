@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gtasks": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/esme/Documents/coding/gtasks-mcp/dist/index.mjs"
+      ],
+      "env": {}
+    }
+  }
+}

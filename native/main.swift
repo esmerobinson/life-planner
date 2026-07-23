@@ -250,21 +250,86 @@ struct Bar: View {
     }
 }
 
+// Undertale-style reveal: text types itself in, character by character.
+// A few seconds total, not a loop — plays once when the view appears.
+struct TypewriterText: View {
+    let text: String
+    var speed: Double = 0.018   // seconds per character
+    var italic: Bool = false
+    var color: Color = fg
+    @State private var shown = ""
+
+    var body: some View {
+        Text(shown)
+            .font(italic ? mono(12).italic() : mono(12))
+            .foregroundColor(color)
+            .fixedSize(horizontal: false, vertical: true)
+            .onAppear {
+                shown = ""
+                for (i, ch) in text.enumerated() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * speed) {
+                        shown.append(ch)
+                    }
+                }
+            }
+            .onChange(of: text) { _, newValue in
+                shown = ""
+                for (i, ch) in newValue.enumerated() {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * speed) {
+                        shown.append(ch)
+                    }
+                }
+            }
+    }
+}
+
+// A chunky, few-frame "burst": scale punches up then settles. No smooth easing,
+// on purpose — that blocky, discrete-frame quality is the Undertale feel.
+struct StarBurst: View {
+    @Binding var trigger: Int
+    @State private var scale: CGFloat = 0
+    @State private var opacity: Double = 0
+    var body: some View {
+        Text("★").font(mono(16)).foregroundColor(gold)
+            .scaleEffect(scale).opacity(opacity)
+            .onChange(of: trigger) { _, _ in
+                scale = 1.6; opacity = 1
+                withAnimation(.linear(duration: 0.06)) { scale = 0.9 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                    withAnimation(.linear(duration: 0.05)) { scale = 1.3 }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    withAnimation(.easeIn(duration: 0.3)) { opacity = 0; scale = 0.6 }
+                }
+            }
+    }
+}
+
+let gold = Color(red: 0.827, green: 0.639, blue: 0.255)
+
 struct Tick: View {
     let on: Bool
     let action: () -> Void
     @State private var hover = false
+    @State private var burstTrigger = 0
     var body: some View {
-        Button(action: action) {
-            Text(on ? "●" : (hover ? "◉" : "○"))
-                .font(mono(13)).foregroundColor(on ? green : (hover ? green : dim))
-                .scaleEffect(hover ? 1.25 : 1)
-                .frame(width: 16).contentShape(Rectangle())
+        ZStack {
+            Button(action: {
+                if !on { burstTrigger += 1 }
+                action()
+            }) {
+                Text(on ? "●" : (hover ? "◉" : "○"))
+                    .font(mono(13)).foregroundColor(on ? green : (hover ? green : dim))
+                    .scaleEffect(hover ? 1.25 : 1)
+                    .frame(width: 16).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hover = $0 }
+            .animation(.easeOut(duration: 0.12), value: hover)
+            .help(on ? "untick" : "tick, it counts")
+
+            StarBurst(trigger: $burstTrigger).offset(x: 14, y: -10)
         }
-        .buttonStyle(.plain)
-        .onHover { hover = $0 }
-        .animation(.easeOut(duration: 0.12), value: hover)
-        .help(on ? "untick" : "tick, it counts")
     }
 }
 
@@ -317,8 +382,7 @@ struct Dashboard: View {
                         Tick(on: model.habitDone("Morning manifestations")) {
                             model.toggleHabit("Morning manifestations")
                         }
-                        Text(model.manifestation).font(mono(12).italic()).foregroundColor(bright)
-                            .fixedSize(horizontal: false, vertical: true)
+                        TypewriterText(text: model.manifestation, italic: true, color: bright)
                         Spacer(minLength: 4)
                         StreakBadge(n: model.streak("Morning manifestations"))
                     }
@@ -326,8 +390,7 @@ struct Dashboard: View {
                         Tick(on: model.habitDone("Read reminders")) {
                             model.toggleHabit("Read reminders")
                         }
-                        Text(model.reminder).font(mono(12)).foregroundColor(fg)
-                            .fixedSize(horizontal: false, vertical: true)
+                        TypewriterText(text: model.reminder, speed: 0.012, color: fg)
                         Spacer(minLength: 4)
                         StreakBadge(n: model.streak("Read reminders"))
                     }
