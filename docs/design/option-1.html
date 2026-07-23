@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>esme's day — Option 1: terminal calm</title>
+<style>
+  :root{
+    --bg:#1b1b1b;
+    --bg-raised:#212120;
+    --line:#333330;
+    --olive:#9a9a82;
+    --olive-dim:#6f6f5e;
+    --green:#8fae87;
+    --text:#d8d8cc;
+    --text-dim:#87877a;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:#141413;
+    color:var(--text);
+    font-family: "SF Mono", "Menlo", "Consolas", ui-monospace, monospace;
+    min-height:100vh;
+  }
+  body{
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:48px 16px;
+  }
+  .page-note{
+    position:fixed;
+    top:14px;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:11px;
+    color:var(--olive-dim);
+    letter-spacing:.04em;
+  }
+  .card{
+    width:100%;
+    max-width:360px;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:18px 18px 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  }
+  .head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    padding-bottom:10px;
+    margin-bottom:14px;
+    border-bottom:1px solid var(--line);
+  }
+  .head .title{
+    font-size:13px;
+    color:var(--green);
+    letter-spacing:.02em;
+  }
+  .head .date{
+    font-size:11px;
+    color:var(--text-dim);
+  }
+  .section-label{
+    font-size:11px;
+    color:var(--olive-dim);
+    margin:18px 0 8px;
+    letter-spacing:.03em;
+  }
+  .section-label:first-of-type{ margin-top:0; }
+
+  /* --- check-in rows --- */
+  .checkin{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:7px 0;
+  }
+  .tick{
+    flex:0 0 auto;
+    width:14px; height:14px;
+    border-radius:50%;
+    border:1.5px solid var(--olive-dim);
+    margin-top:2px;
+    position:relative;
+    cursor:pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .tick.done{
+    background:var(--green);
+    border-color:var(--green);
+  }
+  .tick.done::after{
+    content:"";
+    position:absolute;
+    left:3.5px; top:1px;
+    width:3px; height:6px;
+    border:solid #141413;
+    border-width:0 1.5px 1.5px 0;
+    transform:rotate(40deg);
+  }
+  .checkin:hover .tick:not(.done){ border-color:var(--green); }
+  .checkin-body{ flex:1; min-width:0; }
+  .checkin-label{
+    font-size:10px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+  }
+  .checkin-text{
+    font-size:13px;
+    color:var(--text);
+    margin-top:1px;
+  }
+  .checkin-text.aff{ font-style:italic; color:var(--green); }
+  .streak{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:11px;
+    color:var(--olive);
+    margin-top:2px;
+    white-space:nowrap;
+  }
+  .streak svg{ width:11px; height:11px; }
+
+  .journal-btn{
+    display:block;
+    width:100%;
+    margin-top:8px;
+    padding:8px 10px;
+    background:transparent;
+    border:1px solid var(--olive-dim);
+    color:var(--olive);
+    font-family:inherit;
+    font-size:12px;
+    border-radius:3px;
+    cursor:pointer;
+    text-align:left;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .journal-btn::before{ content:"> "; color:var(--text-dim); }
+  .journal-btn:hover{
+    border-color:var(--green);
+    color:var(--green);
+    background:rgba(143,174,135,0.06);
+  }
+  .journal-btn:active{ background:rgba(143,174,135,0.12); }
+
+  /* --- todo section --- */
+  .todo-cat{ margin-bottom:14px; }
+  .todo-cat:last-child{ margin-bottom:0; }
+  .cat-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:12px;
+    color:var(--text);
+    padding-bottom:5px;
+    margin-bottom:6px;
+    border-bottom:1px dashed var(--line);
+  }
+  .cat-head .stars{
+    color:var(--green);
+    font-size:11px;
+    letter-spacing:.02em;
+  }
+  .task{
+    display:flex;
+    align-items:flex-start;
+    gap:9px;
+    padding:4px 0;
+    font-size:12.5px;
+    color:var(--text);
+  }
+  .task.done .task-text{
+    color:var(--text-dim);
+    text-decoration:line-through;
+    text-decoration-color:var(--olive-dim);
+  }
+  .task .tick{ width:12px; height:12px; margin-top:2px; }
+  .task .tick.done::after{ left:3px; top:0.5px; width:2.5px; height:5px; }
+
+  /* --- goals --- */
+  .goal{ margin-bottom:12px; }
+  .goal:last-child{ margin-bottom:0; }
+  .goal-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:11.5px;
+    margin-bottom:5px;
+  }
+  .goal-name{ color:var(--text); }
+  .goal-val{ color:var(--olive); }
+  .bar{
+    height:6px;
+    background:#252523;
+    border:1px solid var(--line);
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .bar-fill{
+    height:100%;
+    background:var(--green);
+    border-radius:2px 0 0 2px;
+  }
+
+  .foot{
+    margin-top:18px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+    font-size:10px;
+    color:var(--olive-dim);
+    text-align:center;
+  }
+
+  @media (min-width:700px){
+    body{ align-items:center; }
+  }
+</style>
+</head>
+<body>
+<div class="page-note">Option 1 — musicforprogramming terminal calm · 340–400px card</div>
+<div class="card">
+
+  <div class="head">
+    <span class="title">// esme's day</span>
+    <span class="date">2026-07-23</span>
+  </div>
+
+  <div class="section-label">// check in</div>
+
+  <div class="checkin">
+    <div class="tick done"></div>
+    <div class="checkin-body">
+      <div class="checkin-label">Manifestation</div>
+      <div class="checkin-text aff">"I am a real, published writer and people read what I make."</div>
+    </div>
+    <div class="streak">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-2 1 3 3 4 3 7a6 6 0 1 1-12 0c0-4 3-6 3-9 0-1 1.5-2.5 3-3z" fill="#8fae87"/></svg>
+      12
+    </div>
+  </div>
+
+  <div class="checkin">
+    <div class="tick done"></div>
+    <div class="checkin-body">
+      <div class="checkin-label">Reminder</div>
+      <div class="checkin-text">You are able to self soothe, all intense emotions will pass.</div>
+    </div>
+    <div class="streak">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-2 1 3 3 4 3 7a6 6 0 1 1-12 0c0-4 3-6 3-9 0-1 1.5-2.5 3-3z" fill="#8fae87"/></svg>
+      8
+    </div>
+  </div>
+
+  <div class="checkin">
+    <div class="tick"></div>
+    <div class="checkin-body">
+      <div class="checkin-label">Journal</div>
+      <div class="checkin-text">No entry yet today.</div>
+    </div>
+    <div class="streak">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-2 1 3 3 4 3 7a6 6 0 1 1-12 0c0-4 3-6 3-9 0-1 1.5-2.5 3-3z" fill="#6f6f5e"/></svg>
+      3
+    </div>
+  </div>
+  <button class="journal-btn">make a journal entry now?</button>
+
+  <div class="section-label">// to do today</div>
+
+  <div class="todo-cat">
+    <div class="cat-head"><span>Writing</span><span class="stars">★ 5</span></div>
+    <div class="task done"><div class="tick done"></div><div class="task-text">Edit chapter 4 of Jeff biography</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Write 500 words on relationship book</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Outline next Substack post</div></div>
+  </div>
+
+  <div class="todo-cat">
+    <div class="cat-head"><span>Content</span><span class="stars">★ 3</span></div>
+    <div class="task done"><div class="tick done"></div><div class="task-text">Draft Instagram caption for Tuesday</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Film 15s clip for reel</div></div>
+  </div>
+
+  <div class="todo-cat">
+    <div class="cat-head"><span>Admin</span><span class="stars">★ 2</span></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Pay internet bill</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Reply to accountant email</div></div>
+  </div>
+
+  <div class="todo-cat">
+    <div class="cat-head"><span>Health</span><span class="stars">★ 4</span></div>
+    <div class="task done"><div class="tick done"></div><div class="task-text">Morning walk</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Drink 2L water</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Stretch before bed</div></div>
+  </div>
+
+  <div class="section-label">// 2026 goals</div>
+
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Instagram followers</span><span class="goal-val">1,200 / 10,000</span></div>
+    <div class="bar"><div class="bar-fill" style="width:12%"></div></div>
+  </div>
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Jeff biography chapters</span><span class="goal-val">3 / 20</span></div>
+    <div class="bar"><div class="bar-fill" style="width:15%"></div></div>
+  </div>
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Relationship book</span><span class="goal-val">40%</span></div>
+    <div class="bar"><div class="bar-fill" style="width:40%"></div></div>
+  </div>
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Substack posts</span><span class="goal-val">1 / 20</span></div>
+    <div class="bar"><div class="bar-fill" style="width:5%"></div></div>
+  </div>
+
+  <div class="foot">esme's day · updated 07:41</div>
+
+</div>
+</body>
+</html>

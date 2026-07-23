@@ -57,7 +57,7 @@ def build_html():
         log = {}
 
     goals = []
-    for g in _section(cfg, "Big goals"):
+    for g in _section(cfg, "2026"):
         m = re.match(r"(.+?):\s*([\d,]+)\s*/\s*([\d,]+)", g)
         if not m:
             continue
@@ -121,7 +121,7 @@ a{{color:#7ea2b0;text-decoration:none}}
 <h1>{date.today():%A %-d %B}</h1>
 <p class="sub">// who are you becoming? one honest day at a time.</p>
 
-<h2>// goals</h2>
+<h2>// 2026 goals</h2>
 {''.join(goals) or '<p class="dim">add goals in Goals &amp; Habits.md</p>'}
 
 <h2>// this week</h2>

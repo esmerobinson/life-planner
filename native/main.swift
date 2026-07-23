@@ -69,7 +69,19 @@ func todayNoteFile() -> String {
 
 // MARK: - model
 
-struct TaskItem: Identifiable { let id = UUID(); let display: String; let target: String; let done: Bool; let raw: String }
+struct TaskItem: Identifiable { let id = UUID(); let display: String; let target: String; let done: Bool; let raw: String; let category: String }
+
+func categorize(_ text: String, _ target: String) -> String {
+    let s = (text + " " + target).lowercased()
+    if ["walk", "run", "calisthenic", "nutritious", "overeat", "gym", "movement"].contains(where: s.contains) { return "Health" }
+    if ["jeff", "biography", "substack", "book", "essay", "chapter", "write", "story of our relationship", "journal"].contains(where: s.contains) { return "Writing" }
+    if ["reel", "carousel", "content", "post", "video", "instagram", "ai project", "build", "vibecoding", "capcut", "footage"].contains(where: s.contains) { return "Content" }
+    if ["paint", "art", "touchdesigner", "drawing"].contains(where: s.contains) { return "Art" }
+    if ["lucas", "eti", "varvara", "production", "venue", "pr ", "fundrais"].contains(where: s.contains) { return "Production" }
+    return "Admin"
+}
+
+let CATEGORY_ORDER = ["Writing", "Content", "Art", "Production", "Admin", "Health"]
 struct Goal: Identifiable { let id = UUID(); let name: String; let cur: Int; let tgt: Int }
 struct Habit: Identifiable { let id = UUID(); let name: String; let done: Bool; let streak: Int }
 
@@ -100,11 +112,16 @@ final class Model: ObservableObject {
                 let inner = text[r].dropFirst(2).dropLast(2).components(separatedBy: "|")
                 text.replaceSubrange(r, with: inner.last ?? "")
             }
-            return TaskItem(display: text, target: target, done: done, raw: t)
+            return TaskItem(display: text, target: target, done: done, raw: t, category: categorize(text, target))
         }
 
-        // manifestation of the day (stable all day) from her Kit
-        var manis: [String] = []; var inSet = false
+        // manifestation of the day: HER list first (Manifestations & Vision Board), then the Kit set
+        var manis: [String] = []
+        for line in section(read("Mind & Wellbeing/Manifestations & Vision Board.md"), "My manifestations") {
+            let c = line.replacingOccurrences(of: "*", with: "").trimmingCharacters(in: .whitespaces)
+            if c.count > 10 { manis.append(c) }
+        }
+        var inSet = false
         for line in read("Mind & Wellbeing/Motivation & Manifestation Kit.md").components(separatedBy: "\n") {
             if line.hasPrefix("## ") { inSet = line.lowercased().contains("manifestation set"); continue }
             let t = line.trimmingCharacters(in: .whitespaces)
@@ -125,7 +142,7 @@ final class Model: ObservableObject {
         reminder = rem.isEmpty ? "" : rem[(seed * 7) % rem.count]
 
         let cfg = read("Goals & Direction/Goals & Habits.md")
-        goals = section(cfg, "Big goals").compactMap { line in
+        goals = section(cfg, "2026").compactMap { line in
             let parts = line.components(separatedBy: ":")
             guard parts.count >= 2 else { return nil }
             let nums = parts[1].components(separatedBy: "/").map {
@@ -166,8 +183,18 @@ final class Model: ObservableObject {
                              : t.raw.replacingOccurrences(of: "- [ ]", with: "- [x]")
         guard note.contains(t.raw) else { return }
         writeVault(file, note.replacingOccurrences(of: t.raw, with: flipped))
-        if !t.done { awardStar() }
+        if !t.done {
+            awardStar()
+            var cs = jsonDict("Daily/category-stars.json")
+            cs[t.category] = (cs[t.category] as? Int ?? 0) + 1
+            saveJSON("Daily/category-stars.json", cs)
+            if t.category == "Health" && !habitDone("Movement") { toggleHabit("Movement") }
+        }
         load()
+    }
+
+    func categoryStars(_ cat: String) -> Int {
+        jsonDict("Daily/category-stars.json")[cat] as? Int ?? 0
     }
 
     func toggleHabit(_ name: String) {
@@ -181,6 +208,7 @@ final class Model: ObservableObject {
     }
 
     func habitDone(_ name: String) -> Bool { habits.first { $0.name == name }?.done ?? false }
+    func streak(_ name: String) -> Int { habits.first { $0.name == name }?.streak ?? 0 }
 }
 
 // MARK: - styling
@@ -225,11 +253,25 @@ struct Bar: View {
 struct Tick: View {
     let on: Bool
     let action: () -> Void
+    @State private var hover = false
     var body: some View {
         Button(action: action) {
-            Text(on ? "●" : "○").font(mono(13)).foregroundColor(on ? green : dim)
+            Text(on ? "●" : (hover ? "◉" : "○"))
+                .font(mono(13)).foregroundColor(on ? green : (hover ? green : dim))
+                .scaleEffect(hover ? 1.25 : 1)
                 .frame(width: 16).contentShape(Rectangle())
-        }.buttonStyle(.plain).help(on ? "untick" : "tick, it counts toward your streak")
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.12), value: hover)
+        .help(on ? "untick" : "tick, it counts")
+    }
+}
+
+struct StreakBadge: View {
+    let n: Int
+    var body: some View {
+        Text(n > 0 ? "🔥\(n)" : "·").font(mono(11)).foregroundColor(green)
     }
 }
 
@@ -267,8 +309,9 @@ struct Dashboard: View {
                     Text("// one honest day at a time").font(mono(11)).foregroundColor(dim)
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    SectionHeader(title: "manifestation, tick when you've read + felt it",
+                // affirm rows: manifestation / reminder / journal, tick + streak inline
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader(title: "click to affirm",
                                   more: "Mind & Wellbeing/Manifestations & Vision Board")
                     HStack(alignment: .top, spacing: 7) {
                         Tick(on: model.habitDone("Morning manifestations")) {
@@ -276,25 +319,44 @@ struct Dashboard: View {
                         }
                         Text(model.manifestation).font(mono(12).italic()).foregroundColor(bright)
                             .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        StreakBadge(n: model.streak("Morning manifestations"))
                     }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    SectionHeader(title: "today, tick it or tap it for context", more: todayNoteFile())
-                    if model.tasks.isEmpty {
-                        Text("no plan yet, the 8:30 message builds it").font(mono(12)).foregroundColor(dim)
-                    }
-                    ForEach(model.tasks) { TaskRow(task: $0, model: model) }
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    SectionHeader(title: "reminder, tick when it's landed", more: "Daily/Daily reminders")
                     HStack(alignment: .top, spacing: 7) {
                         Tick(on: model.habitDone("Read reminders")) {
                             model.toggleHabit("Read reminders")
                         }
                         Text(model.reminder).font(mono(12)).foregroundColor(fg)
                             .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        StreakBadge(n: model.streak("Read reminders"))
+                    }
+                    HStack(alignment: .top, spacing: 7) {
+                        Tick(on: model.habitDone("Journal feelings")) {
+                            model.toggleHabit("Journal feelings")
+                        }
+                        Text("journal").font(mono(12)).foregroundColor(fg)
+                        Spacer(minLength: 4)
+                        StreakBadge(n: model.streak("Journal feelings"))
+                    }
+                }
+
+                // to do today, grouped by category, stars per category
+                VStack(alignment: .leading, spacing: 6) {
+                    SectionHeader(title: "to do today, tick or tap for context", more: todayNoteFile())
+                    if model.tasks.isEmpty {
+                        Text("no plan yet, the 8:30 message builds it").font(mono(12)).foregroundColor(dim)
+                    }
+                    ForEach(CATEGORY_ORDER, id: \.self) { cat in
+                        let items = model.tasks.filter { $0.category == cat }
+                        if !items.isEmpty {
+                            HStack(spacing: 6) {
+                                Text(cat.lowercased()).font(mono(11, .semibold)).foregroundColor(bright)
+                                Text("★ \(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
+                                Spacer()
+                            }.padding(.top, 4)
+                            ForEach(items) { TaskRow(task: $0, model: model) }
+                        }
                     }
                 }
 
@@ -315,7 +377,7 @@ struct Dashboard: View {
                 }.buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionHeader(title: "goals", more: "Goals & Direction/Goals")
+                    SectionHeader(title: "2026 goals", more: "Goals & Direction/Goals")
                     ForEach(model.goals) { g in
                         VStack(alignment: .leading, spacing: 3) {
                             HStack {
@@ -327,24 +389,6 @@ struct Dashboard: View {
                             Bar(pct: Double(g.cur) / Double(g.tgt))
                         }
                     }
-                }
-
-                VStack(alignment: .leading, spacing: 5) {
-                    SectionHeader(title: "habits + streaks, tick as you go")
-                    ForEach(model.habits) { h in
-                        HStack(spacing: 6) {
-                            Tick(on: h.done) { model.toggleHabit(h.name) }
-                            Text(h.name).font(mono(12)).foregroundColor(fg)
-                            Spacer()
-                            Text(h.streak > 0 ? "🔥 \(h.streak)" : "·").font(mono(11)).foregroundColor(green)
-                        }
-                    }
-                }
-
-                HStack {
-                    Text(model.starsToday > 0 ? String(repeating: "★", count: min(model.starsToday, 10)) : "·")
-                        .foregroundColor(green)
-                    Text("today  ·  \(model.starsWeek) this week").font(mono(11)).foregroundColor(dim)
                 }
 
                 Divider().overlay(dim.opacity(0.4))

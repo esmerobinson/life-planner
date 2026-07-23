@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>esme's day — Option 3: cozy game</title>
+<style>
+  :root{
+    --paper:#f6efe0;
+    --card:#fdf8ee;
+    --line:#e3d5b8;
+    --brown:#8a6f47;
+    --brown-dim:#b3a179;
+    --gold:#d3a341;
+    --gold-dark:#a97c1f;
+    --leaf:#7a9c6b;
+    --leaf-dark:#587a4b;
+    --text:#4a3f2c;
+    --text-dim:#8a7c60;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:#ece0c8;
+    color:var(--text);
+    font-family: "SF Mono", "Menlo", "Consolas", ui-monospace, monospace;
+    min-height:100vh;
+  }
+  body{
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:48px 16px;
+    background-image:
+      radial-gradient(circle at 20% 15%, rgba(255,255,255,0.5) 0, transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(122,156,107,0.12) 0, transparent 45%);
+  }
+  .page-note{
+    position:fixed;
+    top:14px;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:11px;
+    color:var(--brown-dim);
+    letter-spacing:.04em;
+    text-align:center;
+  }
+  .card{
+    width:100%;
+    max-width:360px;
+    background:var(--card);
+    border:2px solid var(--line);
+    border-radius:22px;
+    padding:20px 18px 22px;
+    box-shadow: 0 16px 40px rgba(138,111,71,0.22), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .head{
+    text-align:center;
+    padding-bottom:14px;
+    margin-bottom:16px;
+    border-bottom:2px dotted var(--line);
+  }
+  .head .sun{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:34px; height:34px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #ffe6a0, var(--gold));
+    box-shadow: 0 3px 8px rgba(211,163,65,0.4);
+    margin-bottom:8px;
+  }
+  .head .title{
+    font-size:14px;
+    color:var(--text);
+    font-weight:600;
+    letter-spacing:.02em;
+  }
+  .head .date{
+    font-size:10.5px;
+    color:var(--text-dim);
+    margin-top:3px;
+  }
+  .section-label{
+    font-size:11px;
+    color:var(--brown);
+    margin:20px 0 10px;
+    letter-spacing:.03em;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .section-label:first-of-type{ margin-top:0; }
+
+  /* --- check-in rows --- */
+  .checkin{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:8px 10px;
+    border-radius:14px;
+    transition: background .15s ease;
+  }
+  .checkin:hover{ background:rgba(211,163,65,0.08); }
+  .tick{
+    flex:0 0 auto;
+    width:17px; height:17px;
+    border-radius:50%;
+    border:2px solid var(--brown-dim);
+    background:#fff;
+    margin-top:2px;
+    position:relative;
+    cursor:pointer;
+    transition: border-color .15s ease, background .15s ease, transform .15s ease;
+  }
+  .tick:hover{ transform:scale(1.1); border-color:var(--leaf); }
+  .tick.done{
+    background: var(--leaf);
+    border-color: var(--leaf-dark);
+  }
+  .tick.done::after{
+    content:"";
+    position:absolute;
+    left:4.5px; top:2px;
+    width:4px; height:8px;
+    border:solid #fff;
+    border-width:0 2px 2px 0;
+    transform:rotate(40deg);
+  }
+  .checkin-body{ flex:1; min-width:0; }
+  .checkin-label{
+    font-size:10px;
+    color:var(--text-dim);
+    letter-spacing:.05em;
+    font-weight:600;
+    text-transform:uppercase;
+  }
+  .checkin-text{
+    font-size:13px;
+    color:var(--text);
+    margin-top:2px;
+  }
+  .checkin-text.aff{ font-style:italic; color:var(--gold-dark); }
+  .streak{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:11px;
+    color:var(--brown);
+    margin-top:4px;
+    white-space:nowrap;
+    background:#fff3d6;
+    border:1px solid #ecd9a6;
+    border-radius:10px;
+    padding:2px 7px;
+  }
+  .streak svg{ width:11px; height:11px; }
+
+  .journal-btn{
+    display:block;
+    width:calc(100% - 8px);
+    margin:8px auto 4px;
+    padding:10px 12px;
+    background: linear-gradient(180deg, #fff, #fbf1d8);
+    border:2px solid var(--gold);
+    color:var(--gold-dark);
+    font-family:inherit;
+    font-weight:600;
+    font-size:12px;
+    border-radius:14px;
+    cursor:pointer;
+    text-align:center;
+    box-shadow: 0 3px 0 var(--gold);
+    transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .journal-btn:hover{
+    background: linear-gradient(180deg, #fffaf0, #fdeec1);
+  }
+  .journal-btn:active{
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 var(--gold);
+  }
+
+  /* --- todo section --- */
+  .todo-cat{
+    margin-bottom:12px;
+    background:#fffdf6;
+    border:1.5px solid var(--line);
+    border-radius:16px;
+    padding:10px 12px;
+  }
+  .todo-cat:last-child{ margin-bottom:0; }
+  .cat-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:12px;
+    color:var(--text);
+    font-weight:600;
+    padding-bottom:7px;
+    margin-bottom:6px;
+    border-bottom:1.5px dotted var(--line);
+  }
+  .stamp-row{
+    display:flex;
+    align-items:center;
+    gap:3px;
+  }
+  .stamp{
+    width:15px; height:15px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #ffe9ab, var(--gold) 70%, var(--gold-dark) 100%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:9px;
+    color:#fff;
+    box-shadow: 0 1px 2px rgba(169,124,31,0.5);
+  }
+  .stamp-count{
+    font-size:11px;
+    color:var(--gold-dark);
+    margin-left:3px;
+  }
+  .task{
+    display:flex;
+    align-items:flex-start;
+    gap:9px;
+    padding:5px 2px;
+    font-size:12.5px;
+    color:var(--text);
+    border-radius:8px;
+    transition: background .15s ease;
+  }
+  .task:hover{ background:rgba(122,156,107,0.08); }
+  .task.done .task-text{
+    color:var(--text-dim);
+    text-decoration:line-through;
+    text-decoration-color:var(--leaf);
+  }
+  .task .tick{ width:14px; height:14px; margin-top:2px; border-width:1.5px; }
+  .task .tick.done::after{ left:3.5px; top:1.5px; width:3.5px; height:6.5px; border-width:0 1.5px 1.5px 0; }
+
+  /* --- goals --- */
+  .goal{ margin-bottom:13px; }
+  .goal:last-child{ margin-bottom:0; }
+  .goal-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:11.5px;
+    margin-bottom:6px;
+  }
+  .goal-name{ color:var(--text); font-weight:600; }
+  .goal-val{ color:var(--brown); }
+  .bar{
+    height:10px;
+    background:#efe4c8;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    overflow:hidden;
+    position:relative;
+  }
+  .bar-fill{
+    height:100%;
+    background: linear-gradient(180deg, #a9c99a, var(--leaf-dark));
+    border-radius:6px 0 0 6px;
+  }
+
+  .foot{
+    margin-top:18px;
+    padding-top:12px;
+    border-top:2px dotted var(--line);
+    font-size:10.5px;
+    color:var(--text-dim);
+    text-align:center;
+  }
+
+  @media (min-width:700px){
+    body{ align-items:center; }
+  }
+</style>
+</head>
+<body>
+<div class="page-note">Option 3 — cozy game / Animal Crossing inspired · 340–400px card</div>
+<div class="card">
+
+  <div class="head">
+    <div class="sun"></div>
+    <div class="title">esme's day</div>
+    <div class="date">thursday, 23 july</div>
+  </div>
+
+  <div class="section-label">morning check-in</div>
+
+  <div class="checkin">
+    <div class="tick done"></div>
+    <div class="checkin-body">
+      <div class="checkin-label">Manifestation</div>
+      <div class="checkin-text aff">"I am a real, published writer and people read what I make."</div>
+    </div>
+    <div class="streak">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-2 1 3 3 4 3 7a6 6 0 1 1-12 0c0-4 3-6 3-9 0-1 1.5-2.5 3-3z" fill="#d3a341"/></svg>
+      12
+    </div>
+  </div>
+
+  <div class="checkin">
+    <div class="tick done"></div>
+    <div class="checkin-body">
+      <div class="checkin-label">Reminder</div>
+      <div class="checkin-text">You are able to self soothe, all intense emotions will pass.</div>
+    </div>
+    <div class="streak">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-2 1 3 3 4 3 7a6 6 0 1 1-12 0c0-4 3-6 3-9 0-1 1.5-2.5 3-3z" fill="#d3a341"/></svg>
+      8
+    </div>
+  </div>
+
+  <div class="checkin">
+    <div class="tick"></div>
+    <div class="checkin-body">
+      <div class="checkin-label">Journal</div>
+      <div class="checkin-text">Nothing written yet today.</div>
+    </div>
+    <div class="streak">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-2 1 3 3 4 3 7a6 6 0 1 1-12 0c0-4 3-6 3-9 0-1 1.5-2.5 3-3z" fill="#b3a179"/></svg>
+      3
+    </div>
+  </div>
+  <button class="journal-btn">make a journal entry now?</button>
+
+  <div class="section-label">to do today</div>
+
+  <div class="todo-cat">
+    <div class="cat-head">
+      <span>Writing</span>
+      <span class="stamp-row"><span class="stamp">★</span><span class="stamp-count">5</span></span>
+    </div>
+    <div class="task done"><div class="tick done"></div><div class="task-text">Edit chapter 4 of Jeff biography</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Write 500 words on relationship book</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Outline next Substack post</div></div>
+  </div>
+
+  <div class="todo-cat">
+    <div class="cat-head">
+      <span>Content</span>
+      <span class="stamp-row"><span class="stamp">★</span><span class="stamp-count">3</span></span>
+    </div>
+    <div class="task done"><div class="tick done"></div><div class="task-text">Draft Instagram caption for Tuesday</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Film 15s clip for reel</div></div>
+  </div>
+
+  <div class="todo-cat">
+    <div class="cat-head">
+      <span>Admin</span>
+      <span class="stamp-row"><span class="stamp">★</span><span class="stamp-count">2</span></span>
+    </div>
+    <div class="task"><div class="tick"></div><div class="task-text">Pay internet bill</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Reply to accountant email</div></div>
+  </div>
+
+  <div class="todo-cat">
+    <div class="cat-head">
+      <span>Health</span>
+      <span class="stamp-row"><span class="stamp">★</span><span class="stamp-count">4</span></span>
+    </div>
+    <div class="task done"><div class="tick done"></div><div class="task-text">Morning walk</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Drink 2L water</div></div>
+    <div class="task"><div class="tick"></div><div class="task-text">Stretch before bed</div></div>
+  </div>
+
+  <div class="section-label">2026 goals</div>
+
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Instagram followers</span><span class="goal-val">1,200 / 10,000</span></div>
+    <div class="bar"><div class="bar-fill" style="width:12%"></div></div>
+  </div>
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Jeff biography chapters</span><span class="goal-val">3 / 20</span></div>
+    <div class="bar"><div class="bar-fill" style="width:15%"></div></div>
+  </div>
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Relationship book</span><span class="goal-val">40%</span></div>
+    <div class="bar"><div class="bar-fill" style="width:40%"></div></div>
+  </div>
+  <div class="goal">
+    <div class="goal-row"><span class="goal-name">Substack posts</span><span class="goal-val">1 / 20</span></div>
+    <div class="bar"><div class="bar-fill" style="width:5%"></div></div>
+  </div>
+
+  <div class="foot">little by little, esme. that's the whole game.</div>
+
+</div>
+</body>
+</html>

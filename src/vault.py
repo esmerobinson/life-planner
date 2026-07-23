@@ -140,7 +140,10 @@ def random_why_it_matters():
 
 
 def random_manifestation():
-    items = kit_bullets("Manifestation set")
+    """Her own manifestations first (Manifestations & Vision Board), plus the Kit set."""
+    vb = bullets_under_heading(
+        read("Mind & Wellbeing/Manifestations & Vision Board.md"), "My manifestations")
+    items = [_clean(b) for b in vb if len(_clean(b)) > 10] + kit_bullets("Manifestation set")
     return random.choice(items) if items else None
 
 
