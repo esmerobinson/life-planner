@@ -437,8 +437,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func updateTitle() {
-        let done = model.habits.filter { $0.done }.count
-        statusItem.button?.title = "✿ \(done)/\(model.habits.count)"
+        let done = model.tasks.filter { $0.done }.count
+        statusItem.button?.title = "✿ \(done)/\(model.tasks.count)"
         statusItem.button?.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
     }
 
