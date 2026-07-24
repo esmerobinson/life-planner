@@ -20,6 +20,38 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 NUDGE_AFTER = 100 * 60  # chase an unanswered check-in after ~100 minutes
 
 
+def _entry_ts(entry):
+    """planner-sent.json entries used to be a plain int timestamp; now a dict with
+    ts/kind. Accept both so old same-day state doesn't break."""
+    return entry.get("ts", 0) if isinstance(entry, dict) else entry
+
+
+def _entry_kind(entry):
+    return entry.get("kind", "full") if isinstance(entry, dict) else "full"
+
+
+def unlock_pending_checkin(dry=False):
+    """If today's most recent check-in went out as the reopen-template (full content
+    withheld because the window was closed), send the real message now that she's
+    just replied and the window is open again."""
+    import json
+    from datetime import date
+    from src import vault
+    today = date.today().isoformat()
+    try:
+        sent = json.loads(vault.read("Daily/planner-sent.json") or "{}").get(today, {})
+    except Exception:
+        return
+    if not sent:
+        return
+    slot = max(sent, key=lambda s: _entry_ts(sent[s]))
+    if _entry_kind(sent[slot]) == "template":
+        if not dry:
+            import scripts.run as run
+            run.send_checkin(slot, force_full=True)
+        print(f"window just reopened: sent the real {slot} message")
+
+
 def check_nudge(dry=False):
     """If the latest check-in has sat unanswered, send her nudge line, once per slot."""
     import json
@@ -33,7 +65,8 @@ def check_nudge(dry=False):
         nudged = json.loads(vault.read("Daily/planner-nudged.json") or "{}")
     except Exception:
         return
-    for slot, ts in sent.items():
+    for slot, entry in sent.items():
+        ts = _entry_ts(entry)
         if (now - ts > NUDGE_AFTER and last_reply < ts and slot not in nudged.get(today, [])
                 and now - ts < 6 * 3600):
             if not dry:
@@ -55,12 +88,14 @@ def main():
         check_nudge(dry)
         return
 
-    # record that she replied, so pending nudges stand down
+    # record that she replied, so pending nudges stand down, and unlock any check-in
+    # that was withheld behind the reopen-template while the window was closed
     import json
     import time
     from src import storage
     if not dry:
         storage.write("Daily/planner-last-reply.json", json.dumps({"ts": int(time.time())}))
+    unlock_pending_checkin(dry)
     for m in messages:
         text = m.get("text", "").strip()
         if not text:
