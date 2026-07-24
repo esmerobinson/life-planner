@@ -130,47 +130,73 @@ def render(slot, d=None):
     return headers.random_header() + "\n\n" + body
 
 
-COACH_SYSTEM = (
-    "You are Esme's own warm inner voice, replying to her on WhatsApp. She struggles with "
-    "moods that swing through the day and focus that scatters a lot. Read her CURRENT state "
-    "from her message and meet her exactly there, then give ONE small, concrete, doable next "
-    "step tailored to it. The spirit:\n"
-    "- stuck / unproductive / can't focus: break the cycle first (a 5 min walk or one song), "
-    "then just the first tiny piece of one task.\n"
-    "- focused / energised: great, ride it, point her at her single top priority to pour it into.\n"
-    "- woke up low: gentle, action comes before mood not after, one kind line, one 10-minute thing.\n"
-    "- an argument wrecked her mood: remind her the day is not ruined, one small thing resets it, "
-    "and nod to her repair framework (pause, say what she wants not blame).\n"
-    "- overwhelmed / flooded: her coping tools (it passes, self-soothe, step away gently, legs over head "
-    "or a rubber band over hitting herself).\n"
-    "If a star was just earned (it will appear in the filed actions), celebrate it briefly and "
-    "tell her it's on her star chart on the dashboard. "
-    "If she only reported doing tasks with no feeling, a short warm confirmation is enough. "
-    "Never guilt. From-me-to-me, lowercase, 2 to 4 short sentences. If she sounds in real distress or "
-    "mentions hurting herself, gently remind her she can lean on real support too, warmly."
+def _reminder_candidates(message):
+    """Real, verbatim lines from her own vault, NEVER invented. Oliver/argument
+    messages pull her actual therapy framework first; everything else draws from
+    her reminders, coping tools, discipline bank, and manifestations."""
+    import re
+
+    from src import vault
+
+    low = message.lower()
+    pool = []
+    if any(w in low for w in ("oliver", "argument", "fight", "fought", " row", "snapped at")):
+        mr = vault.read("Goals & Direction/Mind & Relationships Goals.md")
+        pool += [vault._clean(l) for l in vault.bullets_under_heading(mr, "What helps with Oliver")]
+    pool += vault.kit_bullets("Coping bank")
+    text = vault.read(vault.DAILY_REMINDERS)
+    pool += [re.sub(r"^\d+\.\s*", "", ln).strip() for ln in text.splitlines() if re.match(r"\s*\d+\.", ln)]
+    for f in (vault.random_discipline, vault.random_manifestation):
+        v = f()
+        if v:
+            pool.append(v)
+    seen, uniq = set(), []
+    for p in pool:
+        p = p.strip()
+        if p and p not in seen:
+            seen.add(p)
+            uniq.append(p)
+    return uniq[:16]
+
+
+SELECT_SYSTEM = (
+    "You help Esme by choosing from HER OWN written reminders, never by inventing advice. "
+    "Read her message and decide: is she just neutrally reporting a task/mood (mode "
+    "'confirmation'), or does she need real support (mode 'support')? If 'support', pick "
+    "the 2 (max 3) lines from her list that most directly meet her exactly where she is. "
+    "You MUST copy chosen lines character-for-character from the list, never reword or "
+    "summarise them. Also write a ONE-sentence warm acknowledgment of how she's feeling, "
+    "lowercase, from-me-to-me, containing no advice of your own, no em dashes, not preachy. "
+    "Output JSON only: {\"mode\": \"confirmation\"|\"support\", \"ack\": \"...\", \"lines\": [...]}"
 )
 
 
 def reply(message, actions):
-    """A mood-adaptive reply: meets her where she is, one tailored step from her own tools."""
-    from src import llm, vault
-    focus = [ln.strip()[2:].strip() for ln in vault.read("Daily/Focus.md").splitlines()
-             if ln.strip().startswith("- ")]
-    coping = vault.kit_bullets("Coping bank")[:4]
-    system = COACH_SYSTEM + (
-        " When what she lacks is motivation, gently remind her: motivation is fleeting, "
-        "discipline is just keeping the appointment with herself, so do the tiny version anyway "
-        "and let the feeling catch up. " + llm.HUMANIZE)
-    out = llm.generate(
-        f"Her message: {message}\n"
-        f"Her top priorities right now: {focus}\n"
-        f"Her own coping lines: {coping}\n"
-        f"A discipline line she believes in: {vault.random_discipline()}\n"
-        f"What I just filed for her: {'; '.join(actions)}\n"
-        f"Write her reply.",
-        system=system,
+    """Meets her where she is. The substance is always her own real reminders and
+    manifestations, verbatim, selected (never authored) by the model."""
+    from src import llm
+
+    candidates = _reminder_candidates(message)
+    result = llm.generate_json(
+        f"Her message: {message}\nWhat I just filed for her: {'; '.join(actions)}\n\n"
+        "Her own real lines to choose from (copy exactly, do not alter):\n"
+        + "\n".join(f"- {c}" for c in candidates),
+        system=SELECT_SYSTEM, temperature=0,
     )
-    return headers.random_header() + "\n\n" + (out or "i've got you. one small thing first, then we go from there x")
+
+    ack, chosen = "", []
+    if isinstance(result, dict):
+        ack = (result.get("ack") or "").strip()
+        if result.get("mode") == "support":
+            chosen = [l for l in result.get("lines", []) if l in candidates]
+
+    body = ack or "got it, love."
+    if chosen:
+        body += "\n\n" + "\n".join(f"· {c}" for c in chosen)
+    elif any("star" in a.lower() for a in actions):
+        body += " that's a star on your chart now."
+
+    return headers.random_header() + "\n\n" + body
 
 
 # kept as a thin alias so older callers still work
