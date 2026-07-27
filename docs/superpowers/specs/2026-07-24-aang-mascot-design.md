@@ -206,6 +206,21 @@ color rather than leaving them flat black. Output as individual transparent PNGs
 their use (small inline badges, one larger Lotus for the menu-bar icon, full-window-sized
 background). Same `.gitignore`'d, personal-use-only handling as the sprite frames.
 
+### Parked for later: visual-novel-style opening dialogue
+
+**Not in scope for this pass** — captured here so we come back to it once the above ships.
+
+Idea: on opening the app (first open of a session, or every open — TBD), instead of going
+straight to the dashboard, show a brief visual-novel-style exchange with Aang: his face
+portrait, a line of dialogue in "Aang-speak" (e.g. "hey, wanna see what tasks you got for
+today?") rendered in the pixel font from the name-entry sheet, then two response options
+("yes sure!" / "eh, not feeling well"). Either choice leads to a motivational quote + a
+reminder (mood-adjusted based on which option was picked), after which the normal dashboard
+appears as usual. Needs a skip option for anyone who doesn't want the exchange every time.
+Wants its own design pass (dialogue state machine, branching content source, skip
+persistence, how the pixel font renders multi-line dialogue vs. just the date header) once
+the first-pass mascot + theming work above is done and working.
+
 ### Updated testing
 
 Still manual verification only, same rationale as Part 1: rebuild with
