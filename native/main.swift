@@ -349,6 +349,7 @@ let gold = Color(red: 0.827, green: 0.639, blue: 0.255)
 struct Tick: View {
     let on: Bool
     let element: String
+    var wellbeing: Bool = false
     let action: () -> Void
     @State private var hover = false
     @State private var burstTrigger = 0
@@ -358,15 +359,22 @@ struct Tick: View {
                 if !on { burstTrigger += 1 }
                 action()
             }) {
-                Text(on ? "●" : (hover ? "◉" : "○"))
-                    .font(mono(13)).foregroundColor(on ? green : (hover ? green : dim))
-                    .scaleEffect(hover ? 1.25 : 1)
-                    .frame(width: 16).contentShape(Rectangle())
+                Group {
+                    if wellbeing {
+                        ElementIcon(element: "lotus", size: 14)
+                            .opacity(on ? 1.0 : (hover ? 0.85 : 0.45))
+                    } else {
+                        Text(on ? "●" : (hover ? "◉" : "○"))
+                            .font(mono(13)).foregroundColor(on ? green : (hover ? green : dim))
+                    }
+                }
+                .scaleEffect(hover ? 1.25 : 1)
+                .frame(width: 16).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .onHover { hover = $0 }
             .animation(.easeOut(duration: 0.12), value: hover)
-            .help(on ? "untick" : "tick, it counts")
+            .help(on ? (wellbeing ? "wisdom absorbed" : "untick") : (wellbeing ? "tap to absorb it" : "tick, it counts"))
 
             StarBurst(trigger: $burstTrigger, element: element).offset(x: 14, y: -10)
         }
@@ -419,7 +427,7 @@ struct Dashboard: View {
                     SectionHeader(title: "click to affirm",
                                   more: "Mind & Wellbeing/Manifestations & Vision Board")
                     HStack(alignment: .top, spacing: 7) {
-                        Tick(on: model.habitDone("Morning manifestations"), element: "lotus") {
+                        Tick(on: model.habitDone("Morning manifestations"), element: "lotus", wellbeing: true) {
                             model.toggleHabit("Morning manifestations")
                         }
                         TypewriterText(text: model.manifestation, italic: true, color: bright)
@@ -427,7 +435,7 @@ struct Dashboard: View {
                         StreakBadge(n: model.streak("Morning manifestations"))
                     }
                     HStack(alignment: .top, spacing: 7) {
-                        Tick(on: model.habitDone("Read reminders"), element: "lotus") {
+                        Tick(on: model.habitDone("Read reminders"), element: "lotus", wellbeing: true) {
                             model.toggleHabit("Read reminders")
                         }
                         TypewriterText(text: model.reminder, speed: 0.012, color: fg)
@@ -435,7 +443,7 @@ struct Dashboard: View {
                         StreakBadge(n: model.streak("Read reminders"))
                     }
                     HStack(alignment: .top, spacing: 7) {
-                        Tick(on: model.habitDone("Journal feelings"), element: "lotus") {
+                        Tick(on: model.habitDone("Journal feelings"), element: "lotus", wellbeing: true) {
                             model.toggleHabit("Journal feelings")
                         }
                         Text("journal").font(mono(12)).foregroundColor(fg)
