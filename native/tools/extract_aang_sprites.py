@@ -11,7 +11,7 @@ UPSCALE = 4
 # name -> (cluster rect (x0,y0,x1,y1), frame_count) -- sliced evenly across the rect's width
 SEQUENCES = {
     "idle":   ((7, 828, 179, 868), 7),    # walk cycle, ~172px / 7 frames, h=40
-    "splash": ((225, 599, 500, 753), 4),  # larger action cluster, ~275px / 4 frames, h=154
+    "splash": ((225, 599, 500, 753), 6),  # action cluster, ~275px / 6 frames, h=154
 }
 
 def slice_frames(im, rect, count):
