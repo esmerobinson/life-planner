@@ -203,7 +203,15 @@ final class Model: ObservableObject {
     }
 
     func categoryStars(_ cat: String) -> Int {
-        jsonDict("Daily/category-stars.json")[cat] as? Int ?? 0
+        var cs = jsonDict("Daily/category-stars.json")
+        if cs["Art"] != nil || cs["Production"] != nil {
+            let merged = (cs["Content"] as? Int ?? 0) + (cs["Art"] as? Int ?? 0) + (cs["Production"] as? Int ?? 0)
+            cs["Content"] = merged
+            cs.removeValue(forKey: "Art")
+            cs.removeValue(forKey: "Production")
+            saveJSON("Daily/category-stars.json", cs)
+        }
+        return cs[cat] as? Int ?? 0
     }
 
     func toggleHabit(_ name: String) {
@@ -295,12 +303,33 @@ struct TypewriterText: View {
 
 // A chunky, few-frame "burst": scale punches up then settles. No smooth easing,
 // on purpose — that blocky, discrete-frame quality is the Undertale feel.
+// Loads a pre-extracted element/Lotus icon from native/Assets/Icons/ (see native/tools/extract_icons.py).
+// Resolved relative to the running binary's directory, same approach as the vault paths above.
+func assetsIconURL(_ name: String) -> URL {
+    Bundle.main.bundleURL.deletingLastPathComponent()
+        .appendingPathComponent("Assets/Icons/\(name).png")
+}
+
+struct ElementIcon: View {
+    let element: String   // "air" | "water" | "fire" | "earth" | "lotus"
+    var size: CGFloat = 14
+    var body: some View {
+        if let img = NSImage(contentsOf: assetsIconURL(element)) {
+            Image(nsImage: img).resizable().interpolation(.none)
+                .frame(width: size, height: size)
+        } else {
+            Text("?").font(mono(size)).foregroundColor(dim)
+        }
+    }
+}
+
 struct StarBurst: View {
     @Binding var trigger: Int
+    let element: String   // "air" | "water" | "fire" | "earth" | "lotus"
     @State private var scale: CGFloat = 0
     @State private var opacity: Double = 0
     var body: some View {
-        Text("★").font(mono(16)).foregroundColor(gold)
+        ElementIcon(element: element, size: 16)
             .scaleEffect(scale).opacity(opacity)
             .onChange(of: trigger) { _, _ in
                 scale = 1.6; opacity = 1
@@ -319,6 +348,7 @@ let gold = Color(red: 0.827, green: 0.639, blue: 0.255)
 
 struct Tick: View {
     let on: Bool
+    let element: String
     let action: () -> Void
     @State private var hover = false
     @State private var burstTrigger = 0
@@ -338,7 +368,7 @@ struct Tick: View {
             .animation(.easeOut(duration: 0.12), value: hover)
             .help(on ? "untick" : "tick, it counts")
 
-            StarBurst(trigger: $burstTrigger).offset(x: 14, y: -10)
+            StarBurst(trigger: $burstTrigger, element: element).offset(x: 14, y: -10)
         }
     }
 }
@@ -356,7 +386,7 @@ struct TaskRow: View {
     @State private var hover = false
     var body: some View {
         HStack(alignment: .top, spacing: 7) {
-            Tick(on: task.done) { model.toggleTask(task) }
+            Tick(on: task.done, element: element(for: task.category)) { model.toggleTask(task) }
             Button(action: { openInObsidian(task.target) }) {
                 HStack(alignment: .top, spacing: 4) {
                     Text(task.display).font(mono(12))
@@ -389,7 +419,7 @@ struct Dashboard: View {
                     SectionHeader(title: "click to affirm",
                                   more: "Mind & Wellbeing/Manifestations & Vision Board")
                     HStack(alignment: .top, spacing: 7) {
-                        Tick(on: model.habitDone("Morning manifestations")) {
+                        Tick(on: model.habitDone("Morning manifestations"), element: "lotus") {
                             model.toggleHabit("Morning manifestations")
                         }
                         TypewriterText(text: model.manifestation, italic: true, color: bright)
@@ -397,7 +427,7 @@ struct Dashboard: View {
                         StreakBadge(n: model.streak("Morning manifestations"))
                     }
                     HStack(alignment: .top, spacing: 7) {
-                        Tick(on: model.habitDone("Read reminders")) {
+                        Tick(on: model.habitDone("Read reminders"), element: "lotus") {
                             model.toggleHabit("Read reminders")
                         }
                         TypewriterText(text: model.reminder, speed: 0.012, color: fg)
@@ -405,7 +435,7 @@ struct Dashboard: View {
                         StreakBadge(n: model.streak("Read reminders"))
                     }
                     HStack(alignment: .top, spacing: 7) {
-                        Tick(on: model.habitDone("Journal feelings")) {
+                        Tick(on: model.habitDone("Journal feelings"), element: "lotus") {
                             model.toggleHabit("Journal feelings")
                         }
                         Text("journal").font(mono(12)).foregroundColor(fg)
@@ -425,7 +455,8 @@ struct Dashboard: View {
                         if !items.isEmpty {
                             HStack(spacing: 6) {
                                 Text(cat.lowercased()).font(mono(11, .semibold)).foregroundColor(bright)
-                                Text("★ \(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
+                                ElementIcon(element: element(for: cat), size: 12)
+                                Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                                 Spacer()
                             }.padding(.top, 4)
                             ForEach(items) { TaskRow(task: $0, model: model) }
