@@ -75,13 +75,22 @@ func categorize(_ text: String, _ target: String) -> String {
     let s = (text + " " + target).lowercased()
     if ["walk", "run", "calisthenic", "nutritious", "overeat", "gym", "movement"].contains(where: s.contains) { return "Health" }
     if ["jeff", "biography", "substack", "book", "essay", "chapter", "write", "story of our relationship", "journal"].contains(where: s.contains) { return "Writing" }
-    if ["reel", "carousel", "content", "post", "video", "instagram", "ai project", "build", "vibecoding", "capcut", "footage"].contains(where: s.contains) { return "Content" }
-    if ["paint", "art", "touchdesigner", "drawing"].contains(where: s.contains) { return "Art" }
-    if ["lucas", "eti", "varvara", "production", "venue", "pr ", "fundrais"].contains(where: s.contains) { return "Production" }
+    if ["reel", "carousel", "content", "post", "video", "instagram", "ai project", "build", "vibecoding", "capcut", "footage",
+        "paint", "art", "touchdesigner", "drawing",
+        "lucas", "eti", "varvara", "production", "venue", "pr ", "fundrais"].contains(where: s.contains) { return "Content" }
     return "Admin"
 }
 
-let CATEGORY_ORDER = ["Writing", "Content", "Art", "Production", "Admin", "Health"]
+let CATEGORY_ORDER = ["Writing", "Content", "Admin", "Health"]
+
+func element(for category: String) -> String {
+    switch category {
+    case "Writing": return "air"
+    case "Content": return "water"
+    case "Health": return "fire"
+    default: return "earth"   // Admin
+    }
+}
 struct Goal: Identifiable { let id = UUID(); let name: String; let cur: Int; let tgt: Int }
 struct Habit: Identifiable { let id = UUID(); let name: String; let done: Bool; let streak: Int }
 
