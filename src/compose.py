@@ -205,20 +205,12 @@ def acknowledge(message, actions):
 
 
 def proactive_nudge(app):
-    """A gentle, unprompted nudge when focus has drifted during a work block."""
-    from src import llm, vault
-    focus = [ln.strip()[2:].strip() for ln in vault.read("Daily/Focus.md").splitlines()
-             if ln.strip().startswith("- ")]
-    system = (
-        "You are Esme's warm inner voice. You noticed her focus has drifted (she has been on "
-        f"{app}) for a while during a work block. Nudge her GENTLY with zero guilt: name that "
-        "drifting is normal and human, suggest breaking the cycle (a 5 minute walk or one song), "
-        "then one tiny step on her top priority. from-me-to-me, lowercase, 2 to 3 short sentences. "
-        + llm.HUMANIZE)
-    out = llm.generate(f"App she has been on: {app}\nHer top priorities: {focus}\nWrite the nudge.",
-                       system=system)
-    return headers.random_header() + "\n\n" + (out or
-        "hey, focus drifted, that's so normal. take five, a walk or a song, then come back to just one small thing x")
+    """A gentle, unprompted nudge when focus has drifted. Short: one real coping/
+    discipline line from her own vault, not an AI-authored paragraph."""
+    from src import vault
+    line = vault.random_discipline() or vault.random_coping_line() or (
+        "drifting is normal and human. take five, then come back to just one small thing.")
+    return headers.random_header() + "\n\n" + f"focus drifted, just noticing.\n\n{line}"
 
 
 def nudge():

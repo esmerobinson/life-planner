@@ -25,6 +25,7 @@ def main():
     if "𝐃𝐚𝐲 𝐢𝐧 𝐫𝐞𝐯𝐢𝐞𝐰" in note:
         return print("already reviewed today")
     ticked = [l for l in note.splitlines() if l.strip().startswith("- [x]")]
+    # the fuller written record stays in the note (this is a journal, length is fine there)
     body = llm.generate(
         f"Esme's daily note for {d:%A %d %B}, including her own reflections and replies:\n\n"
         f"{note[:5000]}\n\nTicked today: {len(ticked)}\n\n"
@@ -39,10 +40,18 @@ def main():
         return print("Gemini unavailable")
     storage.write(vault.daily_note_path(d),
                   note.rstrip() + "\n\n" + fancy.heading("Day in review") + "\n" + body + "\n")
+
+    # the WhatsApp message stays short: one line, plus a real manifestation, not an AI essay
+    ack = llm.generate(
+        f"Esme's day, summarised: {body[:600]}",
+        system=("Write ONE short lowercase sentence, from-me-to-me, acknowledging her day. "
+                 "No advice, no list, no em dashes. " + llm.HUMANIZE),
+    ) or "today's written up in your note."
+    mani = vault.random_manifestation() or "I am proud of myself for showing up today."
     whatsapp.send_text(os.environ["MY_NUMBER"],
                        headers.random_header() + "\n\n" + fancy.bold_italic("Day in review") + "\n\n"
-                       + body + "\n\ngoodnight, love. tomorrow is already set up for you x")
-    print("day review written + sent")
+                       + ack + "\n\n" + fancy.italic(mani) + "\n\ngoodnight x")
+    print("day review written to note (full) + sent (short)")
 
 
 if __name__ == "__main__":
