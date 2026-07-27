@@ -180,14 +180,25 @@ The rounded, bracket-cornered box art from the name-entry screen is cropped and 
 the "make a journal entry" CTA button and/or the affirm-row wrapper — in place of the current
 plain `RoundedRectangle` fills, so those read as game dialog boxes rather than flat shapes.
 
-### Pixel font (contained scope)
+### Pixel font
 
-Building a renderer that can type arbitrary text with a bitmap font (one image per letter,
-no scalable glyph outlines) is a real engineering lift with no SwiftUI shortcut, so its use
-is deliberately contained: each letter (A–Z, a–z) is cropped from the name-entry sheet into
-its own transparent PNG, and a small `PixelText` view lays out matching letter-images side by
-side for a given string. This is used **only** for the date header ("Friday 24 July",
-`main.swift:372`) — every other text in the app keeps the existing system monospace font.
+**Revised**: `~/Downloads/Avatar Airbender Font.zip` turned out to contain a real vector
+font file (`Avatar Airbender.ttf`), not another sprite rip — its `license.txt` states it's
+"100% free... for personal or commercial purposes," crediting FontGet.com. That makes the
+custom bitmap-glyph renderer originally planned here unnecessary: the `.ttf` gets bundled as
+a normal file the app loads at launch (`CTFontManagerRegisterFontsForURL` or equivalent),
+then referenced anywhere via `Font.custom("Avatar Airbender", size:)` — same mechanism as
+the existing `mono()` helper (`main.swift:222-224`), just a second font helper alongside it.
+
+Unlike the ripped sprite/icon/background assets, this font **is** fine to commit to the
+public repo, with a credit line to FontGet.com kept in a comment near where the font is
+loaded (per its license) — it does not need the gitignore treatment the other assets get.
+
+Since it's a real scalable font rather than a handful of sliced letter-images, there's no
+reason to limit its use to a single header — it's used for header/title-style text
+throughout the popup (the date header, section header labels, button labels), while body
+text (task lists, manifestation/reminder copy) stays on the existing monospace font for
+readability at small sizes.
 
 ### Reaction portraits (supersedes the Part 1 "Reaction" body-sprite moment)
 
@@ -213,13 +224,13 @@ background). Same `.gitignore`'d, personal-use-only handling as the sprite frame
 Idea: on opening the app (first open of a session, or every open — TBD), instead of going
 straight to the dashboard, show a brief visual-novel-style exchange with Aang: his face
 portrait, a line of dialogue in "Aang-speak" (e.g. "hey, wanna see what tasks you got for
-today?") rendered in the pixel font from the name-entry sheet, then two response options
-("yes sure!" / "eh, not feeling well"). Either choice leads to a motivational quote + a
-reminder (mood-adjusted based on which option was picked), after which the normal dashboard
-appears as usual. Needs a skip option for anyone who doesn't want the exchange every time.
-Wants its own design pass (dialogue state machine, branching content source, skip
-persistence, how the pixel font renders multi-line dialogue vs. just the date header) once
-the first-pass mascot + theming work above is done and working.
+today?") rendered in the `Avatar Airbender` font, then two response options ("yes sure!" /
+"eh, not feeling well"). Either choice leads to a motivational quote + a reminder
+(mood-adjusted based on which option was picked), after which the normal dashboard appears
+as usual. Needs a skip option for anyone who doesn't want the exchange every time. Wants its
+own design pass (dialogue state machine, branching content source, skip persistence,
+multi-line dialogue layout) once the first-pass mascot + theming work above is done and
+working.
 
 ### Updated testing
 
@@ -228,5 +239,5 @@ Still manual verification only, same rationale as Part 1: rebuild with
 applied throughout, element tokens counting and bursting correctly per category (including
 the migrated `Content` counts), Lotus tile as menu-bar icon and on all three wellbeing ticks,
 background visible without hurting text legibility, textbox art rendering behind its panels
-without distortion at the popup's fixed 340×640 size, date header rendering via `PixelText`,
-and a reaction portrait appearing on task tick.
+without distortion at the popup's fixed 340×640 size, header text rendering via the
+registered `Avatar Airbender` font, and a reaction portrait appearing on task tick.
