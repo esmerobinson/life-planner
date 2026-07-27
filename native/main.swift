@@ -1,11 +1,12 @@
 // esme's day — native macOS menu bar app.
-// Click the ✿ in the menu bar -> a floating dashboard window (never clipped):
-// today's tasks (each opens its project in Obsidian), manifestation + reminder of
-// the day with "see more", a one-tap "make a journal entry" that opens today's note,
-// goal bars, habit streaks, stars. Reads the vault directly.
-// Build: swiftc -swift-version 5 -O main.swift -o EsmeDay
+// Click the ✿ in the menu bar -> a floating window (never clipped, freely resizable),
+// with three tabs: Today (tasks, manifestation + reminder, goal bars, habit streaks,
+// stars), Schedule (today's suggested timed plan, editable), Calendar (deadlines only).
+// Reads the vault directly, watches it for instant live-updates via FSEvents.
+// Build: swiftc -swift-version 5 -O main.swift -o EsmeDay -framework CoreServices
 
 import AppKit
+import CoreServices
 import SwiftUI
 
 // MARK: - vault access
@@ -226,6 +227,193 @@ final class Model: ObservableObject {
 
     func habitDone(_ name: String) -> Bool { habits.first { $0.name == name }?.done ?? false }
     func streak(_ name: String) -> Int { habits.first { $0.name == name }?.streak ?? 0 }
+}
+
+// MARK: - schedule tab (today's suggested, editable timed plan)
+
+func addMinutes(_ hhmm: String, _ mins: Int) -> String {
+    let parts = hhmm.split(separator: ":").compactMap { Int($0) }
+    guard parts.count == 2 else { return hhmm }
+    let total = ((parts[0] * 60 + parts[1] + mins) % (24 * 60) + 24 * 60) % (24 * 60)
+    return String(format: "%02d:%02d", total / 60, total % 60)
+}
+
+struct ScheduleBlock: Identifiable, Codable, Equatable {
+    var id: String
+    var task_ref: String?
+    var label: String
+    var start: String
+    var duration_min: Int
+    var is_open: Bool?
+    var isOpen: Bool { is_open == true }
+}
+
+enum DeleteMode { case notToday, moveTo(Date) }
+
+final class ScheduleModel: ObservableObject {
+    @Published var blocks: [ScheduleBlock] = []
+    @Published var newlyAdded: Set<String> = []
+
+    func load(currentTasks: [TaskItem]) {
+        var loaded = decode()
+        reconcile(&loaded, currentTasks: currentTasks)
+        blocks = loaded
+        persist()
+    }
+
+    private func decode() -> [ScheduleBlock] {
+        guard let d = read("Daily/schedule.json").data(using: .utf8),
+              let arr = try? JSONDecoder().decode([ScheduleBlock].self, from: d) else { return [] }
+        return arr
+    }
+
+    private func reconcile(_ blocks: inout [ScheduleBlock], currentTasks: [TaskItem]) {
+        let openTexts = Set(currentTasks.filter { !$0.done }.map { $0.display })
+        for i in blocks.indices {
+            if let ref = blocks[i].task_ref, !openTexts.contains(ref) {
+                blocks[i].task_ref = nil
+                blocks[i].label = "open"
+                blocks[i].is_open = true
+            }
+        }
+        let referenced = Set(blocks.compactMap { $0.task_ref })
+        for t in currentTasks where !t.done && !referenced.contains(t.display) {
+            if let idx = blocks.firstIndex(where: { $0.isOpen }) {
+                blocks[idx].task_ref = t.display
+                blocks[idx].label = t.display
+                blocks[idx].is_open = false
+                newlyAdded.insert(blocks[idx].id)
+            } else {
+                let start = blocks.last.map { addMinutes($0.start, $0.duration_min) } ?? "09:00"
+                let blk = ScheduleBlock(id: UUID().uuidString, task_ref: t.display, label: t.display,
+                                        start: start, duration_min: 30, is_open: false)
+                blocks.append(blk)
+                newlyAdded.insert(blk.id)
+            }
+        }
+        recomputeStarts(&blocks)
+    }
+
+    private func recomputeStarts(_ blocks: inout [ScheduleBlock]) {
+        guard var cursor = blocks.first?.start else { return }
+        for i in blocks.indices {
+            blocks[i].start = cursor
+            cursor = addMinutes(cursor, blocks[i].duration_min)
+        }
+    }
+
+    private func persist() {
+        guard let d = try? JSONEncoder().encode(blocks), let s = String(data: d, encoding: .utf8) else { return }
+        writeVault("Daily/schedule.json", s)
+    }
+
+    func move(from: IndexSet, to: Int) {
+        blocks.move(fromOffsets: from, toOffset: to)
+        recomputeStarts(&blocks)
+        persist()
+    }
+
+    func resize(_ id: String, deltaMinutes: Int) {
+        guard let i = blocks.firstIndex(where: { $0.id == id }) else { return }
+        blocks[i].duration_min = max(5, blocks[i].duration_min + deltaMinutes)
+        recomputeStarts(&blocks)
+        persist()
+    }
+
+    func delete(_ id: String, mode: DeleteMode) {
+        guard let i = blocks.firstIndex(where: { $0.id == id }) else { return }
+        let task = blocks[i].task_ref
+        blocks[i].task_ref = nil
+        blocks[i].label = "open"
+        blocks[i].is_open = true
+        recomputeStarts(&blocks)
+        persist()
+        if case .moveTo(let date) = mode, let task = task { moveTaskDue(task, to: date) }
+    }
+
+    private func moveTaskDue(_ text: String, to date: Date) {
+        let path = "Goals & Direction/Backlog.md"
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let tag = "[due \(f.string(from: date))]"
+        let note = read(path)
+        let lines = note.components(separatedBy: "\n").map { line -> String in
+            guard line.contains("- [ ] "), line.contains(text) else { return line }
+            var l = line
+            if let r = l.range(of: #"\[due \d{4}-\d{2}-\d{2}\]"#, options: .regularExpression) {
+                l.replaceSubrange(r, with: tag)
+            } else {
+                l += " " + tag
+            }
+            return l
+        }
+        writeVault(path, lines.joined(separator: "\n"))
+    }
+}
+
+// MARK: - calendar tab (due-dated tasks + deadlines only, no recurring)
+
+struct DueItem: Identifiable {
+    let id = UUID()
+    let text: String
+    let due: Date
+}
+
+final class CalendarModel: ObservableObject {
+    @Published var items: [DueItem] = []
+
+    func load() {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        var out: [DueItem] = []
+        var section = ""
+        for raw in read("Goals & Direction/Backlog.md").components(separatedBy: "\n") {
+            if raw.hasPrefix("## ") { section = raw.dropFirst(3).lowercased(); continue }
+            if section.contains("parked") || section.contains("moved elsewhere") { continue }
+            let t = raw.trimmingCharacters(in: .whitespaces)
+            guard t.hasPrefix("- [ ] "),
+                  let r = t.range(of: #"\[due (\d{4}-\d{2}-\d{2})\]"#, options: .regularExpression),
+                  let dm = t.range(of: #"\d{4}-\d{2}-\d{2}"#, options: .regularExpression, range: r),
+                  let date = df.date(from: String(t[dm])) else { continue }
+            var text = String(t.dropFirst(6))
+            for pat in [#"\s*!p[123]\b"#, #"\s*\[due \d{4}-\d{2}-\d{2}\]"#, #"\s*\[recur: [a-z,]+\]"#, #"\s*#[\w-]+"#] {
+                text = text.replacingOccurrences(of: pat, with: "", options: .regularExpression)
+            }
+            out.append(DueItem(text: text.trimmingCharacters(in: .whitespaces), due: date))
+        }
+        items = out.sorted { $0.due < $1.due }
+    }
+}
+
+// MARK: - vault watcher (instant live-update, local FSEvents, no network/cost)
+
+final class VaultWatcher {
+    private var stream: FSEventStreamRef?
+    var onChange: (() -> Void)?
+
+    init(path: String) {
+        var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(),
+                                            retain: nil, release: nil, copyDescription: nil)
+        let callback: FSEventStreamCallback = { _, clientInfo, _, _, _, _ in
+            guard let clientInfo = clientInfo else { return }
+            let watcher = Unmanaged<VaultWatcher>.fromOpaque(clientInfo).takeUnretainedValue()
+            DispatchQueue.main.async { watcher.onChange?() }
+        }
+        stream = FSEventStreamCreate(nil, callback, &context, [path] as CFArray,
+                                      FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+                                      0.5,
+                                      FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents |
+                                                                kFSEventStreamCreateFlagNoDefer))
+        if let stream = stream {
+            FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
+            FSEventStreamStart(stream)
+        }
+    }
+
+    deinit {
+        if let stream = stream {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+        }
+    }
 }
 
 // MARK: - styling
@@ -513,7 +701,196 @@ struct Dashboard: View {
             }
             .padding(20)
         }
-        .frame(width: 340, height: 640)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(bg)
+    }
+}
+
+// MARK: - schedule view
+
+struct ScheduleRow: View {
+    let block: ScheduleBlock
+    let isNew: Bool
+    let model: ScheduleModel
+    @State private var showMoveTo = false
+    @State private var moveDate = Date()
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(block.start)–\(addMinutes(block.start, block.duration_min))")
+                    .font(mono(10)).foregroundColor(dim)
+                HStack(spacing: 4) {
+                    Text(block.isOpen ? "open" : block.label)
+                        .font(mono(12)).foregroundColor(block.isOpen ? dim : fg)
+                        .italic(block.isOpen)
+                    if isNew {
+                        Text("new").font(mono(9, .semibold)).foregroundColor(bright)
+                            .padding(.horizontal, 4).padding(.vertical, 1)
+                            .background(RoundedRectangle(cornerRadius: 3).fill(green.opacity(0.3)))
+                    }
+                }
+            }
+            Spacer()
+            if !block.isOpen {
+                VStack(spacing: 4) {
+                    Button(action: { model.resize(block.id, deltaMinutes: 5) }) {
+                        Text("+").font(mono(11))
+                    }.buttonStyle(.plain)
+                    Button(action: { model.resize(block.id, deltaMinutes: -5) }) {
+                        Text("–").font(mono(11))
+                    }.buttonStyle(.plain)
+                }.foregroundColor(dim)
+                Button(action: { showMoveTo = true }) {
+                    Text("📅").font(mono(11))
+                }.buttonStyle(.plain)
+                .popover(isPresented: $showMoveTo) {
+                    VStack(spacing: 8) {
+                        DatePicker("move to", selection: $moveDate, displayedComponents: .date)
+                            .datePickerStyle(.graphical).labelsHidden()
+                        Button("move") { model.delete(block.id, mode: .moveTo(moveDate)); showMoveTo = false }
+                    }.padding(12)
+                }
+                Button(action: { model.delete(block.id, mode: .notToday) }) {
+                    Text("✕").font(mono(11))
+                }.buttonStyle(.plain).foregroundColor(dim)
+            }
+        }
+        .frame(minHeight: max(28, CGFloat(block.duration_min) * 0.5))
+        .padding(.vertical, 4).padding(.horizontal, 6)
+        .background(RoundedRectangle(cornerRadius: 5)
+            .fill(block.isOpen ? Color.clear : Color.white.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 5)
+            .stroke(block.isOpen ? dim.opacity(0.3) : Color.clear, style: StrokeStyle(lineWidth: 1, dash: [3])))
+    }
+}
+
+struct ScheduleView: View {
+    @ObservedObject var model: ScheduleModel
+    var body: some View {
+        List {
+            ForEach(model.blocks) { b in
+                ScheduleRow(block: b, isNew: model.newlyAdded.contains(b.id), model: model)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+            .onMove(perform: model.move)
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(bg)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - calendar view
+
+struct CalendarView: View {
+    @ObservedObject var model: CalendarModel
+    @State private var showGrid = true
+    @State private var monthAnchor = Date()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("", selection: $showGrid) {
+                Text("month").tag(true)
+                Text("list").tag(false)
+            }.pickerStyle(.segmented).labelsHidden()
+
+            if showGrid {
+                monthGrid
+            } else {
+                listView
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(bg)
+    }
+
+    private var itemsByDay: [Date: [DueItem]] {
+        let cal = Calendar.current
+        return Dictionary(grouping: model.items) { cal.startOfDay(for: $0.due) }
+    }
+
+    private var monthGrid: some View {
+        let cal = Calendar.current
+        let start = cal.date(from: cal.dateComponents([.year, .month], from: monthAnchor))!
+        let range = cal.range(of: .day, in: .month, for: start)!
+        let firstWeekday = cal.component(.weekday, from: start) - 1
+        let days = (0..<firstWeekday).map { _ in nil as Date? } +
+                   range.map { cal.date(byAdding: .day, value: $0 - 1, to: start) }
+        let byDay = itemsByDay
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button("←") { monthAnchor = cal.date(byAdding: .month, value: -1, to: monthAnchor)! }
+                    .buttonStyle(.plain)
+                Text(start, format: .dateTime.month(.wide).year()).font(mono(12, .semibold)).foregroundColor(bright)
+                Button("→") { monthAnchor = cal.date(byAdding: .month, value: 1, to: monthAnchor)! }
+                    .buttonStyle(.plain)
+            }.foregroundColor(fg)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 6) {
+                ForEach(days.indices, id: \.self) { i in
+                    if let day = days[i] {
+                        let items = byDay[cal.startOfDay(for: day)] ?? []
+                        VStack(spacing: 2) {
+                            Text("\(cal.component(.day, from: day))").font(mono(11))
+                                .foregroundColor(cal.isDateInToday(day) ? bright : fg)
+                            if !items.isEmpty {
+                                Circle().fill(green).frame(width: 5, height: 5)
+                            }
+                        }.frame(maxWidth: .infinity, minHeight: 28)
+                    } else {
+                        Color.clear.frame(minHeight: 28)
+                    }
+                }
+            }
+        }
+    }
+
+    private var listView: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 8) {
+                if model.items.isEmpty {
+                    Text("no deadlines set").font(mono(12)).foregroundColor(dim)
+                }
+                ForEach(model.items) { item in
+                    HStack {
+                        Text(item.due, format: .dateTime.day().month(.abbreviated))
+                            .font(mono(11)).foregroundColor(dim).frame(width: 50, alignment: .leading)
+                        Text(item.text).font(mono(12)).foregroundColor(fg)
+                        Spacer()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - root (tab switcher)
+
+enum PlannerTab: String, CaseIterable { case today = "today", schedule = "schedule", calendar = "calendar" }
+
+struct RootView: View {
+    @ObservedObject var model: Model
+    @ObservedObject var scheduleModel: ScheduleModel
+    @ObservedObject var calendarModel: CalendarModel
+    @State private var tab: PlannerTab = .today
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $tab) {
+                ForEach(PlannerTab.allCases, id: \.self) { Text($0.rawValue) }
+            }.pickerStyle(.segmented).labelsHidden().padding(12)
+
+            switch tab {
+            case .today: Dashboard(model: model)
+            case .schedule: ScheduleView(model: scheduleModel)
+            case .calendar: CalendarView(model: calendarModel)
+            }
+        }
         .background(bg)
     }
 }
@@ -578,16 +955,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     let model = Model()
     let mascot = MascotModel()
+    let scheduleModel = ScheduleModel()
+    let calendarModel = CalendarModel()
+    var watcher: VaultWatcher?
 
     func applicationDidFinishLaunching(_ n: Notification) {
-        model.load()
+        reloadAll()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         updateTitle()
         statusItem.button?.action = #selector(toggle)
         statusItem.button?.target = self
 
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 340, height: 640),
-                          styleMask: [.titled, .closable, .fullSizeContentView],
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 640),
+                          styleMask: [.titled, .closable, .fullSizeContentView, .resizable],
                           backing: .buffered, defer: false)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -595,17 +975,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .floating
         window.backgroundColor = NSColor(red: 0.106, green: 0.106, blue: 0.106, alpha: 1)
         window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 420, height: 560)
+        window.setFrameAutosaveName("EsmeDayWindow")
         window.contentView = NSHostingView(rootView:
             ZStack(alignment: .bottomTrailing) {
-                Dashboard(model: model)
+                RootView(model: model, scheduleModel: scheduleModel, calendarModel: calendarModel)
                 SpriteAnimator(mascot: mascot)
                     .padding(12)
             }
         )
 
+        // instant live-update: watch the vault for any change (Obsidian edits, WhatsApp
+        // replies writing to the vault, this app's own writes), free local OS API, no cost.
+        watcher = VaultWatcher(path: VAULT.path)
+        watcher?.onChange = { [weak self] in self?.reloadAll(); self?.updateTitle() }
+
+        // slow fallback in case an FSEvents notification is ever missed
         Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            self?.model.load(); self?.updateTitle()
+            self?.reloadAll(); self?.updateTitle()
         }
+    }
+
+    func reloadAll() {
+        model.load()
+        scheduleModel.load(currentTasks: model.tasks)
+        calendarModel.load()
     }
 
     func updateTitle() {
@@ -621,7 +1015,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func toggle() {
         if window.isVisible { window.orderOut(nil); return }
-        model.load(); updateTitle()
+        reloadAll(); updateTitle()
         if let btnWin = statusItem.button?.window, let screen = btnWin.screen {
             let btn = btnWin.frame
             var x = btn.midX - window.frame.width + 40
