@@ -1,11 +1,23 @@
 name: Life Planner - daily messages
 
+# GitHub's own `schedule:` trigger is unreliable under load (can be delayed hours,
+# which used to make slot_for_now() misclassify a late-firing "morning" run as
+# midday). The real trigger now comes from Cloudflare Cron Triggers calling this
+# workflow's `workflow_dispatch` with an explicit slot, which is prompt and precise.
+# The schedule below stays only as a safety net in case the Cloudflare trigger
+# itself ever fails silently.
+
 on:
   schedule:
-    - cron: "30 7 * * *"    # ~08:30 London  (morning: generates the note + sends)
-    - cron: "0 12 * * *"    # ~13:00 London  (midday)
-    - cron: "0 16 * * *"    # ~17:00 London  (evening)
-  workflow_dispatch:         # lets you run it by hand from the Actions tab
+    - cron: "30 7 * * *"    # ~08:30 London  (safety net only)
+    - cron: "0 12 * * *"    # ~13:00 London  (safety net only)
+    - cron: "0 16 * * *"    # ~17:00 London  (safety net only)
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "morning | midday | evening (omit to infer from time of day)"
+        required: false
+        type: string
 
 jobs:
   send:
@@ -25,4 +37,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: python scripts/run.py    # picks morning/midday/evening by the time of day
+      - run: python scripts/run.py ${{ inputs.slot }}

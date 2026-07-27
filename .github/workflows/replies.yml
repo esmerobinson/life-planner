@@ -1,8 +1,12 @@
 name: Life Planner - process replies
 
+# GitHub's own schedule trigger is unreliable at 5-min granularity (observed real
+# cadence: ~once every 3 hours, not every 5 min). The real trigger is now Cloudflare
+# Cron Triggers calling workflow_dispatch, which fires promptly. Schedule kept only
+# as a distant safety net.
 on:
   schedule:
-    - cron: "*/5 * * * *"   # every 30 min: file your WhatsApp replies into the vault
+    - cron: "*/30 * * * *"   # safety net only
   workflow_dispatch:
 
 jobs:
