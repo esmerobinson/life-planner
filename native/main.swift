@@ -212,12 +212,13 @@ final class Model: ObservableObject {
 }
 
 // MARK: - styling
-
-let bg = Color(red: 0.106, green: 0.106, blue: 0.106)
-let fg = Color(red: 0.604, green: 0.604, blue: 0.510)
-let bright = Color(red: 0.788, green: 0.788, blue: 0.678)
-let green = Color(red: 0.561, green: 0.682, blue: 0.529)
-let dim = Color(red: 0.396, green: 0.396, blue: 0.353)
+// Avatar: The Last Airbender cozy-game palette (Aang color scheme).
+let bg = Color(red: 0.976, green: 0.937, blue: 0.890)      // #F9EFE3 cream
+let fg = Color(red: 0.443, green: 0.329, blue: 0.278)      // #715447 brown
+let bright = Color(red: 0.431, green: 0.090, blue: 0.0)    // #6E1700 dark red-brown
+let green = Color(red: 0.957, green: 0.757, blue: 0.208)   // #F4C135 gold (kept as `green` -- primary accent, see below)
+let dim = Color(red: 0.443, green: 0.329, blue: 0.278).opacity(0.55) // muted brown
+let hoverAccent = Color(red: 0.933, green: 0.447, blue: 0.137) // #EE7223 orange, hover/pressed states
 
 func mono(_ s: CGFloat, _ w: Font.Weight = .regular) -> Font {
     .system(size: s, weight: w, design: .monospaced)
