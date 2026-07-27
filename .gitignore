@@ -7,3 +7,4 @@ credentials.json
 logs/
 docs/superpowers/introscreens_avatar_files/
 native/Assets/
+.claude/worktrees/
