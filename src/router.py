@@ -16,13 +16,20 @@ ROUTER_SYSTEM = (
     "so nothing she says is ever lost. Never invent content. "
     "Output a JSON array of objects, each with a 'type' and its fields:\n"
     '  {"type":"journal","text":"..."}   a thought, feeling, or reflection (verbatim-ish)\n'
-    '  {"type":"tick","task":"..."}       she reports finishing something (task = a few keywords)\n'
+    '  {"type":"tick","task":"..."}       she reports something is ALREADY DONE (task = a few keywords)\n'
     '  {"type":"todo","text":"..."}       a new idea/task to remember\n'
-    '  {"type":"intention","text":"..."}  her stated focus/intention for the day\n'
+    '  {"type":"intention","text":"..."}  her stated PLAN or focus for later (not yet done)\n'
     '  {"type":"defer","task":"..."}      she does not want to do a task today but keep it (task = a few keywords)\n'
     '  {"type":"habit","name":"..."}      she did a tracked daily habit (name = affirmations / movement / write / kind thing)\n'
     '  {"type":"note","text":"..."}       a work/task-related note or a new backlog item\n'
-    '  {"type":"mood","note":"..."}       a mood or energy check-in'
+    '  {"type":"mood","note":"..."}       a mood or energy check-in\n\n'
+    "CRITICAL: 'tick' is ONLY for clearly PAST-TENSE, completed statements "
+    "('did the walk', 'finished the draft', 'posted it', 'sent that email'). "
+    "Future-tense or planning language ('I want to start with...', 'I will write after', "
+    "'I'm going to...', 'next I'll...', 'I plan to...') is ALWAYS 'intention', even if it "
+    "names a specific task, because nothing has happened yet. When genuinely unsure whether "
+    "something is done or planned, prefer 'intention' over 'tick' — a wrongly-awarded "
+    "completion star is worse than a missed one."
 )
 
 

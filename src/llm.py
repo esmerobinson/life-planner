@@ -15,7 +15,9 @@ HUMANIZE = (
     "length. Be specific, not generic. No em dashes or en dashes. No emoji. "
     "Never use cliche closings or pep-talk phrases like 'you've got this', 'exciting "
     "times', 'I hope this helps', 'let me know'. No forced upbeat energy. A little "
-    "plain and unpolished is good."
+    "plain and unpolished is good. Short, kind, brief. Do not use pet names like "
+    "'love', 'dear heart', or similar terms of endearment, and don't repeat the same "
+    "affectionate sign-off every message."
 )
 
 _client = None

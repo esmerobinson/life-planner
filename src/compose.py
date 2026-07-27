@@ -159,16 +159,19 @@ def _reminder_candidates(message):
     return uniq[:16]
 
 
-SELECT_SYSTEM = (
-    "You help Esme by choosing from HER OWN written reminders, never by inventing advice. "
-    "Read her message and decide: is she just neutrally reporting a task/mood (mode "
-    "'confirmation'), or does she need real support (mode 'support')? If 'support', pick "
-    "the 2 (max 3) lines from her list that most directly meet her exactly where she is. "
-    "You MUST copy chosen lines character-for-character from the list, never reword or "
-    "summarise them. Also write a ONE-sentence warm acknowledgment of how she's feeling, "
-    "lowercase, from-me-to-me, containing no advice of your own, no em dashes, not preachy. "
-    "Output JSON only: {\"mode\": \"confirmation\"|\"support\", \"ack\": \"...\", \"lines\": [...]}"
-)
+def _select_system():
+    from src import llm
+    return (
+        "You help Esme by choosing from HER OWN written reminders, never by inventing advice. "
+        "Read her message and decide: is she just neutrally reporting a task/mood (mode "
+        "'confirmation'), or does she need real support (mode 'support')? If 'support', pick "
+        "the 2 (max 3) lines from her list that most directly meet her exactly where she is. "
+        "You MUST copy chosen lines character-for-character from the list, never reword or "
+        "summarise them. Also write a ONE-sentence acknowledgment of how she's feeling, "
+        "lowercase, from-me-to-me, containing no advice of your own, not preachy. "
+        + llm.HUMANIZE
+        + " Output JSON only: {\"mode\": \"confirmation\"|\"support\", \"ack\": \"...\", \"lines\": [...]}"
+    )
 
 
 def reply(message, actions):
@@ -181,7 +184,7 @@ def reply(message, actions):
         f"Her message: {message}\nWhat I just filed for her: {'; '.join(actions)}\n\n"
         "Her own real lines to choose from (copy exactly, do not alter):\n"
         + "\n".join(f"- {c}" for c in candidates),
-        system=SELECT_SYSTEM, temperature=0,
+        system=_select_system(), temperature=0,
     )
 
     ack, chosen = "", []
@@ -190,10 +193,10 @@ def reply(message, actions):
         if result.get("mode") == "support":
             chosen = [l for l in result.get("lines", []) if l in candidates]
 
-    body = ack or "got it, love."
+    body = ack or "got it."
     if chosen:
         body += "\n\n" + "\n".join(f"· {c}" for c in chosen)
-    elif any("star" in a.lower() for a in actions):
+    elif any("⭐" in a or "star earned" in a.lower() for a in actions):
         body += " that's a star on your chart now."
 
     return headers.random_header() + "\n\n" + body
