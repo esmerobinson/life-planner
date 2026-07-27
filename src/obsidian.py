@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from src import fancy, storage, vault
 
-MASTER_TODO = "Goals & Direction/Master To-Do.md"
+MASTER_TODO = "Goals & Direction/Backlog.md"
 
 
 def award_star(reason, d=None, dry_run=False):
@@ -80,18 +80,18 @@ def append_note(text, d=None, dry_run=False):
 
 
 def add_to_master_todo(text, dry_run=False):
-    """Append a captured idea under the '## Brain Dump' section of Master To-Do."""
-    line = f"- {text.strip()}"
-    preview = f"add to Master To-Do › Brain Dump: {line}"
+    """Append a captured idea under the '## Inbox (to triage)' section of Backlog."""
+    line = f"- [ ] {text.strip()}"
+    preview = f"add to Backlog › Inbox: {line}"
     if not dry_run:
         out, inserted = [], False
         for ln in vault.read(MASTER_TODO).splitlines():
             out.append(ln)
-            if ln.strip().startswith("## Brain Dump") and not inserted:
+            if ln.strip().startswith("## Inbox") and not inserted:
                 out.append(line)
                 inserted = True
         if not inserted:
-            out += ["", "## Brain Dump", line]
+            out += ["", "## Inbox (to triage)", line]
         storage.write(MASTER_TODO, "\n".join(out) + "\n")
     return MASTER_TODO, preview
 

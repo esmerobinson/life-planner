@@ -71,7 +71,7 @@ def morning(d=None):
     mani = vault.random_manifestation() or "I am building the life I want, one honest day at a time."
     reminder = vault.random_reminder()
 
-    parts = [fancy.bold_italic("Good morning") + " <3", "", fancy.italic(mani), ""]
+    parts = [fancy.bold_italic("Good morning") + " <3", "", fancy.bold(mani), ""]
     parts += [fancy.heading("To do today")]
     parts += [_bullets([_plain(t) for t in todo[:5]]) if todo else "• (let's set today's few, reply with what matters)"]
     parts += ["", fancy.heading("Health"), _bullets(vault.daily_health(d), "  ")]
@@ -82,7 +82,7 @@ def morning(d=None):
             parts += ["  • " + disc]
         insp = vault.random_inspiration()
         if insp:
-            parts += ["  • " + _plain(insp)]
+            parts += ["  • study: " + _plain(insp)]
     qs = vault.select_prompts("Morning", 3) or [
         "What task do you want to start with today?",
         "Is anything missing from the to do list?",
@@ -121,7 +121,7 @@ def evening(d=None):
     parts = [fancy.bold_italic("Good evening"), "",
              fancy.italic("winding down. no scorekeeping tonight."), ""]
     parts += [_questions(qs)]
-    parts += ["", fancy.italic(mani)]
+    parts += ["", fancy.bold(mani)]
     return "\n".join(parts)
 
 

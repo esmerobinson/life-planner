@@ -104,11 +104,16 @@ _FUTURE_SELF = [
 
 
 def random_inspiration():
-    """A line from her Inspiration notes, or a 'who you're becoming' future-self prompt."""
+    """A line from her Inspiration notes (creator references / study prompts), or a
+    'who you're becoming' future-self prompt. Labelled 'inspiration' by the caller so
+    it's never confused with her personal Daily reminders list."""
     items = []
     for note in ("Resources/Inspiration & motivation.md", "Resources/Inspiration - Creators & References.md"):
-        items += [ln.strip()[2:].strip().strip("*") for ln in read(note).splitlines()
-                  if ln.strip().startswith("- ") and len(ln.strip()) > 20]
+        for ln in read(note).splitlines():
+            t = ln.strip()
+            if t.startswith("- ") and len(t) > 20:
+                t = re.sub(r"\*\*(.+?)\*\*", r"\1", t[2:].strip())  # strip **bold** anywhere, not just edges
+                items.append(t.strip())
     if items and random.random() < 0.6:
         return random.choice(items)
     return random.choice(_FUTURE_SELF)

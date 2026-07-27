@@ -518,12 +518,66 @@ struct Dashboard: View {
     }
 }
 
+// MARK: - Aang mascot (body-sprite splash/idle)
+
+enum MascotState { case idle, splash }
+
+final class MascotModel: ObservableObject {
+    @Published var state: MascotState = .idle
+
+    func playSplash() {
+        state = .splash
+        // splash is a 4-frame sequence at 6fps (see SpriteAnimator) -> ~0.67s, then fall back to idle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+            self?.state = .idle
+        }
+    }
+}
+
+struct SpriteAnimator: View {
+    @ObservedObject var mascot: MascotModel
+    @State private var frameIndex = 0
+    @State private var frames: [NSImage] = []
+    @State private var timer: Timer?
+
+    var body: some View {
+        Group {
+            if frameIndex < frames.count {
+                Image(nsImage: frames[frameIndex]).resizable().interpolation(.none)
+                    .frame(width: 72, height: 72)
+            }
+        }
+        .onAppear { load(for: mascot.state); start() }
+        .onChange(of: mascot.state) { _, newState in load(for: newState) }
+        .onDisappear { timer?.invalidate() }
+    }
+
+    private func folderName(_ s: MascotState) -> String { s == .idle ? "idle" : "splash" }
+
+    private func load(for state: MascotState) {
+        let dir = Bundle.main.bundleURL.deletingLastPathComponent()
+            .appendingPathComponent("Assets/Sprites/\(folderName(state))")
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        frames = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            .compactMap { NSImage(contentsOf: $0) }
+        frameIndex = 0
+    }
+
+    private func start() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 6.0, repeats: true) { _ in
+            guard !frames.isEmpty else { return }
+            frameIndex = (frameIndex + 1) % frames.count
+        }
+    }
+}
+
 // MARK: - menu bar + floating window (a real window, so nothing gets clipped)
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var window: NSWindow!
     let model = Model()
+    let mascot = MascotModel()
 
     func applicationDidFinishLaunching(_ n: Notification) {
         model.load()
@@ -541,7 +595,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .floating
         window.backgroundColor = NSColor(red: 0.106, green: 0.106, blue: 0.106, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.contentView = NSHostingView(rootView: Dashboard(model: model))
+        window.contentView = NSHostingView(rootView:
+            ZStack(alignment: .bottomTrailing) {
+                Dashboard(model: model)
+                SpriteAnimator(mascot: mascot)
+                    .padding(12)
+            }
+        )
 
         Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
             self?.model.load(); self?.updateTitle()
@@ -570,6 +630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let y = screen.visibleFrame.maxY - window.frame.height - 6
             window.setFrameOrigin(NSPoint(x: x, y: y))
         }
+        mascot.playSplash()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
