@@ -542,7 +542,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func updateTitle() {
         let done = model.tasks.filter { $0.done }.count
-        statusItem.button?.title = "✿ \(done)/\(model.tasks.count)"
+        if let icon = NSImage(contentsOf: assetsIconURL("lotus")) {
+            icon.size = NSSize(width: 16, height: 16)
+            statusItem.button?.image = icon
+            statusItem.button?.imagePosition = .imageLeading
+        }
+        statusItem.button?.title = " \(done)/\(model.tasks.count)"
         statusItem.button?.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
     }
 
