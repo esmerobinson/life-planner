@@ -10,7 +10,7 @@ UPSCALE = 4
 
 # name -> (cluster rect (x0,y0,x1,y1), frame_count) -- sliced evenly across the rect's width
 SEQUENCES = {
-    "idle":   ((6, 14, 205, 136), 7),     # walk cycle, ~199px / 7 frames, h=122
+    "idle":   ((6, 12, 205, 58), 7),      # walk cycle, ~199px / 7 frames, h=46
     "splash": ((225, 599, 500, 753), 6),  # action cluster, ~275px / 6 frames, h=154
 }
 
