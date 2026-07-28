@@ -51,6 +51,17 @@ func isoDay(_ offset: Int = 0) -> String {
     return f.string(from: Calendar.current.date(byAdding: .day, value: offset, to: Date())!)
 }
 
+// Weekday + day + month string for the date header, e.g. "Tuesday 28 July" -- matches
+// the components of the old `.dateTime.weekday(.wide).day().month(.wide)` format style,
+// but as a plain String since PixelText renders letter-images, not a Font.
+func headerDateString() -> String {
+    let d = Date()
+    let day = Calendar.current.component(.day, from: d)
+    let f1 = DateFormatter(); f1.dateFormat = "EEEE"
+    let f2 = DateFormatter(); f2.dateFormat = "MMMM"
+    return "\(f1.string(from: d)) \(day) \(f2.string(from: d))"
+}
+
 func todayNoteFile() -> String {
     let d = Date()
     let day = Calendar.current.component(.day, from: d)
@@ -243,6 +254,8 @@ func mono(_ s: CGFloat, _ w: Font.Weight = .regular) -> Font {
 
 // Avatar Airbender font (native/Fonts/Avatar Airbender.ttf) -- header/title text only;
 // body text stays on mono() for small-size readability.
+// Currently unused (date header now renders via PixelText, see below) -- kept in case
+// a future spot wants a real scalable display font again.
 func heading(_ s: CGFloat) -> Font {
     .custom("Avatar Airbender", size: s)
 }
@@ -325,6 +338,57 @@ struct ElementIcon: View {
                 .frame(width: size, height: size)
         } else {
             Text("?").font(mono(size)).foregroundColor(dim)
+        }
+    }
+}
+
+// Bitmap "font" made of separate letter images extracted from a pixel-art reference
+// sheet (see native/tools -- upper_A.png..upper_Z.png / lower_a.png..lower_z.png in
+// Assets/Font/). SwiftUI has no built-in way to lay out text from per-glyph images, so
+// PixelText does it manually: one Image per matched character, HStack'd left to right.
+// Only A-Z/a-z have glyphs; anything else (digits, punctuation, spaces) renders as a
+// blank gap sized proportionally, since this is a display font for short strings like
+// the date header, not a general-purpose typesetting system.
+func fontLetterURL(_ ch: Character) -> URL? {
+    let base = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Assets/Font")
+    if ch.isASCII, ("A"..."Z").contains(ch) {
+        return base.appendingPathComponent("upper_\(ch).png")
+    }
+    if ch.isASCII, ("a"..."z").contains(ch) {
+        return base.appendingPathComponent("lower_\(ch).png")
+    }
+    return nil
+}
+
+// Simple static cache so repeated PixelText renders (e.g. the date header redrawing)
+// don't re-hit the filesystem every time -- same idea as SpriteAnimator's frame arrays,
+// just keyed by character instead of reloaded per state change.
+enum PixelFontCache {
+    static var images: [Character: NSImage] = [:]
+    static func image(for ch: Character) -> NSImage? {
+        if let cached = images[ch] { return cached }
+        guard let url = fontLetterURL(ch), let img = NSImage(contentsOf: url) else { return nil }
+        images[ch] = img
+        return img
+    }
+}
+
+struct PixelText: View {
+    let text: String
+    var size: CGFloat = 20
+    var body: some View {
+        HStack(alignment: .bottom, spacing: size * 0.08) {
+            ForEach(Array(text.enumerated()), id: \.offset) { _, ch in
+                if let img = PixelFontCache.image(for: ch) {
+                    let w = size * (img.size.width / max(img.size.height, 1))
+                    Image(nsImage: img).resizable().interpolation(.none)
+                        .frame(width: w, height: size)
+                } else if ch == " " {
+                    Color.clear.frame(width: size * 0.5, height: size)
+                } else {
+                    Color.clear.frame(width: size * 0.3, height: size)
+                }
+            }
         }
     }
 }
@@ -428,8 +492,7 @@ struct Dashboard: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide))
-                        .font(heading(20)).foregroundColor(bright)
+                    PixelText(text: headerDateString(), size: 20)
                     Text("// one honest day at a time").font(mono(11)).foregroundColor(dim)
                 }
 
