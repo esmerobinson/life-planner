@@ -21,6 +21,7 @@ import json
 import os
 import re
 import sys
+import uuid
 from datetime import date, timedelta
 
 from src import fancy, obsidian, storage, vault
@@ -200,7 +201,59 @@ def _dedupe(items, threshold=0.55):
     return kept
 
 
-def build(d=None, carry_from=None, done=None):
+_LINE_RE = re.compile(r"^-\s*(\d{2}:\d{2})\s+(.+)$")
+_DUR_RE = re.compile(r"\((\d+)\s*(hr|hrs|min)\)")
+_SLOT_RE = re.compile(r"\{top(\d)\}")
+
+
+def _add_minutes(hhmm, mins):
+    h, m = (int(x) for x in hhmm.split(":"))
+    total = (h * 60 + m + mins) % (24 * 60)
+    return f"{total // 60:02d}:{total % 60:02d}"
+
+
+def schedule_blocks(todo):
+    """Build today's block list from her Dream Day template: fixed rhythm blocks stay as
+    they are; {topN} slots get her top priorities; anything left over (she has more to-dos
+    than template slots) gets appended as plain 30-min blocks after the last templated one.
+    She edits Daily/Dream Day.md to shape the template; the schedule itself lives in
+    Daily/schedule.json and is edited from the native app, not here."""
+    tmpl = vault.read("Daily/Dream Day.md")
+    lines = [ln.strip() for ln in tmpl.splitlines() if ln.strip().startswith("- ")]
+    blocks, used_slots, last_start, last_dur = [], 0, None, 30
+    for ln in lines:
+        m = _LINE_RE.match(ln)
+        if not m:
+            continue
+        start, text = m.group(1), m.group(2)
+        dm = _DUR_RE.search(text)
+        dur = int(dm.group(1)) * (60 if dm.group(2).startswith("hr") else 1) if dm else 60
+        slot = _SLOT_RE.search(text)
+        task_ref = None
+        if slot:
+            i = int(slot.group(1)) - 1
+            used_slots = max(used_slots, i + 1)
+            if i < len(todo):
+                task_ref, text = todo[i], todo[i]
+            else:
+                text = _SLOT_RE.sub("open focus (your pick)", text)
+        blocks.append({"id": str(uuid.uuid4()), "task_ref": task_ref, "label": text,
+                        "start": start, "duration_min": dur})
+        last_start, last_dur = start, dur
+    # leftover to-dos beyond the template's {topN} slots: appended back-to-back, 30 min each
+    for extra in todo[used_slots:]:
+        start = _add_minutes(last_start, last_dur) if last_start else "09:00"
+        blocks.append({"id": str(uuid.uuid4()), "task_ref": extra, "label": extra,
+                       "start": start, "duration_min": 30})
+        last_start, last_dur = start, 30
+    return blocks
+
+
+def write_schedule_json(d, todo):
+    storage.write("Daily/schedule.json", json.dumps(schedule_blocks(todo)))
+
+
+def build(d=None, carry_from=None, done=None, write=False):
     from src import backlog as bl
 
     d = d or date.today()
@@ -246,6 +299,8 @@ def build(d=None, carry_from=None, done=None):
                 carried += 1
 
     todo = [_link(t) for t in _dedupe(todo, threshold=0.4)][:8]
+    if write:
+        write_schedule_json(d, todo)
     if d.weekday() == 6:
         todo.append("rest counts as progress today, Sunday is kept light on purpose")
     if not health:
@@ -287,7 +342,7 @@ def generate(d=None, carry_from=None, write=False):
         return path, None
     if write:
         reconcile(cf)  # only touch state (done log, Master To-Do) on a real generation
-    text = build(d, cf)
+    text = build(d, cf, write=write)
     if write:
         storage.write(path, text + "\n")
     return path, text
