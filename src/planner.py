@@ -204,53 +204,84 @@ def _dedupe(items, threshold=0.55):
 _LINE_RE = re.compile(r"^-\s*(\d{2}:\d{2})\s+(.+)$")
 _DUR_RE = re.compile(r"\((\d+)\s*(hr|hrs|min)\)")
 _SLOT_RE = re.compile(r"\{top(\d)\}")
+_LINK_ALIAS_RE = re.compile(r"\[\[[^\]|]+\|([^\]]+)\]\]")
+_LINK_PLAIN_RE = re.compile(r"\[\[([^\]]+)\]\]")
+EXERCISE_WORDS = ("walk", "run", "calisthenic", "gym", "workout", "exercise", "movement")
+
+
+def _strip_links(t):
+    """[[Hub|alias]] -> alias, [[Hub]] -> Hub -- matches how the native app displays and
+    matches task text, so task_ref written here actually matches TaskItem.display there."""
+    t = _LINK_ALIAS_RE.sub(r"\1", t)
+    return _LINK_PLAIN_RE.sub(r"\1", t)
+
+
+def _minutes(hhmm):
+    h, m = (int(x) for x in hhmm.split(":"))
+    return h * 60 + m
 
 
 def _add_minutes(hhmm, mins):
-    h, m = (int(x) for x in hhmm.split(":"))
-    total = (h * 60 + m + mins) % (24 * 60)
+    total = (_minutes(hhmm) + mins) % (24 * 60)
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
-def schedule_blocks(todo):
-    """Build today's block list from her Dream Day template: fixed rhythm blocks stay as
-    they are; {topN} slots get her top priorities; anything left over (she has more to-dos
-    than template slots) gets appended as plain 30-min blocks after the last templated one.
-    She edits Daily/Dream Day.md to shape the template; the schedule itself lives in
-    Daily/schedule.json and is edited from the native app, not here."""
-    tmpl = vault.read("Daily/Dream Day.md")
-    lines = [ln.strip() for ln in tmpl.splitlines() if ln.strip().startswith("- ")]
-    blocks, used_slots, last_start, last_dur = [], 0, None, 30
-    for ln in lines:
+def schedule_blocks(todo, health=None):
+    """Build today's block list from her Dream Day template: fixed rhythm blocks keep her
+    literal authored clock times; {topN} slots get her top priorities; the "move" block
+    always gets today's actual workout (Calisthenics, a walk, etc.) if she has one, instead
+    of the generic placeholder text; anything left over (more to-dos than template slots)
+    gets appended back-to-back after the last templated block. She edits Daily/Dream Day.md
+    to shape the template; the schedule itself lives in Daily/schedule.json and is edited
+    from the native app, not here."""
+    health = health or []
+    exercise = next((h for h in health if any(w in h.lower() for w in EXERCISE_WORDS)), None)
+    todo = [_strip_links(t) for t in todo]
+
+    parsed = []
+    for ln in vault.read("Daily/Dream Day.md").splitlines():
+        ln = ln.strip()
         m = _LINE_RE.match(ln)
-        if not m:
-            continue
-        start, text = m.group(1), m.group(2)
+        if m:
+            parsed.append((m.group(1), m.group(2)))
+
+    blocks, used_slots = [], 0
+    for i, (start, text) in enumerate(parsed):
         dm = _DUR_RE.search(text)
-        dur = int(dm.group(1)) * (60 if dm.group(2).startswith("hr") else 1) if dm else 60
+        if dm:
+            dur = int(dm.group(1)) * (60 if dm.group(2).startswith("hr") else 1)
+        elif i + 1 < len(parsed):
+            gap = _minutes(parsed[i + 1][0]) - _minutes(start)
+            dur = gap if gap > 0 else 60
+        else:
+            dur = 60
         slot = _SLOT_RE.search(text)
         task_ref = None
         if slot:
-            i = int(slot.group(1)) - 1
-            used_slots = max(used_slots, i + 1)
-            if i < len(todo):
-                task_ref, text = todo[i], todo[i]
+            si = int(slot.group(1)) - 1
+            used_slots = max(used_slots, si + 1)
+            if si < len(todo):
+                task_ref, text = todo[si], todo[si]
             else:
                 text = _SLOT_RE.sub("open focus (your pick)", text)
+        elif "move:" in text.lower() and exercise:
+            task_ref, text = _strip_links(exercise), _strip_links(exercise)
         blocks.append({"id": str(uuid.uuid4()), "task_ref": task_ref, "label": text,
                         "start": start, "duration_min": dur})
-        last_start, last_dur = start, dur
+
     # leftover to-dos beyond the template's {topN} slots: appended back-to-back, 30 min each
+    last_start = blocks[-1]["start"] if blocks else "09:00"
+    last_dur = blocks[-1]["duration_min"] if blocks else 30
     for extra in todo[used_slots:]:
-        start = _add_minutes(last_start, last_dur) if last_start else "09:00"
+        start = _add_minutes(last_start, last_dur)
         blocks.append({"id": str(uuid.uuid4()), "task_ref": extra, "label": extra,
                        "start": start, "duration_min": 30})
         last_start, last_dur = start, 30
     return blocks
 
 
-def write_schedule_json(d, todo):
-    storage.write("Daily/schedule.json", json.dumps(schedule_blocks(todo)))
+def write_schedule_json(d, todo, health=None):
+    storage.write("Daily/schedule.json", json.dumps(schedule_blocks(todo, health)))
 
 
 def build(d=None, carry_from=None, done=None, write=False):
@@ -299,12 +330,12 @@ def build(d=None, carry_from=None, done=None, write=False):
                 carried += 1
 
     todo = [_link(t) for t in _dedupe(todo, threshold=0.4)][:8]
-    if write:
-        write_schedule_json(d, todo)
     if d.weekday() == 6:
         todo.append("rest counts as progress today, Sunday is kept light on purpose")
     if not health:
         health = [vault.daily_health(d)[0]]
+    if write:
+        write_schedule_json(d, todo, health)
     health.append("Fill your body with healthy, nutritious food today, and don't overeat")
     health = [_link(h) for h in health]
 

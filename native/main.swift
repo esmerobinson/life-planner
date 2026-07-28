@@ -322,15 +322,15 @@ final class ScheduleModel: ObservableObject {
         return out
     }
 
+    private static let exerciseWords = ["walk", "run", "calisthenic", "gym", "workout", "exercise", "movement"]
+
     private func reconcile(_ blocks: inout [ScheduleBlock], currentTasks: [TaskItem]) {
         if blocks.isEmpty { blocks = seedFromDreamDay() }
 
-        // Health-section items (Calisthenics, the nutrition reminder, etc.) are never
-        // scheduled here -- Dream Day already has its own fixed "move" block for exercise,
-        // and things like "fill your body with nutritious food" aren't a timed task at all.
-        let schedulable = currentTasks.filter { $0.category != "Health" }
-        let byText = Dictionary(schedulable.map { ($0.display, $0) }, uniquingKeysWith: { a, _ in a })
-
+        // done/gone checks look at ALL current tasks (including Health) -- the move
+        // block's exercise task_ref is a Health-category task and must not be wrongly
+        // treated as "gone" just because it isn't in the non-Health schedulable pool.
+        let byText = Dictionary(currentTasks.map { ($0.display, $0) }, uniquingKeysWith: { a, _ in a })
         doneIds.removeAll()
         for i in blocks.indices {
             guard let ref = blocks[i].task_ref else { continue }
@@ -343,6 +343,20 @@ final class ScheduleModel: ObservableObject {
                 blocks[i].category = nil
             }
         }
+
+        // Health items never get their own floating block EXCEPT an actual workout
+        // (Calisthenics, a walk, etc.), which always lands in Dream Day's fixed "move"
+        // block -- other Health lines (the nutrition reminder) aren't a timed task at all.
+        if let moveIdx = blocks.firstIndex(where: { $0.category == nil && !$0.isOpen &&
+                                                     $0.label.lowercased().contains("move:") }),
+           let exercise = currentTasks.first(where: { !$0.done && $0.category == "Health" &&
+                                                       Self.exerciseWords.contains(where: $0.display.lowercased().contains) }) {
+            blocks[moveIdx].task_ref = exercise.display
+            blocks[moveIdx].label = exercise.display
+            blocks[moveIdx].category = "Health"
+        }
+
+        let schedulable = currentTasks.filter { $0.category != "Health" }
         let referenced = Set(blocks.compactMap { $0.task_ref })
         for t in schedulable where !t.done && !referenced.contains(t.display) {
             if let idx = blocks.firstIndex(where: { $0.isOpen }) {
