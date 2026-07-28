@@ -248,6 +248,18 @@ final class Model: ObservableObject {
         load()
     }
 
+    // push a task off today: mark it deferred ("- [>]", the same convention
+    // src/obsidian.py:defer_task uses) -- it drops off today and the engine
+    // reconsiders it another day, same idea as "not today" in the Schedule tab.
+    func deferTask(_ t: TaskItem) {
+        let file = todayNoteFile() + ".md"
+        let note = read(file)
+        guard note.contains(t.raw) else { return }
+        let deferred = t.raw.replacingOccurrences(of: "- [ ]", with: "- [>]")
+        writeVault(file, note.replacingOccurrences(of: t.raw, with: deferred))
+        load()
+    }
+
     func categoryStars(_ cat: String) -> Int {
         var cs = jsonDict("Daily/category-stars.json")
         if cs["Art"] != nil || cs["Production"] != nil {
@@ -460,24 +472,26 @@ final class ScheduleModel: ObservableObject {
         persist()
         if case .moveTo(let date) = mode, let task = task { moveTaskDue(task, to: date) }
     }
+}
 
-    private func moveTaskDue(_ text: String, to date: Date) {
-        let path = "Goals & Direction/Backlog.md"
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-        let tag = "[due \(f.string(from: date))]"
-        let note = read(path)
-        let lines = note.components(separatedBy: "\n").map { line -> String in
-            guard line.contains("- [ ] "), line.contains(text) else { return line }
-            var l = line
-            if let r = l.range(of: #"\[due \d{4}-\d{2}-\d{2}\]"#, options: .regularExpression) {
-                l.replaceSubrange(r, with: tag)
-            } else {
-                l += " " + tag
-            }
-            return l
+// used by both the Schedule tab (moving a block off today) and the Today tab's to-do
+// list (pushing a task to a specific day) -- writes/updates the [due ...] tag in Backlog.md
+func moveTaskDue(_ text: String, to date: Date) {
+    let path = "Goals & Direction/Backlog.md"
+    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+    let tag = "[due \(f.string(from: date))]"
+    let note = read(path)
+    let lines = note.components(separatedBy: "\n").map { line -> String in
+        guard line.contains("- [ ] "), line.contains(text) else { return line }
+        var l = line
+        if let r = l.range(of: #"\[due \d{4}-\d{2}-\d{2}\]"#, options: .regularExpression) {
+            l.replaceSubrange(r, with: tag)
+        } else {
+            l += " " + tag
         }
-        writeVault(path, lines.joined(separator: "\n"))
+        return l
     }
+    writeVault(path, lines.joined(separator: "\n"))
 }
 
 // MARK: - calendar tab (due-dated tasks + deadlines only, no recurring)
@@ -718,6 +732,9 @@ struct TaskRow: View {
     let task: TaskItem
     let model: Model
     @State private var hover = false
+    @State private var showMoveTo = false
+    @State private var moveDate = Date()
+
     var body: some View {
         HStack(alignment: .top, spacing: 7) {
             Tick(on: task.done, element: element(for: task.category)) { model.toggleTask(task) }
@@ -730,10 +747,30 @@ struct TaskRow: View {
                     Spacer(minLength: 0)
                     if hover { Text("→").font(mono(11)).foregroundColor(green) }
                 }.contentShape(Rectangle())
-            }.buttonStyle(.plain).onHover { hover = $0 }
+            }.buttonStyle(.plain)
+            if hover && !task.done {
+                Button("move") { showMoveTo = true }
+                    .buttonStyle(.plain).font(mono(10)).foregroundColor(green.opacity(0.85))
+                    .popover(isPresented: $showMoveTo) {
+                        VStack(spacing: 8) {
+                            DatePicker("move to", selection: $moveDate, displayedComponents: .date)
+                                .datePickerStyle(.graphical).labelsHidden()
+                            Button("move") {
+                                moveTaskDue(task.display, to: moveDate)
+                                model.deferTask(task)
+                                showMoveTo = false
+                            }
+                        }.padding(12)
+                    }
+                Button(action: { model.deferTask(task) }) {
+                    Text("✕").font(mono(11))
+                }.buttonStyle(.plain).foregroundColor(dim)
+            }
         }
         .padding(.vertical, 2).padding(.horizontal, 4)
         .background(RoundedRectangle(cornerRadius: 5).fill(hover ? Color.white.opacity(0.05) : .clear))
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
     }
 }
 
@@ -998,6 +1035,7 @@ struct ScheduleRow: View {
         .overlay(RoundedRectangle(cornerRadius: 8)
             .stroke(block.isOpen ? dim.opacity(0.3) : fg.opacity(0.15),
                     style: StrokeStyle(lineWidth: 1, dash: block.isOpen ? [3] : [])))
+        .contentShape(Rectangle())
         .onHover { hover = $0 }
     }
 }
@@ -1031,17 +1069,12 @@ struct ScheduleView: View {
 
 // MARK: - calendar view
 
-struct OptionalHelp: ViewModifier {
-    let text: String?
-    func body(content: Content) -> some View {
-        if let text = text { content.help(text) } else { content }
-    }
-}
-
 struct DayCell: View {
     let day: Date?
     let items: [DueItem]
     let isToday: Bool
+    @State private var hover = false
+
     var body: some View {
         GeometryReader { geo in
             if let day = day {
@@ -1053,9 +1086,28 @@ struct DayCell: View {
                     }
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
-                .background(RoundedRectangle(cornerRadius: 5).fill(isToday ? green.opacity(0.12) : Color.clear))
+                .background(RoundedRectangle(cornerRadius: 5)
+                    .fill(hover && !items.isEmpty ? green.opacity(0.15) : (isToday ? green.opacity(0.12) : Color.clear)))
                 .contentShape(Rectangle())
-                .modifier(OptionalHelp(text: items.isEmpty ? nil : items.map { $0.text }.joined(separator: "\n")))
+                .onHover { hover = $0 }
+                .overlay(alignment: .top) {
+                    if hover && !items.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(items) { item in
+                                HStack(spacing: 4) {
+                                    ElementIcon(element: element(for: item.category), size: 10)
+                                    Text(item.text).font(mono(10)).foregroundColor(fg)
+                                }
+                            }
+                        }
+                        .padding(6)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(bg))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(dim.opacity(0.4), lineWidth: 1))
+                        .fixedSize()
+                        .offset(y: -geo.size.height - 4)
+                        .zIndex(10)
+                    }
+                }
             } else {
                 Color.clear
             }
