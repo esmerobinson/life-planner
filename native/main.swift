@@ -585,7 +585,7 @@ struct SectionHeader: View {
     let title: String; var more: String? = nil
     var body: some View {
         HStack {
-            Text("// " + title).font(mono(10)).foregroundColor(dim)
+            Text(title).font(mono(10)).foregroundColor(dim)
             Spacer()
             if let m = more {
                 Button("see more →") { openInObsidian(m) }
@@ -837,11 +837,8 @@ struct Dashboard: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide))
-                        .font(heading(20)).foregroundColor(bright)
-                    Text("// one honest day at a time").font(mono(11)).foregroundColor(dim)
-                }
+                Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide))
+                    .font(heading(20)).foregroundColor(bright)
 
                 // affirm rows: manifestation / reminder / journal, tick + streak inline
                 VStack(alignment: .leading, spacing: 8) {

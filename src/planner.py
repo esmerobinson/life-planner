@@ -183,7 +183,11 @@ _STOP = {"the", "a", "an", "of", "to", "and", "or", "for", "in", "on", "my", "is
 
 
 def _keywords(t):
-    t = re.sub(r"\(carried[^)]*\)", "", t.lower())
+    # strip ALL parenthetical annotations (carried/overdue/due-in/was-due), not just
+    # "(carried...)" -- these are status tags the pipeline itself appends, not part of
+    # her actual task text, and letting them count as shared keywords caused unrelated
+    # tasks (e.g. two different overdue admin emails) to look like near-duplicates.
+    t = re.sub(r"\([^)]*\)", "", t.lower())
     return {w for w in re.findall(r"[a-z]+", t) if len(w) > 2 and w not in _STOP}
 
 
