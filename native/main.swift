@@ -8,6 +8,7 @@
 import AppKit
 import CoreServices
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - vault access
 
@@ -31,6 +32,33 @@ func obsidianURL(_ file: String) -> URL {
 
 func openInObsidian(_ file: String) { NSWorkspace.shared.open(obsidianURL(file)) }
 
+// [[Hub|alias]] -> alias, [[Hub]] -> Hub -- how every task's display text is derived
+func stripLinks(_ raw: String) -> String {
+    var text = raw
+    while let r = text.range(of: #"\[\[([^\]]+)\]\]"#, options: .regularExpression) {
+        let inner = text[r].dropFirst(2).dropLast(2).components(separatedBy: "|")
+        text.replaceSubrange(r, with: inner.last ?? "")
+    }
+    return text
+}
+
+// find an open ("- [ ]") task in today's note whose display text matches, and mark it
+// deferred ("- [>]") -- used when a task is removed from a view other than the Today
+// tab's own row (e.g. deleted from the Schedule tab), so it actually disappears
+// everywhere today, not just from the one view it was removed from.
+func deferTaskInTodayNote(_ display: String) {
+    let file = todayNoteFile() + ".md"
+    let note = read(file)
+    let lines = note.components(separatedBy: "\n").map { line -> String in
+        let t = line.trimmingCharacters(in: .whitespaces)
+        guard t.hasPrefix("- [ ]") else { return line }
+        let text = stripLinks(String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces))
+        guard text == display else { return line }
+        return line.replacingOccurrences(of: "- [ ]", with: "- [>]")
+    }
+    writeVault(file, lines.joined(separator: "\n"))
+}
+
 func section(_ text: String, _ name: String) -> [String] {
     var out: [String] = []; var grab = false
     for line in text.components(separatedBy: "\n") {
@@ -52,18 +80,18 @@ let REFLECTIONS_DECORATED = "☾ 𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬 �
 // end of the whole file -- otherwise entries added after that would land in the wrong place.
 let HEADING_MARKERS: Set<Character> = ["˚", "✩", "✿", "♡", "☾", "⋆", "✧", "˖"]
 
-func appendReflection(_ text: String) {
-    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return }
-    let f = DateFormatter(); f.dateFormat = "HH:mm"
-    let entry = "**\(f.string(from: Date()))** \(trimmed)"
-    let path = todayNoteFile() + ".md"
+// insert `entry` right after the section matching `headerMatch`'s existing content, and
+// before whatever heading comes next (e.g. the nightly Day in review) -- not just tacked
+// onto the end of the file, which would land it under the wrong section. Creates the
+// section (with `createHeader`) if the note doesn't have it yet and one was given.
+func insertIntoSection(path: String, headerMatch: String, entry: String, createHeader: String? = nil) {
     let content = read(path)
     var lines = content.components(separatedBy: "\n")
-
-    guard let headerIdx = lines.firstIndex(where: { $0.contains(REFLECTIONS_HEADER) }) else {
-        let base = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        writeVault(path, base + "\n\n" + REFLECTIONS_DECORATED + "\n" + entry + "\n")
+    guard let headerIdx = lines.firstIndex(where: { $0.contains(headerMatch) }) else {
+        if let createHeader = createHeader {
+            let base = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            writeVault(path, base + "\n\n" + createHeader + "\n" + entry + "\n")
+        }
         return
     }
     var insertAt = lines.count
@@ -78,6 +106,93 @@ func appendReflection(_ text: String) {
     }
     lines.insert(entry, at: insertAt)
     writeVault(path, lines.joined(separator: "\n"))
+}
+
+func appendReflection(_ text: String) {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    let f = DateFormatter(); f.dateFormat = "HH:mm"
+    let entry = "**\(f.string(from: Date()))** \(trimmed)"
+    insertIntoSection(path: todayNoteFile() + ".md", headerMatch: REFLECTIONS_HEADER,
+                       entry: entry, createHeader: REFLECTIONS_DECORATED)
+}
+
+// bold mathematical unicode, e.g. boldMap("To do today") -> "𝐓𝐨 𝐝𝐨 𝐭𝐨𝐝𝐚𝐲" -- mirrors
+// src/fancy.py:bold(), so we can find/build the same headings Python generates.
+func boldMap(_ s: String) -> String {
+    var out = String.UnicodeScalarView()
+    for ch in s.unicodeScalars {
+        if ch.value >= 65 && ch.value <= 90 {
+            out.append(Unicode.Scalar(0x1D400 + (ch.value - 65))!)
+        } else if ch.value >= 97 && ch.value <= 122 {
+            out.append(Unicode.Scalar(0x1D41A + (ch.value - 97))!)
+        } else {
+            out.append(ch)
+        }
+    }
+    return String(out)
+}
+
+let TODO_HEADER = boldMap("To do today")
+let TODO_DECORATED = "˚₊✩ " + TODO_HEADER + " ✩₊˚"
+
+// adds a task both to today's note (shows immediately) and Backlog's Inbox (so it
+// persists as part of the permanent task bank, same convention WhatsApp captures use).
+func addTaskToToday(_ text: String) {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    insertIntoSection(path: todayNoteFile() + ".md", headerMatch: TODO_HEADER,
+                       entry: "- [ ] " + trimmed, createHeader: TODO_DECORATED)
+    var lines = read("Goals & Direction/Backlog.md").components(separatedBy: "\n")
+    if let idx = lines.firstIndex(where: { $0.contains("Inbox (to triage)") }) {
+        var insertAt = idx + 1
+        while insertAt < lines.count, !lines[insertAt].hasPrefix("## ") { insertAt += 1 }
+        lines.insert("- [ ] " + trimmed, at: insertAt)
+        writeVault("Goals & Direction/Backlog.md", lines.joined(separator: "\n"))
+    }
+}
+
+private let _stopWords: Set<String> = ["the", "a", "an", "of", "to", "and", "or", "for", "in", "on", "my",
+                                        "is", "it", "two", "one", "some", "do", "get", "out", "up", "with",
+                                        "into", "not", "plan"]
+
+func taskKeywords(_ t: String) -> Set<String> {
+    let cleaned = t.lowercased().replacingOccurrences(of: #"\([^)]*\)"#, with: "", options: .regularExpression)
+    let words = cleaned.components(separatedBy: CharacterSet.alphanumerics.inverted)
+    return Set(words.filter { $0.count > 2 && !_stopWords.contains($0) })
+}
+
+// "did you mean" suggestions for the add-task field: open Backlog tasks whose keywords
+// overlap the typed query, so a near-duplicate gets reused instead of creating a fresh copy.
+func similarBacklogTasks(_ query: String, limit: Int = 4) -> [String] {
+    let qWords = taskKeywords(query)
+    guard !qWords.isEmpty else { return [] }
+    var scored: [(String, Double)] = []
+    var section = ""
+    for raw in read("Goals & Direction/Backlog.md").components(separatedBy: "\n") {
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        if t.hasPrefix("## ") { section = t.lowercased(); continue }
+        if section.contains("parked") || section.contains("moved elsewhere") { continue }
+        guard t.hasPrefix("- [ ] ") else { continue }
+        var text = String(t.dropFirst(6))
+        for pat in [#"\s*!p[123]\b"#, #"\s*\[due \d{4}-\d{2}-\d{2}\]"#, #"\s*\[recur: [a-z,]+\]"#, #"\s*#[\w-]+"#] {
+            text = text.replacingOccurrences(of: pat, with: "", options: .regularExpression)
+        }
+        text = text.trimmingCharacters(in: .whitespaces)
+        let words = taskKeywords(text)
+        guard !words.isEmpty else { continue }
+        let score = Double(qWords.intersection(words).count) / Double(qWords.union(words).count)
+        if score >= 0.2 { scored.append((text, score)) }
+    }
+    return scored.sorted { $0.1 > $1.1 }.prefix(limit).map { $0.0 }
+}
+
+func roundToFive(_ hhmm: String) -> String {
+    let p = hhmm.split(separator: ":").compactMap { Int($0) }
+    guard p.count == 2 else { return hhmm }
+    let total = p[0] * 60 + p[1]
+    let rounded = ((total + 2) / 5) * 5
+    return String(format: "%02d:%02d", (rounded / 60) % 24, rounded % 60)
 }
 
 func randomReflectionPrompt() -> String? {
@@ -158,15 +273,12 @@ final class Model: ObservableObject {
             let t = line.trimmingCharacters(in: .whitespaces)
             guard t.hasPrefix("- [ ]") || t.hasPrefix("- [x]") else { return nil }
             let done = t.hasPrefix("- [x]")
-            var text = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            let rawText = String(t.dropFirst(5)).trimmingCharacters(in: .whitespaces)
             var target = noteFile
-            if let r = text.range(of: #"\[\[([^\]|]+)\|"#, options: .regularExpression) {
-                target = String(text[r].dropFirst(2).dropLast(1))
+            if let r = rawText.range(of: #"\[\[([^\]|]+)\|"#, options: .regularExpression) {
+                target = String(rawText[r].dropFirst(2).dropLast(1))
             }
-            while let r = text.range(of: #"\[\[([^\]]+)\]\]"#, options: .regularExpression) {
-                let inner = text[r].dropFirst(2).dropLast(2).components(separatedBy: "|")
-                text.replaceSubrange(r, with: inner.last ?? "")
-            }
+            let text = stripLinks(rawText)
             return TaskItem(display: text, target: target, done: done, raw: t, category: categorize(text, target))
         }
 
@@ -454,6 +566,22 @@ final class ScheduleModel: ObservableObject {
         persist()
     }
 
+    // drag a task from the unscheduled pool onto an open slot. If that slot happens to
+    // be the block containing right now, it starts now (rounded to 5 min) instead of
+    // keeping the slot's original template time -- dropping into "now" should mean now.
+    func assign(taskDisplay: String, category: String, blockId: String, startNow: Bool) {
+        guard let i = blocks.firstIndex(where: { $0.id == blockId }) else { return }
+        blocks[i].task_ref = taskDisplay
+        blocks[i].label = taskDisplay
+        blocks[i].category = category
+        blocks[i].is_open = false
+        if startNow {
+            let f = DateFormatter(); f.dateFormat = "HH:mm"
+            blocks[i].start = roundToFive(f.string(from: Date()))
+        }
+        persist()
+    }
+
     func resize(_ id: String, deltaMinutes: Int) {
         guard let i = blocks.firstIndex(where: { $0.id == id }) else { return }
         blocks[i].duration_min = max(5, blocks[i].duration_min + deltaMinutes)
@@ -470,7 +598,12 @@ final class ScheduleModel: ObservableObject {
         blocks[i].category = nil
         recomputeStarts(&blocks)
         persist()
-        if case .moveTo(let date) = mode, let task = task { moveTaskDue(task, to: date) }
+        // defer the underlying checkbox too, so it actually leaves Today as well --
+        // otherwise it just gets auto-re-inserted into Schedule on the next reload.
+        if let task = task {
+            deferTaskInTodayNote(task)
+            if case .moveTo(let date) = mode { moveTaskDue(task, to: date) }
+        }
     }
 }
 
@@ -774,6 +907,45 @@ struct TaskRow: View {
     }
 }
 
+struct AddTaskField: View {
+    let model: Model
+    var onAdded: (() -> Void)? = nil
+    @State private var query = ""
+    @State private var suggestions: [String] = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text("+").font(mono(12)).foregroundColor(green)
+                TextField("add a task...", text: $query)
+                    .textFieldStyle(.plain).font(mono(12)).foregroundColor(fg)
+                    .onChange(of: query) { _, q in
+                        suggestions = q.trimmingCharacters(in: .whitespaces).count > 2 ? similarBacklogTasks(q) : []
+                    }
+                    .onSubmit { submit(query) }
+            }
+            .padding(.vertical, 6).padding(.horizontal, 8)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(dim.opacity(0.3), lineWidth: 1))
+
+            ForEach(suggestions, id: \.self) { s in
+                Button(action: { submit(s) }) {
+                    HStack { Text(s).font(mono(11)).foregroundColor(dim); Spacer() }
+                }.buttonStyle(.plain).padding(.leading, 16)
+            }
+        }
+    }
+
+    private func submit(_ text: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        addTaskToToday(t)
+        query = ""; suggestions = []
+        model.load()
+        onAdded?()
+    }
+}
+
 struct JournalComposer: View {
     @ObservedObject var model: Model
     @State private var text = ""
@@ -888,6 +1060,7 @@ struct Dashboard: View {
                             ForEach(items) { TaskRow(task: $0, model: model) }
                         }
                     }
+                    AddTaskField(model: model)
                 }
 
                 JournalComposer(model: model)
@@ -974,6 +1147,7 @@ struct ScheduleRow: View {
     @State private var moveDate = Date()
     @State private var liveDelta = 0
     @State private var hover = false
+    @State private var dropTargeted = false
 
     private var isTask: Bool { block.task_ref != nil }
 
@@ -1028,16 +1202,29 @@ struct ScheduleRow: View {
             }
         }
         .background(RoundedRectangle(cornerRadius: 8)
-            .fill(block.isOpen ? Color.clear : Color.white.opacity(isTask ? 0.06 : 0.03)))
+            .fill(dropTargeted ? green.opacity(0.15) : (block.isOpen ? Color.clear : Color.white.opacity(isTask ? 0.06 : 0.03))))
         .overlay(RoundedRectangle(cornerRadius: 8)
             .stroke(block.isOpen ? dim.opacity(0.3) : fg.opacity(0.15),
                     style: StrokeStyle(lineWidth: 1, dash: block.isOpen ? [3] : [])))
         .contentShape(Rectangle())
         .onHover { hover = $0 }
+        .onDrop(of: [.text], isTargeted: block.isOpen ? $dropTargeted : .constant(false)) { providers in
+            guard block.isOpen, let provider = providers.first else { return false }
+            _ = provider.loadObject(ofClass: NSString.self) { obj, _ in
+                guard let s = obj as? String else { return }
+                let parts = s.components(separatedBy: "|||")
+                guard parts.count == 2 else { return }
+                DispatchQueue.main.async {
+                    model.assign(taskDisplay: parts[1], category: parts[0], blockId: block.id, startNow: isCurrent)
+                }
+            }
+            return true
+        }
     }
 }
 
 struct ScheduleView: View {
+    @ObservedObject var taskModel: Model
     @ObservedObject var model: ScheduleModel
 
     private func isCurrentBlock(_ i: Int) -> Bool {
@@ -1047,18 +1234,48 @@ struct ScheduleView: View {
         return now >= b.start && now < addMinutes(b.start, b.duration_min)
     }
 
+    // today's to-dos not currently placed in any schedule block -- drag one of these
+    // onto an open slot to place it there yourself.
+    private var unscheduled: [TaskItem] {
+        let referenced = Set(model.blocks.compactMap { $0.task_ref })
+        return taskModel.tasks.filter { !$0.done && $0.category != "Health" && !referenced.contains($0.display) }
+    }
+
     var body: some View {
-        List {
-            ForEach(Array(model.blocks.enumerated()), id: \.element.id) { i, b in
-                ScheduleRow(block: b, isNew: model.newlyAdded.contains(b.id),
-                            isDone: model.doneIds.contains(b.id), isCurrent: isCurrentBlock(i), model: model)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
+        VStack(spacing: 0) {
+            List {
+                ForEach(Array(model.blocks.enumerated()), id: \.element.id) { i, b in
+                    ScheduleRow(block: b, isNew: model.newlyAdded.contains(b.id),
+                                isDone: model.doneIds.contains(b.id), isCurrent: isCurrentBlock(i), model: model)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+                .onMove(perform: model.move)
             }
-            .onMove(perform: model.move)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+
+            if !unscheduled.isEmpty {
+                Divider().overlay(dim.opacity(0.3))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("unscheduled, drag onto an open slot").font(mono(10)).foregroundColor(dim)
+                    ForEach(unscheduled) { t in
+                        HStack(spacing: 6) {
+                            ElementIcon(element: element(for: t.category), size: 12)
+                            Text(t.display).font(mono(11)).foregroundColor(fg)
+                            Spacer()
+                        }
+                        .padding(6)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.05)))
+                        .onDrag { NSItemProvider(object: "\(t.category)|||\(t.display)" as NSString) }
+                    }
+                }.padding(12)
+            }
+
+            Divider().overlay(dim.opacity(0.3))
+            AddTaskField(model: taskModel, onAdded: { model.load(currentTasks: taskModel.tasks) })
+                .padding(12)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
         .background(bg)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -1212,7 +1429,7 @@ struct RootView: View {
             ZStack {
                 Dashboard(model: model).opacity(tab == .today ? 1 : 0)
                     .allowsHitTesting(tab == .today)
-                ScheduleView(model: scheduleModel).opacity(tab == .schedule ? 1 : 0)
+                ScheduleView(taskModel: model, model: scheduleModel).opacity(tab == .schedule ? 1 : 0)
                     .allowsHitTesting(tab == .schedule)
                 CalendarView(model: calendarModel).opacity(tab == .calendar ? 1 : 0)
                     .allowsHitTesting(tab == .calendar)
