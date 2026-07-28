@@ -245,14 +245,26 @@ struct ScheduleBlock: Identifiable, Codable, Equatable {
     var start: String
     var duration_min: Int
     var is_open: Bool?
+    var category: String?
     var isOpen: Bool { is_open == true }
 }
 
 enum DeleteMode { case notToday, moveTo(Date) }
 
+// capture-group regex match, e.g. firstMatch(#"^-\s*(\d{2}:\d{2})\s+(.+)$"#, in: line) -> [full, g1, g2]
+func firstMatch(_ pattern: String, in text: String) -> [String]? {
+    guard let re = try? NSRegularExpression(pattern: pattern),
+          let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+    return (0..<m.numberOfRanges).map { i in
+        guard let r = Range(m.range(at: i), in: text) else { return "" }
+        return String(text[r])
+    }
+}
+
 final class ScheduleModel: ObservableObject {
     @Published var blocks: [ScheduleBlock] = []
     @Published var newlyAdded: Set<String> = []
+    @Published var doneIds: Set<String> = []
 
     func load(currentTasks: [TaskItem]) {
         var loaded = decode()
@@ -267,31 +279,89 @@ final class ScheduleModel: ObservableObject {
         return arr
     }
 
+    // whole-day skeleton from her Dream Day template, mirrors src/planner.py:schedule_blocks.
+    // Used the moment there's no schedule.json yet for today (e.g. before the morning cron
+    // has run), so the full day always shows, not just a stack of bare to-dos from 09:00.
+    private func minutesSinceMidnight(_ hhmm: String) -> Int {
+        let p = hhmm.split(separator: ":").compactMap { Int($0) }
+        return p.count == 2 ? p[0] * 60 + p[1] : 0
+    }
+
+    private func seedFromDreamDay() -> [ScheduleBlock] {
+        // her literal clock times from the template are authoritative -- they are NOT
+        // recomputed/cascaded here (only user drag/reorder/resize does that afterwards),
+        // so the day keeps the shape she actually designed in Dream Day.md.
+        var parsed: [(start: String, text: String)] = []
+        for raw in read("Daily/Dream Day.md").components(separatedBy: "\n") {
+            let ln = raw.trimmingCharacters(in: .whitespaces)
+            guard ln.hasPrefix("- "),
+                  let g = firstMatch(#"^-\s*(\d{2}:\d{2})\s+(.+)$"#, in: ln), g.count == 3 else { continue }
+            parsed.append((g[1], g[2]))
+        }
+        var out: [ScheduleBlock] = []
+        for (i, item) in parsed.enumerated() {
+            var text = item.text
+            var dur: Int
+            if let dg = firstMatch(#"\((\d+)\s*(hr|hrs|min)\)"#, in: text), dg.count == 3, let n = Int(dg[1]) {
+                dur = dg[2].hasPrefix("hr") ? n * 60 : n
+            } else if i + 1 < parsed.count {
+                // no explicit duration: infer it from the gap to the next templated block
+                let gap = minutesSinceMidnight(parsed[i + 1].start) - minutesSinceMidnight(item.start)
+                dur = gap > 0 ? gap : 60
+            } else {
+                dur = 60
+            }
+            let isSlot = text.range(of: #"\{top\d\}"#, options: .regularExpression) != nil
+            if isSlot {
+                text = text.replacingOccurrences(of: #"\{top\d\}"#, with: "open focus (your pick)",
+                                                  options: .regularExpression)
+            }
+            out.append(ScheduleBlock(id: UUID().uuidString, task_ref: nil, label: text,
+                                     start: item.start, duration_min: dur, is_open: isSlot, category: nil))
+        }
+        return out
+    }
+
     private func reconcile(_ blocks: inout [ScheduleBlock], currentTasks: [TaskItem]) {
-        let openTexts = Set(currentTasks.filter { !$0.done }.map { $0.display })
+        if blocks.isEmpty { blocks = seedFromDreamDay() }
+
+        // Health-section items (Calisthenics, the nutrition reminder, etc.) are never
+        // scheduled here -- Dream Day already has its own fixed "move" block for exercise,
+        // and things like "fill your body with nutritious food" aren't a timed task at all.
+        let schedulable = currentTasks.filter { $0.category != "Health" }
+        let byText = Dictionary(schedulable.map { ($0.display, $0) }, uniquingKeysWith: { a, _ in a })
+
+        doneIds.removeAll()
         for i in blocks.indices {
-            if let ref = blocks[i].task_ref, !openTexts.contains(ref) {
+            guard let ref = blocks[i].task_ref else { continue }
+            if let t = byText[ref] {
+                if t.done { doneIds.insert(blocks[i].id) }   // ticked: stays visible, marked done
+            } else {                                          // genuinely gone: free the slot
                 blocks[i].task_ref = nil
                 blocks[i].label = "open"
                 blocks[i].is_open = true
+                blocks[i].category = nil
             }
         }
         let referenced = Set(blocks.compactMap { $0.task_ref })
-        for t in currentTasks where !t.done && !referenced.contains(t.display) {
+        for t in schedulable where !t.done && !referenced.contains(t.display) {
             if let idx = blocks.firstIndex(where: { $0.isOpen }) {
                 blocks[idx].task_ref = t.display
                 blocks[idx].label = t.display
+                blocks[idx].category = t.category
                 blocks[idx].is_open = false
                 newlyAdded.insert(blocks[idx].id)
             } else {
                 let start = blocks.last.map { addMinutes($0.start, $0.duration_min) } ?? "09:00"
                 let blk = ScheduleBlock(id: UUID().uuidString, task_ref: t.display, label: t.display,
-                                        start: start, duration_min: 30, is_open: false)
+                                        start: start, duration_min: 30, is_open: false, category: t.category)
                 blocks.append(blk)
                 newlyAdded.insert(blk.id)
             }
         }
-        recomputeStarts(&blocks)
+        // NOTE: no recomputeStarts here -- her Dream Day clock times and any prior
+        // edits are authoritative; only move()/resize()/delete() (real user actions)
+        // cascade times forward from that point.
     }
 
     private func recomputeStarts(_ blocks: inout [ScheduleBlock]) {
@@ -326,6 +396,7 @@ final class ScheduleModel: ObservableObject {
         blocks[i].task_ref = nil
         blocks[i].label = "open"
         blocks[i].is_open = true
+        blocks[i].category = nil
         recomputeStarts(&blocks)
         persist()
         if case .moveTo(let date) = mode, let task = task { moveTaskDue(task, to: date) }
@@ -356,6 +427,7 @@ struct DueItem: Identifiable {
     let id = UUID()
     let text: String
     let due: Date
+    let category: String
 }
 
 final class CalendarModel: ObservableObject {
@@ -377,7 +449,8 @@ final class CalendarModel: ObservableObject {
             for pat in [#"\s*!p[123]\b"#, #"\s*\[due \d{4}-\d{2}-\d{2}\]"#, #"\s*\[recur: [a-z,]+\]"#, #"\s*#[\w-]+"#] {
                 text = text.replacingOccurrences(of: pat, with: "", options: .regularExpression)
             }
-            out.append(DueItem(text: text.trimmingCharacters(in: .whitespaces), due: date))
+            let clean = text.trimmingCharacters(in: .whitespaces)
+            out.append(DueItem(text: clean, due: date, category: categorize(clean, "")))
         }
         items = out.sorted { $0.due < $1.due }
     }
@@ -624,7 +697,7 @@ struct Dashboard: View {
                         Tick(on: model.habitDone("Morning manifestations"), element: "lotus", wellbeing: true) {
                             model.toggleHabit("Morning manifestations")
                         }
-                        TypewriterText(text: model.manifestation, italic: true, color: bright)
+                        TypewriterText(text: model.manifestation, color: bright)
                         Spacer(minLength: 4)
                         StreakBadge(n: model.streak("Morning manifestations"))
                     }
@@ -757,66 +830,90 @@ struct ResizeHandle: View {
 struct ScheduleRow: View {
     let block: ScheduleBlock
     let isNew: Bool
+    let isDone: Bool
+    let isCurrent: Bool
     let model: ScheduleModel
     @State private var showMoveTo = false
     @State private var moveDate = Date()
     @State private var liveDelta = 0
+    @State private var hover = false
+
+    private var isTask: Bool { block.task_ref != nil }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(block.start)–\(addMinutes(block.start, block.duration_min + liveDelta))")
-                        .font(mono(10)).foregroundColor(dim)
-                    HStack(spacing: 4) {
-                        Text(block.isOpen ? "open" : block.label)
-                            .font(mono(12)).foregroundColor(block.isOpen ? dim : fg)
-                            .italic(block.isOpen)
-                        if isNew {
-                            Text("new").font(mono(9, .semibold)).foregroundColor(bright)
-                                .padding(.horizontal, 4).padding(.vertical, 1)
-                                .background(RoundedRectangle(cornerRadius: 3).fill(green.opacity(0.3)))
+        HStack(spacing: 0) {
+            Rectangle().fill(isCurrent ? green : Color.clear).frame(width: 3)
+
+            VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 8) {
+                    if isTask {
+                        ElementIcon(element: element(for: block.category ?? "Admin"), size: 13)
+                            .opacity(isDone ? 0.4 : 1).padding(.top, 1)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(block.start)–\(addMinutes(block.start, block.duration_min + liveDelta))")
+                            .font(mono(10)).foregroundColor(dim)
+                        HStack(spacing: 4) {
+                            Text(block.isOpen ? "open" : block.label)
+                                .font(mono(12)).foregroundColor(block.isOpen ? dim : (isDone ? dim : fg))
+                                .italic(block.isOpen)
+                                .strikethrough(isDone, color: dim)
+                            if isNew {
+                                Text("new").font(mono(9, .semibold)).foregroundColor(bright)
+                                    .padding(.horizontal, 4).padding(.vertical, 1)
+                                    .background(RoundedRectangle(cornerRadius: 3).fill(green.opacity(0.3)))
+                            }
                         }
                     }
-                }
-                Spacer()
-                if !block.isOpen {
-                    Button(action: { showMoveTo = true }) {
-                        Text("📅").font(mono(11))
-                    }.buttonStyle(.plain)
-                    .popover(isPresented: $showMoveTo) {
-                        VStack(spacing: 8) {
-                            DatePicker("move to", selection: $moveDate, displayedComponents: .date)
-                                .datePickerStyle(.graphical).labelsHidden()
-                            Button("move") { model.delete(block.id, mode: .moveTo(moveDate)); showMoveTo = false }
-                        }.padding(12)
+                    Spacer()
+                    if isTask && hover {
+                        Button("move") { showMoveTo = true }
+                            .buttonStyle(.plain).font(mono(10)).foregroundColor(green.opacity(0.85))
+                            .popover(isPresented: $showMoveTo) {
+                                VStack(spacing: 8) {
+                                    DatePicker("move to", selection: $moveDate, displayedComponents: .date)
+                                        .datePickerStyle(.graphical).labelsHidden()
+                                    Button("move") { model.delete(block.id, mode: .moveTo(moveDate)); showMoveTo = false }
+                                }.padding(12)
+                            }
+                        Button(action: { model.delete(block.id, mode: .notToday) }) {
+                            Text("✕").font(mono(11))
+                        }.buttonStyle(.plain).foregroundColor(dim)
                     }
-                    Button(action: { model.delete(block.id, mode: .notToday) }) {
-                        Text("✕").font(mono(11))
-                    }.buttonStyle(.plain).foregroundColor(dim)
                 }
-            }
-            .padding(.vertical, 4).padding(.horizontal, 6)
-            .frame(minHeight: max(28, CGFloat(block.duration_min + liveDelta) * PT_PER_MIN), alignment: .top)
+                .padding(.vertical, 6).padding(.horizontal, 8)
+                .frame(minHeight: max(30, CGFloat(block.duration_min + liveDelta) * PT_PER_MIN), alignment: .top)
 
-            if !block.isOpen {
-                ResizeHandle(onCommit: { model.resize(block.id, deltaMinutes: $0) }, livePreview: $liveDelta)
-                    .padding(.horizontal, 6)
+                if isTask {
+                    ResizeHandle(onCommit: { model.resize(block.id, deltaMinutes: $0) }, livePreview: $liveDelta)
+                        .padding(.horizontal, 8).padding(.bottom, 4)
+                }
             }
         }
-        .background(RoundedRectangle(cornerRadius: 5)
-            .fill(block.isOpen ? Color.clear : Color.white.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 5)
-            .stroke(block.isOpen ? dim.opacity(0.3) : Color.clear, style: StrokeStyle(lineWidth: 1, dash: [3])))
+        .background(RoundedRectangle(cornerRadius: 8)
+            .fill(block.isOpen ? Color.clear : Color.white.opacity(isTask ? 0.06 : 0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 8)
+            .stroke(block.isOpen ? dim.opacity(0.3) : fg.opacity(0.15),
+                    style: StrokeStyle(lineWidth: 1, dash: block.isOpen ? [3] : [])))
+        .onHover { hover = $0 }
     }
 }
 
 struct ScheduleView: View {
     @ObservedObject var model: ScheduleModel
+
+    private func isCurrentBlock(_ i: Int) -> Bool {
+        let f = DateFormatter(); f.dateFormat = "HH:mm"
+        let now = f.string(from: Date())
+        let b = model.blocks[i]
+        return now >= b.start && now < addMinutes(b.start, b.duration_min)
+    }
+
     var body: some View {
         List {
-            ForEach(model.blocks) { b in
-                ScheduleRow(block: b, isNew: model.newlyAdded.contains(b.id), model: model)
+            ForEach(Array(model.blocks.enumerated()), id: \.element.id) { i, b in
+                ScheduleRow(block: b, isNew: model.newlyAdded.contains(b.id),
+                            isDone: model.doneIds.contains(b.id), isCurrent: isCurrentBlock(i), model: model)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
             }
@@ -831,6 +928,30 @@ struct ScheduleView: View {
 
 // MARK: - calendar view
 
+struct DayCell: View {
+    let day: Date?
+    let items: [DueItem]
+    let isToday: Bool
+    var body: some View {
+        GeometryReader { geo in
+            if let day = day {
+                VStack(spacing: 3) {
+                    Text("\(Calendar.current.component(.day, from: day))")
+                        .font(mono(12)).foregroundColor(isToday ? bright : fg)
+                    ForEach(items.prefix(3)) { item in
+                        ElementIcon(element: element(for: item.category), size: 11)
+                    }
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .background(RoundedRectangle(cornerRadius: 5).fill(isToday ? green.opacity(0.12) : Color.clear))
+                .help(items.isEmpty ? "" : items.map { $0.text }.joined(separator: "\n"))
+            } else {
+                Color.clear
+            }
+        }
+    }
+}
+
 struct CalendarView: View {
     @ObservedObject var model: CalendarModel
     @State private var showGrid = true
@@ -844,9 +965,9 @@ struct CalendarView: View {
             }.pickerStyle(.segmented).labelsHidden()
 
             if showGrid {
-                monthGrid
+                monthGrid.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                listView
+                listView.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .padding(20)
@@ -875,24 +996,17 @@ struct CalendarView: View {
                 Text(start, format: .dateTime.month(.wide).year()).font(mono(12, .semibold)).foregroundColor(bright)
                 Button("→") { monthAnchor = cal.date(byAdding: .month, value: 1, to: monthAnchor)! }
                     .buttonStyle(.plain)
+                Spacer()
             }.foregroundColor(fg)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 6) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
                 ForEach(days.indices, id: \.self) { i in
-                    if let day = days[i] {
-                        let items = byDay[cal.startOfDay(for: day)] ?? []
-                        VStack(spacing: 2) {
-                            Text("\(cal.component(.day, from: day))").font(mono(11))
-                                .foregroundColor(cal.isDateInToday(day) ? bright : fg)
-                            if !items.isEmpty {
-                                Circle().fill(green).frame(width: 5, height: 5)
-                            }
-                        }.frame(maxWidth: .infinity, minHeight: 28)
-                    } else {
-                        Color.clear.frame(minHeight: 28)
-                    }
+                    DayCell(day: days[i], items: days[i].map { byDay[cal.startOfDay(for: $0)] ?? [] } ?? [],
+                            isToday: days[i].map { cal.isDateInToday($0) } ?? false)
+                        .frame(minHeight: 44)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -903,9 +1017,10 @@ struct CalendarView: View {
                     Text("no deadlines set").font(mono(12)).foregroundColor(dim)
                 }
                 ForEach(model.items) { item in
-                    HStack {
+                    HStack(spacing: 6) {
                         Text(item.due, format: .dateTime.day().month(.abbreviated))
                             .font(mono(11)).foregroundColor(dim).frame(width: 50, alignment: .leading)
+                        ElementIcon(element: element(for: item.category), size: 12)
                         Text(item.text).font(mono(12)).foregroundColor(fg)
                         Spacer()
                     }
@@ -931,10 +1046,16 @@ struct RootView: View {
                 ForEach(PlannerTab.allCases, id: \.self) { Text($0.rawValue) }
             }.pickerStyle(.segmented).labelsHidden().padding(12)
 
-            switch tab {
-            case .today: Dashboard(model: model)
-            case .schedule: ScheduleView(model: scheduleModel)
-            case .calendar: CalendarView(model: calendarModel)
+            // all three stay alive underneath; switching tabs just hides/shows them,
+            // instead of destroying and recreating the view (which retriggered the
+            // typewriter text-reveal and lost any in-progress state every switch)
+            ZStack {
+                Dashboard(model: model).opacity(tab == .today ? 1 : 0)
+                    .allowsHitTesting(tab == .today)
+                ScheduleView(model: scheduleModel).opacity(tab == .schedule ? 1 : 0)
+                    .allowsHitTesting(tab == .schedule)
+                CalendarView(model: calendarModel).opacity(tab == .calendar ? 1 : 0)
+                    .allowsHitTesting(tab == .calendar)
             }
         }
         .background(bg)
