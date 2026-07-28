@@ -1,5 +1,33 @@
 # Aang mascot animation + Avatar cozy-game theming — design
 
+## As-built (updated 2026-07-28)
+
+What's below is the original plan; several things shipped differently after live iteration.
+Current reality:
+
+- **Mascot states**: `.idle`, `.splash`, `.reaction`, `.standing` (added later, not in the
+  original plan — mascot stands up and does an occasional last-two-frame bob while the
+  mouse hovers the dashboard; rests seated with an occasional blink otherwise). `.splash`
+  still exists in code but is no longer triggered on window-open ("drop splash animation
+  on open") — effectively unused today, kept rather than deleted in case it's wanted again.
+- **Reaction stayed body-sprite-based**, not the face-portrait redesign described below in
+  "Reaction portraits" — that idea was never actually built.
+- **Idle and standing sprites were replaced again** after this doc was written, with two
+  new hand-picked 4-frame sheets (seated/blink for idle, stand-up-then-bob for standing).
+  Frame boundaries on both are non-uniform (measured via column-density local minima, same
+  method as the sheets below) — even slicing visibly clipped the body on the first attempt.
+- **Typography ended up more layered** than "one pixel font everywhere": `Avatar Airbender`
+  (heading()) for the date header only; `Silkscreen` (pixelBody()) for primary body text;
+  `Papyrus` rendered through a mild pixellate `CIFilter` (`PixelatedHeading`) for section
+  headers. Border/textbox art (`BorderFrame`) ships as planned, with a graceful fallback to
+  a plain rounded rect if the asset isn't found.
+- **Window is resizable**, not fixed at a single size — the "textbox art rendering... at the
+  popup's fixed 340×660 size" testing note below is stale; default is 370×660 but the user
+  can resize freely (minimum 420×560).
+- **Tabs**: Today/Schedule/Calendar didn't exist when this doc was written — added in a
+  separate pass (see `2026-07-27-native-app-schedule-calendar-tabs.md`), themed with a
+  custom `ThemedTabBar` matching this palette rather than the native macOS segmented control.
+
 ## Context
 
 `native/main.swift` is a single-file SwiftUI menu bar app (no Xcode project, built via
