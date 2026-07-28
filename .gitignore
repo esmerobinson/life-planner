@@ -9,3 +9,4 @@ docs/superpowers/introscreens_avatar_files/
 native/Assets/
 .claude/worktrees/
 native/EsmeDay
+.build/
