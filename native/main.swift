@@ -708,56 +708,96 @@ struct Dashboard: View {
 
 // MARK: - schedule view
 
+// pixels-per-minute used for both block height and drag-to-resize conversion
+let PT_PER_MIN: CGFloat = 0.5
+
+// A thin grip at the bottom edge of a block: drag down to lengthen, up to shorten.
+// Live-previews the height during the drag, snaps to 5-min steps, commits (one write)
+// only on release -- so dragging doesn't spam the vault file with every pixel of motion.
+struct ResizeHandle: View {
+    let onCommit: (Int) -> Void
+    @State private var dragMinutes: Int = 0
+    @State private var hovering = false
+    @Binding var livePreview: Int
+
+    var body: some View {
+        Rectangle()
+            .fill(hovering ? green.opacity(0.35) : dim.opacity(0.25))
+            .frame(height: 5)
+            .overlay(
+                RoundedRectangle(cornerRadius: 1).fill(hovering ? green : dim).frame(width: 28, height: 2)
+            )
+            .contentShape(Rectangle().inset(by: -4))
+            .onHover { h in
+                hovering = h
+                if h { NSCursor.resizeUpDown.set() } else { NSCursor.arrow.set() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { v in
+                        let raw = Int((v.translation.height / PT_PER_MIN / 5).rounded()) * 5
+                        dragMinutes = raw
+                        livePreview = raw
+                    }
+                    .onEnded { _ in
+                        if dragMinutes != 0 { onCommit(dragMinutes) }
+                        dragMinutes = 0
+                        livePreview = 0
+                    }
+            )
+    }
+}
+
 struct ScheduleRow: View {
     let block: ScheduleBlock
     let isNew: Bool
     let model: ScheduleModel
     @State private var showMoveTo = false
     @State private var moveDate = Date()
+    @State private var liveDelta = 0
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(block.start)–\(addMinutes(block.start, block.duration_min))")
-                    .font(mono(10)).foregroundColor(dim)
-                HStack(spacing: 4) {
-                    Text(block.isOpen ? "open" : block.label)
-                        .font(mono(12)).foregroundColor(block.isOpen ? dim : fg)
-                        .italic(block.isOpen)
-                    if isNew {
-                        Text("new").font(mono(9, .semibold)).foregroundColor(bright)
-                            .padding(.horizontal, 4).padding(.vertical, 1)
-                            .background(RoundedRectangle(cornerRadius: 3).fill(green.opacity(0.3)))
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(block.start)–\(addMinutes(block.start, block.duration_min + liveDelta))")
+                        .font(mono(10)).foregroundColor(dim)
+                    HStack(spacing: 4) {
+                        Text(block.isOpen ? "open" : block.label)
+                            .font(mono(12)).foregroundColor(block.isOpen ? dim : fg)
+                            .italic(block.isOpen)
+                        if isNew {
+                            Text("new").font(mono(9, .semibold)).foregroundColor(bright)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .background(RoundedRectangle(cornerRadius: 3).fill(green.opacity(0.3)))
+                        }
                     }
                 }
-            }
-            Spacer()
-            if !block.isOpen {
-                VStack(spacing: 4) {
-                    Button(action: { model.resize(block.id, deltaMinutes: 5) }) {
-                        Text("+").font(mono(11))
+                Spacer()
+                if !block.isOpen {
+                    Button(action: { showMoveTo = true }) {
+                        Text("📅").font(mono(11))
                     }.buttonStyle(.plain)
-                    Button(action: { model.resize(block.id, deltaMinutes: -5) }) {
-                        Text("–").font(mono(11))
-                    }.buttonStyle(.plain)
-                }.foregroundColor(dim)
-                Button(action: { showMoveTo = true }) {
-                    Text("📅").font(mono(11))
-                }.buttonStyle(.plain)
-                .popover(isPresented: $showMoveTo) {
-                    VStack(spacing: 8) {
-                        DatePicker("move to", selection: $moveDate, displayedComponents: .date)
-                            .datePickerStyle(.graphical).labelsHidden()
-                        Button("move") { model.delete(block.id, mode: .moveTo(moveDate)); showMoveTo = false }
-                    }.padding(12)
+                    .popover(isPresented: $showMoveTo) {
+                        VStack(spacing: 8) {
+                            DatePicker("move to", selection: $moveDate, displayedComponents: .date)
+                                .datePickerStyle(.graphical).labelsHidden()
+                            Button("move") { model.delete(block.id, mode: .moveTo(moveDate)); showMoveTo = false }
+                        }.padding(12)
+                    }
+                    Button(action: { model.delete(block.id, mode: .notToday) }) {
+                        Text("✕").font(mono(11))
+                    }.buttonStyle(.plain).foregroundColor(dim)
                 }
-                Button(action: { model.delete(block.id, mode: .notToday) }) {
-                    Text("✕").font(mono(11))
-                }.buttonStyle(.plain).foregroundColor(dim)
+            }
+            .padding(.vertical, 4).padding(.horizontal, 6)
+            .frame(minHeight: max(28, CGFloat(block.duration_min + liveDelta) * PT_PER_MIN), alignment: .top)
+
+            if !block.isOpen {
+                ResizeHandle(onCommit: { model.resize(block.id, deltaMinutes: $0) }, livePreview: $liveDelta)
+                    .padding(.horizontal, 6)
             }
         }
-        .frame(minHeight: max(28, CGFloat(block.duration_min) * 0.5))
-        .padding(.vertical, 4).padding(.horizontal, 6)
         .background(RoundedRectangle(cornerRadius: 5)
             .fill(block.isOpen ? Color.clear : Color.white.opacity(0.04)))
         .overlay(RoundedRectangle(cornerRadius: 5)
