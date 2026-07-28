@@ -397,10 +397,14 @@ struct StreakBadge: View {
 struct TaskRow: View {
     let task: TaskItem
     let model: Model
+    let mascot: MascotModel
     @State private var hover = false
     var body: some View {
         HStack(alignment: .top, spacing: 7) {
-            Tick(on: task.done, element: element(for: task.category)) { model.toggleTask(task) }
+            Tick(on: task.done, element: element(for: task.category)) {
+                if !task.done { mascot.playReaction() }
+                model.toggleTask(task)
+            }
             Button(action: { openInObsidian(task.target) }) {
                 HStack(alignment: .top, spacing: 4) {
                     Text(task.display).font(mono(12))
@@ -419,6 +423,7 @@ struct TaskRow: View {
 
 struct Dashboard: View {
     @ObservedObject var model: Model
+    let mascot: MascotModel
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
@@ -473,7 +478,7 @@ struct Dashboard: View {
                                 Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                                 Spacer()
                             }.padding(.top, 4)
-                            ForEach(items) { TaskRow(task: $0, model: model) }
+                            ForEach(items) { TaskRow(task: $0, model: model, mascot: mascot) }
                         }
                     }
                 }
@@ -526,7 +531,7 @@ struct Dashboard: View {
 
 // MARK: - Aang mascot (body-sprite splash/idle)
 
-enum MascotState { case idle, splash }
+enum MascotState { case idle, splash, reaction }
 
 final class MascotModel: ObservableObject {
     @Published var state: MascotState = .idle
@@ -538,11 +543,20 @@ final class MascotModel: ObservableObject {
             self?.state = .idle
         }
     }
+
+    func playReaction() {
+        state = .reaction
+        // reaction is a 7-frame sequence at 6fps -> ~1.17s, then fall back to idle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.state = .idle
+        }
+    }
 }
 
 struct SpriteAnimator: View {
     @ObservedObject var mascot: MascotModel
     @State private var frameIndex = 0
+    @State private var direction = 1
     @State private var frames: [NSImage] = []
     @State private var timer: Timer?
 
@@ -558,7 +572,13 @@ struct SpriteAnimator: View {
         .onDisappear { timer?.invalidate() }
     }
 
-    private func folderName(_ s: MascotState) -> String { s == .idle ? "idle" : "splash" }
+    private func folderName(_ s: MascotState) -> String {
+        switch s {
+        case .idle: return "idle"
+        case .splash: return "splash"
+        case .reaction: return "reaction"
+        }
+    }
 
     private func load(for state: MascotState) {
         let dir = (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
@@ -567,12 +587,25 @@ struct SpriteAnimator: View {
         frames = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
             .compactMap { NSImage(contentsOf: $0) }
         frameIndex = 0
+        direction = 1
     }
 
     private func start() {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 6.0, repeats: true) { _ in
             guard !frames.isEmpty else { return }
-            frameIndex = (frameIndex + 1) % frames.count
+            if mascot.state == .idle {
+                // ping-pong: bounce back and forth across the sequence instead
+                // of hard-cutting back to frame 0, so the resting pose oscillates
+                if frames.count == 1 { frameIndex = 0; return }
+                var next = frameIndex + direction
+                if next >= frames.count { direction = -1; next = frames.count - 2 }
+                else if next < 0 { direction = 1; next = 1 }
+                frameIndex = next
+            } else {
+                // one-shot states (splash, reaction) play forward-only;
+                // MascotModel reverts to .idle on its own timeout
+                frameIndex = (frameIndex + 1) % frames.count
+            }
         }
     }
 }
@@ -609,7 +642,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView:
             ZStack(alignment: .bottomTrailing) {
-                Dashboard(model: model)
+                Dashboard(model: model, mascot: mascot)
                 SpriteAnimator(mascot: mascot)
                     .padding(12)
                     .allowsHitTesting(false)
