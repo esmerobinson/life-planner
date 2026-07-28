@@ -376,6 +376,7 @@ enum PixelFontCache {
 struct PixelText: View {
     let text: String
     var size: CGFloat = 20
+    var fallbackColor: Color = bright
     var body: some View {
         HStack(alignment: .bottom, spacing: size * 0.08) {
             ForEach(Array(text.enumerated()), id: \.offset) { _, ch in
@@ -383,10 +384,13 @@ struct PixelText: View {
                     let w = size * (img.size.width / max(img.size.height, 1))
                     Image(nsImage: img).resizable().interpolation(.none)
                         .frame(width: w, height: size)
-                } else if ch == " " {
-                    Color.clear.frame(width: size * 0.5, height: size)
                 } else {
-                    Color.clear.frame(width: size * 0.3, height: size)
+                    // No bitmap glyph for this character (digits, punctuation, etc. --
+                    // the extracted reference sheet only has A-Z/a-z). Fall back to the
+                    // app's regular font instead of a blank gap, so e.g. day numbers
+                    // in the date header stay visible.
+                    Text(String(ch)).font(mono(size * 0.7)).foregroundColor(fallbackColor)
+                        .frame(height: size)
                 }
             }
         }
