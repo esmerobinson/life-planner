@@ -11,8 +11,8 @@ OUT = "native/Assets/Icons"
 
 # (name, rect, recolor target RGB matching the theming palette)
 ELEMENTS = [
-    ("air",   (336, 1245, 484, 1398), (185, 210, 225)),   # pale blue-white, air/sky
-    ("water", (327,  658, 484,  811), (0xB6, 0xD7, 0xF4)),  # light blue #B6D7F4
+    ("air",   (336, 1245, 484, 1398), (0x3D, 0x7A, 0x66)),  # blue-green teal, clearly distinct hue from water
+    ("water", (327,  658, 484,  811), (0x1E, 0x6F, 0xC7)),  # deeper saturated blue #1E6FC7
     ("fire",  (320, 1023, 494, 1218), (0xEE, 0x72, 0x23)),  # orange #EE7223
     ("earth", (321,  837, 490, 1003), (0x71, 0x54, 0x47)),  # brown #715447
 ]

@@ -1,14 +1,15 @@
 // esme's day — native macOS menu bar app.
-// Click the ✿ in the menu bar -> a floating window (never clipped, freely resizable),
-// with three tabs: Today (tasks, manifestation + reminder, goal bars, habit streaks,
-// stars), Schedule (today's suggested timed plan, editable), Calendar (deadlines only).
-// Reads the vault directly, watches it for instant live-updates via FSEvents.
-// Build: swiftc -swift-version 5 -O main.swift -o EsmeDay -framework CoreServices
+// Click the ✿ in the menu bar -> a floating dashboard window (never clipped):
+// today's tasks (each opens its project in Obsidian), manifestation + reminder of
+// the day with "see more", a one-tap "make a journal entry" that opens today's note,
+// goal bars, habit streaks, stars. Reads the vault directly.
+// Build: swiftc -swift-version 5 -O main.swift -o EsmeDay
 
 import AppKit
-import CoreServices
 import SwiftUI
 import UniformTypeIdentifiers
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 // MARK: - vault access
 
@@ -210,6 +211,17 @@ func jsonDict(_ rel: String) -> [String: Any] {
 func isoDay(_ offset: Int = 0) -> String {
     let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
     return f.string(from: Calendar.current.date(byAdding: .day, value: offset, to: Date())!)
+}
+
+// Weekday + day + month string for the date header, e.g. "Tuesday 28 July" -- matches
+// the components of the old `.dateTime.weekday(.wide).day().month(.wide)` format style,
+// but as a plain String since PixelText renders letter-images, not a Font.
+func headerDateString() -> String {
+    let d = Date()
+    let day = Calendar.current.component(.day, from: d)
+    let f1 = DateFormatter(); f1.dateFormat = "EEEE"
+    let f2 = DateFormatter(); f2.dateFormat = "MMMM"
+    return "\(f1.string(from: d)) \(day) \(f2.string(from: d))"
 }
 
 func todayNoteFile() -> String {
@@ -755,11 +767,97 @@ struct ThemedTabBar<T: Hashable>: View {
     }
 }
 
+// Silkscreen by The Silkscreen Project Authors, SIL Open Font License --
+// native/Fonts/Silkscreen-Regular.ttf / Silkscreen-Bold.ttf. Regular and Bold ship as
+// two files sharing one family name ("Silkscreen") but distinct PostScript names
+// ("Silkscreen-Regular" / "Silkscreen-Bold") -- so unlike a normal system font, asking
+// for the family name at a bold Font.Weight will NOT reliably pick the bold file
+// (NSFont(name:) resolution for a shared family name is ambiguous/first-match, not
+// weight-aware). Look up by the PostScript name directly instead, verified via
+// `python3 -c "from fontTools.ttLib import TTFont; ..."` against the two .ttf files.
+// Sized a couple points larger than mono() at the same call site -- pixel/LCD-style
+// fonts read smaller than their point size for legibility at these small UI sizes.
+func pixelBody(_ s: CGFloat, _ w: Font.Weight = .regular) -> Font {
+    .custom(w == .bold ? "Silkscreen-Bold" : "Silkscreen-Regular", size: s)
+}
+
+// Papyrus (real macOS system font, installed on every Mac -- no download/licensing
+// needed) rendered with a slight pixellate filter for section/category headings, per
+// explicit request ("can you pixelate it slightly"). NOT used for the date header,
+// which stays on heading()/Avatar Airbender per prior work.
+func assetsBorderURL(_ name: String) -> URL {
+    (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+        .appendingPathComponent("Assets/Border/\(name).png")
+}
+
+// Renders `text` in Papyrus via SwiftUI's ImageRenderer (used elsewhere in this
+// codebase for test/verification snapshots -- here in production), then applies a
+// mild CIFilter.pixellate() pass so the heading reads as "slightly" pixelated rather
+// than blocky/illegible. Rendered at a fixed high-quality base size (2x the requested
+// display size) and then scaled down for display, so the pixellate scale stays
+// proportionally small relative to the glyph size.
+@MainActor
+enum PixelatedHeadingCache {
+    static var images: [String: NSImage] = [:]
+
+    static func render(text: String, size: CGFloat, color: Color) -> NSImage? {
+        let nsColor = NSColor(color)
+        let colorComponents = nsColor.cgColor.components ?? []
+        let colorKey = colorComponents.map { String(format: "%.3f", $0) }.joined(separator: ",")
+        let key = "\(text)|\(size)|\(colorKey)"
+        if let cached = images[key] { return cached }
+
+        let renderSize = size * 2
+        let label = Text(text)
+            .font(.custom("Papyrus", size: renderSize))
+            .foregroundColor(color)
+        let renderer = ImageRenderer(content: label)
+        renderer.scale = 2 // retina-quality source before we pixellate it down
+        guard let nsImage = renderer.nsImage,
+              let tiff = nsImage.tiffRepresentation,
+              let ciImage = CIImage(data: tiff) else { return nil }
+
+        let filter = CIFilter.pixellate()
+        filter.inputImage = ciImage
+        // "Slight" pixellation: a small scale relative to the rendered glyph size --
+        // 3px at 2x render scale reads as a subtle textured/pixel look, not blocky.
+        filter.scale = 3.0
+
+        let context = CIContext()
+        guard let output = filter.outputImage,
+              let cgImage = context.createCGImage(output, from: ciImage.extent) else { return nil }
+
+        let result = NSImage(cgImage: cgImage, size: nsImage.size)
+        images[key] = result
+        return result
+    }
+}
+
+struct PixelatedHeading: View {
+    let text: String
+    var size: CGFloat = 14
+    var color: Color = bright
+
+    var body: some View {
+        if let img = PixelatedHeadingCache.render(text: text, size: size, color: color) {
+            Image(nsImage: img)
+                .resizable()
+                .interpolation(.medium)
+                .aspectRatio(contentMode: .fit)
+                .frame(height: size * 1.3)
+        } else {
+            // Papyrus missing or renderer failed -- fall back to plain text rather
+            // than showing nothing.
+            Text(text).font(.custom("Papyrus", size: size)).foregroundColor(color)
+        }
+    }
+}
+
 struct SectionHeader: View {
     let title: String; var more: String? = nil
     var body: some View {
         HStack {
-            Text(title).font(mono(10)).foregroundColor(dim)
+            PixelatedHeading(text: title, size: 11, color: dim)
             Spacer()
             if let m = more {
                 Button("see more →") { openInObsidian(m) }
@@ -793,7 +891,7 @@ struct TypewriterText: View {
 
     var body: some View {
         Text(shown)
-            .font(italic ? mono(12).italic() : mono(12))
+            .font(italic ? pixelBody(13).italic() : pixelBody(13))
             .foregroundColor(color)
             .fixedSize(horizontal: false, vertical: true)
             .onAppear {
@@ -820,8 +918,29 @@ struct TypewriterText: View {
 // Loads a pre-extracted element/Lotus icon from native/Assets/Icons/ (see native/tools/extract_icons.py).
 // Resolved relative to the running binary's directory, same approach as the vault paths above.
 func assetsIconURL(_ name: String) -> URL {
-    Bundle.main.bundleURL
+    (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
         .appendingPathComponent("Assets/Icons/\(name).png")
+}
+
+// Ornate blue bordered-frame graphic (native/Assets/Border/frame.png, cropped from
+// docs/superpowers/fontsavatar.png -- see native/tools/extract_border.py) used as a
+// 9-slice-able background for the CTA button, replacing a plain RoundedRectangle
+// fill/stroke. The source frame is 207x143px with a measured ~16px ornate border
+// ring on every edge and a flat-colored interior -- capInsets below keep that
+// border ring a fixed size while the interior stretches to fit the button, so it
+// doesn't look smeared/distorted at the button's actual (much smaller) size.
+struct BorderFrame: View {
+    var body: some View {
+        if let img = NSImage(contentsOf: assetsBorderURL("frame")) {
+            Image(nsImage: img)
+                .resizable(capInsets: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16),
+                           resizingMode: .stretch)
+                .interpolation(.none)
+        } else {
+            RoundedRectangle(cornerRadius: 8).fill(green.opacity(0.16))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(green.opacity(0.5), lineWidth: 1))
+        }
+    }
 }
 
 struct ElementIcon: View {
@@ -837,13 +956,101 @@ struct ElementIcon: View {
     }
 }
 
+// Bitmap "font" made of separate letter images extracted from a pixel-art reference
+// sheet (see native/tools -- upper_A.png..upper_Z.png / lower_a.png..lower_z.png in
+// Assets/Font/). SwiftUI has no built-in way to lay out text from per-glyph images, so
+// PixelText does it manually: one Image per matched character, HStack'd left to right.
+// Only A-Z/a-z have glyphs (the reference sheet has no digit glyphs at all); anything
+// else (digits, punctuation, spaces) falls back to rendering inline via mono() in the
+// app's regular font/color, since this is a display font for short strings like the
+// date header, not a general-purpose typesetting system.
+func fontLetterURL(_ ch: Character) -> URL? {
+    let base = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Assets/Font")
+    if ch.isASCII, ("A"..."Z").contains(ch) {
+        return base.appendingPathComponent("upper_\(ch).png")
+    }
+    if ch.isASCII, ("a"..."z").contains(ch) {
+        return base.appendingPathComponent("lower_\(ch).png")
+    }
+    return nil
+}
+
+// Simple static cache so repeated PixelText renders (e.g. the date header redrawing)
+// don't re-hit the filesystem every time -- same idea as SpriteAnimator's frame arrays,
+// just keyed by character instead of reloaded per state change.
+enum PixelFontCache {
+    static var images: [Character: NSImage] = [:]
+    static func image(for ch: Character) -> NSImage? {
+        if let cached = images[ch] { return cached }
+        guard let url = fontLetterURL(ch), let img = NSImage(contentsOf: url) else { return nil }
+        images[ch] = img
+        return img
+    }
+}
+
+struct PixelText: View {
+    let text: String
+    var size: CGFloat = 20
+    var fallbackColor: Color = bright
+    // Optional width budget: long dates (e.g. "Wednesday 24 September") can otherwise
+    // outgrow the fixed-width window at larger sizes, so when a maxWidth is given the
+    // whole string scales itself down just enough to fit rather than clipping.
+    var maxWidth: CGFloat? = nil
+
+    // Natural (unshrunk) width of `text` rendered at `size`, matching the per-glyph
+    // widths used below -- bitmap glyph aspect ratio, or measured fallback-font width
+    // for characters (digits, spaces, punctuation) with no bitmap in the sheet.
+    private static func naturalWidth(text: String, size: CGFloat) -> CGFloat {
+        var total: CGFloat = 0
+        var n = 0
+        for ch in text {
+            n += 1
+            if let img = PixelFontCache.image(for: ch) {
+                total += size * (img.size.width / max(img.size.height, 1))
+            } else {
+                let font = NSFont.monospacedSystemFont(ofSize: size * 0.7, weight: .regular)
+                total += (String(ch) as NSString).size(withAttributes: [.font: font]).width
+            }
+        }
+        if n > 1 { total += size * 0.08 * CGFloat(n - 1) }
+        return total
+    }
+
+    private var effectiveSize: CGFloat {
+        guard let maxWidth else { return size }
+        let natural = Self.naturalWidth(text: text, size: size)
+        guard natural > maxWidth, natural > 0 else { return size }
+        return size * (maxWidth / natural)
+    }
+
+    var body: some View {
+        let s = effectiveSize
+        HStack(alignment: .bottom, spacing: s * 0.08) {
+            ForEach(Array(text.enumerated()), id: \.offset) { _, ch in
+                if let img = PixelFontCache.image(for: ch) {
+                    let w = s * (img.size.width / max(img.size.height, 1))
+                    Image(nsImage: img).resizable().interpolation(.none)
+                        .frame(width: w, height: s)
+                } else {
+                    // No bitmap glyph for this character (digits, punctuation, etc. --
+                    // the extracted reference sheet only has A-Z/a-z). Fall back to the
+                    // app's regular font instead of a blank gap, so e.g. day numbers
+                    // in the date header stay visible.
+                    Text(String(ch)).font(mono(s * 0.7)).foregroundColor(fallbackColor)
+                        .frame(height: s)
+                }
+            }
+        }
+    }
+}
+
 struct StarBurst: View {
     @Binding var trigger: Int
     let element: String   // "air" | "water" | "fire" | "earth" | "lotus"
     @State private var scale: CGFloat = 0
     @State private var opacity: Double = 0
     var body: some View {
-        ElementIcon(element: element, size: 16)
+        ElementIcon(element: element, size: 24)
             .scaleEffect(scale).opacity(opacity)
             .onChange(of: trigger) { _, _ in
                 scale = 1.6; opacity = 1
@@ -875,7 +1082,7 @@ struct Tick: View {
             }) {
                 Group {
                     if wellbeing {
-                        ElementIcon(element: "lotus", size: 14)
+                        ElementIcon(element: "lotus", size: 22)
                             .opacity(on ? 1.0 : (hover ? 0.85 : 0.45))
                     } else {
                         Text(on ? "●" : (hover ? "◉" : "○"))
@@ -883,7 +1090,7 @@ struct Tick: View {
                     }
                 }
                 .scaleEffect(hover ? 1.25 : 1)
-                .frame(width: 16).contentShape(Rectangle())
+                .frame(width: 20).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .onHover { hover = $0 }
@@ -905,16 +1112,20 @@ struct StreakBadge: View {
 struct TaskRow: View {
     let task: TaskItem
     let model: Model
+    let mascot: MascotModel
     @State private var hover = false
     @State private var showMoveTo = false
     @State private var moveDate = Date()
 
     var body: some View {
         HStack(alignment: .top, spacing: 7) {
-            Tick(on: task.done, element: element(for: task.category)) { model.toggleTask(task) }
+            Tick(on: task.done, element: element(for: task.category)) {
+                if !task.done { mascot.playReaction() }
+                model.toggleTask(task)
+            }
             Button(action: { openInObsidian(task.target) }) {
                 HStack(alignment: .top, spacing: 4) {
-                    Text(task.display).font(mono(12))
+                    Text(task.display).font(pixelBody(13))
                         .foregroundColor(task.done ? dim : (hover ? bright : fg))
                         .strikethrough(task.done, color: dim)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1047,11 +1258,21 @@ struct JournalComposer: View {
 
 struct Dashboard: View {
     @ObservedObject var model: Model
+    let mascot: MascotModel
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                Text(Date(), format: .dateTime.weekday(.wide).day().month(.wide))
-                    .font(heading(20)).foregroundColor(bright)
+                // Real scalable font (Avatar Airbender.ttf via heading()), reverted
+                // from the bitmap-letter PixelText experiment -- preferred look.
+                // Constrained to a width that clears the mascot's top-right corner
+                // (SpriteAnimator, ~100pt + padding) so long dates (e.g. "Wednesday 24
+                // September") shrink to fit that single line instead of running under him.
+                Text(headerDateString())
+                    .font(heading(30))
+                    .foregroundColor(bright)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                    .frame(maxWidth: 230, alignment: .leading)
 
                 // affirm rows: manifestation / reminder / journal, tick + streak inline
                 VStack(alignment: .leading, spacing: 8) {
@@ -1093,12 +1314,12 @@ struct Dashboard: View {
                         let items = model.tasks.filter { $0.category == cat }
                         if !items.isEmpty {
                             HStack(spacing: 6) {
-                                Text(cat.lowercased()).font(mono(11, .semibold)).foregroundColor(bright)
-                                ElementIcon(element: element(for: cat), size: 12)
+                                PixelatedHeading(text: cat.lowercased(), size: 15, color: bright)
+                                ElementIcon(element: element(for: cat), size: 20)
                                 Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                                 Spacer()
                             }.padding(.top, 4)
-                            ForEach(items) { TaskRow(task: $0, model: model) }
+                            ForEach(items) { TaskRow(task: $0, model: model, mascot: mascot) }
                         }
                     }
                     AddTaskField(model: model)
@@ -1459,6 +1680,7 @@ struct RootView: View {
     @ObservedObject var model: Model
     @ObservedObject var scheduleModel: ScheduleModel
     @ObservedObject var calendarModel: CalendarModel
+    let mascot: MascotModel
     @State private var tab: PlannerTab = .today
 
     var body: some View {
@@ -1470,7 +1692,7 @@ struct RootView: View {
             // instead of destroying and recreating the view (which retriggered the
             // typewriter text-reveal and lost any in-progress state every switch)
             ZStack {
-                Dashboard(model: model).opacity(tab == .today ? 1 : 0)
+                Dashboard(model: model, mascot: mascot).opacity(tab == .today ? 1 : 0)
                     .allowsHitTesting(tab == .today)
                 ScheduleView(taskModel: model, model: scheduleModel).opacity(tab == .schedule ? 1 : 0)
                     .allowsHitTesting(tab == .schedule)
@@ -1478,22 +1700,53 @@ struct RootView: View {
                     .allowsHitTesting(tab == .calendar)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(bg)
+        // Mascot now lives in the top-trailing corner (see AppDelegate) instead of
+        // sitting over scrolled content, so hover detection for the .standing state
+        // can live on the whole dashboard without worrying about the old bottom band.
+        .onHover { hovering in mascot.setHovering(hovering) }
     }
 }
 
 // MARK: - Aang mascot (body-sprite splash/idle)
 
-enum MascotState { case idle, splash }
+enum MascotState { case idle, splash, reaction, standing }
 
 final class MascotModel: ObservableObject {
     @Published var state: MascotState = .idle
+    // Set while the mouse hovers the dashboard (see Dashboard's .onHover). Doesn't
+    // interrupt a one-shot splash/reaction pass in progress -- it only decides which
+    // resting state to settle into: once those passes finish, and whenever hovering
+    // starts/stops while already at rest, we land on .standing instead of .idle.
+    private var isHovering = false
+    private var restState: MascotState { isHovering ? .standing : .idle }
 
     func playSplash() {
         state = .splash
-        // splash is a 6-frame sequence at 6fps -> 1.0s, then fall back to idle
+        // splash is a 6-frame sequence at 6fps -> 1.0s, then settle to rest
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.state = .idle
+            guard let self else { return }
+            self.state = self.restState
+        }
+    }
+
+    func playReaction() {
+        state = .reaction
+        // reaction is a 7-frame sequence at 6fps -> ~1.17s, then settle to rest
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self else { return }
+            self.state = self.restState
+        }
+    }
+
+    func setHovering(_ hovering: Bool) {
+        isHovering = hovering
+        // Only switch immediately if currently settled at rest -- a splash/reaction
+        // pass already in flight should finish and settle via the timers above,
+        // which will pick up the new isHovering value at that point.
+        if state == .idle || state == .standing {
+            state = restState
         }
     }
 }
@@ -1501,14 +1754,30 @@ final class MascotModel: ObservableObject {
 struct SpriteAnimator: View {
     @ObservedObject var mascot: MascotModel
     @State private var frameIndex = 0
+    @State private var direction = 1
     @State private var frames: [NSImage] = []
     @State private var timer: Timer?
+
+    // Idle pacing: rather than continuously ping-ponging at 6fps forever, idle
+    // mostly holds still on the resting frame (frame 0) and only occasionally
+    // does one full bounce pass -- "sits and blinks", not a constant wiggle.
+    @State private var idlePaused = true
+    @State private var idlePauseTicksLeft = SpriteAnimator.idlePauseTicks
+
+    static let tickHz = 6.0
+    // Was 2.5s -- with an ~8-frame bounce pass at 6fps (~2.33s) that read as closer to
+    // 50/50 active/still than the intended "mostly holds still, occasionally bounces"
+    // feel (flagged in a prior review). Bumped to 7s so idle spends most of its time
+    // resting, with only occasional movement.
+    static let idlePauseSeconds = 7.0
+    static let idlePauseTicks = Int(idlePauseSeconds * tickHz)
 
     var body: some View {
         Group {
             if frameIndex < frames.count {
                 Image(nsImage: frames[frameIndex]).resizable().interpolation(.none)
-                    .frame(width: 72, height: 72)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 100, height: 100)
             }
         }
         .onAppear { load(for: mascot.state); start() }
@@ -1516,21 +1785,65 @@ struct SpriteAnimator: View {
         .onDisappear { timer?.invalidate() }
     }
 
-    private func folderName(_ s: MascotState) -> String { s == .idle ? "idle" : "splash" }
+    private func folderName(_ s: MascotState) -> String {
+        switch s {
+        case .idle: return "idle"
+        case .splash: return "splash"
+        case .reaction: return "reaction"
+        case .standing: return "standing"
+        }
+    }
 
     private func load(for state: MascotState) {
-        let dir = Bundle.main.bundleURL
+        let dir = (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
             .appendingPathComponent("Assets/Sprites/\(folderName(state))")
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         frames = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
             .compactMap { NSImage(contentsOf: $0) }
         frameIndex = 0
+        direction = 1
+        idlePaused = true
+        idlePauseTicksLeft = Self.idlePauseTicks
     }
 
     private func start() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 6.0, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / Self.tickHz, repeats: true) { _ in
             guard !frames.isEmpty else { return }
-            frameIndex = (frameIndex + 1) % frames.count
+            switch mascot.state {
+            case .idle:
+                if frames.count == 1 { frameIndex = 0; return }
+                if idlePaused {
+                    // holding on the resting frame between bounce passes
+                    frameIndex = 0
+                    idlePauseTicksLeft -= 1
+                    if idlePauseTicksLeft <= 0 { idlePaused = false; direction = 1 }
+                    return
+                }
+                // one full bounce pass: 0 -> last -> back to 0, then pause again
+                let next = frameIndex + direction
+                if next >= frames.count {
+                    direction = -1
+                    frameIndex = frames.count - 2
+                } else if next < 0 {
+                    frameIndex = 0
+                    idlePaused = true
+                    idlePauseTicksLeft = Self.idlePauseTicks
+                } else {
+                    frameIndex = next
+                }
+            case .standing:
+                // loops continuously while hovering -- same ping-pong feel as the
+                // old always-on idle oscillation, just under a different state
+                if frames.count == 1 { frameIndex = 0; return }
+                var next = frameIndex + direction
+                if next >= frames.count { direction = -1; next = frames.count - 2 }
+                else if next < 0 { direction = 1; next = 1 }
+                frameIndex = next
+            case .splash, .reaction:
+                // one-shot states play forward-only; MascotModel reverts to a
+                // resting state (.idle or .standing) on its own timeout
+                frameIndex = (frameIndex + 1) % frames.count
+            }
         }
     }
 }
@@ -1548,9 +1861,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // Avatar Airbender font by FontGet.com (free for personal/commercial use, credit required) -- native/Fonts/
-        if let fontURL = Bundle.main.bundleURL.deletingLastPathComponent()
-            .appendingPathComponent("Fonts/Avatar Airbender.ttf") as URL? {
-            CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+        let fontURL = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Fonts/Avatar Airbender.ttf")
+        var fontRegisterError: Unmanaged<CFError>?
+        if !CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &fontRegisterError) {
+            print("Warning: failed to register font at \(fontURL.path): \(String(describing: fontRegisterError?.takeUnretainedValue()))")
+        }
+        // Silkscreen by The Silkscreen Project Authors, SIL Open Font License --
+        // native/Fonts/Silkscreen-Regular.ttf / Silkscreen-Bold.ttf (Google Fonts family).
+        // Used for primary body text (pixelBody()) -- a pixel/LCD-style Game Boy dialogue
+        // look for task rows, manifestation/reminder text, and the journal CTA.
+        for silkscreenName in ["Silkscreen-Regular.ttf", "Silkscreen-Bold.ttf"] {
+            let url = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Fonts/\(silkscreenName)")
+            var err: Unmanaged<CFError>?
+            if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &err) {
+                print("Warning: failed to register font at \(url.path): \(String(describing: err?.takeUnretainedValue()))")
+            }
         }
         reloadAll()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -1558,22 +1883,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.action = #selector(toggle)
         statusItem.button?.target = self
 
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 640),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 370, height: 660),
                           styleMask: [.titled, .closable, .fullSizeContentView, .resizable],
                           backing: .buffered, defer: false)
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.level = .floating
-        window.backgroundColor = NSColor(red: 0.106, green: 0.106, blue: 0.106, alpha: 1)
+        window.backgroundColor = NSColor(red: 0.976, green: 0.937, blue: 0.890, alpha: 1)
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 420, height: 560)
         window.setFrameAutosaveName("EsmeDayWindow")
         window.contentView = NSHostingView(rootView:
-            ZStack(alignment: .bottomTrailing) {
-                RootView(model: model, scheduleModel: scheduleModel, calendarModel: calendarModel)
+            ZStack(alignment: .topTrailing) {
+                RootView(model: model, scheduleModel: scheduleModel, calendarModel: calendarModel, mascot: mascot)
                 SpriteAnimator(mascot: mascot)
-                    .padding(12)
+                    // Top-right corner: clear of the window's close button (top-left)
+                    // and the date header (top-left, width-capped to stay clear of him --
+                    // see Dashboard). 14pt padding on trailing/top keeps him inset from
+                    // both window edges at his new slightly-larger 100x100 size.
+                    .padding(.top, 14)
+                    .padding(.trailing, 14)
+                    .allowsHitTesting(false)
             }
         )
 
@@ -1597,11 +1928,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func updateTitle() {
         let done = model.tasks.filter { $0.done }.count
         if let icon = NSImage(contentsOf: assetsIconURL("lotus")) {
+            icon.isTemplate = true
             icon.size = NSSize(width: 16, height: 16)
             statusItem.button?.image = icon
             statusItem.button?.imagePosition = .imageLeading
+            statusItem.button?.title = " \(done)/\(model.tasks.count)"
+        } else {
+            statusItem.button?.image = nil
+            statusItem.button?.title = "✿ \(done)/\(model.tasks.count)"
         }
-        statusItem.button?.title = " \(done)/\(model.tasks.count)"
         statusItem.button?.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
     }
 
