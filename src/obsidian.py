@@ -48,15 +48,29 @@ def _daily_title(d=None):
     return f"{d.strftime('%A')} {vault._ordinal(d.day)} {d.strftime('%B')}"
 
 
+_HEADING_MARKERS = ("˚", "✩", "✿", "♡", "☾", "⋆", "✧", "˖")
+
+
 def _append_to_section(path, search, create_header, entry, title):
-    """Append `entry` under the section matching `search`; create it (with the
-    decorated `create_header`) if the day's note has no such section yet."""
+    """Append `entry` under the section matching `search`, inserted right after that
+    section's existing content and before whatever heading comes next (e.g. the nightly
+    Day in review, appended later) -- not just tacked onto the end of the whole file,
+    which would land it under the wrong section once anything else gets appended after."""
     content = vault.read(path) or f"# {title}\n"
-    if search in content:
-        content = content.rstrip() + "\n" + entry + "\n"
-    else:
-        content = content.rstrip() + f"\n\n{create_header}\n" + entry + "\n"
-    storage.write(path, content)
+    lines = content.split("\n")
+    header_idx = next((i for i, ln in enumerate(lines) if search in ln), None)
+    if header_idx is None:
+        storage.write(path, content.rstrip() + f"\n\n{create_header}\n" + entry + "\n")
+        return
+    insert_at = len(lines)
+    for i in range(header_idx + 1, len(lines)):
+        if lines[i].strip() and lines[i].strip()[0] in _HEADING_MARKERS:
+            insert_at = i
+            break
+    while insert_at > header_idx + 1 and not lines[insert_at - 1].strip():
+        insert_at -= 1
+    lines.insert(insert_at, entry)
+    storage.write(path, "\n".join(lines))
 
 
 def append_reflection(text, d=None, dry_run=False):

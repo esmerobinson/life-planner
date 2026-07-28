@@ -41,6 +41,51 @@ func section(_ text: String, _ name: String) -> [String] {
     return out
 }
 
+// mirrors src/obsidian.py:REFLECTIONS_HEADER / append_reflection / _append_to_section --
+// same timestamp format, same section, so entries from either surface interleave cleanly.
+let REFLECTIONS_HEADER = "𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬"
+let REFLECTIONS_DECORATED = "☾ 𝐑𝐞𝐟𝐥𝐞𝐜𝐭𝐢𝐨𝐧𝐬 ☽"
+
+// mirrors src/obsidian.py:_HEADING_MARKERS -- the leading glyph of every fancy.heading()
+// this codebase uses, so we can find where the Reflections section actually ENDS (i.e.
+// before whatever heading comes next, like the nightly Day in review), not just the
+// end of the whole file -- otherwise entries added after that would land in the wrong place.
+let HEADING_MARKERS: Set<Character> = ["˚", "✩", "✿", "♡", "☾", "⋆", "✧", "˖"]
+
+func appendReflection(_ text: String) {
+    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    let f = DateFormatter(); f.dateFormat = "HH:mm"
+    let entry = "**\(f.string(from: Date()))** \(trimmed)"
+    let path = todayNoteFile() + ".md"
+    let content = read(path)
+    var lines = content.components(separatedBy: "\n")
+
+    guard let headerIdx = lines.firstIndex(where: { $0.contains(REFLECTIONS_HEADER) }) else {
+        let base = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        writeVault(path, base + "\n\n" + REFLECTIONS_DECORATED + "\n" + entry + "\n")
+        return
+    }
+    var insertAt = lines.count
+    for i in (headerIdx + 1)..<lines.count {
+        if let first = lines[i].trimmingCharacters(in: .whitespaces).first, HEADING_MARKERS.contains(first) {
+            insertAt = i
+            break
+        }
+    }
+    while insertAt > headerIdx + 1, lines[insertAt - 1].trimmingCharacters(in: .whitespaces).isEmpty {
+        insertAt -= 1
+    }
+    lines.insert(entry, at: insertAt)
+    writeVault(path, lines.joined(separator: "\n"))
+}
+
+func randomReflectionPrompt() -> String? {
+    section(read("Daily/Journal Prompts.md"), "Reflection")
+        .map { $0.replacingOccurrences(of: #"\s*\(MUST INCLUDE\)\s*"#, with: "", options: .regularExpression) }
+        .randomElement()
+}
+
 func jsonDict(_ rel: String) -> [String: Any] {
     guard let d = read(rel).data(using: .utf8),
           let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
@@ -692,6 +737,64 @@ struct TaskRow: View {
     }
 }
 
+struct JournalComposer: View {
+    @ObservedObject var model: Model
+    @State private var text = ""
+    @State private var prompt: String? = nil
+    @State private var expanded = false
+    @State private var justSubmitted = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: { expanded.toggle() }) {
+                HStack {
+                    Text(expanded ? "✎  writing a journal entry" : "✎  make a journal entry now?")
+                        .font(mono(12, .medium))
+                    Spacer()
+                    Text(expanded ? "▾" : "→").font(mono(12))
+                }
+                .padding(.vertical, 9).padding(.horizontal, 12)
+                .background(RoundedRectangle(cornerRadius: 8).fill(green.opacity(0.16)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(green.opacity(0.5), lineWidth: 1))
+                .foregroundColor(green)
+                .contentShape(Rectangle())
+            }.buttonStyle(.plain)
+
+            if expanded {
+                if let p = prompt {
+                    Text(p).font(mono(11).italic()).foregroundColor(dim)
+                }
+                TextEditor(text: $text)
+                    .font(mono(12)).foregroundColor(fg).scrollContentBackground(.hidden)
+                    .frame(minHeight: 70, maxHeight: 140)
+                    .padding(6)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(dim.opacity(0.3), lineWidth: 1))
+
+                HStack {
+                    Button("prompt me") { prompt = randomReflectionPrompt() }
+                        .buttonStyle(.plain).font(mono(11)).foregroundColor(green.opacity(0.85))
+                    Button("open in obsidian") { openInObsidian(todayNoteFile()) }
+                        .buttonStyle(.plain).font(mono(11)).foregroundColor(dim)
+                    Spacer()
+                    if justSubmitted {
+                        Text("saved ✓").font(mono(11)).foregroundColor(green)
+                    }
+                    Button("submit") {
+                        appendReflection(text)
+                        if !model.habitDone("Journal feelings") { model.toggleHabit("Journal feelings") }
+                        text = ""; prompt = nil
+                        justSubmitted = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { justSubmitted = false }
+                    }
+                    .buttonStyle(.plain).font(mono(11, .semibold)).foregroundColor(bright)
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+}
+
 struct Dashboard: View {
     @ObservedObject var model: Model
     var body: some View {
@@ -753,21 +856,7 @@ struct Dashboard: View {
                     }
                 }
 
-                Button(action: {
-                    openInObsidian(todayNoteFile())
-                    if !model.habitDone("Journal feelings") { model.toggleHabit("Journal feelings") }
-                }) {
-                    HStack {
-                        Text("✎  make a journal entry now?").font(mono(12, .medium))
-                        Spacer()
-                        Text("→").font(mono(12))
-                    }
-                    .padding(.vertical, 9).padding(.horizontal, 12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(green.opacity(0.16)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(green.opacity(0.5), lineWidth: 1))
-                    .foregroundColor(green)
-                    .contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                JournalComposer(model: model)
 
                 VStack(alignment: .leading, spacing: 8) {
                     SectionHeader(title: "2026 goals", more: "Goals & Direction/Goals")
