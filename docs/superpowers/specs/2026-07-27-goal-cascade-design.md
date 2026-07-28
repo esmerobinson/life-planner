@@ -150,29 +150,30 @@ committing to the design:
 
 This becomes the first acceptance test once built (§8).
 
-## 7. Open questions
+## 7. Decisions (resolved 2026-07-28, quick-fire)
 
-- **Same-day-due items**: the live test needed immediate triage rather than waiting
-  for next morning's reconcile. Does triage need a same-day trigger (e.g. on capture,
-  if `[due today]` is stated explicitly), or is "add it straight to the right section
-  yourself when it's urgent" an acceptable manual escape hatch?
-- **`Backlog.md` filename**: conversation used "Master To Do" as the concept name
-  throughout; the file itself was never renamed. Decide whether to rename the file to
-  match, or keep `Backlog.md` and treat "Master To Do" as descriptive language only.
-- **Router misfiling meta-feedback**: found live during this work — Esme's messages
-  *about* the bot ("that's too much") get filed as journal/reflection content by
-  `router.py`'s Gemini classifier instead of being recognized as feedback about the
-  message itself. Flagged, not fixed — deeper than this design's scope, needs its own
-  pass on `ROUTER_SYSTEM`.
-- **`set_intention` fix landed but is a single-slot design**: only one Intention block
-  per day, replaced not appended (fixed 2026-07-27). Confirm this is still desired
-  once daily check-ins happen more than once — a second intention later in the day
-  currently overwrites the first rather than, say, appending as an "updated
-  intention."
-- **"Remove" vs. "defer" semantics**: `defer_task` marks `[>]` (stays visible on
-  today's note, cycles back into the backlog) when Esme says "remove X from today."
-  Her mental model was closer to "make it gone." Not resolved — needs its own
-  decision on whether "remove" should mean something more final.
+- **Same-day-due items**: triage immediately on capture, not just at next morning's
+  reconcile. If a captured task states a due date of today (or "by end of day"/etc.),
+  file it into its real section right away instead of leaving it in Inbox overnight.
+- **Filename**: rename `Backlog.md` → `Master To Do.md`, for real, to match the
+  language used everywhere else. All code paths and vault links need updating
+  (`obsidian.MASTER_TODO`, `backlog.BACKLOG_PATH`, `START HERE.md`, etc.) — this is an
+  implementation-plan item, not yet done.
+- **Second intention of the day**: append as an "updated intention" rather than
+  overwrite. `set_intention`'s current single-slot-replace behavior (fixed
+  2026-07-27) needs a follow-up change: keep the first intention visible and add the
+  new one underneath, clearly marked as updated — not silently discard it.
+- **"Remove" semantics**: removing a task from today should drop it from today's view
+  entirely, while it remains in the overall task pool (Master) rather than being
+  deleted outright. This is different from both current behaviors — `tick_task`
+  (marks done, permanent) and `defer_task` (marks `[>]`, stays visible on today's
+  note). Needs a new action: pull the line out of today's Daily Note display, leave
+  the Master task open/untouched so it can be picked up another day.
+- **Router misfiling meta-feedback** (unresolved): Esme's messages *about* the bot
+  ("that's too much") get filed as journal/reflection content by `router.py`'s Gemini
+  classifier instead of being recognized as feedback about the message itself.
+  Flagged, not fixed — deeper than this design's scope, needs its own pass on
+  `ROUTER_SYSTEM`.
 
 ## 8. Acceptance tests (for the implementation plan)
 
