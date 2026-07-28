@@ -3,18 +3,23 @@
 # sheet, and adds a new one-shot "reaction" sequence (airbend attack) that plays
 # once whenever a task gets ticked complete. See MascotModel/.reaction in main.swift.
 #
-# Frame alignment: slice each frame at a FIXED absolute x-position (full sheet
-# width / frame_count), do NOT independently detect/recenter each frame's own
-# content bbox. An earlier version of this script cropped each frame to its own
-# post-chroma-key content bbox and recentered it onto a shared canvas -- that
-# looked reasonable in isolation but actually broke alignment: the character's
-# anchor point shifted frame-to-frame depending on how wide that particular
-# frame's detected content happened to be, and adjacent frames' slices weren't
-# always disjoint, so two poses could bleed into one frame. Plain fixed-width
-# slicing keeps the character's body position stable across frames (accepting
-# a minor cosmetic sliver of the neighboring pose at some edges, since the
-# source poses touch with near-zero gap at the pixel level -- same known,
-# accepted limitation as the existing "splash" sequence).
+# Frame alignment history (see git log for the two prior broken attempts):
+#   1. Cropping each frame to its own post-chroma-key content bbox and
+#      recentering it onto a shared max-size canvas broke alignment -- the
+#      character's anchor shifted frame-to-frame depending on how wide that
+#      particular frame's detected content happened to be, producing visible
+#      double-character overlap in several frames.
+#   2. Switching to even fixed-width slicing (sheet_width / frame_count) was
+#      still wrong for the idle sheet specifically: its 8 poses are NOT evenly
+#      spaced -- they vary from ~160px down to ~104px wide partway through the
+#      sequence -- so a uniform 142.5px slice still cut across pose boundaries
+#      for the narrower later frames, reproducing the same double-character
+#      overlap (confirmed on frame index 4).
+#   3. (current) Idle now uses IDLE_BOUNDARIES below: 8 literal x-boundaries
+#      measured directly off the sheet's real column-density profile (gaps
+#      between poses), rather than assuming uniform spacing. Reaction's 7
+#      poses were spot-checked and found evenly spaced, so it keeps even
+#      division across the full sheet width.
 import sys, os
 sys.path.insert(0, "native/tools")
 from extract_common import chroma_key_transparent, upscale_nearest
@@ -25,29 +30,35 @@ REACTION_SRC = os.path.expanduser("~/Downloads/aang_reaction_airbend.png")
 OUT = "native/Assets/Sprites"
 UPSCALE = 4
 
-# name -> (source path, y-crop (y0, y1), frame_count)
-# x is always sliced across the FULL sheet width (0..sheet_width), divided
-# evenly by frame_count -- y is cropped to the measured content band, which is
-# the same for every frame so it doesn't introduce any per-frame drift.
-SEQUENCES = {
-    "idle":     (IDLE_SRC,     (24, 195), 8),
-    "reaction": (REACTION_SRC, (35, 175), 7),
-}
+# Measured directly off aang_idle_resting.png's column-density profile: real
+# gaps (local density minima) between the 8 poses, NOT evenly spaced (segment
+# widths run 160,154,154,155,159,127,104,105px -- poses shrink noticeably
+# partway through the sequence).
+IDLE_BOUNDARIES = [0, 160, 314, 468, 623, 782, 909, 1013, 1118]
+
+IDLE_Y = (24, 195)
+REACTION_Y = (35, 175)
+REACTION_COUNT = 7
 
 
-def slice_frames(im, y_range, count):
-    y0, y1 = y_range
-    sheet_w = im.width
-    w = sheet_w / count
+def slice_idle(im):
+    y0, y1 = IDLE_Y
+    return [im.crop((IDLE_BOUNDARIES[i], y0, IDLE_BOUNDARIES[i + 1], y1))
+            for i in range(len(IDLE_BOUNDARIES) - 1)]
+
+
+def slice_reaction(im):
+    y0, y1 = REACTION_Y
+    w = im.width / REACTION_COUNT
     frames = []
-    for i in range(count):
+    for i in range(REACTION_COUNT):
         fx0 = round(i * w)
         fx1 = round((i + 1) * w)
         frames.append(im.crop((fx0, y0, fx1, y1)))
     return frames
 
 
-def process(name, src_path, y_range, count):
+def process(name, src_path, slicer):
     folder = os.path.join(OUT, name)
     os.makedirs(folder, exist_ok=True)
     # wipe any stale frames from a previous (possibly different frame-count) sequence
@@ -56,34 +67,42 @@ def process(name, src_path, y_range, count):
             os.remove(os.path.join(folder, f))
 
     sheet = Image.open(src_path).convert("RGB")
-    raw_frames = slice_frames(sheet, y_range, count)
+    raw_frames = slicer(sheet)
 
     for i, raw in enumerate(raw_frames):
         keyed = chroma_key_transparent(raw, bg_rgb=(255, 255, 255), tol=30)
         upscaled = upscale_nearest(keyed, UPSCALE)
         upscaled.save(os.path.join(folder, f"frame_{i:02d}.png"))
 
-    fw = sheet.width / count
-    print(f"{name}: wrote {count} frames, {fw:.1f}px wide x {y_range[1]-y_range[0]}px tall "
-          f"(upscaled {round(fw*UPSCALE)}x{(y_range[1]-y_range[0])*UPSCALE})")
+    sizes = [f.size for f in raw_frames]
+    print(f"{name}: wrote {len(raw_frames)} frames, sizes={sizes}")
 
 
 def write_overview():
     """Draws a red box around every frame slice, on its own source sheet, for
     visual review (one panel per sheet, stacked into a single _overview.png)."""
     panels = []
-    for name, (src_path, y_range, count) in SEQUENCES.items():
-        sheet = Image.open(src_path).convert("RGB")
-        overview = sheet.copy()
-        draw = ImageDraw.Draw(overview)
-        y0, y1 = y_range
-        w = sheet.width / count
-        for i in range(count):
-            fx0 = round(i * w)
-            fx1 = round((i + 1) * w)
-            draw.rectangle((fx0, y0, fx1, y1), outline=(255, 0, 0), width=2)
-        draw.text((4, max(0, y0 - 14)), f"{name} ({count})", fill=(255, 0, 0))
-        panels.append(overview)
+
+    idle_sheet = Image.open(IDLE_SRC).convert("RGB")
+    overview = idle_sheet.copy()
+    draw = ImageDraw.Draw(overview)
+    y0, y1 = IDLE_Y
+    for i in range(len(IDLE_BOUNDARIES) - 1):
+        draw.rectangle((IDLE_BOUNDARIES[i], y0, IDLE_BOUNDARIES[i + 1], y1), outline=(255, 0, 0), width=2)
+    draw.text((4, max(0, y0 - 14)), f"idle ({len(IDLE_BOUNDARIES) - 1})", fill=(255, 0, 0))
+    panels.append(overview)
+
+    reaction_sheet = Image.open(REACTION_SRC).convert("RGB")
+    overview = reaction_sheet.copy()
+    draw = ImageDraw.Draw(overview)
+    y0, y1 = REACTION_Y
+    w = reaction_sheet.width / REACTION_COUNT
+    for i in range(REACTION_COUNT):
+        fx0 = round(i * w)
+        fx1 = round((i + 1) * w)
+        draw.rectangle((fx0, y0, fx1, y1), outline=(255, 0, 0), width=2)
+    draw.text((4, max(0, y0 - 14)), f"reaction ({REACTION_COUNT})", fill=(255, 0, 0))
+    panels.append(overview)
 
     total_h = sum(p.height for p in panels) + 10 * (len(panels) - 1)
     max_w = max(p.width for p in panels)
@@ -98,5 +117,5 @@ def write_overview():
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     write_overview()
-    for name, (src_path, y_range, count) in SEQUENCES.items():
-        process(name, src_path, y_range, count)
+    process("idle", IDLE_SRC, slice_idle)
+    process("reaction", REACTION_SRC, slice_reaction)
