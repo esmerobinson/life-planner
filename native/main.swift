@@ -346,9 +346,10 @@ struct ElementIcon: View {
 // sheet (see native/tools -- upper_A.png..upper_Z.png / lower_a.png..lower_z.png in
 // Assets/Font/). SwiftUI has no built-in way to lay out text from per-glyph images, so
 // PixelText does it manually: one Image per matched character, HStack'd left to right.
-// Only A-Z/a-z have glyphs; anything else (digits, punctuation, spaces) renders as a
-// blank gap sized proportionally, since this is a display font for short strings like
-// the date header, not a general-purpose typesetting system.
+// Only A-Z/a-z have glyphs (the reference sheet has no digit glyphs at all); anything
+// else (digits, punctuation, spaces) falls back to rendering inline via mono() in the
+// app's regular font/color, since this is a display font for short strings like the
+// date header, not a general-purpose typesetting system.
 func fontLetterURL(_ ch: Character) -> URL? {
     let base = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Assets/Font")
     if ch.isASCII, ("A"..."Z").contains(ch) {
