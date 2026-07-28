@@ -312,7 +312,7 @@ struct TypewriterText: View {
 // Loads a pre-extracted element/Lotus icon from native/Assets/Icons/ (see native/tools/extract_icons.py).
 // Resolved relative to the running binary's directory, same approach as the vault paths above.
 func assetsIconURL(_ name: String) -> URL {
-    Bundle.main.bundleURL
+    (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
         .appendingPathComponent("Assets/Icons/\(name).png")
 }
 
@@ -561,7 +561,7 @@ struct SpriteAnimator: View {
     private func folderName(_ s: MascotState) -> String { s == .idle ? "idle" : "splash" }
 
     private func load(for state: MascotState) {
-        let dir = Bundle.main.bundleURL
+        let dir = (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
             .appendingPathComponent("Assets/Sprites/\(folderName(state))")
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         frames = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
@@ -587,7 +587,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // Avatar Airbender font by FontGet.com (free for personal/commercial use, credit required) -- native/Fonts/
-        let fontURL = Bundle.main.bundleURL.appendingPathComponent("Fonts/Avatar Airbender.ttf")
+        let fontURL = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Fonts/Avatar Airbender.ttf")
         var fontRegisterError: Unmanaged<CFError>?
         if !CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &fontRegisterError) {
             print("Warning: failed to register font at \(fontURL.path): \(String(describing: fontRegisterError?.takeUnretainedValue()))")
