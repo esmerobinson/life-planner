@@ -587,9 +587,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         // Avatar Airbender font by FontGet.com (free for personal/commercial use, credit required) -- native/Fonts/
-        if let fontURL = Bundle.main.bundleURL.deletingLastPathComponent()
-            .appendingPathComponent("Fonts/Avatar Airbender.ttf") as URL? {
-            CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+        let fontURL = Bundle.main.bundleURL.appendingPathComponent("Fonts/Avatar Airbender.ttf")
+        var fontRegisterError: Unmanaged<CFError>?
+        if !CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &fontRegisterError) {
+            print("Warning: failed to register font at \(fontURL.path): \(String(describing: fontRegisterError?.takeUnretainedValue()))")
         }
         model.load()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -604,13 +605,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.level = .floating
-        window.backgroundColor = NSColor(red: 0.106, green: 0.106, blue: 0.106, alpha: 1)
+        window.backgroundColor = NSColor(red: 0.976, green: 0.937, blue: 0.890, alpha: 1)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView:
             ZStack(alignment: .bottomTrailing) {
                 Dashboard(model: model)
                 SpriteAnimator(mascot: mascot)
                     .padding(12)
+                    .allowsHitTesting(false)
             }
         )
 
@@ -622,11 +624,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func updateTitle() {
         let done = model.tasks.filter { $0.done }.count
         if let icon = NSImage(contentsOf: assetsIconURL("lotus")) {
+            icon.isTemplate = true
             icon.size = NSSize(width: 16, height: 16)
             statusItem.button?.image = icon
             statusItem.button?.imagePosition = .imageLeading
+            statusItem.button?.title = " \(done)/\(model.tasks.count)"
+        } else {
+            statusItem.button?.image = nil
+            statusItem.button?.title = "✿ \(done)/\(model.tasks.count)"
         }
-        statusItem.button?.title = " \(done)/\(model.tasks.count)"
         statusItem.button?.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
     }
 
