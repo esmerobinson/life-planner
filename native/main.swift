@@ -1764,6 +1764,13 @@ struct SpriteAnimator: View {
     @State private var idlePaused = true
     @State private var idlePauseTicksLeft = SpriteAnimator.idlePauseTicks
 
+    // Standing pacing: play the stand-up transition (all 4 frames, forward
+    // once) exactly once on entering .standing, then settle into resting on
+    // the last frame with an occasional one-tick dip to the second-to-last
+    // frame -- "stands up, then bobs occasionally", not a continuous loop.
+    @State private var standingTransitionDone = false
+    @State private var standingBobTicksLeft = SpriteAnimator.idlePauseTicks
+
     static let tickHz = 6.0
     // Was 2.5s -- with an ~8-frame bounce pass at 6fps (~2.33s) that read as closer to
     // 50/50 active/still than the intended "mostly holds still, occasionally bounces"
@@ -1804,6 +1811,8 @@ struct SpriteAnimator: View {
         direction = 1
         idlePaused = true
         idlePauseTicksLeft = Self.idlePauseTicks
+        standingTransitionDone = false
+        standingBobTicksLeft = Self.idlePauseTicks
     }
 
     private func start() {
@@ -1832,13 +1841,31 @@ struct SpriteAnimator: View {
                     frameIndex = next
                 }
             case .standing:
-                // loops continuously while hovering -- same ping-pong feel as the
-                // old always-on idle oscillation, just under a different state
                 if frames.count == 1 { frameIndex = 0; return }
-                var next = frameIndex + direction
-                if next >= frames.count { direction = -1; next = frames.count - 2 }
-                else if next < 0 { direction = 1; next = 1 }
-                frameIndex = next
+                if !standingTransitionDone {
+                    // stand-up: play forward through all frames once, then settle
+                    let next = frameIndex + 1
+                    if next >= frames.count {
+                        standingTransitionDone = true
+                        frameIndex = frames.count - 1
+                        standingBobTicksLeft = Self.idlePauseTicks
+                    } else {
+                        frameIndex = next
+                    }
+                    return
+                }
+                // settled: mostly rests on the last frame, occasionally dips to the
+                // second-to-last frame for one tick then back -- a subtle bob, not
+                // a continuous loop
+                standingBobTicksLeft -= 1
+                if standingBobTicksLeft <= 0 {
+                    if frameIndex == frames.count - 1 {
+                        frameIndex = max(0, frames.count - 2)
+                    } else {
+                        frameIndex = frames.count - 1
+                        standingBobTicksLeft = Self.idlePauseTicks
+                    }
+                }
             case .splash, .reaction:
                 // one-shot states play forward-only; MascotModel reverts to a
                 // resting state (.idle or .standing) on its own timeout
