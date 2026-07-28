@@ -271,7 +271,6 @@ def build(d=None, carry_from=None, done=None):
         fancy.heading("Reminders"),
         f"  • {vault.random_reminder()}",
         f"  • {vault.random_discipline()}",
-        f"  • {vault.random_inspiration()}",
         "",
         fancy.heading("Reflections"),
         refl,

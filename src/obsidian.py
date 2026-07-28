@@ -123,13 +123,21 @@ def defer_task(keywords, d=None, dry_run=False):
     return _flip_checkbox(keywords, "[>]", d, dry_run, "defer")
 
 
+_INTENTION_RE = re.compile(r"\n## Intention\n[^\n]*")
+
+
 def set_intention(text, d=None, dry_run=False):
-    """Record the morning intention into today's daily note."""
+    """Record today's intention into the daily note - one slot, replaced if she
+    states a new one, not appended (so the note doesn't fill up with duplicates)."""
     path = vault.daily_note_path(d)
     preview = f"record intention in daily note: {text.strip()}"
     if not dry_run:
         existing = vault.read(path)
-        header = "" if existing else f"# {_daily_title(d)}\n"
-        storage.write(path, existing.rstrip() + f"\n\n## Intention\n{text.strip()}\n" if existing
-                      else header + f"\n## Intention\n{text.strip()}\n")
+        block = f"\n## Intention\n{text.strip()}\n"
+        if existing and _INTENTION_RE.search(existing):
+            storage.write(path, _INTENTION_RE.sub(block.rstrip("\n"), existing, count=1))
+        elif existing:
+            storage.write(path, existing.rstrip() + "\n" + block)
+        else:
+            storage.write(path, f"# {_daily_title(d)}\n" + block)
     return path, preview
