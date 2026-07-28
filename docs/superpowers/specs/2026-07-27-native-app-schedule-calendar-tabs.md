@@ -3,6 +3,27 @@
 *Placeholder styling throughout (existing mono font, dim/bright greens) — the design agent
 themes this in a later pass. This spec is functional/UX only.*
 
+## As-built (updated 2026-07-28)
+
+Core design below shipped mostly as spec'd, plus several things added afterward in
+response to live feedback, not originally planned here:
+
+- **Add-task field** on both Today and Schedule tabs: typing suggests existing Backlog
+  tasks by keyword overlap ("did you mean") before creating a new one.
+- **Drag-to-schedule**: an "unscheduled" pool at the bottom of the Schedule tab lists
+  today's to-dos not yet placed in any block; dragging one onto an open slot assigns it
+  there. Dropping into the block containing right now starts it at now (rounded to 5 min).
+- **Workouts always land in the "move" block** (Calisthenics, a walk/run, etc.) — Health
+  items were originally fully excluded from scheduling; refined so exercise-type Health
+  items still get a home in Dream Day's fixed rhythm block, while non-exercise Health
+  lines (the nutrition reminder) stay unscheduled.
+- **Delete consistency fix**: deleting a block from Schedule now also defers the
+  underlying checkbox in today's note — originally it only edited `schedule.json`, so the
+  task would silently reappear in Schedule on the next reload without this.
+- **Design agent's later pass** replaced the native segmented Picker (mentioned above as
+  still-native) with a themed `ThemedTabBar`, and layered in Silkscreen/Papyrus typography
+  and border art — see the mascot spec's as-built note for the full picture.
+
 ## Why
 
 Two problems this solves:
