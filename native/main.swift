@@ -943,6 +943,30 @@ struct BorderFrame: View {
     }
 }
 
+// Ornate RED Chinese-style corner-bracket border (native/Assets/Border/tab_border.png,
+// cropped + two-color chroma-keyed + recolored from a reference sheet at
+// ~/Downloads/border_inspo_chinese_style.png -- see native/tools/extract_tab_border.py),
+// wrapping the WHOLE tab/window content area (see RootView) -- bigger and more
+// prominent than the affirmations box's blue BorderFrame. The raw crop's ornate
+// greek-key corner motif measured ~170px deep -- fine for a poster, but at that
+// native size on this ~420x560 popup it swallowed the tab bar and bottom links
+// (confirmed via a screenshot of a live test build), so the extraction script scales
+// the WHOLE image down 0.4x (352x233 final) to keep the corner design intact but
+// proportionate to this small window. capInsets here (68 = 170 * 0.4) match that
+// scaled asset, not the original crop.
+struct TabBorderFrame: View {
+    var body: some View {
+        if let img = NSImage(contentsOf: assetsBorderURL("tab_border")) {
+            Image(nsImage: img)
+                .resizable(capInsets: EdgeInsets(top: 68, leading: 68, bottom: 68, trailing: 68),
+                           resizingMode: .stretch)
+                .interpolation(.high)
+        } else {
+            Color.clear
+        }
+    }
+}
+
 struct ElementIcon: View {
     let element: String   // "air" | "water" | "fire" | "earth" | "lotus"
     var size: CGFloat = 14
@@ -1264,21 +1288,27 @@ struct Dashboard: View {
             VStack(alignment: .leading, spacing: 16) {
                 // Real scalable font (Avatar Airbender.ttf via heading()), reverted
                 // from the bitmap-letter PixelText experiment -- preferred look.
-                // Constrained to a width that clears the mascot's top-right corner
-                // (SpriteAnimator, ~100pt + padding) so long dates (e.g. "Wednesday 24
-                // September") shrink to fit that single line instead of running under him.
+                // The mascot is now a layout sibling up in the tab-bar row (see
+                // RootView), not an absolute overlay above this content, so this no
+                // longer needs a width cap to stay clear of him -- just enough to
+                // avoid clipping/wrapping at the window's own width.
                 Text(headerDateString())
                     .font(heading(30))
                     .foregroundColor(bright)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
-                    .frame(maxWidth: 230, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                // affirm rows: manifestation / reminder / journal, tick + streak inline
+                // affirm rows: manifestation / reminder / journal, tick + streak inline.
+                // Wrapped in the same ornate blue BorderFrame art used on the journal
+                // CTA button, per explicit request -- internal padding keeps the rows
+                // clear of the border ring.
                 VStack(alignment: .leading, spacing: 8) {
                     SectionHeader(title: "click to affirm",
                                   more: "Mind & Wellbeing/Manifestations & Vision Board")
-                    HStack(alignment: .top, spacing: 7) {
+                    // .center (not .top): the Lotus tick glyph and the row's text
+                    // should share a visual center, not have the icon float above it.
+                    HStack(alignment: .center, spacing: 7) {
                         Tick(on: model.habitDone("Morning manifestations"), element: "lotus", wellbeing: true) {
                             model.toggleHabit("Morning manifestations")
                         }
@@ -1286,7 +1316,7 @@ struct Dashboard: View {
                         Spacer(minLength: 4)
                         StreakBadge(n: model.streak("Morning manifestations"))
                     }
-                    HStack(alignment: .top, spacing: 7) {
+                    HStack(alignment: .center, spacing: 7) {
                         Tick(on: model.habitDone("Read reminders"), element: "lotus", wellbeing: true) {
                             model.toggleHabit("Read reminders")
                         }
@@ -1294,7 +1324,7 @@ struct Dashboard: View {
                         Spacer(minLength: 4)
                         StreakBadge(n: model.streak("Read reminders"))
                     }
-                    HStack(alignment: .top, spacing: 7) {
+                    HStack(alignment: .center, spacing: 7) {
                         Tick(on: model.habitDone("Journal feelings"), element: "lotus", wellbeing: true) {
                             model.toggleHabit("Journal feelings")
                         }
@@ -1303,6 +1333,8 @@ struct Dashboard: View {
                         StreakBadge(n: model.streak("Journal feelings"))
                     }
                 }
+                .padding(14)
+                .background(BorderFrame())
 
                 // to do today, grouped by category, stars per category
                 VStack(alignment: .leading, spacing: 6) {
@@ -1313,11 +1345,14 @@ struct Dashboard: View {
                     ForEach(CATEGORY_ORDER, id: \.self) { cat in
                         let items = model.tasks.filter { $0.category == cat }
                         if !items.isEmpty {
+                            // Label on the left, element icon + its count pushed to the
+                            // far right -- per explicit request, not clustered together
+                            // with the label on the left.
                             HStack(spacing: 6) {
-                                ElementIcon(element: element(for: cat), size: 20)
-                                Text(cat.lowercased()).font(heading(17)).foregroundColor(bright)
-                                Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
+                                Text(cat.lowercased()).font(heading(20)).foregroundColor(bright)
                                 Spacer()
+                                ElementIcon(element: element(for: cat), size: 20)
+                                Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                             }.padding(.top, 4)
                             ForEach(items) { TaskRow(task: $0, model: model, mascot: mascot) }
                         }
@@ -1685,8 +1720,20 @@ struct RootView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ThemedTabBar(options: PlannerTab.allCases.map { ($0, $0.rawValue.capitalized) }, selection: $tab)
-                .padding(12)
+            // The mascot is a LAYOUT SIBLING of the tab bar here, not an absolute
+            // overlay floating on top of it (that was the old approach, in
+            // AppDelegate -- it had no awareness of the tab bar's existence/height
+            // and ended up visually covering the "Calendar" tab once the tab bar was
+            // added). As a real sibling in this HStack, SwiftUI's layout system
+            // reserves actual space for him, so nothing -- now or anything added to
+            // RootView later -- can ever be laid out underneath him.
+            HStack(alignment: .top, spacing: 8) {
+                ThemedTabBar(options: PlannerTab.allCases.map { ($0, $0.rawValue.capitalized) }, selection: $tab)
+                Spacer(minLength: 8)
+                SpriteAnimator(mascot: mascot)
+                    .frame(width: 90, height: 90)
+            }
+            .padding(12)
 
             // all three stay alive underneath; switching tabs just hides/shows them,
             // instead of destroying and recreating the view (which retriggered the
@@ -1702,16 +1749,24 @@ struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(bg)
-        // Mascot now lives in the top-trailing corner (see AppDelegate) instead of
-        // sitting over scrolled content, so hover detection for the .standing state
-        // can live on the whole dashboard without worrying about the old bottom band.
+        // Mascot lives inside this view now (up in the tab-bar row), not an
+        // absolute overlay from AppDelegate -- hover detection over the whole
+        // dashboard still drives his .standing/.idle resting state the same way.
         .onHover { hovering in mascot.setHovering(hovering) }
+        // Ornate red Chinese-style border art wraps the whole tab/window content
+        // area -- decorative overlay only (transparent interior + thin corner/edge
+        // linework), so it never blocks hit-testing of what's underneath.
+        .overlay(TabBorderFrame().allowsHitTesting(false))
     }
 }
 
 // MARK: - Aang mascot (body-sprite splash/idle)
 
-enum MascotState { case idle, splash, reaction, standing }
+// .standingDown is a transient one-shot state (like .splash/.reaction): it plays the
+// "standing" sprite sequence BACKWARDS once (see SpriteAnimator), then MascotModel
+// settles it to .idle -- so hover-out reads as "sits back down" instead of an abrupt
+// cut straight back to idle.
+enum MascotState { case idle, splash, reaction, standing, standingDown }
 
 final class MascotModel: ObservableObject {
     @Published var state: MascotState = .idle
@@ -1742,12 +1797,30 @@ final class MascotModel: ObservableObject {
 
     func setHovering(_ hovering: Bool) {
         isHovering = hovering
-        // Only switch immediately if currently settled at rest -- a splash/reaction
-        // pass already in flight should finish and settle via the timers above,
-        // which will pick up the new isHovering value at that point.
-        if state == .idle || state == .standing {
-            state = restState
+        if hovering {
+            // Mouse re-entered mid-"sit-down" transition: snap straight back up to
+            // .standing rather than letting the reverse playback finish and then
+            // immediately replaying forward -- avoids a jarring down-then-up flicker.
+            if state == .standingDown || state == .idle { state = .standing }
+            return
         }
+        // Mouse left. If he's settled in .standing, play the reverse transition
+        // instead of cutting straight to .idle.
+        if state == .standing {
+            state = .standingDown
+            // standing is a 4-frame sequence at 6fps -> ~0.67s to play in reverse.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+                guard let self else { return }
+                // Only settle if still mid-transition -- a re-hover (above) or a
+                // reaction/splash firing in the meantime will have already moved
+                // state elsewhere, and this stale timer shouldn't stomp on that.
+                if self.state == .standingDown { self.state = .idle }
+            }
+        } else if state == .idle {
+            state = .idle
+        }
+        // If a splash/reaction pass is currently in flight, its own timer above
+        // will settle to `restState` (now .idle) when it finishes -- unchanged.
     }
 }
 
@@ -1797,9 +1870,17 @@ struct SpriteAnimator: View {
         case .idle: return "idle"
         case .splash: return "splash"
         case .reaction: return "reaction"
-        case .standing: return "standing"
+        case .standing, .standingDown: return "standing"   // standingDown reuses the same frames, played backwards
         }
     }
+
+    // Idle (not hovering) uses only 2 of the 4 idle frames -- frame_01/frame_02, the
+    // pair with the smallest content-bounding-box difference between them (measured
+    // via PIL; frame_00/frame_03 shift the body/staff position noticeably more) --
+    // toggled rather than the full 4-frame ping-pong, per "he moves for no reason"
+    // feedback. restIdx is held most of the time; blinkIdx is a brief flash.
+    private static let idleRestIdx = 1
+    private static let idleBlinkIdx = 2
 
     private func load(for state: MascotState) {
         let dir = (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
@@ -1807,7 +1888,15 @@ struct SpriteAnimator: View {
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         frames = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
             .compactMap { NSImage(contentsOf: $0) }
-        frameIndex = 0
+        switch state {
+        case .idle:
+            frameIndex = frames.count > Self.idleRestIdx ? Self.idleRestIdx : 0
+        case .standingDown:
+            // reverse playback starts from the LAST frame and counts back down
+            frameIndex = max(0, frames.count - 1)
+        default:
+            frameIndex = 0
+        }
         direction = 1
         idlePaused = true
         idlePauseTicksLeft = Self.idlePauseTicks
@@ -1820,26 +1909,27 @@ struct SpriteAnimator: View {
             guard !frames.isEmpty else { return }
             switch mascot.state {
             case .idle:
-                if frames.count == 1 { frameIndex = 0; return }
+                // 2-frame blink toggle (see idleRestIdx/idleBlinkIdx above), not the
+                // full 4-frame ping-pong -- holds still on the resting frame for a
+                // long pause, then briefly flashes to the blink frame and back.
+                guard frames.count > Self.idleBlinkIdx else { frameIndex = 0; return }
                 if idlePaused {
-                    // holding on the resting frame between bounce passes
-                    frameIndex = 0
+                    frameIndex = Self.idleRestIdx
                     idlePauseTicksLeft -= 1
-                    if idlePauseTicksLeft <= 0 { idlePaused = false; direction = 1 }
+                    if idlePauseTicksLeft <= 0 { idlePaused = false }
                     return
                 }
-                // one full bounce pass: 0 -> last -> back to 0, then pause again
-                let next = frameIndex + direction
-                if next >= frames.count {
-                    direction = -1
-                    frameIndex = frames.count - 2
-                } else if next < 0 {
-                    frameIndex = 0
-                    idlePaused = true
-                    idlePauseTicksLeft = Self.idlePauseTicks
-                } else {
-                    frameIndex = next
-                }
+                // one tick of "eyes closed", then straight back to paused/resting
+                frameIndex = Self.idleBlinkIdx
+                idlePaused = true
+                idlePauseTicksLeft = Self.idlePauseTicks
+            case .standingDown:
+                // one-shot reverse playback: count back down to frame 0 and hold --
+                // MascotModel settles this to .idle on its own short timeout, so
+                // holding here just avoids running off the front of the array if a
+                // tick or two land after that timeout fires.
+                if frames.count <= 1 { frameIndex = 0; return }
+                if frameIndex > 0 { frameIndex -= 1 }
             case .standing:
                 if frames.count == 1 { frameIndex = 0; return }
                 if !standingTransitionDone {
@@ -1921,18 +2011,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 420, height: 560)
         window.setFrameAutosaveName("EsmeDayWindow")
+        // RootView now owns the mascot as a real layout sibling of the tab bar (see
+        // RootView.body) -- no more absolute-overlay ZStack here, so he can never be
+        // laid out on top of tab-bar or dashboard content.
         window.contentView = NSHostingView(rootView:
-            ZStack(alignment: .topTrailing) {
-                RootView(model: model, scheduleModel: scheduleModel, calendarModel: calendarModel, mascot: mascot)
-                SpriteAnimator(mascot: mascot)
-                    // Top-right corner: clear of the window's close button (top-left)
-                    // and the date header (top-left, width-capped to stay clear of him --
-                    // see Dashboard). 14pt padding on trailing/top keeps him inset from
-                    // both window edges at his new slightly-larger 100x100 size.
-                    .padding(.top, 14)
-                    .padding(.trailing, 14)
-                    .allowsHitTesting(false)
-            }
+            RootView(model: model, scheduleModel: scheduleModel, calendarModel: calendarModel, mascot: mascot)
         )
 
         // instant live-update: watch the vault for any change (Obsidian edits, WhatsApp

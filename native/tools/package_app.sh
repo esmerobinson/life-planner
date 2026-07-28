@@ -44,11 +44,13 @@ chmod +x "$CONTENTS/MacOS/EsmeDay"
 mkdir -p "$CONTENTS/Resources/Assets/Icons"
 mkdir -p "$CONTENTS/Resources/Assets/Sprites"
 mkdir -p "$CONTENTS/Resources/Assets/Font"
+mkdir -p "$CONTENTS/Resources/Assets/Border"
 mkdir -p "$CONTENTS/Resources/Fonts"
 
 rsync -a --delete "$NATIVE_DIR/Assets/Icons/" "$CONTENTS/Resources/Assets/Icons/"
 rsync -a --delete "$NATIVE_DIR/Assets/Sprites/" "$CONTENTS/Resources/Assets/Sprites/"
 rsync -a --delete "$NATIVE_DIR/Assets/Font/" "$CONTENTS/Resources/Assets/Font/"
+rsync -a --delete "$NATIVE_DIR/Assets/Border/" "$CONTENTS/Resources/Assets/Border/"
 cp "$NATIVE_DIR/Fonts/Avatar Airbender.ttf" "$CONTENTS/Resources/Fonts/Avatar Airbender.ttf"
 cp "$NATIVE_DIR/Assets/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 
