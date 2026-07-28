@@ -705,6 +705,7 @@ struct SpriteAnimator: View {
         Group {
             if frameIndex < frames.count {
                 Image(nsImage: frames[frameIndex]).resizable().interpolation(.none)
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 100, height: 100)
             }
         }
