@@ -1287,6 +1287,8 @@ struct DayCell: View {
     let day: Date?
     let items: [DueItem]
     let isToday: Bool
+    let isTopRow: Bool
+    let edge: HorizontalAlignment?
     @State private var hover = false
 
     var body: some View {
@@ -1304,21 +1306,24 @@ struct DayCell: View {
                     .fill(hover && !items.isEmpty ? green.opacity(0.15) : (isToday ? green.opacity(0.12) : Color.clear)))
                 .contentShape(Rectangle())
                 .onHover { hover = $0 }
-                .overlay(alignment: .top) {
+                .overlay(alignment: isTopRow ? .top : .bottom) {
                     if hover && !items.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
                             ForEach(items) { item in
-                                HStack(spacing: 4) {
+                                HStack(alignment: .top, spacing: 4) {
                                     ElementIcon(element: element(for: item.category), size: 10)
                                     Text(item.text).font(mono(10)).foregroundColor(fg)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                         }
                         .padding(6)
+                        .frame(maxWidth: 170, alignment: .leading)
                         .background(RoundedRectangle(cornerRadius: 6).fill(bg))
                         .overlay(RoundedRectangle(cornerRadius: 6).stroke(dim.opacity(0.4), lineWidth: 1))
-                        .fixedSize()
-                        .offset(y: -geo.size.height - 4)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .offset(x: edge == .leading ? 60 : (edge == .trailing ? -60 : 0),
+                                y: isTopRow ? geo.size.height + 4 : -geo.size.height - 4)
                         .zIndex(10)
                     }
                 }
@@ -1379,7 +1384,8 @@ struct CalendarView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
                 ForEach(days.indices, id: \.self) { i in
                     DayCell(day: days[i], items: days[i].map { byDay[cal.startOfDay(for: $0)] ?? [] } ?? [],
-                            isToday: days[i].map { cal.isDateInToday($0) } ?? false)
+                            isToday: days[i].map { cal.isDateInToday($0) } ?? false,
+                            isTopRow: i < 7, edge: i % 7 == 0 ? .leading : (i % 7 == 6 ? .trailing : nil))
                         .frame(minHeight: 44)
                 }
             }
