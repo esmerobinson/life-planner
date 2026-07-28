@@ -1031,6 +1031,13 @@ struct ScheduleView: View {
 
 // MARK: - calendar view
 
+struct OptionalHelp: ViewModifier {
+    let text: String?
+    func body(content: Content) -> some View {
+        if let text = text { content.help(text) } else { content }
+    }
+}
+
 struct DayCell: View {
     let day: Date?
     let items: [DueItem]
@@ -1047,7 +1054,8 @@ struct DayCell: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
                 .background(RoundedRectangle(cornerRadius: 5).fill(isToday ? green.opacity(0.12) : Color.clear))
-                .help(items.isEmpty ? "" : items.map { $0.text }.joined(separator: "\n"))
+                .contentShape(Rectangle())
+                .modifier(OptionalHelp(text: items.isEmpty ? nil : items.map { $0.text }.joined(separator: "\n")))
             } else {
                 Color.clear
             }
