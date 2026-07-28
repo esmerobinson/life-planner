@@ -378,20 +378,52 @@ struct PixelText: View {
     let text: String
     var size: CGFloat = 20
     var fallbackColor: Color = bright
+    // Optional width budget: long dates (e.g. "Wednesday 24 September") can otherwise
+    // outgrow the fixed-width window at larger sizes, so when a maxWidth is given the
+    // whole string scales itself down just enough to fit rather than clipping.
+    var maxWidth: CGFloat? = nil
+
+    // Natural (unshrunk) width of `text` rendered at `size`, matching the per-glyph
+    // widths used below -- bitmap glyph aspect ratio, or measured fallback-font width
+    // for characters (digits, spaces, punctuation) with no bitmap in the sheet.
+    private static func naturalWidth(text: String, size: CGFloat) -> CGFloat {
+        var total: CGFloat = 0
+        var n = 0
+        for ch in text {
+            n += 1
+            if let img = PixelFontCache.image(for: ch) {
+                total += size * (img.size.width / max(img.size.height, 1))
+            } else {
+                let font = NSFont.monospacedSystemFont(ofSize: size * 0.7, weight: .regular)
+                total += (String(ch) as NSString).size(withAttributes: [.font: font]).width
+            }
+        }
+        if n > 1 { total += size * 0.08 * CGFloat(n - 1) }
+        return total
+    }
+
+    private var effectiveSize: CGFloat {
+        guard let maxWidth else { return size }
+        let natural = Self.naturalWidth(text: text, size: size)
+        guard natural > maxWidth, natural > 0 else { return size }
+        return size * (maxWidth / natural)
+    }
+
     var body: some View {
-        HStack(alignment: .bottom, spacing: size * 0.08) {
+        let s = effectiveSize
+        HStack(alignment: .bottom, spacing: s * 0.08) {
             ForEach(Array(text.enumerated()), id: \.offset) { _, ch in
                 if let img = PixelFontCache.image(for: ch) {
-                    let w = size * (img.size.width / max(img.size.height, 1))
+                    let w = s * (img.size.width / max(img.size.height, 1))
                     Image(nsImage: img).resizable().interpolation(.none)
-                        .frame(width: w, height: size)
+                        .frame(width: w, height: s)
                 } else {
                     // No bitmap glyph for this character (digits, punctuation, etc. --
                     // the extracted reference sheet only has A-Z/a-z). Fall back to the
                     // app's regular font instead of a blank gap, so e.g. day numbers
                     // in the date header stay visible.
-                    Text(String(ch)).font(mono(size * 0.7)).foregroundColor(fallbackColor)
-                        .frame(height: size)
+                    Text(String(ch)).font(mono(s * 0.7)).foregroundColor(fallbackColor)
+                        .frame(height: s)
                 }
             }
         }
@@ -404,7 +436,7 @@ struct StarBurst: View {
     @State private var scale: CGFloat = 0
     @State private var opacity: Double = 0
     var body: some View {
-        ElementIcon(element: element, size: 16)
+        ElementIcon(element: element, size: 20)
             .scaleEffect(scale).opacity(opacity)
             .onChange(of: trigger) { _, _ in
                 scale = 1.6; opacity = 1
@@ -436,7 +468,7 @@ struct Tick: View {
             }) {
                 Group {
                     if wellbeing {
-                        ElementIcon(element: "lotus", size: 14)
+                        ElementIcon(element: "lotus", size: 18)
                             .opacity(on ? 1.0 : (hover ? 0.85 : 0.45))
                     } else {
                         Text(on ? "●" : (hover ? "◉" : "○"))
@@ -444,7 +476,7 @@ struct Tick: View {
                     }
                 }
                 .scaleEffect(hover ? 1.25 : 1)
-                .frame(width: 16).contentShape(Rectangle())
+                .frame(width: 20).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .onHover { hover = $0 }
@@ -497,7 +529,10 @@ struct Dashboard: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    PixelText(text: headerDateString(), size: 20)
+                    // maxWidth accounts for the 20pt horizontal padding on each side of
+                    // the window content -- long dates (e.g. "Wednesday 24 September")
+                    // shrink themselves to fit rather than clipping against the window edge.
+                    PixelText(text: headerDateString(), size: 28, maxWidth: 330)
                     Text("// one honest day at a time").font(mono(11)).foregroundColor(dim)
                 }
 
@@ -542,7 +577,7 @@ struct Dashboard: View {
                         if !items.isEmpty {
                             HStack(spacing: 6) {
                                 Text(cat.lowercased()).font(mono(11, .semibold)).foregroundColor(bright)
-                                ElementIcon(element: element(for: cat), size: 12)
+                                ElementIcon(element: element(for: cat), size: 16)
                                 Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                                 Spacer()
                             }.padding(.top, 4)
@@ -590,9 +625,15 @@ struct Dashboard: View {
                     Button("quit") { NSApp.terminate(nil) }.buttonStyle(.plain).foregroundColor(dim)
                 }.font(mono(11)).foregroundColor(green)
             }
-            .padding(20)
+            .padding(.horizontal, 20).padding(.top, 20)
+            // Extra bottom breathing room: the mascot overlay is fixed to the window's
+            // bottom-trailing corner (outside this ScrollView) at 90x90 + 12pt padding,
+            // so it can cover the last ~102pt of content once scrolled all the way down.
+            // Padding the footer row clear of that band keeps "quit" etc. legible instead
+            // of getting sat on by Aang.
+            .padding(.bottom, 110)
         }
-        .frame(width: 340, height: 640)
+        .frame(width: 370, height: 660)
         .background(bg)
     }
 }
@@ -632,7 +673,7 @@ struct SpriteAnimator: View {
         Group {
             if frameIndex < frames.count {
                 Image(nsImage: frames[frameIndex]).resizable().interpolation(.none)
-                    .frame(width: 72, height: 72)
+                    .frame(width: 90, height: 90)
             }
         }
         .onAppear { load(for: mascot.state); start() }
@@ -699,7 +740,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.action = #selector(toggle)
         statusItem.button?.target = self
 
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 340, height: 640),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 370, height: 660),
                           styleMask: [.titled, .closable, .fullSizeContentView],
                           backing: .buffered, defer: false)
         window.titleVisibility = .hidden
