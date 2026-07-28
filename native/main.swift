@@ -254,8 +254,6 @@ func mono(_ s: CGFloat, _ w: Font.Weight = .regular) -> Font {
 
 // Avatar Airbender font (native/Fonts/Avatar Airbender.ttf) -- header/title text only;
 // body text stays on mono() for small-size readability.
-// Currently unused (date header now renders via PixelText, see below) -- kept in case
-// a future spot wants a real scalable display font again.
 func heading(_ s: CGFloat) -> Font {
     .custom("Avatar Airbender", size: s)
 }
@@ -436,7 +434,7 @@ struct StarBurst: View {
     @State private var scale: CGFloat = 0
     @State private var opacity: Double = 0
     var body: some View {
-        ElementIcon(element: element, size: 20)
+        ElementIcon(element: element, size: 24)
             .scaleEffect(scale).opacity(opacity)
             .onChange(of: trigger) { _, _ in
                 scale = 1.6; opacity = 1
@@ -468,7 +466,7 @@ struct Tick: View {
             }) {
                 Group {
                     if wellbeing {
-                        ElementIcon(element: "lotus", size: 18)
+                        ElementIcon(element: "lotus", size: 22)
                             .opacity(on ? 1.0 : (hover ? 0.85 : 0.45))
                     } else {
                         Text(on ? "●" : (hover ? "◉" : "○"))
@@ -529,10 +527,17 @@ struct Dashboard: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    // maxWidth accounts for the 20pt horizontal padding on each side of
-                    // the window content -- long dates (e.g. "Wednesday 24 September")
-                    // shrink themselves to fit rather than clipping against the window edge.
-                    PixelText(text: headerDateString(), size: 28, maxWidth: 330)
+                    // Real scalable font (Avatar Airbender.ttf via heading()), reverted
+                    // from the bitmap-letter PixelText experiment -- preferred look.
+                    // Constrained to a width that clears the mascot's top-right corner
+                    // (SpriteAnimator, ~100pt + padding) so long dates (e.g. "Wednesday 24
+                    // September") shrink to fit that single line instead of running under him.
+                    Text(headerDateString())
+                        .font(heading(30))
+                        .foregroundColor(bright)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.55)
+                        .frame(maxWidth: 230, alignment: .leading)
                     Text("// one honest day at a time").font(mono(11)).foregroundColor(dim)
                 }
 
@@ -576,8 +581,8 @@ struct Dashboard: View {
                         let items = model.tasks.filter { $0.category == cat }
                         if !items.isEmpty {
                             HStack(spacing: 6) {
-                                Text(cat.lowercased()).font(mono(11, .semibold)).foregroundColor(bright)
-                                ElementIcon(element: element(for: cat), size: 16)
+                                Text(cat.lowercased()).font(mono(13, .bold)).foregroundColor(bright)
+                                ElementIcon(element: element(for: cat), size: 20)
                                 Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                                 Spacer()
                             }.padding(.top, 4)
@@ -626,38 +631,55 @@ struct Dashboard: View {
                 }.font(mono(11)).foregroundColor(green)
             }
             .padding(.horizontal, 20).padding(.top, 20)
-            // Extra bottom breathing room: the mascot overlay is fixed to the window's
-            // bottom-trailing corner (outside this ScrollView) at 90x90 + 12pt padding,
-            // so it can cover the last ~102pt of content once scrolled all the way down.
-            // Padding the footer row clear of that band keeps "quit" etc. legible instead
-            // of getting sat on by Aang.
-            .padding(.bottom, 110)
+            .padding(.bottom, 20)
         }
         .frame(width: 370, height: 660)
         .background(bg)
+        // Mascot now lives in the top-trailing corner (see AppDelegate) instead of
+        // sitting over scrolled content, so hover detection for the .standing state
+        // can live on the whole dashboard without worrying about the old bottom band.
+        .onHover { hovering in mascot.setHovering(hovering) }
     }
 }
 
 // MARK: - Aang mascot (body-sprite splash/idle)
 
-enum MascotState { case idle, splash, reaction }
+enum MascotState { case idle, splash, reaction, standing }
 
 final class MascotModel: ObservableObject {
     @Published var state: MascotState = .idle
+    // Set while the mouse hovers the dashboard (see Dashboard's .onHover). Doesn't
+    // interrupt a one-shot splash/reaction pass in progress -- it only decides which
+    // resting state to settle into: once those passes finish, and whenever hovering
+    // starts/stops while already at rest, we land on .standing instead of .idle.
+    private var isHovering = false
+    private var restState: MascotState { isHovering ? .standing : .idle }
 
     func playSplash() {
         state = .splash
-        // splash is a 6-frame sequence at 6fps -> 1.0s, then fall back to idle
+        // splash is a 6-frame sequence at 6fps -> 1.0s, then settle to rest
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.state = .idle
+            guard let self else { return }
+            self.state = self.restState
         }
     }
 
     func playReaction() {
         state = .reaction
-        // reaction is a 7-frame sequence at 6fps -> ~1.17s, then fall back to idle
+        // reaction is a 7-frame sequence at 6fps -> ~1.17s, then settle to rest
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            self?.state = .idle
+            guard let self else { return }
+            self.state = self.restState
+        }
+    }
+
+    func setHovering(_ hovering: Bool) {
+        isHovering = hovering
+        // Only switch immediately if currently settled at rest -- a splash/reaction
+        // pass already in flight should finish and settle via the timers above,
+        // which will pick up the new isHovering value at that point.
+        if state == .idle || state == .standing {
+            state = restState
         }
     }
 }
@@ -669,11 +691,21 @@ struct SpriteAnimator: View {
     @State private var frames: [NSImage] = []
     @State private var timer: Timer?
 
+    // Idle pacing: rather than continuously ping-ponging at 6fps forever, idle
+    // mostly holds still on the resting frame (frame 0) and only occasionally
+    // does one full bounce pass -- "sits and blinks", not a constant wiggle.
+    @State private var idlePaused = true
+    @State private var idlePauseTicksLeft = SpriteAnimator.idlePauseTicks
+
+    static let tickHz = 6.0
+    static let idlePauseSeconds = 2.5
+    static let idlePauseTicks = Int(idlePauseSeconds * tickHz)
+
     var body: some View {
         Group {
             if frameIndex < frames.count {
                 Image(nsImage: frames[frameIndex]).resizable().interpolation(.none)
-                    .frame(width: 90, height: 90)
+                    .frame(width: 100, height: 100)
             }
         }
         .onAppear { load(for: mascot.state); start() }
@@ -686,6 +718,7 @@ struct SpriteAnimator: View {
         case .idle: return "idle"
         case .splash: return "splash"
         case .reaction: return "reaction"
+        case .standing: return "standing"
         }
     }
 
@@ -697,22 +730,46 @@ struct SpriteAnimator: View {
             .compactMap { NSImage(contentsOf: $0) }
         frameIndex = 0
         direction = 1
+        idlePaused = true
+        idlePauseTicksLeft = Self.idlePauseTicks
     }
 
     private func start() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 6.0, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / Self.tickHz, repeats: true) { _ in
             guard !frames.isEmpty else { return }
-            if mascot.state == .idle {
-                // ping-pong: bounce back and forth across the sequence instead
-                // of hard-cutting back to frame 0, so the resting pose oscillates
+            switch mascot.state {
+            case .idle:
+                if frames.count == 1 { frameIndex = 0; return }
+                if idlePaused {
+                    // holding on the resting frame between bounce passes
+                    frameIndex = 0
+                    idlePauseTicksLeft -= 1
+                    if idlePauseTicksLeft <= 0 { idlePaused = false; direction = 1 }
+                    return
+                }
+                // one full bounce pass: 0 -> last -> back to 0, then pause again
+                let next = frameIndex + direction
+                if next >= frames.count {
+                    direction = -1
+                    frameIndex = frames.count - 2
+                } else if next < 0 {
+                    frameIndex = 0
+                    idlePaused = true
+                    idlePauseTicksLeft = Self.idlePauseTicks
+                } else {
+                    frameIndex = next
+                }
+            case .standing:
+                // loops continuously while hovering -- same ping-pong feel as the
+                // old always-on idle oscillation, just under a different state
                 if frames.count == 1 { frameIndex = 0; return }
                 var next = frameIndex + direction
                 if next >= frames.count { direction = -1; next = frames.count - 2 }
                 else if next < 0 { direction = 1; next = 1 }
                 frameIndex = next
-            } else {
-                // one-shot states (splash, reaction) play forward-only;
-                // MascotModel reverts to .idle on its own timeout
+            case .splash, .reaction:
+                // one-shot states play forward-only; MascotModel reverts to a
+                // resting state (.idle or .standing) on its own timeout
                 frameIndex = (frameIndex + 1) % frames.count
             }
         }
@@ -750,10 +807,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = NSColor(red: 0.976, green: 0.937, blue: 0.890, alpha: 1)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView:
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .topTrailing) {
                 Dashboard(model: model, mascot: mascot)
                 SpriteAnimator(mascot: mascot)
-                    .padding(12)
+                    // Top-right corner: clear of the window's close button (top-left)
+                    // and the date header (top-left, width-capped to stay clear of him --
+                    // see Dashboard). 14pt padding on trailing/top keeps him inset from
+                    // both window edges at his new slightly-larger 100x100 size.
+                    .padding(.top, 14)
+                    .padding(.trailing, 14)
                     .allowsHitTesting(false)
             }
         )
