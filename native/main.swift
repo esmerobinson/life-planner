@@ -1314,8 +1314,8 @@ struct Dashboard: View {
                         let items = model.tasks.filter { $0.category == cat }
                         if !items.isEmpty {
                             HStack(spacing: 6) {
-                                PixelatedHeading(text: cat.lowercased(), size: 15, color: bright)
                                 ElementIcon(element: element(for: cat), size: 20)
+                                Text(cat.lowercased()).font(heading(17)).foregroundColor(bright)
                                 Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                                 Spacer()
                             }.padding(.top, 4)
@@ -1776,7 +1776,7 @@ struct SpriteAnimator: View {
     // 50/50 active/still than the intended "mostly holds still, occasionally bounces"
     // feel (flagged in a prior review). Bumped to 7s so idle spends most of its time
     // resting, with only occasional movement.
-    static let idlePauseSeconds = 7.0
+    static let idlePauseSeconds = 3.0
     static let idlePauseTicks = Int(idlePauseSeconds * tickHz)
 
     var body: some View {
@@ -1978,7 +1978,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let y = screen.visibleFrame.maxY - window.frame.height - 6
             window.setFrameOrigin(NSPoint(x: x, y: y))
         }
-        mascot.playSplash()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
