@@ -714,6 +714,47 @@ func heading(_ s: CGFloat) -> Font {
     .custom("Avatar Airbender", size: s)
 }
 
+// GameBoy-cart-slot-style tab bar: chunky bordered buttons in the Avatar palette,
+// replacing the plain native segmented control (the one place left looking like stock
+// macOS chrome rather than the cozy-game theme used everywhere else in the popup).
+struct ThemedTabButton: View {
+    let title: String
+    let selected: Bool
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(heading(13))
+                .foregroundColor(selected ? bg : (hover ? bright : fg))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 6)
+                    .fill(selected ? bright : (hover ? green.opacity(0.25) : Color.clear)))
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .stroke(bright.opacity(selected ? 0 : 0.35), lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+    }
+}
+
+struct ThemedTabBar<T: Hashable>: View {
+    let options: [(T, String)]
+    @Binding var selection: T
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(options, id: \.0) { value, label in
+                ThemedTabButton(title: label, selected: selection == value) { selection = value }
+            }
+        }
+        .padding(4)
+        .background(RoundedRectangle(cornerRadius: 9).fill(Color.black.opacity(0.05)))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(fg.opacity(0.2), lineWidth: 1))
+    }
+}
+
 struct SectionHeader: View {
     let title: String; var more: String? = nil
     var body: some View {
@@ -1341,10 +1382,7 @@ struct CalendarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("", selection: $showGrid) {
-                Text("month").tag(true)
-                Text("list").tag(false)
-            }.pickerStyle(.segmented).labelsHidden()
+            ThemedTabBar(options: [(true, "month"), (false, "list")], selection: $showGrid)
 
             if showGrid {
                 monthGrid.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1425,9 +1463,8 @@ struct RootView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $tab) {
-                ForEach(PlannerTab.allCases, id: \.self) { Text($0.rawValue) }
-            }.pickerStyle(.segmented).labelsHidden().padding(12)
+            ThemedTabBar(options: PlannerTab.allCases.map { ($0, $0.rawValue.capitalized) }, selection: $tab)
+                .padding(12)
 
             // all three stay alive underneath; switching tabs just hides/shows them,
             // instead of destroying and recreating the view (which retriggered the
