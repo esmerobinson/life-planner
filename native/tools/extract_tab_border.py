@@ -30,14 +30,17 @@ GRAY_BG = (230, 230, 230)
 DARK_RED_BROWN = (0x6E, 0x17, 0x00)   # #6E1700, same as `bright` in main.swift
 
 # The source art's ornate corner motif is ~170px deep on the 879x583 crop -- fine
-# for a large poster-sized frame, but this border wraps a ~420x560 popup window, so
-# at native size the corners swallowed the tab bar and bottom links (verified via a
-# screenshot of a live test build). Downscaling the WHOLE image by this factor keeps
-# the greek-key corner design intact (just proportionally smaller) instead of
-# cropping into it, which would cut the motif off mid-pattern and leave the
-# 9-slice's "stretchable middle" smearing part of the ornament. See TabBorderFrame
-# in main.swift for the matching (scaled-down) capInsets.
-SCALE = 0.4
+# for a large poster-sized frame. An earlier pass here used SCALE=0.4 (68px final
+# corner depth), which -- confirmed via a real screenshot on a live test build --
+# was still far too thick for a ~370-420pt popup: the dense interlocking-square
+# corner motif (measured >50% opaque pixel coverage within its own 68x68 corner
+# block) visually swallowed the tab bar/mascot row and the top of the scrollable
+# content underneath, since TabBorderFrame overlays the ENTIRE RootView. Scaled
+# down further here so the final corner depth is ~16px -- thin enough to read as a
+# crisp accent bracket instead of a solid red block. See TabBorderFrame in
+# main.swift for the matching (scaled-down) capInsets, measured directly off the
+# generated PNG (not guessed) after each change to this factor.
+SCALE = 16 / 170
 
 
 def process():

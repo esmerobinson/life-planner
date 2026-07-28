@@ -946,21 +946,25 @@ struct BorderFrame: View {
 // Ornate RED Chinese-style corner-bracket border (native/Assets/Border/tab_border.png,
 // cropped + two-color chroma-keyed + recolored from a reference sheet at
 // ~/Downloads/border_inspo_chinese_style.png -- see native/tools/extract_tab_border.py),
-// wrapping the WHOLE tab/window content area (see RootView) -- bigger and more
-// prominent than the affirmations box's blue BorderFrame. The raw crop's ornate
-// greek-key corner motif measured ~170px deep -- fine for a poster, but at that
-// native size on this ~420x560 popup it swallowed the tab bar and bottom links
-// (confirmed via a screenshot of a live test build), so the extraction script scales
-// the WHOLE image down 0.4x (352x233 final) to keep the corner design intact but
-// proportionate to this small window. capInsets here (68 = 170 * 0.4) match that
-// scaled asset, not the original crop.
+// wrapping the WHOLE tab/window content area (see RootView) -- decorative accent
+// only. A first pass here scaled the raw ~170px-deep corner motif down to 68px
+// (0.4x) -- still WAY too thick on a ~370-420pt popup: confirmed via a live
+// screenshot, that dense interlocking-square corner block (>50% opaque pixel
+// coverage within its own 68x68 corner) visually swallowed the tab bar/mascot row
+// and the top of the scrollable content underneath. Re-extracted at 16/170 scale
+// (83x55 final asset) so the corner motif's real measured depth is ~16px --
+// capInsets below match that measurement directly (re-measure with PIL after any
+// future change to extract_tab_border.py's SCALE, don't guess). .interpolation(.none)
+// matches the crisp pixel-art rendering used everywhere else (BorderFrame,
+// ElementIcon, SpriteAnimator) -- .high here was smoothing/blurring this border
+// inconsistently with the rest of the app's look.
 struct TabBorderFrame: View {
     var body: some View {
         if let img = NSImage(contentsOf: assetsBorderURL("tab_border")) {
             Image(nsImage: img)
-                .resizable(capInsets: EdgeInsets(top: 68, leading: 68, bottom: 68, trailing: 68),
+                .resizable(capInsets: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16),
                            resizingMode: .stretch)
-                .interpolation(.high)
+                .interpolation(.none)
         } else {
             Color.clear
         }
@@ -2000,7 +2004,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.button?.action = #selector(toggle)
         statusItem.button?.target = self
 
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 370, height: 660),
+        // Height grew from 660 -> 720 (width unchanged) to compensate for the
+        // top row (tab bar + mascot, see RootView) getting taller once the mascot
+        // moved from an absolute overlay into a real HStack sibling there: that row
+        // is now sized to the 90x90 mascot + 12pt padding on each side (~114pt)
+        // instead of just the ~60-66pt-tall tab-bar-only row it used to be. Without
+        // growing the window, the ScrollView below (date header + affirmations box
+        // + task list) lost that ~50-60pt of vertical space and got squeezed enough
+        // to clip/hide content at the top on first open. All positioning code below
+        // reads window.frame live (not this literal), so this is the only spot that
+        // needed updating -- confirmed via screenshot that the date header and all
+        // three affirm rows are now fully visible without scrolling.
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 370, height: 720),
                           styleMask: [.titled, .closable, .fullSizeContentView, .resizable],
                           backing: .buffered, defer: false)
         window.titleVisibility = .hidden
