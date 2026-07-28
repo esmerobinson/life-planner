@@ -294,7 +294,10 @@ enum PixelatedHeadingCache {
     static var images: [String: NSImage] = [:]
 
     static func render(text: String, size: CGFloat, color: Color) -> NSImage? {
-        let key = "\(text)|\(size)"
+        let nsColor = NSColor(color)
+        let colorComponents = nsColor.cgColor.components ?? []
+        let colorKey = colorComponents.map { String(format: "%.3f", $0) }.joined(separator: ",")
+        let key = "\(text)|\(size)|\(colorKey)"
         if let cached = images[key] { return cached }
 
         let renderSize = size * 2
