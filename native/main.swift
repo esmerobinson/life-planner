@@ -7,6 +7,8 @@
 
 import AppKit
 import SwiftUI
+import CoreImage
+import CoreImage.CIFilterBuiltins
 
 // MARK: - vault access
 
@@ -258,11 +260,94 @@ func heading(_ s: CGFloat) -> Font {
     .custom("Avatar Airbender", size: s)
 }
 
+// Silkscreen by The Silkscreen Project Authors, SIL Open Font License --
+// native/Fonts/Silkscreen-Regular.ttf / Silkscreen-Bold.ttf. Regular and Bold ship as
+// two files sharing one family name ("Silkscreen") but distinct PostScript names
+// ("Silkscreen-Regular" / "Silkscreen-Bold") -- so unlike a normal system font, asking
+// for the family name at a bold Font.Weight will NOT reliably pick the bold file
+// (NSFont(name:) resolution for a shared family name is ambiguous/first-match, not
+// weight-aware). Look up by the PostScript name directly instead, verified via
+// `python3 -c "from fontTools.ttLib import TTFont; ..."` against the two .ttf files.
+// Sized a couple points larger than mono() at the same call site -- pixel/LCD-style
+// fonts read smaller than their point size for legibility at these small UI sizes.
+func pixelBody(_ s: CGFloat, _ w: Font.Weight = .regular) -> Font {
+    .custom(w == .bold ? "Silkscreen-Bold" : "Silkscreen-Regular", size: s)
+}
+
+// Papyrus (real macOS system font, installed on every Mac -- no download/licensing
+// needed) rendered with a slight pixellate filter for section/category headings, per
+// explicit request ("can you pixelate it slightly"). NOT used for the date header,
+// which stays on heading()/Avatar Airbender per prior work.
+func assetsBorderURL(_ name: String) -> URL {
+    (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+        .appendingPathComponent("Assets/Border/\(name).png")
+}
+
+// Renders `text` in Papyrus via SwiftUI's ImageRenderer (used elsewhere in this
+// codebase for test/verification snapshots -- here in production), then applies a
+// mild CIFilter.pixellate() pass so the heading reads as "slightly" pixelated rather
+// than blocky/illegible. Rendered at a fixed high-quality base size (2x the requested
+// display size) and then scaled down for display, so the pixellate scale stays
+// proportionally small relative to the glyph size.
+@MainActor
+enum PixelatedHeadingCache {
+    static var images: [String: NSImage] = [:]
+
+    static func render(text: String, size: CGFloat, color: Color) -> NSImage? {
+        let key = "\(text)|\(size)"
+        if let cached = images[key] { return cached }
+
+        let renderSize = size * 2
+        let label = Text(text)
+            .font(.custom("Papyrus", size: renderSize))
+            .foregroundColor(color)
+        let renderer = ImageRenderer(content: label)
+        renderer.scale = 2 // retina-quality source before we pixellate it down
+        guard let nsImage = renderer.nsImage,
+              let tiff = nsImage.tiffRepresentation,
+              let ciImage = CIImage(data: tiff) else { return nil }
+
+        let filter = CIFilter.pixellate()
+        filter.inputImage = ciImage
+        // "Slight" pixellation: a small scale relative to the rendered glyph size --
+        // 3px at 2x render scale reads as a subtle textured/pixel look, not blocky.
+        filter.scale = 3.0
+
+        let context = CIContext()
+        guard let output = filter.outputImage,
+              let cgImage = context.createCGImage(output, from: ciImage.extent) else { return nil }
+
+        let result = NSImage(cgImage: cgImage, size: nsImage.size)
+        images[key] = result
+        return result
+    }
+}
+
+struct PixelatedHeading: View {
+    let text: String
+    var size: CGFloat = 14
+    var color: Color = bright
+
+    var body: some View {
+        if let img = PixelatedHeadingCache.render(text: text, size: size, color: color) {
+            Image(nsImage: img)
+                .resizable()
+                .interpolation(.medium)
+                .aspectRatio(contentMode: .fit)
+                .frame(height: size * 1.3)
+        } else {
+            // Papyrus missing or renderer failed -- fall back to plain text rather
+            // than showing nothing.
+            Text(text).font(.custom("Papyrus", size: size)).foregroundColor(color)
+        }
+    }
+}
+
 struct SectionHeader: View {
     let title: String; var more: String? = nil
     var body: some View {
         HStack {
-            Text("// " + title).font(mono(10)).foregroundColor(dim)
+            PixelatedHeading(text: title, size: 11, color: dim)
             Spacer()
             if let m = more {
                 Button("see more →") { openInObsidian(m) }
@@ -296,7 +381,7 @@ struct TypewriterText: View {
 
     var body: some View {
         Text(shown)
-            .font(italic ? mono(12).italic() : mono(12))
+            .font(italic ? pixelBody(13).italic() : pixelBody(13))
             .foregroundColor(color)
             .fixedSize(horizontal: false, vertical: true)
             .onAppear {
@@ -325,6 +410,27 @@ struct TypewriterText: View {
 func assetsIconURL(_ name: String) -> URL {
     (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
         .appendingPathComponent("Assets/Icons/\(name).png")
+}
+
+// Ornate blue bordered-frame graphic (native/Assets/Border/frame.png, cropped from
+// docs/superpowers/fontsavatar.png -- see native/tools/extract_border.py) used as a
+// 9-slice-able background for the CTA button, replacing a plain RoundedRectangle
+// fill/stroke. The source frame is 207x143px with a measured ~16px ornate border
+// ring on every edge and a flat-colored interior -- capInsets below keep that
+// border ring a fixed size while the interior stretches to fit the button, so it
+// doesn't look smeared/distorted at the button's actual (much smaller) size.
+struct BorderFrame: View {
+    var body: some View {
+        if let img = NSImage(contentsOf: assetsBorderURL("frame")) {
+            Image(nsImage: img)
+                .resizable(capInsets: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16),
+                           resizingMode: .stretch)
+                .interpolation(.none)
+        } else {
+            RoundedRectangle(cornerRadius: 8).fill(green.opacity(0.16))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(green.opacity(0.5), lineWidth: 1))
+        }
+    }
 }
 
 struct ElementIcon: View {
@@ -506,7 +612,7 @@ struct TaskRow: View {
             }
             Button(action: { openInObsidian(task.target) }) {
                 HStack(alignment: .top, spacing: 4) {
-                    Text(task.display).font(mono(12))
+                    Text(task.display).font(pixelBody(13))
                         .foregroundColor(task.done ? dim : (hover ? bright : fg))
                         .strikethrough(task.done, color: dim)
                         .fixedSize(horizontal: false, vertical: true)
@@ -581,7 +687,7 @@ struct Dashboard: View {
                         let items = model.tasks.filter { $0.category == cat }
                         if !items.isEmpty {
                             HStack(spacing: 6) {
-                                Text(cat.lowercased()).font(mono(13, .bold)).foregroundColor(bright)
+                                PixelatedHeading(text: cat.lowercased(), size: 15, color: bright)
                                 ElementIcon(element: element(for: cat), size: 20)
                                 Text("\(model.categoryStars(cat))").font(mono(11)).foregroundColor(green)
                                 Spacer()
@@ -596,14 +702,13 @@ struct Dashboard: View {
                     if !model.habitDone("Journal feelings") { model.toggleHabit("Journal feelings") }
                 }) {
                     HStack {
-                        Text("✎  make a journal entry now?").font(mono(12, .medium))
+                        Text("✎  make a journal entry now?").font(pixelBody(13))
                         Spacer()
                         Text("→").font(mono(12))
                     }
-                    .padding(.vertical, 9).padding(.horizontal, 12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(green.opacity(0.16)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(green.opacity(0.5), lineWidth: 1))
-                    .foregroundColor(green)
+                    .padding(.vertical, 9).padding(.horizontal, 16)
+                    .background(BorderFrame())
+                    .foregroundColor(bright)
                     .contentShape(Rectangle())
                 }.buttonStyle(.plain)
 
@@ -698,7 +803,11 @@ struct SpriteAnimator: View {
     @State private var idlePauseTicksLeft = SpriteAnimator.idlePauseTicks
 
     static let tickHz = 6.0
-    static let idlePauseSeconds = 2.5
+    // Was 2.5s -- with an ~8-frame bounce pass at 6fps (~2.33s) that read as closer to
+    // 50/50 active/still than the intended "mostly holds still, occasionally bounces"
+    // feel (flagged in a prior review). Bumped to 7s so idle spends most of its time
+    // resting, with only occasional movement.
+    static let idlePauseSeconds = 7.0
     static let idlePauseTicks = Int(idlePauseSeconds * tickHz)
 
     var body: some View {
@@ -791,6 +900,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var fontRegisterError: Unmanaged<CFError>?
         if !CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &fontRegisterError) {
             print("Warning: failed to register font at \(fontURL.path): \(String(describing: fontRegisterError?.takeUnretainedValue()))")
+        }
+        // Silkscreen by The Silkscreen Project Authors, SIL Open Font License --
+        // native/Fonts/Silkscreen-Regular.ttf / Silkscreen-Bold.ttf (Google Fonts family).
+        // Used for primary body text (pixelBody()) -- a pixel/LCD-style Game Boy dialogue
+        // look for task rows, manifestation/reminder text, and the journal CTA.
+        for silkscreenName in ["Silkscreen-Regular.ttf", "Silkscreen-Bold.ttf"] {
+            let url = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Fonts/\(silkscreenName)")
+            var err: Unmanaged<CFError>?
+            if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &err) {
+                print("Warning: failed to register font at \(url.path): \(String(describing: err?.takeUnretainedValue()))")
+            }
         }
         model.load()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
