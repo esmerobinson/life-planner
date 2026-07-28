@@ -306,7 +306,7 @@ struct TypewriterText: View {
 // Loads a pre-extracted element/Lotus icon from native/Assets/Icons/ (see native/tools/extract_icons.py).
 // Resolved relative to the running binary's directory, same approach as the vault paths above.
 func assetsIconURL(_ name: String) -> URL {
-    Bundle.main.bundleURL.deletingLastPathComponent()
+    Bundle.main.bundleURL
         .appendingPathComponent("Assets/Icons/\(name).png")
 }
 
@@ -527,8 +527,8 @@ final class MascotModel: ObservableObject {
 
     func playSplash() {
         state = .splash
-        // splash is a 4-frame sequence at 6fps (see SpriteAnimator) -> ~0.67s, then fall back to idle
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in
+        // splash is a 6-frame sequence at 6fps -> 1.0s, then fall back to idle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.state = .idle
         }
     }
@@ -555,7 +555,7 @@ struct SpriteAnimator: View {
     private func folderName(_ s: MascotState) -> String { s == .idle ? "idle" : "splash" }
 
     private func load(for state: MascotState) {
-        let dir = Bundle.main.bundleURL.deletingLastPathComponent()
+        let dir = Bundle.main.bundleURL
             .appendingPathComponent("Assets/Sprites/\(folderName(state))")
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         frames = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
