@@ -1756,11 +1756,81 @@ struct RootView: View {
         // Mascot lives inside this view now (up in the tab-bar row), not an
         // absolute overlay from AppDelegate -- hover detection over the whole
         // dashboard still drives his .standing/.idle resting state the same way.
-        .onHover { hovering in mascot.setHovering(hovering) }
+        .onHover { hovering in
+            mascot.setHovering(hovering)
+            if hovering {
+                FlameCursorController.shared.start()
+            } else {
+                FlameCursorController.shared.stop()
+            }
+        }
         // Ornate red Chinese-style border art wraps the whole tab/window content
         // area -- decorative overlay only (transparent interior + thin corner/edge
         // linework), so it never blocks hit-testing of what's underneath.
         .overlay(TabBorderFrame().allowsHitTesting(false))
+    }
+}
+
+// MARK: - Animated flame cursor
+
+// Custom animated NSCursor: while the mouse hovers the popup's content, swap
+// in a small 6-frame flame sprite loop (native/Assets/Cursor/frame_00..05.png,
+// see native/tools/extract_flame_cursor.py) in place of the system arrow, and
+// restore the arrow the moment hovering stops. This is a plain NSObject (not
+// a View) so it can own an NSTimer/NSCursor push-pop lifecycle independent of
+// SwiftUI's view-update cycle -- it's driven by the same RootView .onHover
+// callback that already feeds MascotModel.setHovering.
+final class FlameCursorController {
+    static let shared = FlameCursorController()
+
+    // 6 frames at 8fps -- a reasonable flicker rate for a small flame; fast
+    // enough to read as "alive" without being distracting.
+    private static let frameInterval: TimeInterval = 1.0 / 8.0
+
+    private var cursors: [NSCursor] = []
+    private var timer: Timer?
+    private var frameIndex = 0
+    private var isPushed = false
+
+    private init() {
+        let dir = (Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+            .appendingPathComponent("Assets/Cursor")
+        for i in 0..<6 {
+            let url = dir.appendingPathComponent(String(format: "frame_%02d.png", i))
+            guard let image = NSImage(contentsOf: url) else { continue }
+            // Hotspot at bottom-center: NSCursor/NSImage coordinates are
+            // bottom-left-origin, so y=0 is the bottom edge -- putting the
+            // hotspot there means the actual pointer/click location is the
+            // base of the flame, with the rest of the sprite rising above it,
+            // like a small torch flame sitting right on the pointer tip.
+            let hotSpot = NSPoint(x: image.size.width / 2, y: 0)
+            cursors.append(NSCursor(image: image, hotSpot: hotSpot))
+        }
+    }
+
+    func start() {
+        guard !cursors.isEmpty, timer == nil else { return }
+        frameIndex = 0
+        isPushed = true
+        cursors[frameIndex].push()
+        timer = Timer.scheduledTimer(withTimeInterval: Self.frameInterval, repeats: true) { [weak self] _ in
+            self?.advance()
+        }
+    }
+
+    private func advance() {
+        guard !cursors.isEmpty else { return }
+        frameIndex = (frameIndex + 1) % cursors.count
+        cursors[frameIndex].set()
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        if isPushed {
+            NSCursor.pop()
+            isPushed = false
+        }
     }
 }
 
@@ -1825,6 +1895,25 @@ final class MascotModel: ObservableObject {
         }
         // If a splash/reaction pass is currently in flight, its own timer above
         // will settle to `restState` (now .idle) when it finishes -- unchanged.
+    }
+
+    // Called by AppDelegate.toggle() right before the popup window becomes
+    // visible again. The model is a persistent singleton (never destroyed
+    // while the window is hidden), so if the window happened to be hidden
+    // mid-transition -- e.g. .standing because the mouse was hovering right
+    // when it closed, or .standingDown mid-reverse-playback -- reopening
+    // later would otherwise resume from whatever stale state it was left in,
+    // producing an inconsistent "different animation" on open. This forces a
+    // clean, deterministic baseline every time the popup opens: always
+    // .idle, with the hover flag cleared so a leftover isHovering=true from
+    // before the window hid doesn't linger either. If the mouse is already
+    // genuinely hovering the popup's location right when it reopens, the
+    // normal .onHover-driven setHovering(true) call fires immediately after
+    // and naturally re-transitions to .standing -- that's expected, this
+    // reset only clears STALE state, it doesn't fight legitimate hover.
+    func resetToIdle() {
+        isHovering = false
+        state = .idle
     }
 }
 
@@ -2066,8 +2155,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func toggle() {
-        if window.isVisible { window.orderOut(nil); return }
+        if window.isVisible {
+            // Defensive: SwiftUI's .onHover exit normally already fires (and
+            // stops the flame cursor timer/restores the arrow) as the mouse
+            // moves off the popup content toward the status bar icon to
+            // trigger this toggle, but ordering the window out programmatically
+            // here too guarantees the animated cursor never gets stuck showing
+            // or its timer left running if that hover-exit is ever missed.
+            FlameCursorController.shared.stop()
+            window.orderOut(nil)
+            return
+        }
         reloadAll(); updateTitle()
+        // The window is about to become visible again. mascot is a persistent
+        // object that survives hide/show, so it may still be sitting in
+        // whatever transient state it was in when the window last hid (e.g.
+        // .standing if the mouse happened to be hovering right at close time).
+        // Force a clean, deterministic baseline on every open -- see
+        // MascotModel.resetToIdle for why. If the mouse is already hovering
+        // the popup's spot when it reopens, the normal .onHover callback fires
+        // right after this and legitimately re-transitions to .standing.
+        mascot.resetToIdle()
         if let btnWin = statusItem.button?.window, let screen = btnWin.screen {
             let btn = btnWin.frame
             var x = btn.midX - window.frame.width + 40
