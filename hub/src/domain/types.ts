@@ -9,6 +9,7 @@ export interface Item {
   title: string;
   notes?: string;
   links: string[];
+  tags?: string[];
   areaId: AreaId;
   goalId?: string;
   priority: Priority;

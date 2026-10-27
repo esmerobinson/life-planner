@@ -14,10 +14,15 @@ export interface ParsedItem {
 
 // Regexes ported from src/backlog.py.
 const TASK_RE = /^- \[( |x|>)\](?: (.*))?$/;
-const PRIO_RE = /\s*!p(\d)\b/;
+// Non-global regexes read the first value; global versions strip every occurrence
+// (Python re.sub semantics). \w is Unicode-aware in Python, so tags use \p{L}\p{N}.
+const PRIO_RE = /\s*!p(\d)(?![\p{L}\p{N}_])/u;
 const DUE_RE = /\s*\[due (\d{4}-\d{2}-\d{2})\]/;
 const RECUR_RE = /\s*\[recur: ([a-z,]+)\]/;
-const TAG_RE = /\s*#([\w-]+)/g;
+const TAG_RE = /\s*#([\p{L}\p{N}_-]+)/gu;
+const PRIO_ALL = new RegExp(PRIO_RE.source, "gu");
+const DUE_ALL = new RegExp(DUE_RE.source, "g");
+const RECUR_ALL = new RegExp(RECUR_RE.source, "g");
 const WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
 export function parseBacklog(markdown: string): {
@@ -43,9 +48,9 @@ export function parseBacklog(markdown: string): {
     const recur = RECUR_RE.exec(raw);
     const tags = [...raw.matchAll(TAG_RE)].map((t) => t[1]);
     const title = raw
-      .replace(PRIO_RE, "")
-      .replace(DUE_RE, "")
-      .replace(RECUR_RE, "")
+      .replace(PRIO_ALL, "")
+      .replace(DUE_ALL, "")
+      .replace(RECUR_ALL, "")
       .replace(TAG_RE, "")
       .replace(/\s+/g, " ")
       .trim();
@@ -114,6 +119,7 @@ export async function importBacklog(
         touchedAt: today,
         source: { kind: "backlog", key: p.key },
       };
+      if (p.tags.length) item.tags = p.tags;
       if (p.due) item.due = p.due;
       if (p.recur) item.recur = p.recur;
       await db.items.add(item);

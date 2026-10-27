@@ -42,11 +42,41 @@ describe("parseBacklog", () => {
     const { items, skipped } = parseBacklog(md);
     expect(items.find((i) => i.title === "Reorganise the spice shelf")!.priority).toBe(2);
     expect(skipped.some((s) => /empty/i.test(s.reason))).toBe(true);
+    expect(skipped.some((s) => s.line.includes("!p9") && /priority/i.test(s.reason))).toBe(true);
     expect(() => parseBacklog("- [ ] \n- [ ] !p1\n## \n- [ ]")).not.toThrow();
   });
 });
 
+describe("parseBacklog robustness", () => {
+  it("strips repeated metadata from the title", () => {
+    const { items } = parseBacklog(
+      "- [ ] Foo !p1 bar !p3\n- [ ] Ring [due 2026-01-01] x [due 2026-02-02]\n- [ ] Go [recur: mon] on [recur: tue]",
+    );
+    expect(items.map((i) => i.title)).toEqual(["Foo bar", "Ring x", "Go on"]);
+    expect(items[0].priority).toBe(1);
+    expect(items[1].due).toBe("2026-01-01");
+  });
+
+  it("handles non-ASCII tags", () => {
+    const { items } = parseBacklog("- [ ] Visit #café now #naïve-x");
+    expect(items[0].title).toBe("Visit now");
+    expect(items[0].tags).toEqual(["café", "naïve-x"]);
+  });
+
+  it("CRLF file gives the same items as LF", () => {
+    expect(parseBacklog(md.replace(/\n/g, "\r\n"))).toEqual(parseBacklog(md));
+  });
+});
+
 describe("importBacklog", () => {
+  it("keeps tags on imported items, none when absent", async () => {
+    await importBacklog("- [ ] A thing #home #art\n- [ ] Plain thing", TODAY);
+    const a = (await db.items.filter((i) => i.title === "A thing").first())!;
+    const b = (await db.items.filter((i) => i.title === "Plain thing").first())!;
+    expect(a.tags).toEqual(["home", "art"]);
+    expect(b.tags ?? []).toEqual([]);
+  });
+
   it("importing twice adds nothing the second time", async () => {
     const first = await importBacklog(md, TODAY);
     expect(first.added).toBe(6);
