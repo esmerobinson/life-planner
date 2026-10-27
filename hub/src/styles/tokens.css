@@ -1,0 +1,83 @@
+/* Values from VISUAL-LANGUAGE.md only (option-3 assignment).
+   Radii are NOT in VISUAL-LANGUAGE.md: taken from the approved mockup. */
+:root {
+  --page: #e2e8ff;
+  --sidebar: #3a412f;
+  --sidebar-item: #51553d;
+  --sidebar-text: #e9e3d6;
+  --panel: #e9e3d6;
+  --row: #e3ddcd;
+  --track: #d4d1c3;
+  --text: #3a412f;
+
+  --radius-panel: 18px;
+  --radius-tile: 9px;
+
+  --placeholder: #ff00ff; /* undecided: obviously wrong on purpose */
+
+  font-family: system-ui;
+  color: var(--text);
+}
+
+* {
+  transition-timing-function: linear;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-content {
+  flex: 1;
+  padding: 24px;
+}
+
+.sidebar {
+  width: 220px;
+  flex: none;
+  background: var(--sidebar);
+  color: var(--sidebar-text);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: var(--sidebar-item);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  border-radius: var(--radius-tile);
+}
+
+/* Active highlight is undecided: magenta placeholder outline. */
+.sidebar-item[aria-current="page"] {
+  outline: 2px solid var(--placeholder);
+}
+
+.sidebar-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-tile);
+}
