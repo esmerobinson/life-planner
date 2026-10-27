@@ -50,21 +50,16 @@ Success in a month (said): she checks her to-dos every morning, works toward eve
 - **Master data location: see Open decision 1.** Recommended: free Cloudflare tier (Worker + D1/R2, already in use) as the sync point, with each device holding a local copy, plus a nightly export of core notes to plain files on the Mac and a second off-site copy.
 - Stack suggestion (builder may change): React + TypeScript + Vite, IndexedDB locally, Cloudflare Worker + D1, web push. Reuse: Python parsers for import; Cloudflare worker patterns.
 
-## Open decision for Esme (changes what gets built)
-1. Where does the master copy live?
-   - (a) Mac is master; phone reaches it over a private tunnel (works only while the Mac is on and awake).
-   - (b) Cloudflare free tier is master, devices keep local copies, Mac keeps an exported plain-file backup (recommended; works with Mac off).
-   Recommendation: (b).
-
-## Open decision 2 for Esme: journal privacy
-Under option (b), journal content (morning-pages photos, check-in answers) would sit on Cloudflare. Choose: (i) end-to-end encrypted with a passphrase only she holds (private, but no server-side search, and a lost passphrase means lost entries); (ii) journal stays on-device and in the Mac backup only, never on Cloudflare (no phone/Mac sync for the journal); (iii) stored normally on her private Cloudflare account. Recommendation: (i).
+## Decisions made by Esme (2026-10-27)
+1. **Master copy: Cloudflare free tier** (Worker + D1/R2), each device keeps a local copy, Mac keeps an exported plain-file backup (said: "b").
+2. **Journal privacy: end-to-end encrypted** with a passphrase only she holds (said: "i"). No server-side search of journal content; a lost passphrase means lost entries, so the app must make that clear at setup and offer a recovery key she stores herself.
 
 ## Settled by me (builder review, 2026-10-27; Esme can overturn)
 - **Kill = archive.** Item is hidden but recoverable from an Archive view. Progress already earned stays; a killed task leaves the goal's denominator.
-- **Goal progress.** A goal may have a numeric target and period (e.g. 10 sessions this month): the bar is done/target. Otherwise the bar is attached tasks done / attached tasks total, equally weighted. Loose goals with nothing attached show an empty bar and a prompt to plan, not a warning.
+- **Goal progress has two levels** (Esme: goals are huge and long-term, e.g. a book, years of calisthenics, becoming a good artist, so one bar is wrong). (1) **Overall arc**: for finite goals (book) a bar of milestones done / total milestones she defines; for open-ended practices (calisthenics, art) no bar that can "finish", instead cumulative evidence (sessions this year, months in a row, streak). (2) **This month**: a monthly target with a bar (e.g. 10 sessions, 12 chapters' worth of outline steps) that tasks, habits and projects feed directly; ticking a task moves this bar and, if the task is a milestone, the arc. Monthly bars reset on the 1st with the monthly review. Loose goals with nothing attached show an empty bar and a prompt to plan, not a warning. The exact mapping is my guess pending Esme's confirmation.
 - **Today vs the cap.** Up to 4 picks. Overdue and due-today items compete for those slots first; any overflow sits in a collapsed "Also due (n)" row, never hidden. Her moves (pin/remove/reorder) stick for that day and reset the next morning.
 - **Triage.** `src/backlog.py` `plan_for` is the starting rule (recurring, then due within 3 days, then p1, then rotating p2). Port the logic, add "goal needs a move this period" as a tie-breaker.
-- **Import.** One-shot first, then re-runnable and idempotent (dedupe by source + source id) because she will keep using old tools for a while. Items without an area land in an Inbox to triage.
+- **Import.** Followed by a guided manual triage session at kickoff for items with no obvious home (Esme agreed). One-shot first, then re-runnable and idempotent (dedupe by source + source id) because she will keep using old tools for a while. Items without an area land in an Inbox to triage.
 - **Offline.** Phone and Mac queue writes offline and sync later; last write wins per field (single user). Push notifications must reach a closed app via web push from the Worker; iOS requires the PWA added to the home screen.
 - **Defaults, all configurable.** Plan-the-day reminder 08:30; an item is "stale" after 14 days untouched; weekly review Sunday, monthly review the 1st.
 - **Mole popup.** A magenta placeholder until art direction exists. Animal Crossing artwork is not bundled; Esme supplies or approves any assets (personal use only).
