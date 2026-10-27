@@ -2,11 +2,26 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useShellToday } from "./ui/shellContext";
 import { AppShell } from "./ui/AppShell";
 import { NAV } from "./ui/areas";
+import { AreaPage } from "./ui/AreaPage";
+import { GoalDetail } from "./ui/GoalDetail";
+import { GoalsPage } from "./ui/GoalsPage";
 import { InboxPage } from "./ui/InboxPage";
 import { TodayPanel } from "./ui/TodayPanel";
 
 function TodayRoute() {
   return <TodayPanel today={useShellToday()} />;
+}
+
+function GoalsRoute() {
+  return <GoalsPage today={useShellToday()} />;
+}
+
+function GoalDetailRoute() {
+  return <GoalDetail today={useShellToday()} />;
+}
+
+function AreaRoute() {
+  return <AreaPage today={useShellToday()} />;
 }
 
 function InboxRoute() {
@@ -21,10 +36,13 @@ export default function App() {
           {NAV.map((n) =>
             n.id === "today" ? (
               <Route key={n.id} path={n.path} element={<TodayRoute />} />
-            ) : (
+            ) : n.id === "goals" || n.path.startsWith("/area/") ? null : (
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
             ),
           )}
+          <Route path="/goals" element={<GoalsRoute />} />
+          <Route path="/goals/:id" element={<GoalDetailRoute />} />
+          <Route path="/area/:areaId" element={<AreaRoute />} />
           <Route path="/inbox" element={<InboxRoute />} />
         </Route>
       </Routes>

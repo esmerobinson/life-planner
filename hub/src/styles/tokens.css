@@ -9,6 +9,9 @@
   --row: #e3ddcd;
   --track: #d4d1c3;
   --text: #3a412f;
+  --bar-fill: #98c293; /* from approved mockup (option 3) */
+  --bar-height: 10px; /* from approved mockup (option 3) */
+  --bar-radius: 6px; /* from approved mockup (option 3) */
 
   --radius-panel: 18px;
   --radius-tile: 9px;
@@ -87,4 +90,16 @@ body {
   background: var(--placeholder);
   color: var(--text);
   font-family: system-ui;
+}
+
+.progress-bar {
+  height: var(--bar-height);
+  border-radius: var(--bar-radius);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--bar-fill);
 }
