@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listGoals, listItems } from "../data/repo";
 import type { Goal, ISODate, Item } from "../domain/types";
 
@@ -6,20 +6,31 @@ export function useHubData(_today: ISODate): {
   items: Item[];
   goals: Goal[];
   refresh: () => Promise<void>;
+  loaded: boolean;
 } {
   const [items, setItems] = useState<Item[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const latest = useRef(0);
+  const mounted = useRef(false);
 
   const refresh = useCallback(async () => {
-    // done items are needed for monthly progress, so read all non-archived
+    const id = ++latest.current;
     const [i, g] = await Promise.all([listItems(), listGoals()]);
+    if (!mounted.current || id !== latest.current) return; // stale or unmounted
     setItems(i);
     setGoals(g);
+    setLoaded(true);
   }, []);
 
   useEffect(() => {
+    mounted.current = true;
     void refresh();
+    return () => {
+      mounted.current = false;
+    };
   }, [refresh]);
 
-  return { items, goals, refresh };
+  return { items, goals, refresh, loaded };
 }

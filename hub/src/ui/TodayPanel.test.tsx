@@ -1,5 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
+import * as repo from "../data/repo";
 import { db } from "../data/db";
 import { createItem } from "../data/repo";
 import { TodayPanel } from "./TodayPanel";
@@ -32,7 +34,9 @@ describe("TodayPanel", () => {
   it("overdue item shows an OVERDUE sticker", async () => {
     await task("Late one", { due: "2026-10-20" });
     render(<TodayPanel today={TODAY} />);
-    expect(await screen.findByText("OVERDUE")).toBeInTheDocument();
+    const sticker = await screen.findByText("OVERDUE");
+    expect(sticker).toHaveClass("overdue-sticker");
+    expect(sticker.getAttribute("style") ?? "").toBe(""); // styles live in tokens.css, no inline colours
   });
 
   it("ticking calls tickItem and shows the celebration placeholder", async () => {
@@ -65,5 +69,27 @@ describe("TodayPanel", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
     await screen.findByText("Nothing planned for today.");
     expect((await db.items.get(it.id))!.status).toBe("archived");
+  });
+
+  it("never shows the empty state while the first read is pending", async () => {
+    const real = await db.items.toArray();
+    expect(real).toEqual([]);
+    const it = await task("Pinned", { pinnedDate: TODAY });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const orig = repo.listItems;
+    vi.spyOn(repo, "listItems").mockImplementationOnce(async (f) => {
+      await gate;
+      return orig(f);
+    });
+    render(<TodayPanel today={TODAY} />);
+    expect(screen.queryByText("Nothing planned for today.")).toBeNull();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(screen.queryByText("Nothing planned for today.")).toBeNull();
+    await act(async () => release());
+    expect(await screen.findByText(it.title)).toBeInTheDocument();
+    expect(screen.queryByText("Nothing planned for today.")).toBeNull();
   });
 });

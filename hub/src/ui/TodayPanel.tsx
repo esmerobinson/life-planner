@@ -15,7 +15,7 @@ function thisMonthDoneFor(goals: Goal[], items: Item[], today: ISODate): Record<
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
 export function TodayPanel({ today }: { today: ISODate }) {
-  const { items, goals, refresh } = useHubData(today);
+  const { items, goals, refresh, loaded } = useHubData(today);
   const [celebrating, setCelebrating] = useState(false);
 
   useEffect(() => {
@@ -46,7 +46,6 @@ export function TodayPanel({ today }: { today: ISODate }) {
         {overdue && (
           <span
             className="overdue-sticker"
-            style={{ background: "#df7e6f", color: "#e9e3d6", padding: "2px 6px", borderRadius: "var(--radius-tile)" }}
           >
             OVERDUE
           </span>
@@ -56,7 +55,7 @@ export function TodayPanel({ today }: { today: ISODate }) {
     );
   }
 
-  const empty = rhythm.length + picks.length + alsoDue.length === 0;
+  const empty = loaded && rhythm.length + picks.length + alsoDue.length === 0;
 
   return (
     <section className="today-panel">

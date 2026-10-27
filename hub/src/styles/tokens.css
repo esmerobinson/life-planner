@@ -81,3 +81,10 @@ body {
   height: 32px;
   border-radius: var(--radius-tile);
 }
+
+/* Sticker look is undecided: magenta placeholder, system font, page text colour. */
+.overdue-sticker {
+  background: var(--placeholder);
+  color: var(--text);
+  font-family: system-ui;
+}
