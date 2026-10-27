@@ -41,8 +41,8 @@ export function pickToday(
   );
 
   const rhythm = live.filter((i) => i.recur?.includes(wd));
-  const rhythmIds = new Set(rhythm.map((i) => i.id));
-  const pool = live.filter((i) => !rhythmIds.has(i.id));
+  const isRecurring = (i: Item) => (i.recur?.length ?? 0) > 0;
+  const pool = live.filter((i) => !isRecurring(i));
 
   const pinned = pool.filter((i) => i.pinnedDate === today);
   const rest = pool.filter((i) => i.pinnedDate !== today);

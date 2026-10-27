@@ -51,6 +51,13 @@ describe("pickToday", () => {
     expect(pickToday([r], [], TUE, {}).picks).toEqual([]);
   });
 
+  it("recurring item on a non-matching day is in no list, even if p1 or due", () => {
+    const p1 = item({ id: "r1", priority: 1, recur: ["thu"] });
+    const dueR = item({ id: "r2", due: TUE, recur: ["thu"] });
+    const out = pickToday([p1, dueR], [], TUE, {});
+    expect(out).toEqual({ rhythm: [], picks: [], alsoDue: [] });
+  });
+
   it("overdue and due within 3 days come first, ordered by due then priority", () => {
     const far = item({ id: "far", due: "2026-11-30", priority: 1 });
     const a = item({ id: "a", due: "2026-10-30", priority: 1 });
