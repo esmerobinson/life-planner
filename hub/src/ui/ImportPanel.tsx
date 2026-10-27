@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { importBacklog } from "../import/backlog";
+import { importBacklog, type ImportNote } from "../import/backlog";
 import type { ISODate } from "../domain/types";
 
 export function ImportPanel({ today, onImported }: { today: ISODate; onImported?: () => void }) {
   const [text, setText] = useState("");
   const [result, setResult] = useState("");
+  const [notes, setNotes] = useState<ImportNote[]>([]);
   const [running, setRunning] = useState(false);
   const inFlight = useRef(false);
 
@@ -14,6 +15,7 @@ export function ImportPanel({ today, onImported }: { today: ISODate; onImported?
     try {
       setText(await file.text());
       setResult("");
+      setNotes([]);
     } catch {
       setResult("That file could not be read.");
     }
@@ -21,6 +23,7 @@ export function ImportPanel({ today, onImported }: { today: ISODate; onImported?
 
   async function run() {
     if (inFlight.current) return;
+    setNotes([]);
     if (!text.trim()) {
       setResult("Paste some text or choose a file first.");
       return;
@@ -30,6 +33,7 @@ export function ImportPanel({ today, onImported }: { today: ISODate; onImported?
     try {
       const r = await importBacklog(text, today);
       setResult(`Added ${r.added}, already had ${r.alreadyHad}, notes ${r.skipped}`);
+      setNotes(r.notes);
       onImported?.();
     } catch {
       setResult("The import did not work.");
@@ -54,6 +58,16 @@ export function ImportPanel({ today, onImported }: { today: ISODate; onImported?
         Import
       </button>
       {result && <p>{result}</p>}
+      {notes.length > 0 && (
+        <details>
+          <summary>{`Notes (${notes.length})`}</summary>
+          <ul aria-label="Import notes">
+            {notes.map((n, i) => (
+              <li key={i}>{`${n.reason}: ${n.line}`}</li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   );
 }

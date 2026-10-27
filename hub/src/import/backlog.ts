@@ -90,10 +90,16 @@ export function parseBacklog(markdown: string): {
   return { items, skipped };
 }
 
+export interface ImportNote {
+  line: string;
+  reason: string;
+}
+
+/** `skipped` is kept for older callers and always equals `notes.length`. */
 export async function importBacklog(
   markdown: string,
   today: ISODate,
-): Promise<{ added: number; alreadyHad: number; skipped: number }> {
+): Promise<{ added: number; alreadyHad: number; skipped: number; notes: ImportNote[] }> {
   const { items, skipped } = parseBacklog(markdown);
   let added = 0;
   let alreadyHad = 0;
@@ -127,5 +133,5 @@ export async function importBacklog(
       added++;
     }
   });
-  return { added, alreadyHad, skipped: skipped.length };
+  return { added, alreadyHad, skipped: skipped.length, notes: skipped };
 }

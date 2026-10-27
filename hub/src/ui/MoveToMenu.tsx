@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { archiveItem, moveTo, removeFromToday } from "../data/repo";
 import type { ISODate } from "../domain/types";
 import { useSaveError } from "./messages";
@@ -26,6 +26,7 @@ export function MoveToMenu({
 }) {
   const [open, setOpen] = useState(false);
   const { attempt, saveError } = useSaveError();
+  const toggle = useRef<HTMLButtonElement>(null);
 
   async function pick(c: Choice) {
     const ok = await attempt(async () => {
@@ -35,13 +36,23 @@ export function MoveToMenu({
     });
     setOpen(false);
     if (ok) await onMoved();
+    else toggle.current?.focus(); // the clicked choice is gone; keep focus somewhere sensible
+  }
+
+  // A plain disclosure of buttons (no menu roles: no arrow-key machinery is promised).
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape" && open) {
+      e.stopPropagation();
+      setOpen(false);
+      toggle.current?.focus();
+    }
   }
 
   return (
-    <span className="move-menu">
+    <span className="move-menu" onKeyDown={onKeyDown}>
       <button
+        ref={toggle}
         type="button"
-        aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label ? `Move: ${label}` : "Move to"}
         onClick={() => setOpen((o) => !o)}
@@ -49,9 +60,9 @@ export function MoveToMenu({
         Move to
       </button>
       {open && (
-        <div role="menu">
+        <div role="group" aria-label={label ? `Move ${label} to` : "Move to"}>
           {CHOICES.map((c) => (
-            <button key={c.id} type="button" role="menuitem" onClick={() => void pick(c.id)}>
+            <button key={c.id} type="button" onClick={() => void pick(c.id)}>
               {c.label}
             </button>
           ))}

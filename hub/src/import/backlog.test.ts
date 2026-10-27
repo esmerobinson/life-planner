@@ -106,6 +106,15 @@ describe("importBacklog", () => {
     expect((await db.items.get(row.id))!.status).toBe("archived");
   });
 
+  it("returns the parse notes as { line, reason } and skipped equals their count", async () => {
+    const r = await importBacklog("- [ ] Pay rent [due 2026-13-45]\n- [ ] Fine one", TODAY);
+    expect(r.added).toBe(2);
+    expect(r.notes).toEqual([
+      { line: "- [ ] Pay rent [due 2026-13-45]", reason: "invalid due date 2026-13-45, imported without due" },
+    ]);
+    expect(r.skipped).toBe(r.notes.length);
+  });
+
   it("duplicate titles in one file collapse to one item", async () => {
     const r = await importBacklog("- [ ] Same  thing\n- [ ] same thing", TODAY);
     expect(r).toMatchObject({ added: 1, alreadyHad: 1 });

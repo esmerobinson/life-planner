@@ -58,6 +58,31 @@ describe("InboxPage", () => {
     expect(await screen.findByText("Added 0, already had 3, notes 0")).toBeInTheDocument();
   });
 
+  it("import notes are listed under a collapsed Notes (K) section", async () => {
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(screen.getByLabelText("Backlog text"));
+    await userEvent.paste("- [ ] Pay rent [due 2026-13-45]\n- [ ] Odd one !p7\n");
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Added 2, already had 0, notes 2")).toBeInTheDocument();
+    const summary = screen.getByText("Notes (2)", { selector: "summary" });
+    const details = summary.closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    const items = within(details).getAllByRole("listitem", { hidden: true }).map((li) => li.textContent);
+    expect(items).toEqual([
+      "invalid due date 2026-13-45, imported without due: - [ ] Pay rent [due 2026-13-45]",
+      "unknown priority !p7, defaulted to 2: - [ ] Odd one !p7",
+    ]);
+  });
+
+  it("no Notes section when the import had nothing to note", async () => {
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(screen.getByLabelText("Backlog text"));
+    await userEvent.paste(BACKLOG);
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    await screen.findByText("Added 3, already had 0, notes 0");
+    expect(screen.queryByText(/^Notes \(/)).toBeNull();
+  });
+
   it("import panel gives a short message for empty text", async () => {
     render(<InboxPage today={TODAY} />);
     await userEvent.click(screen.getByRole("button", { name: "Import" }));

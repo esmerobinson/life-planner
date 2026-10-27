@@ -33,19 +33,25 @@ describe("AreaPage", () => {
     expect(screen.getByText("An idea")).toBeInTheDocument();
     expect(screen.getByText("A goal")).toBeInTheDocument();
     expect(screen.queryByText("Other area task")).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
+    const filter = screen.getByRole("group", { name: "Show" });
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("tab")).toBeNull();
+    expect(within(filter).getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(filter).getByRole("button", { name: "To-dos" })).toHaveAttribute("aria-pressed", "false");
 
-    await userEvent.click(screen.getByRole("tab", { name: "To-dos" }));
+    await userEvent.click(within(filter).getByRole("button", { name: "To-dos" }));
+    expect(within(filter).getByRole("button", { name: "To-dos" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(filter).getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByText("A task")).toBeInTheDocument();
     expect(screen.queryByText("An idea")).not.toBeInTheDocument();
     expect(screen.queryByText("A goal")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("tab", { name: "Ideas" }));
+    await userEvent.click(within(filter).getByRole("button", { name: "Ideas" }));
     expect(screen.getByText("An idea")).toBeInTheDocument();
     expect(screen.queryByText("A task")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Done:/ })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("tab", { name: "Goals" }));
+    await userEvent.click(within(filter).getByRole("button", { name: "Goals" }));
     expect(screen.getByText("A goal")).toBeInTheDocument();
     expect(screen.queryByText("An idea")).not.toBeInTheDocument();
   });
@@ -58,7 +64,7 @@ describe("AreaPage", () => {
     expect(within(archive).getByText("Old plan")).toBeInTheDocument();
     await userEvent.click(within(archive).getByRole("button", { name: "Restore: Old plan" }));
     await screen.findByText("Nothing archived.");
-    await userEvent.click(screen.getByRole("tab", { name: "To-dos" }));
+    await userEvent.click(screen.getByRole("button", { name: "To-dos" }));
     expect(screen.getByRole("button", { name: "Done: Old plan" })).toBeInTheDocument();
   });
 

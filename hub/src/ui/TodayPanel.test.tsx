@@ -71,7 +71,7 @@ describe("TodayPanel", () => {
     const it = await task("Move me", { pinnedDate: TODAY });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Move: Move me" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Tomorrow" }));
+    await userEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
     await screen.findByText("Nothing planned for today.");
     expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-10-28");
   });
@@ -89,7 +89,7 @@ describe("TodayPanel", () => {
       const also = await screen.findByRole("list", { name: "Also due", hidden: true });
       expect(within(also).getByText("Urgent")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Move: Urgent" }));
-      await userEvent.click(screen.getByRole("menuitem", { name: choice }));
+      await userEvent.click(screen.getByRole("button", { name: choice }));
       await vi.waitFor(() => expect(screen.queryByText("Urgent")).toBeNull());
       expect(screen.queryByRole("list", { name: "Also due", hidden: true })).toBeNull();
     });
@@ -100,7 +100,7 @@ describe("TodayPanel", () => {
       const main = await screen.findByRole("list", { name: "Today" });
       expect(within(main).getByText("Urgent")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Move: Urgent" }));
-      await userEvent.click(screen.getByRole("menuitem", { name: choice }));
+      await userEvent.click(screen.getByRole("button", { name: choice }));
       await screen.findByText("Nothing planned for today.");
       expect(screen.queryByRole("list", { name: "Today" })).toBeNull();
       expect(screen.queryByText("Urgent")).toBeNull();
@@ -117,7 +117,7 @@ describe("TodayPanel", () => {
     const it = await task("Archive me", { pinnedDate: TODAY });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Move: Archive me" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
+    await userEvent.click(screen.getByRole("button", { name: "Archive" }));
     await screen.findByText("Nothing planned for today.");
     expect((await db.items.get(it.id))!.status).toBe("archived");
   });
@@ -159,10 +159,11 @@ describe("TodayPanel", () => {
       vi.spyOn(repo, "moveTo").mockRejectedValueOnce(new Error("write failed"));
       render(<TodayPanel today={TODAY} />);
       await userEvent.click(await screen.findByRole("button", { name: "Move: Stuck" }));
-      await userEvent.click(screen.getByRole("menuitem", { name: "Tomorrow" }));
+      await userEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
       expect(await screen.findByText(SAVE_LINE)).toBeInTheDocument();
-      expect(screen.queryByRole("menuitem")).toBeNull(); // the menu closed
+      expect(screen.queryByRole("group", { name: "Move Stuck to" })).toBeNull(); // the menu closed
       expect(screen.getByRole("button", { name: "Move: Stuck" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("button", { name: "Move: Stuck" })).toHaveFocus();
       await act(async () => {
         await new Promise((r) => setTimeout(r, 20));
       });
@@ -188,5 +189,26 @@ describe("TodayPanel", () => {
     } finally {
       watch.stop();
     }
+  });
+
+  it("Move-to choices are plain labelled buttons, and Escape closes them and returns focus", async () => {
+    await task("Keys", { pinnedDate: TODAY });
+    render(<TodayPanel today={TODAY} />);
+    const toggle = await screen.findByRole("button", { name: "Move: Keys" });
+    expect(toggle).not.toHaveAttribute("aria-haspopup");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const group = screen.getByRole("group", { name: "Move Keys to" });
+    expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Today", "Tomorrow", "This week", "Remove from today", "Archive",
+    ]);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("menuitem")).toBeNull();
+    within(group).getByRole("button", { name: "Tomorrow" }).focus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("group", { name: "Move Keys to" })).toBeNull();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveFocus();
   });
 });

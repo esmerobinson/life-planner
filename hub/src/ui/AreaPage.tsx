@@ -12,7 +12,7 @@ import { TaskRow, useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
 
 type View = "all" | "tasks" | "ideas" | "goals";
-const TABS: { id: View; label: string }[] = [
+const FILTERS: { id: View; label: string }[] = [
   { id: "all", label: "All" },
   { id: "tasks", label: "To-dos" },
   { id: "ideas", label: "Ideas" },
@@ -74,13 +74,12 @@ export function AreaPage({ today }: { today: ISODate }) {
   return (
     <section className="area-page">
       <h1>{area.label}</h1>
-      <div role="tablist" aria-label="Show">
-        {TABS.map((t) => (
+      <div role="group" aria-label="Show">
+        {FILTERS.map((t) => (
           <button
             key={t.id}
             type="button"
-            role="tab"
-            aria-selected={view === t.id}
+            aria-pressed={view === t.id}
             onClick={() => setView(t.id)}
           >
             {t.label}

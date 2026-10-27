@@ -1,5 +1,22 @@
-/* Values from VISUAL-LANGUAGE.md only (option-3 assignment).
-   Radii are NOT in VISUAL-LANGUAGE.md: taken from the approved mockup. */
+/* Where every value here comes from. Nothing below is a final look until Esme says so.
+
+   (a) From VISUAL-LANGUAGE.md and the approved option-3 assignment / mockup:
+       --page #e2e8ff, --sidebar #3a412f, --sidebar-item #51553d, --panel #e9e3d6,
+       --row #e3ddcd, --track #d4d1c3 (approved role assignment); --bar-fill #98c293
+       (Passport green, a palette value used for bars in the mockup); system-ui type and
+       linear easing (the placeholders VISUAL-LANGUAGE.md asks for); --placeholder magenta.
+
+   (b) Provisional layout dimensions, NOT in VISUAL-LANGUAGE.md (taken from or fitted to
+       the mockup by the implementers): sidebar width 220px, sidebar tile 32px, icon 24px
+       (Sidebar.tsx), gaps and padding (24px content, 16px/12px sidebar, 20px/6px/10px gaps,
+       6px/8px item padding), Home right column 190px, bar height 10px, bar radius 6px,
+       radii 18px (panel) and 9px (tile).
+
+   (c) Role assignments made by the implementers/controller that Esme has NOT approved:
+       --text #3a412f (forest green used as body text), --sidebar-text #e9e3d6 (cream used
+       as sidebar text), the 2px thickness of the active sidebar outline, and --bar-fill's
+       use of Passport green as the progress-bar colour. The hex values are palette values;
+       giving them these jobs is the unapproved part. */
 :root {
   --page: #e2e8ff;
   --sidebar: #3a412f;
