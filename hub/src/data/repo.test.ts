@@ -82,6 +82,40 @@ describe("repo", () => {
     expect(await listItems()).toHaveLength(2);
   });
 
+  it("restore of an item done before archiving returns it to done with original completedAt", async () => {
+    const it1 = await createItem(base, "2026-10-01");
+    await tickItem(it1.id, "2026-10-02");
+    await archiveItem(it1.id, "2026-10-03");
+    await restoreItem(it1.id, "2026-10-04");
+    const got = await db.items.get(it1.id);
+    expect(got?.status).toBe("done");
+    expect(got?.completedAt).toBe("2026-10-02");
+  });
+
+  it("restore of an item archived while open returns it to open", async () => {
+    const it1 = await createItem(base, today);
+    await archiveItem(it1.id, today);
+    await restoreItem(it1.id, today);
+    expect((await db.items.get(it1.id))?.status).toBe("open");
+  });
+
+  it("two concurrent toggleMilestone calls flip twice (back to original)", async () => {
+    const g = await createGoal(
+      { title: "g", areaId: "art", kind: "finite", deadline: "2026-12-01",
+        milestones: [{ id: "m1", title: "a", done: false }] }, today);
+    await Promise.all([toggleMilestone(g.id, "m1"), toggleMilestone(g.id, "m1")]);
+    expect((await db.goals.get(g.id))?.milestones[0].done).toBe(false);
+  });
+
+  it("two concurrent tickItem calls leave a single consistent done item", async () => {
+    const it1 = await createItem(base, "2026-10-01");
+    await Promise.all([tickItem(it1.id, "2026-10-02"), tickItem(it1.id, "2026-10-03")]);
+    const got = await db.items.get(it1.id);
+    expect(got?.status).toBe("done");
+    expect(got?.completedAt).toBe("2026-10-02");
+    expect(await db.items.count()).toBe(1);
+  });
+
   it("toggleMilestone flips done", async () => {
     const g = await createGoal(
       { title: "g", areaId: "art", kind: "finite", deadline: "2026-12-01",

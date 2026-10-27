@@ -40,16 +40,20 @@ export async function updateItem(id: string, patch: Partial<Item>, today: ISODat
 }
 
 export async function tickItem(id: string, today: ISODate): Promise<void> {
-  const item = await db.items.get(id);
-  if (!item || item.status === "done") return;
-  await db.items.update(id, { status: "done", completedAt: today, touchedAt: today });
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item || item.status === "done") return;
+    await db.items.update(id, { status: "done", completedAt: today, touchedAt: today });
+  });
 }
 
 export async function untickItem(id: string, today: ISODate): Promise<void> {
-  const item = await db.items.get(id);
-  if (!item) return;
-  const { completedAt: _drop, ...rest } = item;
-  await db.items.put({ ...rest, status: "open", touchedAt: today });
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { completedAt: _drop, ...rest } = item;
+    await db.items.put({ ...rest, status: "open", touchedAt: today });
+  });
 }
 
 export async function moveTo(
@@ -57,21 +61,25 @@ export async function moveTo(
   list: "today" | "tomorrow" | "week",
   today: ISODate,
 ): Promise<void> {
-  const item = await db.items.get(id);
-  if (!item) return;
-  const { hiddenOn: _h, pinnedDate: _p, ...rest } = item;
-  const next: Item = { ...rest, touchedAt: today };
-  if (list === "today") next.pinnedDate = today;
-  else if (list === "tomorrow") next.pinnedDate = addDays(today, 1);
-  else next.weekOf = mondayOf(today);
-  await db.items.put(next);
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { hiddenOn: _h, pinnedDate: _p, ...rest } = item;
+    const next: Item = { ...rest, touchedAt: today };
+    if (list === "today") next.pinnedDate = today;
+    else if (list === "tomorrow") next.pinnedDate = addDays(today, 1);
+    else next.weekOf = mondayOf(today);
+    await db.items.put(next);
+  });
 }
 
 export async function removeFromToday(id: string, today: ISODate): Promise<void> {
-  const item = await db.items.get(id);
-  if (!item) return;
-  const { pinnedDate: _p, ...rest } = item;
-  await db.items.put({ ...rest, hiddenOn: today, touchedAt: today });
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { pinnedDate: _p, ...rest } = item;
+    await db.items.put({ ...rest, hiddenOn: today, touchedAt: today });
+  });
 }
 
 export async function archiveItem(id: string, today: ISODate): Promise<void> {
@@ -79,7 +87,14 @@ export async function archiveItem(id: string, today: ISODate): Promise<void> {
 }
 
 export async function restoreItem(id: string, today: ISODate): Promise<void> {
-  await db.items.update(id, { status: "open", touchedAt: today });
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    await db.items.update(id, {
+      status: item.completedAt ? "done" : "open",
+      touchedAt: today,
+    });
+  });
 }
 
 export async function listItems(
@@ -105,9 +120,11 @@ export async function listGoals(): Promise<Goal[]> {
 }
 
 export async function toggleMilestone(goalId: string, milestoneId: string): Promise<void> {
-  const goal = await db.goals.get(goalId);
-  if (!goal) return;
-  await db.goals.update(goalId, {
-    milestones: goal.milestones.map((m) => (m.id === milestoneId ? { ...m, done: !m.done } : m)),
+  await db.transaction("rw", db.goals, async () => {
+    const goal = await db.goals.get(goalId);
+    if (!goal) return;
+    await db.goals.update(goalId, {
+      milestones: goal.milestones.map((m) => (m.id === milestoneId ? { ...m, done: !m.done } : m)),
+    });
   });
 }
