@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -77,6 +77,34 @@ function renderShell() {
     </MemoryRouter>,
   );
 }
+
+describe("double actions and refresh", () => {
+  it("double-clicking Import imports once and disables the button while running", async () => {
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(screen.getByLabelText("Backlog text"));
+    await userEvent.paste(BACKLOG);
+    const btn = screen.getByRole("button", { name: "Import" });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(btn).toBeDisabled();
+    expect(await screen.findByText("Added 3, already had 0, notes 0")).toBeInTheDocument();
+    await vi.waitFor(() => expect(btn).not.toBeDisabled());
+    expect(screen.queryByText("Added 0, already had 3, notes 0")).toBeNull();
+    expect(await db.items.count()).toBe(3);
+  });
+
+  it("quick-add on the inbox page makes the new task appear in the inbox list", async () => {
+    await createItem({ kind: "task", title: "Seed", areaId: "inbox", priority: 2 }, TODAY);
+    renderShell();
+    await userEvent.click(await screen.findByRole("link", { name: "Inbox (1)" }));
+    await screen.findByLabelText("Area for Seed");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.type(screen.getByLabelText("Title"), "Fresh arrival");
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    const list = await screen.findByRole("list", { name: "Inbox items" });
+    await vi.waitFor(() => expect(list).toHaveTextContent("Fresh arrival"));
+  });
+});
 
 describe("AppShell additions", () => {
   it("Inbox link appears in the shell only when inbox items exist", async () => {

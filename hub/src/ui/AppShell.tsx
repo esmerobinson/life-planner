@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { todayISO } from "../domain/dates";
 import { QuickAdd } from "./QuickAdd";
@@ -7,11 +7,32 @@ import { Sidebar } from "./Sidebar";
 import { useHubData } from "./useHubData";
 
 export function AppShell() {
-  const [today] = useState(() => todayISO());
+  const [, setClock] = useState(0); // bumped on focus/visibility so `today` is re-read
+  const today = todayISO();
   const { items, refresh } = useHubData(today);
   const [adding, setAdding] = useState(false);
+  const [version, setVersion] = useState(0);
   const inboxCount = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
-  const ctx = useMemo(() => ({ refresh }), [refresh]);
+
+  useEffect(() => {
+    const bump = () => setClock((c) => c + 1);
+    const onVisible = () => {
+      if (document.visibilityState !== "hidden") bump();
+    };
+    window.addEventListener("focus", bump);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", bump);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  const changed = useCallback(async () => {
+    await refresh();
+    setVersion((v) => v + 1);
+  }, [refresh]);
+
+  const ctx = useMemo(() => ({ refresh: changed, version, today }), [changed, version, today]);
 
   return (
     <ShellContext.Provider value={ctx}>
@@ -24,7 +45,7 @@ export function AppShell() {
             </button>
             {inboxCount > 0 && <Link to="/inbox">{`Inbox (${inboxCount})`}</Link>}
           </div>
-          {adding && <QuickAdd today={today} onAdded={() => void refresh()} />}
+          {adding && <QuickAdd today={today} onAdded={() => void changed()} />}
           <Outlet />
         </main>
       </div>

@@ -1,16 +1,16 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { todayISO } from "./domain/dates";
+import { useShellToday } from "./ui/shellContext";
 import { AppShell } from "./ui/AppShell";
 import { NAV } from "./ui/areas";
 import { InboxPage } from "./ui/InboxPage";
 import { TodayPanel } from "./ui/TodayPanel";
 
 function TodayRoute() {
-  return <TodayPanel today={todayISO()} />;
+  return <TodayPanel today={useShellToday()} />;
 }
 
 function InboxRoute() {
-  return <InboxPage today={todayISO()} />;
+  return <InboxPage today={useShellToday()} />;
 }
 
 export default function App() {

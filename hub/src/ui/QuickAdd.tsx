@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createItem, listGoals } from "../data/repo";
 import type { AreaId, Goal, ISODate, Priority, Weekday } from "../domain/types";
 import { AREA_CHOICES } from "./areas";
@@ -15,6 +15,8 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
   const [recur, setRecur] = useState<Weekday[]>([]);
   const [message, setMessage] = useState("");
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     let live = true;
@@ -34,12 +36,24 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (inFlight.current) return;
     const trimmed = title.trim();
     if (!trimmed) {
       setMessage("A title is needed.");
       return;
     }
     setMessage("");
+    inFlight.current = true;
+    setSaving(true);
+    try {
+      await save(trimmed);
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
+  }
+
+  async function save(trimmed: string) {
     await createItem(
       {
         kind,
@@ -131,7 +145,9 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
         </>
       )}
       {message && <p className="form-message">{message}</p>}
-      <button type="submit">Add item</button>
+      <button type="submit" disabled={saving}>
+        Add item
+      </button>
     </form>
   );
 }

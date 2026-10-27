@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../data/db";
@@ -42,6 +42,19 @@ describe("QuickAdd", () => {
     });
     await vi.waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText("Title")).toHaveValue("");
+  });
+
+  it("a fast double submit creates exactly one item and disables the button while saving", async () => {
+    const onAdded = vi.fn();
+    render(<QuickAdd today={TODAY} onAdded={onAdded} />);
+    await userEvent.type(screen.getByLabelText("Title"), "Once only");
+    const btn = screen.getByRole("button", { name: "Add item" });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(btn).toBeDisabled();
+    await vi.waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(btn).not.toBeDisabled());
+    expect(await db.items.count()).toBe(1);
   });
 
   it("defaults to a task in the inbox with priority 2", async () => {
