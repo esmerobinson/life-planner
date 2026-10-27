@@ -45,7 +45,8 @@ export function pickToday(
   const pool = live.filter((i) => !isRecurring(i));
 
   const pinned = pool.filter((i) => i.pinnedDate === today);
-  const rest = pool.filter((i) => i.pinnedDate !== today);
+  // Items pinned to a later day were moved off today on purpose: never re-pick them early.
+  const rest = pool.filter((i) => i.pinnedDate === undefined || i.pinnedDate < today);
 
   const due = rest
     .filter((i) => i.due !== undefined && daysBetween(today, i.due) <= DUE_HORIZON)

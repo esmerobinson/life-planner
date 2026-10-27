@@ -68,7 +68,10 @@ export async function moveTo(
     const next: Item = { ...rest, touchedAt: today };
     if (list === "today") next.pinnedDate = today;
     else if (list === "tomorrow") next.pinnedDate = addDays(today, 1);
-    else next.weekOf = mondayOf(today);
+    else {
+      next.weekOf = mondayOf(today);
+      next.hiddenOn = today; // off Today for the rest of today, like Remove from today
+    }
     await db.items.put(next);
   });
 }

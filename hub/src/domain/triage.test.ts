@@ -135,4 +135,21 @@ describe("pickToday", () => {
     const out = pickToday([a, b], [g1, g2], WED, { ahead: 4, behind: 0 });
     expect(ids(out.picks)).toEqual(["b", "a"]);
   });
+
+  it("item pinned to tomorrow is not picked today, even if overdue", () => {
+    const moved = item({ id: "moved", due: "2026-10-20", priority: 1, pinnedDate: WED });
+    const p2 = item({ id: "p2later", priority: 2, pinnedDate: WED });
+    const out = pickToday([moved, p2], [], TUE, {});
+    expect(out.picks).toEqual([]);
+    // and on the day it is pinned to, it is a pick
+    expect(ids(pickToday([moved], [], WED, {}).picks)).toEqual(["moved"]);
+  });
+
+  it("item pinned to tomorrow is not in alsoDue", () => {
+    const dues = [1, 2, 3, 4].map((k) => item({ id: `d${k}`, due: `2026-10-1${k}` }));
+    const moved = item({ id: "moved", due: "2026-10-10", pinnedDate: WED });
+    const out = pickToday([...dues, moved], [], TUE, {});
+    expect(ids(out.picks)).toEqual(["d1", "d2", "d3", "d4"]);
+    expect(out.alsoDue).toEqual([]);
+  });
 });

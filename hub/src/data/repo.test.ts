@@ -47,6 +47,17 @@ describe("repo", () => {
     expect(got?.weekOf).toBe("2026-10-26");
   });
 
+  it("moveTo week sets weekOf and hiddenOn today", async () => {
+    const it1 = await createItem({ ...base, pinnedDate: today }, today);
+    await moveTo(it1.id, "week", today);
+    const got = await db.items.get(it1.id);
+    expect(got?.weekOf).toBe("2026-10-26");
+    expect(got?.hiddenOn).toBe(today);
+    expect(got?.pinnedDate).toBeUndefined();
+    await moveTo(it1.id, "tomorrow", today);
+    expect((await db.items.get(it1.id))?.hiddenOn).toBeUndefined();
+  });
+
   it("removeFromToday hides and unpins", async () => {
     const it1 = await createItem(base, today);
     await moveTo(it1.id, "today", today);
