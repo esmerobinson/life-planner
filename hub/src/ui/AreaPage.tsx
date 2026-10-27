@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { listItems, restoreItem } from "../data/repo";
 import type { ISODate, Item } from "../domain/types";
-import { AREA_CHOICES } from "./areas";
+import { GOAL_AREAS } from "./areas";
 import { GoalCard } from "./GoalProgress";
 import { MoveToMenu } from "./MoveToMenu";
 import { TaskRow, useTick } from "./TaskRow";
@@ -18,7 +18,7 @@ const TABS: { id: View; label: string }[] = [
 
 export function AreaPage({ today }: { today: ISODate }) {
   const { areaId } = useParams();
-  const area = AREA_CHOICES.find((a) => a.id === areaId && a.id !== "inbox");
+  const area = GOAL_AREAS.find((a) => a.id === areaId);
   const { items, goals, refresh, loaded } = useHubData(today);
   const { tick, celebration } = useTick(today, refresh);
   const [view, setView] = useState<View>("all");

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createGoal } from "../data/repo";
 import type { AreaId, ISODate } from "../domain/types";
-import { AREA_CHOICES } from "./areas";
+import { GOAL_AREAS } from "./areas";
 
 export function GoalForm({ today, onSaved }: { today: ISODate; onSaved: () => Promise<void> }) {
   const [title, setTitle] = useState("");
@@ -66,7 +66,7 @@ export function GoalForm({ today, onSaved }: { today: ISODate; onSaved: () => Pr
       <label>
         Area
         <select value={areaId} onChange={(e) => setAreaId(e.target.value as AreaId)}>
-          {AREA_CHOICES.map((a) => (
+          {GOAL_AREAS.map((a) => (
             <option key={a.id} value={a.id}>
               {a.label}
             </option>

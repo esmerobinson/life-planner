@@ -29,7 +29,7 @@ export function GoalProgress({ goal, items, today }: { goal: Goal; items: Item[]
           {overall.total === 0 && <p>Add milestones to see the overall arc.</p>}
         </div>
       ) : (
-        <p>{`${overall.thisYear} this year, ${overall.monthsInARow} months in a row, ${overall.streakDays} day streak`}</p>
+        <p>{`${overall.thisYear} this year, ${overall.monthsInARow} ${overall.monthsInARow === 1 ? "month" : "months"} in a row, ${overall.streakDays} day streak`}</p>
       )}
     </div>
   );

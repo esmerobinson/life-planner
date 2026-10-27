@@ -83,8 +83,25 @@ describe("GoalsPage", () => {
       TODAY,
     );
     renderGoals();
-    expect(await screen.findByText("2 this year, 1 months in a row, 1 day streak")).toBeInTheDocument();
+    expect(await screen.findByText("2 this year, 1 month in a row, 1 day streak")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Overall 1/2" })).toHaveAttribute("aria-valuenow", "50");
+  });
+
+  it("pluralises months in a row: 2 months", async () => {
+    const g = await createGoal({ title: "Two months", areaId: "art", kind: "practice" }, TODAY);
+    for (const d of ["2026-09-15", TODAY]) {
+      const it = await createItem({ kind: "task", title: `T ${d}`, areaId: "art", priority: 3, goalId: g.id }, d);
+      await tickItem(it.id, d);
+    }
+    renderGoals();
+    expect(await screen.findByText("2 this year, 2 months in a row, 1 day streak")).toBeInTheDocument();
+  });
+
+  it("goal form Area select has no Inbox option", async () => {
+    renderGoals();
+    const select = await screen.findByLabelText("Area");
+    expect(within(select).queryByRole("option", { name: "Inbox" })).not.toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "Writing" })).toBeInTheDocument();
   });
 
   it("finite goal with zero milestones shows ratio 0 and the add-milestones prompt", async () => {
@@ -157,6 +174,40 @@ describe("GoalDetail", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "Outline" }));
     expect(await screen.findByRole("progressbar", { name: "Overall 1/1" })).toBeInTheDocument();
     expect((await db.goals.toArray())[0].milestones[0].done).toBe(true);
+  });
+
+  it.each([
+    ["Sunday", "2026-11-01", "2026-10-26", "2026-10-30", "2026-11-02"],
+    ["Monday", "2026-11-02", "2026-11-02", "2026-11-04", "2026-11-01"],
+  ])("week boundary on a %s", async (_n, today, monday, laterInWeek, outside) => {
+    const g = await createGoal({ title: "Edge", areaId: "writing", kind: "practice" }, today);
+    const mk = (title: string, extra: Record<string, unknown>) =>
+      createItem({ kind: "task", title, areaId: "writing", priority: 3, goalId: g.id, ...extra }, today);
+    await mk("pinned-today", { pinnedDate: today });
+    await mk("week-of", { weekOf: monday });
+    await mk("pinned-same-week", { pinnedDate: laterInWeek });
+    await mk("pinned-outside", { pinnedDate: outside });
+    await mk("pinned-next-week", { pinnedDate: "2026-11-09" });
+    await mk("pinned-prev-week", { pinnedDate: "2026-10-20" });
+    render(
+      <MemoryRouter initialEntries={[`/goals/${g.id}`]}>
+        <Routes>
+          <Route path="/goals/:id" element={<GoalDetail today={today} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const t = within(await screen.findByRole("list", { name: "Today" }));
+    expect(t.getByText("pinned-today")).toBeInTheDocument();
+    expect(t.getAllByRole("listitem")).toHaveLength(1);
+    const w = within(screen.getByRole("list", { name: "This week" }));
+    expect(w.getByText("week-of")).toBeInTheDocument();
+    expect(w.getByText("pinned-same-week")).toBeInTheDocument();
+    expect(w.getAllByRole("listitem")).toHaveLength(2);
+    const l = within(screen.getByRole("list", { name: "Later" }));
+    for (const n of ["pinned-outside", "pinned-next-week", "pinned-prev-week"]) {
+      expect(l.getByText(n)).toBeInTheDocument();
+    }
+    expect(l.getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("unknown goal id shows a calm message", async () => {

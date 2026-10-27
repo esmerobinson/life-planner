@@ -40,3 +40,6 @@ export const AREA_CHOICES: { id: AreaId; label: string }[] = [
     label: NAV.find((n) => n.id === id)!.label,
   })),
 ];
+
+/** Areas that have a page and can own goals: AREA_CHOICES without the inbox. */
+export const GOAL_AREAS = AREA_CHOICES.filter((a) => a.id !== "inbox");

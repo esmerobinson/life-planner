@@ -70,6 +70,11 @@ describe("AreaPage", () => {
     expect((await db.items.toArray())[0].status).toBe("done");
   });
 
+  it("inbox is not an area page", async () => {
+    renderArea("inbox");
+    expect(await screen.findByText("That area does not exist.")).toBeInTheDocument();
+  });
+
   it("unknown area id shows a calm message", async () => {
     renderArea("nowhere");
     expect(await screen.findByText("That area does not exist.")).toBeInTheDocument();
