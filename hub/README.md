@@ -16,7 +16,8 @@ backup yet. Clearing site data for the app deletes everything.
 
 ## Importing your backlog
 
-Open `/inbox`, then paste the contents of `Backlog.md` or choose the file. The
+Click **Inbox** at the top of any page (it shows a count once items are
+waiting), then paste the contents of `Backlog.md` or choose the file. The
 import is safe to repeat: items already imported are not duplicated.
 
 ## Not done yet

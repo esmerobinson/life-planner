@@ -1,9 +1,13 @@
+import { useContext } from "react";
 import { useParams } from "react-router-dom";
-import { toggleMilestone } from "../data/repo";
+import { toggleMilestone, untickItem } from "../data/repo";
 import { addDays, mondayOf } from "../domain/dates";
 import { monthlyProgress } from "../domain/progress";
 import type { ISODate, Item } from "../domain/types";
+import { DoneSection } from "./DoneSection";
 import { areaLabel, GoalProgress } from "./GoalProgress";
+import { useSaveError } from "./messages";
+import { ShellContext } from "./shellContext";
 import { TaskRow, useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
 
@@ -22,12 +26,22 @@ function group(items: Item[], today: ISODate): { name: string; items: Item[] }[]
 
 export function GoalDetail({ today }: { today: ISODate }) {
   const { id } = useParams();
-  const { items, goals, refresh, loaded } = useHubData(today);
-  const { tick, celebration } = useTick(today, refresh);
+  const { items, goals, refresh, loaded, error } = useHubData(today);
+  const { tick, celebration, message } = useTick(today, refresh);
+  const { attempt, saveError } = useSaveError();
+  const shell = useContext(ShellContext);
   const goal = goals.find((g) => g.id === id);
 
   if (!loaded) return null;
+  if (error) return <p>{error}</p>;
   if (!goal) return <p>That goal does not exist.</p>;
+
+  /** Write, then re-read here and tell the shell so every other page re-reads too. */
+  async function save(fn: () => Promise<unknown>) {
+    if (!(await attempt(fn))) return;
+    await refresh();
+    await shell?.refresh();
+  }
 
   const month = monthlyProgress(goal, items, today);
   const open = items.filter((i) => i.goalId === goal.id && i.kind === "task" && i.status === "open");
@@ -39,6 +53,8 @@ export function GoalDetail({ today }: { today: ISODate }) {
       <span className="goal-area">{areaLabel(goal.areaId)}</span>
       {goal.deadline && <p>{`Deadline ${goal.deadline}`}</p>}
       {celebration}
+      {message}
+      {saveError && <p className="form-message">{saveError}</p>}
       <GoalProgress goal={goal} items={items} today={today} />
       {month && (
         <p>
@@ -55,7 +71,7 @@ export function GoalDetail({ today }: { today: ISODate }) {
                 <input
                   type="checkbox"
                   checked={m.done}
-                  onChange={() => void toggleMilestone(goal.id, m.id).then(refresh)}
+                  onChange={() => void save(() => toggleMilestone(goal.id, m.id))}
                 />
                 {m.title}
               </label>
@@ -74,6 +90,10 @@ export function GoalDetail({ today }: { today: ISODate }) {
           </ul>
         </div>
       ))}
+      <DoneSection
+        items={items.filter((i) => i.goalId === goal.id && i.kind === "task")}
+        onUndo={(itemId) => void save(() => untickItem(itemId, today))}
+      />
     </section>
   );
 }

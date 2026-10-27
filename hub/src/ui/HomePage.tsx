@@ -7,8 +7,17 @@ import { TodayPanel } from "./TodayPanel";
 import { useHubData } from "./useHubData";
 
 export function HomePage({ today }: { today: ISODate }) {
-  const { items, goals, loaded } = useHubData(today);
+  const { items, goals, loaded, error } = useHubData(today);
   const withTargets = goals.filter((g) => monthlyProgress(g, items, today) !== null);
+
+  // One line for the whole page; the Today panel would otherwise repeat it.
+  if (error) {
+    return (
+      <div className="home-page">
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="home-page">

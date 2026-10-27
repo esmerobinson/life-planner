@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { createItem, listGoals } from "../data/repo";
 import type { AreaId, Goal, ISODate, Priority, Weekday } from "../domain/types";
 import { AREA_CHOICES } from "./areas";
+import { SAVE_ERROR } from "./messages";
+import { ShellContext } from "./shellContext";
 
 const WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
@@ -17,16 +19,21 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
   const [goals, setGoals] = useState<Goal[]>([]);
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
+  // Re-read goals when the shell reports a change (e.g. a goal created on /goals).
+  const version = useContext(ShellContext)?.version ?? 0;
 
   useEffect(() => {
     let live = true;
-    void listGoals().then((g) => {
-      if (live) setGoals(g);
-    });
+    listGoals().then(
+      (g) => {
+        if (live) setGoals(g);
+      },
+      () => {}, // the goal list just stays as it was; saving still works without a goal
+    );
     return () => {
       live = false;
     };
-  }, []);
+  }, [version]);
 
   const areaGoals = goals.filter((g) => g.areaId === areaId);
 
@@ -47,6 +54,8 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
     setSaving(true);
     try {
       await save(trimmed);
+    } catch {
+      setMessage(SAVE_ERROR);
     } finally {
       inFlight.current = false;
       setSaving(false);

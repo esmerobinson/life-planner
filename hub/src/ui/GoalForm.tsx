@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createGoal } from "../data/repo";
 import type { AreaId, ISODate } from "../domain/types";
 import { GOAL_AREAS } from "./areas";
+import { SAVE_ERROR } from "./messages";
 
 export function GoalForm({ today, onSaved }: { today: ISODate; onSaved: () => Promise<void> }) {
   const [title, setTitle] = useState("");
@@ -51,6 +52,8 @@ export function GoalForm({ today, onSaved }: { today: ISODate; onSaved: () => Pr
       setMilestones("");
       setMessage("");
       await onSaved();
+    } catch {
+      setMessage(SAVE_ERROR);
     } finally {
       setBusy(false);
     }

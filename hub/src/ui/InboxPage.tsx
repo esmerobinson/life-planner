@@ -3,6 +3,7 @@ import { updateItem } from "../data/repo";
 import type { AreaId, ISODate, Item, Priority } from "../domain/types";
 import { AREA_CHOICES } from "./areas";
 import { ImportPanel } from "./ImportPanel";
+import { SAVE_ERROR } from "./messages";
 import { ShellContext } from "./shellContext";
 import { useHubData } from "./useHubData";
 
@@ -30,11 +31,17 @@ function InboxRow({
       setMessage("Choose an area first.");
       return;
     }
-    await updateItem(
-      item.id,
-      { areaId, goalId: goalId || undefined, priority, due: due || undefined },
-      today,
-    );
+    setMessage("");
+    try {
+      await updateItem(
+        item.id,
+        { areaId, goalId: goalId || undefined, priority, due: due || undefined },
+        today,
+      );
+    } catch {
+      setMessage(SAVE_ERROR);
+      return;
+    }
     await onFiled();
   }
 
@@ -111,15 +118,22 @@ function InboxRow({
 }
 
 export function InboxPage({ today }: { today: ISODate }) {
-  const { items, goals, refresh, loaded } = useHubData(today);
+  const { items, goals, refresh, loaded, error } = useHubData(today);
   const shell = useContext(ShellContext);
-  const inbox = items.filter(
-    (i) => i.areaId === "inbox" && i.status === "open" && (i.kind === "task" || i.kind === "idea"),
-  );
+  const inbox = items.filter((i) => i.areaId === "inbox" && i.status === "open");
 
   async function changed() {
     await refresh();
     await shell?.refresh();
+  }
+
+  if (error) {
+    return (
+      <section className="inbox-page">
+        <h1>Inbox</h1>
+        <p>{error}</p>
+      </section>
+    );
   }
 
   return (

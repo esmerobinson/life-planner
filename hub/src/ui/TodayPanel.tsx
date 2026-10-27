@@ -4,6 +4,7 @@ import { pickToday } from "../domain/triage";
 import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
+import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
 import { ShellContext } from "./shellContext";
 import { useHubData } from "./useHubData";
@@ -16,8 +17,9 @@ function thisMonthDoneFor(goals: Goal[], items: Item[], today: ISODate): Record<
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
 export function TodayPanel({ today }: { today: ISODate }) {
-  const { items, goals, refresh, loaded } = useHubData(today);
+  const { items, goals, refresh, loaded, error } = useHubData(today);
   const [celebrating, setCelebrating] = useState(false);
+  const { attempt, saveError } = useSaveError();
   const shell = useContext(ShellContext);
 
   /** Re-read locally, then tell the shell so every other useHubData consumer re-reads too. */
@@ -38,7 +40,7 @@ export function TodayPanel({ today }: { today: ISODate }) {
   );
 
   async function tick(id: string) {
-    await tickItem(id, today);
+    if (!(await attempt(() => tickItem(id, today)))) return;
     setCelebrating(true);
     await changed();
   }
@@ -63,12 +65,22 @@ export function TodayPanel({ today }: { today: ISODate }) {
     );
   }
 
+  if (error) {
+    return (
+      <section className="today-panel">
+        <h1>Today</h1>
+        <p>{error}</p>
+      </section>
+    );
+  }
+
   const empty = loaded && rhythm.length + picks.length + alsoDue.length === 0;
 
   return (
     <section className="today-panel">
       <h1>Today</h1>
       {celebrating && <CelebrationPlaceholder />}
+      {saveError && <p className="form-message">{saveError}</p>}
       {empty && <p>Nothing planned for today.</p>}
       {rhythm.length > 0 && (
         <ul aria-label="Rhythm">{rhythm.map(row)}</ul>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { archiveItem, moveTo, removeFromToday } from "../data/repo";
 import type { ISODate } from "../domain/types";
+import { useSaveError } from "./messages";
 
 type Choice = "today" | "tomorrow" | "week" | "remove" | "archive";
 
@@ -24,13 +25,16 @@ export function MoveToMenu({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { attempt, saveError } = useSaveError();
 
   async function pick(c: Choice) {
-    if (c === "remove") await removeFromToday(itemId, today);
-    else if (c === "archive") await archiveItem(itemId, today);
-    else await moveTo(itemId, c, today);
+    const ok = await attempt(async () => {
+      if (c === "remove") await removeFromToday(itemId, today);
+      else if (c === "archive") await archiveItem(itemId, today);
+      else await moveTo(itemId, c, today);
+    });
     setOpen(false);
-    await onMoved();
+    if (ok) await onMoved();
   }
 
   return (
@@ -53,6 +57,7 @@ export function MoveToMenu({
           ))}
         </div>
       )}
+      {saveError && <span className="form-message">{saveError}</span>}
     </span>
   );
 }

@@ -2,24 +2,30 @@ import { useEffect, useState } from "react";
 import { tickItem } from "../data/repo";
 import type { ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
+import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
 
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
-/** Tick handler plus the celebration placeholder it triggers. */
+/** Tick handler plus the celebration placeholder it triggers (or the save message if it fails). */
 export function useTick(today: ISODate, refresh: () => Promise<void>) {
   const [celebrating, setCelebrating] = useState(false);
+  const { attempt, saveError } = useSaveError();
   useEffect(() => {
     if (!celebrating) return;
     const t = setTimeout(() => setCelebrating(false), CELEBRATION_MS);
     return () => clearTimeout(t);
   }, [celebrating]);
   async function tick(id: string) {
-    await tickItem(id, today);
+    if (!(await attempt(() => tickItem(id, today)))) return;
     setCelebrating(true);
     await refresh();
   }
-  return { tick, celebration: celebrating ? <CelebrationPlaceholder /> : null };
+  return {
+    tick,
+    celebration: celebrating ? <CelebrationPlaceholder /> : null,
+    message: saveError ? <p className="form-message">{saveError}</p> : null,
+  };
 }
 
 export function TaskRow({

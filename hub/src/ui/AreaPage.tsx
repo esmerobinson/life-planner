@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { listItems, restoreItem } from "../data/repo";
+import { listItems, restoreItem, untickItem } from "../data/repo";
 import type { ISODate, Item } from "../domain/types";
 import { GOAL_AREAS } from "./areas";
+import { DoneSection } from "./DoneSection";
 import { GoalCard } from "./GoalProgress";
+import { DATA_ERROR, useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
+import { ShellContext } from "./shellContext";
 import { TaskRow, useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
 
@@ -19,23 +22,48 @@ const TABS: { id: View; label: string }[] = [
 export function AreaPage({ today }: { today: ISODate }) {
   const { areaId } = useParams();
   const area = GOAL_AREAS.find((a) => a.id === areaId);
-  const { items, goals, refresh, loaded } = useHubData(today);
-  const { tick, celebration } = useTick(today, refresh);
+  const { items, goals, refresh, loaded, error } = useHubData(today);
+  const { tick, celebration, message } = useTick(today, refresh);
+  const { attempt, saveError } = useSaveError();
   const [view, setView] = useState<View>("all");
   const [archived, setArchived] = useState<Item[]>([]);
+  const [archiveFailed, setArchiveFailed] = useState(false);
+  const shell = useContext(ShellContext);
 
   // Archived items are not in useHubData; re-read whenever the open items change.
   const id = area?.id;
   useEffect(() => {
     if (!id) return;
     let live = true;
-    void listItems({ status: "archived", areaId: id }).then((a) => live && setArchived(a));
+    listItems({ status: "archived", areaId: id }).then(
+      (a) => {
+        if (!live) return;
+        setArchived(a);
+        setArchiveFailed(false);
+      },
+      () => live && setArchiveFailed(true),
+    );
     return () => {
       live = false;
     };
   }, [items, id]);
 
   if (!area) return <p>That area does not exist.</p>;
+  if (error) {
+    return (
+      <section className="area-page">
+        <h1>{area.label}</h1>
+        <p>{error}</p>
+      </section>
+    );
+  }
+
+  /** Write, then re-read here and tell the shell so every other page re-reads too. */
+  async function save(fn: () => Promise<unknown>) {
+    if (!(await attempt(fn))) return;
+    await refresh();
+    await shell?.refresh();
+  }
 
   const mine = items.filter((i) => i.areaId === area.id && i.status === "open");
   const tasks = view === "all" || view === "tasks" ? mine.filter((i) => i.kind === "task") : [];
@@ -60,6 +88,8 @@ export function AreaPage({ today }: { today: ISODate }) {
         ))}
       </div>
       {celebration}
+      {message}
+      {saveError && <p className="form-message">{saveError}</p>}
       {empty && <p>Nothing here yet.</p>}
       {tasks.length > 0 && (
         <ul aria-label="To-dos">
@@ -86,8 +116,16 @@ export function AreaPage({ today }: { today: ISODate }) {
           ))}
         </ul>
       )}
+      {(view === "all" || view === "tasks") && (
+        <DoneSection
+          items={items.filter((i) => i.areaId === area.id)}
+          onUndo={(itemId) => void save(() => untickItem(itemId, today))}
+        />
+      )}
       <h2>Archive</h2>
-      {archived.length === 0 ? (
+      {archiveFailed ? (
+        <p>{DATA_ERROR}</p>
+      ) : archived.length === 0 ? (
         <p>Nothing archived.</p>
       ) : (
         <ul aria-label="Archive">
@@ -97,7 +135,7 @@ export function AreaPage({ today }: { today: ISODate }) {
               <button
                 type="button"
                 aria-label={`Restore: ${it.title}`}
-                onClick={() => void restoreItem(it.id, today).then(refresh)}
+                onClick={() => void save(() => restoreItem(it.id, today))}
               >
                 Restore
               </button>

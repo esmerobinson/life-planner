@@ -6,8 +6,11 @@ import { ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { useHubData } from "./useHubData";
 
+/** How often the shell re-reads the clock (a technical check, not a motion timing). */
+const CLOCK_CHECK_MS = 60_000;
+
 export function AppShell() {
-  const [, setClock] = useState(0); // bumped on focus/visibility so `today` is re-read
+  const [, setClock] = useState(0); // bumped on focus/visibility/interval so `today` is re-read
   const today = todayISO();
   const { items, refresh } = useHubData(today);
   const [adding, setAdding] = useState(false);
@@ -21,9 +24,12 @@ export function AppShell() {
     };
     window.addEventListener("focus", bump);
     document.addEventListener("visibilitychange", onVisible);
+    // A tab left focused across midnight gets no focus event; check the date periodically.
+    const timer = setInterval(bump, CLOCK_CHECK_MS);
     return () => {
       window.removeEventListener("focus", bump);
       document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
     };
   }, []);
 
@@ -43,7 +49,8 @@ export function AppShell() {
             <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
               Add
             </button>
-            {inboxCount > 0 && <Link to="/inbox">{`Inbox (${inboxCount})`}</Link>}
+            {/* Always shown: on a fresh install it is the only way to reach Import. */}
+            <Link to="/inbox">{inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox"}</Link>
           </div>
           {adding && <QuickAdd today={today} onAdded={() => void changed()} />}
           <Outlet />

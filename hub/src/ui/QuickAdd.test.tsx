@@ -4,6 +4,7 @@ import { vi } from "vitest";
 import { db } from "../data/db";
 import { createGoal } from "../data/repo";
 import { QuickAdd } from "./QuickAdd";
+import { ShellContext } from "./shellContext";
 
 const TODAY = "2026-10-27";
 
@@ -104,5 +105,20 @@ describe("QuickAdd", () => {
     await userEvent.selectOptions(screen.getByLabelText("Area"), "art");
     expect(await screen.findByRole("option", { name: "Portfolio" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Novel" })).toBeNull();
+  });
+
+  it("re-reads goals when the shell version changes", async () => {
+    const shell = (version: number) => (
+      <ShellContext.Provider value={{ refresh: () => {}, version, today: TODAY }}>
+        <QuickAdd today={TODAY} onAdded={() => {}} />
+      </ShellContext.Provider>
+    );
+    const { rerender } = render(shell(0));
+    await userEvent.selectOptions(screen.getByLabelText("Area"), "writing");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole("option", { name: "New novel" })).toBeNull();
+    await createGoal({ title: "New novel", areaId: "writing", kind: "practice" }, TODAY);
+    rerender(shell(1));
+    expect(await screen.findByRole("option", { name: "New novel" })).toBeInTheDocument();
   });
 });

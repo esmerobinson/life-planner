@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { db } from "../data/db";
 import { createGoal, createItem, tickItem } from "../data/repo";
+import { AppShell } from "./AppShell";
 import { GoalDetail } from "./GoalDetail";
 import { GoalsPage } from "./GoalsPage";
 import { ProgressBar } from "./ProgressBar";
@@ -135,6 +136,28 @@ describe("GoalsPage", () => {
   });
 });
 
+describe("Goals and the shell", () => {
+  it("a goal created on /goals appears in an open quick-add form", async () => {
+    render(
+      <MemoryRouter initialEntries={["/goals"]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/goals" element={<GoalsPage today={TODAY} />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    const quick = within(document.querySelector("form.quick-add") as HTMLElement);
+    await userEvent.selectOptions(quick.getByLabelText("Area"), "writing");
+    expect(quick.queryByRole("option", { name: "Fresh goal" })).toBeNull();
+    await userEvent.type(screen.getByLabelText("Goal title"), "Fresh goal");
+    await userEvent.selectOptions(screen.getByLabelText("Kind", { selector: "form.goal-form select" }), "practice");
+    await userEvent.click(screen.getByRole("button", { name: "Add goal" }));
+    expect(await quick.findByRole("option", { name: "Fresh goal" })).toBeInTheDocument();
+  });
+});
+
 describe("GoalDetail", () => {
   it("ticking a task on a goal page raises the monthly bar", async () => {
     const g = await createGoal({ title: "Write", areaId: "writing", kind: "practice", monthlyTarget: 4 }, TODAY);
@@ -208,6 +231,22 @@ describe("GoalDetail", () => {
       expect(l.getByText(n)).toBeInTheDocument();
     }
     expect(l.getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("Undo in Done lowers the monthly bar and returns the task to the open list", async () => {
+    const g = await createGoal({ title: "Write", areaId: "writing", kind: "practice", monthlyTarget: 4 }, TODAY);
+    const t = await createItem({ kind: "task", title: "Draft", areaId: "writing", priority: 3, goalId: g.id }, TODAY);
+    await tickItem(t.id, TODAY);
+    renderDetail(g.id);
+    expect(await screen.findByRole("progressbar", { name: "This month 1/4" })).toBeInTheDocument();
+    expect(screen.getByText("No open tasks attached to this goal.")).toBeInTheDocument();
+    const done = screen.getByText("Done", { selector: "summary" }).closest("details")!;
+    expect(done).not.toHaveAttribute("open");
+    await userEvent.click(within(done).getByText("Done", { selector: "summary" }));
+    await userEvent.click(within(done).getByRole("button", { name: "Undo: Draft" }));
+    expect(await screen.findByRole("progressbar", { name: "This month 0/4" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Later" })).getByText("Draft")).toBeInTheDocument();
+    expect(within(done).getByText("Nothing done yet.")).toBeInTheDocument();
   });
 
   it("unknown goal id shows a calm message", async () => {

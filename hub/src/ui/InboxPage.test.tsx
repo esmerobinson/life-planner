@@ -107,11 +107,13 @@ describe("double actions and refresh", () => {
 });
 
 describe("AppShell additions", () => {
-  it("Inbox link appears in the shell only when inbox items exist", async () => {
+  it("Inbox link is always in the shell; the count shows only when inbox items exist", async () => {
     const first = renderShell();
     expect(await screen.findByText("Today page")).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryByRole("link", { name: /Inbox/ })).toBeNull();
+    const plain = screen.getByRole("link", { name: "Inbox" });
+    expect(plain).toHaveAttribute("href", "/inbox");
+    expect(plain).toHaveTextContent(/^Inbox$/);
     first.unmount();
 
     await createItem({ kind: "task", title: "Loose end", areaId: "inbox", priority: 2 }, TODAY);
@@ -124,20 +126,22 @@ describe("AppShell additions", () => {
   it("Add button toggles the quick-add form and adding updates the inbox count", async () => {
     renderShell();
     expect(screen.queryByLabelText("Title")).toBeNull();
+    expect(screen.getByRole("link", { name: "Inbox" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
     await userEvent.type(screen.getByLabelText("Title"), "Fresh");
     await userEvent.click(screen.getByRole("button", { name: "Add item" }));
     expect(await screen.findByRole("link", { name: "Inbox (1)" })).toBeInTheDocument();
   });
 
-  it("filing the last inbox item from the inbox page drops the shell link", async () => {
+  it("filing the last inbox item from the inbox page drops the count from the shell link", async () => {
     await createItem({ kind: "task", title: "Only one", areaId: "inbox", priority: 2 }, TODAY);
     renderShell();
     await userEvent.click(await screen.findByRole("link", { name: "Inbox (1)" }));
     await userEvent.selectOptions(await screen.findByLabelText("Area for Only one"), "art");
     await userEvent.click(screen.getByRole("button", { name: "File Only one" }));
     await screen.findByText("Nothing waiting in the inbox.");
-    await vi.waitFor(() => expect(screen.queryByRole("link", { name: /Inbox/ })).toBeNull());
+    await vi.waitFor(() => expect(screen.getByRole("link", { name: "Inbox" })).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: /Inbox \(/ })).toBeNull();
   });
 
   it("Sidebar still shows exactly ten items (no Inbox) with the shell rendered", async () => {

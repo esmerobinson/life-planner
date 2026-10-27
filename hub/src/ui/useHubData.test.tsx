@@ -83,4 +83,17 @@ describe("useHubData", () => {
     expect(result.current.loaded).toBe(false);
     expect(err).not.toHaveBeenCalled();
   });
+
+  it("a failed read sets error and loaded; a later good read clears error", async () => {
+    const spy = vi.spyOn(repo, "listItems").mockRejectedValueOnce(new Error("nope"));
+    const { result } = renderHook(() => useHubData(TODAY));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.error).toBe("Your data could not be read. Reload to try again.");
+    spy.mockResolvedValueOnce([mk("back")]);
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.items.map((i) => i.title)).toEqual(["back"]);
+  });
 });

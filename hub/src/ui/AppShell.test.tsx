@@ -74,4 +74,16 @@ describe("AppShell", () => {
     });
     expect(await screen.findByText("date:2026-10-28")).toBeInTheDocument();
   });
+
+  it("a tab left focused across midnight moves to the new day without a focus event", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date(2026, 9, 27, 23, 59, 30));
+    renderShell(<ShowToday />);
+    expect(await screen.findByText("date:2026-10-27")).toBeInTheDocument();
+    vi.setSystemTime(new Date(2026, 9, 28, 0, 0, 30));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(await screen.findByText("date:2026-10-28")).toBeInTheDocument();
+  });
 });

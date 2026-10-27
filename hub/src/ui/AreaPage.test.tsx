@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { db } from "../data/db";
-import { archiveItem, createGoal, createItem } from "../data/repo";
+import { archiveItem, createGoal, createItem, tickItem } from "../data/repo";
 import { AreaPage } from "./AreaPage";
 
 const TODAY = "2026-10-27";
@@ -68,6 +68,42 @@ describe("AreaPage", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Done: Tick me" }));
     await screen.findByText("Nothing here yet.");
     expect((await db.items.toArray())[0].status).toBe("done");
+  });
+
+  it("a ticked task appears under Done and Undo returns it to To-dos", async () => {
+    await createItem({ kind: "task", title: "Oops", areaId: "art", priority: 3 }, TODAY);
+    renderArea("art");
+    await userEvent.click(await screen.findByRole("button", { name: "Done: Oops" }));
+    const done = screen.getByText("Done", { selector: "summary" }).closest("details")!;
+    expect(done).not.toHaveAttribute("open");
+    await userEvent.click(within(done).getByText("Done", { selector: "summary" }));
+    const doneList = await within(done).findByRole("list", { name: "Done" });
+    expect(within(doneList).getByText("Oops")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "To-dos" })).toBeNull();
+
+    await userEvent.click(within(doneList).getByRole("button", { name: "Undo: Oops" }));
+    const todos = await screen.findByRole("list", { name: "To-dos" });
+    expect(within(todos).getByText("Oops")).toBeInTheDocument();
+    expect(within(done).getByText("Nothing done yet.")).toBeInTheDocument();
+    const stored = (await db.items.toArray())[0];
+    expect(stored.status).toBe("open");
+    expect(stored.completedAt).toBeUndefined();
+  });
+
+  it("Done lists the most recently completed first, and says so calmly when empty", async () => {
+    const a = await createItem({ kind: "task", title: "Earlier", areaId: "mind", priority: 3 }, TODAY);
+    const b = await createItem({ kind: "task", title: "Later", areaId: "mind", priority: 3 }, TODAY);
+    await tickItem(a.id, "2026-10-20");
+    await tickItem(b.id, "2026-10-25");
+    const first = renderArea("mind");
+    const list = await screen.findByRole("list", { name: "Done", hidden: true });
+    expect(within(list).getAllByRole("listitem", { hidden: true }).map((li) => li.textContent)).toEqual([
+      expect.stringContaining("Later"),
+      expect.stringContaining("Earlier"),
+    ]);
+    first.unmount();
+    renderArea("body");
+    expect(await screen.findByText("Nothing done yet.")).toBeInTheDocument();
   });
 
   it("inbox is not an area page", async () => {
