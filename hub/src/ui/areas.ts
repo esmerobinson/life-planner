@@ -1,3 +1,4 @@
+import type { AreaId } from "../domain/types";
 import home from "../assets/icons/home.svg";
 import today from "../assets/icons/today.svg";
 import goals from "../assets/icons/goals.svg";
@@ -29,4 +30,13 @@ export const NAV: NavEntry[] = [
   { id: "body", label: "Body", path: "/area/body", icon: body, tile: "#e39876", group: 2 },
   { id: "journal", label: "Journal", path: "/journal", icon: journal, tile: "#9285c5", group: 3 },
   { id: "vision", label: "Vision board", path: "/vision", icon: vision, tile: "#ecca7d", group: 3 },
+];
+
+/** Area choices for forms: the five sidebar areas (labels from NAV) plus the inbox. */
+export const AREA_CHOICES: { id: AreaId; label: string }[] = [
+  { id: "inbox", label: "Inbox" },
+  ...(["writing", "art", "content", "mind", "body"] as const).map((id) => ({
+    id: id as AreaId,
+    label: NAV.find((n) => n.id === id)!.label,
+  })),
 ];
