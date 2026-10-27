@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { tickItem } from "../data/repo";
 import { pickToday } from "../domain/triage";
 import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { MoveToMenu } from "./MoveToMenu";
+import { ShellContext } from "./shellContext";
 import { useHubData } from "./useHubData";
 
 /** Completions this month per goal id, as pickToday expects. */
@@ -17,6 +18,13 @@ const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by
 export function TodayPanel({ today }: { today: ISODate }) {
   const { items, goals, refresh, loaded } = useHubData(today);
   const [celebrating, setCelebrating] = useState(false);
+  const shell = useContext(ShellContext);
+
+  /** Re-read locally, then tell the shell so every other useHubData consumer re-reads too. */
+  async function changed() {
+    await refresh();
+    await shell?.refresh();
+  }
 
   useEffect(() => {
     if (!celebrating) return;
@@ -32,7 +40,7 @@ export function TodayPanel({ today }: { today: ISODate }) {
   async function tick(id: string) {
     await tickItem(id, today);
     setCelebrating(true);
-    await refresh();
+    await changed();
   }
 
   function row(it: Item) {
@@ -50,7 +58,7 @@ export function TodayPanel({ today }: { today: ISODate }) {
             OVERDUE
           </span>
         )}
-        <MoveToMenu itemId={it.id} today={today} onMoved={refresh} label={it.title} />
+        <MoveToMenu itemId={it.id} today={today} onMoved={changed} label={it.title} />
       </li>
     );
   }

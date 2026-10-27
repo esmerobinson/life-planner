@@ -1,9 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import { createGoal, createItem, tickItem } from "../data/repo";
+import { AppShell } from "./AppShell";
 import { HomePage } from "./HomePage";
+import { Route, Routes } from "react-router-dom";
 
 const TODAY = "2026-10-27";
 
@@ -45,6 +48,7 @@ describe("HomePage", () => {
     expect(await screen.findByText("Nothing planned for today.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Morning pages" })).toBeInTheDocument();
     expect(await screen.findByText("No monthly targets yet.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to goals" })).toHaveAttribute("href", "/goals");
     expect(container.textContent).not.toMatch(/NaN/);
     expect(screen.queryByRole("alert")).toBeNull();
     expect(spy).not.toHaveBeenCalled();
@@ -57,5 +61,28 @@ describe("HomePage", () => {
     expect(await screen.findByText("No monthly targets yet.")).toBeInTheDocument();
     expect(screen.queryByText("Targetless")).toBeNull();
     expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("ticking a goal pick on Home updates the goal bar without navigation", async () => {
+    const goal = await createGoal({ title: "Write more", areaId: "writing", kind: "practice", monthlyTarget: 10 }, TODAY);
+    for (let i = 0; i < 3; i++) {
+      const it = await createItem({ kind: "task", title: `Finished ${i}`, areaId: "writing", priority: 3, goalId: goal.id }, TODAY);
+      await tickItem(it.id, TODAY);
+    }
+    await createItem({ kind: "task", title: "Open goal task", areaId: "writing", priority: 3, due: TODAY, goalId: goal.id }, TODAY);
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<HomePage today={TODAY} />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const bar = await screen.findByRole("progressbar", { name: /3\/10/ });
+    expect(bar).toHaveAttribute("aria-valuenow", "30");
+    await userEvent.click(await screen.findByRole("button", { name: "Done: Open goal task" }));
+    const updated = await screen.findByRole("progressbar", { name: /4\/10/ });
+    expect(updated).toHaveAttribute("aria-valuenow", "40");
   });
 });
