@@ -103,3 +103,9 @@ body {
   height: 100%;
   background: var(--bar-fill);
 }
+
+/* Home layout A. Right column width from approved mockup (option 3); provisional. */
+.home-page {
+  display: grid;
+  grid-template-columns: 1fr 190px;
+}

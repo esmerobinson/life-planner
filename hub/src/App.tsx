@@ -5,11 +5,16 @@ import { NAV } from "./ui/areas";
 import { AreaPage } from "./ui/AreaPage";
 import { GoalDetail } from "./ui/GoalDetail";
 import { GoalsPage } from "./ui/GoalsPage";
+import { HomePage } from "./ui/HomePage";
 import { InboxPage } from "./ui/InboxPage";
 import { TodayPanel } from "./ui/TodayPanel";
 
 function TodayRoute() {
   return <TodayPanel today={useShellToday()} />;
+}
+
+function HomeRoute() {
+  return <HomePage today={useShellToday()} />;
 }
 
 function GoalsRoute() {
@@ -34,7 +39,9 @@ export default function App() {
       <Routes>
         <Route element={<AppShell />}>
           {NAV.map((n) =>
-            n.id === "today" ? (
+            n.id === "home" ? (
+              <Route key={n.id} path={n.path} element={<HomeRoute />} />
+            ) : n.id === "today" ? (
               <Route key={n.id} path={n.path} element={<TodayRoute />} />
             ) : n.id === "goals" || n.path.startsWith("/area/") ? null : (
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
