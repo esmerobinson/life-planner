@@ -39,6 +39,56 @@ are never touched. A task whose title matches one already in the app (for
 example from your Backlog) is not added, and is counted as "same title as an
 existing task". Anything that could not be read is listed under **Notes**.
 
+## One-time transfer from Obsidian and Google Tasks
+
+`scripts/obsidian-transfer.ts` builds an Esmeworld backup file from your
+Obsidian notes (`Backlog.md`, `Goals.md`, `Goals for month.md`,
+`Goals & Habits.md`) and the Google Tasks export, using the app's own
+parsers and the same validator the Backup page uses. It only reads those
+files. Run it once, from `hub/`:
+
+    npx tsx scripts/obsidian-transfer.ts [--vault DIR] [--gtasks FILE] [--out DIR] \
+        [--today YYYY-MM-DD] [--classify-out FILE] [--areas FILE]
+
+It writes two private files (mode 0600) into `--out` (default `~/Downloads`):
+`esmeworld-transfer-<date>.json` (load it on the Backup page with **Merge**,
+once, into one place) and `esmeworld-transfer-<date>-summary.md` (a readable
+summary with your titles, for you only). The terminal prints counts only.
+A missing input is skipped with a note.
+
+`--classify-out FILE` writes a private list of every item the rules left in the
+Inbox (stable `key`, title, origin, section or list, first 200 characters of
+notes). `--areas FILE` reads `{ "<key>": "<area id>" }` and files those inbox
+items; unknown keys, `inbox` and invalid areas are ignored with a note, and the
+summary lists them under "Sorted for you".
+
+How the notes map:
+
+- **Backlog and Google Tasks**: exactly as the Inbox importers do (Backlog
+  sections choose the area; Google tasks skipped as the same title as an item
+  already being transferred are listed in the summary).
+- **Goals note** (`## <Area name>` sections): each area becomes one goal. The
+  title is the area name without its emoji or a trailing `(...)`. The area is
+  matched like Backlog sections, plus Creative technologist -> Tech projects
+  and Inner work -> Mind; a heading that matches nothing is proposed as Admin
+  (goals cannot live in the Inbox). `Identity:` lines become the goal's "why"
+  (joined with a blank line); `Weekly:`, `Ongoing:` and `Daily:` lines become
+  its cadence, prefix kept; `Study these north stars:` becomes its notes; each
+  `Marker:` line becomes a milestone (cut at 200 characters). A goal with at
+  least one marker is finite, otherwise a practice goal. A finite goal's
+  deadline is 31 December of the year in its first marker, else this year.
+  The `## Notes` section is ignored.
+- **Monthly note** (`# Goals for <Month> <Year>`): each bold bullet under
+  "This month's goals" becomes a finite goal (area Admin, deadline the last day
+  of that month, description as notes) and its first nested line (normally
+  `Next step:`) becomes an open task linked to that goal.
+- **Habits note**: each item under "Daily habits" becomes a task that repeats
+  every day (area Mind). "Big goals" numbers and "This week" counts are listed
+  in the summary and not created.
+
+Goals also carry optional **why**, **cadence** and **notes** text (shown under
+the goal's title) and an Obsidian source marker; all are included in backups.
+
 ## Areas
 
 There are nine areas: Inbox, plus Writing, Art, Content, Mind, Body, Tech
