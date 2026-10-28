@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "./db";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
-  archiveItem, restoreItem, listItems, toggleMilestone, updateItems,
+  archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem,
 } from "./repo";
 
 const today = "2026-10-27";
@@ -135,6 +135,26 @@ describe("repo", () => {
     expect((await db.goals.get(g.id))?.milestones[0].done).toBe(true);
     await toggleMilestone(g.id, "m1");
     expect((await db.goals.get(g.id))?.milestones[0].done).toBe(false);
+  });
+});
+
+describe("updateItem", () => {
+  it("sets a due date and touches the item", async () => {
+    const a = await createItem({ ...base, due: "2026-10-01" }, "2026-10-01");
+    await updateItem(a.id, { due: "2026-11-05" }, today);
+    const got = (await db.items.get(a.id))!;
+    expect(got.due).toBe("2026-11-05");
+    expect(got.touchedAt).toBe(today);
+  });
+
+  it("clears the due date when due is explicitly undefined, keeping the other fields", async () => {
+    const a = await createItem({ ...base, due: "2026-10-01", tags: ["x"] }, "2026-10-01");
+    await updateItem(a.id, { due: undefined }, today);
+    const got = (await db.items.get(a.id))!;
+    expect("due" in got).toBe(false);
+    expect(got.tags).toEqual(["x"]);
+    expect(got.status).toBe("open");
+    expect(got.touchedAt).toBe(today);
   });
 });
 

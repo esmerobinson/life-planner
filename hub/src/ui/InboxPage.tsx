@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { updateItem, updateItems } from "../data/repo";
 import type { AreaId, ISODate, Item, Priority } from "../domain/types";
 import { AREA_CHOICES, GOAL_AREAS } from "./areas";
+import { NeedsALook } from "./NeedsALook";
 import { ImportPanel } from "./ImportPanel";
 import { SAVE_ERROR, useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
@@ -190,6 +191,7 @@ export function InboxPage({ today }: { today: ISODate }) {
   return (
     <section className="inbox-page">
       <h1>Inbox</h1>
+      <h2>To sort</h2>
       <ImportPanel today={today} onImported={() => void changed()} />
       {loaded && inbox.length === 0 && <p>Nothing waiting in the inbox.</p>}
       {inbox.length > 0 && (
@@ -239,6 +241,8 @@ export function InboxPage({ today }: { today: ISODate }) {
           ))}
         </ul>
       )}
+      <h2>Needs a look</h2>
+      {loaded && <NeedsALook items={items} today={today} onChanged={changed} />}
     </section>
   );
 }

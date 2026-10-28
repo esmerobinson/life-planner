@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
+import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
 import { QuickAdd } from "./QuickAdd";
 import { ShellContext } from "./shellContext";
@@ -18,7 +19,10 @@ export function AppShell() {
   const [adding, setAdding] = useState(false);
   const [version, setVersion] = useState(0);
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
-  const inboxCount = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
+  const unsorted = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
+  const look = needsALook(items, today);
+  // Unsorted items are excluded from needsALook, so nothing is counted twice.
+  const inboxCount = unsorted + look.overdue.length + look.dueSoon.length + look.stale.length;
 
   // Ask the browser once, on start, to keep this data.
   useEffect(() => {
