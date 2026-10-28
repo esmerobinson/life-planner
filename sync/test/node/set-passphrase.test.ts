@@ -4,7 +4,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { EventEmitter } from "node:events";
 import {
+  applyKeys,
   checkPassphrase,
   CONFIG_PATH,
   deriveToken,
@@ -12,6 +14,7 @@ import {
   MIN_PASSPHRASE_LENGTH,
   parseArgs,
   putSecret,
+  rawModeGuard,
   run,
 } from "../../tools/set-passphrase.mjs";
 import { deriveToken as sharedDeriveToken, hashToken as sharedHashToken } from "../../shared/token.ts";
@@ -103,6 +106,69 @@ describe("set-passphrase: passphrase checks", () => {
   it("rejects leading/trailing whitespace (easy to mistype invisibly)", () => {
     expect(checkPassphrase(` ${FAKE}`, ` ${FAKE}`)).toMatch(/spaces/);
     expect(checkPassphrase(`${FAKE} `, `${FAKE} `)).toMatch(/spaces/);
+  });
+});
+
+describe("set-passphrase: key handling of the hidden prompt", () => {
+  it("keeps a Tab inside a pasted passphrase", () => {
+    expect(applyKeys("", "fake\tpass\tphrase")).toEqual({ value: "fake\tpass\tphrase", status: "more" });
+    expect(applyKeys("", "fake\tpass\r")).toEqual({ value: "fake\tpass", status: "done" });
+  });
+
+  it("finishes on Enter, cancels on Ctrl-C and on Ctrl-D with empty input", () => {
+    expect(applyKeys("abc", "\n")).toEqual({ value: "abc", status: "done" });
+    expect(applyKeys("abc", "\u0003").status).toBe("cancelled");
+    expect(applyKeys("", "\u0004").status).toBe("cancelled");
+    expect(applyKeys("abc", "\u0004")).toEqual({ value: "abc", status: "more" });
+  });
+
+  it("handles Backspace per character (code point), Ctrl-U, and ignores escape sequences", () => {
+    expect(applyKeys("ab\u{1F511}", "\u007f")).toEqual({ value: "ab", status: "more" });
+    expect(applyKeys("ab", "\b")).toEqual({ value: "a", status: "more" });
+    expect(applyKeys("abc", "\u0015x")).toEqual({ value: "x", status: "more" });
+    expect(applyKeys("abc", "\u001b[A")).toEqual({ value: "abc", status: "more" });
+    expect(applyKeys("abc", "\u0001\u0002d")).toEqual({ value: "abcd", status: "more" });
+  });
+});
+
+describe("set-passphrase: raw-mode guard", () => {
+  class FakeStdin {
+    calls: boolean[] = [];
+    paused = false;
+    setRawMode(on: boolean) {
+      this.calls.push(on);
+    }
+    pause() {
+      this.paused = true;
+    }
+  }
+  class FakeProcess extends EventEmitter {
+    exitCodes: number[] = [];
+    stderr = { write: (_s: string) => true };
+    exit(code: number) {
+      this.exitCodes.push(code);
+    }
+  }
+
+  it("enables raw mode and restores it exactly once via the returned function", () => {
+    const stdin = new FakeStdin();
+    const proc = new FakeProcess();
+    const restore = rawModeGuard(stdin, proc);
+    expect(stdin.calls).toEqual([true]);
+    restore();
+    restore();
+    expect(stdin.calls).toEqual([true, false]);
+    expect(proc.listenerCount("exit")).toBe(0);
+    expect(proc.listenerCount("SIGTERM")).toBe(0);
+  });
+
+  it.each(["exit", "SIGINT", "SIGTERM", "SIGHUP", "uncaughtException"])("restores the terminal on %s", (event) => {
+    const stdin = new FakeStdin();
+    const proc = new FakeProcess();
+    rawModeGuard(stdin, proc);
+    proc.emit(event, event === "uncaughtException" ? new Error("boom") : event);
+    expect(stdin.calls).toEqual([true, false]);
+    if (event !== "exit") expect(proc.exitCodes).toHaveLength(1);
   });
 });
 
