@@ -367,6 +367,11 @@ export async function saveItemNotes(id: string, notes: string, today: ISODate): 
   });
 }
 
+/** One item as stored (for an undo snapshot). */
+export async function getItem(id: string): Promise<Item | undefined> {
+  return db.items.get(id);
+}
+
 /** Undo: puts an item back exactly as it was (the change tracker re-stamps it). */
 export async function putItemBack(snapshot: Item, today: ISODate): Promise<void> {
   const { updatedAt: _u, ...row } = snapshot;

@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles/tokens.css";
 import "./styles/controls.css";
 import "./styles/strips.css";
+import "./styles/sort.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

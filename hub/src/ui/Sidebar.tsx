@@ -28,7 +28,8 @@ export function Sidebar() {
       </nav>
       <div className="sidebar-footer">
         <NavLink to="/backup">Backup</NavLink>{" "}
-        <NavLink to="/sync">{sync.status === "needs-passphrase" ? "Sync (needs passphrase)" : "Sync"}</NavLink>
+        <NavLink to="/sync">{sync.status === "needs-passphrase" ? "Sync (needs passphrase)" : "Sync"}</NavLink>{" "}
+        <NavLink to="/bin">Bin</NavLink>
       </div>
     </aside>
   );
