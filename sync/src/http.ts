@@ -31,6 +31,8 @@ export type ErrorCode =
   | "unsupported_media_type"
   | "rate_limited"
   | "cursor_ahead"
+  | "bad_board"
+  | "pinterest_unavailable"
   | "server_misconfigured"
   | "internal";
 
@@ -71,7 +73,7 @@ export async function readJsonBody(request: Request, maxBytes: number): Promise<
   const declared = request.headers.get("Content-Length");
   if (declared !== null && Number(declared) > maxBytes) throw new HttpError(413, "payload_too_large");
 
-  const bytes = new Uint8Array(await readCapped(request, maxBytes));
+  const bytes = new Uint8Array(await readCapped(request.body, maxBytes));
   let text: string;
   try {
     text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(bytes);
@@ -85,9 +87,27 @@ export async function readJsonBody(request: Request, maxBytes: number): Promise<
   }
 }
 
-async function readCapped(request: Request, maxBytes: number): Promise<ArrayBuffer> {
-  if (!request.body) return new ArrayBuffer(0);
-  const reader = request.body.getReader();
+/**
+ * Reads a body, refusing it (413) once it passes `maxBytes`. An abort `signal` cancels the read
+ * (used for upstream responses that must not hang).
+ */
+export async function readCapped(
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes: number,
+  signal?: AbortSignal,
+): Promise<ArrayBuffer> {
+  if (!body) return new ArrayBuffer(0);
+  const reader = body.getReader();
+  const onAbort = () => void reader.cancel().catch(() => undefined);
+  signal?.addEventListener("abort", onAbort);
+  try {
+    return await readAll(reader, maxBytes);
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+async function readAll(reader: ReadableStreamDefaultReader<Uint8Array>, maxBytes: number): Promise<ArrayBuffer> {
   const parts: Uint8Array[] = [];
   let total = 0;
   for (;;) {
