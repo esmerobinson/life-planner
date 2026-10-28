@@ -1,5 +1,5 @@
 import Dexie from "dexie";
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
 import { addPicture, getFile } from "../data/repo";
 import { MAX_NOTES_TEXT } from "../data/validate";
@@ -63,6 +63,8 @@ interface Slash {
   start: number;
   query: string;
   index: number;
+  /** An option was picked with the arrows (then Enter chooses even with nothing typed). */
+  chosen?: boolean;
 }
 
 const matching = (query: string) => COMMANDS.filter((c) => c.label.toLowerCase().startsWith(query.toLowerCase()));
@@ -102,6 +104,11 @@ export function PageEditor({
   const fileInput = useRef<HTMLInputElement>(null);
   const pictureAfter = useRef<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  /** An empty line opened below a last picture: only written once something is typed. */
+  const draftKey = useRef<string | null>(null);
+  const uid = useId();
+  const menuId = `${uid}-slash`;
+  const optionId = (c: Command) => `${uid}-slash-${c}`;
 
   function setActive(key: string | null) {
     activeRef.current = key;
@@ -114,9 +121,11 @@ export function PageEditor({
   useEffect(() => {
     if (value === emitted.current) return;
     emitted.current = value;
-    // Lines keep their place (and the one being typed in stays open) where they still exist.
-    const before = rowsRef.current;
-    const next = value.split("\n").map((line, i) => ({ key: before[i]?.key ?? newKey(), line }));
+    // Lines that are still there keep their identity (matched by their text, so a line added
+    // above does not shift the one being typed in onto another line's words).
+    const free = new Map<string, string[]>();
+    for (const r of rowsRef.current) free.set(r.line, [...(free.get(r.line) ?? []), r.key]);
+    const next = value.split("\n").map((line) => ({ key: free.get(line)?.shift() ?? newKey(), line }));
     rowsRef.current = next;
     setRows(next);
     if (activeRef.current && !next.some((r) => r.key === activeRef.current)) setActive(null);
@@ -142,6 +151,7 @@ export function PageEditor({
       return false;
     }
     setFull(false);
+    draftKey.current = null;
     rowsRef.current = next;
     setRows(next);
     if (focus) {
@@ -346,10 +356,11 @@ export function PageEditor({
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         const step = e.key === "ArrowDown" ? 1 : -1;
-        setSlash({ ...slash, index: (slash.index + step + options.length) % options.length });
+        setSlash({ ...slash, index: (slash.index + step + options.length) % options.length, chosen: true });
         return;
       }
-      if (e.key === "Enter" && options.length > 0) {
+      // Enter chooses once a letter is typed or an option picked; "/" then Enter is a new line.
+      if (e.key === "Enter" && options.length > 0 && (slash.query !== "" || slash.chosen)) {
         e.preventDefault();
         run(options[slash.index]!.id, slash);
         return;
@@ -440,7 +451,15 @@ export function PageEditor({
     const block = parseLine(last.line);
     if (block.type === "picture") {
       const key = newKey();
-      commit([...rs, { key, line: "" }], { key, caret: 0 });
+      const next = [...rs, { key, line: "" }];
+      rowsRef.current = next; // shown, not sent: nothing is written until she types
+      draftKey.current = key;
+      focusReq.current = { key, caret: 0 };
+      flushSync(() => {
+        setRows(next);
+        setActive(key);
+      });
+      areas.current.get(key)?.focus();
       return;
     }
     activate(last.key, block.text.length);
@@ -494,10 +513,22 @@ export function PageEditor({
                   onInput={(el) => typed(row, block, el)}
                   onKeyDown={(e) => keyDown(e, row, block)}
                   onBlur={() => {
+                    if (draftKey.current === row.key) {
+                      // Left without typing: the opened line goes again.
+                      draftKey.current = null;
+                      const rest = rowsRef.current.filter((r) => r.key !== row.key);
+                      rowsRef.current = rest;
+                      setRows(rest);
+                    }
                     if (activeRef.current !== row.key) return;
                     setActive(null);
                     setSlash(null);
                   }}
+                  menu={
+                    slash?.key === row.key
+                      ? { id: menuId, active: optionId(matching(slash.query)[slash.index]?.id ?? "heading") }
+                      : undefined
+                  }
                 />
               ) : (
                 <LineView
@@ -508,17 +539,19 @@ export function PageEditor({
                 />
               )}
               {slash?.key === row.key && (
-                <div className="page-slash" aria-label={PAGE_WORDS.menu}>
+                <div className="page-slash" role="listbox" id={menuId} aria-label={PAGE_WORDS.menu}>
                   {matching(slash.query).map((c, n) => (
-                    <button
+                    <div
                       key={c.id}
-                      type="button"
+                      id={optionId(c.id)}
+                      role="option"
+                      aria-selected={n === slash.index}
                       className={`peek-pill${n === slash.index ? " is-current" : ""}`}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => run(c.id, slash)}
                     >
                       {c.label}
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -603,7 +636,10 @@ function LineField({
   onInput,
   onKeyDown,
   onBlur,
+  menu,
 }: {
+  /** The "/" menu open under this line: its id and the highlighted option's id. */
+  menu?: { id: string; active: string };
   text: string;
   label: string;
   heading: boolean;
@@ -632,6 +668,8 @@ function LineField({
       onChange={(e) => onInput(e.currentTarget)}
       onKeyDown={onKeyDown}
       onBlur={onBlur}
+      aria-controls={menu?.id}
+      aria-activedescendant={menu?.active}
     />
   );
 }

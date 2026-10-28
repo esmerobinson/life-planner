@@ -266,7 +266,16 @@ input[type="checkbox"].tick.page-tick {
   margin: 4px 0;
 }
 
-.page-slash .peek-pill.is-current {
+/* The "/" menu's options (a listbox, so not buttons): the same values as button.peek-pill. */
+.page-slash [role="option"] {
+  padding: 4px 12px;
+  font-size: 14px;
+  border-radius: 999px;
+  background: var(--track);
+  cursor: default;
+}
+
+.page-slash [role="option"].is-current {
   outline: 2px solid var(--placeholder);
 }
 

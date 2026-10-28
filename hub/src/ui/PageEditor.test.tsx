@@ -146,6 +146,17 @@ describe("editing", () => {
     expect(last()).toBe("start\n- [ ] pasted\n## head");
   });
 
+  it("a synced change that adds a line above keeps the open field on the same line (m3)", async () => {
+    const changes: string[] = [];
+    const { rerender } = render(
+      <PageEditor value={"first\nsecond"} onChange={(t) => changes.push(t)} onBlur={() => {}} today={TODAY} />,
+    );
+    const page = within(screen.getByRole("group", { name: "Notes" }));
+    await userEvent.click(page.getByText("second"));
+    rerender(<PageEditor value={"inserted elsewhere\nfirst\nsecond"} onChange={(t) => changes.push(t)} onBlur={() => {}} today={TODAY} />);
+    expect(page.getByRole("textbox", { name: /text/ })).toHaveValue("second");
+  });
+
   it("a stored change from elsewhere replaces the lines", async () => {
     const { page } = setup("old words");
     await userEvent.click(screen.getByRole("button", { name: "outside" }));
@@ -225,6 +236,19 @@ describe("pictures", () => {
     expect(await page.findByRole("img", { name: "Picture" })).toHaveAttribute("width", "40");
   });
 
+  it("clicking below a last picture opens a new line, but writes nothing until something is typed (m2)", async () => {
+    const { page, changes, last } = setup(`a\n${pictureLine("p1")}`);
+    await userEvent.click(screen.getByRole("group", { name: "Notes" }).querySelector(".page-lines") as HTMLElement);
+    expect(page.getByRole("textbox", { name: /text 3/ })).toHaveFocus();
+    expect(changes).toEqual([]);
+    await userEvent.tab(); // left without typing: the empty line goes again
+    expect(page.queryByRole("textbox", { name: /text 3/ })).toBeNull();
+    expect(changes).toEqual([]);
+    await userEvent.click(screen.getByRole("group", { name: "Notes" }).querySelector(".page-lines") as HTMLElement);
+    await userEvent.keyboard("after");
+    expect(last()).toBe(`a\n${pictureLine("p1")}\nafter`);
+  });
+
   it("Remove picture takes its line off the page", async () => {
     const { page, last } = setup(`a\n${pictureLine("p1")}\nb`);
     await userEvent.click(page.getByRole("button", { name: PAGE_WORDS.removePicture }));
@@ -237,13 +261,28 @@ describe("the / menu", () => {
     const { page, last } = setup("");
     await userEvent.click(page.getByText(PAGE_WORDS.placeholder));
     await userEvent.keyboard("/");
-    const menu = within(page.getByLabelText(PAGE_WORDS.menu));
-    expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["Heading", "Checklist", "Link", "Picture"]);
+    const list = page.getByRole("listbox", { name: PAGE_WORDS.menu });
+    const menu = within(list);
+    expect(menu.getAllByRole("option").map((b) => b.textContent)).toEqual(["Heading", "Checklist", "Link", "Picture"]);
     await userEvent.keyboard("ch");
-    expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["Checklist"]);
+    expect(menu.getAllByRole("option").map((b) => b.textContent)).toEqual(["Checklist"]);
+    // The field points at the highlighted choice for screen readers (m6).
+    const box = page.getByRole("textbox", { name: /text 1/ });
+    expect(box).toHaveAttribute("aria-controls", list.id);
+    expect(box).toHaveAttribute("aria-activedescendant", menu.getByRole("option", { name: "Checklist" }).id);
+    expect(menu.getByRole("option", { name: "Checklist" })).toHaveAttribute("aria-selected", "true");
     await userEvent.keyboard("{Enter}buy paint");
     expect(last()).toBe("- [ ] buy paint");
-    expect(page.queryByLabelText(PAGE_WORDS.menu)).toBeNull();
+    expect(page.queryByRole("listbox")).toBeNull();
+  });
+
+  it("/ then Enter with nothing chosen is just a new line (m8); arrows then Enter choose", async () => {
+    const { page, last } = setup("");
+    await userEvent.click(page.getByText(PAGE_WORDS.placeholder));
+    await userEvent.keyboard("see /{Enter}");
+    expect(last()).toBe("see /\n");
+    await userEvent.keyboard("/{ArrowDown}{Enter}x");
+    expect(last()).toBe("see /\n- [ ] x");
   });
 
   it("Escape closes the menu without closing the panel; a / inside a word is just a slash", async () => {
