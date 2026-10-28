@@ -1,0 +1,272 @@
+/* Design round 2 (VISUAL-LANGUAGE.md, "Said (2026-10-28, design round 2)"). Every value
+   here is copied from Esme's chosen mockup options: round 1 "A · Strips" and round 2
+   "1B" (two icons), "2D" (due line), "3A" (goal cards), "4A" (month count and done
+   fold-out), plus the round-2 "1A" menu look for the two popovers. Colours are tokens
+   or palette values only (sage #a09f88, Happy Home red #bf6564; the popover shadow is
+   forest green #3a412f at 25%, as in the mockup). Type stays system-ui and nothing
+   animates (the placeholders VISUAL-LANGUAGE.md asks for).
+
+   Composition calls the mockups do not show, made by the implementer (Esme may veto):
+   - the Inbox and "Needs a look" strips put their extra controls on a second line under
+     the title, the way the round-2 "1C" tray does (grid-column 2 to the end);
+   - the popovers hang 4px under their icon, right-aligned to it (the mockup's menu sits
+     4px below the 30px icon inside a 10px-padded strip);
+   - the goal-card title link covers the whole card (one link per card). */
+:root {
+  --sage: #a09f88; /* palette value; tick-box border in the strips mockup */
+  --late: #bf6564; /* Happy Home red; overdue due line (2D) */
+}
+
+/* Lists of strips: no bullets, 8px between strips. */
+.strip-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Other lists (milestones): no bullets either. */
+.plain-list {
+  list-style: none;
+  padding: 0;
+}
+
+.strip {
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Ideas and archived items have no tick box. */
+.strip.no-tick {
+  grid-template-columns: 1fr auto;
+}
+
+.strip-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.strip-title {
+  line-height: 1.35;
+}
+
+.strip-meta {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.strip-late {
+  font-weight: 600;
+  color: var(--late);
+}
+
+.strip-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Second line under the title for extra controls (the round-2 1C tray). */
+.strip-tray {
+  grid-column: 2 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
+.strip.no-tick .strip-tray {
+  grid-column: 1 / -1;
+}
+
+/* The tick box (a real checkbox): 22px, 7px radius, --panel with a sage border; ticked is green. */
+input[type="checkbox"].tick {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--panel);
+  border: 2px solid var(--sage);
+  padding: 0;
+}
+
+input[type="checkbox"].tick:checked {
+  background: var(--bar-fill);
+  border-color: var(--bar-fill);
+}
+
+/* The two small icons (1B): 30px --panel squares, 8px radius, 16px glyph. */
+button.icon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+button.icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Popovers in the 1A menu look. */
+.pop {
+  position: relative;
+  display: inline-block;
+}
+
+.pop-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 5;
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+  min-width: 190px;
+}
+
+.pop-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.pop-menu button:hover {
+  background: var(--row);
+}
+
+.pop-menu hr {
+  border: 0;
+  border-top: 2px solid var(--row);
+  margin: 4px 0;
+}
+
+.pop-menu input[type="date"] {
+  display: block;
+  width: 100%;
+}
+
+/* Done fold-out (4A). */
+.done-fold {
+  margin-top: 12px;
+}
+
+.done-fold summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+.done-fold .strip-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.done-note {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-top: 8px;
+}
+
+/* Month count (4A). */
+.month-progress {
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+/* Goal cards (3A). */
+.goal-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goal-card {
+  position: relative;
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.goal-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.goal-tile {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-tile);
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.goal-title {
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1.25;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-content .goal-title a {
+  text-decoration: none;
+}
+
+.goal-title a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-panel);
+}
+
+.chip {
+  font-size: 12px;
+  background: var(--row);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.goal-next {
+  font-size: 14px;
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 8px 10px;
+}
