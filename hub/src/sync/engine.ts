@@ -1,0 +1,317 @@
+// The sync engine: one `syncOnce` run sends this device's pending changes to the sync
+// server and applies what comes back, following the v1.1 contract
+// (docs/superpowers/specs/2026-10-28-sync-api.md plus its v1.1 amendments).
+//
+// One run is a loop of POST /v1/sync requests:
+//   1. build a batch from `pending` (at most 500 changes and 1 MB of JSON), each change
+//      carrying the full row (with its own id and updatedAt);
+//   2. send it with the stored cursor;
+//   3. apply the response in ONE IndexedDB transaction: clear the pending entries whose
+//      sent version is still the latest local one, apply each returned row unless this
+//      device has a newer local change to it waiting (that change stays pending and is
+//      sent later; the server then returns the winner), store the new cursor;
+//   4. repeat while there are unsent pending changes or the server says hasMore.
+// Errors: 401 clears the stored token and stops (never retried automatically); 429 reports
+// Retry-After; 409 cursor_ahead resets the cursor to 0 and re-sends every local row; 400
+// bad_change re-stamps far-future pending changes to now and retries once; anything else
+// (including no network) leaves every local change pending.
+
+import { applyUntracked } from "../data/changeTracking";
+import { validGoal, validItem } from "../data/backup";
+import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
+
+/** Contract limits for one request (the server allows more; these keep requests small). */
+export const MAX_CHANGES_PER_REQUEST = 500;
+export const MAX_REQUEST_BYTES = 1_000_000;
+/** A pending change stamped further ahead than this is re-stamped to now after a 400 bad_change. */
+export const FUTURE_RESTAMP_MS = 23 * 60 * 60 * 1000;
+/** Fallback wait when a 429 has no usable Retry-After. */
+export const DEFAULT_RETRY_AFTER_MS = 60_000;
+/** Safety stop for one run's request loop (a run normally needs a handful). */
+const MAX_ROUNDS = 10_000;
+
+export const NEEDS_PASSPHRASE_MESSAGE = "The passphrase was not accepted. Enter it again to keep syncing.";
+export const OFFLINE_MESSAGE = "Could not reach the sync server. Your changes are kept on this device and will sync later.";
+export const RATE_LIMITED_MESSAGE = "The sync server asked to wait a little. Sync will try again by itself.";
+export const TOO_LARGE_MESSAGE = "A change was too large to sync. It is kept on this device.";
+export const REJECTED_MESSAGE = "The sync server did not accept a change. Your changes are kept on this device.";
+export const FAILED_MESSAGE = "Sync did not work this time. Your changes are kept on this device.";
+
+export type SyncOutcome =
+  | { kind: "ok"; sent: number; received: number }
+  | { kind: "not-configured" }
+  | { kind: "needs-passphrase"; message: string }
+  | { kind: "rate-limited"; retryAfterMs: number; message: string }
+  | { kind: "offline"; message: string }
+  | { kind: "error"; message: string };
+
+export interface SyncEnv {
+  db: HubDB;
+  fetch: typeof fetch;
+}
+
+interface WireChange {
+  table: SyncTable;
+  id: string;
+  updatedAt: number;
+  data: Record<string, unknown>;
+}
+
+// ---- settings (syncMeta) ----------------------------------------------------------------
+
+export type MetaKey = "deviceId" | "cursor" | "lastSyncedAt" | "token" | "serverUrl" | "needsPassphrase";
+
+export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
+  return (await db.syncMeta.get(key))?.value as T | undefined;
+}
+
+export async function setMeta(db: HubDB, key: MetaKey, value: unknown): Promise<void> {
+  await db.syncMeta.put({ key, value });
+}
+
+/** This install's random device id (made once, never copied: syncMeta is not in backups). */
+export async function getDeviceId(db: HubDB): Promise<string> {
+  return db.transaction("rw", db.syncMeta, async () => {
+    const have = await getMeta<string>(db, "deviceId");
+    if (have) return have;
+    const id = crypto.randomUUID();
+    await setMeta(db, "deviceId", id);
+    return id;
+  });
+}
+
+/** Stores the address and the DERIVED token (never the passphrase) and re-enables sync. */
+export async function saveSyncSettings(db: HubDB, s: { serverUrl: string; token: string }): Promise<void> {
+  await db.transaction("rw", db.syncMeta, async () => {
+    await setMeta(db, "serverUrl", s.serverUrl.trim());
+    await setMeta(db, "token", s.token);
+    await db.syncMeta.delete("needsPassphrase");
+  });
+}
+
+/** Stops syncing on this device: forgets the token. Local data and pending changes stay. */
+export async function stopSyncing(db: HubDB): Promise<void> {
+  await db.transaction("rw", db.syncMeta, async () => {
+    await db.syncMeta.delete("token");
+    await db.syncMeta.delete("needsPassphrase");
+  });
+}
+
+// ---- one run ----------------------------------------------------------------------------
+
+const keyOf = (table: string, id: string) => `${table}\u0000${id}`;
+const utf8Length = (s: string) => new TextEncoder().encode(s).length;
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** Runs a whole sync. Never throws for network or server problems; returns what happened. */
+export async function syncOnce(env: SyncEnv): Promise<SyncOutcome> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  // One run at a time per database, across tabs too, where the browser supports it.
+  if (locks?.request) return locks.request(`esmeworld-sync:${env.db.name}`, () => run(env));
+  return run(env);
+}
+
+async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
+  const serverUrl = await getMeta<string>(db, "serverUrl");
+  const token = await getMeta<string>(db, "token");
+  if (!serverUrl || !token) return { kind: "not-configured" };
+  const deviceId = await getDeviceId(db);
+  const url = `${serverUrl.replace(/\/+$/, "")}/v1/sync`;
+
+  let cursor = (await getMeta<number>(db, "cursor")) ?? 0;
+  const attempted = new Set<string>(); // keys sent in this run (re-edits wait for the next run)
+  let needPull = true;
+  let hasMore = false;
+  let cursorReset = false;
+  let badChangeRetried = false;
+  let sent = 0;
+  let received = 0;
+
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const batch = await buildBatch(db, deviceId, cursor, attempted);
+    if (!needPull && !hasMore && batch.changes.length === 0) break;
+    const body = JSON.stringify({ deviceId, cursor, changes: batch.changes });
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body,
+      });
+    } catch {
+      return { kind: "offline", message: OFFLINE_MESSAGE };
+    }
+
+    if (!res.ok) {
+      const code = await errorCode(res);
+      if (res.status === 401) {
+        await db.transaction("rw", db.syncMeta, async () => {
+          await db.syncMeta.delete("token");
+          await setMeta(db, "needsPassphrase", true);
+        });
+        return { kind: "needs-passphrase", message: NEEDS_PASSPHRASE_MESSAGE };
+      }
+      if (res.status === 429) {
+        return { kind: "rate-limited", retryAfterMs: retryAfterMs(res.headers.get("Retry-After")), message: RATE_LIMITED_MESSAGE };
+      }
+      if (res.status === 409 && code === "cursor_ahead" && !cursorReset) {
+        cursorReset = true;
+        cursor = 0;
+        await resetForCursorAhead(db);
+        attempted.clear();
+        needPull = true;
+        hasMore = false;
+        continue;
+      }
+      if (res.status === 400 && code === "bad_change" && !badChangeRetried) {
+        badChangeRetried = true;
+        await restampFarFuture(db);
+        continue;
+      }
+      if (res.status === 413) return { kind: "error", message: TOO_LARGE_MESSAGE };
+      if (res.status === 400) return { kind: "error", message: REJECTED_MESSAGE };
+      return { kind: "error", message: FAILED_MESSAGE };
+    }
+
+    let reply: { cursor: number; hasMore: boolean; changes: WireChange[] };
+    try {
+      reply = parseReply(await res.json());
+    } catch {
+      return { kind: "error", message: FAILED_MESSAGE };
+    }
+
+    received += await applyReply(db, batch.changes, batch.pendingVersions, reply);
+    for (const c of batch.changes) attempted.add(keyOf(c.table, c.id));
+    sent += batch.changes.length;
+    cursor = reply.cursor;
+    hasMore = reply.hasMore;
+    needPull = false;
+  }
+  return { kind: "ok", sent, received };
+}
+
+/** Pending changes not yet attempted in this run, within the count and size limits. */
+async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted: Set<string>) {
+  return db.transaction("rw", db.items, db.goals, db.pending, async () => {
+    const changes: WireChange[] = [];
+    /** The pending entry's updatedAt when the request was built, per key. */
+    const pendingVersions = new Map<string, number>();
+    let bytes = utf8Length(JSON.stringify({ deviceId, cursor, changes: [] }));
+    for (const p of await db.pending.toArray()) {
+      const key = keyOf(p.table, p.id);
+      if (attempted.has(key)) continue;
+      const row = await db[p.table].get(p.id);
+      if (!row) {
+        await db.pending.delete([p.table, p.id]); // the row is gone (e.g. replaced by a restore)
+        continue;
+      }
+      const updatedAt = row.updatedAt ?? p.updatedAt;
+      const change: WireChange = { table: p.table, id: p.id, updatedAt, data: { ...row, id: p.id, updatedAt } };
+      const size = utf8Length(JSON.stringify(change)) + (changes.length > 0 ? 1 : 0);
+      if (changes.length >= MAX_CHANGES_PER_REQUEST) break;
+      if (changes.length > 0 && bytes + size > MAX_REQUEST_BYTES) break;
+      changes.push(change);
+      pendingVersions.set(key, p.updatedAt);
+      bytes += size;
+    }
+    return { changes, pendingVersions };
+  });
+}
+
+/** Applies one response in ONE transaction. Returns how many rows were written. */
+async function applyReply(
+  db: HubDB,
+  sentChanges: WireChange[],
+  pendingVersions: Map<string, number>,
+  reply: { cursor: number; changes: WireChange[] },
+): Promise<number> {
+  return applyUntracked(db, async () => {
+    // The sent versions are answered: clear them unless the row was edited again meanwhile.
+    for (const c of sentChanges) {
+      const p = await db.pending.get([c.table, c.id]);
+      if (p && p.updatedAt === pendingVersions.get(keyOf(c.table, c.id))) await db.pending.delete([c.table, c.id]);
+    }
+    let written = 0;
+    for (const c of reply.changes) {
+      // A local change still waiting (made after this request was built, or not sent yet)
+      // stays: it is sent later, and the server answers with whichever version wins.
+      if (await db.pending.get([c.table, c.id])) continue;
+      const local = await db[c.table].get(c.id);
+      if (typeof local?.updatedAt === "number" && local.updatedAt > c.updatedAt) continue; // stale repeat
+      const row = { ...c.data, id: c.id, updatedAt: c.updatedAt };
+      if (c.table === "items" ? !validItem(row) : !validGoal(row)) continue; // never store a broken row
+      await db.table(c.table).put(row);
+      written++;
+    }
+    await db.syncMeta.put({ key: "cursor", value: reply.cursor });
+    await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
+    return written;
+  });
+}
+
+/** 409 cursor_ahead: pull from the start and re-send every local row (stamps unchanged). */
+async function resetForCursorAhead(db: HubDB): Promise<void> {
+  await applyUntracked(db, async () => {
+    for (const table of SYNC_TABLES) {
+      const rows = await db.table(table).toArray();
+      for (const row of rows as { id: string; updatedAt?: number }[]) {
+        if (await db.pending.get([table, row.id])) continue;
+        await db.pending.put({ table, id: row.id, updatedAt: row.updatedAt ?? Date.now() });
+      }
+    }
+    await db.syncMeta.put({ key: "cursor", value: 0 });
+  });
+}
+
+/** 400 bad_change: pending changes stamped more than 23 h ahead (a wrong clock) become now. */
+async function restampFarFuture(db: HubDB): Promise<void> {
+  await applyUntracked(db, async () => {
+    const now = Date.now();
+    for (const p of await db.pending.toArray()) {
+      if (p.updatedAt <= now + FUTURE_RESTAMP_MS) continue;
+      const row = await db[p.table].get(p.id);
+      if (row) await db.table(p.table).put({ ...row, updatedAt: now });
+      await db.pending.put({ ...p, updatedAt: now });
+    }
+  });
+}
+
+async function errorCode(res: Response): Promise<string | undefined> {
+  try {
+    const body: unknown = await res.json();
+    return isObj(body) && typeof body.error === "string" ? body.error : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Retry-After as seconds or an HTTP date; a sensible default when missing or odd. */
+export function retryAfterMs(header: string | null, now = Date.now()): number {
+  if (header) {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.max(1000, seconds * 1000);
+    const at = Date.parse(header);
+    if (Number.isFinite(at)) return Math.max(1000, at - now);
+  }
+  return DEFAULT_RETRY_AFTER_MS;
+}
+
+function parseReply(body: unknown): { cursor: number; hasMore: boolean; changes: WireChange[] } {
+  if (!isObj(body)) throw new Error("bad reply");
+  const { cursor, hasMore, changes } = body;
+  if (typeof cursor !== "number" || !Number.isSafeInteger(cursor) || cursor < 0) throw new Error("bad cursor");
+  if (typeof hasMore !== "boolean" || !Array.isArray(changes)) throw new Error("bad reply");
+  for (const c of changes as unknown[]) {
+    if (
+      !isObj(c) ||
+      !(SYNC_TABLES as readonly unknown[]).includes(c.table) ||
+      typeof c.id !== "string" ||
+      typeof c.updatedAt !== "number" ||
+      !isObj(c.data)
+    ) {
+      throw new Error("bad change");
+    }
+  }
+  return { cursor, hasMore, changes: changes as WireChange[] };
+}

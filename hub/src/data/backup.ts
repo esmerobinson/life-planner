@@ -27,7 +27,8 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
 const isStr = (v: unknown): v is string => typeof v === "string";
 const isStrArray = (v: unknown) => Array.isArray(v) && v.every(isStr);
 
-function validItem(r: unknown): r is Item {
+/** The backup validator for one item row; sync uses it on rows from the server too. */
+export function validItem(r: unknown): r is Item {
   return (
     isObj(r) &&
     isStr(r.id) && r.id !== "" &&
@@ -53,7 +54,8 @@ function validItem(r: unknown): r is Item {
   );
 }
 
-function validGoal(r: unknown): r is Goal {
+/** The backup validator for one goal row; sync uses it on rows from the server too. */
+export function validGoal(r: unknown): r is Goal {
   return (
     isObj(r) &&
     isStr(r.id) && r.id !== "" &&
