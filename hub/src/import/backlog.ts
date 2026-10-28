@@ -1,5 +1,6 @@
 import { db } from "../data/db";
 import { isValidISODate } from "../domain/dates";
+import { sectionToArea } from "./sectionAreas";
 import type { ISODate, Item, Priority, Weekday } from "../domain/types";
 
 export interface ParsedItem {
@@ -9,6 +10,8 @@ export interface ParsedItem {
   recur?: Weekday[];
   tags: string[];
   inbox: boolean;
+  /** Raw `## ` heading text, trimmed. */
+  section: string;
   key: string;
 }
 
@@ -32,10 +35,12 @@ export function parseBacklog(markdown: string): {
   const items: ParsedItem[] = [];
   const skipped: { line: string; reason: string }[] = [];
   let section = "";
+  let rawSection = "";
   for (const rawLine of markdown.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (rawLine.startsWith("## ")) {
-      section = rawLine.slice(3).trim().toLowerCase();
+      rawSection = rawLine.slice(3).trim();
+      section = rawSection.toLowerCase();
       continue;
     }
     const m = TASK_RE.exec(line);
@@ -81,6 +86,7 @@ export function parseBacklog(markdown: string): {
       priority,
       tags,
       inbox: section.includes("inbox"),
+      section: rawSection,
       key: "backlog:" + title.toLowerCase(),
     };
     if (dueDate) parsed.due = dueDate;
@@ -118,7 +124,7 @@ export async function importBacklog(
         kind: "task",
         title: p.title,
         links: [],
-        areaId: "inbox",
+        areaId: sectionToArea(p.section),
         priority: p.priority,
         status: "open",
         createdAt: today,

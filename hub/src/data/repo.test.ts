@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "./db";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
-  archiveItem, restoreItem, listItems, toggleMilestone,
+  archiveItem, restoreItem, listItems, toggleMilestone, updateItems,
 } from "./repo";
 
 const today = "2026-10-27";
@@ -135,5 +135,38 @@ describe("repo", () => {
     expect((await db.goals.get(g.id))?.milestones[0].done).toBe(true);
     await toggleMilestone(g.id, "m1");
     expect((await db.goals.get(g.id))?.milestones[0].done).toBe(false);
+  });
+});
+
+describe("updateItems", () => {
+  it("updateItems changes all given ids in one transaction, ignores unknown ids, and never changes status/tags/source", async () => {
+    const a = await createItem({ ...base, areaId: "inbox", tags: ["x"], source: { kind: "backlog", key: "k1" } }, "2026-10-01");
+    const b = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");
+    await db.items.update(b.id, { status: "done", completedAt: "2026-10-02" });
+    const spy = vi.spyOn(db, "transaction");
+    await updateItems([a.id, b.id, "nope"], { areaId: "art", priority: 1 }, today);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    const ga = (await db.items.get(a.id))!;
+    const gb = (await db.items.get(b.id))!;
+    expect(ga).toMatchObject({ areaId: "art", priority: 1, touchedAt: today, tags: ["x"], status: "open", source: { kind: "backlog", key: "k1" } });
+    expect(gb).toMatchObject({ areaId: "art", priority: 1, touchedAt: today, status: "done", completedAt: "2026-10-02" });
+    expect(await db.items.count()).toBe(2);
+  });
+
+  it("updateItems rolls back everything if one write fails", async () => {
+    const a = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");
+    const b = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");
+    const orig = db.items.update.bind(db.items);
+    let calls = 0;
+    const spy = vi.spyOn(db.items, "update").mockImplementation(((...args: Parameters<typeof orig>) => {
+      calls++;
+      if (calls === 2) return Promise.reject(new Error("boom"));
+      return orig(...args);
+    }) as typeof db.items.update);
+    await expect(updateItems([a.id, b.id], { areaId: "art" }, today)).rejects.toThrow();
+    spy.mockRestore();
+    expect(await db.items.get(a.id)).toMatchObject({ areaId: "inbox", touchedAt: "2026-10-01" });
+    expect(await db.items.get(b.id)).toMatchObject({ areaId: "inbox", touchedAt: "2026-10-01" });
   });
 });

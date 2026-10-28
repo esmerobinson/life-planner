@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../data/db";
 import { parseBacklog, importBacklog } from "./backlog";
+import { sectionToArea } from "./sectionAreas";
 import md from "./__fixtures__/Backlog.md?raw";
 
 const TODAY = "2026-10-27";
@@ -28,7 +29,7 @@ describe("parseBacklog", () => {
     expect(titles).not.toContain("Learn the theremin");
     expect(titles).not.toContain("Draft the invented newsletter");
     expect(titles.join("|")).not.toMatch(/Finished|Handed-off/);
-    expect(titles).toHaveLength(6);
+    expect(titles).toHaveLength(12);
   });
 
   it("[due 2026-13-45] is reported in skipped, item imported without due", () => {
@@ -79,12 +80,12 @@ describe("importBacklog", () => {
 
   it("importing twice adds nothing the second time", async () => {
     const first = await importBacklog(md, TODAY);
-    expect(first.added).toBe(6);
+    expect(first.added).toBe(12);
     expect(first.skipped).toBeGreaterThan(0);
     const second = await importBacklog(md, TODAY);
-    expect(second).toMatchObject({ added: 0, alreadyHad: 6 });
-    expect(await db.items.count()).toBe(6);
-    const one = (await db.items.toArray())[0];
+    expect(second).toMatchObject({ added: 0, alreadyHad: 12 });
+    expect(await db.items.count()).toBe(12);
+    const one = (await db.items.toArray()).find((i) => i.title === "Reply to the imaginary landlord")!;
     expect(one).toMatchObject({ areaId: "inbox", kind: "task", links: [], status: "open" });
     expect(one.source?.kind).toBe("backlog");
   });
@@ -102,7 +103,7 @@ describe("importBacklog", () => {
     const row = (await db.items.filter((i) => i.title === "Sketch a lighthouse").first())!;
     await db.items.update(row.id, { status: "archived" });
     const r = await importBacklog(md, TODAY);
-    expect(r.alreadyHad).toBe(6);
+    expect(r.alreadyHad).toBe(12);
     expect((await db.items.get(row.id))!.status).toBe("archived");
   });
 
@@ -118,5 +119,85 @@ describe("importBacklog", () => {
   it("duplicate titles in one file collapse to one item", async () => {
     const r = await importBacklog("- [ ] Same  thing\n- [ ] same thing", TODAY);
     expect(r).toMatchObject({ added: 1, alreadyHad: 1 });
+  });
+});
+
+describe("sectionToArea", () => {
+  const table: [string, string][] = [
+    ["📖 Writing", "writing"],
+    ["🌱 Inner work", "mind"],
+    ["🏃 Health", "body"],
+    ["📱 Content", "content"],
+    ["🎨 Art", "art"],
+    ["WRITING", "writing"],
+    ["  inner   work  ", "mind"],
+    ["Writing (incl. drafts)", "writing"],
+    ["Production & freelance (incl. ETI)", "inbox"],
+    ["Vibecoding", "inbox"],
+    ["Life admin", "inbox"],
+    ["Leisure", "inbox"],
+    ["🔁 Weekly rhythm (recurring, scheduled by day)", "inbox"],
+    ["Inbox", "inbox"],
+    ["Parked for later", "inbox"],
+    ["Something unknown", "inbox"],
+    ["", "inbox"],
+  ];
+  it.each(table)("%j -> %s", (heading, area) => {
+    expect(sectionToArea(heading)).toBe(area);
+  });
+});
+
+describe("import filing by section", () => {
+  it("imported items under Writing land in the writing area and under Life admin in inbox", async () => {
+    await importBacklog(md, TODAY);
+    const area = async (t: string) => (await db.items.filter((i) => i.title === t).first())!.areaId;
+    expect(await area("Outline the invented lighthouse story")).toBe("writing");
+    expect(await area("Revise the pretend poem")).toBe("writing");
+    expect(await area("Try a fictional breathing exercise")).toBe("mind");
+    expect(await area("Book an imaginary check-up")).toBe("body");
+    expect(await area("Sort the made-up paperwork")).toBe("inbox");
+    expect(await area("Water the pretend herbs")).toBe("inbox");
+    expect(await area("Reply to the imaginary landlord")).toBe("inbox");
+  });
+
+  it("parsed items carry the raw section heading", () => {
+    const { items } = parseBacklog(md);
+    expect(items.find((i) => i.title === "Book an imaginary check-up")!.section).toBe("🏃 Health");
+  });
+
+  it("re-import after filing one item elsewhere does not move it back", async () => {
+    await importBacklog(md, TODAY);
+    const row = (await db.items.filter((i) => i.title === "Sort the made-up paperwork").first())!;
+    await db.items.update(row.id, { areaId: "art" });
+    await importBacklog(md, "2026-10-28");
+    expect(await db.items.get(row.id)).toEqual({ ...row, areaId: "art" });
+  });
+
+  it("re-import after ticking and archiving leaves both untouched", async () => {
+    await importBacklog(md, TODAY);
+    const a = (await db.items.filter((i) => i.title === "Outline the invented lighthouse story").first())!;
+    const b = (await db.items.filter((i) => i.title === "Book an imaginary check-up").first())!;
+    await db.items.update(a.id, { status: "done", completedAt: TODAY });
+    await db.items.update(b.id, { status: "archived" });
+    const beforeA = await db.items.get(a.id);
+    const beforeB = await db.items.get(b.id);
+    await importBacklog(md, "2026-10-28");
+    expect(await db.items.get(a.id)).toEqual(beforeA);
+    expect(await db.items.get(b.id)).toEqual(beforeB);
+  });
+
+  it("re-import after the user moved an imported writing item to art keeps it in art", async () => {
+    await importBacklog(md, TODAY);
+    const row = (await db.items.filter((i) => i.title === "Revise the pretend poem").first())!;
+    await db.items.update(row.id, { areaId: "art" });
+    await importBacklog(md, "2026-10-28");
+    expect((await db.items.get(row.id))!.areaId).toBe("art");
+  });
+
+  it("importBacklog is still one transaction", async () => {
+    const spy = vi.spyOn(db, "transaction");
+    await importBacklog(md, TODAY);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 });

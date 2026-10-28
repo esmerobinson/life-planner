@@ -178,3 +178,63 @@ describe("AppShell additions", () => {
     expect(within(nav).queryByText(/Inbox/)).toBeNull();
   });
 });
+
+describe("bulk filing", () => {
+  async function seed(n: number) {
+    for (let i = 1; i <= n; i++) {
+      await createItem({ kind: "task", title: `Loose ${i}`, areaId: "inbox", priority: 2 }, TODAY);
+    }
+  }
+
+  it("Move selected files five items to Art and they leave the inbox", async () => {
+    await seed(6);
+    render(<InboxPage today={TODAY} />);
+    for (let i = 1; i <= 5; i++) {
+      await userEvent.click(await screen.findByRole("checkbox", { name: new RegExp(`Loose ${i}$`) }));
+    }
+    await userEvent.selectOptions(screen.getByLabelText("Move selected to"), "art");
+    await userEvent.click(screen.getByRole("button", { name: "Move selected" }));
+    await vi.waitFor(() => expect(screen.queryByText("Loose 1")).toBeNull());
+    expect(screen.getByText("Loose 6")).toBeInTheDocument();
+    const all = await db.items.toArray();
+    expect(all.filter((i) => i.areaId === "art")).toHaveLength(5);
+    expect(all.find((i) => i.title === "Loose 6")!.areaId).toBe("inbox");
+    expect(screen.getByRole("checkbox", { name: /Loose 6$/ })).not.toBeChecked();
+  });
+
+  it("select all shown then move empties the inbox", async () => {
+    await seed(3);
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Select all shown" }));
+    await userEvent.selectOptions(screen.getByLabelText("Move selected to"), "mind");
+    await userEvent.click(screen.getByRole("button", { name: "Move selected" }));
+    expect(await screen.findByText("Nothing waiting in the inbox.")).toBeInTheDocument();
+    expect((await db.items.toArray()).every((i) => i.areaId === "mind")).toBe(true);
+  });
+
+  it("the move button is disabled until something is selected and an area is chosen", async () => {
+    await seed(2);
+    render(<InboxPage today={TODAY} />);
+    const btn = await screen.findByRole("button", { name: "Move selected" });
+    expect(btn).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText("Move selected to"), "body");
+    expect(btn).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Loose 1$/ }));
+    expect(btn).toBeEnabled();
+    const sel = screen.getByLabelText("Move selected to");
+    expect(within(sel).queryByRole("option", { name: "Inbox" })).toBeNull();
+  });
+
+  it("a failing bulk move shows the calm message and changes nothing", async () => {
+    await seed(2);
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Select all shown" }));
+    await userEvent.selectOptions(screen.getByLabelText("Move selected to"), "art");
+    const spy = vi.spyOn(db.items, "update").mockRejectedValue(new Error("boom"));
+    await userEvent.click(screen.getByRole("button", { name: "Move selected" }));
+    expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
+    spy.mockRestore();
+    expect((await db.items.toArray()).every((i) => i.areaId === "inbox")).toBe(true);
+    expect(screen.getByText("Loose 1")).toBeInTheDocument();
+  });
+});

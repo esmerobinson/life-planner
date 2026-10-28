@@ -22,6 +22,18 @@ waiting), then paste the contents of `Backlog.md` or choose the file. The
 import is safe to repeat: items already imported are not duplicated. Lines the
 import could not fully read are listed under **Notes** below the counts.
 
+## Areas
+
+On a first import, new items are filed by their Backlog section: Writing,
+Content and Art go to those areas, Inner work goes to Mind, and Health goes to
+Body. Everything else goes to the Inbox. Items already in the app are never
+moved by a re-import. In the Inbox you can tick several items and move them to
+an area in one go.
+
+Open question: Vibecoding, Production & freelance, Life admin and Leisure have
+no area yet, so those items stay in the Inbox until we decide whether to add
+areas for them.
+
 ## Not done yet
 
 Deliberately left for later plans (2 to 5):

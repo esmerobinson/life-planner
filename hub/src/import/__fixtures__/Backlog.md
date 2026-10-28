@@ -10,6 +10,22 @@
 - [x] Finished fictional chore !p3
 - [>] Handed-off fictional chore
 
+## 📖 Writing
+- [ ] Outline the invented lighthouse story
+- [ ] Revise the pretend poem !p1
+
+## 🌱 Inner work
+- [ ] Try a fictional breathing exercise
+
+## 🏃 Health
+- [ ] Book an imaginary check-up
+
+## 💼 Life admin
+- [ ] Sort the made-up paperwork
+
+## 🔁 Weekly rhythm (recurring, scheduled by day)
+- [ ] Water the pretend herbs [recur: sat]
+
 ## Inbox
 - [ ] Look into a pretend pottery class #ideas
 

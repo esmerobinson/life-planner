@@ -131,3 +131,18 @@ export async function toggleMilestone(goalId: string, milestoneId: string): Prom
     });
   });
 }
+
+/** Bulk filing: one transaction, unknown ids skipped, only the patched fields (plus touchedAt) change. */
+export async function updateItems(
+  ids: string[],
+  patch: Pick<Partial<Item>, "areaId" | "goalId" | "priority" | "due">,
+  today: ISODate,
+): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    for (const id of ids) {
+      const item = await db.items.get(id);
+      if (!item) continue;
+      await db.items.update(id, { ...patch, touchedAt: today });
+    }
+  });
+}
