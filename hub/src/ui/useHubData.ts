@@ -1,3 +1,4 @@
+import Dexie from "dexie";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ShellContext } from "./shellContext";
 import { DATA_ERROR } from "./messages";
@@ -41,7 +42,13 @@ export function useHubData(_today: ISODate): {
   useEffect(() => {
     mounted.current = true;
     void refresh();
+    // Other tabs (and other connections) announce writes here; reads are
+    // funnelled through the request-id guarded refresh, so the last read wins.
+    // Reads never write, so this cannot loop.
+    const onMutated = () => void refresh();
+    Dexie.on.storagemutated.subscribe(onMutated);
     return () => {
+      Dexie.on.storagemutated.unsubscribe(onMutated);
       mounted.current = false;
     };
   }, [refresh, version]);

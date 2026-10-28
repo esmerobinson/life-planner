@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 import * as repo from "../data/repo";
-import { db } from "../data/db";
+import Dexie from "dexie";
+import { db, HubDB } from "../data/db";
 import type { Item } from "../domain/types";
 import { useHubData } from "./useHubData";
 
@@ -95,5 +96,74 @@ describe("useHubData", () => {
     });
     expect(result.current.error).toBeNull();
     expect(result.current.items.map((i) => i.title)).toEqual(["back"]);
+  });
+
+  describe("cross-tab freshness", () => {
+    it("a write from a second Dexie connection triggers a re-read in the hook", async () => {
+      const other = new HubDB();
+      const { result } = renderHook(() => useHubData(TODAY));
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      await other.items.put(mk("external"));
+      await waitFor(() => expect(result.current.items.map((i) => i.title)).toEqual(["external"]));
+      other.close();
+    });
+
+    it("the subscription is removed on unmount", async () => {
+      const unsub = vi.spyOn(Dexie.on.storagemutated, "unsubscribe");
+      const { result, unmount } = renderHook(() => useHubData(TODAY));
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      unmount();
+      expect(unsub).toHaveBeenCalled();
+      const spy = vi.spyOn(repo, "listItems");
+      const other = new HubDB();
+      await other.items.put(mk("after-unmount"));
+      await new Promise((r) => setTimeout(r, 50));
+      expect(spy).not.toHaveBeenCalled();
+      other.close();
+    });
+
+    it("two rapid external writes produce a final state containing both", async () => {
+      const other = new HubDB();
+      const { result } = renderHook(() => useHubData(TODAY));
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      await Promise.all([other.items.put(mk("a")), other.items.put(mk("b"))]);
+      await waitFor(() =>
+        expect(result.current.items.map((i) => i.title).sort()).toEqual(["a", "b"]),
+      );
+      other.close();
+    });
+
+    it("a local write causes a bounded number of reads (no loop)", async () => {
+      const spy = vi.spyOn(repo, "listItems");
+      const { result } = renderHook(() => useHubData(TODAY));
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      spy.mockClear();
+      await db.items.put(mk("local"));
+      await waitFor(() => expect(result.current.items).toHaveLength(1));
+      await new Promise((r) => setTimeout(r, 100));
+      expect(spy.mock.calls.length).toBeLessThanOrEqual(3);
+    });
+
+    it("an external change while a slower older read is in flight does not let the older result overwrite the newer", async () => {
+      const older = deferred<Item[]>();
+      const spy = vi.spyOn(repo, "listItems");
+      spy.mockReturnValueOnce(Promise.resolve([])); // mount read
+      const other = new HubDB();
+      const { result } = renderHook(() => useHubData(TODAY));
+      await waitFor(() => expect(result.current.loaded).toBe(true));
+      spy.mockReturnValueOnce(older.promise); // slow read, started by a manual refresh
+      let p!: Promise<void>;
+      act(() => {
+        p = result.current.refresh();
+      });
+      await other.items.put(mk("fresh")); // external event -> newer real read
+      await waitFor(() => expect(result.current.items.map((i) => i.title)).toEqual(["fresh"]));
+      await act(async () => {
+        older.resolve([mk("stale")]);
+        await p;
+      });
+      expect(result.current.items.map((i) => i.title)).toEqual(["fresh"]);
+      other.close();
+    });
   });
 });
