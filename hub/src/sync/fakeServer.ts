@@ -76,6 +76,8 @@ export class FakeSyncServer {
       maxResponseBytes?: number;
       now?: () => number;
       strictClient?: boolean;
+      /** Extra tables a LATER server accepts (to test clients against tables they don't know yet). */
+      extraTables?: string[];
       /** Test hook: refuse a change (whole request, 400) with this code, e.g. a row the real server finds too large. */
       reject?: (change: { table: string; id: string; updatedAt: number; data: Record<string, unknown> }) => string | undefined;
     } = {},
@@ -171,7 +173,9 @@ export class FakeSyncServer {
     for (const c of changes as unknown[]) {
       if (!isObj(c)) return bad("bad_change");
       const { table, id, updatedAt, data } = c;
-      if (typeof table !== "string" || !TABLES.has(table)) return bad("bad_change");
+      if (typeof table !== "string" || !(TABLES.has(table) || this.options.extraTables?.includes(table))) {
+        return bad("bad_change");
+      }
       if (typeof id !== "string" || id.length === 0 || id.length > MAX_ID_LENGTH) return bad("bad_change");
       if (typeof updatedAt !== "number" || !Number.isSafeInteger(updatedAt) || updatedAt <= 0 || updatedAt > latest) {
         return bad("bad_change");

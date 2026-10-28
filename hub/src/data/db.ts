@@ -34,7 +34,8 @@ export interface PendingChange {
  * again and applies it, by the usual last-write-wins, once it passes.
  */
 export interface QuarantinedRow {
-  table: SyncTable;
+  /** A synced table, or one only a later app version knows (kept until this app updates). */
+  table: string;
   id: string;
   updatedAt: number;
   /** The row exactly as the server sent it. */

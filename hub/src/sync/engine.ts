@@ -171,6 +171,8 @@ export async function stopSyncing(db: HubDB): Promise<void> {
 
 /** The row check for each synced table (the same one every local write passes). */
 const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = { items: validItem, goals: validGoal, files: validFile };
+/** A table this build syncs (a later build may add more; their rows are skipped here). */
+const isSyncTable = (t: unknown): t is SyncTable => (SYNC_TABLES as readonly unknown[]).includes(t);
 
 const keyOf = (table: string, id: string) => `${table}\u0000${id}`;
 const utf8Length = (s: string) => new TextEncoder().encode(s).length;
@@ -376,6 +378,12 @@ async function applyReply(
     }
     let written = 0;
     for (const c of reply.changes) {
+      // A table only a later app version knows: never fatal, so this device keeps syncing.
+      // The row waits in quarantine; after the update, retryQuarantine applies it.
+      if (!isSyncTable(c.table)) {
+        await holdForLater(db, c, reply.cursor);
+        continue;
+      }
       if (await applyRow(db, c, reply.cursor)) written++;
     }
     await db.syncMeta.put({ key: "cursor", value: reply.cursor });
@@ -418,6 +426,16 @@ async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boole
   return true;
 }
 
+/** Keeps a row of an unknown table in quarantine (the newest version of it only). */
+async function holdForLater(db: HubDB, c: { table: string; id: string; updatedAt: number; data: Record<string, unknown> }, cursor: number) {
+  const held = await db.quarantine.get([c.table, c.id]);
+  if (held && held.updatedAt > c.updatedAt) return;
+  await db.quarantine.put({
+    table: c.table, id: c.id, updatedAt: c.updatedAt, data: c.data,
+    reason: "A later version of the app syncs this.", cursor,
+  });
+}
+
 /**
  * Tries every quarantined row again (after an app update it may now be readable) and
  * applies it by the usual rules; a row that is now outdated is dropped. ONE transaction.
@@ -427,6 +445,7 @@ async function retryQuarantine(db: HubDB): Promise<number> {
   return applyUntracked(db, async () => {
     let written = 0;
     for (const q of await db.quarantine.toArray()) {
+      if (!isSyncTable(q.table)) continue; // kept for a later version that knows the table
       const row = { ...q.data, id: q.id, updatedAt: q.updatedAt };
       if (!VALID_ROW[q.table](row)) continue; // still unreadable
       await db.quarantine.delete([q.table, q.id]);
@@ -482,7 +501,7 @@ function parseReply(body: unknown): { cursor: number; hasMore: boolean; changes:
   for (const c of changes as unknown[]) {
     if (
       !isObj(c) ||
-      !(SYNC_TABLES as readonly unknown[]).includes(c.table) ||
+      typeof c.table !== "string" ||
       typeof c.id !== "string" ||
       typeof c.updatedAt !== "number" ||
       !isObj(c.data)
