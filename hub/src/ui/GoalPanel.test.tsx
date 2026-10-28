@@ -275,6 +275,19 @@ describe("habits in a goal's To come (review M-4)", () => {
 });
 
 describe("Delete goal (at the bottom of the panel)", () => {
+  it("Confirm goes Back exactly one step, even when the stale-?open check closes too", async () => {
+    const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
+    renderApp(["/inbox", "/goals"], TODAY);
+    await userEvent.click(await screen.findByRole("link", { name: "Pretend goal" }));
+    const p = within(await screen.findByRole("complementary", { name: "Pretend goal" }));
+    expect(currentUrl).toBe(`/goals?open=${g.id}`);
+    await userEvent.click(p.getByRole("button", { name: "Delete goal" }));
+    await userEvent.click(p.getByRole("button", { name: "Confirm" }));
+    await vi.waitFor(() => expect(screen.queryByRole("complementary", { name: "Pretend goal" })).toBeNull());
+    await new Promise((r) => setTimeout(r, 50)); // let any second close land
+    expect(currentUrl).toBe("/goals");
+  });
+
   it("asks first; Cancel keeps the goal", async () => {
     const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
     const p = await openGoal(g.id);

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useLocation, useNavigate, type To } from "react-router-dom";
 
 /** The URL parameter naming the open item or goal (`?open=<id>`), so Back closes the panel. */
@@ -54,11 +54,20 @@ export function PanelProvider({ children }: { children: ReactNode }) {
     [openId, location.pathname, location.state, navigate, searchWith],
   );
 
+  // One Back per open entry: a second close() before the URL has caught up (e.g. Delete
+  // goal closes, then the stale-?open check closes again) must not step back a page more.
+  const backedFrom = useRef<string | null>(null);
+  useEffect(() => {
+    backedFrom.current = null; // the URL moved on (also when Forward returns to this entry later)
+  }, [location.key]);
   const close = useCallback(() => {
     if (!openId) return;
-    if (pushed) navigate(-1);
-    else navigate({ pathname: location.pathname, search: searchWith(null) }, { replace: true });
-  }, [openId, pushed, navigate, location.pathname, searchWith]);
+    if (pushed) {
+      if (backedFrom.current === location.key) return;
+      backedFrom.current = location.key;
+      navigate(-1);
+    } else navigate({ pathname: location.pathname, search: searchWith(null) }, { replace: true });
+  }, [openId, pushed, navigate, location.key, location.pathname, searchWith]);
 
   const href = useCallback((id: string): To => ({ pathname: location.pathname, search: searchWith(id) }), [
     location.pathname,
