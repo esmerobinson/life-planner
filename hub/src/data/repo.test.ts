@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "./db";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
-  archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem,
+  archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem, updateGoal,
 } from "./repo";
 
 const today = "2026-10-27";
@@ -198,5 +198,69 @@ describe("updateItems", () => {
     spy.mockRestore();
     expect(await db.items.get(a.id)).toMatchObject({ areaId: "inbox", touchedAt: "2026-10-01" });
     expect(await db.items.get(b.id)).toMatchObject({ areaId: "inbox", touchedAt: "2026-10-01" });
+  });
+});
+
+describe("updateGoal", () => {
+  const seed = () =>
+    createGoal(
+      {
+        title: "Old", areaId: "art", kind: "finite", deadline: "2026-12-31", monthlyTarget: 3,
+        milestones: [{ id: "m1", title: "one", done: true }], why: "because", cadence: "Weekly: 2",
+        notes: "n", source: { kind: "obsidian", key: "obsidian:goal:old" },
+      },
+      today,
+    );
+
+  it("changes only title, area, deadline and monthly target, in one transaction", async () => {
+    const g = await seed();
+    const spy = vi.spyOn(db, "transaction");
+    await updateGoal(g.id, { title: "  New  ", areaId: "body", deadline: "2027-01-31", monthlyTarget: 5 }, "2026-11-01");
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    expect(await db.goals.get(g.id)).toEqual({
+      ...g, title: "New", areaId: "body", deadline: "2027-01-31", monthlyTarget: 5,
+    });
+  });
+
+  it("never touches milestones, source, why, cadence or notes, even if passed", async () => {
+    const g = await seed();
+    await updateGoal(g.id, { title: "X", milestones: [], source: undefined, why: "hacked" } as never, today);
+    const got = (await db.goals.get(g.id))!;
+    expect(got.milestones).toEqual(g.milestones);
+    expect(got.source).toEqual(g.source);
+    expect(got.why).toBe("because");
+  });
+
+  it("leaves fields that are not in the patch alone", async () => {
+    const g = await seed();
+    await updateGoal(g.id, { title: "Only title" }, today);
+    expect(await db.goals.get(g.id)).toEqual({ ...g, title: "Only title" });
+  });
+
+  it("clears the monthly target and the deadline of a practice goal when set to undefined", async () => {
+    const p = await createGoal({ title: "p", areaId: "art", kind: "practice", deadline: "2026-12-01", monthlyTarget: 2 }, today);
+    await updateGoal(p.id, { deadline: undefined, monthlyTarget: undefined }, today);
+    const got = (await db.goals.get(p.id))!;
+    expect(got.deadline).toBeUndefined();
+    expect(got.monthlyTarget).toBeUndefined();
+  });
+
+  it.each([
+    ["blank title", { title: "   " }],
+    ["inbox area", { areaId: "inbox" }],
+    ["unknown area", { areaId: "nowhere" }],
+    ["finite goal losing its deadline", { deadline: undefined }],
+    ["impossible deadline", { deadline: "2026-02-30" }],
+    ["monthly target 0", { monthlyTarget: 0 }],
+    ["monthly target 1.5", { monthlyTarget: 1.5 }],
+  ])("rejects %s and changes nothing", async (_n, patch) => {
+    const g = await seed();
+    await expect(updateGoal(g.id, patch as never, today)).rejects.toThrow();
+    expect(await db.goals.get(g.id)).toEqual(g);
+  });
+
+  it("rejects a goal that does not exist", async () => {
+    await expect(updateGoal("nope", { title: "x" }, today)).rejects.toThrow();
   });
 });

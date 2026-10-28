@@ -1,10 +1,11 @@
 import { useContext } from "react";
 import { useParams } from "react-router-dom";
-import { toggleMilestone, untickItem } from "../data/repo";
+import { toggleMilestone, untickItem, updateGoal } from "../data/repo";
 import { addDays, mondayOf } from "../domain/dates";
 import { monthlyProgress } from "../domain/progress";
 import type { ISODate, Item } from "../domain/types";
 import { DoneSection } from "./DoneSection";
+import { GoalEditForm } from "./GoalEditForm";
 import { areaLabel, GoalProgress } from "./GoalProgress";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
@@ -99,6 +100,11 @@ export function GoalDetail({ today }: { today: ISODate }) {
       <DoneSection
         items={items.filter((i) => i.goalId === goal.id && i.kind === "task")}
         onUndo={(itemId) => void save(() => untickItem(itemId, today))}
+      />
+      <GoalEditForm
+        key={`${goal.id}|${goal.title}|${goal.areaId}|${goal.deadline}|${goal.monthlyTarget}`}
+        goal={goal}
+        onSave={(patch) => save(() => updateGoal(goal.id, patch, today))}
       />
     </section>
   );

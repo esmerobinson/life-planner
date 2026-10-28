@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { addDays, mondayOf } from "../domain/dates";
-import type { AreaId, Goal, ISODate, Item, Milestone } from "../domain/types";
+import { addDays, isValidISODate, mondayOf } from "../domain/dates";
+import { AREA_IDS, type AreaId, type Goal, type ISODate, type Item, type Milestone } from "../domain/types";
 
 export async function createItem(
   input: Omit<Item, "id" | "status" | "links" | "createdAt" | "touchedAt"> & { links?: string[] },
@@ -33,6 +33,52 @@ export async function createGoal(
   };
   await db.goals.add(goal);
   return goal;
+}
+
+/** The only goal fields the Edit section may change. */
+export interface GoalPatch {
+  title?: string;
+  areaId?: AreaId;
+  deadline?: ISODate | undefined;
+  monthlyTarget?: number | undefined;
+}
+
+/**
+ * Edits a goal's title, area, deadline and monthly target in one transaction, with the
+ * same rules as createGoal (a finite goal keeps a real deadline; goals are never in the
+ * inbox). A key that is present with the value undefined clears that field. Milestones,
+ * source, why, cadence and notes are never touched.
+ */
+export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate): Promise<void> {
+  await db.transaction("rw", db.goals, async () => {
+    const goal = await db.goals.get(id);
+    if (!goal) throw new Error("that goal does not exist");
+    const next: Goal = { ...goal };
+    if ("title" in patch) {
+      const title = (patch.title ?? "").trim();
+      if (!title) throw new Error("a goal needs a title");
+      next.title = title;
+    }
+    if ("areaId" in patch) {
+      if (!patch.areaId || patch.areaId === "inbox" || !(AREA_IDS as readonly string[]).includes(patch.areaId)) {
+        throw new Error("a goal needs an area other than the inbox");
+      }
+      next.areaId = patch.areaId;
+    }
+    if ("deadline" in patch) {
+      if (patch.deadline === undefined) delete next.deadline;
+      else next.deadline = patch.deadline;
+    }
+    if (next.deadline !== undefined && !isValidISODate(next.deadline)) throw new Error("that deadline is not a real date");
+    if (next.kind === "finite" && !next.deadline) throw new Error("finite goals need a deadline");
+    if ("monthlyTarget" in patch) {
+      const t = patch.monthlyTarget;
+      if (t === undefined) delete next.monthlyTarget;
+      else if (!Number.isInteger(t) || t < 1) throw new Error("a monthly target is a whole number, 1 or more");
+      else next.monthlyTarget = t;
+    }
+    await db.goals.put(next);
+  });
 }
 
 export async function updateItem(id: string, patch: Partial<Item>, today: ISODate): Promise<void> {
