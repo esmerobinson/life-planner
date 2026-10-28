@@ -336,6 +336,38 @@ describe("syncOnce", () => {
     expect(await a.pending.count()).toBe(1);
   });
 
+  it("changing the sync address starts over: cursor 0, every row pending again, both sides complete", async () => {
+    const scratch = new FakeSyncServer(TOKEN);
+    const a = await device();
+    await a.items.bulkAdd([item("mine1"), item("mine2")]);
+    await syncOnce({ db: a, fetch: scratch.fetch });
+    expect(await a.pending.count()).toBe(0);
+    expect(await getMeta(a, "firstPullDone")).toBe(true);
+
+    // The real server already holds MORE rows than this device's cursor (no 409 would fire).
+    const real = new FakeSyncServer(TOKEN);
+    const other = new HubDB(`sync-device-${++n}`);
+    open.push(other);
+    await saveSyncSettings(other, { serverUrl: "https://real.example.test", token: TOKEN });
+    await other.items.bulkAdd([item("theirs1"), item("theirs2"), item("theirs3")]);
+    await syncOnce({ db: other, fetch: real.fetch });
+    expect(real.seq).toBeGreaterThan((await getMeta<number>(a, "cursor"))!);
+
+    await saveSyncSettings(a, { serverUrl: "https://real.example.test/", token: TOKEN });
+    expect(await getMeta(a, "cursor")).toBe(0);
+    expect(await getMeta(a, "lastSyncedAt")).toBeUndefined();
+    expect(await getMeta(a, "firstPullDone")).toBeUndefined();
+    expect(await a.pending.count()).toBe(2);
+    await syncOnce({ db: a, fetch: real.fetch });
+    expect(Object.keys(await titles(a)).sort()).toEqual(["mine1", "mine2", "theirs1", "theirs2", "theirs3"]);
+    expect(real.rows.size).toBe(5);
+
+    // Saving the same address again (e.g. a new passphrase) does not start over.
+    await saveSyncSettings(a, { serverUrl: "https://real.example.test", token: TOKEN });
+    expect(await getMeta(a, "cursor")).toBe(real.seq);
+    expect(await a.pending.count()).toBe(0);
+  });
+
   it("409 cursor_ahead resets the cursor to 0 and re-sends every local row unchanged", async () => {
     const old = new FakeSyncServer(TOKEN);
     const a = await device();
@@ -394,7 +426,7 @@ describe("syncOnce", () => {
     expect(out.kind).toBe("offline");
     expect(await a.items.count()).toBe(2);
     expect(await a.pending.count()).toBe(2);
-    expect(await getMeta(a, "cursor")).toBeUndefined();
+    expect(await getMeta(a, "cursor")).toBe(0); // unchanged since the address was saved
     expect((await syncOnce({ db: a, fetch: server.fetch })).kind).toBe("ok");
     expect(server.rows.size).toBe(2);
   });

@@ -61,7 +61,19 @@ interface WireChange {
 
 // ---- settings (syncMeta) ----------------------------------------------------------------
 
-export type MetaKey = "deviceId" | "cursor" | "lastSyncedAt" | "token" | "serverUrl" | "needsPassphrase";
+export type MetaKey =
+  | "deviceId"
+  | "cursor"
+  | "lastSyncedAt"
+  | "token"
+  | "serverUrl"
+  | "needsPassphrase"
+  /** The address the stored cursor belongs to. */
+  | "cursorServerUrl"
+  /** This device has pulled everything the server had at least once. */
+  | "firstPullDone"
+  /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
+  | "tokenVersion";
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -84,11 +96,39 @@ export async function getDeviceId(db: HubDB): Promise<string> {
 
 /** Stores the address and the DERIVED token (never the passphrase) and re-enables sync. */
 export async function saveSyncSettings(db: HubDB, s: { serverUrl: string; token: string }): Promise<void> {
-  await db.transaction("rw", db.syncMeta, async () => {
-    await setMeta(db, "serverUrl", s.serverUrl.trim());
+  const serverUrl = normaliseAddress(s.serverUrl);
+  await db.transaction("rw", [db.items, db.goals, db.pending, db.syncMeta], async () => {
+    // A different address is a different server: its cursor means nothing here, and rows
+    // already "sent" went somewhere else. Start over: pull everything, send everything.
+    if ((await getMeta<string>(db, "cursorServerUrl")) !== serverUrl) {
+      await startOver(db);
+      await setMeta(db, "cursorServerUrl", serverUrl);
+    }
+    await setMeta(db, "serverUrl", serverUrl);
     await setMeta(db, "token", s.token);
+    await setMeta(db, "tokenVersion", ((await getMeta<number>(db, "tokenVersion")) ?? 0) + 1);
     await db.syncMeta.delete("needsPassphrase");
   });
+}
+
+/** Trimmed, without trailing slashes, so "https://x/" and "https://x" are one address. */
+export function normaliseAddress(text: string): string {
+  return text.trim().replace(/\/+$/, "");
+}
+
+/**
+ * Cursor 0, no last-sync time, first pull not done, and EVERY local row pending again
+ * (with its current stamp, so nothing is re-dated). Runs inside the caller's transaction,
+ * which must include items, goals, pending and syncMeta.
+ */
+async function startOver(db: HubDB): Promise<void> {
+  for (const table of SYNC_TABLES) {
+    const rows = (await db.table(table).toArray()) as { id: string; updatedAt?: number }[];
+    await db.pending.bulkPut(rows.map((r) => ({ table, id: r.id, updatedAt: r.updatedAt ?? 1 })));
+  }
+  await db.syncMeta.put({ key: "cursor", value: 0 });
+  await db.syncMeta.delete("lastSyncedAt");
+  await db.syncMeta.delete("firstPullDone");
 }
 
 /** Stops syncing on this device: forgets the token. Local data and pending changes stay. */
@@ -266,19 +306,9 @@ async function applyReply(
   });
 }
 
-/** 409 cursor_ahead: pull from the start and re-send every local row (stamps unchanged). */
+/** 409 cursor_ahead (the server was reset or restored): start over, as for a new address. */
 async function resetForCursorAhead(db: HubDB): Promise<void> {
-  await applyUntracked(db, async () => {
-    for (const table of SYNC_TABLES) {
-      const rows = await db.table(table).toArray();
-      for (const row of rows as { id: string; updatedAt?: number }[]) {
-        if (await db.pending.get([table, row.id])) continue;
-        await db.pending.put({ table, id: row.id, updatedAt: row.updatedAt ?? Date.now() });
-      }
-    }
-    await db.syncMeta.put({ key: "cursor", value: 0 });
-    await db.syncMeta.delete("firstPullDone");
-  });
+  await applyUntracked(db, () => startOver(db));
 }
 
 /** 400 bad_change: pending changes stamped more than 23 h ahead (a wrong clock) become now. */
