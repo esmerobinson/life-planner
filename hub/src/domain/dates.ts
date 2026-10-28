@@ -44,6 +44,11 @@ export function todayISO(): ISODate {
   return fromUTC(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 }
 
+/** Last calendar day of a month (month is 1 to 12). No local-timezone conversion. */
+export function endOfMonth(year: number, month: number): ISODate {
+  return fromUTC(Date.UTC(year, month, 0));
+}
+
 export function isValidISODate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   return fromUTC(toUTC(s)) === s;
