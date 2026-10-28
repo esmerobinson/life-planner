@@ -25,10 +25,10 @@ export function milestoneTaskId(goalId: string, milestoneId: string): string {
 
 /**
  * The linked task for one legacy milestone: a to-do in the goal's area, flagged, done if
- * the milestone was done. Milestones never recorded when they were done, so a done one has
+ * the milestone was done, with the milestone's position in the list as `order`. Milestones never recorded when they were done, so a done one has
  * no completedAt (it then counts for overall progress, not for any month).
  */
-export function milestoneTask(goal: Goal, m: Milestone, today: ISODate): Item {
+export function milestoneTask(goal: Goal, m: Milestone, today: ISODate, order: number): Item {
   const item: Item = {
     id: milestoneTaskId(goal.id, m.id),
     kind: "task",
@@ -37,6 +37,7 @@ export function milestoneTask(goal: Goal, m: Milestone, today: ISODate): Item {
     areaId: goal.areaId,
     goalId: goal.id,
     milestone: true,
+    order,
     priority: 2,
     status: m.done ? "done" : "open",
     createdAt: goal.createdAt,

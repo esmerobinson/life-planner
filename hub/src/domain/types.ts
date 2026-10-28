@@ -36,6 +36,8 @@ export interface Item {
   completedAt?: ISODate;
   /** A goal's big step (round 3): counted for the goal's overall progress. */
   milestone?: boolean;
+  /** Position among its goal's steps (a goal's "To come" sorts undated steps by it). */
+  order?: number;
   /** Habits: the days it was ticked (sorted, the most recent 400 kept). Never changes `status`. */
   doneDates?: ISODate[];
   createdAt: ISODate;

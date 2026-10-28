@@ -43,15 +43,19 @@ afterEach(async () => {
 describe("migrateMilestones", () => {
   it("turns each milestone into a flagged linked task and empties the goal's list", async () => {
     await db.goals.add(goal());
+    const goalStamp = (await db.goals.get("g1"))!.updatedAt!;
+    clock += 86_400_000; // migrated a day later
     expect(await migrateMilestones(TODAY)).toBe(1);
 
-    expect((await db.goals.get("g1"))!.milestones).toEqual([]);
+    const cleared = (await db.goals.get("g1"))!;
+    expect(cleared.milestones).toEqual([]);
     const t1 = await db.items.get(milestoneTaskId("g1", "m1"));
     const t2 = await db.items.get(milestoneTaskId("g1", "m2"));
-    expect(t1).toMatchObject({ kind: "task", title: "Outline all parts", goalId: "g1", areaId: "writing", milestone: true, status: "done" });
-    expect(t2).toMatchObject({ title: "Draft part 1", milestone: true, status: "open" });
-    // Tracked writes: stamped and waiting to sync.
-    expect(t1!.updatedAt).toBe(clock);
+    expect(t1).toMatchObject({ kind: "task", title: "Outline all parts", goalId: "g1", areaId: "writing", milestone: true, status: "done", order: 0 });
+    expect(t2).toMatchObject({ title: "Draft part 1", milestone: true, status: "open", order: 1 });
+    // Tracked (waiting to sync) but with OLD stamps: the goal version's own, never "now".
+    expect(t1!.updatedAt).toBe(goalStamp);
+    expect(cleared.updatedAt).toBe(goalStamp + 1);
     expect(await db.pending.count()).toBe(3);
     // Progress now comes from the tasks.
     expect(overallProgress((await db.goals.get("g1"))!, (await db.items.toArray()), TODAY)).toMatchObject({ done: 1, total: 2 });
@@ -114,6 +118,75 @@ describe("migrateMilestones", () => {
     expect(phoneItems).toEqual(macItems);
     expect((await mac.goals.get("g1"))!.milestones).toEqual([]);
     expect((await phone.goals.get("g1"))!.milestones).toEqual([]);
+    expect(await migrateMilestones(TODAY, mac)).toBe(0);
+    expect(await migrateMilestones(TODAY, phone)).toBe(0);
+  });
+
+  // Review C-1: a device that migrates LATE (synced long ago, still holding the old goal with
+  // milestones) must never win over edits made elsewhere since.
+  it.each([
+    ["the goal renamed", "rename"],
+    ["the goal deleted", "delete"],
+  ] as const)("a stale device migrating later never reverts edits made elsewhere (%s)", async (_n, goalEdit) => {
+    const server = new FakeSyncServer(TOKEN);
+    const device = async () => {
+      const d = new HubDB(`stale-${++n}`);
+      open.push(d);
+      await saveSyncSettings(d, { serverUrl: SERVER, token: TOKEN });
+      return d;
+    };
+    const mac = await device();
+    const phone = await device();
+    const legacy = goal({
+      milestones: [
+        { id: "m1", title: "Outline", done: false },
+        { id: "m2", title: "Draft part 1", done: false },
+        { id: "m3", title: "Edit", done: true },
+      ],
+    });
+    await mac.goals.add(legacy);
+    await syncOnce({ db: mac, fetch: server.fetch });
+    await syncOnce({ db: phone, fetch: server.fetch }); // the phone's first pull, long ago
+    expect((await phone.goals.get("g1"))!.milestones).toHaveLength(3);
+
+    // Days later the Mac gets the new version, migrates and syncs.
+    clock += 86_400_000;
+    await migrateMilestones(TODAY, mac);
+    await syncOnce({ db: mac, fetch: server.fetch });
+
+    // Esme edits on the Mac: renames and ticks one step, bins another, edits the goal.
+    clock += 60_000;
+    const m1 = milestoneTaskId("g1", "m1");
+    const m2 = milestoneTaskId("g1", "m2");
+    await mac.items.update(m1, { title: "Outline, renamed", status: "done", completedAt: TODAY });
+    await mac.items.update(m2, { status: "deleted", deletedAt: TODAY });
+    if (goalEdit === "rename") await mac.goals.update("g1", { title: "Renamed on the Mac" });
+    else await mac.goals.update("g1", { status: "deleted", deletedAt: TODAY });
+    await syncOnce({ db: mac, fetch: server.fetch });
+
+    // The phone opens the new version later (offline, before its sync): it migrates its stale copy.
+    clock += 60_000;
+    expect(await migrateMilestones("2026-10-30", phone)).toBe(1);
+    for (let i = 0; i < 2; i++) {
+      await syncOnce({ db: phone, fetch: server.fetch });
+      await syncOnce({ db: mac, fetch: server.fetch });
+    }
+
+    for (const [where, get] of [
+      ["server", async (t: string, id: string) => server.data(t, id)],
+      ["mac", async (t: string, id: string) => (t === "items" ? mac.items.get(id) : mac.goals.get(id))],
+      ["phone", async (t: string, id: string) => (t === "items" ? phone.items.get(id) : phone.goals.get(id))],
+    ] as const) {
+      expect(await get("items", m1), where).toMatchObject({ title: "Outline, renamed", status: "done" });
+      expect(await get("items", m2), where).toMatchObject({ status: "deleted" });
+      expect(await get("items", milestoneTaskId("g1", "m3")), where).toMatchObject({ title: "Edit", status: "done" });
+      const g = (await get("goals", "g1")) as Record<string, unknown>;
+      expect(g.milestones, where).toEqual([]);
+      if (goalEdit === "rename") expect(g, where).toMatchObject({ title: "Renamed on the Mac" });
+      else expect(g, where).toMatchObject({ status: "deleted" });
+    }
+    expect(await mac.items.count()).toBe(3);
+    expect(await phone.items.count()).toBe(3);
     expect(await migrateMilestones(TODAY, mac)).toBe(0);
     expect(await migrateMilestones(TODAY, phone)).toBe(0);
   });

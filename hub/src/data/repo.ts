@@ -42,7 +42,7 @@ export async function createGoal(
   };
   return db.transaction("rw", db.goals, db.items, async () => {
     await db.goals.add(goal);
-    if (milestones.length) await db.items.bulkAdd(milestones.map((m) => milestoneTask(goal, m, today)));
+    if (milestones.length) await db.items.bulkAdd(milestones.map((m, i) => milestoneTask(goal, m, today, i)));
     return (await db.goals.get(goal.id)) ?? goal; // as stored, with its updatedAt
   });
 }

@@ -44,6 +44,7 @@ export function validItem(r: unknown): r is Item {
     optDate(r.completedAt) &&
     optDate(r.deletedAt) &&
     (r.milestone === undefined || typeof r.milestone === "boolean") &&
+    (r.order === undefined || (typeof r.order === "number" && Number.isFinite(r.order))) &&
     (r.doneDates === undefined ||
       (Array.isArray(r.doneDates) &&
         r.doneDates.length <= MAX_DONE_DATES &&
