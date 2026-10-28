@@ -57,6 +57,25 @@ describe("POST /v1/sync: writing", () => {
     await syncOk(DEVICE_A, 0, [change("same", 1, { t: "i" }, "items"), change("same", 1, { t: "g" }, "goals")]);
     expect((await storedRows()).map((r) => [r.tbl, r.id])).toEqual([["goals", "same"], ["items", "same"]]);
   });
+
+  it("accepts the files table (pictures on pages) and returns its rows to other devices", async () => {
+    const picture = { id: "p1", mime: "image/jpeg", data: "/9j/4AAQ", width: 1600, height: 1200, createdAt: "2026-10-28" };
+    const body = await syncOk(DEVICE_A, 0, [change("p1", T0 - 1, picture, "files"), change("same", T0 - 1, { t: "i" }, "items")]);
+    expect(body).toMatchObject({ applied: 2, ignored: 0 });
+    expect((await storedRows()).map((r) => [r.tbl, r.id])).toEqual([["files", "p1"], ["items", "same"]]);
+    const pulled = await pullAll(DEVICE_B);
+    expect(pulled.changes).toContainEqual({ table: "files", id: "p1", updatedAt: T0 - 1, data: picture });
+  });
+
+  it("a picture row just under 700 KB of JPEG (about 933,000 base64 characters) fits the row cap and pulls alone", async () => {
+    const big = (id: string) => ({ id, mime: "image/jpeg", data: "A".repeat(933_336), width: 1600, height: 1200, createdAt: "2026-10-28" });
+    await syncOk(DEVICE_A, 0, [change("b1", T0 - 2, big("b1"), "files")]);
+    await syncOk(DEVICE_A, 0, [change("b2", T0 - 1, big("b2"), "files")]);
+    const pulled = await pullAll(DEVICE_B);
+    expect(pulled.changes.map((c) => c.id)).toEqual(["b1", "b2"]);
+    // The response byte budget (1 MiB) holds one such row per page.
+    expect(pulled.pages.filter((p) => p.changes.length > 0).every((p) => p.changes.length === 1)).toBe(true);
+  });
 });
 
 describe("POST /v1/sync: last write wins", () => {
@@ -403,6 +422,7 @@ describe("POST /v1/sync: validation", () => {
   const cases: Array<[string, unknown, string]> = [
     ["bad table name", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "journal")] }, "bad_change"],
     ["table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Items")] }, "bad_change"],
+    ["files table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Files")] }, "bad_change"],
     ["empty id", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("", 1)] }, "bad_change"],
     ["id over 128 chars", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x".repeat(MAX_ID_LENGTH + 1), 1)] }, "bad_change"],
     ["id not a string", { deviceId: DEVICE_A, cursor: 0, changes: [good(), { table: "items", id: 7, updatedAt: 1, data: {} }] }, "bad_change"],
