@@ -161,6 +161,24 @@ export async function moveTo(
   });
 }
 
+/**
+ * Schedule for: pins the item to a day (it shows on Today that day) or, with undefined,
+ * clears the pin. Pinning also clears a "Remove from today" hide so a pin for today shows
+ * at once. The due date is never changed.
+ */
+export async function pinTo(id: string, date: ISODate | undefined, today: ISODate): Promise<void> {
+  if (date !== undefined && !isValidISODate(date)) throw new Error("that is not a real date");
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { pinnedDate: _p, hiddenOn, ...rest } = item;
+    const next: Item = { ...rest, touchedAt: today };
+    if (date !== undefined) next.pinnedDate = date;
+    else if (hiddenOn !== undefined) next.hiddenOn = hiddenOn;
+    await db.items.put(next);
+  });
+}
+
 export async function removeFromToday(id: string, today: ISODate): Promise<void> {
   await db.transaction("rw", db.items, async () => {
     const item = await db.items.get(id);
