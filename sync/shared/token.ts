@@ -3,10 +3,12 @@
 // WKWebView, Cloudflare Workers and Node.
 //
 // Contract (docs/superpowers/specs/2026-10-28-sync-api.md):
-//   token = hex(PBKDF2-HMAC-SHA256(passphrase, salt "esmeworld-sync-v1", 200000 iterations, 32 bytes))
+//   token = lowercase hex(PBKDF2-HMAC-SHA256(UTF-8(NFC(passphrase)), salt "esmeworld-sync-v1",
+//                                             200000 iterations, 32 bytes))
 //   SYNC_TOKEN_HASH = hex(SHA-256(token))   (SHA-256 of the token's lowercase hex string)
 //
-// The passphrase is encoded as UTF-8 exactly as given (no Unicode normalization).
+// The passphrase is Unicode-normalized to NFC first, so the same accented passphrase typed on
+// keyboards that produce composed or decomposed characters derives the same token.
 
 export const TOKEN_SALT = "esmeworld-sync-v1";
 export const TOKEN_ITERATIONS = 200_000;
@@ -20,7 +22,9 @@ function toHex(buffer: ArrayBuffer): string {
 
 export async function deriveToken(passphrase: string): Promise<string> {
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", encoder.encode(passphrase), "PBKDF2", false, ["deriveBits"]);
+  const key = await crypto.subtle.importKey("raw", encoder.encode(passphrase.normalize("NFC")), "PBKDF2", false, [
+    "deriveBits",
+  ]);
   const bits = await crypto.subtle.deriveBits(
     { name: "PBKDF2", hash: "SHA-256", salt: encoder.encode(TOKEN_SALT), iterations: TOKEN_ITERATIONS },
     key,

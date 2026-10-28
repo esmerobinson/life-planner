@@ -8,7 +8,7 @@
 // logs or writes the passphrase, the token or the hash: only the hash is piped to
 // wrangler's stdin, from an empty temporary directory, with an explicit --config.
 // Dependency-free on purpose. The derivation below duplicates shared/token.ts
-// (PBKDF2-HMAC-SHA256, salt "esmeworld-sync-v1", 200000 iterations, 32 bytes, hex;
+// (NFC-normalize, PBKDF2-HMAC-SHA256, salt "esmeworld-sync-v1", 200000 iterations, 32 bytes, hex;
 // hash = SHA-256 of the hex token); tests check that the two agree.
 
 import { spawn } from "node:child_process";
@@ -36,7 +36,9 @@ function toHex(buffer) {
 /** @param {string} passphrase */
 export async function deriveToken(passphrase) {
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", encoder.encode(passphrase), "PBKDF2", false, ["deriveBits"]);
+  const key = await crypto.subtle.importKey("raw", encoder.encode(passphrase.normalize("NFC")), "PBKDF2", false, [
+    "deriveBits",
+  ]);
   const bits = await crypto.subtle.deriveBits(
     { name: "PBKDF2", hash: "SHA-256", salt: encoder.encode("esmeworld-sync-v1"), iterations: 200_000 },
     key,
