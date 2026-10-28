@@ -52,12 +52,11 @@ describe("a failing read shows one calm line and no empty state", () => {
 });
 
 describe("failing writes show the save line", () => {
-  it("filing an inbox item that does not save", async () => {
+  it("deleting an inbox item that does not save", async () => {
     await repo.createItem({ kind: "task", title: "Loose", areaId: "inbox", priority: 2 }, TODAY);
-    vi.spyOn(repo, "updateItem").mockRejectedValueOnce(new Error("write failed"));
+    vi.spyOn(repo, "deleteItem").mockRejectedValueOnce(new Error("write failed"));
     at("/inbox", "/inbox", <InboxPage today={TODAY} />);
-    await userEvent.selectOptions(await screen.findByLabelText("Area for Loose"), "art");
-    await userEvent.click(screen.getByRole("button", { name: "File Loose" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete: Loose" }));
     expect(await screen.findByText(SAVE_LINE)).toBeInTheDocument();
     expect(screen.getByText("Loose")).toBeInTheDocument();
   });
