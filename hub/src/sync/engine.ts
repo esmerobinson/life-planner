@@ -28,8 +28,10 @@ export const MAX_REQUEST_BYTES = 1_000_000;
 export const FUTURE_RESTAMP_MS = 23 * 60 * 60 * 1000;
 /** Fallback wait when a 429 has no usable Retry-After. */
 export const DEFAULT_RETRY_AFTER_MS = 60_000;
-/** Safety stop for one run's request loop (a run normally needs a handful). */
-const MAX_ROUNDS = 10_000;
+/** One change as the server stores it (`{t,i,u,d: JSON text of data}`): at most this many bytes. */
+export const MAX_ROW_BYTES = 1_000_000;
+/** Safety stop for one run's request loop: 200 rounds is 100,000 rows, far more than a run needs. */
+export const MAX_ROUNDS = 200;
 
 export const NEEDS_PASSPHRASE_MESSAGE = "The passphrase was not accepted. Enter it again to keep syncing.";
 export const OFFLINE_MESSAGE = "Could not reach the sync server. Your changes are kept on this device and will sync later.";
@@ -37,9 +39,10 @@ export const RATE_LIMITED_MESSAGE = "The sync server asked to wait a little. Syn
 export const TOO_LARGE_MESSAGE = "A change was too large to sync. It is kept on this device.";
 export const REJECTED_MESSAGE = "The sync server did not accept a change. Your changes are kept on this device.";
 export const FAILED_MESSAGE = "Sync did not work this time. Your changes are kept on this device.";
+export const STOPPED_EARLY_MESSAGE = "Sync stopped before it finished. It will carry on next time.";
 
 export type SyncOutcome =
-  /** `held`: changes too large for any request; they stay pending on this device. */
+  /** `held`: changes the server would refuse (or did, one by one); kept here, marked stuck. */
   | { kind: "ok"; sent: number; received: number; held: number }
   | { kind: "not-configured" }
   /** The run used a token that was replaced while it was in flight; run again. */
@@ -170,12 +173,24 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   let badChangeRetried = false;
   let sent = 0;
   let held = 0;
+  /** Halves of a batch the server refused with 400, being narrowed down to the culprit(s). */
+  const probes: Batch[] = [];
+  let finished = false;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const batch = await buildBatch(db, deviceId, cursor, attempted);
-    for (const k of batch.held) attempted.add(k);
-    held += batch.held.length;
-    if (!needPull && !hasMore && batch.changes.length === 0) break;
+    const probing = probes.length > 0;
+    let batch: Batch;
+    if (probing) batch = probes.shift()!;
+    else {
+      const built = await buildBatch(db, deviceId, cursor, attempted);
+      for (const k of built.held) attempted.add(k);
+      held += built.held.length;
+      batch = built;
+      if (!needPull && !hasMore && batch.changes.length === 0) {
+        finished = true;
+        break;
+      }
+    }
     const body = JSON.stringify({ deviceId, cursor, changes: batch.changes });
 
     let res: Response;
@@ -218,10 +233,29 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
         hasMore = false;
         continue;
       }
-      if (res.status === 400 && code === "bad_change" && !badChangeRetried) {
-        badChangeRetried = true;
+      if (res.status === 400 && code === "bad_change" && !badChangeRetried && !probing) {
+        badChangeRetried = true; // a wrong clock: re-stamp far-future changes, retry once
         await restampFarFuture(db);
         continue;
+      }
+      if (res.status === 400 && (code === "bad_change" || code === "row_too_large")) {
+        // One (or a few) changes are refused. Split the batch until each culprit is alone,
+        // hold those back (kept here, marked stuck) and let everything else through.
+        if (batch.changes.length > 1) {
+          const half = Math.ceil(batch.changes.length / 2);
+          probes.unshift(
+            { changes: batch.changes.slice(0, half), pendingVersions: batch.pendingVersions },
+            { changes: batch.changes.slice(half), pendingVersions: batch.pendingVersions },
+          );
+          continue;
+        }
+        if (batch.changes.length === 1) {
+          const [only] = batch.changes;
+          await markStuck(db, [{ key: keyOf(only!.table, only!.id), table: only!.table, id: only!.id }], batch.pendingVersions);
+          attempted.add(keyOf(only!.table, only!.id));
+          held++;
+          continue;
+        }
       }
       if (res.status === 413) return { kind: "error", message: TOO_LARGE_MESSAGE };
       if (res.status === 400) return { kind: "error", message: REJECTED_MESSAGE };
@@ -242,7 +276,25 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
     hasMore = reply.hasMore;
     needPull = false;
   }
+  // The loop ran out while there was still work: say so rather than loop on.
+  if (!finished) return { kind: "error", message: STOPPED_EARLY_MESSAGE };
   return { kind: "ok", sent, received, held };
+}
+
+interface Batch {
+  changes: WireChange[];
+  /** The pending entry's updatedAt when the request was built, per key. */
+  pendingVersions: Map<string, number>;
+}
+
+/** Marks changes the server refused as stuck, if they are still the version that was sent. */
+async function markStuck(db: HubDB, keys: { key: string; table: SyncTable; id: string }[], versions: Map<string, number>) {
+  await db.transaction("rw", db.pending, async () => {
+    for (const k of keys) {
+      const p = await db.pending.get([k.table, k.id]);
+      if (p && p.updatedAt === versions.get(k.key)) await db.pending.put({ ...p, stuck: true });
+    }
+  });
 }
 
 /** Pending changes not yet attempted in this run, within the count and size limits. */
@@ -256,7 +308,7 @@ async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted
     let bytes = base;
     for (const p of await db.pending.toArray()) {
       const key = keyOf(p.table, p.id);
-      if (attempted.has(key)) continue;
+      if (attempted.has(key) || p.stuck) continue;
       const row = await db[p.table].get(p.id);
       if (!row) {
         await db.pending.delete([p.table, p.id]); // the row is gone (e.g. replaced by a restore)
@@ -265,8 +317,11 @@ async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted
       const updatedAt = row.updatedAt ?? p.updatedAt;
       const change: WireChange = { table: p.table, id: p.id, updatedAt, data: { ...row, id: p.id, updatedAt } };
       const own = utf8Length(JSON.stringify(change));
-      if (base + own > MAX_REQUEST_BYTES) {
-        held.push(key); // could never be sent; kept pending so nothing is lost
+      const asStored = utf8Length(JSON.stringify({ t: p.table, i: p.id, u: updatedAt, d: JSON.stringify(change.data) }));
+      if (base + own > MAX_REQUEST_BYTES || asStored > MAX_ROW_BYTES) {
+        // Could never be sent: kept here, marked stuck (until edited again), never lost.
+        await db.pending.put({ ...p, stuck: true });
+        held.push(key);
         continue;
       }
       const size = own + (changes.length > 0 ? 1 : 0);

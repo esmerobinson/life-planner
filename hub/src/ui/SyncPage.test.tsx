@@ -115,6 +115,17 @@ describe("SyncPage", () => {
     await db.quarantine.clear();
   });
 
+  it("counts changes the server refused (kept here) apart from changes waiting", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    await db.items.add({ id: "s", kind: "task", title: "S", links: [], areaId: "art", priority: 2,
+      status: "open", createdAt: "2026-10-01", touchedAt: "2026-10-01" });
+    const p = (await db.pending.get(["items", "s"]))!;
+    await db.pending.put({ ...p, stuck: true });
+    setup();
+    expect(await screen.findByText("1 change could not be sent. It is kept on this device.")).toBeInTheDocument();
+    expect(screen.queryByText(/changes? waiting/)).toBeNull();
+  });
+
   it("asks for the passphrase again after it was not accepted", async () => {
     await db.syncMeta.bulkPut([{ key: "serverUrl", value: ADDRESS }, { key: "needsPassphrase", value: true }]);
     setup();

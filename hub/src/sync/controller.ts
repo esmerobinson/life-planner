@@ -10,7 +10,7 @@
 import { liveQuery, type Subscription } from "dexie";
 import type { HubDB } from "../data/db";
 import { onLocalWrite } from "../data/changeTracking";
-import { NEEDS_PASSPHRASE_MESSAGE, RATE_LIMITED_MESSAGE, TOO_LARGE_MESSAGE, syncOnce, type SyncOutcome } from "./engine";
+import { NEEDS_PASSPHRASE_MESSAGE, RATE_LIMITED_MESSAGE, syncOnce, type SyncOutcome } from "./engine";
 
 /** Wait after the last local write before syncing (a technical batching delay, not motion). */
 export const SYNC_DEBOUNCE_MS = 2000;
@@ -209,7 +209,7 @@ export class SyncController {
     }
     switch (out.kind) {
       case "ok":
-        this.error = out.held > 0 ? TOO_LARGE_MESSAGE : null;
+        this.error = null; // changes held back are counted on the Sync page
         break;
       case "not-configured":
       case "superseded":

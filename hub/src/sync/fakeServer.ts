@@ -57,6 +57,7 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const MAX_CHANGES = 2000;
 const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
 const MAX_ID_LENGTH = 128;
+const MAX_ROW_BYTES = 1_000_000;
 
 const key = (table: string, id: string) => `${table}\u0000${id}`;
 const utf8 = (s: string) => new TextEncoder().encode(s).length;
@@ -75,6 +76,8 @@ export class FakeSyncServer {
       maxResponseBytes?: number;
       now?: () => number;
       strictClient?: boolean;
+      /** Test hook: refuse a change (whole request, 400) with this code, e.g. a row the real server finds too large. */
+      reject?: (change: { table: string; id: string; updatedAt: number; data: Record<string, unknown> }) => string | undefined;
     } = {},
   ) {}
 
@@ -175,6 +178,12 @@ export class FakeSyncServer {
       }
       if (!isObj(data)) return bad("bad_change");
       if (strict && (data.id !== id || data.updatedAt !== updatedAt)) return bad("bad_change");
+      // The real server's row limit, measured its way (data JSON encoded twice).
+      if (utf8(JSON.stringify({ t: table, i: id, u: updatedAt, d: JSON.stringify(data) })) > MAX_ROW_BYTES) {
+        return bad("row_too_large");
+      }
+      const refused = this.options.reject?.({ table, id, updatedAt, data });
+      if (refused) return bad(refused);
     }
     if (cursor > this.seq) return { status: 409, body: { error: "cursor_ahead" } };
 

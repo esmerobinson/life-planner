@@ -104,6 +104,63 @@ describe("syncOnce", () => {
     expect((await d.pending.toArray()).map((p) => p.id)).toEqual(["huge"]);
   });
 
+  it("a change the server refuses on its own (row_too_large) is found, kept as stuck, and the rest still sync", async () => {
+    const server = new FakeSyncServer(TOKEN, { reject: (c) => (c.id === "r3" ? "row_too_large" : undefined) });
+    const a = await device();
+    await a.items.bulkAdd(["r1", "r2", "r3", "r4", "r5"].map((id) => item(id)));
+    const out = await syncOnce({ db: a, fetch: server.fetch });
+    expect(out).toMatchObject({ kind: "ok", held: 1 });
+    expect([...server.rows.values()].map((r) => r.id).sort()).toEqual(["r1", "r2", "r4", "r5"]);
+    expect(await a.pending.toArray()).toEqual([{ table: "items", id: "r3", updatedAt: clock, stuck: true }]);
+    expect(await a.items.get("r3")).toBeTruthy(); // kept locally
+
+    // Not sent again by later runs...
+    const before = server.syncRequests.length;
+    await syncOnce({ db: a, fetch: server.fetch });
+    expect(server.syncRequests.slice(before).flatMap((r) => r.body!.changes.map((c) => c.id))).not.toContain("r3");
+    // ...until it is edited again.
+    clock += 1000;
+    await a.items.update("r3", { title: "shorter now" });
+    expect((await a.pending.get(["items", "r3"]))!.stuck).toBeUndefined();
+  });
+
+  it("a non-clock bad_change for one row: one restamp retry, then that row alone is held back", async () => {
+    const server = new FakeSyncServer(TOKEN, { reject: (c) => (c.id === "odd" ? "bad_change" : undefined) });
+    const a = await device();
+    await a.items.bulkAdd([item("fine1"), item("odd"), item("fine2")]);
+    const out = await syncOnce({ db: a, fetch: server.fetch });
+    expect(out).toMatchObject({ kind: "ok", held: 1 });
+    expect(server.data("items", "fine1")).toBeDefined();
+    expect(server.data("items", "fine2")).toBeDefined();
+    expect((await a.pending.get(["items", "odd"]))!.stuck).toBe(true);
+  });
+
+  it("measures a row the server's way (its data JSON is encoded twice) and holds back one that would be refused", async () => {
+    const a = await device();
+    // 300,000 quotes: about 600 KB as one JSON string, about 1.2 MB as the server measures it.
+    await a.items.add(item("quoted", { notes: '"'.repeat(300_000) }));
+    await a.items.add(item("plain"));
+    const server = new FakeSyncServer(TOKEN);
+    const out = await syncOnce({ db: a, fetch: server.fetch });
+    expect(out).toMatchObject({ kind: "ok", held: 1 });
+    expect(server.data("items", "quoted")).toBeUndefined();
+    expect(server.data("items", "plain")).toBeDefined();
+    // Held back by the client's own measure: never even sent.
+    expect(server.syncRequests.flatMap((r) => r.body!.changes.map((c) => c.id))).not.toContain("quoted");
+  });
+
+  it("stops after a sane number of rounds instead of looping on a server that always says hasMore", async () => {
+    const a = await device();
+    let calls = 0;
+    const endless: typeof fetch = async () => {
+      calls++;
+      return new Response(JSON.stringify({ cursor: 0, applied: 0, ignored: 0, hasMore: true, changes: [] }), { status: 200 });
+    };
+    const out = await syncOnce({ db: a, fetch: endless });
+    expect(out.kind).toBe("error");
+    expect(calls).toBeLessThanOrEqual(200);
+  });
+
   it("two devices converge, and a conflicting edit goes to the later updatedAt on both", async () => {
     const server = new FakeSyncServer(TOKEN);
     const a = await device();
@@ -421,15 +478,27 @@ describe("syncOnce", () => {
     expect(FUTURE_RESTAMP_MS).toBe(23 * 3600_000);
   });
 
-  it("400 bad_change twice shows the error and keeps everything pending", async () => {
+  it("400 bad_change twice for a lone change: it is held back as stuck, kept, and sync carries on", async () => {
     const server = new FakeSyncServer(TOKEN);
     const a = await device();
     await a.items.add(item("x"));
     server.inject({ status: 400, body: { error: "bad_change" } }, { status: 400, body: { error: "bad_change" } });
     const out = await syncOnce({ db: a, fetch: server.fetch });
+    expect(out).toMatchObject({ kind: "ok", held: 1 });
+    expect(server.requests.map((r) => r.status)).toEqual([400, 400, 200]); // restamp retry, then pull on
+    expect(await a.pending.toArray()).toMatchObject([{ id: "x", stuck: true }]);
+    expect(await a.items.get("x")).toBeTruthy();
+  });
+
+  it("any other 400 (not about one change) shows the error and keeps everything pending", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const a = await device();
+    await a.items.add(item("x"));
+    server.inject({ status: 400, body: { error: "bad_device_id" } });
+    const out = await syncOnce({ db: a, fetch: server.fetch });
     expect(out.kind).toBe("error");
-    expect(server.requests).toHaveLength(2);
-    expect(await a.pending.count()).toBe(1);
+    expect(await a.pending.toArray()).toMatchObject([{ id: "x" }]);
+    expect((await a.pending.get(["items", "x"]))!.stuck).toBeUndefined();
   });
 
   it("offline: a failed fetch keeps everything pending and loses nothing", async () => {
