@@ -25,8 +25,8 @@ decisions, the security-review fixes and what has not been verified.
   `^[A-Za-z0-9_-]{1,64}/[A-Za-z0-9_-]{1,100}$` (`400 bad_board`). Upstream: 5 s timeout, at most 2 MB, redirects
   not followed; any failure is `502 pinterest_unavailable`. Only `https://i.pinimg.com/` images and
   `https://www.pinterest.com/` / `https://pinterest.com/` links are returned; anything else in the feed is dropped.
-  Parsed boards are kept in the edge cache (Cache API) for 15 minutes. Caveat: Cloudflare does not keep Cache API
-  entries for Workers served on `*.workers.dev`, so there every call reaches Pinterest; the app itself only asks
+  Parsed boards are kept in the edge cache (Cache API) for 15 minutes. Caveat: community reports say the Cache API has
+  no effect for Workers served on `*.workers.dev` (unverified); if so, every call there reaches Pinterest; the app itself only asks
   when its own copy is older than 15 minutes or on "Refresh".
 
 Errors are always `{"error":"<code>"}`. Every response carries `Cache-Control: no-store`.
