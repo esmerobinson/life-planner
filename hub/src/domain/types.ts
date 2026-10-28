@@ -4,7 +4,11 @@ export const AREA_IDS = [
 ] as const;
 export type AreaId = (typeof AREA_IDS)[number];
 export type Priority = 1 | 2 | 3;
-export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+/** The one lists of weekdays and item sources. Validators derive from these. */
+export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+export const SOURCE_KINDS = ["backlog", "manual", "gtasks"] as const;
+export type SourceKind = (typeof SOURCE_KINDS)[number];
 export type ISODate = string;
 
 export interface Item {
@@ -26,7 +30,7 @@ export interface Item {
   completedAt?: ISODate;
   createdAt: ISODate;
   touchedAt: ISODate;
-  source?: { kind: "backlog" | "manual"; key: string };
+  source?: { kind: SourceKind; key: string };
 }
 
 export interface Milestone {

@@ -1,7 +1,7 @@
 import { db } from "../data/db";
 import { isValidISODate } from "../domain/dates";
 import { sectionToArea } from "./sectionAreas";
-import type { ISODate, Item, Priority, Weekday } from "../domain/types";
+import { WEEKDAYS, type ISODate, type Item, type Priority, type Weekday } from "../domain/types";
 
 export interface ParsedItem {
   title: string;
@@ -26,7 +26,7 @@ const TAG_RE = /\s*#([\p{L}\p{N}_-]+)/gu;
 const PRIO_ALL = new RegExp(PRIO_RE.source, "gu");
 const DUE_ALL = new RegExp(DUE_RE.source, "g");
 const RECUR_ALL = new RegExp(RECUR_RE.source, "g");
-const WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const WEEKDAY_LIST: readonly string[] = WEEKDAYS;
 
 export function parseBacklog(markdown: string): {
   items: ParsedItem[];
@@ -77,7 +77,7 @@ export function parseBacklog(markdown: string): {
     let recurDays: Weekday[] | undefined;
     if (recur) {
       const days = recur[1].split(",").filter(Boolean);
-      if (days.length && days.every((d) => WEEKDAYS.includes(d as Weekday))) recurDays = days as Weekday[];
+      if (days.length && days.every((d) => WEEKDAY_LIST.includes(d))) recurDays = days as Weekday[];
       else skipped.push({ line, reason: `invalid recur "${recur[1]}", imported without recur` });
     }
 

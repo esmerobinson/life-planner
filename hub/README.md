@@ -28,6 +28,17 @@ waiting), then paste the contents of `Backlog.md` or choose the file. The
 import is safe to repeat: items already imported are not duplicated. Lines the
 import could not fully read are listed under **Notes** below the counts.
 
+## Importing Google Tasks
+
+On the Inbox page, under **Google Tasks (JSON file)**, choose your exported
+JSON file or paste its contents, then press **Import Google Tasks**. Open
+tasks arrive in the Inbox, tagged with their Google list name; completed tasks
+are left out. A task's notes and due date are kept, and a subtask gets a
+`Part of: <parent>` line. Repeating the import is safe: tasks already imported
+are never touched. A task whose title matches one already in the app (for
+example from your Backlog) is not added, and is counted as "same title as an
+existing task". Anything that could not be read is listed under **Notes**.
+
 ## Areas
 
 There are nine areas: Inbox, plus Writing, Art, Content, Mind, Body, Tech

@@ -1,0 +1,41 @@
+{
+  "exportedBy": "fictional exporter",
+  "lists": [
+    {
+      "id": "L1",
+      "title": "Home",
+      "tasks": [
+        { "id": "t1", "title": "Buy fictional lightbulbs", "status": "needsAction" },
+        { "id": "t2", "title": "Fix the pretend shelf", "status": "needsAction", "notes": "Use the blue drill", "due": "2026-11-01T00:00:00.000Z" },
+        { "id": "t3", "title": "Hang the shelf pictures", "status": "needsAction", "parent": "t2" },
+        { "id": "t4", "title": "Returned the imaginary ladder", "status": "completed" }
+      ]
+    },
+    {
+      "id": "L2",
+      "title": "Work  Stuff",
+      "tasks": [
+        { "id": "t5", "title": "Café menu ✨ résumé", "status": "needsAction" },
+        { "id": "t6", "title": "   ", "status": "needsAction" },
+        { "id": "t7", "title": "Call the pretend plumber", "status": "needsAction", "due": "not-a-date" },
+        { "id": "t8", "title": "Shared title", "status": "needsAction" }
+      ]
+    },
+    {
+      "id": "L3",
+      "title": "Reading List",
+      "tasks": [
+        { "id": "t9", "title": "Shared title", "status": "needsAction" },
+        { "id": "t10", "title": "Read a pretend novel", "status": "needsAction" }
+      ]
+    },
+    {
+      "id": "L4",
+      "title": "Errands",
+      "tasks": [
+        { "id": "t11", "title": "Post the invented parcel", "status": "needsAction" },
+        { "id": "t12", "title": "Old finished errand", "status": "completed" }
+      ]
+    }
+  ]
+}

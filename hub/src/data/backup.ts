@@ -1,6 +1,6 @@
 import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
-import { AREA_IDS, type Goal, type ISODate, type Item } from "../domain/types";
+import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type Goal, type ISODate, type Item } from "../domain/types";
 
 export interface BackupFile {
   app: "life-hub";
@@ -43,7 +43,7 @@ function validItem(r: unknown): r is Item {
     optStrArray(r.tags) &&
     optStr(r.goalId) &&
     optDate(r.due) &&
-    (r.recur === undefined || (Array.isArray(r.recur) && r.recur.every((d) => WEEKDAYS.includes(d as string)))) &&
+    (r.recur === undefined || (Array.isArray(r.recur) && r.recur.every((d) => WEEKDAY_LIST.includes(d as string)))) &&
     optDate(r.pinnedDate) &&
     optDate(r.weekOf) &&
     optDate(r.hiddenOn) &&
@@ -70,7 +70,8 @@ function validGoal(r: unknown): r is Goal {
   );
 }
 
-const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const WEEKDAY_LIST: readonly string[] = WEEKDAYS;
+const SOURCE_LIST: readonly string[] = SOURCE_KINDS;
 /** Absent, or a real "YYYY-MM-DD" date. */
 const optDate = (v: unknown) => v === undefined || (isStr(v) && isValidISODate(v));
 const optStr = (v: unknown) => v === undefined || isStr(v);
@@ -78,7 +79,7 @@ const optStrArray = (v: unknown) => v === undefined || isStrArray(v);
 
 function validSource(v: unknown) {
   if (v === undefined) return true;
-  return isObj(v) && (v.kind === "backlog" || v.kind === "manual") && isStr(v.key);
+  return isObj(v) && SOURCE_LIST.includes(v.kind as string) && isStr(v.key);
 }
 
 const hasDuplicateIds = (rows: { id: string }[]) => new Set(rows.map((r) => r.id)).size !== rows.length;

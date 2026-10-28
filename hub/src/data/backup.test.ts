@@ -145,6 +145,26 @@ describe("backup", () => {
     });
   });
 
+  describe("gtasks source", () => {
+    const g = item("g1", { source: { kind: "gtasks", key: "gtasks:abc" }, tags: ["home"], areaId: "inbox" });
+
+    it("round-trips a gtasks item with replace and merge", async () => {
+      await db.items.add(g);
+      const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+      await db.items.clear();
+      await restoreBackup(file, "replace");
+      expect(await db.items.get("g1")).toEqual(g);
+      await db.items.clear();
+      await restoreBackup(file, "merge");
+      expect(await db.items.get("g1")).toEqual(g);
+    });
+
+    it("still rejects an unknown source kind", async () => {
+      const raw = { app: "life-hub", schema: 1, exportedOn: "2026-10-28", goals: [], items: [{ ...g, source: { kind: "nonsense", key: "k" } }] };
+      await expect(restoreBackup(raw, "merge")).rejects.toThrow(/backup/i);
+    });
+  });
+
   describe("new areas", () => {
     const NEW = ["tech", "production", "admin"] as const;
     const seed = async () => {
