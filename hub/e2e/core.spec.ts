@@ -82,7 +82,7 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await page.goto("/area/admin");
     await expect(page.getByText("1 ticked off in", { exact: false })).toBeVisible();
     await page.getByText("Done (1)", { exact: true }).click();
-    const ticked = page.getByRole("list", { name: "Done" }).getByRole("checkbox", { name: "Mark done: Overdue pretend errand" });
+    const ticked = page.getByRole("list", { name: "Done" }).getByRole("checkbox", { name: "Done: Overdue pretend errand" });
     await expect(ticked).toBeChecked();
     await ticked.click();
     await expect(page.getByText("Done (0)", { exact: true })).toBeVisible();

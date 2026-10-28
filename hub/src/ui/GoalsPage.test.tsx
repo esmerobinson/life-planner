@@ -139,6 +139,15 @@ describe("GoalsPage", () => {
     expect(screen.queryByRole("heading", { level: 2, name: "Art" })).toBeNull();
   });
 
+  it("a goal whose area is not a sidebar area still shows, under its own heading", async () => {
+    await createGoal({ title: "Stray goal", areaId: "inbox", kind: "practice" }, TODAY);
+    await createGoal({ title: "Writing goal", areaId: "writing", kind: "practice" }, TODAY);
+    renderGoals();
+    expect(await screen.findByRole("link", { name: "Stray goal" })).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent).slice(0, 2)).toEqual(["Writing", "Inbox"]);
+    expect(within(screen.getByRole("list", { name: "Inbox goals" })).getByText("Stray goal")).toBeInTheDocument();
+  });
+
   it("a card shows the area tile, links to the goal, and names the next step (or none)", async () => {
     const g = await createGoal({ title: "Book", areaId: "writing", kind: "practice" }, TODAY);
     await createGoal({ title: "Idle", areaId: "writing", kind: "practice" }, TODAY);
@@ -312,7 +321,7 @@ describe("GoalDetail", () => {
     const done = screen.getByText("Done (1)", { selector: "summary" }).closest("details")!;
     expect(done).not.toHaveAttribute("open");
     await userEvent.click(within(done).getByText("Done (1)", { selector: "summary" }));
-    await userEvent.click(within(done).getByRole("checkbox", { name: "Mark done: Draft" }));
+    await userEvent.click(within(done).getByRole("checkbox", { name: "Done: Draft" }));
     expect(await screen.findByRole("progressbar", { name: "This month 0/4" })).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Later" })).getByText("Draft")).toBeInTheDocument();
     expect(within(done).getByText("Nothing done yet.")).toBeInTheDocument();

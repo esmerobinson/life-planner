@@ -19,8 +19,8 @@ const TYPES: { to: "task" | "idea" | "goal"; label: string }[] = [
 
 /**
  * The arrow icon (Move to). When the item's kind is known: "Change to" first (the types
- * it is not: To-do, Idea, Goal), then the other areas, then This week and Remove from
- * today (the old menu's choices that Schedule for does not cover), then Archive.
+ * it is not: To-do, Idea, Goal), then the other areas, then This week (not for ideas)
+ * and Remove from today (only on the Today list), then Archive.
  */
 export function MoveToMenu({
   itemId,
@@ -29,10 +29,13 @@ export function MoveToMenu({
   today,
   onMoved,
   label,
+  onTodayList = false,
 }: {
   itemId: string;
   areaId?: AreaId;
   kind?: Item["kind"];
+  /** Offer "Remove from today" (only where the list is Today's). */
+  onTodayList?: boolean;
   today: ISODate;
   onMoved: () => void | Promise<void>;
   label?: string;
@@ -90,13 +93,19 @@ export function MoveToMenu({
               {a.label}
             </button>
           ))}
-          <hr />
-          <button type="button" onClick={() => void pick({ kind: "week" }, close)}>
-            This week
-          </button>
-          <button type="button" onClick={() => void pick({ kind: "remove" }, close)}>
-            Remove from today
-          </button>
+          {kind !== "idea" && (
+            <>
+              <hr />
+              <button type="button" onClick={() => void pick({ kind: "week" }, close)}>
+                This week
+              </button>
+              {onTodayList && (
+                <button type="button" onClick={() => void pick({ kind: "remove" }, close)}>
+                  Remove from today
+                </button>
+              )}
+            </>
+          )}
           <hr />
           <button type="button" onClick={() => void pick({ kind: "archive" }, close)}>
             Archive

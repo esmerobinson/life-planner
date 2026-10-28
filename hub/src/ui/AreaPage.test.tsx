@@ -1,4 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { vi } from "vitest";
+import * as repo from "../data/repo";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { db } from "../data/db";
@@ -91,7 +93,7 @@ describe("AreaPage", () => {
     expect(within(doneList).getByText("27 Oct")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "To-dos" })).toBeNull();
 
-    const box = within(doneList).getByRole("checkbox", { name: "Mark done: Oops" });
+    const box = within(doneList).getByRole("checkbox", { name: "Done: Oops" });
     expect(box).toBeChecked();
     await userEvent.click(box);
     const todos = await screen.findByRole("list", { name: "To-dos" });
@@ -307,5 +309,49 @@ describe("AreaPage", () => {
     expect(card).toHaveClass("goal-card");
     expect(within(card).getByRole("link", { name: "Paint daily" })).toHaveAttribute("href", `/goals/${g.id}`);
     expect(within(card).getByText("October: 0 of 4")).toBeInTheDocument();
+  });
+
+  it("Move to on an area page has This week but not Remove from today; an idea has neither", async () => {
+    await createItem({ kind: "task", title: "Pinned later", areaId: "art", priority: 3, pinnedDate: "2026-11-03" }, TODAY);
+    await createItem({ kind: "idea", title: "Loose idea", areaId: "art", priority: 3 }, TODAY);
+    renderArea("art");
+    await userEvent.click(await screen.findByRole("button", { name: "Move to: Pinned later" }));
+    const task = within(screen.getByRole("group", { name: "Move Pinned later to" }));
+    expect(task.getByRole("button", { name: "This week" })).toBeInTheDocument();
+    expect(task.queryByRole("button", { name: "Remove from today" })).toBeNull();
+    expect(task.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByRole("button", { name: "Move to: Loose idea" }));
+    const idea = within(screen.getByRole("group", { name: "Move Loose idea to" }));
+    expect(idea.queryByRole("button", { name: "This week" })).toBeNull();
+    expect(idea.queryByRole("button", { name: "Remove from today" })).toBeNull();
+    expect(idea.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+  });
+
+  it("a ticked box shows ticked until the row leaves, and unticks again if the save fails", async () => {
+    await createItem({ kind: "task", title: "Slow tick", areaId: "art", priority: 3 }, TODAY);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const real = repo.tickItem;
+    vi.spyOn(repo, "tickItem")
+      .mockImplementationOnce(async (id, d) => {
+        await gate;
+        return real(id, d);
+      })
+      .mockRejectedValueOnce(new Error("write failed"));
+    renderArea("art");
+    const box = await screen.findByRole("checkbox", { name: "Mark done: Slow tick" });
+    await userEvent.click(box);
+    expect(box).toBeChecked();
+    await act(async () => release());
+    await vi.waitFor(() => expect(screen.queryByRole("checkbox", { name: "Mark done: Slow tick" })).toBeNull());
+
+    await createItem({ kind: "task", title: "Fails", areaId: "art", priority: 3 }, TODAY);
+    cleanup();
+    renderArea("art");
+    const failing = await screen.findByRole("checkbox", { name: "Mark done: Fails" });
+    await userEvent.click(failing);
+    expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
+    expect(failing).not.toBeChecked();
   });
 });

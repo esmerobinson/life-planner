@@ -27,7 +27,7 @@ function Row({
   item: Item;
   kind: Kind;
   today: ISODate;
-  onTick: (id: string) => void;
+  onTick: (id: string) => Promise<boolean>;
   onChanged: () => Promise<void>;
 }) {
   const [due, setDue] = useState(item.due ?? "");
@@ -113,7 +113,7 @@ export function NeedsALook({
             <h3>{heading}</h3>
             <ul aria-label={heading} className="strip-list">
               {found[kind].map((it) => (
-                <Row key={it.id} item={it} kind={kind} today={today} onTick={(id) => void tick(id)} onChanged={onChanged} />
+                <Row key={it.id} item={it} kind={kind} today={today} onTick={tick} onChanged={onChanged} />
               ))}
             </ul>
           </section>

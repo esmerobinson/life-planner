@@ -36,7 +36,7 @@ export function DoneSection({
                 <input
                   type="checkbox"
                   className="tick"
-                  aria-label={`Mark done: ${it.title}`}
+                  aria-label={`Done: ${it.title}`}
                   checked
                   onChange={() => onUndo(it.id)}
                 />

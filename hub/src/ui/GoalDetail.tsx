@@ -83,7 +83,7 @@ export function GoalDetail({ today }: { today: ISODate }) {
           <h2>{g.name}</h2>
           <ul aria-label={g.name} className="strip-list">
             {g.items.map((it) => (
-              <TaskRow key={it.id} item={it} today={today} onTick={(i) => void tick(i)} onMoved={changed} />
+              <TaskRow key={it.id} item={it} today={today} onTick={tick} onMoved={changed} />
             ))}
           </ul>
         </div>

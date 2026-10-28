@@ -100,7 +100,7 @@ export function AreaPage({ today }: { today: ISODate }) {
           {view === "all" && <h2>To-dos</h2>}
           <ul aria-label="To-dos" className="strip-list">
             {tasks.map((it) => (
-              <TaskRow key={it.id} item={it} today={today} onTick={(i) => void tick(i)} onMoved={changed} />
+              <TaskRow key={it.id} item={it} today={today} onTick={tick} onMoved={changed} />
             ))}
           </ul>
         </section>

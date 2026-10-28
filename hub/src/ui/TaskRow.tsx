@@ -18,10 +18,12 @@ export function useTick(today: ISODate, refresh: () => Promise<void>) {
     const t = setTimeout(() => setCelebrating(false), CELEBRATION_MS);
     return () => clearTimeout(t);
   }, [celebrating]);
-  async function tick(id: string) {
-    if (!(await attempt(() => tickItem(id, today)))) return;
+  /** Returns whether the tick saved. */
+  async function tick(id: string): Promise<boolean> {
+    if (!(await attempt(() => tickItem(id, today)))) return false;
     setCelebrating(true);
     await refresh();
+    return true;
   }
   return {
     tick,
@@ -59,10 +61,12 @@ export function TaskRow({
   tray,
   lead,
   className,
+  onTodayList,
 }: {
   item: Item;
   today: ISODate;
-  onTick?: (id: string) => void;
+  /** Marks it done; resolving to false (the save failed) unticks the box again. */
+  onTick?: (id: string) => void | Promise<boolean | void>;
   onMoved: () => void | Promise<void>;
   meta?: ReactNode;
   extra?: ReactNode;
@@ -70,7 +74,11 @@ export function TaskRow({
   /** Sits in the tick box's place when there is no tick box (the Inbox's Select checkbox). */
   lead?: ReactNode;
   className?: string;
+  /** This strip is on the Today list (offers Remove from today). */
+  onTodayList?: boolean;
 }) {
+  // Shows the box ticked until the refresh removes the row (React would otherwise snap it back).
+  const [ticked, setTicked] = useState(false);
   const isTask = item.kind === "task";
   const tick = isTask && onTick !== undefined;
   const first = tick || lead !== undefined;
@@ -82,8 +90,12 @@ export function TaskRow({
           type="checkbox"
           className="tick"
           aria-label={`Mark done: ${item.title}`}
-          checked={false}
-          onChange={() => onTick(item.id)}
+          checked={ticked}
+          onChange={async () => {
+            if (ticked) return;
+            setTicked(true);
+            if ((await onTick(item.id)) === false) setTicked(false);
+          }}
         />
       )}
       <div className="strip-body">
@@ -109,6 +121,7 @@ export function TaskRow({
           today={today}
           onMoved={onMoved}
           label={item.title}
+          onTodayList={onTodayList}
         />
       </div>
       {tray && <div className="strip-tray">{tray}</div>}

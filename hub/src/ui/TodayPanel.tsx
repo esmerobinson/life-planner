@@ -39,14 +39,15 @@ export function TodayPanel({ today }: { today: ISODate }) {
     [items, goals, today],
   );
 
-  async function tick(id: string) {
-    if (!(await attempt(() => tickItem(id, today)))) return;
+  async function tick(id: string): Promise<boolean> {
+    if (!(await attempt(() => tickItem(id, today)))) return false;
     setCelebrating(true);
     await changed();
+    return true;
   }
 
   function row(it: Item) {
-    return <TaskRow key={it.id} item={it} today={today} onTick={(id) => void tick(id)} onMoved={changed} />;
+    return <TaskRow key={it.id} item={it} today={today} onTick={tick} onMoved={changed} onTodayList />;
   }
 
   if (error) {
