@@ -608,7 +608,9 @@ describe("POST /v1/sync: atomicity", () => {
     await env.DB.prepare("DELETE FROM rows").run();
     await env.DB.prepare("UPDATE meta SET value = 0 WHERE key = 'seq'").run();
     const small = await syncOk(DEVICE_A, 0, changes, { deps: { chunkBytes: 300 } });
-    expect(small).toEqual(big);
+    // Seq gaps (burned by ignored changes) depend on chunking, so the cursor may differ.
+    expect({ ...small, cursor: 0 }).toEqual({ ...big, cursor: 0 });
+    expect(small.changes).toEqual([]);
     expect((await storedRows()).map(({ seq: _seq, ...rest }) => rest)).toEqual(bigRows);
   });
 });
