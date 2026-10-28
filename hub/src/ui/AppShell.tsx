@@ -61,8 +61,8 @@ export function AppShell() {
               Add
             </button>
             {/* Always shown: on a fresh install it is the only way to reach Import. */}
-            <Link to="/inbox">{inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox"}</Link>
-            <Link to="/backup">Backup</Link>
+            <Link to="/inbox" className="btn-secondary">{inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox"}</Link>
+            <Link to="/backup" className="btn-secondary">Backup</Link>
           </div>
           {adding && <QuickAdd today={today} onAdded={() => void changed()} />}
           <Outlet />

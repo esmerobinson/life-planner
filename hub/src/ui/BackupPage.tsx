@@ -129,47 +129,55 @@ export function BackupPage({ today }: { today: ISODate }) {
       </p>
 
       <h2>Download a backup</h2>
-      <button type="button" onClick={() => void download()}>
-        Download backup
-      </button>
+      <div className="form-actions">
+        <button type="button" onClick={() => void download()}>
+          Download backup
+        </button>
+      </div>
 
       <h2>Restore from a backup</h2>
-      <label>
-        Backup file
+      <label className="form-field">
+        <span className="form-label">Backup file</span>
         <input type="file" accept=".json,application/json" onChange={(e) => void onFile(e)} />
       </label>
       {fileName && <p>{`Chosen: ${fileName}`}</p>}
       <fieldset>
         <legend>How to restore</legend>
-        <label>
+        <label className="form-check">
           <input type="radio" name="restore-mode" checked={!replacing} onChange={() => changeMode("merge")} />
           Merge (add what is missing)
         </label>
-        <label>
+        <label className="form-check">
           <input type="radio" name="restore-mode" checked={replacing} onChange={() => changeMode("replace")} />
           Replace everything
         </label>
       </fieldset>
 
       {!replacing && (
-        <button type="button" disabled={busy || text === null} onClick={() => void restore()}>
-          Merge
-        </button>
+        <div className="form-actions">
+          <button type="button" disabled={busy || text === null} onClick={() => void restore()}>
+            Merge
+          </button>
+        </div>
       )}
       {replacing && (
         <div>
           <p>Download a backup first.</p>
-          <button type="button" className="btn-secondary" onClick={() => void download()}>
-            Download backup
-          </button>
+          <div className="form-actions">
+            <button type="button" className="btn-secondary" onClick={() => void download()}>
+              Download backup
+            </button>
+          </div>
           <p>Replace removes everything here and puts the file's tasks and goals in its place.</p>
-          <label>
+          <label className="form-check">
             <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
             I understand replace removes what is here now
           </label>
-          <button type="button" disabled={busy || text === null || !confirmed} onClick={() => void restore()}>
-            Replace
-          </button>
+          <div className="form-actions">
+            <button type="button" disabled={busy || text === null || !confirmed} onClick={() => void restore()}>
+              Replace
+            </button>
+          </div>
         </div>
       )}
 

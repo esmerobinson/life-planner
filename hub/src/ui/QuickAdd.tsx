@@ -89,20 +89,20 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
   }
 
   return (
-    <form className="quick-add" onSubmit={(e) => void submit(e)}>
-      <label>
-        Title
+    <form className="quick-add form-grid" onSubmit={(e) => void submit(e)}>
+      <label className="form-field form-full">
+        <span className="form-label">Title</span>
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
-      <label>
-        Kind
+      <label className="form-field">
+        <span className="form-label">Kind</span>
         <select value={kind} onChange={(e) => setKind(e.target.value as "task" | "idea")}>
           <option value="task">Task</option>
           <option value="idea">Idea</option>
         </select>
       </label>
-      <label>
-        Area
+      <label className="form-field">
+        <span className="form-label">Area</span>
         <select
           value={areaId}
           onChange={(e) => {
@@ -117,8 +117,8 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
           ))}
         </select>
       </label>
-      <label>
-        Goal
+      <label className="form-field">
+        <span className="form-label">Goal</span>
         <select value={goalId} onChange={(e) => setGoalId(e.target.value)}>
           <option value="">None</option>
           {areaGoals.map((g) => (
@@ -128,8 +128,8 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
           ))}
         </select>
       </label>
-      <label>
-        Priority
+      <label className="form-field">
+        <span className="form-label">Priority</span>
         <select value={priority} onChange={(e) => setPriority(Number(e.target.value) as Priority)}>
           <option value="1">1</option>
           <option value="2">2</option>
@@ -138,25 +138,29 @@ export function QuickAdd({ today, onAdded }: { today: ISODate; onAdded: () => vo
       </label>
       {kind === "task" && (
         <>
-          <label>
-            Due
+          <label className="form-field">
+            <span className="form-label">Due</span>
             <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
           </label>
-          <fieldset>
+          <fieldset className="form-full">
             <legend>Repeats on</legend>
+            <div className="form-checks">
             {WEEKDAYS.map((d) => (
-              <label key={d}>
+              <label key={d} className="form-check">
                 <input type="checkbox" checked={recur.includes(d)} onChange={() => toggleDay(d)} />
                 {d}
               </label>
             ))}
+            </div>
           </fieldset>
         </>
       )}
-      {message && <p className="form-message">{message}</p>}
-      <button type="submit" disabled={saving}>
-        Add item
-      </button>
+      {message && <p className="form-message form-full">{message}</p>}
+      <div className="form-actions form-full">
+        <button type="submit" disabled={saving}>
+          Add item
+        </button>
+      </div>
     </form>
   );
 }

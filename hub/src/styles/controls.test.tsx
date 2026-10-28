@@ -1,4 +1,6 @@
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { QuickAdd } from "../ui/QuickAdd";
 
 // The project has no @types/node; vitest runs in node, so declare just what is used.
 declare const process: { cwd(): string };
@@ -19,7 +21,7 @@ const allowed = new Set([...hexes(visual), "#ff00ff"]);
 /** Declarations of the first rule whose selector list contains `selector`. */
 function rule(selector: string): string {
   const re = /([^{}]+)\{([^{}]*)\}/g;
-  for (const m of controls.matchAll(re)) {
+  for (const m of controls.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(re)) {
     if (m[1].split(",").map((s) => s.trim()).includes(selector)) return m[2].replace(/\s+/g, " ");
   }
   throw new Error(`no rule for ${selector}`);
@@ -102,7 +104,69 @@ describe("controls.css (approved mockup A, soft pills)", () => {
   it("does not target sidebar links and is imported by main.tsx", () => {
     const code = controls.replace(/\/\*[\s\S]*?\*\//g, "");
     expect(code).not.toMatch(/sidebar|nav/);
-    expect(code).not.toMatch(/(^|[\s,}])a[\s,{:]/);
+    // Any anchor selector must be scoped to the content area or be the pill variant.
+    for (const m of code.matchAll(/([^{}]+)\{/g)) {
+      for (const sel of m[1].split(",").map((x) => x.trim())) {
+        if (/(^|[\s>])a([\s.:[]|$)/.test(sel)) {
+          expect(sel.startsWith(".app-content a") || sel.startsWith("a.btn-secondary")).toBe(true);
+        }
+      }
+    }
     expect(main).toContain('import "./styles/controls.css"');
+  });
+
+  it("form grid layout from mockup A", () => {
+    const g = rule(".form-grid");
+    expect(g).toContain("display: grid");
+    expect(g).toContain("grid-template-columns: 1fr 1fr");
+    expect(g).toContain("gap: 8px 12px");
+    expect(rule(".form-full")).toContain("grid-column: 1 / -1");
+    const l = rule(".form-field");
+    expect(l).toContain("display: block");
+    expect(rule(".form-label")).toContain("font-size: 11px");
+    expect(l).toContain("margin: 8px 0 4px");
+    expect(rule(".form-grid .form-field input[type=\"text\"]")).toContain("width: 100%");
+    const f = rule("fieldset");
+    expect(f).toContain("border: 0");
+    expect(f).toContain("padding: 0");
+    expect(f).toContain("margin: 0");
+    expect(rule("legend")).toContain("font-size: 11px");
+    const c = rule(".form-check");
+    expect(c).toContain("display: inline-flex");
+    expect(c).toContain("align-items: center");
+    expect(c).toContain("gap: 6px");
+    const a = rule(".form-actions");
+    expect(a).toContain("display: flex");
+    expect(a).toContain("gap: 8px");
+    expect(a).toContain("margin-top: 12px");
+  });
+
+  it("pill links and content links", () => {
+    const a = rule("a.btn-secondary");
+    expect(a).toContain("padding: 8px 16px");
+    expect(a).toContain("border-radius: 999px");
+    expect(a).toContain("background: var(--track)");
+    expect(a).toContain("color: var(--text)");
+    expect(a).toContain("text-decoration: none");
+    const row = rule(".shell-actions");
+    expect(row).toContain("display: flex");
+    expect(row).toContain("gap: 8px");
+    expect(row).toContain("flex-wrap: wrap");
+    expect(row).toContain("align-items: center");
+    expect(rule(".app-content a:not(.btn-secondary)")).toContain("color: var(--text)");
+  });
+
+  it("QuickAdd markup uses the grid classes and every control has a label", () => {
+    const { container } = render(<QuickAdd today="2026-10-27" onAdded={() => {}} />);
+    const form = container.querySelector("form") as HTMLElement;
+    expect(form.classList.contains("form-grid")).toBe(true);
+    expect(screen.getByLabelText("Title").closest("label")?.classList.contains("form-full")).toBe(true);
+    expect(container.querySelector("fieldset.form-full")).not.toBeNull();
+    expect(container.querySelector(".form-actions.form-full")).not.toBeNull();
+    for (const el of Array.from(form.querySelectorAll("input, select"))) {
+      expect(el.closest("label")).not.toBeNull();
+    }
+    expect(form.querySelectorAll("label.form-field").length).toBeGreaterThanOrEqual(6);
+    expect(form.querySelectorAll("label.form-check").length).toBe(7);
   });
 });

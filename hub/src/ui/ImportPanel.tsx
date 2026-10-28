@@ -46,17 +46,19 @@ export function ImportPanel({ today, onImported }: { today: ISODate; onImported?
   return (
     <section className="import-panel">
       <h2>Import Backlog.md</h2>
-      <label>
-        Backlog file
+      <label className="form-field">
+        <span className="form-label">Backlog file</span>
         <input type="file" accept=".md,.txt" onChange={(e) => void onFile(e)} />
       </label>
-      <label>
-        Backlog text
+      <label className="form-field">
+        <span className="form-label">Backlog text</span>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} />
       </label>
-      <button type="button" disabled={running} onClick={() => void run()}>
-        Import
-      </button>
+      <div className="form-actions">
+        <button type="button" disabled={running} onClick={() => void run()}>
+          Import
+        </button>
+      </div>
       {result && <p>{result}</p>}
       {notes.length > 0 && (
         <details>

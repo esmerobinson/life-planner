@@ -50,7 +50,7 @@ function InboxRow({
   }
 
   return (
-    <li className="inbox-row">
+    <li className="inbox-row form-row">
       <input
         type="checkbox"
         aria-label={`Select ${item.title}`}
@@ -63,8 +63,8 @@ function InboxRow({
           #{t}
         </span>
       ))}
-      <label>
-        Area
+      <label className="form-field">
+        <span className="form-label">Area</span>
         <select
           aria-label={`Area for ${item.title}`}
           value={areaId}
@@ -81,8 +81,8 @@ function InboxRow({
           ))}
         </select>
       </label>
-      <label>
-        Goal
+      <label className="form-field">
+        <span className="form-label">Goal</span>
         <select
           aria-label={`Goal for ${item.title}`}
           value={goalId}
@@ -98,8 +98,8 @@ function InboxRow({
             ))}
         </select>
       </label>
-      <label>
-        Priority
+      <label className="form-field">
+        <span className="form-label">Priority</span>
         <select
           aria-label={`Priority for ${item.title}`}
           value={priority}
@@ -110,8 +110,8 @@ function InboxRow({
           <option value="3">3</option>
         </select>
       </label>
-      <label>
-        Due
+      <label className="form-field">
+        <span className="form-label">Due</span>
         <input
           type="date"
           aria-label={`Due for ${item.title}`}
@@ -193,8 +193,8 @@ export function InboxPage({ today }: { today: ISODate }) {
       <ImportPanel today={today} onImported={() => void changed()} />
       {loaded && inbox.length === 0 && <p>Nothing waiting in the inbox.</p>}
       {inbox.length > 0 && (
-        <div className="inbox-bulk">
-          <label>
+        <div className="inbox-bulk form-row">
+          <label className="form-check">
             <input
               type="checkbox"
               aria-label="Select all shown"
@@ -203,8 +203,8 @@ export function InboxPage({ today }: { today: ISODate }) {
             />
             Select all shown
           </label>
-          <label>
-            Move selected to
+          <label className="form-field">
+            <span className="form-label">Move selected to</span>
             <select
               aria-label="Move selected to"
               value={moveArea}

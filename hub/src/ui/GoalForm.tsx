@@ -60,14 +60,14 @@ export function GoalForm({ today, onSaved }: { today: ISODate; onSaved: () => Pr
   }
 
   return (
-    <form className="goal-form" onSubmit={(e) => void submit(e)}>
-      <h2>New goal</h2>
-      <label>
-        Goal title
+    <form className="goal-form form-grid" onSubmit={(e) => void submit(e)}>
+      <h2 className="form-full">New goal</h2>
+      <label className="form-field form-full">
+        <span className="form-label">Goal title</span>
         <input value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
-      <label>
-        Area
+      <label className="form-field">
+        <span className="form-label">Area</span>
         <select value={areaId} onChange={(e) => setAreaId(e.target.value as AreaId)}>
           {GOAL_AREAS.map((a) => (
             <option key={a.id} value={a.id}>
@@ -76,33 +76,35 @@ export function GoalForm({ today, onSaved }: { today: ISODate; onSaved: () => Pr
           ))}
         </select>
       </label>
-      <label>
-        Kind
+      <label className="form-field">
+        <span className="form-label">Kind</span>
         <select value={kind} onChange={(e) => setKind(e.target.value as "finite" | "practice")}>
           <option value="finite">Finite</option>
           <option value="practice">Practice</option>
         </select>
       </label>
       {kind === "finite" && (
-        <label>
-          Deadline
+        <label className="form-field">
+          <span className="form-label">Deadline</span>
           <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
         </label>
       )}
-      <label>
-        Monthly target
+      <label className="form-field">
+        <span className="form-label">Monthly target</span>
         <input type="number" min={1} step={1} value={target} onChange={(e) => setTarget(e.target.value)} />
       </label>
       {kind === "finite" && (
-        <label>
-          Milestones
+        <label className="form-field form-full">
+          <span className="form-label">Milestones</span>
           <textarea value={milestones} placeholder="One per line" onChange={(e) => setMilestones(e.target.value)} />
         </label>
       )}
-      {message && <p role="alert">{message}</p>}
-      <button type="submit" disabled={busy}>
-        Add goal
-      </button>
+      {message && <p role="alert" className="form-full">{message}</p>}
+      <div className="form-actions form-full">
+        <button type="submit" disabled={busy}>
+          Add goal
+        </button>
+      </div>
     </form>
   );
 }
