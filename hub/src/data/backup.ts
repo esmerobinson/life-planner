@@ -12,7 +12,7 @@ export interface BackupFile {
 
 /** The one message for any file that is not a usable backup. */
 export const INVALID_BACKUP =
-  "That file is not a Life Hub backup, or it is damaged. Nothing was changed.";
+  "That file is not an Esmeworld backup, or it is damaged. Nothing was changed.";
 
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";

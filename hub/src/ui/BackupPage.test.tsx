@@ -54,7 +54,7 @@ describe("BackupPage", () => {
     expect(await screen.findByText(/Added 1 task/)).toBeInTheDocument();
     await user.upload(screen.getByLabelText("Backup file"), fileOf("{oops"));
     await user.click(screen.getByRole("button", { name: "Merge" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/not a Life Hub backup/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/not an Esmeworld backup/i);
     expect(await db.items.count()).toBe(1);
   });
 });
