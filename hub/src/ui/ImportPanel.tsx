@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { importBacklog, type ImportNote } from "../import/backlog";
-import { importGoogleTasks } from "../import/googleTasks";
+import { importGoogleTasks, type SkippedDuplicate } from "../import/googleTasks";
 import type { ISODate } from "../domain/types";
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
 interface Outcome {
   summary: string;
   notes: ImportNote[];
+  duplicates?: SkippedDuplicate[];
 }
 
 /** Shared by both sections: text box, file input, in-flight guard, result line, notes. */
@@ -20,6 +21,7 @@ function ImportSection({
   textLabel,
   accept,
   buttonLabel,
+  notesLabel,
   runImport,
   onImported,
 }: {
@@ -28,12 +30,14 @@ function ImportSection({
   textLabel: string;
   accept: string;
   buttonLabel: string;
+  notesLabel: string;
   runImport: (text: string) => Promise<Outcome>;
   onImported?: () => void;
 }) {
   const [text, setText] = useState("");
   const [result, setResult] = useState("");
   const [notes, setNotes] = useState<ImportNote[]>([]);
+  const [duplicates, setDuplicates] = useState<SkippedDuplicate[]>([]);
   const [running, setRunning] = useState(false);
   const inFlight = useRef(false);
 
@@ -52,6 +56,7 @@ function ImportSection({
   async function run() {
     if (inFlight.current) return;
     setNotes([]);
+    setDuplicates([]);
     if (!text.trim()) {
       setResult("Paste some text or choose a file first.");
       return;
@@ -62,6 +67,7 @@ function ImportSection({
       const r = await runImport(text);
       setResult(r.summary);
       setNotes(r.notes);
+      setDuplicates(r.duplicates ?? []);
       onImported?.();
     } catch {
       setResult("The import did not work.");
@@ -91,9 +97,21 @@ function ImportSection({
       {notes.length > 0 && (
         <details>
           <summary>{`Notes (${notes.length})`}</summary>
-          <ul aria-label="Import notes">
+          <ul aria-label={notesLabel}>
             {notes.map((n, i) => (
               <li key={i}>{n.line ? `${n.reason}: ${n.line}` : n.reason}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {duplicates.length > 0 && (
+        <details>
+          <summary>{`Same title, not added (${duplicates.length})`}</summary>
+          <ul aria-label="Same title tasks not added">
+            {duplicates.map((d, i) => (
+              <li key={i}>
+                {`${d.title} (from ${d.listTitle})${d.hadNotes ? " - had notes" : ""}${d.hadDue ? " - had a due date" : ""}`}
+              </li>
             ))}
           </ul>
         </details>
@@ -113,6 +131,7 @@ export function ImportPanel({ today, onImported }: Props) {
         textLabel="Backlog text"
         accept=".md,.txt"
         buttonLabel="Import"
+        notesLabel="Backlog import notes"
         onImported={onImported}
         runImport={async (text) => {
           const r = await importBacklog(text, today);
@@ -128,6 +147,7 @@ export function ImportPanel({ today, onImported }: Props) {
         textLabel="Google Tasks text"
         accept=".json,application/json"
         buttonLabel="Import Google Tasks"
+        notesLabel="Google Tasks import notes"
         onImported={onImported}
         runImport={async (text) => {
           let data: unknown;
@@ -140,6 +160,7 @@ export function ImportPanel({ today, onImported }: Props) {
           return {
             summary: `Added ${r.added}, already had ${r.alreadyHad}, same title as an existing task ${r.duplicateTitles}, notes ${r.skipped}`,
             notes: r.notes,
+            duplicates: r.duplicates,
           };
         }}
       />

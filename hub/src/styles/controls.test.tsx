@@ -72,7 +72,7 @@ describe("controls.css (approved mockup A, soft pills)", () => {
       "margin-right: 8px",
       "cursor: default",
     ]);
-    expect(rule('input[type="file"]')).toContain("color: var(--text)");
+    expect(controls).not.toMatch(/input\[type="file"\]\s*\{/);
     expect(allowed.has("#d4d1c3") && allowed.has("#3a412f")).toBe(true);
   });
 

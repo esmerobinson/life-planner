@@ -165,7 +165,85 @@ describe("importGoogleTasks", () => {
 
   it("a bad file adds nothing and reports it", async () => {
     const r = await importGoogleTasks({ lists: 5 }, TODAY);
-    expect(r).toEqual({ added: 0, alreadyHad: 0, duplicateTitles: 0, skipped: 1, notes: NOT_EXPORT });
+    expect(r).toEqual({ added: 0, alreadyHad: 0, duplicateTitles: 0, skipped: 1, notes: NOT_EXPORT, duplicates: [] });
     expect(await db.items.count()).toBe(0);
+  });
+
+  it("lists skipped duplicates: cross-source with notes and due, and in-file", async () => {
+    await importBacklog("- [ ] Read a pretend novel", TODAY);
+    const raw = { lists: [
+      { id: "a", title: "Books", tasks: [{ id: "n1", title: "READ a pretend novel", status: "needsAction", notes: "Chapter 3", due: "2026-12-01T00:00:00.000Z" }] },
+      { id: "b", title: "Misc", tasks: [
+        { id: "n2", title: "Shared thing", status: "needsAction" },
+        { id: "n3", title: "shared thing", status: "needsAction", notes: "x" },
+      ] },
+    ] };
+    const r = await importGoogleTasks(raw, TODAY);
+    expect(r.duplicates).toEqual([
+      { title: "READ a pretend novel", listTitle: "Books", hadNotes: true, hadDue: true, reason: "existing" },
+      { title: "shared thing", listTitle: "Misc", hadNotes: true, hadDue: false, reason: "in-file" },
+    ]);
+    expect(r.duplicateTitles).toBe(r.duplicates.length);
+  });
+
+  it("fixture duplicates list matches duplicateTitles", async () => {
+    const r = await importGoogleTasks(fixture, TODAY);
+    expect(r.duplicates).toEqual([
+      { title: "Shared title", listTitle: "Reading List", hadNotes: false, hadDue: false, reason: "in-file" },
+    ]);
+    expect(r.duplicateTitles).toBe(1);
+  });
+
+  it("the same task id twice gives a parse note, not alreadyHad", async () => {
+    const raw = { lists: [{ id: "l", title: "L", tasks: [
+      { id: "same", title: "First copy", status: "needsAction" },
+      { id: "same", title: "Second copy", status: "needsAction" },
+    ] }] };
+    const p = parseGoogleTasks(raw);
+    expect(p.items).toHaveLength(1);
+    expect(p.notes).toEqual([{ line: "Second copy", reason: "duplicate task id in file" }]);
+    const r = await importGoogleTasks(raw, TODAY);
+    expect(r).toMatchObject({ added: 1, alreadyHad: 0, skipped: 1 });
+  });
+
+  it("2026-02-30 due is rejected and reported", () => {
+    const r = parseGoogleTasks(one({ id: "d", title: "Odd day", status: "needsAction", due: "2026-02-30T00:00:00.000Z" }));
+    expect(r.items[0].due).toBeUndefined();
+    expect(r.notes).toHaveLength(1);
+    expect(r.notes[0].reason).toMatch(/due/i);
+  });
+
+  it("emoji-only titles are never duplicates of each other or of existing emoji-only rows", async () => {
+    await db.items.add({ id: "e0", kind: "task", title: "🎉", links: [], areaId: "inbox", priority: 2, status: "open", createdAt: TODAY, touchedAt: TODAY });
+    const raw = { lists: [{ id: "l", title: "L", tasks: [
+      { id: "e1", title: "✨", status: "needsAction" },
+      { id: "e2", title: "🎉", status: "needsAction" },
+    ] }] };
+    const r = await importGoogleTasks(raw, TODAY);
+    expect(r).toMatchObject({ added: 2, duplicateTitles: 0 });
+  });
+
+  it("an existing done or archived item with the same title counts as a duplicate", async () => {
+    const base = { kind: "task" as const, links: [], areaId: "art" as const, priority: 2 as const, createdAt: TODAY, touchedAt: TODAY };
+    await db.items.bulkAdd([
+      { ...base, id: "x1", title: "Finished pretend job", status: "done", completedAt: TODAY },
+      { ...base, id: "x2", title: "Shelved pretend job", status: "archived" },
+    ]);
+    const raw = { lists: [{ id: "l", title: "L", tasks: [
+      { id: "g1", title: "Finished pretend job", status: "needsAction" },
+      { id: "g2", title: "Shelved pretend job", status: "needsAction" },
+    ] }] };
+    const r = await importGoogleTasks(raw, TODAY);
+    expect(r).toMatchObject({ added: 0, duplicateTitles: 2 });
+    expect(r.duplicates.map((d) => d.reason)).toEqual(["existing", "existing"]);
+  });
+
+  it("merged tags are not repeated when both copies come from the same list", async () => {
+    const raw = { lists: [{ id: "l", title: "Same List", tasks: [
+      { id: "m1", title: "Twice listed", status: "needsAction" },
+      { id: "m2", title: "twice listed", status: "needsAction" },
+    ] }] };
+    await importGoogleTasks(raw, TODAY);
+    expect((await db.items.toArray())[0].tags).toEqual(["same list"]);
   });
 });

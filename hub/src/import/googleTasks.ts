@@ -19,6 +19,14 @@ export interface ParsedGoogleTask {
   key: string;
 }
 
+export interface SkippedDuplicate {
+  title: string;
+  listTitle: string;
+  hadNotes: boolean;
+  hadDue: boolean;
+  reason: "existing" | "in-file";
+}
+
 const NOT_AN_EXPORT: GoogleImportNote = { line: "", reason: "This is not a Google Tasks export." };
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -48,6 +56,7 @@ export function parseGoogleTasks(raw: unknown): { items: ParsedGoogleTask[]; not
   if (!isObj(raw) || !Array.isArray(raw.lists)) return { items: [], notes: [NOT_AN_EXPORT] };
   const items: ParsedGoogleTask[] = [];
   const notes: GoogleImportNote[] = [];
+  const seenIds = new Set<string>();
 
   const titleById = new Map<string, string>();
   for (const list of raw.lists) {
@@ -86,6 +95,11 @@ export function parseGoogleTasks(raw: unknown): { items: ParsedGoogleTask[]; not
         notes.push({ line: "", reason: "task has a blank title, not imported" });
         continue;
       }
+      if (seenIds.has(id)) {
+        notes.push({ line: title, reason: "duplicate task id in file" });
+        continue;
+      }
+      seenIds.add(id);
       const task: ParsedGoogleTask = { title, listTitle, googleId: id, key: "gtasks:" + id };
       const taskNotes = str(t.notes)?.trim();
       if (taskNotes) task.notes = taskNotes;
@@ -106,6 +120,14 @@ export function parseGoogleTasks(raw: unknown): { items: ParsedGoogleTask[]; not
   return { items, notes };
 }
 
+const skipped = (p: ParsedGoogleTask, reason: SkippedDuplicate["reason"]): SkippedDuplicate => ({
+  title: p.title,
+  listTitle: p.listTitle,
+  hadNotes: !!p.notes,
+  hadDue: !!p.due,
+  reason,
+});
+
 export async function importGoogleTasks(
   raw: unknown,
   today: ISODate,
@@ -115,11 +137,12 @@ export async function importGoogleTasks(
   duplicateTitles: number;
   skipped: number;
   notes: GoogleImportNote[];
+  duplicates: SkippedDuplicate[];
 }> {
   const { items, notes } = parseGoogleTasks(raw);
   let added = 0;
   let alreadyHad = 0;
-  let duplicateTitles = 0;
+  const duplicates: SkippedDuplicate[] = [];
   await db.transaction("rw", db.items, async () => {
     const haveKeys = new Set<string>();
     const haveTitles = new Set<string>();
@@ -141,12 +164,12 @@ export async function importGoogleTasks(
       if (norm) {
         const earlier = addedByTitle.get(norm);
         if (earlier) {
-          duplicateTitles++;
+          duplicates.push(skipped(p, "in-file"));
           if (tag && !(earlier.tags ?? []).includes(tag)) earlier.tags = [...(earlier.tags ?? []), tag];
           continue;
         }
         if (haveTitles.has(norm)) {
-          duplicateTitles++;
+          duplicates.push(skipped(p, "existing"));
           continue;
         }
       }
@@ -176,5 +199,5 @@ export async function importGoogleTasks(
     }
     if (pending.length) await db.items.bulkAdd(pending);
   });
-  return { added, alreadyHad, duplicateTitles, skipped: notes.length, notes };
+  return { added, alreadyHad, duplicateTitles: duplicates.length, skipped: notes.length, notes, duplicates };
 }

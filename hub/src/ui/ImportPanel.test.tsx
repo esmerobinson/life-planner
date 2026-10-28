@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import { ImportPanel } from "./ImportPanel";
+import * as gt from "../import/googleTasks";
 import fixture from "../import/__fixtures__/googleTasks.json";
 
 const TODAY = "2026-10-28";
@@ -34,7 +35,7 @@ describe("ImportPanel Google Tasks section", () => {
     ).toBeInTheDocument();
     expect(onImported).toHaveBeenCalled();
     await userEvent.click(screen.getByText("Notes (2)"));
-    const list = screen.getByRole("list", { name: "Import notes" });
+    const list = screen.getByRole("list", { name: "Google Tasks import notes" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
   });
 
@@ -45,7 +46,7 @@ describe("ImportPanel Google Tasks section", () => {
     await userEvent.click(screen.getByRole("button", { name: "Import Google Tasks" }));
     await userEvent.click(await screen.findByText("Notes (1)"));
     expect(document.querySelector("b, i")).toBeNull();
-    expect(screen.getByRole("list", { name: "Import notes" }).textContent).toContain("<b>x</b>");
+    expect(screen.getByRole("list", { name: "Google Tasks import notes" }).textContent).toContain("<b>x</b>");
   });
 
   it("says so when the text is empty or is not JSON, and writes nothing", async () => {
@@ -62,11 +63,14 @@ describe("ImportPanel Google Tasks section", () => {
   it("double-clicking imports once and disables the button while running", async () => {
     render(<ImportPanel today={TODAY} />);
     paste("Google Tasks text", JSON.stringify(fixture));
+    const spy = vi.spyOn(gt, "importGoogleTasks");
     const btn = screen.getByRole("button", { name: "Import Google Tasks" });
     fireEvent.click(btn);
     fireEvent.click(btn);
     expect(btn).toBeDisabled();
     expect(await screen.findByText(/^Added 8, already had 0/)).toBeInTheDocument();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
     await vi.waitFor(() => expect(btn).not.toBeDisabled());
     expect(await db.items.count()).toBe(8);
   });
@@ -74,5 +78,37 @@ describe("ImportPanel Google Tasks section", () => {
   it("the Backlog Import button is unchanged", () => {
     render(<ImportPanel today={TODAY} />);
     expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
+  });
+
+  it("lists skipped same-title tasks in a second details, as text", async () => {
+    await db.items.add({ id: "ex", kind: "task", title: "Plan <b>trip</b>", links: [], areaId: "inbox", priority: 2, status: "open", createdAt: TODAY, touchedAt: TODAY });
+    render(<ImportPanel today={TODAY} />);
+    const raw = { lists: [{ id: "l", title: "Travel", tasks: [
+      { id: "a", title: "Plan <b>trip</b>", status: "needsAction", notes: "n", due: "2026-12-01T00:00:00.000Z" },
+      { id: "b", title: "Plain one", status: "needsAction" },
+    ] }] };
+    paste("Google Tasks text", JSON.stringify(raw));
+    await userEvent.click(screen.getByRole("button", { name: "Import Google Tasks" }));
+    await userEvent.click(await screen.findByText("Same title, not added (1)"));
+    const list = screen.getByRole("list", { name: "Same title tasks not added" });
+    expect(list.textContent).toBe("Plan <b>trip</b> (from Travel) - had notes - had a due date");
+    expect(document.querySelector("b")).toBeNull();
+    expect(screen.queryByText(/^Notes \(/)).toBeNull();
+  });
+
+  it("shows no same-title details when nothing was skipped", async () => {
+    render(<ImportPanel today={TODAY} />);
+    paste("Google Tasks text", JSON.stringify({ lists: [] }));
+    await userEvent.click(screen.getByRole("button", { name: "Import Google Tasks" }));
+    await screen.findByText(/^Added 0/);
+    expect(screen.queryByText(/Same title, not added/)).toBeNull();
+  });
+
+  it("the Backlog notes list has its own name", async () => {
+    render(<ImportPanel today={TODAY} />);
+    paste("Backlog text", "- [ ] Thing [due 2026-13-45]");
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    await userEvent.click(await screen.findByText("Notes (1)"));
+    expect(screen.getByRole("list", { name: "Backlog import notes" })).toBeInTheDocument();
   });
 });
