@@ -1,4 +1,5 @@
-import { render as rtlRender, screen, within } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import { renderApp } from "../test/renderApp";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { vi } from "vitest";
@@ -21,6 +22,7 @@ beforeEach(async () => {
   await db.items.clear();
   await db.goals.clear();
 });
+afterEach(() => vi.useRealTimers());
 
 describe("Inbox strips (unsorted: no type yet)", () => {
   it("a strip has no tick box or select box, and Schedule for, Move to and Delete on the right", async () => {
@@ -38,8 +40,9 @@ describe("Inbox strips (unsorted: no type yet)", () => {
     const del = within(actions).getByRole("button", { name: "Delete: Loose end" });
     expect(del).toHaveClass("icon");
     expect(del).toHaveAttribute("title", "Delete");
-    // The only tray is the temporary More options (goal, priority, due).
-    expect(within(row.querySelector(".strip-tray") as HTMLElement).getByText("More options")).toBeInTheDocument();
+    // The temporary More options is gone (the side panel sets goal, priority and due).
+    expect(row.querySelector(".strip-tray")).toBeNull();
+    expect(within(row).queryByText("More options")).toBeNull();
   });
 
   it("a stored idea looks the same as a stored to-do: the stored kind is ignored until it is sorted", async () => {
@@ -91,37 +94,39 @@ describe("Inbox strips (unsorted: no type yet)", () => {
     await vi.waitFor(() => expect(within(card).getByText("Chosen")).toBeInTheDocument());
   });
 
-  it("More options (temporary, until the side panel) sets goal, priority and due; the item stays in the Inbox", async () => {
+  it("clicking an Inbox strip's title opens the panel, which sets goal, priority and due; the item stays in the Inbox", async () => {
     const goal = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
     const it = await createItem({ kind: "idea", title: "Detailed", areaId: "inbox", priority: 2 }, TODAY);
-    render(<InboxPage today={TODAY} />);
-    await screen.findByText("Detailed");
-    const row = rowOf("Detailed");
-    expect(row.querySelector(".strip-tray details")).not.toHaveAttribute("open");
-    await userEvent.click(within(row).getByText("More options"));
-    await userEvent.selectOptions(within(row).getByLabelText("Goal for Detailed"), goal.id);
-    await userEvent.selectOptions(within(row).getByLabelText("Priority for Detailed"), "1");
-    // An Inbox item has no type yet, so the due date is always offered.
-    await userEvent.type(within(row).getByLabelText("Due for Detailed"), "2026-11-05");
-    await userEvent.click(within(row).getByRole("button", { name: "Save Detailed" }));
+    renderApp("/inbox", TODAY);
+    await userEvent.click(await screen.findByRole("button", { name: "Detailed" }));
+    const p = within(await screen.findByRole("complementary", { name: "Detailed" }));
+    // No type until it is sorted; the area changes only through Sort.
+    expect(p.queryByText("Type")).toBeNull();
+    expect(p.getByText("Inbox")).toBeInTheDocument();
+    await userEvent.click(p.getByRole("button", { name: "Edit" }));
+    expect(p.queryByLabelText("Type")).toBeNull();
+    expect(p.queryByLabelText("Area")).toBeNull();
+    await userEvent.selectOptions(p.getByLabelText("Goal"), goal.id);
+    await userEvent.selectOptions(p.getByLabelText("Priority"), "1");
+    fireEvent.change(p.getByLabelText("Due"), { target: { value: "2026-11-05" } });
+    await userEvent.click(p.getByRole("button", { name: "Done" }));
     await vi.waitFor(async () =>
-      expect(await db.items.get(it.id)).toMatchObject({ goalId: goal.id, priority: 1, due: "2026-11-05", areaId: "inbox" }),
+      expect(await db.items.get(it.id)).toMatchObject({ goalId: goal.id, priority: 1, due: "2026-11-05", areaId: "inbox", kind: "idea" }),
     );
-    expect(screen.getByText("Detailed")).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Inbox items" })).getByText("Detailed")).toBeInTheDocument();
   });
 
-  it("More options can clear the goal and the due date again", async () => {
+  it("the panel can clear an Inbox item's goal and due date again", async () => {
     const goal = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
     const it = await createItem({ kind: "task", title: "Clear me", areaId: "inbox", priority: 3, goalId: goal.id, due: "2026-11-05" }, TODAY);
-    render(<InboxPage today={TODAY} />);
-    await screen.findByText("Clear me");
-    const row = rowOf("Clear me");
-    await userEvent.click(within(row).getByText("More options"));
-    expect(within(row).getByLabelText("Goal for Clear me")).toHaveValue(goal.id);
-    expect(within(row).getByLabelText("Priority for Clear me")).toHaveValue("3");
-    await userEvent.selectOptions(within(row).getByLabelText("Goal for Clear me"), "");
-    await userEvent.clear(within(row).getByLabelText("Due for Clear me"));
-    await userEvent.click(within(row).getByRole("button", { name: "Save Clear me" }));
+    renderApp(`/inbox?open=${it.id}`, TODAY);
+    const p = within(await screen.findByRole("complementary", { name: "Clear me" }));
+    await userEvent.click(p.getByRole("button", { name: "Edit" }));
+    expect(p.getByLabelText("Goal")).toHaveValue(goal.id);
+    expect(p.getByLabelText("Priority")).toHaveValue("3");
+    await userEvent.selectOptions(p.getByLabelText("Goal"), "");
+    fireEvent.change(p.getByLabelText("Due"), { target: { value: "" } });
+    await userEvent.click(p.getByRole("button", { name: "Done" }));
     await vi.waitFor(async () => {
       const got = (await db.items.get(it.id))!;
       expect(got.goalId).toBeUndefined();

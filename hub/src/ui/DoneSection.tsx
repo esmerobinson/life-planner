@@ -1,6 +1,21 @@
 import { useState } from "react";
 import { shortDate } from "../domain/display";
 import type { ISODate, Item } from "../domain/types";
+import { StripTitle, useOpenOnBodyClick } from "./TaskRow";
+
+/** A done item as a strip: ticked box (untick brings it back), struck-through title, done date. */
+export function DoneStrip({ item: it, today, onUndo }: { item: Item; today: ISODate; onUndo: (id: string) => void }) {
+  const openOnClick = useOpenOnBodyClick(it.id);
+  return (
+    <li className="strip crossed">
+      <input type="checkbox" className="tick" aria-label={`Done: ${it.title}`} checked onChange={() => onUndo(it.id)} />
+      <div className={openOnClick ? "strip-body openable" : "strip-body"} onClick={openOnClick}>
+        <StripTitle item={it} />
+      </div>
+      <span className="strip-meta">{it.completedAt ? shortDate(it.completedAt, today) : ""}</span>
+    </li>
+  );
+}
 
 /** How many done items the fold-out lists before "Show all". */
 export const DONE_CAP = 50;
@@ -32,19 +47,7 @@ export function DoneSection({
         <>
           <ul aria-label="Done" className="strip-list">
             {shown.map((it) => (
-              <li key={it.id} className="strip">
-                <input
-                  type="checkbox"
-                  className="tick"
-                  aria-label={`Done: ${it.title}`}
-                  checked
-                  onChange={() => onUndo(it.id)}
-                />
-                <div className="strip-body">
-                  <div className="strip-title">{it.title}</div>
-                </div>
-                <span className="strip-meta">{it.completedAt ? shortDate(it.completedAt, today) : ""}</span>
-              </li>
+              <DoneStrip key={it.id} item={it} today={today} onUndo={onUndo} />
             ))}
           </ul>
           {shown.length < done.length && (

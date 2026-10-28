@@ -6,6 +6,7 @@ import "./styles/controls.css";
 import "./styles/strips.css";
 import "./styles/sort.css";
 import "./styles/phone.css";
+import "./styles/panel.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

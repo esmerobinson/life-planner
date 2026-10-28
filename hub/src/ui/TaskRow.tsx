@@ -1,10 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { tickItem } from "../data/repo";
 import { dueLine } from "../domain/display";
+import { HABIT_WORDS, isHabit } from "../domain/habits";
 import type { ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
+import { FLAG_GLYPH, REPEAT_GLYPH } from "./IconPopover";
 import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
+import { usePanel } from "./panelContext";
 import { ScheduleMenu } from "./ScheduleMenu";
 
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
@@ -45,19 +48,70 @@ export function DueLine({ item, today }: { item: Item; today: ISODate }) {
   );
 }
 
+/** Interactive things inside a strip body that must not also open the panel. */
+const OWN_CLICK = "button, a, input, select, textarea, summary, label";
+
+/**
+ * A strip's title: the repeat symbol for a habit, the flag for a milestone, then the
+ * title. Inside the app shell it is a button that opens the side panel.
+ */
+export function StripTitle({ item, untyped = false }: { item: Item; untyped?: boolean }) {
+  const panel = usePanel();
+  const body = (
+    <>
+      {!untyped && isHabit(item) && (
+        <span className="strip-glyph" aria-hidden="true">
+          {REPEAT_GLYPH}
+        </span>
+      )}
+      {!untyped && item.milestone && (
+        <span className="strip-glyph" title="Milestone">
+          {FLAG_GLYPH}
+          <span className="visually-hidden">Milestone: </span>
+        </span>
+      )}
+      {item.title}
+    </>
+  );
+  return panel ? (
+    <button type="button" className="strip-title strip-open" onClick={() => panel.open(item.id)}>
+      {body}
+    </button>
+  ) : (
+    <div className="strip-title">{body}</div>
+  );
+}
+
+/** Clicking anywhere in a strip's body (not its own controls) opens the panel too. */
+export function useOpenOnBodyClick(id: string) {
+  const panel = usePanel();
+  return panel
+    ? (e: MouseEvent<HTMLDivElement>) => {
+        if ((e.target as Element).closest(OWN_CLICK)) return;
+        panel.open(id);
+      }
+    : undefined;
+}
+
 /**
  * One task (or idea) as a strip: tick box on the left (Done; tasks only), title with the
  * due line under it, and the Schedule for (tasks only) and Move to icons on the right.
+ * Clicking the title (or anywhere in the body) opens it in the side panel.
  * `meta` adds lines under the title, `extra` sits before the icons, `tray` is a second
  * line under the title for a page's own controls, `trail` sits after the icons.
  * `untyped` is for Inbox items, which have no type until they are sorted: no tick box,
  * and nothing that depends on the stored kind (the calendar shows, Move to has no
  * "Change to").
+ * `crossed`: ticked off today and kept in place (a habit done today; a to-do done today on
+ * the Today list): ticked box, struck-through title; unticking calls `onUntick`.
+ * A habit (recurring to-do) shows the repeat symbol and its schedule, or "Done for today".
  */
 export function TaskRow({
   item,
   today,
   onTick,
+  onUntick,
+  crossed = false,
   onMoved,
   meta,
   extra,
@@ -71,6 +125,9 @@ export function TaskRow({
   today: ISODate;
   /** Marks it done; resolving to false (the save failed) unticks the box again. */
   onTick?: (id: string) => void | Promise<boolean | void>;
+  /** Unticks a crossed-off strip. */
+  onUntick?: (id: string) => void | Promise<unknown>;
+  crossed?: boolean;
   onMoved: () => void | Promise<void>;
   meta?: ReactNode;
   extra?: ReactNode;
@@ -81,33 +138,44 @@ export function TaskRow({
   /** This strip is on the Today list (offers Remove from today). */
   onTodayList?: boolean;
 }) {
-  // Shows the box ticked until the refresh removes the row (React would otherwise snap it back).
+  // Shows the box ticked until the refresh removes (or crosses off) the row.
   const [ticked, setTicked] = useState(false);
+  useEffect(() => {
+    if (!crossed) setTicked(false);
+  }, [crossed]);
+  const openOnClick = useOpenOnBodyClick(item.id);
   const isTask = untyped || item.kind === "task";
+  const habit = !untyped && isHabit(item);
   const tick = !untyped && isTask && onTick !== undefined;
+  const checked = crossed || ticked;
   return (
-    <li className={["strip", tick ? "" : "no-tick", className ?? ""].filter(Boolean).join(" ")}>
+    <li className={["strip", tick ? "" : "no-tick", crossed ? "crossed" : "", className ?? ""].filter(Boolean).join(" ")}>
       {tick && (
         <input
           type="checkbox"
           className="tick"
-          aria-label={`Mark done: ${item.title}`}
-          checked={ticked}
+          aria-label={crossed ? `Done: ${item.title}` : `Mark done: ${item.title}`}
+          checked={checked}
           onChange={async () => {
+            if (crossed) {
+              await onUntick?.(item.id);
+              return;
+            }
             if (ticked) return;
             setTicked(true);
             if ((await onTick(item.id)) === false) setTicked(false);
           }}
         />
       )}
-      <div className="strip-body">
-        <div className="strip-title">{item.title}</div>
-        {isTask && <DueLine item={item} today={today} />}
+      <div className={openOnClick ? "strip-body openable" : "strip-body"} onClick={openOnClick}>
+        <StripTitle item={item} untyped={untyped} />
+        {isTask && !crossed && <DueLine item={item} today={today} />}
+        {habit && <div className="strip-meta">{crossed ? HABIT_WORDS.doneForToday : HABIT_WORDS.schedule(item.recur)}</div>}
         {meta}
       </div>
       <div className="strip-actions">
         {extra}
-        {isTask && (
+        {isTask && !habit && !crossed && (
           <ScheduleMenu
             itemId={item.id}
             pinnedDate={item.pinnedDate}
@@ -125,6 +193,7 @@ export function TaskRow({
           onMoved={onMoved}
           label={item.title}
           onTodayList={onTodayList}
+          milestone={!untyped && item.kind === "task" && item.goalId ? item.milestone === true : undefined}
         />
         {trail}
       </div>

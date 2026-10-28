@@ -1,10 +1,9 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useShellToday } from "./ui/shellContext";
 import { AppShell } from "./ui/AppShell";
 import { NAV } from "./ui/areas";
 import { AreaPage } from "./ui/AreaPage";
 import { BackupPage } from "./ui/BackupPage";
-import { GoalDetail } from "./ui/GoalDetail";
 import { GoalsPage } from "./ui/GoalsPage";
 import { HomePage } from "./ui/HomePage";
 import { InboxPage } from "./ui/InboxPage";
@@ -25,8 +24,10 @@ function GoalsRoute() {
   return <GoalsPage today={useShellToday()} />;
 }
 
+/** Old goal links (/goals/<id>) open the goal in the side panel on the Goals page. */
 function GoalDetailRoute() {
-  return <GoalDetail today={useShellToday()} />;
+  const { id = "" } = useParams();
+  return <Navigate to={`/goals?open=${encodeURIComponent(id)}`} replace />;
 }
 
 function AreaRoute() {
@@ -52,6 +53,14 @@ function BackupRoute() {
 export default function App() {
   return (
     <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
+}
+
+/** Every route of the app (inside whichever router: the browser's, or a test's). */
+export function AppRoutes() {
+  return (
       <Routes>
         <Route element={<AppShell />}>
           {NAV.map((n) =>
@@ -73,6 +82,5 @@ export default function App() {
           <Route path="/sync" element={<SyncPage />} />
         </Route>
       </Routes>
-    </BrowserRouter>
   );
 }

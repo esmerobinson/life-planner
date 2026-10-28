@@ -1,5 +1,38 @@
 import type { Goal, ISODate, Item } from "./types";
 import { daysBetween, weekdayOf } from "./dates";
+import { doneToday, isHabit } from "./habits";
+
+/** Ticked off today: a habit with today in its done log, or a to-do completed today. */
+export function tickedOffToday(it: Item, today: ISODate): boolean {
+  return isHabit(it) && it.status === "open" ? doneToday(it, today) : it.status === "done" && it.completedAt === today;
+}
+
+/**
+ * Today keeps what was ticked off today (round 3): habits done today stay in the rhythm
+ * list (also one ticked on a day it is not planned for), to-dos completed today join the
+ * Today list. Ticked ones move to the bottom of their list, so what is left stays on top.
+ */
+export function withTickedOff(
+  pick: { rhythm: Item[]; picks: Item[]; alsoDue: Item[] },
+  items: Item[],
+  today: ISODate,
+): { rhythm: Item[]; picks: Item[]; alsoDue: Item[] } {
+  const sorted = (i: Item) => i.kind === "task" && i.areaId !== "inbox";
+  const inRhythm = new Set(pick.rhythm.map((i) => i.id));
+  const extraHabits = items.filter(
+    (i) => sorted(i) && isHabit(i) && i.status === "open" && doneToday(i, today) && !inRhythm.has(i.id),
+  );
+  const doneTasks = items.filter((i) => sorted(i) && i.status === "done" && i.completedAt === today);
+  const lastIfTicked = (list: Item[]) => [
+    ...list.filter((i) => !tickedOffToday(i, today)),
+    ...list.filter((i) => tickedOffToday(i, today)),
+  ];
+  return {
+    rhythm: lastIfTicked([...pick.rhythm, ...extraHabits]),
+    picks: lastIfTicked([...pick.picks, ...doneTasks]),
+    alsoDue: pick.alsoDue,
+  };
+}
 
 export const CAPACITY = 4;
 export const DUE_HORIZON = 3;

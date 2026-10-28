@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { tickItem } from "../data/repo";
-import { pickToday } from "../domain/triage";
+import { tickItem, untickItem } from "../data/repo";
+import { pickToday, tickedOffToday, withTickedOff } from "../domain/triage";
 import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
@@ -36,8 +36,9 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
     return () => clearTimeout(t);
   }, [celebrating]);
 
+  // What was ticked off today stays, crossed out, at the bottom of its list (round 3).
   const { rhythm, picks, alsoDue } = useMemo(
-    () => pickToday(items, goals, today, thisMonthDoneFor(goals, items, today)),
+    () => withTickedOff(pickToday(items, goals, today, thisMonthDoneFor(goals, items, today)), items, today),
     [items, goals, today],
   );
 
@@ -48,8 +49,23 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
     return true;
   }
 
+  async function untick(id: string) {
+    if (await attempt(() => untickItem(id, today))) await changed();
+  }
+
   function row(it: Item) {
-    return <TaskRow key={it.id} item={it} today={today} onTick={tick} onMoved={changed} onTodayList />;
+    return (
+      <TaskRow
+        key={it.id}
+        item={it}
+        today={today}
+        onTick={tick}
+        onUntick={untick}
+        crossed={tickedOffToday(it, today)}
+        onMoved={changed}
+        onTodayList
+      />
+    );
   }
 
   if (error) {

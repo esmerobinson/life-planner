@@ -1,7 +1,10 @@
 import { useContext, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { listItems, restoreItem, untickItem } from "../data/repo";
+import { doneToday, HABIT_WORDS, isHabit, sessions } from "../domain/habits";
 import type { ISODate, Item } from "../domain/types";
+import { REPEAT_GLYPH } from "./IconPopover";
+import { ProgressBar } from "./ProgressBar";
 import { GOAL_AREAS } from "./areas";
 import { DoneSection } from "./DoneSection";
 import { GoalCard, MonthProgress } from "./GoalProgress";
@@ -70,14 +73,49 @@ export function AreaPage({ today }: { today: ISODate }) {
   }
 
   const mine = items.filter((i) => i.areaId === area.id && i.status === "open");
-  const tasks = view === "all" || view === "tasks" ? mine.filter((i) => i.kind === "task") : [];
+  // Habits live in their own box at the top, not in the To-dos list (round 3).
+  const habits = view === "all" || view === "tasks" ? mine.filter(isHabit) : [];
+  const tasks = view === "all" || view === "tasks" ? mine.filter((i) => i.kind === "task" && !isHabit(i)) : [];
   const ideas = view === "all" || view === "ideas" ? mine.filter((i) => i.kind === "idea") : [];
   const areaGoals = view === "all" || view === "goals" ? goals.filter((g) => g.areaId === area.id) : [];
-  const empty = loaded && tasks.length + ideas.length + areaGoals.length === 0;
+  const empty = loaded && habits.length + tasks.length + ideas.length + areaGoals.length === 0;
 
   return (
     <section className="area-page">
       <h1>{area.label}</h1>
+      {habits.length > 0 && (
+        <section className="habits" aria-labelledby="habits-heading">
+          <h2 className="habits-head" id="habits-heading">
+            <span className="strip-glyph" aria-hidden="true">
+              {REPEAT_GLYPH}
+            </span>
+            {HABIT_WORDS.heading}
+          </h2>
+          <ul aria-label={HABIT_WORDS.heading} className="strip-list">
+            {habits.map((it) => {
+              const s = sessions(it, today);
+              const text = HABIT_WORDS.session(today, s.done, s.planned);
+              return (
+                <TaskRow
+                  key={it.id}
+                  item={it}
+                  today={today}
+                  onTick={tick}
+                  onUntick={(id) => save(() => untickItem(id, today))}
+                  crossed={doneToday(it, today)}
+                  onMoved={changed}
+                  extra={
+                    <div className="habit-session">
+                      <div className="habit-count">{text}</div>
+                      <ProgressBar ratio={s.planned ? s.done / s.planned : 0} label={text} />
+                    </div>
+                  }
+                />
+              );
+            })}
+          </ul>
+        </section>
+      )}
       {loaded && <MonthProgress areaId={area.id} items={items} today={today} />}
       <div role="group" aria-label="Show" className="btn-group">
         {FILTERS.map((t) => (

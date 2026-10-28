@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickToday, CAPACITY, DUE_HORIZON } from "./triage";
+import { pickToday, CAPACITY, DUE_HORIZON, tickedOffToday, withTickedOff } from "./triage";
 import type { Item, Goal } from "./types";
 
 let n = 0;
@@ -151,5 +151,34 @@ describe("pickToday", () => {
     const out = pickToday([...dues, moved], [], TUE, {});
     expect(ids(out.picks)).toEqual(["d1", "d2", "d3", "d4"]);
     expect(out.alsoDue).toEqual([]);
+  });
+});
+
+describe("Today keeps what was ticked off today (withTickedOff)", () => {
+  const today = (items: Item[], day = TUE) => withTickedOff(pickToday(items, [], day, {}), items, day);
+
+  it("a to-do completed today stays on the Today list, at the bottom; tomorrow it is gone", () => {
+    const a = item({ id: "a", pinnedDate: TUE });
+    const b = item({ id: "b", pinnedDate: TUE, status: "done", completedAt: TUE });
+    const c = item({ id: "c", pinnedDate: TUE });
+    const old = item({ id: "old", status: "done", completedAt: "2026-10-26" });
+    const inbox = item({ id: "inbox", areaId: "inbox", status: "done", completedAt: TUE });
+    expect(ids(today([a, b, c, old, inbox]).picks)).toEqual(["a", "c", "b"]);
+    expect(ids(today([a, b, c], WED).picks)).not.toContain("b");
+  });
+
+  it("a habit done today stays in the rhythm, ticked ones last; tomorrow it is fresh", () => {
+    const h1 = item({ id: "h1", recur: ["tue", "wed"], doneDates: [TUE] });
+    const h2 = item({ id: "h2", recur: ["tue", "wed"] });
+    expect(ids(today([h1, h2]).rhythm)).toEqual(["h2", "h1"]);
+    expect(tickedOffToday(h1, TUE)).toBe(true);
+    expect(ids(today([h1, h2], WED).rhythm)).toEqual(["h1", "h2"]);
+    expect(tickedOffToday(h1, WED)).toBe(false);
+  });
+
+  it("a habit ticked on a day it is not planned for still shows, crossed off", () => {
+    const h = item({ id: "h", recur: ["mon"], doneDates: [TUE] });
+    expect(ids(today([h]).rhythm)).toEqual(["h"]);
+    expect(ids(today([item({ id: "h0", recur: ["mon"] })]).rhythm)).toEqual([]);
   });
 });

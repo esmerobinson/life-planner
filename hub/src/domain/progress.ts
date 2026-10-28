@@ -50,11 +50,16 @@ export function milestoneProgress(
   return { done, total: base.length, ratio: done / base.length, flagged: flagged.length > 0 };
 }
 
+/** Tick-offs for the goal this calendar month (with or without a monthly target). */
+export function doneThisMonth(goal: Goal, items: Item[], today: ISODate): number {
+  const month = monthOf(today);
+  return completions(goal, items).filter((d) => monthOf(d) === month).length;
+}
+
 export function monthlyProgress(goal: Goal, items: Item[], today: ISODate): MonthlyProgress | null {
   const target = goal.monthlyTarget;
   if (target === undefined || !(target > 0)) return null;
-  const month = monthOf(today);
-  const done = completions(goal, items).filter((d) => monthOf(d) === month).length;
+  const done = doneThisMonth(goal, items, today);
   return { done, target, ratio: Math.min(1, done / target) };
 }
 

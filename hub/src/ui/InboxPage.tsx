@@ -11,7 +11,7 @@ import { ShellContext } from "./shellContext";
 import { useHubData } from "./useHubData";
 
 export function InboxPage({ today }: { today: ISODate }) {
-  const { items, goals, refresh, loaded, error } = useHubData(today);
+  const { items, refresh, loaded, error } = useHubData(today);
   const shell = useContext(ShellContext);
   // The same order as Sort one by one (oldest first).
   const inbox = inboxOrder(items.filter((i) => i.areaId === "inbox" && i.status === "open"));
@@ -168,7 +168,7 @@ export function InboxPage({ today }: { today: ISODate }) {
       {shown.length > 0 && (
         <ul aria-label="Inbox items" className="strip-list">
           {shown.map((it) => (
-            <InboxRow key={it.id} item={it} today={today} goals={goals} onFiled={changed} onDelete={() => void remove(it)} busy={busy} />
+            <InboxRow key={it.id} item={it} today={today} onFiled={changed} onDelete={() => void remove(it)} busy={busy} />
           ))}
         </ul>
       )}

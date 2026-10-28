@@ -307,7 +307,7 @@ describe("AreaPage", () => {
     const list = await screen.findByRole("list", { name: "Goals" });
     const card = within(list).getByRole("listitem");
     expect(card).toHaveClass("goal-card");
-    expect(within(card).getByRole("link", { name: "Paint daily" })).toHaveAttribute("href", `/goals/${g.id}`);
+    expect(within(card).getByRole("link", { name: "Paint daily" })).toHaveAttribute("href", `/area/art?open=${g.id}`);
     expect(within(card).getByText("October: 0 of 4")).toBeInTheDocument();
   });
 

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { archiveItem, deleteItem, itemToGoal, moveTo, removeFromToday, updateItem } from "../data/repo";
+import { archiveItem, deleteItem, itemToGoal, moveTo, removeFromToday, setMilestone, updateItem } from "../data/repo";
 import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
 import { ARROW_GLYPH, IconPopover } from "./IconPopover";
@@ -8,6 +8,7 @@ import { useSaveError } from "./messages";
 type Choice =
   | { kind: "become"; to: "task" | "idea" | "goal" }
   | { kind: "area"; areaId: AreaId }
+  | { kind: "milestone"; on: boolean }
   | { kind: "week" }
   | { kind: "remove" }
   | { kind: "archive" }
@@ -35,7 +36,13 @@ export function MoveToMenu({
   label,
   onTodayList = false,
   untyped = false,
+  milestone,
 }: {
+  /**
+   * For a to-do with a goal: whether it is flagged as a milestone (offers "Mark as
+   * milestone", or "Unmark as milestone" when it is). Undefined: no row.
+   */
+  milestone?: boolean;
   itemId: string;
   areaId?: AreaId;
   kind?: Item["kind"];
@@ -62,6 +69,7 @@ export function MoveToMenu({
           );
         } else await updateItem(itemId, { kind: "task" }, today);
       } else if (c.kind === "area") await updateItem(itemId, { areaId: c.areaId }, today);
+      else if (c.kind === "milestone") await setMilestone(itemId, c.on, today);
       else if (c.kind === "week") await moveTo(itemId, "week", today);
       else if (c.kind === "remove") await removeFromToday(itemId, today);
       else if (c.kind === "archive") await archiveItem(itemId, today);
@@ -99,6 +107,14 @@ export function MoveToMenu({
                   </button>
                 ))}
               </div>
+              <hr />
+            </>
+          )}
+          {!untyped && milestone !== undefined && (
+            <>
+              <button type="button" onClick={() => void pick({ kind: "milestone", on: !milestone }, close)}>
+                {milestone ? "Unmark as milestone" : "Mark as milestone"}
+              </button>
               <hr />
             </>
           )}

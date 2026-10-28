@@ -5,7 +5,6 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import * as repo from "../data/repo";
 import { db } from "../data/db";
 import { AreaPage } from "./AreaPage";
-import { GoalDetail } from "./GoalDetail";
 import { GoalsPage } from "./GoalsPage";
 import { HomePage } from "./HomePage";
 import { InboxPage } from "./InboxPage";
@@ -39,7 +38,6 @@ describe("a failing read shows one calm line and no empty state", () => {
     ["Inbox", () => at("/inbox", "/inbox", <InboxPage today={TODAY} />), ["Nothing waiting in the inbox."]],
     ["Area", () => at("/area/art", "/area/:areaId", <AreaPage today={TODAY} />), ["Nothing here yet.", "Nothing archived."]],
     ["Goals", () => at("/goals", "/goals", <GoalsPage today={TODAY} />), ["No goals yet."]],
-    ["Goal detail", () => at("/goals/x", "/goals/:id", <GoalDetail today={TODAY} />), ["That goal does not exist."]],
   ])("%s", async (_name, renderPage, emptyLines) => {
     vi.spyOn(repo, "listItems").mockRejectedValue(new Error("disk gone"));
     renderPage();

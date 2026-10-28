@@ -14,6 +14,23 @@ export const ARROW_GLYPH = (
   </svg>
 );
 
+/* Repeat symbol copied from the round-3 mockup (habits): 16px, 1.6 stroke, currentColor. */
+export const REPEAT_GLYPH = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true" focusable="false">
+    <path d="M3 6a5 5 0 0 1 9-2M13 10a5 5 0 0 1-9 2" />
+    <path d="M12 1v3h-3M4 15v-3h3" />
+  </svg>
+);
+
+/* Milestone flag (round 3): drawn by the implementer in the calendar/arrow style (16px
+   box, 1.6 stroke, currentColor); the drawing is unreviewed. */
+export const FLAG_GLYPH = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true" focusable="false">
+    <path d="M3.5 15V1.5" />
+    <path d="M3.5 2.5h9l-2.2 3.2 2.2 3.3h-9" />
+  </svg>
+);
+
 /**
  * A small icon button that opens a plain group of buttons under it (no menu roles: no
  * arrow-key machinery is promised). Escape closes it and returns focus to the icon; so

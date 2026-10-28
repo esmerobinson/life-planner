@@ -12,6 +12,8 @@ import { UpdatePrompt } from "./UpdatePrompt";
 import { DbClosedNotice } from "./DbClosedNotice";
 import { db } from "../data/db";
 import { migrateMilestones } from "../data/migrateMilestones";
+import { PanelProvider } from "./panelContext";
+import { SidePanel } from "./SidePanel";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
 
@@ -21,7 +23,7 @@ const CLOCK_CHECK_MS = 60_000;
 export function AppShell() {
   const [, setClock] = useState(0); // bumped on focus/visibility/interval so `today` is re-read
   const today = todayISO();
-  const { items, refresh } = useHubData(today);
+  const { items, goals, refresh } = useHubData(today);
   const [adding, setAdding] = useState(false);
   const [version, setVersion] = useState(0);
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
@@ -79,6 +81,7 @@ export function AppShell() {
 
   return (
     <ShellContext.Provider value={ctx}>
+      <PanelProvider>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
@@ -94,8 +97,10 @@ export function AppShell() {
           </div>
           {adding && <QuickAdd today={today} onAdded={() => void changed()} />}
           <Outlet />
+          <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
         </main>
       </div>
+      </PanelProvider>
     </ShellContext.Provider>
   );
 }

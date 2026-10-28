@@ -3,6 +3,7 @@ import { monthName, shortDate } from "../domain/display";
 import { monthlyProgress, nextStep, overallProgress, tickedOff } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { AREA_CHOICES, NAV } from "./areas";
+import { usePanel } from "./panelContext";
 import { ProgressBar } from "./ProgressBar";
 
 export function areaLabel(id: string): string {
@@ -27,41 +28,16 @@ export function MonthProgress({ areaId, items, today }: { areaId: string; items:
   );
 }
 
-/** The two progress displays: this month, and the overall arc. */
-export function GoalProgress({ goal, items, today }: { goal: Goal; items: Item[]; today: ISODate }) {
-  const month = monthlyProgress(goal, items, today);
-  const overall = overallProgress(goal, items, today);
-  return (
-    <div className="goal-progress">
-      {month ? (
-        <div>
-          <span>This month</span> <span>{`${month.done}/${month.target}`}</span>
-          <ProgressBar ratio={month.ratio} label={`This month ${month.done}/${month.target}`} />
-        </div>
-      ) : (
-        <p>Set a monthly target to see progress this month.</p>
-      )}
-      {overall.kind === "milestones" ? (
-        <div>
-          <span>Overall</span> <span>{`${overall.done}/${overall.total}`}</span>
-          <ProgressBar ratio={overall.ratio} label={`Overall ${overall.done}/${overall.total}`} />
-          {overall.total === 0 && <p>Add milestones to see the overall arc.</p>}
-        </div>
-      ) : (
-        <p>{`${overall.thisYear} this year, ${overall.monthsInARow} ${overall.monthsInARow === 1 ? "month" : "months"} in a row, ${overall.streakDays} day streak`}</p>
-      )}
-    </div>
-  );
-}
-
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
  * A goal as a list entry (3A): area tile, title, chips (area; "By <date>" or "Practice"),
- * the Overall bar (finite), this month's bar (with a monthly target) and the next step.
- * The title link covers the whole card.
+ * the Overall bar (finite, once it has linked tasks), this month's bar (with a monthly
+ * target) and the next step. The title link covers the whole card and opens the goal in
+ * the side panel (`?open=<id>`).
  */
 export function GoalCard({ goal, items, today }: { goal: Goal; items: Item[]; today: ISODate }) {
+  const panel = usePanel();
   const nav = NAV.find((n) => n.id === goal.areaId);
   const month = monthlyProgress(goal, items, today);
   const overall = overallProgress(goal, items, today);
@@ -76,7 +52,16 @@ export function GoalCard({ goal, items, today }: { goal: Goal; items: Item[]; to
         </span>
         <div>
           <h3 className="goal-title">
-            <Link to={`/goals/${goal.id}`}>{goal.title}</Link>
+            <Link
+              to={panel ? panel.href(goal.id) : { search: `?open=${encodeURIComponent(goal.id)}` }}
+              onClick={(e) => {
+                if (!panel || e.metaKey || e.ctrlKey || e.shiftKey) return;
+                e.preventDefault();
+                panel.open(goal.id);
+              }}
+            >
+              {goal.title}
+            </Link>
           </h3>
           <div>
             <span className="chip">{areaLabel(goal.areaId)}</span>{" "}
@@ -86,7 +71,7 @@ export function GoalCard({ goal, items, today }: { goal: Goal; items: Item[]; to
           </div>
         </div>
       </div>
-      {overall.kind === "milestones" && (
+      {overall.kind === "milestones" && overall.total > 0 && (
         <div>
           <div className="bar-label">
             <span>Overall</span>

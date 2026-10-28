@@ -4,7 +4,6 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { db } from "../data/db";
 import { createGoal, createItem, tickItem } from "../data/repo";
 import { AppShell } from "./AppShell";
-import { GoalDetail } from "./GoalDetail";
 import { GoalsPage } from "./GoalsPage";
 import { ProgressBar } from "./ProgressBar";
 
@@ -23,15 +22,6 @@ function renderGoals() {
   );
 }
 
-function renderDetail(id: string) {
-  return render(
-    <MemoryRouter initialEntries={[`/goals/${id}`]}>
-      <Routes>
-        <Route path="/goals/:id" element={<GoalDetail today={TODAY} />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
 
 async function doneTasks(goalId: string, n: number) {
   for (let i = 0; i < n; i++) {
@@ -51,16 +41,13 @@ describe("ProgressBar", () => {
 });
 
 describe("GoalsPage", () => {
-  it("goal without monthly target: no month bar on its card, the set-a-target prompt on its page, no NaN", async () => {
-    const g = await createGoal({ title: "Read more", areaId: "mind", kind: "practice" }, TODAY);
+  it("goal without monthly target: no month bar on its card, no NaN", async () => {
+    await createGoal({ title: "Read more", areaId: "mind", kind: "practice" }, TODAY);
     const { container } = renderGoals();
     const card = (await screen.findByRole("link", { name: "Read more" })).closest("li")!;
     expect(within(card).getByText("Practice")).toBeInTheDocument();
     expect(within(card).queryByRole("progressbar")).toBeNull();
     expect(container.textContent).not.toMatch(/NaN|Infinity|undefined/);
-    cleanup();
-    renderDetail(g.id);
-    expect(await screen.findByText("Set a monthly target to see progress this month.")).toBeInTheDocument();
   });
 
   it("goal with 6 of 10 shows the October bar at 60%", async () => {
@@ -82,7 +69,7 @@ describe("GoalsPage", () => {
     expect(screen.queryByText("60%")).toBeNull();
   });
 
-  it("practice goal shows evidence line on its page, finite goal card shows the Overall bar and By date", async () => {
+  it("finite goal card shows the Overall bar (from its milestone tasks) and By date", async () => {
     const p = await createGoal({ title: "Practise", areaId: "art", kind: "practice" }, TODAY);
     await doneTasks(p.id, 2);
     await createGoal(
@@ -105,9 +92,7 @@ describe("GoalsPage", () => {
     expect(within(card).getByText("50%")).toBeInTheDocument();
     expect(within(card).getByText("By 31 Dec")).toBeInTheDocument();
     expect(within(card).getByText("Writing")).toBeInTheDocument();
-    cleanup();
-    renderDetail(p.id);
-    expect(await screen.findByText("2 this year, 1 month in a row, 1 day streak")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Practise" }).closest("li")!.querySelector("[role=progressbar]")).toBeNull();
   });
 
   it("pluralises months in a row: 2 months", async () => {
@@ -118,9 +103,7 @@ describe("GoalsPage", () => {
     }
     renderGoals();
     expect(await screen.findByText("2 months in a row")).toBeInTheDocument();
-    cleanup();
-    renderDetail(g.id);
-    expect(await screen.findByText("2 this year, 2 months in a row, 1 day streak")).toBeInTheDocument();
+    expect(g.id).toBeTruthy();
   });
 
   it("groups goals under one heading per area, in sidebar order, as cards", async () => {
@@ -155,7 +138,7 @@ describe("GoalsPage", () => {
     await createItem({ kind: "task", title: "Today bit", areaId: "writing", priority: 3, goalId: g.id, pinnedDate: TODAY }, TODAY);
     renderGoals();
     const link = await screen.findByRole("link", { name: "Book" });
-    expect(link).toHaveAttribute("href", `/goals/${g.id}`);
+    expect(link).toHaveAttribute("href", `/goals?open=${g.id}`);
     const card = link.closest("li")!;
     expect((card.querySelector(".goal-tile") as HTMLElement).style.background).toBe("rgb(230, 174, 175)"); // Writing's tile #e6aeaf
     expect(card.querySelector(".goal-tile img")).not.toBeNull();
@@ -180,14 +163,16 @@ describe("GoalsPage", () => {
     expect(within(select).getByRole("option", { name: "Writing" })).toBeInTheDocument();
   });
 
-  it("finite goal with zero milestones shows ratio 0, and the add-milestones prompt on its page", async () => {
+  it("finite goal with no linked tasks has no Overall bar; with only unflagged tasks it counts them all", async () => {
     const g = await createGoal({ title: "Empty arc", areaId: "writing", kind: "finite", deadline: "2026-12-31" }, TODAY);
     renderGoals();
-    expect(await screen.findByRole("progressbar", { name: "Overall 0/0" })).toHaveAttribute("aria-valuenow", "0");
-    expect(screen.getByText("0%")).toBeInTheDocument();
+    const card = (await screen.findByRole("link", { name: "Empty arc" })).closest("li")!;
+    expect(within(card).queryByRole("progressbar")).toBeNull();
     cleanup();
-    renderDetail(g.id);
-    expect(await screen.findByText("Add milestones to see the overall arc.")).toBeInTheDocument();
+    await doneTasks(g.id, 1);
+    await createItem({ kind: "task", title: "Open one", areaId: "writing", priority: 3, goalId: g.id }, TODAY);
+    renderGoals();
+    expect(await screen.findByRole("progressbar", { name: "Overall 1/2" })).toHaveAttribute("aria-valuenow", "50");
   });
 
   it("finite goal form blocks save without a deadline", async () => {
@@ -236,102 +221,5 @@ describe("Goals and the shell", () => {
     await userEvent.selectOptions(screen.getByLabelText("Kind", { selector: "form.goal-form select" }), "practice");
     await userEvent.click(screen.getByRole("button", { name: "Add goal" }));
     expect(await quick.findByRole("option", { name: "Fresh goal" })).toBeInTheDocument();
-  });
-});
-
-describe("GoalDetail", () => {
-  it("ticking a task on a goal page raises the monthly bar", async () => {
-    const g = await createGoal({ title: "Write", areaId: "writing", kind: "practice", monthlyTarget: 4 }, TODAY);
-    await createItem({ kind: "task", title: "Draft", areaId: "writing", priority: 3, goalId: g.id }, TODAY);
-    renderDetail(g.id);
-    expect(await screen.findByRole("progressbar", { name: "This month 0/4" })).toBeInTheDocument();
-    expect(screen.getByText("4 more to reach this month's target")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Draft" }));
-    expect(await screen.findByRole("progressbar", { name: "This month 1/4" })).toBeInTheDocument();
-    expect(screen.getByText("3 more to reach this month's target")).toBeInTheDocument();
-  });
-
-  it("groups attached tasks; a milestone is a flagged task ticked like any other", async () => {
-    const g = await createGoal(
-      {
-        title: "Book",
-        areaId: "writing",
-        kind: "finite",
-        deadline: "2026-12-31",
-        milestones: [{ id: "m1", title: "Outline", done: false }],
-      },
-      TODAY,
-    );
-    const mk = (title: string, extra: Record<string, unknown>) =>
-      createItem({ kind: "task", title, areaId: "writing", priority: 3, goalId: g.id, ...extra }, TODAY);
-    await mk("T-today", { pinnedDate: TODAY });
-    await mk("T-week", { weekOf: "2026-10-26" });
-    await mk("T-weekpin", { pinnedDate: "2026-10-29" });
-    await mk("T-later", {});
-    renderDetail(g.id);
-    const today = await screen.findByRole("list", { name: "Today" });
-    expect(within(today).getByText("T-today")).toBeInTheDocument();
-    const week = screen.getByRole("list", { name: "This week" });
-    expect(within(week).getByText("T-week")).toBeInTheDocument();
-    expect(within(week).getByText("T-weekpin")).toBeInTheDocument();
-    expect(within(screen.getByRole("list", { name: "Later" })).getByText("T-later")).toBeInTheDocument();
-    expect(await screen.findByRole("progressbar", { name: "Overall 0/1" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Outline" }));
-    expect(await screen.findByRole("progressbar", { name: "Overall 1/1" })).toBeInTheDocument();
-  });
-
-  it.each([
-    ["Sunday", "2026-11-01", "2026-10-26", "2026-10-30", "2026-11-02"],
-    ["Monday", "2026-11-02", "2026-11-02", "2026-11-04", "2026-11-01"],
-  ])("week boundary on a %s", async (_n, today, monday, laterInWeek, outside) => {
-    const g = await createGoal({ title: "Edge", areaId: "writing", kind: "practice" }, today);
-    const mk = (title: string, extra: Record<string, unknown>) =>
-      createItem({ kind: "task", title, areaId: "writing", priority: 3, goalId: g.id, ...extra }, today);
-    await mk("pinned-today", { pinnedDate: today });
-    await mk("week-of", { weekOf: monday });
-    await mk("pinned-same-week", { pinnedDate: laterInWeek });
-    await mk("pinned-outside", { pinnedDate: outside });
-    await mk("pinned-next-week", { pinnedDate: "2026-11-09" });
-    await mk("pinned-prev-week", { pinnedDate: "2026-10-20" });
-    render(
-      <MemoryRouter initialEntries={[`/goals/${g.id}`]}>
-        <Routes>
-          <Route path="/goals/:id" element={<GoalDetail today={today} />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    const t = within(await screen.findByRole("list", { name: "Today" }));
-    expect(t.getByText("pinned-today")).toBeInTheDocument();
-    expect(t.getAllByRole("listitem")).toHaveLength(1);
-    const w = within(screen.getByRole("list", { name: "This week" }));
-    expect(w.getByText("week-of")).toBeInTheDocument();
-    expect(w.getByText("pinned-same-week")).toBeInTheDocument();
-    expect(w.getAllByRole("listitem")).toHaveLength(2);
-    const l = within(screen.getByRole("list", { name: "Later" }));
-    for (const n of ["pinned-outside", "pinned-next-week", "pinned-prev-week"]) {
-      expect(l.getByText(n)).toBeInTheDocument();
-    }
-    expect(l.getAllByRole("listitem")).toHaveLength(3);
-  });
-
-  it("Undo in Done lowers the monthly bar and returns the task to the open list", async () => {
-    const g = await createGoal({ title: "Write", areaId: "writing", kind: "practice", monthlyTarget: 4 }, TODAY);
-    const t = await createItem({ kind: "task", title: "Draft", areaId: "writing", priority: 3, goalId: g.id }, TODAY);
-    await tickItem(t.id, TODAY);
-    renderDetail(g.id);
-    expect(await screen.findByRole("progressbar", { name: "This month 1/4" })).toBeInTheDocument();
-    expect(screen.getByText("No open tasks attached to this goal.")).toBeInTheDocument();
-    const done = screen.getByText("Done (1)", { selector: "summary" }).closest("details")!;
-    expect(done).not.toHaveAttribute("open");
-    await userEvent.click(within(done).getByText("Done (1)", { selector: "summary" }));
-    await userEvent.click(within(done).getByRole("checkbox", { name: "Done: Draft" }));
-    expect(await screen.findByRole("progressbar", { name: "This month 0/4" })).toBeInTheDocument();
-    expect(within(screen.getByRole("list", { name: "Later" })).getByText("Draft")).toBeInTheDocument();
-    expect(within(done).getByText("Nothing done yet.")).toBeInTheDocument();
-  });
-
-  it("unknown goal id shows a calm message", async () => {
-    renderDetail("nope");
-    expect(await screen.findByText("That goal does not exist.")).toBeInTheDocument();
   });
 });
