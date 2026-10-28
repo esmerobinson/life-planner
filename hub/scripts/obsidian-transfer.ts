@@ -1,7 +1,7 @@
 // One-time transfer: Obsidian notes + Google Tasks export -> an Esmeworld backup file.
 //
 //   npx tsx scripts/obsidian-transfer.ts [--vault DIR] [--gtasks FILE] [--out DIR]
-//                                        [--today YYYY-MM-DD] [--classify-out FILE] [--areas FILE]
+//                                        [--today YYYY-MM-DD] [--classify-out FILE] [--areas FILE] [--extra FILE]
 //
 // It only reads the vault and the Google file. It writes two private (0600) files into
 // --out: esmeworld-transfer-<today>.json (load it on the Backup page with Merge) and
@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { isValidISODate, todayISO } from "../src/domain/dates";
 import { runTransfer } from "./transfer";
 
-const FLAGS = ["--vault", "--gtasks", "--out", "--today", "--classify-out", "--areas"] as const;
+const FLAGS = ["--vault", "--gtasks", "--out", "--today", "--classify-out", "--areas", "--extra"] as const;
 
 function main(argv: string[]) {
   const given: Record<string, string> = {};
@@ -33,6 +33,7 @@ function main(argv: string[]) {
     today,
     classifyOut: given["--classify-out"],
     areasFile: given["--areas"],
+    extraFile: given["--extra"],
   });
   for (const l of lines) console.log(l);
 }

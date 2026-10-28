@@ -180,6 +180,77 @@ describe("classification hook", () => {
   });
 });
 
+describe("--extra vault-review items", () => {
+  const line = (o: Record<string, unknown>) => JSON.stringify(o);
+  const EXTRA = [
+    line({ key: "x:daily:1", title: "Pretend idea from daily notes", kind: "idea", areaId: "inbox", tag: "from-daily-notes", notes: "A note" }),
+    line({ key: "x:old:1", title: "Pretend old list task", kind: "task", areaId: "art", tag: "from-old-task-lists", due: "2026-12-01", check: "not sure if this is still open" }),
+    line({ key: "x:proj:1", title: "Pretend project goal", kind: "goal", areaId: "tech", tag: "from-project-notes", notes: "Goal detail" }),
+    line({ key: "x:proj:2", title: "Pretend dated goal", kind: "goal", areaId: "admin", tag: "from-project-notes", due: "2027-03-01" }),
+    line({ key: "x:daily:2", title: "Pretend check with notes", kind: "task", areaId: "inbox", tag: "from-daily-notes", notes: "Original text", check: "idea or to-do?" }),
+  ].join("\n");
+
+  it("adds ideas, tasks and goals with their tags, and applies the check reason", () => {
+    const t = buildTransfer({ ...inputs(), extra: EXTRA }, TODAY);
+    const by = (title: string) => t.backup.items.find((i) => i.title === title)!;
+    expect(by("Pretend idea from daily notes")).toMatchObject({
+      kind: "idea", areaId: "inbox", tags: ["from-daily-notes"], notes: "A note", priority: 2, status: "open",
+      createdAt: TODAY, touchedAt: TODAY, source: { kind: "obsidian", key: "x:daily:1" },
+    });
+    expect(by("Pretend old list task")).toMatchObject({
+      kind: "task", areaId: "art", due: "2026-12-01", tags: ["from-old-task-lists", "check"],
+      notes: "Check: not sure if this is still open",
+    });
+    expect(by("Pretend check with notes").notes).toBe("Check: idea or to-do?\nOriginal text");
+    const g = t.backup.goals.find((x) => x.title === "Pretend project goal")!;
+    expect(g).toMatchObject({ kind: "practice", areaId: "tech", notes: "Goal detail", source: { kind: "obsidian", key: "x:proj:1" } });
+    expect(g.deadline).toBeUndefined();
+    expect(t.backup.goals.find((x) => x.title === "Pretend dated goal")).toMatchObject({ kind: "practice", deadline: "2027-03-01" });
+    expect(t.counts.extraItems).toBe(3);
+    expect(t.counts.extraGoals).toBe(2);
+    expect(() => parseBackup(JSON.parse(JSON.stringify(t.backup)))).not.toThrow();
+  });
+
+  it("validates each line and reports the bad ones without stopping", () => {
+    const bad = [
+      "not json",
+      line({ key: "b1", title: "No tag", kind: "task", areaId: "art", tag: "from-nowhere" }),
+      line({ key: "b2", title: "Bad kind", kind: "epic", areaId: "art", tag: "from-daily-notes" }),
+      line({ key: "b3", title: "Goal in inbox", kind: "goal", areaId: "inbox", tag: "from-project-notes" }),
+      line({ key: "b4", title: "Bad area", kind: "task", areaId: "nowhere", tag: "from-daily-notes" }),
+      line({ key: "b5", title: "   ", kind: "task", areaId: "art", tag: "from-daily-notes" }),
+      line({ key: "b6", title: "Bad due", kind: "task", areaId: "art", tag: "from-daily-notes", due: "2026-02-30" }),
+      line({ key: "", title: "No key", kind: "task", areaId: "art", tag: "from-daily-notes" }),
+      line({ key: "ok1", title: "Fine one", kind: "task", areaId: "art", tag: "from-daily-notes" }),
+      line({ key: "ok1", title: "Same key again", kind: "task", areaId: "art", tag: "from-daily-notes" }),
+      "",
+    ].join("\n");
+    const t = buildTransfer({ ...inputs(), extra: bad }, TODAY);
+    expect(t.counts.extraItems).toBe(1);
+    expect(t.backup.items.some((i) => i.title === "Fine one")).toBe(true);
+    expect(t.backup.items.some((i) => i.title === "Same key again")).toBe(false);
+    expect(t.notes.filter((n) => /extra/i.test(n.reason)).length).toBe(9);
+    expect(t.summary).toMatch(/extra line 1/i);
+    expect(() => parseBackup(JSON.parse(JSON.stringify(t.backup)))).not.toThrow();
+  });
+
+  it("extra items in the inbox are not in the classify list, but an areas file can sort them", () => {
+    const a = buildTransfer({ ...inputs(), extra: EXTRA }, TODAY);
+    expect(a.classify.some((c) => c.key.startsWith("x:"))).toBe(false);
+    const b = buildTransfer({ ...inputs(), extra: EXTRA }, TODAY, { areas: { "x:daily:1": "mind" } });
+    expect(b.backup.items.find((i) => i.title === "Pretend idea from daily notes")!.areaId).toBe("mind");
+  });
+
+  it("a key that collides with a transferred row is reported, not duplicated", () => {
+    const t = buildTransfer(
+      { ...inputs(), extra: line({ key: "backlog:water the fictional ferns", title: "Dupe", kind: "task", areaId: "art", tag: "from-daily-notes" }) },
+      TODAY,
+    );
+    expect(t.backup.items.some((i) => i.title === "Dupe")).toBe(false);
+    expect(t.notes.some((n) => /extra/i.test(n.reason) && /key/i.test(n.reason))).toBe(true);
+  });
+});
+
 describe("runTransfer", () => {
   let dir: string;
   let vault: string;
@@ -262,6 +333,24 @@ describe("runTransfer", () => {
   it("refuses to write when the result does not validate, and says so calmly", () => {
     writeFileSync(join(vault, "Goals.md"), "## Writing\n- Identity: " + "x".repeat(5000));
     expect(() => run()).toThrow(/Nothing was written/);
+    expect(existsSync(join(out, `esmeworld-transfer-${TODAY}.json`))).toBe(false);
+  });
+
+  it("reads an --extra file; terminal still prints counts only", () => {
+    const extra = join(dir, "extra.jsonl");
+    writeFileSync(
+      extra,
+      JSON.stringify({ key: "x1", title: "Secret fixture title", kind: "idea", areaId: "inbox", tag: "from-daily-notes" }) + "\n",
+    );
+    const r = run({ extraFile: extra });
+    const backup = parseBackup(readFileSync(join(out, `esmeworld-transfer-${TODAY}.json`), "utf8"));
+    expect(backup.items.find((i) => i.title === "Secret fixture title")!.kind).toBe("idea");
+    expect(r.lines.join("\n")).not.toMatch(/secret/i);
+    expect(r.lines.join("\n")).toMatch(/vault review/i);
+  });
+
+  it("an unreadable --extra file is a calm error and writes nothing", () => {
+    expect(() => run({ extraFile: join(dir, "missing.jsonl") })).toThrow(/extra file/i);
     expect(existsSync(join(out, `esmeworld-transfer-${TODAY}.json`))).toBe(false);
   });
 

@@ -23,14 +23,14 @@ later plans. Clearing site data for the app deletes everything.
 
 ## Importing your backlog
 
-Click **Inbox** at the top of any page (it shows a count once items are
-waiting), then paste the contents of `Backlog.md` or choose the file. The
+Open **Backup** (next to Inbox), then the **Import from a file** section at the
+bottom, and paste the contents of `Backlog.md` or choose the file. The
 import is safe to repeat: items already imported are not duplicated. Lines the
 import could not fully read are listed under **Notes** below the counts.
 
 ## Importing Google Tasks
 
-On the Inbox page, under **Google Tasks (JSON file)**, choose your exported
+On the Backup page, in **Import from a file**, under **Google Tasks (JSON file)**, choose your exported
 JSON file or paste its contents, then press **Import Google Tasks**. Open
 tasks arrive in the Inbox, tagged with their Google list name; completed tasks
 are left out. A task's notes and due date are kept, and a subtask gets a
@@ -61,6 +61,26 @@ Inbox (stable `key`, title, origin, section or list, first 200 characters of
 notes). `--areas FILE` reads `{ "<key>": "<area id>" }` and files those inbox
 items; unknown keys, `inbox` and invalid areas are ignored with a note, and the
 summary lists them under "Sorted for you".
+
+`--extra FILE` adds hand-reviewed vault items, one JSON object per line:
+`{ "key", "title", "kind": "task"|"idea"|"goal", "areaId", "tag", "notes"?, "due"?, "check"? }`.
+`tag` is `from-daily-notes`, `from-old-task-lists` or `from-project-notes` (the
+Inbox "From" filter uses it). A `check` reason adds the `check` tag and a first
+notes line "Check: <reason>", which the Inbox shows under the title. Goals are
+practice goals (a deadline only if `due` is given) and cannot be in the inbox.
+Bad lines are reported by number in the summary and skipped. Extra items are
+not repeated in the classify file.
+
+## The Inbox
+
+The Inbox has a one-line **Add to inbox** box at the top (Enter adds, the box
+keeps focus). Under **To sort**, each row has one button per area: one tap
+files it. **More options** holds the to-do/idea switch, **Make it a goal**
+(creates a practice goal and archives the item), goal, priority and due date.
+When items come from more than one source, a **From** filter appears.
+**Select all shown** respects it; **Move selected** and **Archive selected**
+act on the selection. Archived inbox items are listed at the bottom with
+Restore. Nothing is ever deleted.
 
 How the notes map:
 
