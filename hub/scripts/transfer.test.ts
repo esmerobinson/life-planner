@@ -59,25 +59,29 @@ describe("buildTransfer", () => {
     expect(byId(await db.items.toArray())).toEqual(byId(t.backup.items));
     expect(byId(await db.goals.toArray())).toEqual(byId(t.backup.goals));
     expect(t.counts.goals).toBe(10);
-    expect(t.counts.nextSteps).toBe(3);
+    expect("nextSteps" in t.counts).toBe(false);
     expect(t.counts.habits).toBe(4);
     expect(t.counts.backlogItems).toBe(12);
     expect(t.counts.gtasksAdded).toBe(2);
     expect(t.counts.gtasksDuplicates).toBe(2);
-    expect(t.backup.items).toHaveLength(12 + 2 + 3 + 4);
+    expect(t.backup.items).toHaveLength(12 + 2 + 4);
   });
 
-  it("goals carry milestones, why and cadence; next steps are linked; habits repeat daily", () => {
+  it("goals carry milestones, why and cadence; monthly goals are area goals with Done when; habits repeat daily", () => {
     const { backup } = buildTransfer(inputs(), TODAY);
     const writing = backup.goals.find((g) => g.title === "Writing")!;
     expect(writing.milestones).toHaveLength(2);
     expect(writing.why).toContain("small pretend zines");
     expect(writing.cadence).toContain("Weekly:");
     expect(backup.goals.every((g) => g.areaId !== "inbox")).toBe(true);
-    const zine = backup.goals.find((g) => g.title === "Finish the pretend zine")!;
-    const step = backup.items.find((i) => i.title === "Write the ending scene")!;
-    expect(step.goalId).toBe(zine.id);
-    expect(zine.deadline).toBe("2028-02-29");
+    const zine = backup.goals.find((g) => g.title === "February goal: Writing (Pretend Zine)")!;
+    expect(zine).toMatchObject({ areaId: "writing", kind: "finite", deadline: "2028-02-29" });
+    expect(zine.notes).toContain("Done when: Chapter three is finished");
+    expect(backup.goals.find((g) => g.title === "February goal: Creative Technologist")!.areaId).toBe("tech");
+    // the nested lines are success criteria, not tasks
+    expect(backup.items.some((i) => i.source?.key.startsWith("obsidian:month-task"))).toBe(false);
+    expect(backup.items.some((i) => /chapter three|runs on my own machine/i.test(i.title))).toBe(false);
+    expect(backup.items.find((i) => i.title === "Stretch for five minutes")!.areaId).toBe("body");
     const habit = backup.items.find((i) => i.title === "Drink water")!;
     expect(habit.recur).toEqual(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
     expect(backup.goals.find((g) => g.title === "Gardening corner")!.areaId).toBe("admin");
@@ -103,13 +107,14 @@ describe("buildTransfer", () => {
   it("the summary has the readable sections and the load instructions", () => {
     const { summary } = buildTransfer(inputs(), TODAY);
     for (const h of [
-      "Items by area", "Goals", "Monthly goals and next steps", "Daily habits",
+      "Items by area", "Goals", "Monthly goals", "Daily habits",
       "Google Tasks skipped as the same title", "Notes", "How to load this", "Still in your Inbox",
     ]) {
       expect(summary).toContain(h);
     }
-    expect(summary).toContain("Finish the pretend zine");
-    expect(summary).toContain("Write the ending scene");
+    expect(summary).toMatch(/February goal: Writing \(Pretend Zine\).*Writing.*2028-02-29/);
+    expect(summary).toContain("Done when: Chapter three is finished and sent to a friend");
+    expect(summary).not.toContain("next steps");
     expect(summary).toContain("Merge");
   });
 
@@ -214,7 +219,6 @@ describe("deterministic ids", () => {
     const { backup } = buildTransfer(inputs(), TODAY);
     const goalIds = new Set(backup.goals.map((g) => g.id));
     const linked = backup.items.filter((i) => i.goalId);
-    expect(linked.length).toBe(3);
     expect(linked.every((i) => goalIds.has(i.goalId!))).toBe(true);
   });
 

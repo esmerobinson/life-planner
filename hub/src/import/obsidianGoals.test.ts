@@ -114,41 +114,74 @@ describe("parseAreaGoals", () => {
 describe("parseMonthGoals", () => {
   const r = parseMonthGoals(monthMd, TODAY);
 
-  it("reads the month end, goals and next-step tasks", () => {
+  it("each bold label is an area; the goal is titled with the month and keeps the label", () => {
     expect(r.monthEnd).toBe("2028-02-29");
     expect(r.goals.map((g) => g.title)).toEqual([
-      "Finish the pretend zine", "Tidy the invented studio", "Send three pretend pitches",
+      "February goal: Writing (Pretend Zine)",
+      "February goal: Creative Technologist",
+      "February goal: Gardening Corner",
     ]);
     expect(r.goals[0]).toMatchObject({
-      kind: "finite", areaId: "admin", areaFallback: true, deadline: "2028-02-29", milestones: [],
-      notes: "Get the whole first draft down, rough is fine.",
-      key: "obsidian:month:finish the pretend zine",
+      kind: "finite", areaId: "writing", areaFallback: false, deadline: "2028-02-29", milestones: [],
+      key: "obsidian:month:february goal: writing (pretend zine)",
     });
-    expect(r.tasks).toHaveLength(3);
-    expect(r.tasks[0]).toEqual({
-      key: "obsidian:month-task:finish the pretend zine:write the ending scene",
-      title: "Write the ending scene",
-      areaId: "admin",
-      goalKey: "obsidian:month:finish the pretend zine",
-    });
+    expect(r.goals[1]).toMatchObject({ areaId: "tech", areaFallback: false });
+    // an area name that maps to nothing falls back to admin, never the inbox
+    expect(r.goals[2]).toMatchObject({ areaId: "admin", areaFallback: true });
     expect(r.notes).toEqual([]);
   });
 
-  it("ignores the other sections", () => {
-    expect(r.goals.map((g) => g.title)).not.toContain("Not a goal");
+  it("the description and the nested line become the notes, with a Done when line", () => {
+    expect(r.goals[0].notes).toBe(
+      "Get the whole first draft down, rough is fine.\nDone when: Chapter three is finished and sent to a friend",
+    );
+    expect(r.goals[1].notes).toBe("Build the small invented tool.\nDone when: It runs on my own machine");
   });
 
-  it("a goal without a next step gets no task", () => {
-    const x = parseMonthGoals("# Goals for March 2027\n## This month's goals\n*   **Solo goal:** desc", TODAY);
-    expect(x.goals).toHaveLength(1);
-    expect(x.tasks).toEqual([]);
+  it("makes no tasks from the nested lines", () => {
+    expect("tasks" in r).toBe(false);
+  });
+
+  it("ignores the other sections", () => {
+    expect(r.goals.map((g) => g.title).join("|")).not.toContain("Not a goal");
+  });
+
+  it.each([
+    ["Writing (Relationship Book)", "writing"],
+    ["Creative Technologist", "tech"],
+    ["Inner Work", "mind"],
+    ["Production", "production"],
+    ["Health", "body"],
+  ])("label %s maps to %s", (label, area) => {
+    const x = parseMonthGoals(`# Goals for October 2026\n## This month's goals\n*   **${label}:** d`, TODAY);
+    expect(x.goals[0]).toMatchObject({ areaId: area, title: `October goal: ${label}` });
+  });
+
+  it("a goal without a nested line has only its description as notes", () => {
+    const x = parseMonthGoals("# Goals for March 2027\n## This month's goals\n*   **Art:** desc only", TODAY);
+    expect(x.goals[0].notes).toBe("desc only");
     expect(x.monthEnd).toBe("2027-03-31");
   });
 
-  it("without a readable month heading, uses the end of today's month and says so", () => {
-    const x = parseMonthGoals("## This month's goals\n*   **Solo goal:** desc", TODAY);
+  it("a goal with a nested line but no description still gets Done when", () => {
+    const x = parseMonthGoals("# Goals for March 2027\n## This month's goals\n*   **Art:**\n    *   Test-sign: It exists", TODAY);
+    expect(x.goals[0].notes).toBe("Done when: It exists");
+  });
+
+  it("only the first nested line counts, and no 'next step' note is made", () => {
+    const x = parseMonthGoals(
+      "# Goals for May 2027\n## This month's goals\n*   **Art:** d\n    *   Try-first: One\n    *   Other-bit: Two",
+      TODAY,
+    );
+    expect(x.goals[0].notes).toBe("d\nDone when: One");
+    expect(x.notes).toEqual([]);
+  });
+
+  it("without a readable month heading, uses this month's name and end, and says so", () => {
+    const x = parseMonthGoals("## This month's goals\n*   **Art:** desc", TODAY);
     expect(x.monthEnd).toBeUndefined();
     expect(x.goals[0].deadline).toBe("2026-10-31");
+    expect(x.goals[0].title).toBe("October goal: Art");
     expect(x.notes.some((n) => /month/i.test(n.reason))).toBe(true);
   });
 
@@ -166,32 +199,10 @@ describe("parseMonthGoals", () => {
     expect(parseMonthGoals("", TODAY).goals).toEqual([]);
   });
 
-  it("accepts Next-step and Next steps labels", () => {
-    const x = parseMonthGoals(
-      "# Goals for May 2027\n## This month's goals\n*   **A goal:** d\n    *   Next-step: Do one\n*   **B goal:** d\n    *   Next steps: Do two",
-      TODAY,
-    );
-    expect(x.tasks.map((t) => t.title)).toEqual(["Do one", "Do two"]);
-    expect(x.notes).toEqual([]);
-  });
-
-  it("uses the first nested labelled line when its label is not Next step, and says so", () => {
-    const x = parseMonthGoals(
-      "# Goals for May 2027\n## This month's goals\n*   **A goal:** d\n    *   Try-first: Do one\n    *   Other-bit: ignored",
-      TODAY,
-    );
-    expect(x.tasks.map((t) => t.title)).toEqual(["Do one"]);
+  it("the same label twice is reported once, not duplicated", () => {
+    const x = parseMonthGoals("# Goals for May 2027\n## This month's goals\n*   **Art:** a\n*   **Art:** b", TODAY);
+    expect(x.goals).toHaveLength(1);
     expect(x.notes).toHaveLength(1);
-    expect(x.notes[0].reason).toMatch(/next step/i);
-  });
-
-  it("two goals whose titles differ only by a parenthetical both stay, with the full titles", () => {
-    const x = parseMonthGoals(
-      "# Goals for May 2027\n## This month's goals\n*   **Make it (part one):** d\n*   **Make it (part two):** d",
-      TODAY,
-    );
-    expect(x.goals.map((g) => g.title)).toEqual(["Make it", "Make it (part two)"]);
-    expect(x.notes).toEqual([]);
   });
 
   it("a bullet without a bold title is reported", () => {
@@ -204,11 +215,10 @@ describe("parseMonthGoals", () => {
 describe("key spaces and length limits", () => {
   it("a monthly goal and an area goal with the same title do not share a key", () => {
     const a = parseAreaGoals("## Writing\n- Identity: x", TODAY).goals[0];
-    const m = parseMonthGoals("# Goals for May 2027\n## This month's goals\n*   **Writing:** d\n    *   Next step: Draft", TODAY);
+    const m = parseMonthGoals("# Goals for May 2027\n## This month's goals\n*   **Writing:** d\n    *   Done-test: Draft", TODAY);
     expect(a.key).toBe("obsidian:goal:writing");
-    expect(m.goals[0].key).toBe("obsidian:month:writing");
-    expect(m.tasks[0].key).toBe("obsidian:month-task:writing:draft");
-    const rows = buildObsidianRows({ goals: [a, ...m.goals], tasks: m.tasks }, TODAY);
+    expect(m.goals[0].key).toBe("obsidian:month:may goal: writing");
+    const rows = buildObsidianRows({ goals: [a, ...m.goals], tasks: [] }, TODAY);
     expect(rows.goals).toHaveLength(2);
   });
 
@@ -225,23 +235,42 @@ describe("key spaces and length limits", () => {
   it("cuts a monthly goal's description at 4000 characters and says which goal", () => {
     const r = parseMonthGoals(`# Goals for May 2027\n## This month's goals\n*   **Big one:** ${"y".repeat(5000)}`, TODAY);
     expect(r.goals[0].notes).toHaveLength(4000);
-    expect(r.notes).toEqual([{ line: "Big one", reason: "notes cut to 4000 characters" }]);
+    expect(r.notes).toEqual([{ line: "May goal: Big one", reason: "notes cut to 4000 characters" }]);
   });
 });
 
 describe("parseHabits", () => {
   const r = parseHabits(habitsMd);
 
-  it("makes daily recurring tasks in mind", () => {
+  it("makes daily recurring tasks; movement habits go to body, the rest to mind", () => {
     expect(r.habits.map((h) => h.title)).toEqual([
       "Stretch for five minutes", "Write one line in the diary", "Drink water", "Tidy one corner",
     ]);
     expect(r.habits[0]).toEqual({
       key: "obsidian:task:habits:stretch for five minutes",
       title: "Stretch for five minutes",
-      areaId: "mind",
+      areaId: "body",
       recur: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
     });
+    expect(r.habits.slice(1).map((h) => h.areaId)).toEqual(["mind", "mind", "mind"]);
+  });
+
+  it.each([
+    ["Go for a walk", "body"],
+    ["Morning run", "body"],
+    ["Movement break", "body"],
+    ["Do some exercise", "body"],
+    ["Workout at home", "body"],
+    ["Calisthenics set", "body"],
+    ["Yoga flow", "body"],
+    ["Quick GYM visit", "body"],
+    ["Stretching", "body"],
+    ["Meditate", "mind"],
+    ["Read a chapter", "mind"],
+    ["Runway planning notes", "mind"],
+    ["Prune the shrubs", "mind"],
+  ])("habit %s goes to %s", (text, area) => {
+    expect(parseHabits(`## Daily habits\n- ${text}`).habits[0].areaId).toBe(area);
   });
 
   it("reads metrics with commas and percent signs, and weekly lines", () => {
@@ -264,14 +293,14 @@ const selectionFrom = () => {
   const a = parseAreaGoals(goalsMd, TODAY).goals;
   const m = parseMonthGoals(monthMd, TODAY);
   const h = parseHabits(habitsMd);
-  return { goals: [...a, ...m.goals], tasks: [...m.tasks, ...h.habits] };
+  return { goals: [...a, ...m.goals], tasks: h.habits };
 };
 
 describe("buildObsidianRows", () => {
   it("builds goals and items, links tasks to goal ids, and fills fields", () => {
     const { goals, items } = buildObsidianRows(selectionFrom(), TODAY);
     expect(goals).toHaveLength(10);
-    expect(items).toHaveLength(7);
+    expect(items).toHaveLength(4);
     const writing = goals.find((g) => g.title === "Writing")!;
     expect(writing).toMatchObject({
       areaId: "writing", kind: "finite", deadline: "2027-12-31", createdAt: TODAY,
@@ -281,19 +310,25 @@ describe("buildObsidianRows", () => {
     expect(writing.milestones.map((m) => m.title)).toEqual(["Publish 2 zines by 30 Jun 2027", "Reach 500 newsletter readers"]);
     expect(writing.milestones.every((m) => m.done === false && m.id.length > 0)).toBe(true);
     expect(new Set(writing.milestones.map((m) => m.id)).size).toBe(2);
-    const zine = goals.find((g) => g.title === "Finish the pretend zine")!;
-    const step = items.find((i) => i.title === "Write the ending scene")!;
+    const month = goals.find((g) => g.title === "February goal: Writing (Pretend Zine)")!;
+    expect(month).toMatchObject({ areaId: "writing", kind: "finite", deadline: "2028-02-29" });
+    // a task given a goalKey is linked to that goal's new id
+    const linked = buildObsidianRows(
+      { goals: selectionFrom().goals, tasks: [{ key: "obsidian:task:x:y", title: "Linked", areaId: "art", goalKey: month.source!.key }] },
+      TODAY,
+    );
+    const step = linked.items[0];
     expect(step).toMatchObject({
-      kind: "task", goalId: zine.id, areaId: "admin", priority: 2, status: "open", links: [],
-      createdAt: TODAY, touchedAt: TODAY,
-      source: { kind: "obsidian", key: "obsidian:month-task:finish the pretend zine:write the ending scene" },
+      kind: "task", goalId: linked.goals.find((g) => g.source?.key === month.source!.key)!.id, areaId: "art",
+      priority: 2, status: "open", links: [], createdAt: TODAY, touchedAt: TODAY,
+      source: { kind: "obsidian", key: "obsidian:task:x:y" },
     });
     expect(step.due).toBeUndefined();
     const habit = items.find((i) => i.title === "Drink water")!;
     expect(habit.recur).toHaveLength(7);
     expect(habit.goalId).toBeUndefined();
     expect(goals.find((g) => g.title === "Art")!.deadline).toBeUndefined();
-    expect(new Set([...goals, ...items].map((r) => r.id)).size).toBe(17);
+    expect(new Set([...goals, ...items].map((r) => r.id)).size).toBe(14);
   });
 
   const base = (): ProposedGoal => ({

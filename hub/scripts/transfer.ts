@@ -146,11 +146,10 @@ export function buildTransfer(
     notes.push(...parsed.skipped);
   }
 
-  // Goals, monthly goals with their next steps, and daily habits.
+  // Goals, monthly goals, and daily habits.
   const goals: ProposedGoal[] = [];
   const tasks: ProposedTask[] = [];
   let monthGoals: ProposedGoal[] = [];
-  let monthTasks: ProposedTask[] = [];
   let habitTasks: ProposedTask[] = [];
   let metrics: { name: string; current: number; target: number }[] = [];
   let weekly: string[] = [];
@@ -164,9 +163,7 @@ export function buildTransfer(
   if (inputs.month !== undefined) {
     const m = parseMonthGoals(inputs.month, today);
     monthGoals = m.goals;
-    monthTasks = m.tasks;
     goals.push(...m.goals);
-    tasks.push(...m.tasks);
     notes.push(...m.notes);
   }
   if (inputs.habits !== undefined) {
@@ -178,13 +175,9 @@ export function buildTransfer(
     notes.push(...h.notes);
   }
   const rows = buildObsidianRows({ goals, tasks }, today);
-  let nextSteps = 0;
   let habits = 0;
   for (const i of rows.items) {
-    if (add(i)) {
-      if (i.recur) habits++;
-      else nextSteps++;
-    }
+    if (add(i) && i.recur) habits++;
   }
 
   // Vault-review items (--extra), already decided by hand, tagged by where they came from.
@@ -305,7 +298,6 @@ export function buildTransfer(
     mergedIntoBacklog: googleMerges.filter((m) => m.into === "backlog").length,
     gtasksAdded,
     gtasksDuplicates: duplicates.length,
-    nextSteps,
     habits,
     sorted: sorted.length,
     stillInInbox,
@@ -313,7 +305,7 @@ export function buildTransfer(
   };
   const summary = makeSummary({
     extraItems, extraGoals, backlogMerged, googleMerges,
-    today, backup, monthGoals, monthTasks, habitTasks, metrics, weekly, duplicates, notes, sorted, stillInInbox,
+    today, backup, monthGoals, habitTasks, metrics, weekly, duplicates, notes, sorted, stillInInbox,
     goalsAsProposed: goals,
   });
   return { backup, summary, classify, notes, counts };
@@ -405,7 +397,7 @@ export function runTransfer(o: RunOptions): { lines: string[] } {
     ...(o.classifyOut ? [{ path: o.classifyOut, text: JSON.stringify(t.classify, null, 2) }] : []),
   ]);
   const lines = [
-    `Items: ${t.counts.items} (backlog ${t.counts.backlogItems}, google tasks ${t.counts.gtasksAdded}, next steps ${t.counts.nextSteps}, habits ${t.counts.habits})`,
+    `Items: ${t.counts.items} (backlog ${t.counts.backlogItems}, google tasks ${t.counts.gtasksAdded}, habits ${t.counts.habits})`,
     `Goals: ${t.counts.goals}`,
     `Folded together: ${t.counts.backlogMerged} Backlog copies, ${t.counts.mergedIntoBacklog} Google copies`,
     `Vault review: ${t.counts.extraItems} items, ${t.counts.extraGoals} goals`,

@@ -174,22 +174,35 @@ function monthNumber(name: string): number | undefined {
   return i >= 0 ? i + 1 : undefined;
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * The monthly note. Each bold label under "This month's goals" is an AREA name (a trailing
+ * `(...)` is ignored when choosing the area but kept in the title). It becomes one finite goal
+ * titled "<Month> goal: <label>", due at month end, whose notes are the description plus a
+ * "Done when: ..." line from the first nested line (the success criterion). No tasks are made.
+ */
 export function parseMonthGoals(
   md: string,
   today: ISODate,
-): { goals: ProposedGoal[]; tasks: ProposedTask[]; monthEnd?: ISODate; notes: ParseNote[] } {
+): { goals: ProposedGoal[]; monthEnd?: ISODate; notes: ParseNote[] } {
   const goals: ProposedGoal[] = [];
-  const tasks: ProposedTask[] = [];
   const notes: ParseNote[] = [];
   const all = lines(md);
 
   let monthEnd: ISODate | undefined;
+  let monthName = MONTH_NAMES[Number(today.slice(5, 7)) - 1] ?? "This month";
   const head = all.map((l) => l.trim()).find((l) => /^#\s+goals for\b/i.test(l));
   if (head) {
     const m = /^#\s+goals for\s+(\S+)\s+(\d{4})\b/i.exec(head);
     const month = m ? monthNumber(m[1]) : undefined;
-    if (m && month) monthEnd = endOfMonth(Number(m[2]), month);
-    else notes.push({ line: head, reason: "month heading not readable, using the end of this month" });
+    if (m && month) {
+      monthEnd = endOfMonth(Number(m[2]), month);
+      monthName = MONTH_NAMES[month - 1];
+    } else notes.push({ line: head, reason: "month heading not readable, using the end of this month" });
   } else if (all.some((l) => l.trim())) {
     notes.push({ line: "", reason: "no month heading found, using the end of this month" });
   }
@@ -197,12 +210,22 @@ export function parseMonthGoals(
 
   let active = false;
   let last: ProposedGoal | undefined;
-  let stepTaken = false;
+  let desc = "";
+  let doneWhen: string | undefined;
   const seen = new Set<string>();
+
+  /** Writes the notes of the goal being read (description, then the Done when line). */
+  function closeGoal() {
+    if (!last) return;
+    const parts = [desc, doneWhen ? `Done when: ${doneWhen}` : ""].filter(Boolean);
+    if (parts.length) last.notes = capText(parts.join("\n"), "notes", last.title, notes);
+  }
+
   for (const raw of all) {
     const line = raw.trim();
     const h = /^##\s+(.*)$/.exec(line);
     if (h && !line.startsWith("###")) {
+      closeGoal();
       active = /^this month['’]?s goals$/i.test(stripEmoji(h[1]));
       last = undefined;
       continue;
@@ -210,65 +233,56 @@ export function parseMonthGoals(
     if (!active || !line) continue;
     const text = bulletText(line);
     if (text === undefined) continue;
-    const indented = /^\s/.test(raw);
-    if (indented) {
-      const n = /^([^:]{1,40}?)\s*:\s*(.*)$/.exec(text);
-      if (n && last && n[2].trim()) {
-        const isNext = /^next[\s-]?steps?$/i.test(n[1].trim());
-        // A different label is used only for the first nested line, and we say so.
-        if (isNext || !stepTaken) {
-          const title = n[2].trim();
-          tasks.push({
-            key: `obsidian:month-task:${slug(last.title)}:${slug(title)}`,
-            title,
-            areaId: last.areaId,
-            goalKey: last.key,
-          });
-          if (!isNext) notes.push({ line: last.title, reason: "nested line used as the next step (its label was not Next step)" });
-          stepTaken = true;
-        }
+    if (/^\s/.test(raw)) {
+      // The first nested line is the success criterion; its label ("Success-test:") is dropped.
+      if (last && doneWhen === undefined) {
+        const n = /^([^:]{1,40}?)\s*:\s*(.*)$/.exec(text);
+        const value = (n ? n[2] : text).trim();
+        if (value) doneWhen = value;
       }
       continue;
     }
+    closeGoal();
+    last = undefined;
+    desc = "";
+    doneWhen = undefined;
     const b = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(text);
-    const full = b ? b[1].trim().replace(/:\s*$/, "").trim().replace(/\s+/g, " ") : "";
-    let title = stripParenthetical(full);
-    if (!b || !title) {
+    const label = b ? b[1].trim().replace(/:\s*$/, "").trim().replace(/\s+/g, " ") : "";
+    if (!b || !label) {
       notes.push({ line: text, reason: "goal has no bold title, skipped" });
-      last = undefined;
       continue;
     }
-    // Two titles that differ only by a parenthetical keep the full text for the later one.
-    if (seen.has(slug(title)) && full !== title && !seen.has(slug(full))) title = full;
+    const title = `${monthName} goal: ${label}`;
     if (seen.has(slug(title))) {
       notes.push({ line: title, reason: "duplicate goal, skipped" });
-      last = undefined;
       continue;
     }
     seen.add(slug(title));
-    stepTaken = false;
+    // The monthly note says just "Production"; the Backlog heading is "Production & freelance".
+    const base = stripParenthetical(label);
+    const area = sectionToArea(base) !== "inbox" ? sectionToArea(base) : sectionToArea(`${base} & freelance`);
     const g: ProposedGoal = {
       key: "obsidian:month:" + slug(title),
       title,
-      areaId: "admin",
-      areaFallback: true,
+      areaId: area === "inbox" ? "admin" : area,
+      areaFallback: area === "inbox",
       kind: "finite",
       deadline,
       milestones: [],
     };
-    const desc = b[2].trim();
-    if (desc) g.notes = capText(desc, "notes", title, notes);
+    desc = b[2].trim();
     goals.push(g);
     last = g;
   }
-  const out: { goals: ProposedGoal[]; tasks: ProposedTask[]; monthEnd?: ISODate; notes: ParseNote[] } = {
-    goals,
-    tasks,
-    notes,
-  };
+  closeGoal();
+  const out: { goals: ProposedGoal[]; monthEnd?: ISODate; notes: ParseNote[] } = { goals, notes };
   if (monthEnd) out.monthEnd = monthEnd;
   return out;
 }
+
+/** Habits that are about moving the body go to Body; everything else to Mind. */
+const MOVEMENT =
+  /\b(mov(e|es|ing|ement)|walk(s|ing)?|run(s|ning)?|exercis(e|es|ing)|work ?outs?|calisthenics|stretch(es|ing)?|yoga|gym)\b/i;
 
 export function parseHabits(md: string): {
   habits: ProposedTask[];
@@ -307,7 +321,7 @@ export function parseHabits(md: string): {
         continue;
       }
       seen.add(k);
-      habits.push({ key: `obsidian:task:habits:${k}`, title: text, areaId: "mind", recur: [...ALL_DAYS] });
+      habits.push({ key: `obsidian:task:habits:${k}`, title: text, areaId: MOVEMENT.test(text) ? "body" : "mind", recur: [...ALL_DAYS] });
     }
   }
   return { habits, metrics, weekly, notes };

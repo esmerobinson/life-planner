@@ -24,7 +24,6 @@ export function makeSummary(s: {
   today: ISODate;
   backup: BackupFile;
   monthGoals: ProposedGoal[];
-  monthTasks: ProposedTask[];
   habitTasks: ProposedTask[];
   metrics: { name: string; current: number; target: number }[];
   weekly: string[];
@@ -57,11 +56,12 @@ export function makeSummary(s: {
   }
   L.push("");
 
-  L.push("## Monthly goals and next steps", "");
+  L.push("## Monthly goals", "");
   if (!s.monthGoals.length) L.push("None.");
   for (const g of s.monthGoals) {
-    L.push(`- ${g.title} (deadline ${g.deadline ?? "none"})`);
-    for (const t of s.monthTasks.filter((t) => t.goalKey === g.key)) L.push(`  - Next step: ${t.title}`);
+    L.push(`- ${g.title}: ${label(g.areaId)}, deadline ${g.deadline ?? "none"}`);
+    const done = (g.notes ?? "").split("\n").find((l) => l.startsWith("Done when:"));
+    if (done) L.push(`  - ${done}`);
   }
   L.push("");
 

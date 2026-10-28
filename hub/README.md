@@ -109,13 +109,17 @@ How the notes map:
   least one marker is finite, otherwise a practice goal. A finite goal's
   deadline is 31 December of the year in its first marker, else this year.
   The `## Notes` section is ignored.
-- **Monthly note** (`# Goals for <Month> <Year>`): each bold bullet under
-  "This month's goals" becomes a finite goal (area Admin, deadline the last day
-  of that month, description as notes) and its first nested line (normally
-  `Next step:`) becomes an open task linked to that goal.
+- **Monthly note** (`# Goals for <Month> <Year>`): each bold label under
+  "This month's goals" is an area name (a trailing `(...)` is ignored when
+  choosing the area, so "Writing (Relationship Book)" is Writing, "Creative
+  Technologist" is Tech projects; no match means Admin). It becomes one finite
+  goal titled "<Month> goal: <label>", due on the last day of that month. Its
+  notes are the description plus a `Done when: ...` line taken from the first
+  nested line (the success criterion). No tasks are made from monthly goals.
 - **Habits note**: each item under "Daily habits" becomes a task that repeats
-  every day (area Mind). "Big goals" numbers and "This week" counts are listed
-  in the summary and not created.
+  every day. Habits about movement (walk, run, exercise, workout, calisthenics,
+  stretch, yoga, gym, move) go to Body; the rest to Mind. "Big goals" numbers
+  and "This week" counts are listed in the summary and not created.
 
 Goals also carry optional **why**, **cadence** and **notes** text (shown under
 the goal's title) and an Obsidian source marker; all are included in backups.
