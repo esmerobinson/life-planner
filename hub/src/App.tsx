@@ -12,6 +12,7 @@ import { BinPage } from "./ui/BinPage";
 import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
 import { TodayPanel } from "./ui/TodayPanel";
+import { VisionPage } from "./ui/VisionPage";
 
 function TodayRoute() {
   return <TodayPanel today={useShellToday()} />;
@@ -59,6 +60,8 @@ export default function App() {
               <Route key={n.id} path={n.path} element={<HomeRoute />} />
             ) : n.id === "today" ? (
               <Route key={n.id} path={n.path} element={<TodayRoute />} />
+            ) : n.id === "vision" ? (
+              <Route key={n.id} path={n.path} element={<VisionPage />} />
             ) : n.id === "goals" || n.path.startsWith("/area/") ? null : (
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
             ),
