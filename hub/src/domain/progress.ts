@@ -139,9 +139,14 @@ export function nextStep(goal: Goal, items: Item[], today: ISODate): Item | unde
   return groupGoalTasks(goal, items, today).flatMap((g) => g.items)[0];
 }
 
+/** Steps with an `order` come first, by it; those without after them. */
+const byOrder = (a: Item, b: Item) =>
+  a.order !== undefined && b.order !== undefined ? a.order - b.order : a.order !== undefined ? -1 : b.order !== undefined ? 1 : 0;
+
 /**
- * The goal panel's "To come" (open linked tasks, soonest first by due or pinned date; those
- * with neither last, in listing order) and "Completed" (done, newest first).
+ * The goal panel's "To come" (open linked tasks: soonest first by due or pinned date, those
+ * with neither last; then by `order`, then createdAt, then listing order) and "Completed"
+ * (done, newest first; undated ones by `order`).
  */
 export function goalTaskSplit(goal: Goal, items: Item[]): { toCome: Item[]; completed: Item[] } {
   const linked = goalTasks(goal, items);
@@ -149,10 +154,22 @@ export function goalTaskSplit(goal: Goal, items: Item[]): { toCome: Item[]; comp
   const toCome = linked
     .filter((it) => it.status === "open")
     .map((it, i) => ({ it, i, d: when(it) }))
-    .sort((a, b) => (a.d && b.d ? a.d.localeCompare(b.d) : a.d ? -1 : b.d ? 1 : 0) || a.i - b.i)
+    .sort(
+      (a, b) =>
+        (a.d && b.d ? a.d.localeCompare(b.d) : a.d ? -1 : b.d ? 1 : 0) ||
+        byOrder(a.it, b.it) ||
+        a.it.createdAt.localeCompare(b.it.createdAt) ||
+        a.i - b.i,
+    )
     .map((x) => x.it);
   const completed = linked
     .filter((it) => it.status === "done")
-    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? ""));
+    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? "") || byOrder(a, b));
   return { toCome, completed };
+}
+
+/** The `order` for a new step on this goal: after its last one (0 for the first). */
+export function nextGoalOrder(goal: Goal, items: Item[]): number {
+  const orders = items.filter((it) => it.goalId === goal.id && it.order !== undefined).map((it) => it.order!);
+  return orders.length ? Math.max(...orders) + 1 : 0;
 }

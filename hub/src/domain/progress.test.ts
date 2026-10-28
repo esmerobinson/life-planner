@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  goalTaskSplit, groupGoalTasks, milestoneProgress, monthlyProgress, monthsInARow, nextStep, overallProgress, tickedOff,
+  goalTaskSplit, groupGoalTasks, milestoneProgress, monthlyProgress, monthsInARow, nextGoalOrder, nextStep,
+  overallProgress, tickedOff,
 } from "./progress";
 import type { Goal, Item } from "./types";
 
@@ -148,6 +149,32 @@ describe("goalTaskSplit", () => {
     const { toCome, completed } = goalTaskSplit(g, [a, b, c, d1, d2, other]);
     expect(toCome.map((i) => i.id)).toEqual(["c", "b", "a"]);
     expect(completed.map((i) => i.id)).toEqual(["d2", "d1"]);
+  });
+
+  it("keeps a goal's steps in order: date first, then order, then createdAt (review I-1)", () => {
+    const g = goal();
+    const open = (id: string, o: Partial<Item>) => done("", { id, status: "open", completedAt: undefined, ...o });
+    const items = [
+      open("draft2", { order: 2 }),
+      open("plain-new", { createdAt: "2026-10-20" }),
+      open("outline", { order: 0 }),
+      open("edit", { order: 3 }),
+      open("plain-old", { createdAt: "2026-10-02" }),
+      open("dated", { order: 9, due: "2026-11-01" }),
+      open("draft1", { order: 1 }),
+    ];
+    expect(goalTaskSplit(g, items).toCome.map((i) => i.id)).toEqual([
+      "dated", "outline", "draft1", "draft2", "edit", "plain-old", "plain-new",
+    ]);
+    // Undated done steps (legacy milestones) keep their order too.
+    const d = [done("", { id: "b", completedAt: undefined, order: 1 }), done("", { id: "a", completedAt: undefined, order: 0 })];
+    expect(goalTaskSplit(g, d).completed.map((i) => i.id)).toEqual(["a", "b"]);
+  });
+
+  it("nextGoalOrder appends after the goal's last step", () => {
+    const g = goal();
+    expect(nextGoalOrder(g, [])).toBe(0);
+    expect(nextGoalOrder(g, [done("", { order: 4 }), done("", { order: 1 }), done("", { goalId: "x", order: 9 })])).toBe(5);
   });
 });
 

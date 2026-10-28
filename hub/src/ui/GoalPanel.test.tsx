@@ -124,6 +124,26 @@ describe("the goal panel (view)", () => {
     await vi.waitFor(() => expect(within(screen.getByRole("list", { name: "To-dos" })).getByText("Fold the pages")).toBeInTheDocument());
   });
 
+  it("+ Add a task appends after the goal's existing steps (review I-1)", async () => {
+    const g = await createGoal(
+      {
+        title: "Ordered goal", areaId: "art", kind: "finite", deadline: "2026-12-31",
+        milestones: [{ id: "x", title: "Step one", done: false }, { id: "y", title: "Step two", done: false }],
+      },
+      TODAY,
+    );
+    const p = await openGoal(g.id);
+    await userEvent.click(p.getByRole("button", { name: "+ Add a task" }));
+    await userEvent.type(p.getByLabelText("New task for this goal"), "Step three{enter}");
+    const list = p.getByRole("list", { name: "To come" });
+    await vi.waitFor(() =>
+      expect(within(list).getAllByRole("listitem").map((li) => li.querySelector(".strip-title")!.textContent)).toEqual([
+        "Milestone: Step one", "Milestone: Step two", "Step three",
+      ]),
+    );
+    expect((await db.items.toArray()).find((t) => t.title === "Step three")!.order).toBe(2);
+  });
+
   it("clicking a task in the goal panel swaps the panel to that task", async () => {
     const g = await createGoal({ title: "Swap goal", areaId: "art", kind: "practice" }, TODAY);
     const t = await createItem({ kind: "task", title: "Swap to me", areaId: "art", priority: 2, goalId: g.id }, TODAY);

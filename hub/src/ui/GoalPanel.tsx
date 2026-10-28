@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createItem, deleteGoal, saveGoalNotes, untickItem, updateGoal, type GoalPatch } from "../data/repo";
 import { MAX_GOAL_TEXT } from "../data/validate";
 import { monthName, shortDate } from "../domain/display";
-import { doneThisMonth, goalTaskSplit, milestoneProgress, monthlyProgress, monthsInARow } from "../domain/progress";
+import { doneThisMonth, goalTaskSplit, milestoneProgress, monthlyProgress, monthsInARow, nextGoalOrder } from "../domain/progress";
 import type { AreaId, Goal, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS, NAV } from "./areas";
 import { DoneStrip } from "./DoneSection";
@@ -157,7 +157,10 @@ export function GoalPanel({
     const title = newTitle.trim();
     if (!title) return;
     const ok = await write(() =>
-      createItem({ kind: "task", title, areaId: goal.areaId, goalId: goal.id, priority: 2 }, today),
+      createItem(
+        { kind: "task", title, areaId: goal.areaId, goalId: goal.id, priority: 2, order: nextGoalOrder(goal, items) },
+        today,
+      ),
     );
     if (ok) setNewTitle("");
   }

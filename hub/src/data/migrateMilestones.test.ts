@@ -3,7 +3,7 @@ import { vi } from "vitest";
 import { db, HubDB } from "./db";
 import { migrateMilestones } from "./migrateMilestones";
 import { milestoneTaskId } from "../domain/milestones";
-import { overallProgress } from "../domain/progress";
+import { goalTaskSplit, overallProgress } from "../domain/progress";
 import type { Goal } from "../domain/types";
 import { FakeSyncServer } from "../sync/fakeServer";
 import { saveSyncSettings, syncOnce } from "../sync/engine";
@@ -59,6 +59,16 @@ describe("migrateMilestones", () => {
     expect(await db.pending.count()).toBe(3);
     // Progress now comes from the tasks.
     expect(overallProgress((await db.goals.get("g1"))!, (await db.items.toArray()), TODAY)).toMatchObject({ done: 1, total: 2 });
+  });
+
+  it("keeps the steps in their original order (review I-1)", async () => {
+    const titles = ["Outline", "Draft part 1", "Draft part 2", "Edit"];
+    // Ids chosen so that id order differs from list order.
+    const ids = ["zz", "aa", "mm", "bb"];
+    await db.goals.add(goal({ milestones: titles.map((title, i) => ({ id: ids[i], title, done: false })) }));
+    await migrateMilestones(TODAY);
+    const { toCome } = goalTaskSplit((await db.goals.get("g1"))!, await db.items.toArray());
+    expect(toCome.map((t) => t.title)).toEqual(titles);
   });
 
   it("is idempotent: a second run writes nothing and never duplicates or reverts a task", async () => {

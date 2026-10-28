@@ -6,6 +6,7 @@ import { createGoal, createItem, tickItem } from "../data/repo";
 import { AppShell } from "./AppShell";
 import { GoalsPage } from "./GoalsPage";
 import { ProgressBar } from "./ProgressBar";
+import { goalTaskSplit } from "../domain/progress";
 
 const TODAY = "2026-10-27"; // a Tuesday
 
@@ -187,16 +188,18 @@ describe("GoalsPage", () => {
     renderGoals();
     await userEvent.type(await screen.findByLabelText("Goal title"), "Ship it");
     await userEvent.type(screen.getByLabelText("Deadline"), "2026-12-31");
-    await userEvent.type(screen.getByLabelText("Milestones"), "one{enter}two");
+    await userEvent.type(screen.getByLabelText("Milestones"), "Outline{enter}Draft part 1{enter}Draft part 2{enter}Edit");
     await userEvent.click(screen.getByRole("button", { name: "Add goal" }));
     expect(await screen.findByText("Ship it")).toBeInTheDocument();
     const [g] = await db.goals.toArray();
-    // Milestones are flagged linked tasks (round 3).
+    // Milestones are flagged linked tasks (round 3), in the order of the lines (review I-1).
     expect(g.milestones).toEqual([]);
-    const tasks = (await db.items.toArray()).sort((a, b) => a.title.localeCompare(b.title));
-    expect(tasks.map((t) => [t.title, t.status, t.milestone, t.goalId])).toEqual([
-      ["one", "open", true, g.id],
-      ["two", "open", true, g.id],
+    const tasks = goalTaskSplit(g, await db.items.toArray()).toCome;
+    expect(tasks.map((t) => [t.title, t.status, t.milestone, t.goalId, t.order])).toEqual([
+      ["Outline", "open", true, g.id, 0],
+      ["Draft part 1", "open", true, g.id, 1],
+      ["Draft part 2", "open", true, g.id, 2],
+      ["Edit", "open", true, g.id, 3],
     ]);
     expect(g.deadline).toBe("2026-12-31");
   });
