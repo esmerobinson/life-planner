@@ -132,6 +132,20 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
       {state.status === "syncing" && <p role="status">Syncing.</p>}
       {state.configured && (state.lastSyncedAt ? <p>{`Last synced ${when(state.lastSyncedAt)}`}</p> : <p>Not synced yet.</p>)}
       {waiting > 0 && <p>{waiting === 1 ? "1 change waiting" : `${waiting} changes waiting`}</p>}
+      {state.stuckCount > 0 && (
+        <p>
+          {state.stuckCount === 1
+            ? "1 change could not be sent. It is kept on this device."
+            : `${state.stuckCount} changes could not be sent. They are kept on this device.`}
+        </p>
+      )}
+      {state.quarantineCount > 0 && (
+        <p>
+          {state.quarantineCount === 1
+            ? "1 item from another device couldn't be read yet"
+            : `${state.quarantineCount} items from another device couldn't be read yet`}
+        </p>
+      )}
       {state.message && <p role="alert">{state.message}</p>}
       {note && <p role="status">{note}</p>}
       {problem && <p role="alert">{problem}</p>}

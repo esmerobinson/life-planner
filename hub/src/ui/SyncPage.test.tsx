@@ -103,6 +103,18 @@ describe("SyncPage", () => {
     await waitFor(() => expect(screen.getByLabelText("Sync address")).toHaveValue(ADDRESS));
   });
 
+  it("says how many items from another device could not be read yet", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    const data = { id: "q", areaId: "garden" };
+    await db.quarantine.bulkPut([
+      { table: "items", id: "q1", updatedAt: 5, data, reason: "x", cursor: 1 },
+      { table: "goals", id: "q2", updatedAt: 6, data, reason: "x", cursor: 1 },
+    ]);
+    setup();
+    expect(await screen.findByText("2 items from another device couldn't be read yet")).toBeInTheDocument();
+    await db.quarantine.clear();
+  });
+
   it("asks for the passphrase again after it was not accepted", async () => {
     await db.syncMeta.bulkPut([{ key: "serverUrl", value: ADDRESS }, { key: "needsPassphrase", value: true }]);
     setup();

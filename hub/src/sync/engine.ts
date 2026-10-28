@@ -161,6 +161,7 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   const deviceId = await getDeviceId(db);
   const url = `${serverUrl.replace(/\/+$/, "")}/v1/sync`;
 
+  let received = await retryQuarantine(db);
   let cursor = (await getMeta<number>(db, "cursor")) ?? 0;
   const attempted = new Set<string>(); // keys sent in this run (re-edits wait for the next run)
   let needPull = true;
@@ -168,7 +169,6 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   let cursorReset = false;
   let badChangeRetried = false;
   let sent = 0;
-  let received = 0;
   let held = 0;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -295,24 +295,62 @@ async function applyReply(
     }
     let written = 0;
     for (const c of reply.changes) {
-      // v1.1 F.3: a local change still waiting (made while this request was in flight, or
-      // not sent yet) that is NEWER than the returned row stays, and is sent later. A tie
-      // stays too: only the server can break it (by deviceId), and it answers with the
-      // winner. An OLDER waiting change has already lost: the returned row replaces it.
-      const waiting = await db.pending.get([c.table, c.id]);
-      if (waiting && waiting.updatedAt >= c.updatedAt) continue;
-      const local = await db[c.table].get(c.id);
-      if (!waiting && typeof local?.updatedAt === "number" && local.updatedAt > c.updatedAt) continue; // stale repeat
-      const row = { ...c.data, id: c.id, updatedAt: c.updatedAt };
-      if (c.table === "items" ? !validItem(row) : !validGoal(row)) continue; // never store a broken row
-      await db.table(c.table).put(row);
-      if (waiting) await db.pending.delete([c.table, c.id]);
-      written++;
+      if (await applyRow(db, c, reply.cursor)) written++;
     }
     await db.syncMeta.put({ key: "cursor", value: reply.cursor });
     // Everything the server had has now been seen once: Merge and imports may run.
     if (!reply.hasMore) await db.syncMeta.put({ key: "firstPullDone", value: true });
     await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
+    return written;
+  });
+}
+
+/**
+ * Applies one row from the server inside the caller's untracked transaction. Returns true
+ * when it was written.
+ * - v1.1 F.3: a local change still waiting (made while the request was in flight, or not
+ *   sent yet) that is NEWER than the row stays and is sent later. A tie stays too: only
+ *   the server can break it (by deviceId), and it answers with the winner. An OLDER
+ *   waiting change has already lost: the row replaces it.
+ * - An old copy never replaces a newer synced local row.
+ * - A row this app version cannot read goes to quarantine instead of being dropped.
+ */
+async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boolean> {
+  const waiting = await db.pending.get([c.table, c.id]);
+  if (waiting && waiting.updatedAt >= c.updatedAt) return false;
+  const local = await db[c.table].get(c.id);
+  if (!waiting && typeof local?.updatedAt === "number" && local.updatedAt > c.updatedAt) return false; // stale repeat
+  const row = { ...c.data, id: c.id, updatedAt: c.updatedAt };
+  const held = await db.quarantine.get([c.table, c.id]);
+  if (c.table === "items" ? !validItem(row) : !validGoal(row)) {
+    if (!held || held.updatedAt <= c.updatedAt) {
+      await db.quarantine.put({
+        table: c.table, id: c.id, updatedAt: c.updatedAt, data: c.data,
+        reason: "This version of the app cannot read it yet.", cursor,
+      });
+    }
+    return false;
+  }
+  await db.table(c.table).put(row);
+  if (waiting) await db.pending.delete([c.table, c.id]);
+  if (held && held.updatedAt <= c.updatedAt) await db.quarantine.delete([c.table, c.id]);
+  return true;
+}
+
+/**
+ * Tries every quarantined row again (after an app update it may now be readable) and
+ * applies it by the usual rules; a row that is now outdated is dropped. ONE transaction.
+ */
+async function retryQuarantine(db: HubDB): Promise<number> {
+  if ((await db.quarantine.count()) === 0) return 0;
+  return applyUntracked(db, async () => {
+    let written = 0;
+    for (const q of await db.quarantine.toArray()) {
+      const row = { ...q.data, id: q.id, updatedAt: q.updatedAt };
+      if (q.table === "items" ? !validItem(row) : !validGoal(row)) continue; // still unreadable
+      await db.quarantine.delete([q.table, q.id]);
+      if (await applyRow(db, { table: q.table, id: q.id, updatedAt: q.updatedAt, data: q.data }, q.cursor)) written++;
+    }
     return written;
   });
 }

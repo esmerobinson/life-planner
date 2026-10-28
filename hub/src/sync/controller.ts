@@ -25,6 +25,10 @@ export interface SyncState {
   message: string | null;
   lastSyncedAt: number | null;
   pendingCount: number;
+  /** Local changes the server refused one by one; kept here, not sent until edited again. */
+  stuckCount: number;
+  /** Rows from the server this app version cannot read yet. */
+  quarantineCount: number;
   /** A token and an address are stored. */
   configured: boolean;
   serverUrl: string | null;
@@ -51,6 +55,8 @@ const browserTimers: Timers = {
 interface Stored {
   lastSyncedAt: number | null;
   pendingCount: number;
+  stuckCount: number;
+  quarantineCount: number;
   configured: boolean;
   needsPassphrase: boolean;
   serverUrl: string | null;
@@ -64,7 +70,7 @@ export class SyncController {
   private readonly timers: Timers;
 
   private stored: Stored = {
-    lastSyncedAt: null, pendingCount: 0, configured: false, needsPassphrase: false, serverUrl: null,
+    lastSyncedAt: null, pendingCount: 0, stuckCount: 0, quarantineCount: 0, configured: false, needsPassphrase: false, serverUrl: null,
     syncOn: false, firstPullDone: false,
   };
   private running = false;
@@ -237,12 +243,14 @@ export class SyncController {
   }
 
   private async load(): Promise<Stored> {
-    return this.db.transaction("r", this.db.syncMeta, this.db.pending, async () => {
+    return this.db.transaction("r", this.db.syncMeta, this.db.pending, this.db.quarantine, async () => {
       const meta = new Map((await this.db.syncMeta.toArray()).map((r) => [r.key, r.value]));
       const serverUrl = typeof meta.get("serverUrl") === "string" ? (meta.get("serverUrl") as string) : null;
       return {
         lastSyncedAt: typeof meta.get("lastSyncedAt") === "number" ? (meta.get("lastSyncedAt") as number) : null,
-        pendingCount: await this.db.pending.count(),
+        pendingCount: await this.db.pending.filter((p) => !p.stuck).count(),
+        stuckCount: await this.db.pending.filter((p) => p.stuck === true).count(),
+        quarantineCount: await this.db.quarantine.count(),
         configured: Boolean(serverUrl && meta.get("token")),
         needsPassphrase: meta.get("needsPassphrase") === true,
         serverUrl,
@@ -279,6 +287,8 @@ export class SyncController {
       message: s.needsPassphrase ? NEEDS_PASSPHRASE_MESSAGE : this.error,
       lastSyncedAt: s.lastSyncedAt,
       pendingCount: s.pendingCount,
+      stuckCount: s.stuckCount,
+      quarantineCount: s.quarantineCount,
       configured: s.configured,
       serverUrl: s.serverUrl,
       syncOn: s.syncOn,

@@ -14,6 +14,12 @@ export interface PendingChange {
   table: SyncTable;
   id: string;
   updatedAt: number;
+  /**
+   * The server refused this exact version on its own (400 for this one change). It stays
+   * here, is not sent again, and is counted on the Sync page; a new local edit replaces the
+   * entry (without the flag), so it is tried again then.
+   */
+  stuck?: true;
 }
 
 /**
@@ -22,6 +28,22 @@ export interface PendingChange {
  * itself; the passphrase itself is never stored), needsPassphrase. Never part of a backup,
  * so a deviceId is never copied to another device.
  */
+/**
+ * A row from the sync server that this app version cannot read yet (it fails the row
+ * validator, e.g. a newer build added an area). Kept, never dropped: every sync tries it
+ * again and applies it, by the usual last-write-wins, once it passes.
+ */
+export interface QuarantinedRow {
+  table: SyncTable;
+  id: string;
+  updatedAt: number;
+  /** The row exactly as the server sent it. */
+  data: Record<string, unknown>;
+  reason: string;
+  /** The response cursor it arrived with (rows carry no seq of their own on the wire). */
+  cursor: number;
+}
+
 export interface SyncMetaRow {
   key: string;
   value: unknown;
@@ -32,6 +54,7 @@ export class HubDB extends Dexie {
   goals!: Table<Goal, string>;
   pending!: Table<PendingChange, [string, string]>;
   syncMeta!: Table<SyncMetaRow, string>;
+  quarantine!: Table<QuarantinedRow, [string, string]>;
 
   constructor(name = "life-hub") {
     super(name);
@@ -60,6 +83,8 @@ export class HubDB extends Dexie {
           await tx.table("pending").bulkPut(marks);
         }
       });
+    // v3: rows from the server this version cannot read yet.
+    this.version(3).stores({ quarantine: "[table+id]" });
     installChangeTracking(this);
   }
 }
