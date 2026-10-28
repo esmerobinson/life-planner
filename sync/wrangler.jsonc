@@ -24,7 +24,7 @@
       "binding": "DB",
       "database_name": "esmeworld-sync",
       // PLACEHOLDER: replace with the real id printed by `wrangler d1 create`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4c51585e-306e-4454-a450-a3a290f100aa",
       "migrations_dir": "migrations"
     }
   ]

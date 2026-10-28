@@ -118,9 +118,9 @@ TOKEN=$(node -e "import('$SYNC/shared/token.ts').then(async m => console.log(awa
 
 1. **Health:** `curl -sS $URL/v1/health` returns `{"ok":true,"version":1}` with `Cache-Control: no-store`.
 2. **401:** `curl -sS -i $URL/v1/export` (no token) returns `401 {"error":"unauthorized"}`.
-3. **Lockout:** five requests with a wrong token return 401; the sixth (even with `$TOKEN`) returns
-   `429` with `Retry-After`. Run this from a different network or a phone hotspot, so your own IP is
-   not locked; or wait 15 minutes afterwards.
+3. **Lockout:** step 2's tokenless request already counts as one failure, so from the same network
+   four more requests with a wrong token return 401, and the next one (even with `$TOKEN`) returns
+   `429` with `Retry-After`. Your own IP is then locked for 15 minutes; the reset in step 9 clears it.
 4. **Bulk write:** POST 2000 small rows in one request (`deviceId` like `smoke-test-1`, `cursor` 0).
    Expect `applied: 2000`.
 5. **Large body:** POST a body of about 4 MB (a few rows with big `data`). Expect 200, not a CPU-limit
