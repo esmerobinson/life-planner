@@ -74,7 +74,7 @@ export function AreaPage({ today }: { today: ISODate }) {
   return (
     <section className="area-page">
       <h1>{area.label}</h1>
-      <div role="group" aria-label="Show">
+      <div role="group" aria-label="Show" className="btn-group">
         {FILTERS.map((t) => (
           <button
             key={t.id}

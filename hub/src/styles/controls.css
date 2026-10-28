@@ -158,6 +158,17 @@ legend {
   margin-top: 12px;
 }
 
+.form-grid > * {
+  min-width: 0;
+}
+
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 /* Rows of label+control pairs (inbox row, bulk move): wrap, controls keep their own width. */
 .form-row {
   display: flex;

@@ -95,6 +95,7 @@ replace or confirm:
   pale stone `#d4d1c3` with sage `#a09f88` text, keyboard focus ring is the
   magenta placeholder, no hover styling, radio buttons and file pickers keep
   the browser look
+- Move-to menu choices use the secondary pill style: pending Esme
 - Provisional sizes: sidebar 220px, tile 32px, icon 24px, gaps and padding, the
   190px Home right column, bar height 10px and radius 6px, panel and tile radii
   18px / 9px (taken from or fitted to the approved mockup, option 3)

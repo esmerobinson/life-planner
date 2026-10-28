@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
 import { QuickAdd } from "../ui/QuickAdd";
+import { MoveToMenu } from "../ui/MoveToMenu";
+import { JournalCardStub } from "../ui/JournalCardStub";
+import { AreaPage } from "../ui/AreaPage";
 
 // The project has no @types/node; vitest runs in node, so declare just what is used.
 declare const process: { cwd(): string };
@@ -16,12 +21,18 @@ const main = read("src/main.tsx");
 const visual = read("../VISUAL-LANGUAGE.md");
 
 const hexes = (s: string) => (s.match(/#[0-9a-fA-F]{6}\b/g) ?? []).map((h) => h.toLowerCase());
-const allowed = new Set([...hexes(visual), "#ff00ff"]);
+// Only the palette sections of VISUAL-LANGUAGE.md (sampled palette and role assignments), not the prose elsewhere.
+const paletteText = visual.slice(visual.indexOf("## Extracted palette"), visual.indexOf("## Not decided"));
+const allowed = new Set(hexes(paletteText));
+const PLACEHOLDER = "#ff00ff";
+/** Hex colours in `css` that are neither palette values nor the magenta placeholder. */
+const unapprovedHexes = (css: string, ok: Set<string> = allowed): string[] =>
+  hexes(css).filter((h) => !ok.has(h) && h !== PLACEHOLDER);
 
 /** Declarations of the first rule whose selector list contains `selector`. */
-function rule(selector: string): string {
+function rule(selector: string, source: string = controls): string {
   const re = /([^{}]+)\{([^{}]*)\}/g;
-  for (const m of controls.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(re)) {
+  for (const m of source.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(re)) {
     if (m[1].split(",").map((s) => s.trim()).includes(selector)) return m[2].replace(/\s+/g, " ");
   }
   throw new Error(`no rule for ${selector}`);
@@ -94,7 +105,7 @@ describe("controls.css (approved mockup A, soft pills)", () => {
   });
 
   it("uses only palette colours and no unapproved effects", () => {
-    for (const h of hexes(controls)) expect(allowed.has(h)).toBe(true);
+    expect(unapprovedHexes(controls)).toEqual([]);
     const code = controls.replace(/\/\*[\s\S]*?\*\//g, "");
     for (const bad of ["transition", "animation", "box-shadow", ":hover", "!important", "opacity"]) {
       expect(code).not.toContain(bad);
@@ -168,5 +179,55 @@ describe("controls.css (approved mockup A, soft pills)", () => {
     }
     expect(form.querySelectorAll("label.form-field").length).toBeGreaterThanOrEqual(6);
     expect(form.querySelectorAll("label.form-check").length).toBe(7);
+  });
+
+  it("the palette checker rejects made-up hexes and accepts palette ones", () => {
+    expect(allowed.has("#98c293")).toBe(true);
+    expect(allowed.has("#ff00ff")).toBe(false);
+    expect(unapprovedHexes("a { color: #123456; }")).toEqual(["#123456"]);
+    expect(unapprovedHexes("a { color: #98c293; background: #FF00FF; }")).toEqual([]);
+  });
+
+  it("pins the sidebar while the page scrolls", () => {
+    const r = rule(".sidebar", tokens);
+    expect(r).toContain("position: sticky");
+    expect(r).toContain("top: 0");
+    expect(r).toContain("height: 100vh");
+    expect(r).toContain("overflow-y: auto");
+    expect(rule(".app-shell", tokens)).toContain("align-items: flex-start");
+  });
+
+  it("button groups have spacing", async () => {
+    const g = rule(".btn-group");
+    expect(g).toContain("display: flex");
+    expect(g).toContain("flex-wrap: wrap");
+    expect(g).toContain("gap: 8px");
+    expect(g).toContain("align-items: center");
+
+    const area = render(
+      <MemoryRouter initialEntries={["/area/art"]}>
+        <Routes>
+          <Route path="/area/:areaId" element={<AreaPage today="2026-10-27" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect((await screen.findByRole("group", { name: "Show" })).classList.contains("btn-group")).toBe(true);
+    area.unmount();
+
+    const journal = render(<JournalCardStub />);
+    expect(screen.getByRole("button", { name: "Morning pages" }).parentElement?.classList.contains("btn-group")).toBe(true);
+    journal.unmount();
+
+    render(<MoveToMenu itemId="x" today="2026-10-27" onMoved={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Move to" }));
+    const menu = screen.getByRole("group", { name: "Move to" });
+    expect(menu.classList.contains("btn-group")).toBe(true);
+    const choices = Array.from(menu.querySelectorAll("button"));
+    expect(choices.length).toBe(5);
+    for (const b of choices) expect(b.classList.contains("btn-secondary")).toBe(true);
+  });
+
+  it("grid items can shrink", () => {
+    expect(rule(".form-grid > *")).toContain("min-width: 0");
   });
 });

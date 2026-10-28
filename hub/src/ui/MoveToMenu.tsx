@@ -61,9 +61,9 @@ export function MoveToMenu({
         Move to
       </button>
       {open && (
-        <div role="group" aria-label={label ? `Move ${label} to` : "Move to"}>
+        <div role="group" aria-label={label ? `Move ${label} to` : "Move to"} className="btn-group">
           {CHOICES.map((c) => (
-            <button key={c.id} type="button" onClick={() => void pick(c.id)}>
+            <button key={c.id} type="button" className="btn-secondary" onClick={() => void pick(c.id)}>
               {c.label}
             </button>
           ))}
