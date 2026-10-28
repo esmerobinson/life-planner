@@ -36,6 +36,13 @@ describe("set-passphrase: derivation (duplicated from shared/token.ts)", () => {
     expect(await hashToken(FAKE_TOKEN)).toBe(FAKE_HASH);
   });
 
+  it("normalizes to NFC like shared/token.ts", async () => {
+    const composed = "café-crème-brûlée-fake";
+    const expected = "503c56a3aae540c2834aed2f246320cac35988940481faf07f1fb3e30201eda6";
+    expect(await deriveToken(composed)).toBe(expected);
+    expect(await deriveToken(composed.normalize("NFD"))).toBe(expected);
+  });
+
   it("agrees with shared/token.ts on other inputs", async () => {
     for (const passphrase of ["another-fake-passphrase", "ünïcøde-fake-passphrase \u{1F511}"]) {
       const token = await deriveToken(passphrase);

@@ -39,6 +39,18 @@ describe("shared/token", () => {
     });
   }
 
+  it("normalizes the passphrase to NFC: composed and decomposed accents give the same token", async () => {
+    const composed = "café-crème-brûlée-fake";
+    const decomposed = composed.normalize("NFD");
+    expect(decomposed).not.toBe(composed);
+    const expected = "503c56a3aae540c2834aed2f246320cac35988940481faf07f1fb3e30201eda6";
+    expect(await deriveToken(composed)).toBe(expected);
+    expect(await deriveToken(decomposed)).toBe(expected);
+    expect(await hashToken(expected)).toBe("9938075770b44b5244c49f829577ccdf99ad6c596fd525f2c8fa9e5b0a6c92a3");
+    // Equals Node's PBKDF2 over the NFC form.
+    expect(pbkdf2Sync(decomposed.normalize("NFC"), "esmeworld-sync-v1", 200_000, 32, "sha256").toString("hex")).toBe(expected);
+  });
+
   it("produces 64 lowercase hex characters", async () => {
     const token = await deriveToken("another-fake-passphrase");
     expect(token).toMatch(/^[0-9a-f]{64}$/);
