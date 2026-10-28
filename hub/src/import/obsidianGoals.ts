@@ -189,6 +189,7 @@ export function parseMonthGoals(
 
   let active = false;
   let last: ProposedGoal | undefined;
+  let stepTaken = false;
   const seen = new Set<string>();
   for (const raw of all) {
     const line = raw.trim();
@@ -203,31 +204,41 @@ export function parseMonthGoals(
     if (text === undefined) continue;
     const indented = /^\s/.test(raw);
     if (indented) {
-      const n = /^next step\s*:\s*(.*)$/i.exec(text);
-      if (n && last && n[1].trim()) {
-        const title = n[1].trim();
-        tasks.push({
-          key: `obsidian:task:${slug(last.title)}:${slug(title)}`,
-          title,
-          areaId: last.areaId,
-          goalKey: last.key,
-        });
+      const n = /^([^:]{1,40}?)\s*:\s*(.*)$/.exec(text);
+      if (n && last && n[2].trim()) {
+        const isNext = /^next[\s-]?steps?$/i.test(n[1].trim());
+        // A different label is used only for the first nested line, and we say so.
+        if (isNext || !stepTaken) {
+          const title = n[2].trim();
+          tasks.push({
+            key: `obsidian:task:${slug(last.title)}:${slug(title)}`,
+            title,
+            areaId: last.areaId,
+            goalKey: last.key,
+          });
+          if (!isNext) notes.push({ line: last.title, reason: "nested line used as the next step (its label was not Next step)" });
+          stepTaken = true;
+        }
       }
       continue;
     }
     const b = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(text);
-    const title = b ? stripParenthetical(b[1].trim().replace(/:\s*$/, "").trim()).replace(/\s+/g, " ") : "";
+    const full = b ? b[1].trim().replace(/:\s*$/, "").trim().replace(/\s+/g, " ") : "";
+    let title = stripParenthetical(full);
     if (!b || !title) {
       notes.push({ line: text, reason: "goal has no bold title, skipped" });
       last = undefined;
       continue;
     }
+    // Two titles that differ only by a parenthetical keep the full text for the later one.
+    if (seen.has(slug(title)) && full !== title && !seen.has(slug(full))) title = full;
     if (seen.has(slug(title))) {
       notes.push({ line: title, reason: "duplicate goal, skipped" });
       last = undefined;
       continue;
     }
     seen.add(slug(title));
+    stepTaken = false;
     const g: ProposedGoal = {
       key: "obsidian:goal:" + slug(title),
       title,

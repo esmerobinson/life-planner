@@ -8,6 +8,7 @@ import { GoalDetail } from "./ui/GoalDetail";
 import { GoalsPage } from "./ui/GoalsPage";
 import { HomePage } from "./ui/HomePage";
 import { InboxPage } from "./ui/InboxPage";
+import { ObsidianImportPage } from "./ui/ObsidianImportPage";
 import { TodayPanel } from "./ui/TodayPanel";
 
 function TodayRoute() {
@@ -24,6 +25,10 @@ function GoalsRoute() {
 
 function GoalDetailRoute() {
   return <GoalDetail today={useShellToday()} />;
+}
+
+function ObsidianImportRoute() {
+  return <ObsidianImportPage today={useShellToday()} />;
 }
 
 function AreaRoute() {
@@ -53,6 +58,7 @@ export default function App() {
             ),
           )}
           <Route path="/goals" element={<GoalsRoute />} />
+          <Route path="/goals/import" element={<ObsidianImportRoute />} />
           <Route path="/goals/:id" element={<GoalDetailRoute />} />
           <Route path="/area/:areaId" element={<AreaRoute />} />
           <Route path="/inbox" element={<InboxRoute />} />

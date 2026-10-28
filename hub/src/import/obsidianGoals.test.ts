@@ -172,6 +172,34 @@ describe("parseMonthGoals", () => {
     expect(parseMonthGoals("", TODAY).goals).toEqual([]);
   });
 
+  it("accepts Next-step and Next steps labels", () => {
+    const x = parseMonthGoals(
+      "# Goals for May 2027\n## This month's goals\n*   **A goal:** d\n    *   Next-step: Do one\n*   **B goal:** d\n    *   Next steps: Do two",
+      TODAY,
+    );
+    expect(x.tasks.map((t) => t.title)).toEqual(["Do one", "Do two"]);
+    expect(x.notes).toEqual([]);
+  });
+
+  it("uses the first nested labelled line when its label is not Next step, and says so", () => {
+    const x = parseMonthGoals(
+      "# Goals for May 2027\n## This month's goals\n*   **A goal:** d\n    *   Try-first: Do one\n    *   Other-bit: ignored",
+      TODAY,
+    );
+    expect(x.tasks.map((t) => t.title)).toEqual(["Do one"]);
+    expect(x.notes).toHaveLength(1);
+    expect(x.notes[0].reason).toMatch(/next step/i);
+  });
+
+  it("two goals whose titles differ only by a parenthetical both stay, with the full titles", () => {
+    const x = parseMonthGoals(
+      "# Goals for May 2027\n## This month's goals\n*   **Make it (part one):** d\n*   **Make it (part two):** d",
+      TODAY,
+    );
+    expect(x.goals.map((g) => g.title)).toEqual(["Make it", "Make it (part two)"]);
+    expect(x.notes).toEqual([]);
+  });
+
   it("a bullet without a bold title is reported", () => {
     const x = parseMonthGoals("# Goals for May 2027\n## This month's goals\n*   plain bullet", TODAY);
     expect(x.goals).toEqual([]);

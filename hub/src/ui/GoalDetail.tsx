@@ -52,6 +52,12 @@ export function GoalDetail({ today }: { today: ISODate }) {
       <h1>{goal.title}</h1>
       <span className="goal-area">{areaLabel(goal.areaId)}</span>
       {goal.deadline && <p>{`Deadline ${goal.deadline}`}</p>}
+      {goal.why?.split(/\n+/).filter(Boolean).map((t, n) => (
+        <p key={"w" + n} className="goal-why">{t}</p>
+      ))}
+      {goal.cadence?.split(/\n+/).filter(Boolean).map((t, n) => (
+        <p key={"c" + n} className="goal-cadence">{t}</p>
+      ))}
       {celebration}
       {message}
       {saveError && <p className="form-message">{saveError}</p>}
