@@ -6,6 +6,7 @@ import { db } from "../data/db";
 import { HubDB } from "../data/db";
 import * as repo from "../data/repo";
 import { createItem } from "../data/repo";
+import { importBacklog } from "../import/backlog";
 import { AppShell } from "./AppShell";
 import { InboxPage } from "./InboxPage";
 
@@ -24,10 +25,8 @@ describe("InboxPage", () => {
   });
 
   it("inbox lists imported items and filing one removes it from inbox", async () => {
+    await importBacklog(BACKLOG, TODAY);
     render(<InboxPage today={TODAY} />);
-    await userEvent.click(screen.getByLabelText("Backlog text"));
-    await userEvent.paste(BACKLOG);
-    await userEvent.click(screen.getByRole("button", { name: "Import" }));
     expect(await screen.findByText("Water the ferns")).toBeInTheDocument();
     expect(screen.getByText("#home")).toBeInTheDocument();
     expect(screen.getByText("Email Sam")).toBeInTheDocument();
@@ -50,46 +49,6 @@ describe("InboxPage", () => {
     expect(within(sel).queryByRole("option", { name: "Inbox" })).toBeNull();
   });
 
-  it("import panel shows added / already had / notes counts", async () => {
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(screen.getByLabelText("Backlog text"));
-    await userEvent.paste(BACKLOG);
-    await userEvent.click(screen.getByRole("button", { name: "Import" }));
-    expect(await screen.findByText("Added 3, already had 0, notes 0")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Import" }));
-    expect(await screen.findByText("Added 0, already had 3, notes 0")).toBeInTheDocument();
-  });
-
-  it("import notes are listed under a collapsed Notes (K) section", async () => {
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(screen.getByLabelText("Backlog text"));
-    await userEvent.paste("- [ ] Pay rent [due 2026-13-45]\n- [ ] Odd one !p7\n");
-    await userEvent.click(screen.getByRole("button", { name: "Import" }));
-    expect(await screen.findByText("Added 2, already had 0, notes 2")).toBeInTheDocument();
-    const summary = screen.getByText("Notes (2)", { selector: "summary" });
-    const details = summary.closest("details")!;
-    expect(details).not.toHaveAttribute("open");
-    const items = within(details).getAllByRole("listitem", { hidden: true }).map((li) => li.textContent);
-    expect(items).toEqual([
-      "invalid due date 2026-13-45, imported without due: - [ ] Pay rent [due 2026-13-45]",
-      "unknown priority !p7, defaulted to 2: - [ ] Odd one !p7",
-    ]);
-  });
-
-  it("no Notes section when the import had nothing to note", async () => {
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(screen.getByLabelText("Backlog text"));
-    await userEvent.paste(BACKLOG);
-    await userEvent.click(screen.getByRole("button", { name: "Import" }));
-    await screen.findByText("Added 3, already had 0, notes 0");
-    expect(screen.queryByText(/^Notes \(/)).toBeNull();
-  });
-
-  it("import panel gives a short message for empty text", async () => {
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(screen.getByRole("button", { name: "Import" }));
-    expect(screen.getByText("Paste some text or choose a file first.")).toBeInTheDocument();
-  });
 });
 
 function renderShell() {
@@ -106,20 +65,6 @@ function renderShell() {
 }
 
 describe("double actions and refresh", () => {
-  it("double-clicking Import imports once and disables the button while running", async () => {
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(screen.getByLabelText("Backlog text"));
-    await userEvent.paste(BACKLOG);
-    const btn = screen.getByRole("button", { name: "Import" });
-    fireEvent.click(btn);
-    fireEvent.click(btn);
-    expect(btn).toBeDisabled();
-    expect(await screen.findByText("Added 3, already had 0, notes 0")).toBeInTheDocument();
-    await vi.waitFor(() => expect(btn).not.toBeDisabled());
-    expect(screen.queryByText("Added 0, already had 3, notes 0")).toBeNull();
-    expect(await db.items.count()).toBe(3);
-  });
-
   it("quick-add on the inbox page makes the new task appear in the inbox list", async () => {
     await createItem({ kind: "task", title: "Seed", areaId: "inbox", priority: 2 }, TODAY);
     renderShell();

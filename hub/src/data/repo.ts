@@ -81,8 +81,45 @@ export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate):
   });
 }
 
+/**
+ * Updates an item. A key that is present with the value undefined is REMOVED from the
+ * row (e.g. `{ kind: "idea", due: undefined, recur: undefined }`); keys left out of the
+ * patch are untouched.
+ */
 export async function updateItem(id: string, patch: Partial<Item>, today: ISODate): Promise<void> {
   await db.items.update(id, { ...patch, touchedAt: today });
+}
+
+/**
+ * Turns an item into a practice goal in ONE transaction: the goal is created (title and
+ * notes from the item) and the item is archived, never deleted, with "Became a goal:
+ * <title>" appended to its notes. Goals cannot live in the inbox, so an inbox area
+ * becomes admin. Returns the new goal.
+ */
+export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate): Promise<Goal> {
+  const area: AreaId = areaId === "inbox" ? "admin" : areaId;
+  if (!(AREA_IDS as readonly string[]).includes(area)) throw new Error("that area does not exist");
+  return db.transaction("rw", db.items, db.goals, async () => {
+    const item = await db.items.get(itemId);
+    if (!item) throw new Error("that item does not exist");
+    const goal: Goal = {
+      id: crypto.randomUUID(),
+      title: item.title,
+      areaId: area,
+      kind: "practice",
+      milestones: [],
+      createdAt: today,
+    };
+    if (item.notes) goal.notes = item.notes;
+    await db.goals.add(goal);
+    const line = `Became a goal: ${goal.title}`;
+    await db.items.update(itemId, {
+      status: "archived",
+      touchedAt: today,
+      notes: item.notes ? `${item.notes}\n${line}` : line,
+    });
+    return goal;
+  });
 }
 
 export async function tickItem(id: string, today: ISODate): Promise<void> {
@@ -133,6 +170,22 @@ export async function removeFromToday(id: string, today: ISODate): Promise<void>
 
 export async function archiveItem(id: string, today: ISODate): Promise<void> {
   await db.items.update(id, { status: "archived", touchedAt: today });
+}
+
+/**
+ * Archives many items in ONE transaction (all or nothing). Never deletes; unknown ids are
+ * skipped silently. Returns how many items were archived.
+ */
+export async function archiveItems(ids: string[], today: ISODate): Promise<number> {
+  return db.transaction("rw", db.items, async () => {
+    let n = 0;
+    for (const id of ids) {
+      if (!(await db.items.get(id))) continue;
+      await db.items.update(id, { status: "archived", touchedAt: today });
+      n++;
+    }
+    return n;
+  });
 }
 
 export async function restoreItem(id: string, today: ISODate): Promise<void> {

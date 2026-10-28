@@ -33,6 +33,8 @@ test("first run, import, file, tick, move, persist and backup round trip", async
       "- [ ] Gamma pretend errand",
       `- [ ] Overdue pretend errand [due ${overdue}]`,
     ].join("\n");
+    await page.goto("/backup");
+    await page.getByText("Import from a file", { exact: true }).click();
     await page.getByLabel("Backlog text").fill(backlog);
     await page.getByRole("button", { name: "Import", exact: true }).click();
     await expect(page.getByText("Added 5, already had 0")).toBeVisible();
@@ -57,10 +59,12 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(page.getByText("Alpha pretend errand")).toBeVisible();
     await expect(page.getByText("Beta pretend errand")).toBeVisible();
 
-    // File one item with the per-row File it.
+    // File one item with the per-row More options and File it.
     await page.goto("/inbox");
-    await page.getByLabel("Area for Overdue pretend errand").selectOption({ label: "Admin" });
-    await page.getByRole("button", { name: "File Overdue pretend errand" }).click();
+    const row = page.getByLabel("Inbox items").getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
+    await row.getByText("More options", { exact: true }).click();
+    await row.getByLabel("Area for Overdue pretend errand").selectOption({ label: "Admin" });
+    await row.getByRole("button", { name: "File Overdue pretend errand", exact: true }).click();
     await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(1);
   });
 
@@ -137,7 +141,7 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expectCalm(page, "Nothing waiting in the inbox.");
 
     await page.goto("/backup");
-    await page.locator('input[type="file"]').setInputFiles(file);
+    await page.getByLabel("Backup file").setInputFiles(file);
     await page.getByLabel("Replace everything").check();
     await page.getByLabel("I understand replace removes what is here now").check();
     await page.getByRole("button", { name: "Replace", exact: true }).click();

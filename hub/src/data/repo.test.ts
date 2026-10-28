@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "./db";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
-  archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem, updateGoal,
+  archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem, updateGoal, archiveItems,
+  itemToGoal,
 } from "./repo";
 
 const today = "2026-10-27";
@@ -198,6 +199,122 @@ describe("updateItems", () => {
     spy.mockRestore();
     expect(await db.items.get(a.id)).toMatchObject({ areaId: "inbox", touchedAt: "2026-10-01" });
     expect(await db.items.get(b.id)).toMatchObject({ areaId: "inbox", touchedAt: "2026-10-01" });
+  });
+});
+
+describe("updateItem clearing fields", () => {
+  it("clears due, recur, pinnedDate and hiddenOn when they are passed explicitly as undefined", async () => {
+    const it1 = await createItem(
+      { ...base, due: "2026-11-01", recur: ["mon"], pinnedDate: "2026-10-28", hiddenOn: "2026-10-28", notes: "keep" },
+      "2026-10-01",
+    );
+    await updateItem(
+      it1.id,
+      { kind: "idea", due: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined },
+      "2026-10-20",
+    );
+    const got = (await db.items.get(it1.id))!;
+    expect(got).toMatchObject({ kind: "idea", notes: "keep", touchedAt: "2026-10-20" });
+    for (const k of ["due", "recur", "pinnedDate", "hiddenOn"] as const) expect(k in got).toBe(false);
+  });
+
+  it("leaves fields alone when they are not in the patch", async () => {
+    const it1 = await createItem({ ...base, due: "2026-11-01", recur: ["mon"] }, "2026-10-01");
+    await updateItem(it1.id, { kind: "idea" }, "2026-10-20");
+    expect(await db.items.get(it1.id)).toMatchObject({ kind: "idea", due: "2026-11-01", recur: ["mon"] });
+  });
+});
+
+describe("itemToGoal", () => {
+  it("makes a practice goal from the item and archives the item with a note, in one transaction", async () => {
+    const it1 = await createItem({ ...base, title: "Learn pottery", areaId: "inbox", notes: "Some detail" }, "2026-10-01");
+    const spy = vi.spyOn(db, "transaction");
+    const goal = await itemToGoal(it1.id, "art", "2026-10-20");
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    expect(goal).toMatchObject({ title: "Learn pottery", areaId: "art", kind: "practice", notes: "Some detail", milestones: [], createdAt: "2026-10-20" });
+    expect(goal.deadline).toBeUndefined();
+    expect(await db.goals.get(goal.id)).toEqual(goal);
+    expect(await db.items.get(it1.id)).toMatchObject({
+      status: "archived", touchedAt: "2026-10-20", title: "Learn pottery",
+      notes: "Some detail\nBecame a goal: Learn pottery",
+    });
+    expect(await db.items.count()).toBe(1);
+  });
+
+  it("uses admin when the area is the inbox, and works for an item with no notes", async () => {
+    const it1 = await createItem({ ...base, title: "Vague thing", areaId: "inbox" }, "2026-10-01");
+    const goal = await itemToGoal(it1.id, "inbox", "2026-10-20");
+    expect(goal.areaId).toBe("admin");
+    expect(goal.notes).toBeUndefined();
+    expect((await db.items.get(it1.id))!.notes).toBe("Became a goal: Vague thing");
+  });
+
+  it("rolls back the goal if archiving the item fails", async () => {
+    const it1 = await createItem({ ...base, title: "Keep me", areaId: "inbox" }, "2026-10-01");
+    const spy = vi.spyOn(db.items, "update").mockRejectedValue(new Error("boom"));
+    await expect(itemToGoal(it1.id, "art", "2026-10-20")).rejects.toThrow();
+    spy.mockRestore();
+    expect(await db.goals.count()).toBe(0);
+    expect(await db.items.get(it1.id)).toMatchObject({ status: "open", title: "Keep me" });
+  });
+
+  it("rejects a missing item and an unknown area, writing nothing", async () => {
+    await expect(itemToGoal("nope", "art", today)).rejects.toThrow();
+    const it1 = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");
+    await expect(itemToGoal(it1.id, "nowhere" as never, today)).rejects.toThrow();
+    expect(await db.goals.count()).toBe(0);
+    expect((await db.items.get(it1.id))!.status).toBe("open");
+  });
+});
+
+describe("archiveItems", () => {
+  it("archives every given item in one transaction and returns how many", async () => {
+    const a = await createItem(base, "2026-10-01");
+    const b = await createItem({ ...base, areaId: "art" }, "2026-10-01");
+    const keep = await createItem(base, "2026-10-01");
+    const spy = vi.spyOn(db, "transaction");
+    const n = await archiveItems([a.id, b.id], "2026-10-20");
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    expect(n).toBe(2);
+    expect(await db.items.get(a.id)).toMatchObject({ status: "archived", touchedAt: "2026-10-20", title: "t" });
+    expect(await db.items.get(b.id)).toMatchObject({ status: "archived", areaId: "art" });
+    expect(await db.items.get(keep.id)).toMatchObject({ status: "open", touchedAt: "2026-10-01" });
+    expect(await db.items.count()).toBe(3);
+  });
+
+  it("ignores unknown ids silently and handles an empty list", async () => {
+    const a = await createItem(base, "2026-10-01");
+    expect(await archiveItems(["nope", a.id, "nada"], today)).toBe(1);
+    expect(await archiveItems([], today)).toBe(0);
+    expect((await db.items.get(a.id))!.status).toBe("archived");
+  });
+
+  it("rolls back everything if one write fails", async () => {
+    const a = await createItem(base, "2026-10-01");
+    const b = await createItem(base, "2026-10-01");
+    const real = db.items.update.bind(db.items);
+    let calls = 0;
+    const spy = vi.spyOn(db.items, "update").mockImplementation(((...args: Parameters<typeof real>) => {
+      calls++;
+      if (calls === 2) throw new Error("disk full");
+      return real(...args);
+    }) as never);
+    await expect(archiveItems([a.id, b.id], today)).rejects.toThrow();
+    spy.mockRestore();
+    expect((await db.items.get(a.id))!.status).toBe("open");
+    expect((await db.items.get(b.id))!.status).toBe("open");
+  });
+
+  it("archived items show in their area's archive list and can be restored", async () => {
+    const a = await createItem({ ...base, areaId: "art" }, "2026-10-01");
+    await archiveItems([a.id], today);
+    expect((await listItems({ status: "archived", areaId: "art" })).map((i) => i.id)).toEqual([a.id]);
+    expect(await listItems({ status: "open", areaId: "art" })).toEqual([]);
+    await restoreItem(a.id, today);
+    expect((await db.items.get(a.id))!.status).toBe("open");
+    expect(await listItems({ status: "archived", areaId: "art" })).toEqual([]);
   });
 });
 

@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { exportBackup, INVALID_BACKUP, RESTORE_FAILED, restoreBackup } from "../data/backup";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import type { ISODate } from "../domain/types";
+import { ImportPanel } from "./ImportPanel";
 import { ShellContext } from "./shellContext";
 
 /**
@@ -183,6 +184,11 @@ export function BackupPage({ today }: { today: ISODate }) {
 
       {message && <p role="status">{message}</p>}
       {error && <p role="alert">{error}</p>}
+
+      <details>
+        <summary>Import from a file</summary>
+        <ImportPanel today={today} onImported={() => void shell?.refresh()} />
+      </details>
     </section>
   );
 }

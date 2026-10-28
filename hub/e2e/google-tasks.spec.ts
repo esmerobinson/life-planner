@@ -14,19 +14,15 @@ test("Google Tasks JSON import: add, repeat, list tag, cross-source title check"
       },
     ],
   });
-  await page.goto("/inbox");
+  // The import panels live in a collapsed section at the bottom of the Backup page.
+  await page.goto("/backup");
+  await page.getByText("Import from a file", { exact: true }).click();
 
   await page.getByLabel("Google Tasks text").fill(gt);
   await page.getByRole("button", { name: "Import Google Tasks" }).click();
   await expect(page.getByText("Added 2, already had 0, same title as an existing task 0, notes 0")).toBeVisible();
   await page.getByRole("button", { name: "Import Google Tasks" }).click();
   await expect(page.getByText("Added 0, already had 2, same title as an existing task 0, notes 0")).toBeVisible();
-
-  const inbox = page.getByLabel("Inbox items");
-  await expect(inbox.getByText("Prune the pretend roses")).toBeVisible();
-  await expect(inbox.getByText("Order invented seeds")).toBeVisible();
-  await expect(inbox.getByText("#garden jobs").first()).toBeVisible();
-  await expect(inbox.getByText("Already done chore")).toHaveCount(0);
 
   // A title that already came in from the Backlog is not added again.
   await page.getByLabel("Backlog text").fill("- [ ] Sketch the pretend hedgehog");
@@ -38,5 +34,12 @@ test("Google Tasks JSON import: add, repeat, list tag, cross-source title check"
   await page.getByLabel("Google Tasks text").fill(dup);
   await page.getByRole("button", { name: "Import Google Tasks" }).click();
   await expect(page.getByText("Added 0, already had 0, same title as an existing task 1, notes 0")).toBeVisible();
+
+  await page.getByRole("link", { name: /^Inbox/ }).click();
+  const inbox = page.getByLabel("Inbox items");
+  await expect(inbox.getByText("Prune the pretend roses")).toBeVisible();
+  await expect(inbox.getByText("Order invented seeds")).toBeVisible();
+  await expect(inbox.getByText("#garden jobs").first()).toBeVisible();
+  await expect(inbox.getByText("Already done chore")).toHaveCount(0);
   await expect(inbox.getByText(/sketch the pretend hedgehog/i)).toHaveCount(1);
 });

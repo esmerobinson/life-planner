@@ -59,6 +59,61 @@ describe("BackupPage", () => {
   });
 });
 
+describe("Import from a file (moved here from the Inbox)", () => {
+  const BACKLOG = "- [ ] Water the ferns #home\n- [ ] Email Sam !p1\n- [ ] Call mum [due 2026-11-01]\n";
+
+  it("is a collapsed section at the bottom of the page holding both import panels", () => {
+    render(<BackupPage today="2026-10-28" />);
+    const summary = screen.getByText("Import from a file", { selector: "summary" });
+    const details = summary.closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    expect(within(details).getByLabelText("Backlog text")).toBeInTheDocument();
+    expect(within(details).getByLabelText("Google Tasks text")).toBeInTheDocument();
+    const all = Array.from(document.querySelector(".backup-page")!.children);
+    expect(all[all.length - 1]).toBe(details);
+  });
+
+  it("the Backlog import still shows counts, and repeating is safe", async () => {
+    render(<BackupPage today="2026-10-28" />);
+    await userEvent.click(screen.getByLabelText("Backlog text"));
+    await userEvent.paste(BACKLOG);
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Added 3, already had 0, notes 0")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Added 0, already had 3, notes 0")).toBeInTheDocument();
+    expect(await db.items.count()).toBe(3);
+  });
+
+  it("Backlog notes are listed under a collapsed Notes (K) section", async () => {
+    render(<BackupPage today="2026-10-28" />);
+    await userEvent.click(screen.getByLabelText("Backlog text"));
+    await userEvent.paste("- [ ] Pay rent [due 2026-13-45]\n- [ ] Odd one !p7\n");
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Added 2, already had 0, notes 2")).toBeInTheDocument();
+    const details = screen.getByText("Notes (2)", { selector: "summary" }).closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    expect(within(details).getAllByRole("listitem", { hidden: true }).map((li) => li.textContent)).toEqual([
+      "invalid due date 2026-13-45, imported without due: - [ ] Pay rent [due 2026-13-45]",
+      "unknown priority !p7, defaulted to 2: - [ ] Odd one !p7",
+    ]);
+  });
+
+  it("gives a short message for empty text, and double-clicking imports once", async () => {
+    render(<BackupPage today="2026-10-28" />);
+    const btn = screen.getByRole("button", { name: "Import" });
+    await userEvent.click(btn);
+    expect(screen.getByText("Paste some text or choose a file first.")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("Backlog text"));
+    await userEvent.paste(BACKLOG);
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(btn).toBeDisabled();
+    expect(await screen.findByText("Added 3, already had 0, notes 0")).toBeInTheDocument();
+    await waitFor(() => expect(btn).not.toBeDisabled());
+    expect(await db.items.count()).toBe(3);
+  });
+});
+
 describe("shell", () => {
   it("Backup link is always visible in the shell and the sidebar still has exactly thirteen items", () => {
     vi.stubGlobal("navigator", {});
