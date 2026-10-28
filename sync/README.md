@@ -22,12 +22,14 @@ decisions, the security-review fixes and what has not been verified.
   The Worker reads `https://www.pinterest.com/<user>/<board>.rss` (no login; Pinterest's feed holds roughly the
   25 most recent pins) because browsers cannot (no CORS). It needs the sync token, so it is not an open proxy,
   and wrong tokens count toward the same rate limit as sync. `board` must match
-  `^[A-Za-z0-9_-]{1,64}/[A-Za-z0-9_-]{1,100}$` (`400 bad_board`). Upstream: 5 s timeout, at most 2 MB, redirects
+  `^[A-Za-z0-9_-]{1,64}/[A-Za-z0-9_-]{1,100}$` (`400 bad_board`). Upstream: 5 s timeout, at most 256 KB (the real feed is ~18 KB), redirects
   not followed; any failure is `502 pinterest_unavailable`. Only `https://i.pinimg.com/` images and
   `https://www.pinterest.com/` / `https://pinterest.com/` links are returned; anything else in the feed is dropped.
-  Parsed boards are kept in the edge cache (Cache API) for 15 minutes. Caveat: community reports say the Cache API has
-  no effect for Workers served on `*.workers.dev` (unverified); if so, every call there reaches Pinterest; the app itself only asks
-  when its own copy is older than 15 minutes or on "Refresh".
+  Parsing is linear in the body size whatever the feed holds (`shared/pinterestFeed.ts`). Parsed boards are kept in
+  the edge cache (Cache API) for 15 minutes, and cached pins are filtered again when read. Caveat: the Cache API is
+  likely a no-op for Workers served on `*.workers.dev`, so every call there probably reaches Pinterest; the app itself
+  only asks when its own copy is older than 15 minutes or on "Refresh". After deploy, two authenticated calls a minute
+  apart with different `fetchedAt` confirm the cache is inert (acceptable for one user).
 
 Errors are always `{"error":"<code>"}`. Every response carries `Cache-Control: no-store`.
 
@@ -66,8 +68,9 @@ src/cors.ts       exact-origin allow list
 src/http.ts       limits, JSON/error helpers, capped body reading
 src/sync.ts       validation, last-write-wins upserts, the paginated pull, returned winners
 src/export.ts     streamed export
-src/pinterest.ts  public Pinterest board feed -> pins (fetch, parse, filter, edge cache)
+src/pinterest.ts  public Pinterest board feed -> pins (fetch, edge cache)
 shared/token.ts   passphrase -> token -> hash (NFC, WebCrypto only; reusable by the client)
+shared/pinterestFeed.ts  RSS -> pins parser and URL filter, linear time on any input (indexOf, bounded slices)
 tools/set-passphrase.mjs   sets the SYNC_TOKEN_HASH secret (hidden input)
 migrations/0001_init.sql   D1 schema
 ```
