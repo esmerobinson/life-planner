@@ -132,56 +132,116 @@ export async function putSecret(hash, options = {}) {
   }
 }
 
-// ---- hidden prompt (interactive only; not exercised by tests) ----
+// ---- hidden prompt ----
 
 /**
- * Reads one line from the terminal without echoing it.
+ * Applies one chunk of raw terminal input to the value being typed. Pure, so it is testable.
+ * Tab is kept (pasted passphrases may contain one); other control characters are dropped.
+ * @param {string} value
+ * @param {string} chunk
+ * @returns {{ value: string, status: "more" | "done" | "cancelled" }}
+ */
+export function applyKeys(value, chunk) {
+  if (chunk.startsWith("\u001b")) return { value, status: "more" }; // arrow keys etc.
+  let current = value;
+  for (const ch of chunk) {
+    if (ch === "\r" || ch === "\n") return { value: current, status: "done" };
+    if (ch === "\u0003") return { value: "", status: "cancelled" }; // Ctrl-C
+    if (ch === "\u0004") {
+      if (current === "") return { value: "", status: "cancelled" }; // Ctrl-D on empty input
+      continue;
+    }
+    if (ch === "\u007f" || ch === "\b") {
+      current = [...current].slice(0, -1).join("");
+      continue;
+    }
+    if (ch === "\u0015") {
+      current = ""; // Ctrl-U clears the line
+      continue;
+    }
+    if (ch === "\t") {
+      current += ch;
+      continue;
+    }
+    if (ch < " ") continue;
+    current += ch;
+  }
+  return { value: current, status: "more" };
+}
+
+const SIGNAL_EXIT_CODES = /** @type {const} */ ({ SIGINT: 130, SIGTERM: 143, SIGHUP: 129 });
+
+/**
+ * Turns raw mode on and guarantees it is turned off again: via the returned function
+ * (call it in a `finally`), on process exit, on SIGINT/SIGTERM/SIGHUP and on a crash.
+ * @param {{ setRawMode(on: boolean): unknown, pause?: () => unknown }} stdin
+ * @param {{ on: Function, off: Function, exit: (code: number) => unknown, stderr: { write(s: string): unknown } }} [proc]
+ * @returns {() => void}
+ */
+export function rawModeGuard(stdin, proc = process) {
+  let active = true;
+  const restore = () => {
+    if (!active) return;
+    active = false;
+    try {
+      stdin.setRawMode(false);
+    } catch {
+      // the terminal may already be gone
+    }
+    stdin.pause?.();
+    proc.off("exit", restore);
+    proc.off("uncaughtException", onCrash);
+    for (const signal of Object.keys(SIGNAL_EXIT_CODES)) proc.off(signal, onSignal);
+  };
+  /** @param {keyof typeof SIGNAL_EXIT_CODES} signal */
+  const onSignal = (signal) => {
+    restore();
+    proc.exit(SIGNAL_EXIT_CODES[signal] ?? 1);
+  };
+  const onCrash = () => {
+    restore();
+    proc.stderr.write("\nUnexpected error; nothing was set.\n"); // never the error itself
+    proc.exit(1);
+  };
+  stdin.setRawMode(true);
+  proc.on("exit", restore);
+  proc.on("uncaughtException", onCrash);
+  for (const signal of Object.keys(SIGNAL_EXIT_CODES)) proc.on(signal, onSignal);
+  return restore;
+}
+
+/**
+ * Reads one line from the terminal without echoing it (interactive only; not run by tests).
  * @param {string} question
  * @returns {Promise<string>}
  */
-function promptHidden(question) {
+async function promptHidden(question) {
   const { stdin, stderr } = process;
   if (!stdin.isTTY || typeof stdin.setRawMode !== "function") {
-    return Promise.reject(new Error("This script must be run in an interactive terminal."));
+    throw new Error("This script must be run in an interactive terminal.");
   }
   stderr.write(question);
-  stdin.setRawMode(true);
-  stdin.setEncoding("utf8");
-  stdin.resume();
-  return new Promise((resolve, reject) => {
-    let value = "";
-    const finish = (/** @type {Error | null} */ error) => {
-      stdin.off("data", onData);
-      stdin.setRawMode(false);
-      stdin.pause();
-      stderr.write("\n");
-      if (error) reject(error);
-      else resolve(value);
-    };
-    /** @param {string} chunk */
-    const onData = (chunk) => {
-      if (chunk.startsWith("\u001b")) return; // arrow keys and other escape sequences
-      for (const ch of chunk) {
-        if (ch === "\r" || ch === "\n") return finish(null);
-        if (ch === "\u0003") return finish(new Error("Cancelled.")); // Ctrl-C
-        if (ch === "\u0004") {
-          if (value === "") return finish(new Error("Cancelled.")); // Ctrl-D on empty input
-          continue;
-        }
-        if (ch === "\u007f" || ch === "\b") {
-          value = [...value].slice(0, -1).join("");
-          continue;
-        }
-        if (ch === "\u0015") {
-          value = ""; // Ctrl-U clears the line
-          continue;
-        }
-        if (ch < " ") continue;
-        value += ch;
-      }
-    };
-    stdin.on("data", onData);
-  });
+  const restore = rawModeGuard(stdin);
+  /** @type {((chunk: string) => void) | undefined} */
+  let onData;
+  try {
+    stdin.setEncoding("utf8");
+    stdin.resume();
+    return await new Promise((resolve, reject) => {
+      let value = "";
+      onData = (chunk) => {
+        const next = applyKeys(value, chunk);
+        value = next.value;
+        if (next.status === "done") resolve(value);
+        else if (next.status === "cancelled") reject(new Error("Cancelled."));
+      };
+      stdin.on("data", onData);
+    });
+  } finally {
+    if (onData) stdin.off("data", onData);
+    restore();
+    stderr.write("\n");
+  }
 }
 
 // ---- orchestration ----
