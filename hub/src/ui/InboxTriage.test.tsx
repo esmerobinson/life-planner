@@ -429,6 +429,51 @@ describe("type control and Make it a goal (inside More options)", () => {
   });
 });
 
+describe("filing details", () => {
+  it("an idea is filed without a due date and has no Due field", async () => {
+    await createItem({ kind: "idea", title: "Dreamy", areaId: "inbox", priority: 2, due: "2026-11-01" }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    await screen.findByRole("checkbox", { name: "Select Dreamy" });
+    expect(screen.queryByLabelText("Due for Dreamy")).toBeNull();
+    const row = rowOf("Dreamy");
+    await userEvent.click(within(row).getByText("More options", { selector: "summary" }));
+    await userEvent.selectOptions(within(row).getByLabelText("Area for Dreamy"), "art");
+    await userEvent.click(within(row).getByRole("button", { name: "File Dreamy" }));
+    await vi.waitFor(async () => expect((await db.items.toArray())[0].areaId).toBe("art"));
+    expect("due" in (await db.items.toArray())[0]).toBe(false);
+  });
+
+  it("File it is disabled while the write is running", async () => {
+    await seed({ title: "Slow" });
+    render(<InboxPage today={TODAY} />);
+    await screen.findByRole("checkbox", { name: "Select Slow" });
+    const row = rowOf("Slow");
+    await userEvent.click(within(row).getByText("More options", { selector: "summary" }));
+    await userEvent.selectOptions(within(row).getByLabelText("Area for Slow"), "art");
+    let release: () => void = () => undefined;
+    const spy = vi.spyOn(repo, "updateItem").mockImplementation(() => new Promise<void>((res) => (release = res)));
+    const btn = within(row).getByRole("button", { name: "File Slow" });
+    fireEvent.click(btn);
+    await vi.waitFor(() => expect(btn).toBeDisabled());
+    fireEvent.click(btn);
+    expect(spy).toHaveBeenCalledTimes(1);
+    release();
+    spy.mockRestore();
+  });
+
+  it("a failed switch to Idea keeps the due date in the field", async () => {
+    await createItem({ kind: "task", title: "Dated", areaId: "inbox", priority: 2, due: "2026-11-01" }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    await screen.findByRole("checkbox", { name: "Select Dated" });
+    const spy = vi.spyOn(db.items, "update").mockRejectedValue(new Error("boom"));
+    await userEvent.click(within(rowOf("Dated")).getByRole("button", { name: "Idea" }));
+    expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
+    spy.mockRestore();
+    expect(within(rowOf("Dated")).getByLabelText("Due for Dated")).toHaveValue("2026-11-01");
+    expect((await db.items.toArray())[0].kind).toBe("task");
+  });
+});
+
 describe("check reasons", () => {
   it("shows the reason line under the title when the item has the check tag", async () => {
     await createItem(

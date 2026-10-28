@@ -2,9 +2,12 @@
 // backup file. It REUSES the app's own parsers, row builders and backup validator, so
 // the file is exactly what the Backup page's Merge accepts. Nothing here is bundled
 // into the app; run it with `npx tsx scripts/obsidian-transfer.ts`.
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import { isValidISODate } from "../src/domain/dates";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { checkOutputs, findRepoRoot, writeAllPrivate } from "./files";
 import { parseBackup, type BackupFile } from "../src/data/backup";
 import { parseExtra } from "./extra";
 import { makeSummary } from "./summary";
@@ -66,6 +69,42 @@ export const NOT_VALID = "The transfer does not validate as an Esmeworld backup.
 
 const AREA_LIST: readonly string[] = AREA_IDS;
 
+/** The vault notes the transfer reads (all inside the vault folder). */
+const NOTE_FILES = ["Backlog.md", "Goals.md", "Goals for month.md", "Goals & Habits.md"];
+
+/**
+ * A UUID-shaped id made from a source key, so running the transfer twice gives the same ids
+ * and a second Merge restore adds nothing.
+ */
+export function stableId(kind: string, key: string): string {
+  const h = createHash("sha256").update(`esmeworld-transfer:${kind}:${key}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+
+/** Gives every row a stable id and points each goalId at the matching goal. Throws if a link is broken. */
+function withStableIds(items: Item[], goals: Goal[]): void {
+  const goalIdByOld = new Map<string, string>();
+  for (const g of goals) {
+    const key = g.source?.key ?? g.title;
+    const id = stableId("goal", key);
+    goalIdByOld.set(g.id, id);
+    g.id = id;
+    g.milestones.forEach((m, n) => {
+      m.id = stableId("milestone", `${key}:${n}`);
+    });
+  }
+  for (const i of items) {
+    i.id = stableId("item", i.source?.key ?? i.title);
+    if (i.goalId) {
+      const id = goalIdByOld.get(i.goalId);
+      if (!id) throw new Error(NOT_VALID);
+      i.goalId = id;
+    }
+  }
+  const have = new Set(goals.map((g) => g.id));
+  if (items.some((i) => i.goalId && !have.has(i.goalId))) throw new Error(NOT_VALID);
+}
+
 /** Adds what a Google copy knows to the row that stays: its list tag, a due date if missing, new notes lines. */
 function foldGoogleInto(target: Item, g: ParsedGoogleTask): void {
   const tag = tagFor(g.listTitle);
@@ -94,8 +133,10 @@ export function buildTransfer(
   // Backlog, filed by section exactly as importBacklog does.
   const sectionOf = new Map<string, string>();
   let backlogItems = 0;
+  let backlogMerged: { title: string; section: string }[] = [];
   if (inputs.backlog !== undefined) {
     const parsed = parseBacklog(inputs.backlog);
+    backlogMerged = parsed.merged;
     for (const p of parsed.items) {
       if (add(backlogItem(p, today))) {
         backlogItems++;
@@ -243,6 +284,7 @@ export function buildTransfer(
     }
   }
 
+  withStableIds(items, allGoals);
   const backup: BackupFile = { app: "life-hub", schema: 1, exportedOn: today, items, goals: allGoals };
   try {
     parseBackup(JSON.parse(JSON.stringify(backup)));
@@ -259,6 +301,8 @@ export function buildTransfer(
     areaGoals: areaGoalCount,
     monthGoals: monthGoals.length,
     backlogItems,
+    backlogMerged: backlogMerged.length,
+    mergedIntoBacklog: googleMerges.filter((m) => m.into === "backlog").length,
     gtasksAdded,
     gtasksDuplicates: duplicates.length,
     nextSteps,
@@ -268,7 +312,7 @@ export function buildTransfer(
     notes: notes.length,
   };
   const summary = makeSummary({
-    extraItems, extraGoals,
+    extraItems, extraGoals, backlogMerged, googleMerges,
     today, backup, monthGoals, monthTasks, habitTasks, metrics, weekly, duplicates, notes, sorted, stillInInbox,
     goalsAsProposed: goals,
   });
@@ -286,18 +330,13 @@ export function readInputs(vault: string, gtasks: string): TransferInputs {
     return readFileSync(path, "utf8");
   };
   return {
-    backlog: read("Backlog.md", join(vault, "Backlog.md")),
-    goals: read("Goals.md", join(vault, "Goals.md")),
-    month: read("Goals for month.md", join(vault, "Goals for month.md")),
-    habits: read("Goals & Habits.md", join(vault, "Goals & Habits.md")),
+    backlog: read(NOTE_FILES[0], join(vault, NOTE_FILES[0])),
+    goals: read(NOTE_FILES[1], join(vault, NOTE_FILES[1])),
+    month: read(NOTE_FILES[2], join(vault, NOTE_FILES[2])),
+    habits: read(NOTE_FILES[3], join(vault, NOTE_FILES[3])),
     gtasks: read(basename(gtasks), gtasks),
     missing,
   };
-}
-
-function writePrivate(path: string, text: string) {
-  writeFileSync(path, text, { mode: 0o600 });
-  chmodSync(path, 0o600);
 }
 
 export interface RunOptions {
@@ -309,10 +348,38 @@ export interface RunOptions {
   areasFile?: string;
   /** JSONL of vault-review items (see parseExtra). */
   extraFile?: string;
+  /** Folders nothing may be written into. Default: the Obsidian vault folder and this git repository. */
+  protectedDirs?: string[];
+}
+
+/** One calm sentence for any failure; always says nothing was written. */
+export function formatFailure(e: unknown): string {
+  const msg = e instanceof Error && e.message ? e.message.trim() : "The transfer did not work.";
+  if (/Nothing was written\.$/.test(msg)) return msg;
+  return `${/[.!?]$/.test(msg) ? msg : msg + "."} Nothing was written.`;
 }
 
 /** Builds the transfer and writes the files. Returns terminal lines: counts only, never titles. */
 export function runTransfer(o: RunOptions): { lines: string[] } {
+  const backupPath = join(o.out, `esmeworld-transfer-${o.today}.json`);
+  const summaryPath = join(o.out, `esmeworld-transfer-${o.today}-summary.md`);
+
+  // Check where we may write before reading or building anything.
+  const protectedDirs = [
+    ...(o.protectedDirs ?? [
+      join(homedir(), "Desktop", "Esme's Brain"),
+      ...[findRepoRoot(dirname(fileURLToPath(import.meta.url)))].filter((d): d is string => !!d),
+    ]),
+    o.vault,
+  ];
+  const outputs = [backupPath, summaryPath, ...(o.classifyOut ? [o.classifyOut] : [])];
+  const inputs = [
+    o.gtasks,
+    ...NOTE_FILES.map((f) => join(o.vault, f)),
+    ...[o.areasFile, o.extraFile].filter((f): f is string => !!f),
+  ];
+  checkOutputs({ outputs, inputs, protectedDirs });
+
   let areas: Record<string, unknown> | undefined;
   if (o.areasFile) {
     try {
@@ -323,23 +390,24 @@ export function runTransfer(o: RunOptions): { lines: string[] } {
       throw new Error("The areas file could not be read as a JSON object of keys to areas. Nothing was written.");
     }
   }
-  const inputs = readInputs(o.vault, o.gtasks);
+  const read = readInputs(o.vault, o.gtasks);
   if (o.extraFile) {
     try {
-      inputs.extra = readFileSync(o.extraFile, "utf8");
+      read.extra = readFileSync(o.extraFile, "utf8");
     } catch {
       throw new Error("The extra file could not be read. Nothing was written.");
     }
   }
-  const t = buildTransfer(inputs, o.today, { areas });
-  mkdirSync(o.out, { recursive: true });
-  const backupPath = join(o.out, `esmeworld-transfer-${o.today}.json`);
-  const summaryPath = join(o.out, `esmeworld-transfer-${o.today}-summary.md`);
-  writePrivate(backupPath, JSON.stringify(t.backup, null, 2));
-  writePrivate(summaryPath, t.summary);
+  const t = buildTransfer(read, o.today, { areas });
+  writeAllPrivate([
+    { path: backupPath, text: JSON.stringify(t.backup, null, 2) },
+    { path: summaryPath, text: t.summary },
+    ...(o.classifyOut ? [{ path: o.classifyOut, text: JSON.stringify(t.classify, null, 2) }] : []),
+  ]);
   const lines = [
     `Items: ${t.counts.items} (backlog ${t.counts.backlogItems}, google tasks ${t.counts.gtasksAdded}, next steps ${t.counts.nextSteps}, habits ${t.counts.habits})`,
     `Goals: ${t.counts.goals}`,
+    `Folded together: ${t.counts.backlogMerged} Backlog copies, ${t.counts.mergedIntoBacklog} Google copies`,
     `Vault review: ${t.counts.extraItems} items, ${t.counts.extraGoals} goals`,
     `Google tasks skipped as the same title: ${t.counts.gtasksDuplicates}`,
     `Sorted by the areas file: ${t.counts.sorted}`,
@@ -348,9 +416,6 @@ export function runTransfer(o: RunOptions): { lines: string[] } {
     `Wrote ${backupPath}`,
     `Wrote ${summaryPath}`,
   ];
-  if (o.classifyOut) {
-    writePrivate(o.classifyOut, JSON.stringify(t.classify, null, 2));
-    lines.push(`Wrote ${o.classifyOut} (${t.classify.length} items to classify)`);
-  }
+  if (o.classifyOut) lines.push(`Wrote ${o.classifyOut} (${t.classify.length} items to classify)`);
   return { lines };
 }

@@ -86,9 +86,25 @@ describe("goal detail: Edit section", () => {
     await db.goals.add({ id: "ep", title: "Practice", areaId: "body", kind: "practice", milestones: [], createdAt: TODAY });
     renderDetail("ep");
     await screen.findByRole("heading", { name: "Edit" });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Practice renamed" } });
     await userEvent.click(screen.getByRole("button", { name: "Save goal" }));
-    await vi.waitFor(async () => expect((await db.goals.get("ep"))!.title).toBe("Practice"));
+    // the save really happened (a no-op save would leave the old title), with no deadline asked for
+    expect(await screen.findByRole("heading", { name: "Practice renamed", level: 1 })).toBeInTheDocument();
+    const got = (await db.goals.get("ep"))!;
+    expect(got.title).toBe("Practice renamed");
+    expect(got.deadline).toBeUndefined();
     expect(screen.queryByText("A finite goal needs a deadline.")).toBeNull();
+    expect(screen.queryByText("That did not save. Try again.")).toBeNull();
+  });
+
+  it("shows the goal's notes as plain text", async () => {
+    await db.goals.add({
+      id: "gn", title: "With notes", areaId: "art", kind: "practice", milestones: [], createdAt: TODAY,
+      notes: "Study <b>these</b>, those",
+    });
+    renderDetail("gn");
+    expect(await screen.findByText("Study <b>these</b>, those")).toBeInTheDocument();
+    expect(document.querySelector("b")).toBeNull();
   });
 
   it("shows the calm save message when the write fails", async () => {

@@ -33,6 +33,10 @@ export function makeSummary(s: {
   sorted: { title: string; areaId: AreaId }[];
   stillInInbox: number;
   goalsAsProposed: ProposedGoal[];
+  /** Backlog copies of one task that were folded into a single item. */
+  backlogMerged: { title: string; section: string }[];
+  /** Google copies folded into an existing row (list tag, notes and due kept). */
+  googleMerges: { title: string; listTitle: string; into: string }[];
 }): string {
   const L: string[] = [];
   L.push(`# Esmeworld transfer summary, ${s.today}`, "");
@@ -81,12 +85,19 @@ export function makeSummary(s: {
     L.push("");
   }
 
+  L.push("## Backlog copies folded together", "");
+  if (!s.backlogMerged.length) L.push("None.");
+  for (const m of s.backlogMerged) L.push(`- ${m.title} (a copy under ${m.section || "no section"})`);
+  L.push("");
+
   L.push("## Google Tasks skipped as the same title", "");
   if (!s.duplicates.length) L.push("None.");
   for (const d of s.duplicates) {
     const why = d.reason === "existing" ? "matches a transferred item" : "repeated in the Google file";
+    const merge = s.googleMerges.find((m) => m.title === d.title && m.listTitle === d.listTitle);
+    const into = merge ? ` - merged into the ${merge.into === "backlog" ? "Backlog" : "existing"} item` : "";
     L.push(
-      `- ${d.title} (from ${d.listTitle})${d.hadNotes ? " - had notes" : ""}${d.hadDue ? " - had a due date" : ""} - ${why}`,
+      `- ${d.title} (from ${d.listTitle})${d.hadNotes ? " - had notes" : ""}${d.hadDue ? " - had a due date" : ""} - ${why}${into}`,
     );
   }
   L.push("");
@@ -106,11 +117,12 @@ export function makeSummary(s: {
   L.push(
     "## How to load this",
     "",
-    "1. Open Esmeworld and go to Backup.",
-    "2. Choose the transfer .json file next to this summary.",
-    "3. Choose Merge (not Replace).",
-    "4. Load it ONCE, into ONE place: the hosted app. Sync will copy it to your other devices later.",
-    "5. Do not also import the same notes through the Inbox, or you will get duplicates.",
+    "1. Download a backup first (Backup page), so you can go back.",
+    "2. Open Esmeworld and go to Backup.",
+    "3. Choose the transfer .json file next to this summary.",
+    "4. Choose Merge (not Replace).",
+    "5. Load it ONCE, into ONE place: the hosted app. Sync will copy it to your other devices later.",
+    "6. Do not also import the same notes through the Inbox, or you will get duplicates.",
     "",
   );
   return L.join("\n");

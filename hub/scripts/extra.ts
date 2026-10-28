@@ -1,7 +1,7 @@
 // Vault-review items for the transfer script (--extra). Pure parsing, no I/O.
 import { isValidISODate } from "../src/domain/dates";
 import { AREA_IDS, type AreaId, type Goal, type ISODate, type Item } from "../src/domain/types";
-import type { ParseNote } from "../src/import/obsidianGoals";
+import { MAX_GOAL_TEXT, type ParseNote } from "../src/import/obsidianGoals";
 
 const AREA_LIST: readonly string[] = AREA_IDS;
 
@@ -44,11 +44,19 @@ export function parseExtra(
     if (!EXTRA_TAGS.includes(r.tag as string)) return bad(n, "unknown tag");
     const kind = r.kind as "task" | "idea" | "goal";
     const areaId = r.areaId as AreaId;
-    const due = r.due === undefined ? undefined : str(r.due);
+    let due = r.due === undefined ? undefined : str(r.due);
     if (r.due !== undefined && !(due && isValidISODate(due))) return bad(n, "due is not a real date");
     if (r.notes !== undefined && typeof r.notes !== "string") return bad(n, "notes must be text");
     if (r.check !== undefined && typeof r.check !== "string") return bad(n, "check must be text");
-    const notesText = str(r.notes)?.trim();
+    if (kind === "idea" && due) {
+      notes.push({ line: "", reason: `extra line ${n}: an idea has no due date, due dropped` });
+      due = undefined;
+    }
+    let notesText = str(r.notes)?.trim();
+    if (kind === "goal" && notesText && notesText.length > MAX_GOAL_TEXT) {
+      notes.push({ line: "", reason: `extra line ${n}: notes cut to ${MAX_GOAL_TEXT} characters` });
+      notesText = notesText.slice(0, MAX_GOAL_TEXT);
+    }
     if (kind === "goal") {
       if (areaId === "inbox") return bad(n, "a goal cannot be in the inbox");
       const goal: Goal = {

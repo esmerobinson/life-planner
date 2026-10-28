@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { db } from "../src/data/db";
 import { parseBackup, restoreBackup } from "../src/data/backup";
-import { buildTransfer, runTransfer, type TransferInputs } from "./transfer";
+import { buildTransfer, formatFailure, runTransfer, type TransferInputs } from "./transfer";
 
 const FIX = join(process.cwd(), "src/import/__fixtures__");
 const read = (f: string) => readFileSync(join(FIX, f), "utf8");
@@ -54,6 +54,10 @@ describe("buildTransfer", () => {
     const t = buildTransfer(inputs(), TODAY);
     const r = await restoreBackup(JSON.parse(JSON.stringify(t.backup)), "merge");
     expect(r).toEqual({ addedItems: t.backup.items.length, addedGoals: t.backup.goals.length, skipped: 0 });
+    // the rows in the database are exactly the rows in the file, not just the same number of them
+    const byId = <T extends { id: string }>(rows: T[]) => [...rows].sort((a, b) => a.id.localeCompare(b.id));
+    expect(byId(await db.items.toArray())).toEqual(byId(t.backup.items));
+    expect(byId(await db.goals.toArray())).toEqual(byId(t.backup.goals));
     expect(t.counts.goals).toBe(10);
     expect(t.counts.nextSteps).toBe(3);
     expect(t.counts.habits).toBe(4);
@@ -116,9 +120,15 @@ describe("buildTransfer", () => {
     expect(t.summary).toContain("Goals.md");
   });
 
-  it("refuses an invalid result", () => {
+  it("refuses a result that does not validate", () => {
+    expect(() => buildTransfer(inputs(), "2026-13-45")).toThrow(/does not validate.*Nothing was written/i);
+  });
+
+  it("an oversized goal field is cut with a note instead of failing the whole transfer", () => {
     const huge = "## Writing\n- Identity: " + "x".repeat(5000);
-    expect(() => buildTransfer({ goals: huge, missing: [] }, TODAY)).toThrow(/not valid|does not validate/i);
+    const t = buildTransfer({ goals: huge, missing: [] }, TODAY);
+    expect(t.backup.goals[0].why).toHaveLength(4000);
+    expect(t.notes.some((n) => /4000/.test(n.reason) && n.line === "Writing")).toBe(true);
   });
 });
 
@@ -170,13 +180,59 @@ describe("classification hook", () => {
     expect(() => parseBackup(JSON.parse(JSON.stringify(t.backup)))).not.toThrow();
   });
 
-  it("the same keys sort the same items on a second run with fresh ids", () => {
+  it("the same keys sort the same items on a second run", () => {
     const areas = { "gtasks:a2": "admin" };
     const a = buildTransfer(inputs(), TODAY, { areas });
     const b = buildTransfer(inputs(), TODAY, { areas });
-    const id = (t: typeof a) => t.backup.items.find((i) => i.title === "Post the invented parcel")!.id;
-    expect(id(a)).not.toBe(id(b));
     expect(b.backup.items.find((i) => i.title === "Post the invented parcel")!.areaId).toBe("admin");
+    expect(b.backup).toEqual(a.backup);
+  });
+});
+
+describe("failure messages", () => {
+  it("always end with Nothing was written., once", () => {
+    expect(formatFailure(new Error("The areas file could not be read."))).toBe(
+      "The areas file could not be read. Nothing was written.",
+    );
+    expect(formatFailure(new Error("Already says it. Nothing was written."))).toBe("Already says it. Nothing was written.");
+    expect(formatFailure("weird")).toBe("The transfer did not work. Nothing was written.");
+  });
+});
+
+describe("deterministic ids", () => {
+  it("the same input gives the same ids, goal links and milestone ids", () => {
+    const a = buildTransfer(inputs(), TODAY);
+    const b = buildTransfer(inputs(), TODAY);
+    expect(b.backup).toEqual(a.backup);
+    const writing = a.backup.goals.find((g) => g.title === "Writing")!;
+    expect(writing.milestones).toHaveLength(2);
+    expect(writing.milestones[0].id).not.toBe(writing.milestones[1].id);
+    expect(a.backup.goals.every((g) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(g.id))).toBe(true);
+  });
+
+  it("every goalId points at a goal in the file", () => {
+    const { backup } = buildTransfer(inputs(), TODAY);
+    const goalIds = new Set(backup.goals.map((g) => g.id));
+    const linked = backup.items.filter((i) => i.goalId);
+    expect(linked.length).toBe(3);
+    expect(linked.every((i) => goalIds.has(i.goalId!))).toBe(true);
+  });
+
+  it("loading a second run with Merge adds nothing", async () => {
+    const first = buildTransfer(inputs(), TODAY);
+    await restoreBackup(JSON.parse(JSON.stringify(first.backup)), "merge");
+    const second = buildTransfer(inputs(), TODAY);
+    const r = await restoreBackup(JSON.parse(JSON.stringify(second.backup)), "merge");
+    expect(r).toMatchObject({ addedItems: 0, addedGoals: 0 });
+    expect(await db.items.count()).toBe(first.backup.items.length);
+    expect(await db.goals.count()).toBe(first.backup.goals.length);
+  });
+
+  it("the summary starts the load steps with downloading a backup first", () => {
+    const { summary } = buildTransfer(inputs(), TODAY);
+    const steps = summary.slice(summary.indexOf("## How to load this"));
+    expect(steps).toMatch(/1\. Download a backup first \(Backup page\)/);
+    expect(steps).toMatch(/Merge/);
   });
 });
 
@@ -225,7 +281,7 @@ describe("the same task in the Backlog and in Google Tasks", () => {
 
   it("lists every merged copy in the summary and counts them", () => {
     const r = t();
-    expect(r.counts.backlogMerged).toBe(3);
+    expect(r.counts.backlogMerged).toBe(2);
     expect(r.counts.gtasksDuplicates).toBe(1);
     expect(r.counts.mergedIntoBacklog).toBe(1);
     expect(r.summary).toContain("Backlog copies folded together");
@@ -301,6 +357,18 @@ describe("--extra vault-review items", () => {
     expect(a.classify.some((c) => c.key.startsWith("x:"))).toBe(false);
     const b = buildTransfer({ ...inputs(), extra: EXTRA }, TODAY, { areas: { "x:daily:1": "mind" } });
     expect(b.backup.items.find((i) => i.title === "Pretend idea from daily notes")!.areaId).toBe("mind");
+  });
+
+  it("cuts oversized goal notes with a note naming the line, and ideas never keep a due date", () => {
+    const big = line({ key: "g1", title: "Big goal", kind: "goal", areaId: "art", tag: "from-project-notes", notes: "z".repeat(5000) });
+    const idea = line({ key: "i1", title: "Dated idea", kind: "idea", areaId: "inbox", tag: "from-daily-notes", due: "2026-12-01" });
+    const t = buildTransfer({ ...inputs(), extra: `${big}\n${idea}` }, TODAY);
+    expect(t.backup.goals.find((g) => g.title === "Big goal")!.notes).toHaveLength(4000);
+    expect(t.notes.some((n) => /extra line 1/.test(n.reason) && /4000/.test(n.reason))).toBe(true);
+    const i = t.backup.items.find((x) => x.title === "Dated idea")!;
+    expect("due" in i).toBe(false);
+    expect(t.notes.some((n) => /extra line 2/.test(n.reason) && /idea/.test(n.reason))).toBe(true);
+    expect(() => parseBackup(JSON.parse(JSON.stringify(t.backup)))).not.toThrow();
   });
 
   it("a key that collides with a transferred row is reported, not duplicated", () => {
@@ -392,9 +460,66 @@ describe("runTransfer", () => {
     expect(r.lines.join("\n")).not.toMatch(/parcel/i);
   });
 
+  it("leaves only the finished files in the output folder (no temp files)", () => {
+    run({ classifyOut: join(out, "classify.json") });
+    expect(readdirSync(out).sort()).toEqual([
+      "classify.json",
+      `esmeworld-transfer-${TODAY}-summary.md`,
+      `esmeworld-transfer-${TODAY}.json`,
+    ]);
+  });
+
+  describe("output paths are guarded", () => {
+    const untouched = (p: string) => expect(existsSync(p)).toBe(false);
+
+    it("refuses an output folder inside the vault or equal to it", () => {
+      const inside = join(vault, "exports");
+      expect(() => run({ out: inside })).toThrow(/Nothing was written/);
+      untouched(inside);
+      expect(() => run({ out: vault })).toThrow(/inside your notes|vault/i);
+      expect(readdirSync(vault).some((f) => f.startsWith("esmeworld-transfer"))).toBe(false);
+    });
+
+    it("refuses an output folder inside a protected folder, including through a symlink", () => {
+      const prot = join(dir, "protected");
+      mkdirSync(prot);
+      expect(() => run({ protectedDirs: [prot], out: join(prot, "o") })).toThrow(/Nothing was written/);
+      untouched(join(prot, "o"));
+      symlinkSync(prot, join(dir, "link"));
+      expect(() => run({ protectedDirs: [prot], out: join(dir, "link", "o") })).toThrow(/Nothing was written/);
+      untouched(join(prot, "o"));
+    });
+
+    it("refuses an output folder inside the git repository", () => {
+      const inRepo = join(process.cwd(), "tmp-transfer-test-out");
+      expect(() => run({ out: inRepo })).toThrow(/Nothing was written/);
+      untouched(inRepo);
+    });
+
+    it("refuses to overwrite an input file", () => {
+      const backupPath = join(out, `esmeworld-transfer-${TODAY}.json`);
+      writeFileSync(backupPath, "keep me");
+      const areasFile = join(dir, "areas.json");
+      writeFileSync(areasFile, "{}");
+      expect(() => run({ extraFile: backupPath })).toThrow(/overwrite|input/i);
+      expect(() => run({ classifyOut: areasFile, areasFile })).toThrow(/overwrite|input/i);
+      const summaryPath = join(out, `esmeworld-transfer-${TODAY}-summary.md`);
+      writeFileSync(summaryPath, "{}");
+      expect(() => run({ gtasks: summaryPath })).toThrow(/overwrite|input/i);
+      expect(readFileSync(backupPath, "utf8")).toBe("keep me");
+      expect(readFileSync(areasFile, "utf8")).toBe("{}");
+      expect(readFileSync(summaryPath, "utf8")).toBe("{}");
+    });
+
+    it("refuses a classify file inside the vault", () => {
+      expect(() => run({ classifyOut: join(vault, "classify.json") })).toThrow(/Nothing was written/);
+      untouched(join(vault, "classify.json"));
+      untouched(join(out, `esmeworld-transfer-${TODAY}.json`));
+    });
+  });
+
   it("refuses to write when the result does not validate, and says so calmly", () => {
-    writeFileSync(join(vault, "Goals.md"), "## Writing\n- Identity: " + "x".repeat(5000));
-    expect(() => run()).toThrow(/Nothing was written/);
+    expect(() => run({ today: "2026-13-45" })).toThrow(/Nothing was written/);
     expect(existsSync(join(out, `esmeworld-transfer-${TODAY}.json`))).toBe(false);
   });
 

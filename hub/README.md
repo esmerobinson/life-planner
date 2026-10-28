@@ -48,13 +48,24 @@ parsers and the same validator the Backup page uses. It only reads those
 files. Run it once, from `hub/`:
 
     npx tsx scripts/obsidian-transfer.ts [--vault DIR] [--gtasks FILE] [--out DIR] \
-        [--today YYYY-MM-DD] [--classify-out FILE] [--areas FILE]
+        [--today YYYY-MM-DD] [--classify-out FILE] [--areas FILE] [--extra FILE]
 
 It writes two private files (mode 0600) into `--out` (default `~/Downloads`):
 `esmeworld-transfer-<date>.json` (load it on the Backup page with **Merge**,
 once, into one place) and `esmeworld-transfer-<date>-summary.md` (a readable
 summary with your titles, for you only). The terminal prints counts only.
 A missing input is skipped with a note.
+
+Safe to repeat: ids are made from each row's source key, so a second run
+produces the same ids and loading it again with Merge adds nothing. The script
+refuses to write inside the vault, inside this git repository, or over any
+input file, and writes nothing if any check fails. Titles are tidied first:
+wiki-links become their text, old suffixes such as `(from Google Tasks)`,
+`(overdue!)`, `(due today)`, `(due in 3d)`, `(carried ...)` and
+`(was due 19 Jul)` are removed (a date is kept as a notes line), and copies of
+one task (same title ignoring case, punctuation and emoji) are folded into one
+item, also across the Backlog and Google Tasks. The summary lists every folded
+copy.
 
 `--classify-out FILE` writes a private list of every item the rules left in the
 Inbox (stable `key`, title, origin, section or list, first 200 characters of

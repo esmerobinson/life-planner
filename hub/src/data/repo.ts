@@ -102,6 +102,7 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
   return db.transaction("rw", db.items, db.goals, async () => {
     const item = await db.items.get(itemId);
     if (!item) throw new Error("that item does not exist");
+    if (item.status !== "open") throw new Error("only an open item can become a goal");
     const goal: Goal = {
       id: crypto.randomUUID(),
       title: item.title,
@@ -110,7 +111,8 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
       milestones: [],
       createdAt: today,
     };
-    if (item.notes) goal.notes = item.notes;
+    // A goal's notes are limited to 4000 characters (the backup validator's rule); the full text stays on the item.
+    if (item.notes) goal.notes = item.notes.slice(0, 4000);
     await db.goals.add(goal);
     const line = `Became a goal: ${goal.title}`;
     await db.items.update(itemId, {
