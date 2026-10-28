@@ -3,8 +3,8 @@ import { db } from "./db";
 import { unstamped } from "../test/unstamped";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
-  archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem, updateGoal, archiveItems,
-  itemToGoal, pinTo,
+  archiveItem, restoreItem, listItems, setMilestone, updateItems, updateItem, updateGoal, archiveItems,
+  itemToGoal, pinTo, saveGoalNotes,
 } from "./repo";
 import { exportBackup, restoreBackup } from "./backup";
 
@@ -113,14 +113,6 @@ describe("repo", () => {
     expect((await db.items.get(it1.id))?.status).toBe("open");
   });
 
-  it("two concurrent toggleMilestone calls flip twice (back to original)", async () => {
-    const g = await createGoal(
-      { title: "g", areaId: "art", kind: "finite", deadline: "2026-12-01",
-        milestones: [{ id: "m1", title: "a", done: false }] }, today);
-    await Promise.all([toggleMilestone(g.id, "m1"), toggleMilestone(g.id, "m1")]);
-    expect((await db.goals.get(g.id))?.milestones[0].done).toBe(false);
-  });
-
   it("two concurrent tickItem calls leave a single consistent done item", async () => {
     const it1 = await createItem(base, "2026-10-01");
     await Promise.all([tickItem(it1.id, "2026-10-02"), tickItem(it1.id, "2026-10-03")]);
@@ -130,14 +122,57 @@ describe("repo", () => {
     expect(await db.items.count()).toBe(1);
   });
 
-  it("toggleMilestone flips done", async () => {
+  it("createGoal turns given milestones into flagged linked tasks; the goal's list stays empty", async () => {
     const g = await createGoal(
       { title: "g", areaId: "art", kind: "finite", deadline: "2026-12-01",
         milestones: [{ id: "m1", title: "a", done: false }] }, today);
-    await toggleMilestone(g.id, "m1");
-    expect((await db.goals.get(g.id))?.milestones[0].done).toBe(true);
-    await toggleMilestone(g.id, "m1");
-    expect((await db.goals.get(g.id))?.milestones[0].done).toBe(false);
+    expect(g.milestones).toEqual([]);
+    expect(await db.items.toArray()).toEqual([
+      expect.objectContaining({ title: "a", goalId: g.id, areaId: "art", kind: "task", milestone: true, status: "open" }),
+    ]);
+  });
+
+  it("setMilestone flags and unflags a task", async () => {
+    const it1 = await createItem(base, today);
+    await setMilestone(it1.id, true, today);
+    expect((await db.items.get(it1.id))?.milestone).toBe(true);
+    await setMilestone(it1.id, false, today);
+    expect(await db.items.get(it1.id)).not.toHaveProperty("milestone");
+  });
+});
+
+describe("habits (recurring to-dos)", () => {
+  const habit = { ...base, recur: ["mon" as const, "wed" as const] };
+
+  it("ticking logs today and never changes status; a second tick changes nothing", async () => {
+    const h = await createItem(habit, today);
+    await tickItem(h.id, today);
+    await tickItem(h.id, today);
+    const got = (await db.items.get(h.id))!;
+    expect(got.status).toBe("open");
+    expect(got.completedAt).toBeUndefined();
+    expect(got.doneDates).toEqual([today]);
+  });
+
+  it("unticking removes only today; a new day starts unticked with the log kept", async () => {
+    const h = await createItem({ ...habit, doneDates: ["2026-10-26"] }, today);
+    await tickItem(h.id, today);
+    expect((await db.items.get(h.id))!.doneDates).toEqual(["2026-10-26", today]);
+    await untickItem(h.id, today);
+    expect((await db.items.get(h.id))!.doneDates).toEqual(["2026-10-26"]);
+    await untickItem(h.id, today); // nothing to remove
+    expect((await db.items.get(h.id))!.doneDates).toEqual(["2026-10-26"]);
+    const only = await createItem(habit, today);
+    await tickItem(only.id, today);
+    await untickItem(only.id, today);
+    expect(await db.items.get(only.id)).not.toHaveProperty("doneDates");
+  });
+
+  it("a recurring item already marked done (before habits) unticks back to open as before", async () => {
+    const h = await createItem(habit, today);
+    await db.items.update(h.id, { status: "done", completedAt: today });
+    await untickItem(h.id, today);
+    expect((await db.items.get(h.id))!.status).toBe("open");
   });
 });
 
@@ -377,11 +412,15 @@ describe("updateGoal", () => {
     createGoal(
       {
         title: "Old", areaId: "art", kind: "finite", deadline: "2026-12-31", monthlyTarget: 3,
-        milestones: [{ id: "m1", title: "one", done: true }], why: "because", cadence: "Weekly: 2",
+        why: "because", cadence: "Weekly: 2",
         notes: "n", source: { kind: "obsidian", key: "obsidian:goal:old" },
       },
       today,
-    );
+    ).then(async (g) => {
+      // A legacy milestone list (before round 3), written straight in.
+      await db.goals.update(g.id, { milestones: [{ id: "m1", title: "one", done: true }] });
+      return (await db.goals.get(g.id))!;
+    });
 
   it("changes only title, area, deadline and monthly target, in one transaction", async () => {
     const g = await seed();
@@ -394,13 +433,41 @@ describe("updateGoal", () => {
     });
   });
 
-  it("never touches milestones, source, why, cadence or notes, even if passed", async () => {
+  it("never touches milestones or source, even if passed", async () => {
     const g = await seed();
-    await updateGoal(g.id, { title: "X", milestones: [], source: undefined, why: "hacked" } as never, today);
+    await updateGoal(g.id, { title: "X", milestones: [], source: undefined } as never, today);
     const got = (await db.goals.get(g.id))!;
     expect(got.milestones).toEqual(g.milestones);
     expect(got.source).toEqual(g.source);
-    expect(got.why).toBe("because");
+  });
+
+  it("edits why, cadence and notes; blank text removes them; over 4000 characters is refused", async () => {
+    const g = await seed();
+    await updateGoal(g.id, { why: "a new reason", cadence: "  ", notes: undefined }, today);
+    const got = (await db.goals.get(g.id))!;
+    expect(got.why).toBe("a new reason");
+    expect(got).not.toHaveProperty("cadence");
+    expect(got).not.toHaveProperty("notes");
+    await expect(updateGoal(g.id, { why: "x".repeat(4001) }, today)).rejects.toThrow();
+  });
+
+  it("switches type: practice drops the deadline; finite needs one", async () => {
+    const g = await seed();
+    await updateGoal(g.id, { kind: "practice" }, today);
+    expect(await db.goals.get(g.id)).toMatchObject({ kind: "practice" });
+    expect(await db.goals.get(g.id)).not.toHaveProperty("deadline");
+    await expect(updateGoal(g.id, { kind: "finite" }, today)).rejects.toThrow();
+    await updateGoal(g.id, { kind: "finite", deadline: "2027-02-01" }, today);
+    expect(await db.goals.get(g.id)).toMatchObject({ kind: "finite", deadline: "2027-02-01" });
+  });
+
+  it("saveGoalNotes saves the page text, blank removes it, never over the cap", async () => {
+    const g = await seed();
+    await saveGoalNotes(g.id, "# Plan\nA pretend line");
+    expect((await db.goals.get(g.id))!.notes).toBe("# Plan\nA pretend line");
+    await saveGoalNotes(g.id, "   ");
+    expect(await db.goals.get(g.id)).not.toHaveProperty("notes");
+    await expect(saveGoalNotes(g.id, "x".repeat(4001))).rejects.toThrow();
   });
 
   it("leaves fields that are not in the patch alone", async () => {

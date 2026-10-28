@@ -34,6 +34,10 @@ export interface Item {
   weekOf?: ISODate;
   hiddenOn?: ISODate;
   completedAt?: ISODate;
+  /** A goal's big step (round 3): counted for the goal's overall progress. */
+  milestone?: boolean;
+  /** Habits: the days it was ticked (sorted, the most recent 400 kept). Never changes `status`. */
+  doneDates?: ISODate[];
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
@@ -44,6 +48,11 @@ export interface Item {
   updatedAt?: number;
 }
 
+/**
+ * Legacy (before round 3): a goal's own checklist. Milestones are now flagged tasks
+ * (`Item.milestone`); data/migrateMilestones.ts turns these into them and leaves the
+ * goal's list empty. The field stays (always []) so older app versions still accept goals.
+ */
 export interface Milestone {
   id: string;
   title: string;

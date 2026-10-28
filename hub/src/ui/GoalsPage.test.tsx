@@ -206,9 +206,12 @@ describe("GoalsPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add goal" }));
     expect(await screen.findByText("Ship it")).toBeInTheDocument();
     const [g] = await db.goals.toArray();
-    expect(g.milestones.map((m) => [m.title, m.done])).toEqual([
-      ["one", false],
-      ["two", false],
+    // Milestones are flagged linked tasks (round 3).
+    expect(g.milestones).toEqual([]);
+    const tasks = (await db.items.toArray()).sort((a, b) => a.title.localeCompare(b.title));
+    expect(tasks.map((t) => [t.title, t.status, t.milestone, t.goalId])).toEqual([
+      ["one", "open", true, g.id],
+      ["two", "open", true, g.id],
     ]);
     expect(g.deadline).toBe("2026-12-31");
   });
@@ -248,7 +251,7 @@ describe("GoalDetail", () => {
     expect(screen.getByText("3 more to reach this month's target")).toBeInTheDocument();
   });
 
-  it("groups attached tasks and toggles milestones", async () => {
+  it("groups attached tasks; a milestone is a flagged task ticked like any other", async () => {
     const g = await createGoal(
       {
         title: "Book",
@@ -272,9 +275,9 @@ describe("GoalDetail", () => {
     expect(within(week).getByText("T-week")).toBeInTheDocument();
     expect(within(week).getByText("T-weekpin")).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Later" })).getByText("T-later")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: "Outline" }));
+    expect(await screen.findByRole("progressbar", { name: "Overall 0/1" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Outline" }));
     expect(await screen.findByRole("progressbar", { name: "Overall 1/1" })).toBeInTheDocument();
-    expect((await db.goals.toArray())[0].milestones[0].done).toBe(true);
   });
 
   it.each([

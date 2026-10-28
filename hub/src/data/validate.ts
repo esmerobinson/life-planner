@@ -4,6 +4,7 @@
 // No database import here, so the change tracker can use it without an import cycle.
 
 import { isValidISODate } from "../domain/dates";
+import { MAX_DONE_DATES } from "../domain/habits";
 import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type Goal, type Item } from "../domain/types";
 
 /** The longest goal why / cadence / notes text (characters). */
@@ -42,6 +43,11 @@ export function validItem(r: unknown): r is Item {
     optDate(r.hiddenOn) &&
     optDate(r.completedAt) &&
     optDate(r.deletedAt) &&
+    (r.milestone === undefined || typeof r.milestone === "boolean") &&
+    (r.doneDates === undefined ||
+      (Array.isArray(r.doneDates) &&
+        r.doneDates.length <= MAX_DONE_DATES &&
+        r.doneDates.every((d) => isStr(d) && isValidISODate(d)))) &&
     optStamp(r.updatedAt) &&
     validSource(r.source) &&
     // An emptied-from-the-Bin tombstone carries no content.

@@ -37,6 +37,16 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
+  it("converts legacy goal milestones into flagged tasks on start (sync off)", async () => {
+    await db.goals.add({
+      id: "g", title: "Pretend goal", areaId: "art", kind: "practice", createdAt: "2026-10-01",
+      milestones: [{ id: "m", title: "A pretend step", done: false }],
+    });
+    renderShell(<p>page</p>);
+    await vi.waitFor(async () => expect((await db.goals.get("g"))!.milestones).toEqual([]));
+    expect(await db.items.toArray()).toEqual([expect.objectContaining({ title: "A pretend step", milestone: true, goalId: "g" })]);
+  });
+
   it("quick-add on /today shows a task due today in the Today list", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 27, 12, 0));

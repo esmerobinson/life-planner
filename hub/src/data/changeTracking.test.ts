@@ -4,7 +4,7 @@ import { db, HubDB } from "./db";
 import { applyUntracked, onLocalWrite } from "./changeTracking";
 import {
   archiveItem, archiveItems, createGoal, createItem, itemToGoal, moveTo, removeFromToday, restoreItem,
-  tickItem, toggleMilestone, untickItem, updateGoal, updateItem, updateItems,
+  tickItem, setMilestone, saveGoalNotes, untickItem, updateGoal, updateItem, updateItems,
 } from "./repo";
 import { restoreBackup } from "./backup";
 import { importBacklog } from "../import/backlog";
@@ -129,6 +129,7 @@ describe("stamping every local write", () => {
       ["restoreItem", () => restoreItem(a.id, today)],
       ["archiveItems", () => archiveItems([a.id], today)],
       ["updateItems", () => updateItems([a.id], { priority: 1 }, today)],
+      ["setMilestone", () => setMilestone(a.id, true, today)],
     ];
     for (const [name, step] of steps) {
       await db.pending.clear();
@@ -142,7 +143,7 @@ describe("stamping every local write", () => {
 
     for (const [name, step] of [
       ["updateGoal", () => updateGoal(g.id, { title: "G2" }, today)],
-      ["toggleMilestone", () => toggleMilestone(g.id, "none")],
+      ["saveGoalNotes", () => saveGoalNotes(g.id, "a pretend note")],
     ] as const) {
       await db.pending.clear();
       clock += 1000;

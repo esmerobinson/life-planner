@@ -1,5 +1,8 @@
 import { db } from "./db";
+import { MAX_GOAL_TEXT } from "./validate";
 import { addDays, isValidISODate, mondayOf } from "../domain/dates";
+import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
+import { milestoneTask } from "../domain/milestones";
 import { AREA_IDS, type AreaId, type Goal, type ISODate, type Item, type Milestone } from "../domain/types";
 
 export async function createItem(
@@ -18,6 +21,11 @@ export async function createItem(
   return (await db.items.get(item.id)) ?? item; // as stored, with its updatedAt
 }
 
+/**
+ * Creates a goal. Milestones given here become milestone-flagged linked tasks in the
+ * goal's area (round 3: there is no separate milestones list), in the same transaction;
+ * the goal's own list stays empty.
+ */
 export async function createGoal(
   input: Omit<Goal, "id" | "createdAt" | "milestones"> & { milestones?: Milestone[] },
   today: ISODate,
@@ -25,29 +33,38 @@ export async function createGoal(
   if (input.kind === "finite" && !input.deadline) {
     throw new Error("finite goals need a deadline");
   }
+  const { milestones = [], ...rest } = input;
   const goal: Goal = {
-    ...input,
+    ...rest,
     id: crypto.randomUUID(),
-    milestones: input.milestones ?? [],
+    milestones: [],
     createdAt: today,
   };
-  await db.goals.add(goal);
-  return (await db.goals.get(goal.id)) ?? goal; // as stored, with its updatedAt
+  return db.transaction("rw", db.goals, db.items, async () => {
+    await db.goals.add(goal);
+    if (milestones.length) await db.items.bulkAdd(milestones.map((m) => milestoneTask(goal, m, today)));
+    return (await db.goals.get(goal.id)) ?? goal; // as stored, with its updatedAt
+  });
 }
 
-/** The only goal fields the Edit section may change. */
+/** The goal fields the panel's Edit mode may change. */
 export interface GoalPatch {
   title?: string;
   areaId?: AreaId;
+  /** "finite" (finish by a date) or "practice". Practice drops the deadline. */
+  kind?: Goal["kind"];
   deadline?: ISODate | undefined;
   monthlyTarget?: number | undefined;
+  /** Blank text removes them. At most MAX_GOAL_TEXT characters each. */
+  why?: string | undefined;
+  cadence?: string | undefined;
+  notes?: string | undefined;
 }
 
 /**
- * Edits a goal's title, area, deadline and monthly target in one transaction, with the
- * same rules as createGoal (a finite goal keeps a real deadline; goals are never in the
- * inbox). A key that is present with the value undefined clears that field. Milestones,
- * source, why, cadence and notes are never touched.
+ * Edits a goal in one transaction, with the same rules as createGoal (a finite goal keeps
+ * a real deadline; goals are never in the inbox). A key that is present with the value
+ * undefined clears that field. Milestones and source are never touched.
  */
 export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate): Promise<void> {
   await db.transaction("rw", db.goals, async () => {
@@ -64,6 +81,18 @@ export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate):
         throw new Error("a goal needs an area other than the inbox");
       }
       next.areaId = patch.areaId;
+    }
+    if ("kind" in patch) {
+      if (patch.kind !== "finite" && patch.kind !== "practice") throw new Error("a goal is finite or practice");
+      next.kind = patch.kind;
+      if (patch.kind === "practice") delete next.deadline;
+    }
+    for (const key of ["why", "cadence", "notes"] as const) {
+      if (!(key in patch)) continue;
+      const text = patch[key];
+      if (text === undefined || !text.trim()) delete next[key];
+      else if (text.length > MAX_GOAL_TEXT) throw new Error(`at most ${MAX_GOAL_TEXT} characters`);
+      else next[key] = text;
     }
     if ("deadline" in patch) {
       if (patch.deadline === undefined) delete next.deadline;
@@ -124,18 +153,35 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
   });
 }
 
+/**
+ * Ticks an item off. A to-do becomes done (completedAt today). A habit (an open recurring
+ * to-do) instead logs today in its doneDates and stays open: it never goes to Done.
+ */
 export async function tickItem(id: string, today: ISODate): Promise<void> {
   await db.transaction("rw", db.items, async () => {
     const item = await db.items.get(id);
     if (!item || item.status === "done") return;
+    if (isHabit(item) && item.status === "open") {
+      if (item.doneDates?.includes(today)) return;
+      await db.items.update(id, { doneDates: withDoneDate(item.doneDates, today), touchedAt: today });
+      return;
+    }
     await db.items.update(id, { status: "done", completedAt: today, touchedAt: today });
   });
 }
 
+/** Unticks: a done item is open again; a habit loses today from its doneDates. */
 export async function untickItem(id: string, today: ISODate): Promise<void> {
   await db.transaction("rw", db.items, async () => {
     const item = await db.items.get(id);
     if (!item) return;
+    if (isHabit(item) && item.status === "open") {
+      if (!item.doneDates?.includes(today)) return;
+      const { doneDates, ...rest } = item;
+      const left = withoutDoneDate(doneDates, today);
+      await db.items.put({ ...rest, ...(left ? { doneDates: left } : {}), touchedAt: today });
+      return;
+    }
     const { completedAt: _drop, ...rest } = item;
     await db.items.put({ ...rest, status: "open", touchedAt: today });
   });
@@ -250,13 +296,24 @@ export async function listGoals(): Promise<Goal[]> {
   return (await db.goals.toArray()).filter((g) => g.status === undefined);
 }
 
-export async function toggleMilestone(goalId: string, milestoneId: string): Promise<void> {
+/** Flags a task as one of its goal's milestones, or unflags it (the field is then removed). */
+export async function setMilestone(id: string, milestone: boolean, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { milestone: _m, ...rest } = item;
+    await db.items.put(milestone ? { ...rest, milestone: true, touchedAt: today } : { ...rest, touchedAt: today });
+  });
+}
+
+/** Saves a goal's notes (the panel's page); blank text removes them. */
+export async function saveGoalNotes(id: string, notes: string): Promise<void> {
+  if (notes.length > MAX_GOAL_TEXT) throw new Error(`at most ${MAX_GOAL_TEXT} characters`);
   await db.transaction("rw", db.goals, async () => {
-    const goal = await db.goals.get(goalId);
-    if (!goal) return;
-    await db.goals.update(goalId, {
-      milestones: goal.milestones.map((m) => (m.id === milestoneId ? { ...m, done: !m.done } : m)),
-    });
+    const goal = await db.goals.get(id);
+    if (!goal || goal.status !== undefined) return;
+    const { notes: _n, ...rest } = goal;
+    await db.goals.put(notes.trim() ? { ...rest, notes } : rest);
   });
 }
 

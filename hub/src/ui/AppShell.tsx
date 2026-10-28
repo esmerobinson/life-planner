@@ -11,6 +11,7 @@ import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
 import { DbClosedNotice } from "./DbClosedNotice";
 import { db } from "../data/db";
+import { migrateMilestones } from "../data/migrateMilestones";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
 
@@ -58,9 +59,17 @@ export function AppShell() {
   }, []);
 
   const changed = useCallback(async () => {
+    // Legacy goal milestones become flagged tasks (idempotent; waits for the first sync
+    // pull; writes nothing when there is nothing to convert). Run on start, after every
+    // sync and after local changes such as a restore, so late arrivals are converted too.
+    await migrateMilestones(todayISO()).catch(() => 0);
     await refresh();
     setVersion((v) => v + 1);
   }, [refresh]);
+
+  useEffect(() => {
+    void changed();
+  }, [changed]);
 
   // Automatic sync (does nothing until an address and passphrase are saved on the Sync
   // page). Rows that arrive refresh every view the same way a local write does.

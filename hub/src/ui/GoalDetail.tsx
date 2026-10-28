@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { deleteGoal, toggleMilestone, untickItem, updateGoal } from "../data/repo";
+import { deleteGoal, untickItem, updateGoal } from "../data/repo";
 import { groupGoalTasks, monthlyProgress } from "../domain/progress";
 import type { ISODate } from "../domain/types";
 import { DoneSection } from "./DoneSection";
@@ -67,22 +67,6 @@ export function GoalDetail({ today }: { today: ISODate }) {
             ? "Target reached"
             : `${month.target - month.done} more to reach this month's target`}
         </p>
-      )}
-      {goal.kind === "finite" && goal.milestones.length > 0 && (
-        <ul aria-label="Milestones" className="plain-list">
-          {goal.milestones.map((m) => (
-            <li key={m.id}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={m.done}
-                  onChange={() => void save(() => toggleMilestone(goal.id, m.id))}
-                />
-                {m.title}
-              </label>
-            </li>
-          ))}
-        </ul>
       )}
       {groups.length === 0 && <p>No open tasks attached to this goal.</p>}
       {groups.map((g) => (
