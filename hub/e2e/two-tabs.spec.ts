@@ -37,7 +37,8 @@ test("a tick in one tab updates another tab's Today without reload", async ({ co
   await a.getByLabel("Title").fill("Cross tab pretend errand");
   await a.getByRole("button", { name: "Add item" }).click();
   await a.getByRole("link", { name: /^Inbox/ }).click();
-  await a.getByRole("button", { name: "File Cross tab pretend errand in Art" }).click();
+  await a.getByRole("button", { name: "Move to: Cross tab pretend errand" }).click();
+  await a.getByRole("group", { name: "Move Cross tab pretend errand to" }).getByRole("button", { name: "Art" }).click();
 
   const b = await context.newPage();
   await b.goto("/");

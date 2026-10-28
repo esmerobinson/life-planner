@@ -46,25 +46,36 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(page.getByText("Draft the fictional zine intro")).toBeVisible();
   });
 
-  await test.step("triage: bulk move and File it", async () => {
-    // Bulk move two Inbox items to Art.
+  await test.step("triage: Sort one by one", async () => {
+    // File three Inbox items one at a time; Gamma is skipped and stays in the Inbox.
     await page.goto("/inbox");
     await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(4);
-    await page.getByLabel("Select Alpha pretend errand").check();
-    await page.getByLabel("Select Beta pretend errand").check();
-    await page.getByLabel("Move selected to").selectOption({ label: "Art" });
-    await page.getByRole("button", { name: "Move selected" }).click();
-    await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(2);
+    await page.getByRole("link", { name: "Sort one by one" }).click();
+    const card = page.getByRole("region", { name: "Item to sort" });
+    const plan: Record<string, string> = {
+      "Alpha pretend errand": "Art",
+      "Beta pretend errand": "Art",
+      "Overdue pretend errand": "Admin",
+    };
+    for (let filed = 0; filed < 3; ) {
+      const title = (await card.locator(".sort-title").innerText()).trim();
+      const area = plan[title];
+      if (!area) {
+        await card.getByRole("button", { name: "Skip →" }).click();
+        await expect(page.getByText("Skipped (it comes back at the end)")).toBeVisible();
+        continue;
+      }
+      await card.getByRole("button", { name: "To-do" }).click();
+      await card.getByRole("button", { name: area, exact: true }).click();
+      await expect(page.getByText(`Filed as To-do in ${area} · Undo`)).toBeVisible();
+      await expect(card.locator(".sort-title")).not.toHaveText(title);
+      filed++;
+    }
+    await expect(page.getByText("1 of 1")).toBeVisible();
     await page.goto("/area/art");
     await expect(page.getByText("Alpha pretend errand")).toBeVisible();
     await expect(page.getByText("Beta pretend errand")).toBeVisible();
-
-    // File one item with the per-row More options and File it.
     await page.goto("/inbox");
-    const row = page.getByLabel("Inbox items").getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
-    await row.getByText("More options", { exact: true }).click();
-    await row.getByLabel("Area for Overdue pretend errand").selectOption({ label: "Admin" });
-    await row.getByRole("button", { name: "File Overdue pretend errand", exact: true }).click();
     await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(1);
   });
 
