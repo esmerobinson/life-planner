@@ -8,23 +8,35 @@ import { corsHeaders, preflightHeaders } from "./cors";
 import type { Env } from "./env";
 import { exportResponse } from "./export";
 import { errorResponse, HttpError, json, jsonText, MAX_BODY_BYTES, readJsonBody } from "./http";
+import { PINTEREST_TIMEOUT_MS, pinterestBoardResponse } from "./pinterest";
 import { checkBucket, clientBucket, recordFailure } from "./ratelimit";
 import { DEFAULT_CHUNK_BYTES, runSync, validateSyncRequest } from "./sync";
 
 export type { Env } from "./env";
 
-/** Injectable dependencies (tests use a fixed clock and small chunks). */
+/** Injectable dependencies (tests use a fixed clock, small chunks and a stand-in Pinterest). */
 export interface Deps {
   now: () => number;
   chunkBytes: number;
+  /** Fetch for Pinterest's public board feed (the only outbound request the Worker makes). */
+  upstreamFetch: typeof fetch;
+  upstreamTimeoutMs: number;
+  /** Edge cache for parsed boards; undefined means the default cache, null none. */
+  boardCache?: Cache | null;
 }
 
-const DEFAULT_DEPS: Deps = { now: () => Date.now(), chunkBytes: DEFAULT_CHUNK_BYTES };
+const DEFAULT_DEPS: Deps = {
+  now: () => Date.now(),
+  chunkBytes: DEFAULT_CHUNK_BYTES,
+  upstreamFetch: (input, init) => fetch(input, init),
+  upstreamTimeoutMs: PINTEREST_TIMEOUT_MS,
+};
 
 const ROUTES = new Map<string, "GET" | "POST">([
   ["/v1/health", "GET"],
   ["/v1/sync", "POST"],
   ["/v1/export", "GET"],
+  ["/v1/pinterest-board", "GET"],
 ]);
 
 export async function handle(request: Request, env: Env, overrides: Partial<Deps> = {}): Promise<Response> {
@@ -64,6 +76,14 @@ async function route(path: string, request: Request, env: Env, deps: Deps): Prom
     const body = await readJsonBody(request, MAX_BODY_BYTES);
     const syncRequest = validateSyncRequest(body, deps.now());
     return jsonText(200, await runSync(env.DB, syncRequest, { chunkBytes: deps.chunkBytes }));
+  }
+  if (path === "/v1/pinterest-board") {
+    return pinterestBoardResponse(new URL(request.url), {
+      now: deps.now,
+      upstreamFetch: deps.upstreamFetch,
+      upstreamTimeoutMs: deps.upstreamTimeoutMs,
+      boardCache: deps.boardCache === undefined ? caches.default : deps.boardCache,
+    });
   }
   return exportResponse(env.DB, deps.now(), {});
 }
