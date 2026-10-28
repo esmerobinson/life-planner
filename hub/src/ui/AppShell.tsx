@@ -5,6 +5,7 @@ import { todayISO } from "../domain/dates";
 import { QuickAdd } from "./QuickAdd";
 import { ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
+import { UpdatePrompt } from "./UpdatePrompt";
 import { useHubData } from "./useHubData";
 
 /** How often the shell re-reads the clock (a technical check, not a motion timing). */
@@ -56,6 +57,7 @@ export function AppShell() {
       <div className="app-shell">
         <Sidebar />
         <main className="app-content">
+          <UpdatePrompt />
           <div className="shell-actions">
             <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
               Add

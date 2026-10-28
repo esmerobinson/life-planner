@@ -10,9 +10,18 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:5173",
     channel: "chrome",
   },
-  webServer: {
-    command: "npm run dev",
-    url: "http://127.0.0.1:5173",
-    reuseExistingServer: true,
-  },
+  webServer: [
+    {
+      command: "npm run dev",
+      url: "http://127.0.0.1:5173",
+      reuseExistingServer: true,
+    },
+    {
+      // Production build, for the service worker (it is off in the dev server).
+      command: "npm run build && npm run preview",
+      url: "http://127.0.0.1:4173",
+      reuseExistingServer: true,
+      timeout: 180_000,
+    },
+  ],
 });
