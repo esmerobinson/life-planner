@@ -6,11 +6,14 @@ export type OverallProgress =
   | { kind: "milestones"; done: number; total: number; ratio: number }
   | { kind: "evidence"; thisYear: number; monthsInARow: number; streakDays: number };
 
+/** A to-do that has been sorted: Inbox items have no type until they are filed. */
+const isSortedTask = (it: Item) => it.kind === "task" && it.areaId !== "inbox";
+
 /** Completion dates of done tasks attached to this goal. */
 function completions(goal: Goal, items: Item[]): ISODate[] {
   const out: ISODate[] = [];
   for (const it of items) {
-    if (it.goalId === goal.id && it.kind === "task" && it.status === "done" && it.completedAt) {
+    if (it.goalId === goal.id && isSortedTask(it) && it.status === "done" && it.completedAt) {
       out.push(it.completedAt);
     }
   }
@@ -67,7 +70,7 @@ export function tickedOff(areaId: string, items: Item[], today: ISODate): Ticked
   let thisMonth = 0;
   let lastMonth = 0;
   for (const it of items) {
-    if (it.areaId !== areaId || it.kind !== "task" || it.status !== "done" || !it.completedAt) continue;
+    if (it.areaId !== areaId || !isSortedTask(it) || it.status !== "done" || !it.completedAt) continue;
     const m = monthOf(it.completedAt);
     if (m === month) thisMonth++;
     else if (m === last) lastMonth++;
@@ -81,7 +84,7 @@ export function groupGoalTasks(goal: Goal, items: Item[], today: ISODate): { nam
   const sunday = addDays(monday, 6);
   const out = { Today: [] as Item[], "This week": [] as Item[], Later: [] as Item[] };
   for (const it of items) {
-    if (it.goalId !== goal.id || it.kind !== "task" || it.status !== "open") continue;
+    if (it.goalId !== goal.id || !isSortedTask(it) || it.status !== "open") continue;
     if (it.pinnedDate === today) out.Today.push(it);
     else if (it.weekOf === monday || (it.pinnedDate && it.pinnedDate >= monday && it.pinnedDate <= sunday)) {
       out["This week"].push(it);

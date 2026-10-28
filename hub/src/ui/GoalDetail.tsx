@@ -89,7 +89,7 @@ export function GoalDetail({ today }: { today: ISODate }) {
         </div>
       ))}
       <DoneSection
-        items={items.filter((i) => i.goalId === goal.id && i.kind === "task")}
+        items={items.filter((i) => i.goalId === goal.id && i.kind === "task" && i.areaId !== "inbox")}
         today={today}
         onUndo={(itemId) => void save(() => untickItem(itemId, today))}
       />

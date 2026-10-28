@@ -22,7 +22,10 @@ export const INVALID_BACKUP =
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
 
-const hasDuplicateIds = (rows: { id: string }[]) => new Set(rows.map((r) => r.id)).size !== rows.length;
+/** Rows emptied from the Bin stay in files as tombstones but are never counted for the person. */
+const notPurged = (i: Item) => i.status !== "purged";
+
+const hasDuplicateIds =(rows: { id: string }[]) => new Set(rows.map((r) => r.id)).size !== rows.length;
 
 /** Checks the whole file before anything is written. Throws INVALID_BACKUP. */
 export function parseBackup(raw: unknown): BackupFile {
@@ -95,7 +98,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.syncMeta.delete("firstPullDone");
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
-      return { addedItems: file.items.length, addedGoals: file.goals.length, skipped: 0 };
+      return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.length, skipped: 0 };
     }
     const haveItems = new Set(await db.items.toCollection().primaryKeys());
     const haveGoals = new Set(await db.goals.toCollection().primaryKeys());
@@ -103,10 +106,12 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     const newGoals = file.goals.filter((g) => !haveGoals.has(g.id));
     await db.items.bulkAdd(newItems);
     await db.goals.bulkAdd(newGoals);
+    const fileVisible = file.items.filter(notPurged).length;
+    const addedVisible = newItems.filter(notPurged).length;
     return {
-      addedItems: newItems.length,
+      addedItems: addedVisible,
       addedGoals: newGoals.length,
-      skipped: file.items.length - newItems.length + (file.goals.length - newGoals.length),
+      skipped: fileVisible - addedVisible + (file.goals.length - newGoals.length),
     };
   });
 }

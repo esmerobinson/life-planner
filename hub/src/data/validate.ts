@@ -11,7 +11,7 @@ export const MAX_GOAL_TEXT = 4000;
 
 const AREAS: readonly string[] = AREA_IDS;
 const ITEM_KINDS = ["task", "idea"];
-const STATUSES = ["open", "done", "archived"];
+const STATUSES = ["open", "done", "archived", "deleted", "purged"];
 const GOAL_KINDS = ["finite", "practice"];
 
 export const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -41,8 +41,12 @@ export function validItem(r: unknown): r is Item {
     optDate(r.weekOf) &&
     optDate(r.hiddenOn) &&
     optDate(r.completedAt) &&
+    optDate(r.deletedAt) &&
     optStamp(r.updatedAt) &&
-    validSource(r.source)
+    validSource(r.source) &&
+    // An emptied-from-the-Bin tombstone carries no content.
+    (r.status !== "purged" ||
+      (r.title === "" && r.notes === undefined && r.tags === undefined && (r.links as unknown[]).length === 0))
   );
 }
 

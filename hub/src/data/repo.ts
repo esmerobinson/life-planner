@@ -219,17 +219,25 @@ export async function restoreItem(id: string, today: ISODate): Promise<void> {
   });
 }
 
+/** Rows in the Bin, or emptied from it: never shown outside the Bin page (purged: nowhere). */
+const BINNED: readonly Item["status"][] = ["deleted", "purged"];
+
+/**
+ * Items for every list and count in the app. Never returns Bin rows (deleted or purged);
+ * without a status it returns open and done items.
+ */
 export async function listItems(
   filter: {
     areaId?: AreaId;
     goalId?: string;
-    status?: Item["status"];
+    status?: "open" | "done" | "archived";
     kind?: Item["kind"];
   } = {},
 ): Promise<Item[]> {
   const all = await db.items.toArray();
   return all.filter(
     (i) =>
+      !BINNED.includes(i.status) &&
       (filter.status ? i.status === filter.status : i.status !== "archived") &&
       (!filter.areaId || i.areaId === filter.areaId) &&
       (!filter.goalId || i.goalId === filter.goalId) &&
@@ -270,4 +278,97 @@ export async function updateItems(
       await db.items.update(id, { ...changes, touchedAt: today });
     }
   });
+}
+
+/** Delete: the item goes to the Bin (restorable from the Bin page). */
+export async function deleteItem(id: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item || BINNED.includes(item.status)) return;
+    await db.items.update(id, { status: "deleted", deletedAt: today, touchedAt: today });
+  });
+}
+
+/** The Bin: deleted items, newest deletion first. Purged rows never appear. */
+export async function listBin(): Promise<Item[]> {
+  const bin = await db.items.where("status").equals("deleted").toArray();
+  return bin.sort(
+    (a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? "") || (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+  );
+}
+
+/** Restore from the Bin: back to open, in the area it was in. */
+export async function restoreFromBin(id: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item || item.status !== "deleted") return;
+    const { deletedAt: _d, ...rest } = item;
+    await db.items.put({ ...rest, status: "open", touchedAt: today });
+  });
+}
+
+/**
+ * Empty the Bin, in ONE transaction. Sync never hard-deletes, so each deleted row is
+ * replaced by a content-free tombstone (status "purged": no title, notes, links, tags,
+ * source or dates beyond createdAt/touchedAt) that syncs like any other change. Returns
+ * how many were emptied.
+ */
+export async function emptyBin(today: ISODate): Promise<number> {
+  return db.transaction("rw", db.items, async () => {
+    const bin = await db.items.where("status").equals("deleted").toArray();
+    const tombs: Item[] = bin.map((i) => ({
+      id: i.id,
+      kind: i.kind,
+      title: "",
+      links: [],
+      areaId: i.areaId,
+      priority: i.priority,
+      status: "purged",
+      createdAt: i.createdAt,
+      touchedAt: today,
+    }));
+    if (tombs.length) await db.items.bulkPut(tombs);
+    return tombs.length;
+  });
+}
+
+export type SortType = "task" | "idea" | "goal";
+
+/**
+ * Files an inbox item from the sort card with the type chosen there: To-do and Idea set
+ * the kind and the area (an idea drops due, repeat and day pins); Goal turns it into a
+ * practice goal in that area (itemToGoal). Returns the new goal for Goal.
+ */
+export async function fileItem(id: string, type: SortType, areaId: AreaId, today: ISODate): Promise<Goal | undefined> {
+  if (areaId === "inbox" || !(AREA_IDS as readonly string[]).includes(areaId)) {
+    throw new Error("choose an area other than the inbox");
+  }
+  if (type === "goal") return itemToGoal(id, areaId, today);
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) throw new Error("that item does not exist");
+    if (type === "idea") {
+      const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, ...rest } = item;
+      await db.items.put({ ...rest, kind: "idea", areaId, touchedAt: today });
+    } else {
+      await db.items.put({ ...item, kind: "task", areaId, touchedAt: today });
+    }
+  });
+  return undefined;
+}
+
+/** Saves an item's notes; blank text removes them. */
+export async function saveItemNotes(id: string, notes: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { notes: _n, ...rest } = item;
+    await db.items.put(notes.trim() ? { ...rest, notes, touchedAt: today } : { ...rest, touchedAt: today });
+  });
+}
+
+/** Undo: puts an item back exactly as it was (the change tracker re-stamps it). */
+export async function putItemBack(snapshot: Item, today: ISODate): Promise<void> {
+  const { updatedAt: _u, ...row } = snapshot;
+  await db.items.put({ ...row, touchedAt: today });
 }
