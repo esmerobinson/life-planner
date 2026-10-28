@@ -15,6 +15,11 @@ Camera purple `#b693ec`, Nook Miles blue `#9eb4e6`, Critterpedia gold `#ecca7d`,
 **Wiki page background:** periwinkle `#e2e8ff`.
 **Village-dashboard pins (Pinterest):** forest green `#3a412f` (header), deep olive `#51553d`, sage `#a09f88`, cream `#e9e3d6`, warm paper `#e3ddcd`, pale stone `#d4d1c3`.
 
+## Role assignments made without Esme's approval (2026-10-28)
+Unused values from the sampled palette above, given jobs by the implementers. Esme may veto any of them.
+- **Sidebar tile colours** for the three added areas: Tech projects Chat Log lime `#cedb6e`, Production DIY terracotta `#d59770`, Admin Island Designer brown `#90825b`.
+- **Icon accents** in `docs/design/icons/tech.svg` (Passport green `#98c293` leaf), `production.svg` (Critterpedia gold `#ecca7d` bar, forest green `#3a412f` stripes) and `admin.svg` (Rescue coral `#df7e6f` paperclip). The drawings themselves are unreviewed first attempts in the style of the approved set.
+
 ## Not decided (placeholders, must look obviously wrong)
 - **Type:** system font until Esme chooses.
 - **Easing and timing:** linear, with default durations, until Esme chooses.

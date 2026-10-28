@@ -1,4 +1,4 @@
-import type { AreaId } from "../domain/types";
+import { AREA_IDS, type AreaId } from "../domain/types";
 import home from "../assets/icons/home.svg";
 import today from "../assets/icons/today.svg";
 import goals from "../assets/icons/goals.svg";
@@ -9,6 +9,9 @@ import mind from "../assets/icons/mind.svg";
 import body from "../assets/icons/body.svg";
 import journal from "../assets/icons/journal.svg";
 import vision from "../assets/icons/vision-board.svg";
+import tech from "../assets/icons/tech.svg";
+import production from "../assets/icons/production.svg";
+import admin from "../assets/icons/admin.svg";
 
 export type NavEntry = {
   id: string;
@@ -28,18 +31,18 @@ export const NAV: NavEntry[] = [
   { id: "content", label: "Content", path: "/area/content", icon: content, tile: "#b693ec", group: 2 },
   { id: "mind", label: "Mind", path: "/area/mind", icon: mind, tile: "#a3d5c2", group: 2 },
   { id: "body", label: "Body", path: "/area/body", icon: body, tile: "#e39876", group: 2 },
+  { id: "tech", label: "Tech projects", path: "/area/tech", icon: tech, tile: "#cedb6e", group: 2 },
+  { id: "production", label: "Production", path: "/area/production", icon: production, tile: "#d59770", group: 2 },
+  { id: "admin", label: "Admin", path: "/area/admin", icon: admin, tile: "#90825b", group: 2 },
   { id: "journal", label: "Journal", path: "/journal", icon: journal, tile: "#9285c5", group: 3 },
   { id: "vision", label: "Vision board", path: "/vision", icon: vision, tile: "#ecca7d", group: 3 },
 ];
 
-/** Area choices for forms: the five sidebar areas (labels from NAV) plus the inbox. */
-export const AREA_CHOICES: { id: AreaId; label: string }[] = [
-  { id: "inbox", label: "Inbox" },
-  ...(["writing", "art", "content", "mind", "body"] as const).map((id) => ({
-    id: id as AreaId,
-    label: NAV.find((n) => n.id === id)!.label,
-  })),
-];
+/** Area choices for forms: every area in AREA_IDS order (the inbox first), labels from NAV. */
+export const AREA_CHOICES: { id: AreaId; label: string }[] = AREA_IDS.map((id) => ({
+  id,
+  label: id === "inbox" ? "Inbox" : NAV.find((n) => n.id === id)!.label,
+}));
 
 /** Areas that have a page and can own goals: AREA_CHOICES without the inbox. */
 export const GOAL_AREAS = AREA_CHOICES.filter((a) => a.id !== "inbox");

@@ -154,6 +154,16 @@ describe("updateItems", () => {
     expect(await db.items.count()).toBe(2);
   });
 
+  it("updateItems copies only areaId, goalId, priority and due, even if a caller casts others in", async () => {
+    const a = await createItem({ ...base, areaId: "inbox", source: { kind: "backlog", key: "k1" } }, "2026-10-01");
+    const sneaky = { areaId: "tech", status: "done", source: { kind: "manual", key: "x" }, title: "hijack" };
+    await updateItems([a.id], sneaky as never, today);
+    const got = (await db.items.get(a.id))!;
+    expect(got).toMatchObject({
+      areaId: "tech", status: "open", title: "t", touchedAt: today, source: { kind: "backlog", key: "k1" },
+    });
+  });
+
   it("updateItems rolls back everything if one write fails", async () => {
     const a = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");
     const b = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");

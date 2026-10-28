@@ -98,6 +98,14 @@ describe("GoalsPage", () => {
     expect(await screen.findByText("2 this year, 2 months in a row, 1 day streak")).toBeInTheDocument();
   });
 
+  it("goal form Area select offers the three new areas", async () => {
+    renderGoals();
+    const select = await screen.findByLabelText("Area");
+    for (const name of ["Tech projects", "Production", "Admin"]) {
+      expect(within(select).getByRole("option", { name })).toBeInTheDocument();
+    }
+  });
+
   it("goal form Area select has no Inbox option", async () => {
     renderGoals();
     const select = await screen.findByLabelText("Area");

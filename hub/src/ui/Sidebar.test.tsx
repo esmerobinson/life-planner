@@ -11,11 +11,12 @@ function renderAt(path: string) {
 }
 
 describe("Sidebar", () => {
-  it("lists the ten entries in order", () => {
+  it("lists the thirteen entries in order", () => {
     renderAt("/");
     const labels = screen.getAllByRole("link").map((a) => a.textContent?.trim());
     expect(labels).toEqual([
-      "Home", "Today", "Goals", "Writing", "Art", "Content", "Mind", "Body", "Journal", "Vision board",
+      "Home", "Today", "Goals", "Writing", "Art", "Content", "Mind", "Body",
+      "Tech projects", "Production", "Admin", "Journal", "Vision board",
     ]);
   });
 
@@ -35,7 +36,7 @@ describe("Sidebar", () => {
     const groups = screen.getAllByRole("group");
     expect(groups).toHaveLength(3);
     expect(within(groups[0]).getAllByRole("link")).toHaveLength(3);
-    expect(within(groups[1]).getAllByRole("link")).toHaveLength(5);
+    expect(within(groups[1]).getAllByRole("link")).toHaveLength(8);
     expect(within(groups[2]).getAllByRole("link")).toHaveLength(2);
     expect(screen.getByRole("group", { name: "Overview" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Areas" })).toBeInTheDocument();

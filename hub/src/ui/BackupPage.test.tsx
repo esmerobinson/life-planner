@@ -60,7 +60,7 @@ describe("BackupPage", () => {
 });
 
 describe("shell", () => {
-  it("Backup link is always visible in the shell and the sidebar still has exactly ten items", () => {
+  it("Backup link is always visible in the shell and the sidebar still has exactly thirteen items", () => {
     vi.stubGlobal("navigator", {});
     render(
       <MemoryRouter initialEntries={["/x"]}>
@@ -68,7 +68,7 @@ describe("shell", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("link", { name: "Backup" })).toHaveAttribute("href", "/backup");
-    expect(within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link")).toHaveLength(10);
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link")).toHaveLength(13);
   });
 });
 

@@ -144,4 +144,44 @@ describe("backup", () => {
       expect(await db.goals.get("g")).toEqual(fullGoal);
     });
   });
+
+  describe("new areas", () => {
+    const NEW = ["tech", "production", "admin"] as const;
+    const seed = async () => {
+      await db.items.bulkAdd(NEW.map((a) => item(`i-${a}`, { areaId: a })));
+      await db.goals.bulkAdd(NEW.map((a) => ({ ...goal(`g-${a}`), areaId: a })));
+    };
+
+    it("items and goals in tech, production and admin export and restore (replace)", async () => {
+      await seed();
+      const before = await snapshot();
+      const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+      await db.items.clear();
+      await db.goals.clear();
+      await restoreBackup(file, "replace");
+      expect(await snapshot()).toEqual(before);
+    });
+
+    it("items and goals in the new areas restore with merge", async () => {
+      await seed();
+      const before = await snapshot();
+      const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+      await db.items.clear();
+      await db.goals.clear();
+      const r = await restoreBackup(file, "merge");
+      expect(r).toEqual({ addedItems: 3, addedGoals: 3, skipped: 0 });
+      expect(await snapshot()).toEqual(before);
+    });
+
+    it("an unknown area id is still rejected for items and goals", async () => {
+      const base = { app: "life-hub", schema: 1, exportedOn: "2026-10-28" };
+      await expect(
+        restoreBackup({ ...base, items: [item("x", { areaId: "nonsense" as never })], goals: [] }, "merge"),
+      ).rejects.toThrow(/backup/i);
+      await expect(
+        restoreBackup({ ...base, items: [], goals: [{ ...goal("g"), areaId: "nonsense" }] }, "replace"),
+      ).rejects.toThrow(/backup/i);
+      expect(await db.items.count()).toBe(0);
+    });
+  });
 });

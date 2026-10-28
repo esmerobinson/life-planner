@@ -16,7 +16,10 @@
        --text #3a412f (forest green used as body text), --sidebar-text #e9e3d6 (cream used
        as sidebar text), the 2px thickness of the active sidebar outline, and --bar-fill's
        use of Passport green as the progress-bar colour. The hex values are palette values;
-       giving them these jobs is the unapproved part. */
+       giving them these jobs is the unapproved part. Also unapproved: the sidebar tile
+       colours of the three added areas, Tech projects #cedb6e (Chat Log lime), Production
+       #d59770 (DIY terracotta) and Admin #90825b (Island Designer brown), and the accent
+       colours inside their icons (#98c293, #ecca7d, #df7e6f). */
 :root {
   --page: #e2e8ff;
   --sidebar: #3a412f;

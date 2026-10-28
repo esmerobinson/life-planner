@@ -121,4 +121,19 @@ describe("AreaPage", () => {
     renderArea("nowhere");
     expect(await screen.findByText("That area does not exist.")).toBeInTheDocument();
   });
+
+  it.each([
+    ["tech", "Tech projects"],
+    ["production", "Production"],
+    ["admin", "Admin"],
+  ])("the %s area page shows its heading and an empty state", async (id, label) => {
+    renderArea(id);
+    expect(await screen.findByRole("heading", { level: 1, name: label })).toBeInTheDocument();
+    expect(await screen.findByText("Nothing here yet.")).toBeInTheDocument();
+  });
+
+  it("the inbox is still not an area page", () => {
+    renderArea("inbox");
+    expect(screen.getByText("That area does not exist.")).toBeInTheDocument();
+  });
 });

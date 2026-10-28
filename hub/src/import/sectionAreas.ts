@@ -6,13 +6,17 @@ const TABLE: Record<string, AreaId> = {
   art: "art",
   "inner work": "mind",
   health: "body",
+  vibecoding: "tech",
+  "production & freelance": "production",
+  "life admin": "admin",
+  leisure: "mind",
 };
 
 function normalise(heading: string): string {
   return heading
     .toLowerCase()
     .replace(/\p{Extended_Pictographic}/gu, "")
-    .replace(/[‍︎️]/g, "")
+    .replace(/[\u200D\uFE0E\uFE0F]/g, "")
     .replace(/\s*\([^)]*\)\s*$/, "")
     .replace(/\s+/g, " ")
     .trim();

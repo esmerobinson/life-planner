@@ -142,7 +142,13 @@ export async function updateItems(
     for (const id of ids) {
       const item = await db.items.get(id);
       if (!item) continue;
-      await db.items.update(id, { ...patch, touchedAt: today });
+      // Copy only the four fields meant to change, so a cast-in field cannot ride along.
+      const changes: Pick<Partial<Item>, "areaId" | "goalId" | "priority" | "due"> = {};
+      if (patch.areaId !== undefined) changes.areaId = patch.areaId;
+      if (patch.goalId !== undefined) changes.goalId = patch.goalId;
+      if (patch.priority !== undefined) changes.priority = patch.priority;
+      if (patch.due !== undefined) changes.due = patch.due;
+      await db.items.update(id, { ...changes, touchedAt: today });
     }
   });
 }

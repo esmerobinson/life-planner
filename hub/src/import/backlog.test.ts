@@ -132,10 +132,15 @@ describe("sectionToArea", () => {
     ["WRITING", "writing"],
     ["  inner   work  ", "mind"],
     ["Writing (incl. drafts)", "writing"],
-    ["Production & freelance (incl. ETI)", "inbox"],
-    ["Vibecoding", "inbox"],
-    ["Life admin", "inbox"],
-    ["Leisure", "inbox"],
+    ["🤖 Vibecoding", "tech"],
+    ["🎬 Production & freelance (incl. ETI)", "production"],
+    ["💼 Life admin", "admin"],
+    ["🌙 Leisure", "mind"],
+    ["Vibecoding", "tech"],
+    ["Production", "inbox"],
+    ["Smart admin", "inbox"],
+    ["Tech", "inbox"],
+    ["Someday ideas", "inbox"],
     ["🔁 Weekly rhythm (recurring, scheduled by day)", "inbox"],
     ["Inbox", "inbox"],
     ["Parked for later", "inbox"],
@@ -148,14 +153,14 @@ describe("sectionToArea", () => {
 });
 
 describe("import filing by section", () => {
-  it("imported items under Writing land in the writing area and under Life admin in inbox", async () => {
+  it("imported items under Writing land in the writing area and under Life admin in admin", async () => {
     await importBacklog(md, TODAY);
     const area = async (t: string) => (await db.items.filter((i) => i.title === t).first())!.areaId;
     expect(await area("Outline the invented lighthouse story")).toBe("writing");
     expect(await area("Revise the pretend poem")).toBe("writing");
     expect(await area("Try a fictional breathing exercise")).toBe("mind");
     expect(await area("Book an imaginary check-up")).toBe("body");
-    expect(await area("Sort the made-up paperwork")).toBe("inbox");
+    expect(await area("Sort the made-up paperwork")).toBe("admin");
     expect(await area("Water the pretend herbs")).toBe("inbox");
     expect(await area("Reply to the imaginary landlord")).toBe("inbox");
   });

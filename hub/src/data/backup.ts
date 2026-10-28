@@ -1,6 +1,6 @@
 import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
-import type { Goal, ISODate, Item } from "../domain/types";
+import { AREA_IDS, type Goal, type ISODate, type Item } from "../domain/types";
 
 export interface BackupFile {
   app: "life-hub";
@@ -17,7 +17,7 @@ export const INVALID_BACKUP =
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
 
-const AREAS = ["writing", "art", "content", "mind", "body", "inbox"];
+const AREAS: readonly string[] = AREA_IDS;
 const ITEM_KINDS = ["task", "idea"];
 const STATUSES = ["open", "done", "archived"];
 const GOAL_KINDS = ["finite", "practice"];

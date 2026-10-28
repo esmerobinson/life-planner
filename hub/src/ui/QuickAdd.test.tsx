@@ -121,4 +121,12 @@ describe("QuickAdd", () => {
     rerender(shell(1));
     expect(await screen.findByRole("option", { name: "New novel" })).toBeInTheDocument();
   });
+
+  it("the Area select offers the three new areas and the inbox", () => {
+    render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    const names = Array.from(screen.getByLabelText("Area").querySelectorAll("option")).map((o) => o.textContent);
+    expect(names).toEqual([
+      "Inbox", "Writing", "Art", "Content", "Mind", "Body", "Tech projects", "Production", "Admin",
+    ]);
+  });
 });

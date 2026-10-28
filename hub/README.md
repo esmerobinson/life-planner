@@ -24,15 +24,27 @@ import could not fully read are listed under **Notes** below the counts.
 
 ## Areas
 
-On a first import, new items are filed by their Backlog section: Writing,
-Content and Art go to those areas, Inner work goes to Mind, and Health goes to
-Body. Everything else goes to the Inbox. Items already in the app are never
-moved by a re-import. In the Inbox you can tick several items and move them to
-an area in one go.
+There are nine areas: Inbox, plus Writing, Art, Content, Mind, Body, Tech
+projects, Production and Admin. The sidebar lists the eight areas (the Inbox is a link
+at the top of every page).
 
-Open question: Vibecoding, Production & freelance, Life admin and Leisure have
-no area yet, so those items stay in the Inbox until we decide whether to add
-areas for them.
+On a first import, new items are filed by their Backlog section:
+
+| Backlog section | Area |
+| --- | --- |
+| Writing | Writing |
+| Art | Art |
+| Content | Content |
+| Inner work | Mind |
+| Leisure | Mind |
+| Health | Body |
+| Vibecoding | Tech projects |
+| Production & freelance | Production |
+| Life admin | Admin |
+
+Everything else goes to the Inbox. Items already in the app are never moved by
+a re-import. In the Inbox you can tick several items and move them to an area
+in one go.
 
 ## Not done yet
 
@@ -81,7 +93,8 @@ replace or confirm:
   190px Home right column, bar height 10px and radius 6px, panel and tile radii
   18px / 9px (taken from or fitted to the approved mockup, option 3)
 - Colour jobs not yet approved (the colours are from the palette, the roles are
-  not): body text in forest green (`--text`), sidebar text in cream
+  not): the tile colours and icon accents of Tech projects, Production and Admin,
+  body text in forest green (`--text`), sidebar text in cream
   (`--sidebar-text`), the 2px thickness of the active outline, and Passport
   green as the progress-bar fill (`--bar-fill`)
 

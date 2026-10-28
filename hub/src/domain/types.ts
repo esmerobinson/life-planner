@@ -1,4 +1,8 @@
-export type AreaId = "writing" | "art" | "content" | "mind" | "body" | "inbox";
+/** The one list of area ids. Nothing else may hard-code it; derive from this. */
+export const AREA_IDS = [
+  "inbox", "writing", "art", "content", "mind", "body", "tech", "production", "admin",
+] as const;
+export type AreaId = (typeof AREA_IDS)[number];
 export type Priority = 1 | 2 | 3;
 export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type ISODate = string;

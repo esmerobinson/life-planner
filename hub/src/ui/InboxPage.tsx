@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { updateItem, updateItems } from "../data/repo";
 import type { AreaId, ISODate, Item, Priority } from "../domain/types";
 import { AREA_CHOICES, GOAL_AREAS } from "./areas";
@@ -136,6 +136,18 @@ export function InboxPage({ today }: { today: ISODate }) {
   const [moveArea, setMoveArea] = useState<AreaId | "">("");
   const { attempt, saveError } = useSaveError();
   const shownPicked = inbox.filter((i) => picked.has(i.id));
+  const [moving, setMoving] = useState(false);
+  const movingRef = useRef(false);
+
+  // Drop ticks for items no longer shown, so a stale id can never be re-included.
+  useEffect(() => {
+    if (!loaded) return;
+    const shown = new Set(items.filter((i) => i.areaId === "inbox" && i.status === "open").map((i) => i.id));
+    setPicked((prev) => {
+      const next = new Set([...prev].filter((id) => shown.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [items, loaded]);
 
   function toggle(id: string) {
     setPicked((prev) => {
@@ -147,11 +159,18 @@ export function InboxPage({ today }: { today: ISODate }) {
   }
 
   async function moveSelected() {
-    if (!moveArea || shownPicked.length === 0) return;
-    const ok = await attempt(() => updateItems(shownPicked.map((i) => i.id), { areaId: moveArea }, today));
-    if (!ok) return;
-    setPicked(new Set());
-    await changed();
+    if (movingRef.current || !moveArea || shownPicked.length === 0) return;
+    movingRef.current = true;
+    setMoving(true);
+    try {
+      const ok = await attempt(() => updateItems(shownPicked.map((i) => i.id), { areaId: moveArea }, today));
+      if (!ok) return;
+      setPicked(new Set());
+      await changed();
+    } finally {
+      movingRef.current = false;
+      setMoving(false);
+    }
   }
 
   async function changed() {
@@ -201,7 +220,7 @@ export function InboxPage({ today }: { today: ISODate }) {
           </label>
           <button
             type="button"
-            disabled={!moveArea || shownPicked.length === 0}
+            disabled={moving || !moveArea || shownPicked.length === 0}
             onClick={() => void moveSelected()}
           >
             Move selected

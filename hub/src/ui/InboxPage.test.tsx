@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { db } from "../data/db";
+import { HubDB } from "../data/db";
+import * as repo from "../data/repo";
 import { createItem } from "../data/repo";
 import { AppShell } from "./AppShell";
 import { InboxPage } from "./InboxPage";
@@ -169,12 +171,12 @@ describe("AppShell additions", () => {
     expect(screen.queryByRole("link", { name: /Inbox \(/ })).toBeNull();
   });
 
-  it("Sidebar still shows exactly ten items (no Inbox) with the shell rendered", async () => {
+  it("Sidebar still shows exactly thirteen items (no Inbox) with the shell rendered", async () => {
     await createItem({ kind: "task", title: "Loose end", areaId: "inbox", priority: 2 }, TODAY);
     renderShell();
     await screen.findByRole("link", { name: "Inbox (1)" });
     const nav = document.querySelector(".sidebar") as HTMLElement;
-    expect(within(nav).getAllByRole("link")).toHaveLength(10);
+    expect(within(nav).getAllByRole("link")).toHaveLength(13);
     expect(within(nav).queryByText(/Inbox/)).toBeNull();
   });
 });
@@ -236,5 +238,45 @@ describe("bulk filing", () => {
     spy.mockRestore();
     expect((await db.items.toArray()).every((i) => i.areaId === "inbox")).toBe(true);
     expect(screen.getByText("Loose 1")).toBeInTheDocument();
+  });
+
+  it("the move and file selects offer the three new areas and no inbox", async () => {
+    await seed(1);
+    render(<InboxPage today={TODAY} />);
+    for (const sel of [await screen.findByLabelText("Move selected to"), screen.getByLabelText("Area for Loose 1")]) {
+      for (const name of ["Tech projects", "Production", "Admin"]) {
+        expect(within(sel).getByRole("option", { name })).toBeInTheDocument();
+      }
+      expect(within(sel).queryByRole("option", { name: "Inbox" })).toBeNull();
+    }
+  });
+
+  it("double-clicking Move selected writes once", async () => {
+    await seed(2);
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Select all shown" }));
+    await userEvent.selectOptions(screen.getByLabelText("Move selected to"), "tech");
+    const spy = vi.spyOn(repo, "updateItems");
+    const btn = screen.getByRole("button", { name: "Move selected" });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    await screen.findByText("Nothing waiting in the inbox.");
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    expect((await db.items.toArray()).every((i) => i.areaId === "tech")).toBe(true);
+  });
+
+  it("a ticked item that left the inbox elsewhere is not still ticked when it returns", async () => {
+    await seed(2);
+    const other = new HubDB();
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Select all shown" }));
+    const one = (await db.items.filter((i) => i.title === "Loose 1").first())!;
+    await other.items.update(one.id, { areaId: "art" });
+    await vi.waitFor(() => expect(screen.queryByText("Loose 1")).toBeNull());
+    await other.items.update(one.id, { areaId: "inbox" });
+    await vi.waitFor(() => expect(screen.getByText("Loose 1")).toBeInTheDocument());
+    expect(screen.getByRole("checkbox", { name: /Loose 1$/ })).not.toBeChecked();
+    other.close();
   });
 });
