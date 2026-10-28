@@ -4,7 +4,7 @@ import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { db } from "../data/db";
 import * as repo from "../data/repo";
-import { createItem, deleteItem } from "../data/repo";
+import { createGoal, createItem, deleteGoal, deleteItem } from "../data/repo";
 import { BinPage } from "./BinPage";
 import { ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
@@ -85,6 +85,33 @@ describe("Bin page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
     expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
     expect(screen.getByText("Stays")).toBeInTheDocument();
+  });
+
+  it("lists deleted goals too, with a Goal chip, newest first among the items, and restores them", async () => {
+    await binned("Older task", "2026-10-20");
+    const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, "2026-10-01");
+    await deleteGoal(g.id, "2026-10-25");
+    render(<BinPage today={TODAY} />);
+    await screen.findByText("Pretend goal");
+    const rows = within(list()).getAllByRole("listitem");
+    expect(rows.map((r) => r.querySelector(".strip-title")!.textContent)).toEqual(["Pretend goal", "Older task"]);
+    expect(within(rows[0]).getByText("Goal")).toHaveClass("chip");
+    expect(within(rows[1]).queryByText("Goal")).toBeNull();
+    await userEvent.click(within(rows[0]).getByRole("button", { name: "Restore: Pretend goal" }));
+    await vi.waitFor(() => expect(screen.queryByText("Pretend goal")).toBeNull());
+    expect((await repo.listGoals()).map((x) => x.id)).toEqual([g.id]);
+  });
+
+  it("Empty bin counts and purges goals with the items", async () => {
+    await binned("A task", "2026-10-20");
+    const g = await createGoal({ title: "A goal", areaId: "art", kind: "practice" }, "2026-10-01");
+    await deleteGoal(g.id, "2026-10-25");
+    render(<BinPage today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Empty bin" }));
+    expect(screen.getByText("Delete 2 items for good? This can't be undone.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    expect(await screen.findByText("The bin is empty.")).toBeInTheDocument();
+    expect(await db.goals.get(g.id)).toMatchObject({ status: "purged", title: "" });
   });
 
   it("an empty Bin says so and offers no Empty bin", async () => {

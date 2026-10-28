@@ -1,4 +1,4 @@
-import { archiveItem, itemToGoal, moveTo, removeFromToday, updateItem } from "../data/repo";
+import { archiveItem, deleteItem, itemToGoal, moveTo, removeFromToday, updateItem } from "../data/repo";
 import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
 import { ARROW_GLYPH, IconPopover } from "./IconPopover";
@@ -9,7 +9,8 @@ type Choice =
   | { kind: "area"; areaId: AreaId }
   | { kind: "week" }
   | { kind: "remove" }
-  | { kind: "archive" };
+  | { kind: "archive" }
+  | { kind: "delete" };
 
 const TYPES: { to: "task" | "idea" | "goal"; label: string }[] = [
   { to: "task", label: "To-do" },
@@ -20,7 +21,7 @@ const TYPES: { to: "task" | "idea" | "goal"; label: string }[] = [
 /**
  * The arrow icon (Move to). When the item's kind is known: "Change to" first (the types
  * it is not: To-do, Idea, Goal), then the other areas, then This week (not for ideas)
- * and Remove from today (only on the Today list), then Archive.
+ * and Remove from today (only on the Today list), then Archive and Delete (to the Bin).
  */
 export function MoveToMenu({
   itemId,
@@ -57,7 +58,8 @@ export function MoveToMenu({
       } else if (c.kind === "area") await updateItem(itemId, { areaId: c.areaId }, today);
       else if (c.kind === "week") await moveTo(itemId, "week", today);
       else if (c.kind === "remove") await removeFromToday(itemId, today);
-      else await archiveItem(itemId, today);
+      else if (c.kind === "archive") await archiveItem(itemId, today);
+      else await deleteItem(itemId, today);
     });
     close(!ok); // the clicked choice is gone; on failure keep focus somewhere sensible
     if (ok) await onMoved();
@@ -109,6 +111,9 @@ export function MoveToMenu({
           <hr />
           <button type="button" onClick={() => void pick({ kind: "archive" }, close)}>
             Archive
+          </button>
+          <button type="button" onClick={() => void pick({ kind: "delete" }, close)}>
+            Delete
           </button>
         </>
       )}

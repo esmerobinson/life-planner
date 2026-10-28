@@ -128,6 +128,7 @@ test("sort one by one: To-do, Idea, Goal, Skip, Archive, Delete, Undo and the Bi
   await expect(page.getByText("The bin is empty.")).toBeVisible();
   await page.goto("/inbox");
   await page.getByRole("button", { name: "Delete: Renew the pretend library card" }).click();
+  await expect(page.getByText("Moved to the Bin · Undo")).toBeVisible();
   await page.goto("/bin");
   await page.getByRole("button", { name: "Empty bin" }).click();
   await page.getByRole("button", { name: "Confirm" }).click();
@@ -137,6 +138,48 @@ test("sort one by one: To-do, Idea, Goal, Skip, Archive, Delete, Undo and the Bi
   await expect(page.getByText("The bin is empty.")).toBeVisible();
   await page.goto("/inbox");
   await expect(page.getByText("Nothing waiting in the inbox.")).toBeVisible();
+});
+
+test("delete from an area strip and delete a goal: both in the Bin, both restorable", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Nothing planned for today.").first()).toBeVisible();
+  // Make a task and a goal through the app itself.
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByLabel("Title").fill("Pretend chore to delete");
+  await page.getByRole("combobox", { name: "Area", exact: true }).selectOption({ label: "Art" });
+  await page.getByRole("button", { name: "Add item" }).click();
+  await page.goto("/area/art");
+  await page.getByRole("button", { name: "Move to: Pretend chore to delete" }).click();
+  await page.getByRole("group", { name: "Move Pretend chore to delete to" }).getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Pretend chore to delete")).toHaveCount(0);
+
+  await page.goto("/inbox");
+  await page.getByRole("textbox", { name: "Add to inbox" }).fill("Pretend goal to delete");
+  await page.getByRole("textbox", { name: "Add to inbox" }).press("Enter");
+  await page.getByRole("link", { name: "Sort one by one" }).click();
+  await expect(card(page).getByText("Pretend goal to delete")).toBeVisible();
+  await card(page).getByRole("button", { name: "Goal" }).click();
+  await card(page).getByRole("button", { name: "Body" }).click();
+  await expect(page.getByText("Filed as Goal in Body")).toBeVisible();
+  await page.goto("/goals");
+  await page.getByRole("link", { name: "Pretend goal to delete" }).click();
+  await page.getByRole("button", { name: "Delete goal" }).click();
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Goals" })).toBeVisible();
+  await expect(page.getByText("Pretend goal to delete")).toHaveCount(0);
+
+  await page.goto("/bin");
+  const bin = page.getByRole("list", { name: "In the bin" });
+  await expect(bin.getByRole("listitem")).toHaveCount(2);
+  await expect(bin.getByRole("listitem").filter({ hasText: "Pretend goal to delete" }).getByText("Goal", { exact: true })).toBeVisible();
+  await shoot(page, "bin-with-goal-1280");
+  await page.getByRole("button", { name: "Restore: Pretend goal to delete" }).click();
+  await page.getByRole("button", { name: "Restore: Pretend chore to delete" }).click();
+  await expect(page.getByText("The bin is empty.")).toBeVisible();
+  await page.goto("/goals");
+  await expect(page.getByText("Pretend goal to delete")).toBeVisible();
+  await page.goto("/area/art");
+  await expect(page.getByText("Pretend chore to delete")).toBeVisible();
 });
 
 test("Escape goes back to the Inbox", async ({ page }) => {
@@ -185,6 +228,7 @@ test.describe("phone width (390px)", () => {
     await expectNoSideScroll(page);
 
     await card(page).getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText("Moved to the Bin · Undo")).toBeVisible();
     await page.goto("/bin");
     await expect(page.getByRole("list", { name: "In the bin" })).toBeAttached();
     await shoot(page, "bin-390");

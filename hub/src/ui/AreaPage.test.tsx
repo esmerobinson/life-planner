@@ -328,6 +328,23 @@ describe("AreaPage", () => {
     expect(idea.getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
+  it("Move to ends with Archive then Delete; Delete sends a task or an idea to the Bin", async () => {
+    const task = await createItem({ kind: "task", title: "Pretend chore", areaId: "art", priority: 3 }, TODAY);
+    const idea = await createItem({ kind: "idea", title: "Pretend notion", areaId: "art", priority: 3 }, TODAY);
+    renderArea("art");
+    await userEvent.click(await screen.findByRole("button", { name: "Move to: Pretend chore" }));
+    const menu = screen.getByRole("group", { name: "Move Pretend chore to" });
+    const names = within(menu).getAllByRole("button").map((b) => b.textContent);
+    expect(names.slice(-2)).toEqual(["Archive", "Delete"]);
+    await userEvent.click(within(menu).getByRole("button", { name: "Delete" }));
+    await vi.waitFor(() => expect(screen.queryByText("Pretend chore")).toBeNull());
+    expect(await db.items.get(task.id)).toMatchObject({ status: "deleted", deletedAt: TODAY });
+    await userEvent.click(screen.getByRole("button", { name: "Move to: Pretend notion" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Move Pretend notion to" })).getByRole("button", { name: "Delete" }));
+    await vi.waitFor(async () => expect((await db.items.get(idea.id))!.status).toBe("deleted"));
+    expect((await repo.listBin()).map((i) => i.title).sort()).toEqual(["Pretend chore", "Pretend notion"]);
+  });
+
   it("a ticked box shows ticked until the row leaves, and unticks again if the save fails", async () => {
     await createItem({ kind: "task", title: "Slow tick", areaId: "art", priority: 3 }, TODAY);
     let release!: () => void;

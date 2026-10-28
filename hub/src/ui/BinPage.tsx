@@ -1,19 +1,33 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { emptyBin, listBin, restoreFromBin } from "../data/repo";
-import type { ISODate, Item } from "../domain/types";
+import { emptyBin, listBin, listGoalBin, restoreFromBin, restoreGoalFromBin } from "../data/repo";
+import type { Goal, ISODate, Item } from "../domain/types";
 import { DATA_ERROR, useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { useHubData } from "./useHubData";
 
+type Binned = { what: "item"; row: Item } | { what: "goal"; row: Goal };
+
+/** Items and goals together, newest deletion first. */
+function merge(items: Item[], goals: Goal[]): Binned[] {
+  const all: Binned[] = [
+    ...items.map((row) => ({ what: "item" as const, row })),
+    ...goals.map((row) => ({ what: "goal" as const, row })),
+  ];
+  return all.sort(
+    (a, b) =>
+      (b.row.deletedAt ?? "").localeCompare(a.row.deletedAt ?? "") || (b.row.updatedAt ?? 0) - (a.row.updatedAt ?? 0),
+  );
+}
+
 /**
- * The Bin: deleted items, newest first, each with Restore; "Empty bin" (after a
+ * The Bin: deleted items and goals, newest first, each with Restore; "Empty bin" (after a
  * confirmation) turns them into content-free tombstones that sync, and are shown nowhere.
  */
 export function BinPage({ today }: { today: ISODate }) {
   // The open items change whenever anything is written (here, in another tab, or by sync).
-  const { items, refresh } = useHubData(today);
+  const { items, goals, refresh } = useHubData(today);
   const shell = useContext(ShellContext);
-  const [bin, setBin] = useState<Item[]>([]);
+  const [bin, setBin] = useState<Binned[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [readError, setReadError] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -23,10 +37,10 @@ export function BinPage({ today }: { today: ISODate }) {
 
   useEffect(() => {
     let live = true;
-    listBin().then(
-      (b) => {
+    Promise.all([listBin(), listGoalBin()]).then(
+      ([items, goals]) => {
         if (!live) return;
-        setBin(b);
+        setBin(merge(items, goals));
         setReadError(false);
         setLoaded(true);
       },
@@ -35,7 +49,7 @@ export function BinPage({ today }: { today: ISODate }) {
     return () => {
       live = false;
     };
-  }, [items, reads]);
+  }, [items, goals, reads]);
 
   async function write(fn: () => Promise<unknown>) {
     if (busy.current) return false;
@@ -85,17 +99,24 @@ export function BinPage({ today }: { today: ISODate }) {
       )}
       {n > 0 && (
         <ul aria-label="In the bin" className="strip-list">
-          {bin.map((it) => (
-            <li key={it.id} className="strip no-tick">
+          {bin.map(({ what, row: it }) => (
+            <li key={`${what}:${it.id}`} className="strip no-tick">
               <div className="strip-body">
                 <div className="strip-title">{it.title}</div>
+                {what === "goal" && (
+                  <div className="strip-meta">
+                    <span className="chip">Goal</span>
+                  </div>
+                )}
               </div>
               <div className="strip-actions">
                 <button
                   type="button"
                   className="btn-secondary"
                   aria-label={`Restore: ${it.title}`}
-                  onClick={() => void write(() => restoreFromBin(it.id, today))}
+                  onClick={() =>
+                    void write(() => (what === "goal" ? restoreGoalFromBin(it.id, today) : restoreFromBin(it.id, today)))
+                  }
                 >
                   Restore
                 </button>

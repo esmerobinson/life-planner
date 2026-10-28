@@ -240,7 +240,7 @@ describe("controls.css (approved mockup A, soft pills)", () => {
     const menu = screen.getByRole("group", { name: "Move to" });
     expect(menu.classList.contains("pop-menu")).toBe(true);
     const choices = Array.from(menu.querySelectorAll("button"));
-    expect(choices.length).toBe(10); // eight areas, This week, Archive (Remove from today is Today-only)
+    expect(choices.length).toBe(11); // eight areas, This week, Archive, Delete (Remove from today is Today-only)
   });
 
   it("grid items can shrink", () => {
