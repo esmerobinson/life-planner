@@ -5,6 +5,9 @@ import { defineConfig } from "vitest/config";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 
+// Tests run fully locally; make sure wrangler internals never send telemetry.
+process.env.WRANGLER_SEND_METRICS ??= "false";
+
 // Obviously fake test credentials. The Worker under test only ever sees the hash.
 const TEST_PASSPHRASE = "test-passphrase-not-real";
 const TEST_TOKEN = pbkdf2Sync(TEST_PASSPHRASE, "esmeworld-sync-v1", 200_000, 32, "sha256").toString("hex");
