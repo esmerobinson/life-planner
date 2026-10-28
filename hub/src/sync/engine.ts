@@ -18,7 +18,7 @@
 
 import { applyUntracked } from "../data/changeTracking";
 import { withSyncLock } from "../data/syncGate";
-import { validGoal, validItem } from "../data/validate";
+import { validFile, validGoal, validItem } from "../data/validate";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
 /** The deployed sync server. The Sync page offers it when no address is saved (still editable). */
@@ -111,7 +111,7 @@ export async function saveSyncSettings(db: HubDB, s: { serverUrl: string; token:
 }
 
 async function saveUnderLock(db: HubDB, serverUrl: string, token: string): Promise<void> {
-  await db.transaction("rw", [db.items, db.goals, db.pending, db.syncMeta], async () => {
+  await db.transaction("rw", [db.items, db.goals, db.files, db.pending, db.syncMeta], async () => {
     // A different address is a different server: its cursor means nothing here, and rows
     // already "sent" went somewhere else. Start over: pull everything, send everything.
     if ((await getMeta<string>(db, "cursorServerUrl")) !== serverUrl) {
@@ -147,7 +147,7 @@ export function normaliseAddress(text: string): string {
 /**
  * Cursor 0, no last-sync time, first pull not done, and EVERY local row pending again
  * (with its current stamp, so nothing is re-dated). Runs inside the caller's transaction,
- * which must include items, goals, pending and syncMeta.
+ * which must include every synced table, pending and syncMeta.
  */
 async function startOver(db: HubDB): Promise<void> {
   for (const table of SYNC_TABLES) {
@@ -168,6 +168,9 @@ export async function stopSyncing(db: HubDB): Promise<void> {
 }
 
 // ---- one run ----------------------------------------------------------------------------
+
+/** The row check for each synced table (the same one every local write passes). */
+const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = { items: validItem, goals: validGoal, files: validFile };
 
 const keyOf = (table: string, id: string) => `${table}\u0000${id}`;
 const utf8Length = (s: string) => new TextEncoder().encode(s).length;
@@ -322,7 +325,7 @@ async function markStuck(db: HubDB, keys: { key: string; table: SyncTable; id: s
 
 /** Pending changes not yet attempted in this run, within the count and size limits. */
 async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted: Set<string>) {
-  return db.transaction("rw", db.items, db.goals, db.pending, async () => {
+  return db.transaction("rw", [db.items, db.goals, db.files, db.pending], async () => {
     const changes: WireChange[] = [];
     /** The pending entry's updatedAt when the request was built, per key. */
     const pendingVersions = new Map<string, number>();
@@ -332,7 +335,7 @@ async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted
     for (const p of await db.pending.toArray()) {
       const key = keyOf(p.table, p.id);
       if (attempted.has(key) || p.stuck) continue;
-      const row = await db[p.table].get(p.id);
+      const row = (await db.table(p.table).get(p.id)) as { updatedAt?: number } | undefined;
       if (!row) {
         await db.pending.delete([p.table, p.id]); // the row is gone (e.g. replaced by a restore)
         continue;
@@ -396,11 +399,11 @@ async function applyReply(
 async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boolean> {
   const waiting = await db.pending.get([c.table, c.id]);
   if (waiting && waiting.updatedAt >= c.updatedAt) return false;
-  const local = await db[c.table].get(c.id);
+  const local = (await db.table(c.table).get(c.id)) as { updatedAt?: number } | undefined;
   if (!waiting && typeof local?.updatedAt === "number" && local.updatedAt > c.updatedAt) return false; // stale repeat
   const row = { ...c.data, id: c.id, updatedAt: c.updatedAt };
   const held = await db.quarantine.get([c.table, c.id]);
-  if (c.table === "items" ? !validItem(row) : !validGoal(row)) {
+  if (!VALID_ROW[c.table](row)) {
     if (!held || held.updatedAt <= c.updatedAt) {
       await db.quarantine.put({
         table: c.table, id: c.id, updatedAt: c.updatedAt, data: c.data,
@@ -425,7 +428,7 @@ async function retryQuarantine(db: HubDB): Promise<number> {
     let written = 0;
     for (const q of await db.quarantine.toArray()) {
       const row = { ...q.data, id: q.id, updatedAt: q.updatedAt };
-      if (q.table === "items" ? !validItem(row) : !validGoal(row)) continue; // still unreadable
+      if (!VALID_ROW[q.table](row)) continue; // still unreadable
       await db.quarantine.delete([q.table, q.id]);
       if (await applyRow(db, { table: q.table, id: q.id, updatedAt: q.updatedAt, data: q.data }, q.cursor)) written++;
     }
@@ -444,7 +447,7 @@ async function restampFarFuture(db: HubDB): Promise<void> {
     const now = Date.now();
     for (const p of await db.pending.toArray()) {
       if (p.updatedAt <= now + FUTURE_RESTAMP_MS) continue;
-      const row = await db[p.table].get(p.id);
+      const row = (await db.table(p.table).get(p.id)) as object | undefined;
       if (row) await db.table(p.table).put({ ...row, updatedAt: now });
       await db.pending.put({ ...p, updatedAt: now });
     }

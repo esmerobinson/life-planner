@@ -6,7 +6,7 @@
 // Faithful to the contract:
 // - Auth: `Authorization: Bearer <token>` must match exactly, else 401 {"error":"unauthorized"}.
 // - Validation: deviceId [A-Za-z0-9_-]{8,64}; cursor a safe integer >= 0; at most 2000
-//   changes; table items|goals; id 1-128 chars; updatedAt a positive safe integer at most
+//   changes; table items|goals|files; id 1-128 chars; updatedAt a positive safe integer at most
 //   24 h ahead of the server clock; data a plain object. Any invalid change rejects the whole
 //   request with 400 and applies nothing. Body over 5 MB: 413.
 // - Cursor ahead of the server's highest seq: 409 {"error":"cursor_ahead"}.
@@ -52,7 +52,7 @@ export interface FakeRequestLog {
 }
 
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
-const TABLES = new Set(["items", "goals"]);
+const TABLES = new Set(["items", "goals", "files"]);
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const MAX_CHANGES = 2000;
 const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;

@@ -1,4 +1,4 @@
-// Change tracking for sync: EVERY local write to `items` or `goals` gets
+// Change tracking for sync: EVERY local write to `items`, `goals` or `files` gets
 //   updatedAt = max(Date.now(), previous updatedAt + 1)
 // and a `pending` entry, in the SAME IndexedDB transaction as the write.
 //
@@ -14,9 +14,15 @@
 
 import Dexie from "dexie";
 import type { DBCore, DBCoreMutateRequest, DBCoreMutateResponse, DBCoreTable, DBCoreTransaction, Transaction } from "dexie";
-import { validGoal, validItem } from "./validate";
+import { validFile, validGoal, validItem } from "./validate";
 
-const TRACKED = new Set(["items", "goals"]);
+/** The synced tables, each with the row check other devices apply and its name in messages. */
+const TRACKED_TABLES: Record<string, { valid: (r: unknown) => boolean; noun: string }> = {
+  items: { valid: validItem, noun: "task" },
+  goals: { valid: validGoal, noun: "goal" },
+  files: { valid: validFile, noun: "picture" },
+};
+const TRACKED = new Set(Object.keys(TRACKED_TABLES));
 const PENDING = "pending";
 
 /** IndexedDB transactions whose writes are applied server changes (or the migration). */
@@ -129,9 +135,9 @@ function trackTable(db: Dexie, core: DBCore, down: DBCoreTable): DBCoreTable {
         // Copies: the caller's objects are never changed.
         const values = req.values.map((v, i) => ({ ...(v as object), updatedAt: stamps[i] }));
         // Nothing invalid is ever stored or sent: the same check other devices apply.
-        const valid = name === "items" ? validItem : validGoal;
+        const { valid, noun } = TRACKED_TABLES[name]!;
         const bad = values.findIndex((v) => !valid(v));
-        if (bad !== -1) throw new Error(`That ${name === "items" ? "task" : "goal"} could not be saved: it is not valid.`);
+        if (bad !== -1) throw new Error(`That ${noun} could not be saved: it is not valid.`);
         return down.mutate({ ...req, values } as DBCoreMutateRequest).then((res) => {
           const marks = keys
             .map((id, i) => ({ table: name, id, updatedAt: stamps[i]! }))

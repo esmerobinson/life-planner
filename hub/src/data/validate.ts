@@ -5,10 +5,17 @@
 
 import { isValidISODate } from "../domain/dates";
 import { MAX_DONE_DATES } from "../domain/habits";
-import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type Goal, type Item } from "../domain/types";
+import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item } from "../domain/types";
 
-/** The longest goal why / cadence / notes text (characters). */
+/** The longest goal why / cadence text (characters). */
 export const MAX_GOAL_TEXT = 4000;
+/**
+ * The longest page (notes) a goal may hold, and the most the page editor lets anyone type
+ * into a task's or goal's page (round 3b raised it from 4000: a page with headings and
+ * checklists outgrows that). Item notes have never had a validator cap and still don't, so
+ * no existing row can become invalid.
+ */
+export const MAX_NOTES_TEXT = 20_000;
 
 const AREAS: readonly string[] = AREA_IDS;
 const ITEM_KINDS = ["task", "idea"];
@@ -71,7 +78,8 @@ export function validGoal(r: unknown): r is Goal {
     ) &&
     isStr(r.createdAt) && isValidISODate(r.createdAt) &&
     optDate(r.deadline) &&
-    optText(r.why) && optText(r.cadence) && optText(r.notes) &&
+    optText(r.why) && optText(r.cadence) &&
+    (r.notes === undefined || (isStr(r.notes) && r.notes.length <= MAX_NOTES_TEXT)) &&
     validGoalSource(r.source) &&
     optStamp(r.updatedAt) &&
     (r.status === undefined || r.status === "deleted" || r.status === "purged") &&
@@ -105,4 +113,34 @@ function validGoalSource(v: unknown) {
 function validSource(v: unknown) {
   if (v === undefined) return true;
   return isObj(v) && SOURCE_LIST.includes(v.kind as string) && isStr(v.key);
+}
+
+/** Picture types a file row may hold (the app writes JPEG; the others are accepted for later). */
+export const FILE_MIMES = ["image/jpeg", "image/png", "image/webp"] as const;
+/**
+ * The most base64 text one picture may hold. The app keeps pictures under 700 KB of JPEG
+ * (about 933,000 base64 characters); this leaves room under the sync server's 1 MB row cap.
+ */
+export const MAX_FILE_DATA = 960_000;
+/** The largest width or height a picture row may claim (pixels). */
+const MAX_FILE_SIDE = 20_000;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+const side = (v: unknown, min: number) => typeof v === "number" && Number.isInteger(v) && v >= min && v <= MAX_FILE_SIDE;
+
+/** One file (picture) row is valid (backup, sync, local writes). */
+export function validFile(r: unknown): r is FileRow {
+  if (!isObj(r)) return false;
+  const purged = r.status === "purged";
+  return (
+    isStr(r.id) && r.id !== "" &&
+    isStr(r.mime) && (FILE_MIMES as readonly string[]).includes(r.mime) &&
+    isStr(r.data) && r.data.length <= MAX_FILE_DATA && r.data.length % 4 === 0 && BASE64.test(r.data) &&
+    isStr(r.createdAt) && isValidISODate(r.createdAt) &&
+    (r.status === undefined || purged) &&
+    // A live picture has pixels; a purged tombstone has no data and no size.
+    (purged
+      ? r.data === "" && r.width === 0 && r.height === 0
+      : r.data !== "" && side(r.width, 1) && side(r.height, 1)) &&
+    optStamp(r.updatedAt)
+  );
 }

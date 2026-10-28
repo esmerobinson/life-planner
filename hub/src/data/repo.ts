@@ -1,9 +1,10 @@
 import { db } from "./db";
-import { MAX_GOAL_TEXT } from "./validate";
+import { MAX_GOAL_TEXT, MAX_NOTES_TEXT } from "./validate";
+import { pictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf } from "../domain/dates";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
 import { milestoneTask } from "../domain/milestones";
-import { AREA_IDS, type AreaId, type Goal, type ISODate, type Item, type Milestone } from "../domain/types";
+import { AREA_IDS, type AreaId, type FileRow, type Goal, type ISODate, type Item, type Milestone } from "../domain/types";
 
 export async function createItem(
   input: Omit<Item, "id" | "status" | "links" | "createdAt" | "touchedAt"> & { links?: string[] },
@@ -55,7 +56,7 @@ export interface GoalPatch {
   kind?: Goal["kind"];
   deadline?: ISODate | undefined;
   monthlyTarget?: number | undefined;
-  /** Blank text removes them. At most MAX_GOAL_TEXT characters each. */
+  /** Blank text removes them. At most MAX_GOAL_TEXT characters each (notes: MAX_NOTES_TEXT). */
   why?: string | undefined;
   cadence?: string | undefined;
   notes?: string | undefined;
@@ -91,7 +92,9 @@ export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate):
       if (!(key in patch)) continue;
       const text = patch[key];
       if (text === undefined || !text.trim()) delete next[key];
-      else if (text.length > MAX_GOAL_TEXT) throw new Error(`at most ${MAX_GOAL_TEXT} characters`);
+      else if (text.length > (key === "notes" ? MAX_NOTES_TEXT : MAX_GOAL_TEXT)) {
+        throw new Error(`at most ${key === "notes" ? MAX_NOTES_TEXT : MAX_GOAL_TEXT} characters`);
+      }
       else next[key] = text;
     }
     if ("deadline" in patch) {
@@ -308,7 +311,7 @@ export async function setMilestone(id: string, milestone: boolean, today: ISODat
 
 /** Saves a goal's notes (the panel's page); blank text removes them. */
 export async function saveGoalNotes(id: string, notes: string): Promise<void> {
-  if (notes.length > MAX_GOAL_TEXT) throw new Error(`at most ${MAX_GOAL_TEXT} characters`);
+  if (notes.length > MAX_NOTES_TEXT) throw new Error(`at most ${MAX_NOTES_TEXT} characters`);
   await db.transaction("rw", db.goals, async () => {
     const goal = await db.goals.get(id);
     if (!goal || goal.status !== undefined) return;
@@ -370,13 +373,14 @@ export async function restoreFromBin(id: string, today: ISODate): Promise<void> 
  * replaced by a content-free tombstone (status "purged": no title, notes, links, tags,
  * source or dates beyond createdAt/touchedAt) that syncs like any other change. Deleted
  * goals become tombstones the same way (no title, why, cadence, notes, milestones,
- * deadline, target or source). Returns how many were emptied (items and goals).
+ * deadline, target or source). Pictures on their pages that no other page shows become
+ * tombstones too (no image data). Returns how many were emptied (items and goals).
  */
 export async function emptyBin(today: ISODate, only?: { items: string[]; goals: string[] }): Promise<number> {
   // With `only` (the rows the confirmation showed), nothing binned since is purged unasked.
   const pickItem = (i: Item) => !only || only.items.includes(i.id);
   const pickGoal = (g: Goal) => !only || only.goals.includes(g.id);
-  return db.transaction("rw", db.items, db.goals, async () => {
+  return db.transaction("rw", db.items, db.goals, db.files, async () => {
     const bin = (await db.items.where("status").equals("deleted").toArray()).filter(pickItem);
     const tombs: Item[] = bin.map((i) => ({
       id: i.id,
@@ -401,6 +405,7 @@ export async function emptyBin(today: ISODate, only?: { items: string[]; goals: 
       status: "purged",
     }));
     if (goalTombs.length) await db.goals.bulkPut(goalTombs);
+    await purgePictures([...bin.map((i) => i.notes), ...goals.map((g) => g.notes)]);
     return tombs.length + goalTombs.length;
   });
 }
@@ -477,4 +482,42 @@ export async function getItem(id: string): Promise<Item | undefined> {
 export async function putItemBack(snapshot: Item, today: ISODate): Promise<void> {
   const { updatedAt: _u, ...row } = snapshot;
   await db.items.put({ ...row, touchedAt: today });
+}
+
+/**
+ * Pictures on pages that were just emptied from the Bin become content-free tombstones,
+ * unless another page (anything not purged, the Bin included) still shows them. Runs inside
+ * emptyBin's transaction, after the page tombstones are written.
+ */
+async function purgePictures(pages: (string | undefined)[]): Promise<void> {
+  const gone = new Set(pages.flatMap((p) => pictureIds(p ?? "")));
+  if (gone.size === 0) return;
+  const stillShown = new Set<string>();
+  await db.items.each((i) => pictureIds(i.notes ?? "").forEach((id) => stillShown.add(id)));
+  await db.goals.each((g) => pictureIds(g.notes ?? "").forEach((id) => stillShown.add(id)));
+  const tombs: FileRow[] = [];
+  for (const id of gone) {
+    if (stillShown.has(id)) continue;
+    const f = await db.files.get(id);
+    if (!f || f.status === "purged") continue;
+    tombs.push({ id, mime: f.mime, data: "", width: 0, height: 0, createdAt: f.createdAt, status: "purged" });
+  }
+  if (tombs.length) await db.files.bulkPut(tombs);
+}
+
+/** A picture as stored (undefined until it has arrived on this device). */
+export async function getFile(id: string): Promise<FileRow | undefined> {
+  return db.files.get(id);
+}
+
+/** Stores a new picture for a page; returns its id (the page refers to it as `![](file:<id>)`). */
+export async function addPicture(
+  picture: { mime: string; data: string; width: number; height: number },
+  today: ISODate,
+): Promise<string> {
+  const id = crypto.randomUUID();
+  await db.files.add({
+    id, mime: picture.mime, data: picture.data, width: picture.width, height: picture.height, createdAt: today,
+  });
+  return id;
 }

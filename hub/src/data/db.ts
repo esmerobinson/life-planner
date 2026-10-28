@@ -1,9 +1,9 @@
 import Dexie, { type Table } from "dexie";
-import type { Item, Goal } from "../domain/types";
+import type { FileRow, Item, Goal } from "../domain/types";
 import { installChangeTracking, legacyStamp, markTransactionUntracked } from "./changeTracking";
 
-/** The two tables that sync. */
-export const SYNC_TABLES = ["items", "goals"] as const;
+/** The tables that sync (files: the pictures on pages, round 3b). */
+export const SYNC_TABLES = ["items", "goals", "files"] as const;
 export type SyncTable = (typeof SYNC_TABLES)[number];
 
 /**
@@ -52,6 +52,7 @@ export interface SyncMetaRow {
 export class HubDB extends Dexie {
   items!: Table<Item, string>;
   goals!: Table<Goal, string>;
+  files!: Table<FileRow, string>;
   pending!: Table<PendingChange, [string, string]>;
   syncMeta!: Table<SyncMetaRow, string>;
   quarantine!: Table<QuarantinedRow, [string, string]>;
@@ -74,7 +75,7 @@ export class HubDB extends Dexie {
         // upgrades late must not beat edits other devices made since (any copy the server
         // already has is newer and wins). Not validated: old rows are kept exactly as they are.
         markTransactionUntracked(tx);
-        for (const table of SYNC_TABLES) {
+        for (const table of ["items", "goals"] as const) { // the tables v2 had
           const marks: PendingChange[] = [];
           await tx.table(table).toCollection().modify((row: { id: string; updatedAt?: number }) => {
             row.updatedAt = legacyStamp(row);
@@ -85,6 +86,8 @@ export class HubDB extends Dexie {
       });
     // v3: rows from the server this version cannot read yet.
     this.version(3).stores({ quarantine: "[table+id]" });
+    // v4: pictures on pages (round 3b). New and empty, so nothing to stamp or mark pending.
+    this.version(4).stores({ files: "id" });
     installChangeTracking(this);
   }
 }

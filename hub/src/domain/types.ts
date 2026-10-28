@@ -86,3 +86,26 @@ export interface Goal {
   /** Sync stamp, as on Item. */
   updatedAt?: number;
 }
+
+/**
+ * A picture on a task's / idea's / goal's page (round 3b). The page's Markdown refers to it
+ * as `![](file:<id>)`. Synced like items and goals; `data` is the image itself as base64
+ * (no `data:` prefix), downscaled in the browser so a row stays well under the sync
+ * server's 1 MB row cap.
+ */
+export interface FileRow {
+  id: string;
+  mime: string;
+  /** Base64 of the image bytes; "" once purged. */
+  data: string;
+  width: number;
+  height: number;
+  createdAt: ISODate;
+  /**
+   * "purged": the page it was on was emptied from the Bin; the row stays as a content-free
+   * tombstone (no data) because sync never hard-deletes.
+   */
+  status?: "purged";
+  /** Sync stamp, as on Item. */
+  updatedAt?: number;
+}

@@ -2,10 +2,10 @@ import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
-import type { Goal, ISODate, Item } from "../domain/types";
-import { isObj, isStr, validGoal, validItem } from "./validate";
+import type { FileRow, Goal, ISODate, Item } from "../domain/types";
+import { isObj, isStr, validFile, validGoal, validItem } from "./validate";
 
-export { validGoal, validItem };
+export { validFile, validGoal, validItem };
 
 export interface BackupFile {
   app: "life-hub";
@@ -13,6 +13,8 @@ export interface BackupFile {
   exportedOn: ISODate;
   items: Item[];
   goals: Goal[];
+  /** Pictures on pages (round 3b). Optional: older backups have none and still load. */
+  files?: FileRow[];
 }
 
 /** The one message for any file that is not a usable backup. */
@@ -48,7 +50,9 @@ export function parseBackup(raw: unknown): BackupFile {
     !data.items.every(validItem) ||
     !data.goals.every(validGoal) ||
     hasDuplicateIds(data.items as Item[]) ||
-    hasDuplicateIds(data.goals as Goal[])
+    hasDuplicateIds(data.goals as Goal[]) ||
+    (data.files !== undefined &&
+      (!Array.isArray(data.files) || !data.files.every(validFile) || hasDuplicateIds(data.files as FileRow[])))
   ) {
     throw new Error(INVALID_BACKUP);
   }
@@ -56,12 +60,13 @@ export function parseBackup(raw: unknown): BackupFile {
 }
 
 export async function exportBackup(today: ISODate): Promise<BackupFile> {
-  return db.transaction("r", db.items, db.goals, async () => ({
+  return db.transaction("r", db.items, db.goals, db.files, async () => ({
     app: "life-hub" as const,
     schema: 1 as const,
     exportedOn: today,
     items: await db.items.toArray(),
     goals: await db.goals.toArray(),
+    files: await db.files.toArray(),
   }));
 }
 
@@ -81,7 +86,7 @@ export async function restoreBackup(
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
-  return db.transaction("rw", db.items, db.goals, db.syncMeta, async () => {
+  return db.transaction("rw", [db.items, db.goals, db.files, db.syncMeta], async () => {
     // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
     // a copy the server already has, edited since on another device, wins over them.
     keepOwnStamps();
@@ -91,6 +96,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     if (mode === "replace") {
       await db.items.clear();
       await db.goals.clear();
+      await db.files.clear();
       // Sync never deletes, so rows removed here still exist on the server. Pulling from
       // the start again brings them back instead of leaving this device silently missing
       // them.
@@ -98,6 +104,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.syncMeta.delete("firstPullDone");
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
+      await db.files.bulkAdd(file.files ?? []);
       return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0 };
     }
     const haveItems = new Set(await db.items.toCollection().primaryKeys());
@@ -106,6 +113,9 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     const newGoals = file.goals.filter((g) => !haveGoals.has(g.id));
     await db.items.bulkAdd(newItems);
     await db.goals.bulkAdd(newGoals);
+    // Pictures: only the missing ones (they are never edited, so a copy here is the same picture).
+    const haveFiles = new Set(await db.files.toCollection().primaryKeys());
+    await db.files.bulkAdd((file.files ?? []).filter((f) => !haveFiles.has(f.id)));
     const fileVisible = file.items.filter(notPurged).length;
     const addedVisible = newItems.filter(notPurged).length;
     const fileGoalsVisible = file.goals.filter(notPurged).length;
