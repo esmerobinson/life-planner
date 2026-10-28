@@ -191,3 +191,100 @@ contract is not enforced, because silently truncating a backup would be worse.
    the deployed Worker, which has no dependencies.
 8. Error bodies never echo input. The secret, token and passphrase never appear in the repo; tests use
    `test-passphrase-not-real` and other obviously fake values.
+
+## Fix round 1 (after the security / data-integrity review, 2026-10-28)
+
+Each fix was test-first: the new tests were committed while failing on their assertions, then the fix.
+**Results:** `npm test` runs 202 tests and all pass (worker 163 in 5 files, node 39 in 3 files). Both `tsc`
+checks report 0 errors. The offline `wrangler deploy --dry-run` succeeds (21.9 KiB bundle, metrics off).
+**The contract is now v1.1** (`docs/superpowers/specs/2026-10-28-sync-api.md`, sections A to F).
+
+Where this round contradicts the sections above, this round wins: the 4 MiB page budget, attempts not
+recorded during a lockout, and concerns 1, 2 and 6, which are fixed here.
+
+**CRITICAL 1: global-cap bypass (fixed).**
+- Every wrong or missing token is now recorded by ONE conditional insert:
+  `INSERT … SELECT ?bucket, ?now WHERE bucket_count < (global_count >= 100 ? 1 : 5) RETURNING ts`,
+  batched with the prune.
+- Outcomes:
+  - no row inserted: 429;
+  - inserted, and more than 100 failures are now in the hour (the cap was already reached): 429;
+  - otherwise: 401.
+- A correct token is checked against the same effective limit (5, or 1 during a global lockout). A bucket
+  that is locked therefore gets 429 even for the right token, so there is no 429/200 oracle.
+- The old test that locked in "capped attempts are not recorded" was replaced. New tests: a bucket with 2
+  earlier failures cannot keep guessing once the cap is reached (nothing more is recorded, and its correct
+  token gets 429); fresh buckets get one recorded attempt each during a lockout.
+- Trade-off: during a global lockout every new bucket can still write one row per 15 minutes. D1 writes are
+  bounded by the number of distinct attacking /64s and IPv4 addresses, not by request volume.
+
+**IMPORTANT 1: check-then-record race (fixed by the same insert).** A test fires 20 concurrent wrong-token
+requests from one IP. Exactly 5 are recorded and answered 401; the other 15 get 429. Before the fix all 20
+were recorded.
+
+**IMPORTANT 2: IPv6 grouping (fixed).** `bucketFor` produces the bucket key:
+- IPv4: canonical dotted quad.
+- IPv6: expanded, keyed on the /64 (`2001:db8:1:2::/64`). This handles `::`, `::1`, leading zeros,
+  upper case, an embedded dotted IPv4 tail and `%zone`.
+- IPv4-mapped (`::ffff:a.b.c.d`, and the hex form): treated as the IPv4 address.
+- Absent or unparseable: the shared `unknown` bucket.
+
+The column is still called `ip` (no migration needed).
+
+**IMPORTANT 3: the losing device is told the winner (fixed).**
+- After all upserts, one statement per chunk (in the same batch) joins the chunk's entries to `rows`. For
+  each `(tbl, id)` it reports whether the stored row is exactly a version the chunk sent (same deviceId,
+  updatedAt AND data). `data` is returned only when it is not.
+- JS combines the chunks. A key is a winner only if no chunk matched it. Winners are de-duplicated against
+  the paged rows, sorted by seq, and appended after the paged rows. They are outside the page limits and
+  never move the cursor.
+- Cursor: `hasMore ? max(req, last paged seq) : max(req, current meta.seq)`. The current seq is read as the
+  last statement of the batch. This also removes "own writes come back once" (old concern 2).
+- Tests: clock-skew loss below the cursor, a reused timestamp (`x@100 {v:1}` then `x@100 {v:2}` returns
+  `{v:1}`), a replay with no winners, a winner after a 500-row page with the cursor staying at 500, a winner
+  returned once for a twice-named id, and own writes not returned next time.
+- The test client now acknowledges sent changes after the response and applies returned rows unless a newer
+  unsent local change exists. Two new convergence tests use it (slow clock; reused timestamp).
+- Known bound: returned winners are not size-capped. A request naming many rows that lost to large rows
+  elsewhere gets a response of at most one stored row per named id. Client obligation 6 (500 changes and
+  about 1 MB per request) keeps this small in practice.
+
+**IMPORTANT 4: cursor ahead (fixed).** `meta.seq` is read before the batch. If the cursor is greater, the
+response is `409 {"error":"cursor_ahead"}` and nothing is applied. A cursor equal to the seq is accepted.
+The counter only grows, so the read-then-batch gap is safe.
+
+**IMPORTANT 5: CPU budget.**
+- `MAX_RESPONSE_DATA_BYTES` is now 1 MiB. The 5 MiB request cap is unchanged.
+- Client limits (500 changes and about 1 MB per request) are documented in the contract (E, F) and the
+  README. The 10 ms CPU limit is still not verified on real Cloudflare; the README smoke test step 5 checks it.
+
+**FIX NOW: NFC (fixed).** `passphrase.normalize("NFC")` is applied before encoding, in both
+`shared/token.ts` and the helper. The new vector `café-crème-brûlée-fake` (composed and NFD forms) derives
+`503c56a3…eda6`, which matches Node's PBKDF2 over the NFC form. The earlier vectors are unchanged because
+they were already NFC.
+
+**Minor items (done):**
+- `@cloudflare/workers-types` is pinned to `5.20261013.1` (15 days old).
+- `wrangler.jsonc` sets `observability` explicitly:
+  - logs on;
+  - **`invocation_logs: false`** and **traces off**, because wrangler's schema has no switch to exclude
+    request headers (Authorization) from invocation metadata, so the only safe setting is off;
+  - `redact_query_string: true`.
+- README:
+  - a cut-off export still returns 200, so the backup writer must parse fully before replacing a file;
+  - rows' `data` must carry `id` and `updatedAt`;
+  - about 49k-row export ceiling (1000 rows per query, about 50 D1 queries per invocation on the free plan);
+  - answer **no** if `wrangler d1 create` offers to edit config, and paste the id by hand;
+  - a post-deploy smoke-test checklist: health, 401, five 401s then 429, 2000 rows, about 4 MB body,
+    cursor-0 pull, export parse, `wrangler tail` for CPU, then empty `rows`/`auth_failures`, reset
+    `meta.seq = 0`, and set the real passphrase. It uses a throwaway passphrase whose token is derived
+    locally.
+- Helper:
+  - Tab in a pasted passphrase is kept. Key handling is now a pure, tested `applyKeys`.
+  - Raw mode is restored by a `rawModeGuard` on every path: try/finally, process `exit`, SIGINT, SIGTERM,
+    SIGHUP and `uncaughtException`. The crash handler prints a fixed message, never the error. Tests use a
+    fake stdin and process.
+
+**Still unverified:** real D1 and the Workers runtime (statement and parameter limits, the per-invocation
+query limit that the 49k figure assumes, CPU time), and the interactive prompt with a real wrangler.
+Nothing was deployed, created or logged in to.
