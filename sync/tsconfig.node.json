@@ -6,6 +6,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "checkJs": true,
     "strict": true,
