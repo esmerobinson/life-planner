@@ -83,6 +83,21 @@ body {
   border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
 }
 
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Backup: a quiet text link at the bottom of the sidebar's scroll area. */
+.sidebar-footer {
+  margin-top: auto;
+}
+
+.sidebar-footer a {
+  color: var(--sidebar-text);
+}
+
 .sidebar-group {
   display: flex;
   flex-direction: column;

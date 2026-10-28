@@ -86,4 +86,14 @@ describe("AppShell", () => {
     });
     expect(await screen.findByText("date:2026-10-28")).toBeInTheDocument();
   });
+
+  it("top row has Add on the left and the Inbox pill last; Backup is not in it", async () => {
+    renderShell(<p>x</p>);
+    const row = document.querySelector(".shell-actions") as HTMLElement;
+    const kids = Array.from(row.children).map((c) => c.textContent);
+    expect(kids).toEqual(["Add", "Inbox"]);
+    expect(row.lastElementChild).toHaveAttribute("href", "/inbox");
+    expect(row.querySelector('a[href="/backup"]')).toBeNull();
+    expect(document.querySelector('.sidebar-footer a[href="/backup"]')).not.toBeNull();
+  });
 });

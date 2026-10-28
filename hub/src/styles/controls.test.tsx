@@ -230,4 +230,10 @@ describe("controls.css (approved mockup A, soft pills)", () => {
   it("grid items can shrink", () => {
     expect(rule(".form-grid > *")).toContain("min-width: 0");
   });
+
+  it("top row pushes Inbox right; Backup footer uses the sidebar text colour", () => {
+    expect(rule(".shell-inbox")).toContain("margin-left: auto");
+    expect(rule(".sidebar-footer", tokens)).toContain("margin-top: auto");
+    expect(rule(".sidebar-footer a", tokens)).toContain("color: var(--sidebar-text)");
+  });
 });

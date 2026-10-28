@@ -41,7 +41,7 @@ test("sidebar stays pinned after scrolling", async ({ page }) => {
   await page.addStyleTag({ content: "main.app-content::after{content:'';display:block;height:3000px}" });
   await page.evaluate(() => window.scrollTo(0, 800));
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  const nav = page.getByRole("navigation", { name: "Main" });
+  const nav = page.locator("aside.sidebar");
   expect(await nav.evaluate((el) => getComputedStyle(el).position)).toBe("sticky");
   expect(await nav.evaluate((el) => Math.round(el.getBoundingClientRect().top))).toBe(0);
 });
