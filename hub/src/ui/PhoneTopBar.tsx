@@ -38,8 +38,9 @@ export function PhoneTopBar({ inboxLabel }: { inboxLabel: string }) {
           type="button"
           className="phone-back"
           aria-label="Back"
-          // "default" is the router's key for the first page this app was opened on.
-          onClick={() => (location.key === "default" ? navigate("/") : navigate(-1))}
+          // "default" is the router's key for the first page this app was opened on. Going
+          // Home then replaces it, so the system swipe-back does not return here.
+          onClick={() => (location.key === "default" ? navigate("/", { replace: true }) : navigate(-1))}
         >
           ←
         </button>

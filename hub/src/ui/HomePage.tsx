@@ -15,7 +15,8 @@ export function HomePage({ today }: { today: ISODate }) {
 
 /**
  * Phone Home (mockup-phone.html tab A, VISUAL-LANGUAGE.md "Phone layout"): the app grid
- * of every sidebar destination except Home, then Today's list, then the quiet footer
+ * of every sidebar destination except Home, the Journal card (Esme: on the first screen,
+ * 2026-10-28), then Today's list, then the quiet footer
  * links (the sidebar's own list). The "Esmeworld" title is in the shell's top bar.
  */
 function PhoneHome({ today }: { today: ISODate }) {
@@ -35,6 +36,7 @@ function PhoneHome({ today }: { today: ISODate }) {
           ))}
         </ul>
       </nav>
+      <JournalCardStub />
       <TodayPanel today={today} headingLevel={2} />
       <nav aria-label="More" className="phone-footer">
         <FooterLinks />

@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigationType } from "react-router-dom";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import { createItem } from "../data/repo";
@@ -21,7 +21,12 @@ function setPhone(matches: boolean) {
 }
 
 function HomeRoute() {
-  return <HomePage today={useShellToday()} />;
+  return (
+    <>
+      <HomePage today={useShellToday()} />
+      <p data-testid="nav-type">{useNavigationType()}</p>
+    </>
+  );
 }
 
 function TodayRoute() {
@@ -98,6 +103,21 @@ describe("phone layout (below 700px)", () => {
     renderAt(["/area/art"]);
     await userEvent.click(await screen.findByRole("button", { name: "Back" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Esmeworld" })).toBeInTheDocument();
+    // A replace, so the system swipe-back does not return to the page just left.
+    expect(screen.getByTestId("nav-type")).toHaveTextContent("REPLACE");
+  });
+
+  it("Home shows the Journal card under the app grid and above Today", async () => {
+    renderAt(["/"]);
+    await screen.findByText("Nothing planned for today.");
+    const grid = screen.getByRole("navigation", { name: "Main" });
+    const journal = screen.getByRole("region", { name: "Journal" });
+    const today = screen.getByRole("heading", { level: 2, name: "Today" });
+    expect(within(journal).getByRole("button", { name: "Morning pages" })).toBeDisabled();
+    expect(within(journal).getByRole("button", { name: "Daily check-in" })).toBeDisabled();
+    const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(grid, journal)).toBe(true);
+    expect(follows(journal, today)).toBe(true);
   });
 
   it("an opened goal keeps its own heading visible and the bar title empty", async () => {
