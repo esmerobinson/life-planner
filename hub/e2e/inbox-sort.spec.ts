@@ -55,7 +55,7 @@ test("sort one by one: To-do, Idea, Goal, Skip, Archive, Delete, Undo and the Bi
   await seedInbox(page);
   await page.goto("/inbox");
   await expect(page.getByText("5 to sort")).toBeVisible();
-  await shoot(page, "inbox-1280");
+  await shoot(page, "inbox-list-1280");
   await page.getByRole("link", { name: "Sort one by one" }).click();
   await expect(page).toHaveURL(/\/inbox\/sort$/);
 
@@ -207,9 +207,9 @@ test.describe("phone width (390px)", () => {
     await seedInbox(page);
     await page.goto("/inbox");
     await expect(page.getByText("5 to sort")).toBeAttached();
-    await shoot(page, "inbox-390");
+    await shoot(page, "inbox-list-390");
     await contentAtFullWidth(page);
-    await shoot(page, "inbox-390-content");
+    await shoot(page, "inbox-list-390-content");
     await expectNoSideScroll(page);
 
     await page.goto("/inbox/sort");
