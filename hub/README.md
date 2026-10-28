@@ -39,40 +39,6 @@ are never touched. A task whose title matches one already in the app (for
 example from your Backlog) is not added, and is counted as "same title as an
 existing task". Anything that could not be read is listed under **Notes**.
 
-## Importing goals from Obsidian
-
-On the Goals page choose **Import from Obsidian** (`/goals/import`). Paste or
-choose any of three notes (all optional), press **Preview**, and look over what
-would be added. Nothing is saved until you press **Add selected**. You can
-untick rows, change an area, and edit a deadline first. Rows already in the app
-show "Already added" and are never changed; repeating the import is safe.
-
-How the notes map:
-
-- **Goals note** (`## <Area name>` sections): each area becomes one goal. The
-  title is the area name without its emoji or a trailing `(...)`. The area is
-  matched like Backlog sections, plus Creative technologist -> Tech projects
-  and Inner work -> Mind; a heading that matches nothing is proposed as Admin
-  (goals cannot live in the Inbox) and you can change it in the preview.
-  `Identity:` lines become the goal's "why" (joined with a blank line);
-  `Weekly:`, `Ongoing:` and `Daily:` lines become its cadence, prefix kept;
-  `Study these north stars:` becomes its notes; each `Marker:` line becomes a
-  milestone (cut at 200 characters). A goal with at least one marker is
-  finite, otherwise a practice goal. A finite goal's deadline defaults to
-  31 December of the year found in its first marker, else this year. The
-  `## Notes` section is ignored.
-- **Monthly note** (`# Goals for <Month> <Year>`): each bold bullet under
-  "This month's goals" becomes a finite goal (title without the trailing colon
-  and `(...)`, description as notes, deadline the last day of that month, area
-  proposed as Admin), and its `Next step:` line becomes an open task linked to
-  that goal.
-- **Habits note**: each item under "Daily habits" becomes a task that repeats
-  every day (area Mind). "Big goals" numbers and "This week" counts are shown
-  under "Not imported yet" and are not created.
-
-Goals also carry optional **why**, **cadence** and **notes** text (shown under
-the goal's title) and an Obsidian source marker; all are included in backups.
-
 ## Areas
 
 There are nine areas: Inbox, plus Writing, Art, Content, Mind, Body, Tech

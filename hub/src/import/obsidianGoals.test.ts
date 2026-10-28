@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { db } from "../data/db";
+import { describe, expect, it } from "vitest";
 import { endOfMonth } from "../domain/dates";
 import {
-  importObsidianGoals,
+  buildObsidianRows,
   parseAreaGoals,
   parseHabits,
   parseMonthGoals,
@@ -14,11 +13,6 @@ import monthMd from "./__fixtures__/ObsidianMonth.md?raw";
 import habitsMd from "./__fixtures__/ObsidianHabits.md?raw";
 
 const TODAY = "2026-10-28";
-
-beforeEach(async () => {
-  await db.items.clear();
-  await db.goals.clear();
-});
 
 describe("endOfMonth", () => {
   it("handles 30/31-day months and leap Februaries", () => {
@@ -245,11 +239,12 @@ const selectionFrom = () => {
   return { goals: [...a, ...m.goals], tasks: [...m.tasks, ...h.habits] };
 };
 
-describe("importObsidianGoals", () => {
-  it("adds goals and tasks, links tasks to goal ids, and fills fields", async () => {
-    const r = await importObsidianGoals(selectionFrom(), TODAY);
-    expect(r).toEqual({ goalsAdded: 10, tasksAdded: 7, alreadyHad: 0 });
-    const writing = (await db.goals.filter((g) => g.title === "Writing").first())!;
+describe("buildObsidianRows", () => {
+  it("builds goals and items, links tasks to goal ids, and fills fields", () => {
+    const { goals, items } = buildObsidianRows(selectionFrom(), TODAY);
+    expect(goals).toHaveLength(10);
+    expect(items).toHaveLength(7);
+    const writing = goals.find((g) => g.title === "Writing")!;
     expect(writing).toMatchObject({
       areaId: "writing", kind: "finite", deadline: "2027-12-31", createdAt: TODAY,
       source: { kind: "obsidian", key: "obsidian:goal:writing" },
@@ -258,79 +253,45 @@ describe("importObsidianGoals", () => {
     expect(writing.milestones.map((m) => m.title)).toEqual(["Publish 2 zines by 30 Jun 2027", "Reach 500 newsletter readers"]);
     expect(writing.milestones.every((m) => m.done === false && m.id.length > 0)).toBe(true);
     expect(new Set(writing.milestones.map((m) => m.id)).size).toBe(2);
-    const zine = (await db.goals.filter((g) => g.title === "Finish the pretend zine").first())!;
-    const step = (await db.items.filter((i) => i.title === "Write the ending scene").first())!;
+    const zine = goals.find((g) => g.title === "Finish the pretend zine")!;
+    const step = items.find((i) => i.title === "Write the ending scene")!;
     expect(step).toMatchObject({
       kind: "task", goalId: zine.id, areaId: "admin", priority: 2, status: "open", links: [],
       createdAt: TODAY, touchedAt: TODAY,
       source: { kind: "obsidian", key: "obsidian:task:finish the pretend zine:write the ending scene" },
     });
     expect(step.due).toBeUndefined();
-    const habit = (await db.items.filter((i) => i.title === "Drink water").first())!;
+    const habit = items.find((i) => i.title === "Drink water")!;
     expect(habit.recur).toHaveLength(7);
     expect(habit.goalId).toBeUndefined();
-    const practice = (await db.goals.filter((g) => g.title === "Art").first())!;
-    expect(practice.deadline).toBeUndefined();
-  });
-
-  it("is idempotent and never changes existing rows, archived or not", async () => {
-    await importObsidianGoals(selectionFrom(), TODAY);
-    const g = (await db.goals.filter((x) => x.title === "Art").first())!;
-    await db.goals.update(g.id, { title: "Art (renamed by me)", areaId: "body" });
-    const t = (await db.items.filter((i) => i.title === "Drink water").first())!;
-    await db.items.update(t.id, { status: "archived", title: "Drink more water" });
-    const goalsBefore = await db.goals.orderBy("id").toArray();
-    const itemsBefore = await db.items.orderBy("id").toArray();
-    const r = await importObsidianGoals(selectionFrom(), "2027-01-05");
-    expect(r).toEqual({ goalsAdded: 0, tasksAdded: 0, alreadyHad: 17 });
-    expect(await db.goals.orderBy("id").toArray()).toEqual(goalsBefore);
-    expect(await db.items.orderBy("id").toArray()).toEqual(itemsBefore);
-  });
-
-  it("links a new task to an existing goal without touching that goal", async () => {
-    const sel = selectionFrom();
-    await importObsidianGoals({ goals: sel.goals, tasks: [] }, TODAY);
-    const before = await db.goals.orderBy("id").toArray();
-    const r = await importObsidianGoals(sel, TODAY);
-    expect(r.tasksAdded).toBe(7);
-    expect(await db.goals.orderBy("id").toArray()).toEqual(before);
-    const zine = before.find((g) => g.title === "Finish the pretend zine")!;
-    expect((await db.items.filter((i) => i.title === "Write the ending scene").first())!.goalId).toBe(zine.id);
-  });
-
-  it("uses one transaction", async () => {
-    const spy = vi.spyOn(db, "transaction");
-    await importObsidianGoals(selectionFrom(), TODAY);
-    expect(spy).toHaveBeenCalledTimes(1);
-    spy.mockRestore();
+    expect(goals.find((g) => g.title === "Art")!.deadline).toBeUndefined();
+    expect(new Set([...goals, ...items].map((r) => r.id)).size).toBe(17);
   });
 
   const base = (): ProposedGoal => ({
     key: "obsidian:goal:x", title: "X", areaId: "art", areaFallback: false, kind: "practice", milestones: [],
   });
 
-  it("rejects a finite goal without a deadline, writing nothing", async () => {
+  it("rejects a finite goal without a deadline", () => {
     const bad: ProposedGoal = { ...base(), key: "obsidian:goal:bad", kind: "finite" };
-    await expect(importObsidianGoals({ goals: [base(), bad], tasks: [] }, TODAY)).rejects.toThrow(/deadline/i);
-    expect(await db.goals.count()).toBe(0);
+    expect(() => buildObsidianRows({ goals: [base(), bad], tasks: [] }, TODAY)).toThrow(/deadline/i);
   });
 
-  it("rejects an invalid deadline, an inbox goal, an unknown area and an inbox task, writing nothing", async () => {
+  it("rejects an invalid deadline, an inbox goal, an unknown area and an inbox task", () => {
     for (const goal of [
       { ...base(), kind: "finite" as const, deadline: "2026-02-30" },
       { ...base(), areaId: "inbox" as const },
       { ...base(), areaId: "nowhere" as never },
     ]) {
-      await expect(importObsidianGoals({ goals: [goal], tasks: [] }, TODAY)).rejects.toThrow();
+      expect(() => buildObsidianRows({ goals: [goal], tasks: [] }, TODAY)).toThrow();
     }
-    await expect(
-      importObsidianGoals({ goals: [], tasks: [{ key: "obsidian:task:x:y", title: "Y", areaId: "inbox" }] }, TODAY),
-    ).rejects.toThrow();
-    expect(await db.goals.count()).toBe(0);
-    expect(await db.items.count()).toBe(0);
+    expect(() =>
+      buildObsidianRows({ goals: [], tasks: [{ key: "obsidian:task:x:y", title: "Y", areaId: "inbox" }] }, TODAY),
+    ).toThrow();
   });
 
-  it("an empty selection adds nothing", async () => {
-    expect(await importObsidianGoals({ goals: [], tasks: [] }, TODAY)).toEqual({ goalsAdded: 0, tasksAdded: 0, alreadyHad: 0 });
+  it("an empty selection builds nothing", () => {
+    expect(buildObsidianRows({ goals: [], tasks: [] }, TODAY)).toEqual({ goals: [], items: [] });
   });
 });
+

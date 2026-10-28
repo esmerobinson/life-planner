@@ -1,6 +1,4 @@
-import { useContext } from "react";
-import { Link } from "react-router-dom";
-import type { ISODate } from "../domain/types";
+import { useContext } from "react";import type { ISODate } from "../domain/types";
 import { GoalCard } from "./GoalProgress";
 import { GoalForm } from "./GoalForm";
 import { ShellContext } from "./shellContext";
@@ -27,11 +25,6 @@ export function GoalsPage({ today }: { today: ISODate }) {
   return (
     <section className="goals-page">
       <h1>Goals</h1>
-      <p>
-        <Link className="btn-secondary" to="/goals/import">
-          Import from Obsidian
-        </Link>
-      </p>
       {loaded && goals.length === 0 && <p>No goals yet.</p>}
       {goals.length > 0 && (
         <ul aria-label="Goals" className="goal-list">
