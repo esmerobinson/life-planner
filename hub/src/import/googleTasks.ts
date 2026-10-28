@@ -1,6 +1,9 @@
 import { db } from "../data/db";
 import { isValidISODate } from "../domain/dates";
 import type { ISODate, Item } from "../domain/types";
+import { normaliseTitle } from "./titleClean";
+
+export { normaliseTitle };
 
 export interface GoogleImportNote {
   line: string;
@@ -32,16 +35,6 @@ const NOT_AN_EXPORT: GoogleImportNote = { line: "", reason: "This is not a Googl
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
-
-/** Lowercase, letters and digits only, spaces collapsed: emoji and punctuation are ignored. */
-export function normaliseTitle(title: string): string {
-  return title
-    .normalize("NFC")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 const tagFor = (listTitle: string) => listTitle.toLowerCase().replace(/\s+/g, " ").trim();
 

@@ -1,6 +1,7 @@
 import { db } from "../data/db";
 import { isValidISODate } from "../domain/dates";
 import { sectionToArea } from "./sectionAreas";
+import { cleanTitle, normaliseTitle, unwikilink } from "./titleClean";
 import { WEEKDAYS, type ISODate, type Item, type Priority, type Weekday } from "../domain/types";
 
 export interface ParsedItem {
@@ -13,6 +14,8 @@ export interface ParsedItem {
   /** Raw `## ` heading text, trimmed. */
   section: string;
   key: string;
+  /** Lines worth keeping from old-engine title suffixes ("Was due 19 Jul"), joined with newlines. */
+  notes?: string;
 }
 
 // Regexes ported from src/backlog.py.
@@ -31,6 +34,8 @@ const WEEKDAY_LIST: readonly string[] = WEEKDAYS;
 export function parseBacklog(markdown: string): {
   items: ParsedItem[];
   skipped: { line: string; reason: string }[];
+  /** Copies of the same task that were folded into one (same normalised title). */
+  merged: { title: string; section: string }[];
 } {
   const items: ParsedItem[] = [];
   const skipped: { line: string; reason: string }[] = [];
@@ -46,19 +51,20 @@ export function parseBacklog(markdown: string): {
     const m = TASK_RE.exec(line);
     if (!m || m[1] !== " ") continue;
     if (section.includes("parked") || section.includes("moved elsewhere")) continue;
-    const raw = m[2] ?? "";
+    const raw = unwikilink(m[2] ?? "");
 
     const prio = PRIO_RE.exec(raw);
     const due = DUE_RE.exec(raw);
     const recur = RECUR_RE.exec(raw);
     const tags = [...raw.matchAll(TAG_RE)].map((t) => t[1]);
-    const title = raw
+    const stripped = raw
       .replace(PRIO_ALL, "")
       .replace(DUE_ALL, "")
       .replace(RECUR_ALL, "")
       .replace(TAG_RE, "")
       .replace(/\s+/g, " ")
       .trim();
+    const { title, notes: titleNotes } = cleanTitle(stripped);
     if (!title) {
       skipped.push({ line, reason: "empty text" });
       continue;
@@ -91,9 +97,45 @@ export function parseBacklog(markdown: string): {
     };
     if (dueDate) parsed.due = dueDate;
     if (recurDays) parsed.recur = recurDays;
+    if (titleNotes.length) parsed.notes = titleNotes.join("\n");
     items.push(parsed);
   }
-  return { items, skipped };
+  const { items: unique, merged } = mergeCopies(items);
+  return { items: unique, skipped, merged };
+}
+
+const union = (a: string[], b: string[]) => [...a, ...b.filter((x) => !a.includes(x))];
+
+/**
+ * Folds copies of one task (same normalised title) into the first. The copy under a real
+ * section wins over one in an inbox section; tags and notes are merged, and a missing
+ * due date or repeat is filled from the copy.
+ */
+function mergeCopies(items: ParsedItem[]): { items: ParsedItem[]; merged: { title: string; section: string }[] } {
+  const kept: ParsedItem[] = [];
+  const byTitle = new Map<string, ParsedItem>();
+  const merged: { title: string; section: string }[] = [];
+  for (const it of items) {
+    const norm = normaliseTitle(it.title);
+    const first = norm ? byTitle.get(norm) : undefined;
+    if (!first) {
+      kept.push(it);
+      if (norm) byTitle.set(norm, it);
+      continue;
+    }
+    merged.push({ title: first.title, section: it.section });
+    if (sectionToArea(first.section) === "inbox" && sectionToArea(it.section) !== "inbox") {
+      first.section = it.section;
+      first.inbox = it.inbox;
+    }
+    first.tags = union(first.tags, it.tags);
+    first.priority = Math.min(first.priority, it.priority) as Priority;
+    if (!first.due && it.due) first.due = it.due;
+    if (!first.recur && it.recur) first.recur = it.recur;
+    const notes = union((first.notes ?? "").split("\n").filter(Boolean), (it.notes ?? "").split("\n").filter(Boolean));
+    if (notes.length) first.notes = notes.join("\n");
+  }
+  return { items: kept, merged };
 }
 
 export interface ImportNote {
@@ -115,6 +157,7 @@ export function backlogItem(p: ParsedItem, today: ISODate): Item {
     touchedAt: today,
     source: { kind: "backlog", key: p.key },
   };
+  if (p.notes) item.notes = p.notes;
   if (p.tags.length) item.tags = p.tags;
   if (p.due) item.due = p.due;
   if (p.recur) item.recur = p.recur;

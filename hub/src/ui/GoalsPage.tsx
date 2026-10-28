@@ -1,4 +1,5 @@
-import { useContext } from "react";import type { ISODate } from "../domain/types";
+import { useContext } from "react";
+import type { ISODate } from "../domain/types";
 import { GoalCard } from "./GoalProgress";
 import { GoalForm } from "./GoalForm";
 import { ShellContext } from "./shellContext";
