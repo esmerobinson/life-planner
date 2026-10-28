@@ -1,0 +1,66 @@
+/* Vision board. Esme's choice: VISUAL-LANGUAGE.md "Vision board", mockup-vision.html tab D
+   ("Just the photos"): pins packed edge to edge in columns at their real shapes, no gaps,
+   no borders, no rounded corners, no shadows; the page scrolls through it. Values copied from
+   that mockup: columns 4 at a 220px minimum with no column gap; the heading row (flex, 12px gap,
+   wrapping, 16px under it); the source line 13px at 0.8 opacity (the same as .strip-meta).
+   Phone (below 700px, the shell's .is-phone): 2 columns, from the brief.
+
+   Not in the mockup, implementer's call (Esme may veto): the Refresh pill is the existing
+   secondary soft pill (button.btn-secondary) rather than the mockup's smaller pill; the
+   "Change board" disclosure sits under the heading row in the same small line style, with its
+   form in the existing form-field/label styles, 16px above the collage (the heading row's own
+   gap). Colours are tokens only; nothing animates. */
+
+.vision-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.vision-head h1 {
+  margin: 0;
+}
+
+.vision-source,
+.vision-change summary,
+.vision-note {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.vision-change {
+  margin-bottom: 16px;
+}
+
+.vision-change-form {
+  max-width: 520px;
+}
+
+.vision-change-form input {
+  width: 100%;
+}
+
+.vision-note {
+  margin: 8px 0;
+}
+
+.vision-collage {
+  columns: 4 220px;
+  column-gap: 0;
+}
+
+.vision-collage a {
+  display: block;
+  break-inside: avoid;
+}
+
+.vision-collage img {
+  display: block;
+  width: 100%;
+}
+
+.is-phone .vision-collage {
+  columns: 2;
+}
