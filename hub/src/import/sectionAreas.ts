@@ -5,6 +5,7 @@ const TABLE: Record<string, AreaId> = {
   content: "content",
   art: "art",
   "inner work": "mind",
+  "creative technologist": "tech",
   health: "body",
   vibecoding: "tech",
   "production & freelance": "production",

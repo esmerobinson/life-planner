@@ -165,6 +165,51 @@ describe("backup", () => {
     });
   });
 
+  describe("obsidian goal fields", () => {
+    const g: Goal = {
+      ...goal("og"), why: "Because.\n\nAlso.", cadence: "Weekly: 3 sessions", notes: "Study a, b",
+      source: { kind: "obsidian", key: "obsidian:goal:writing" },
+    };
+    const t = item("ot", { goalId: "og", source: { kind: "obsidian", key: "obsidian:task:writing:step" } });
+    const file = (goals: unknown[], items: unknown[] = []) =>
+      ({ app: "life-hub", schema: 1, exportedOn: "2026-10-28", goals, items });
+
+    it("round-trips new goal fields and obsidian-sourced goal and task (replace and merge)", async () => {
+      await db.goals.add(g);
+      await db.items.add(t);
+      const out = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+      await db.goals.clear();
+      await db.items.clear();
+      await restoreBackup(out, "replace");
+      expect(await db.goals.get("og")).toEqual(g);
+      expect(await db.items.get("ot")).toEqual(t);
+      await db.goals.clear();
+      await db.items.clear();
+      await restoreBackup(out, "merge");
+      expect(await db.goals.get("og")).toEqual(g);
+      expect(await db.items.get("ot")).toEqual(t);
+    });
+
+    it.each([
+      ["why number", { why: 3 }],
+      ["cadence number", { cadence: 3 }],
+      ["notes number", { notes: {} }],
+      ["why too long", { why: "x".repeat(4001) }],
+      ["cadence too long", { cadence: "x".repeat(4001) }],
+      ["notes too long", { notes: "x".repeat(4001) }],
+      ["source kind", { source: { kind: "backlog", key: "k" } }],
+      ["source key", { source: { kind: "obsidian" } }],
+      ["source not object", { source: "obsidian" }],
+    ])("rejects bad %s", async (_n, extra) => {
+      await expect(restoreBackup(file([{ ...goal("bad"), ...extra }]), "merge")).rejects.toThrow(/backup/i);
+    });
+
+    it("accepts exactly 4000 characters", async () => {
+      await restoreBackup(file([{ ...goal("ok"), why: "x".repeat(4000) }]), "merge");
+      expect((await db.goals.get("ok"))!.why).toHaveLength(4000);
+    });
+  });
+
   describe("new areas", () => {
     const NEW = ["tech", "production", "admin"] as const;
     const seed = async () => {

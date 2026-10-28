@@ -65,6 +65,8 @@ function validGoal(r: unknown): r is Goal {
     ) &&
     isStr(r.createdAt) && isValidISODate(r.createdAt) &&
     optDate(r.deadline) &&
+    optText(r.why) && optText(r.cadence) && optText(r.notes) &&
+    validGoalSource(r.source) &&
     (r.monthlyTarget === undefined ||
       (typeof r.monthlyTarget === "number" && Number.isFinite(r.monthlyTarget) && r.monthlyTarget > 0))
   );
@@ -76,6 +78,14 @@ const SOURCE_LIST: readonly string[] = SOURCE_KINDS;
 const optDate = (v: unknown) => v === undefined || (isStr(v) && isValidISODate(v));
 const optStr = (v: unknown) => v === undefined || isStr(v);
 const optStrArray = (v: unknown) => v === undefined || isStrArray(v);
+
+/** Absent, or a string of at most 4000 characters. */
+const optText = (v: unknown) => v === undefined || (isStr(v) && v.length <= 4000);
+
+function validGoalSource(v: unknown) {
+  if (v === undefined) return true;
+  return isObj(v) && v.kind === "obsidian" && isStr(v.key);
+}
 
 function validSource(v: unknown) {
   if (v === undefined) return true;

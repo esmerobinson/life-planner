@@ -7,7 +7,7 @@ export type Priority = 1 | 2 | 3;
 /** The one lists of weekdays and item sources. Validators derive from these. */
 export const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
-export const SOURCE_KINDS = ["backlog", "manual", "gtasks"] as const;
+export const SOURCE_KINDS = ["backlog", "manual", "gtasks", "obsidian"] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 export type ISODate = string;
 
@@ -47,5 +47,11 @@ export interface Goal {
   deadline?: ISODate;
   monthlyTarget?: number;
   milestones: Milestone[];
+  /** Why this goal matters, in the user's words. Plain text. */
+  why?: string;
+  /** How often it is worked on, e.g. "Weekly: 3 sessions". Plain text. */
+  cadence?: string;
+  notes?: string;
+  source?: { kind: "obsidian"; key: string };
   createdAt: ISODate;
 }
