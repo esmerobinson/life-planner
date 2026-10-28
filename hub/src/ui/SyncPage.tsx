@@ -4,6 +4,10 @@ import type { SyncController } from "../sync/controller";
 import { saveSyncSettings, stopSyncing } from "../sync/engine";
 import { deriveToken } from "../sync/token";
 
+/** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
+export const LOCKOUT_LINE =
+  "After several wrong passphrases, sync stops accepting tries for 15 minutes. Wait, then try again.";
+
 /** "Last synced" time: the time today, or the date and time on another day. */
 function when(ms: number): string {
   const d = new Date(ms);
@@ -120,6 +124,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
           The passphrase itself is not kept. A key made from it is stored on this device so sync can run by itself;
           Stop syncing removes it.
         </p>
+        <p>{LOCKOUT_LINE}</p>
         <div className="form-actions">
           <button type="submit" disabled={busy}>
             Save

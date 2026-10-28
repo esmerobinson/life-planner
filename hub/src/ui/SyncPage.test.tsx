@@ -9,7 +9,7 @@ import { getMeta, saveSyncSettings } from "../sync/engine";
 import { deriveToken } from "../sync/token";
 import { syncController } from "../sync";
 import { Sidebar } from "./Sidebar";
-import { SyncPage } from "./SyncPage";
+import { LOCKOUT_LINE, SyncPage } from "./SyncPage";
 
 // Obviously fake: never a real passphrase.
 const PASSPHRASE = "fake-passphrase-for-tests-only-7f3a";
@@ -82,6 +82,11 @@ describe("SyncPage", () => {
     expect(stored).not.toContain(PASSPHRASE);
     expect(stored).not.toContain(PASSPHRASE.normalize("NFD"));
     expect(screen.queryByDisplayValue(PASSPHRASE)).toBeNull();
+  });
+
+  it("says that wrong passphrases are limited and how long to wait", () => {
+    setup();
+    expect(screen.getByText(LOCKOUT_LINE)).toBeInTheDocument();
   });
 
   it("prefills the address from VITE_SYNC_URL", async () => {

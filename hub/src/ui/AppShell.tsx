@@ -7,6 +7,8 @@ import { QuickAdd } from "./QuickAdd";
 import { ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
+import { DbClosedNotice } from "./DbClosedNotice";
+import { db } from "../data/db";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
 
@@ -67,6 +69,7 @@ export function AppShell() {
         <Sidebar />
         <main className="app-content">
           <UpdatePrompt />
+          <DbClosedNotice db={db} />
           <div className="shell-actions">
             <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
               Add
