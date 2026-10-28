@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { monthlyProgress } from "../domain/progress";
 import type { ISODate } from "../domain/types";
-import { GoalProgress } from "./GoalProgress";
+import { GoalCard } from "./GoalProgress";
 import { JournalCardStub } from "./JournalCardStub";
 import { TodayPanel } from "./TodayPanel";
 import { useHubData } from "./useHubData";
@@ -35,12 +35,7 @@ export function HomePage({ today }: { today: ISODate }) {
         {withTargets.length > 0 && (
           <ul className="goal-list">
             {withTargets.map((g) => (
-              <li key={g.id} className="goal-card">
-                <h3>
-                  <Link to={`/goals/${g.id}`}>{g.title}</Link>
-                </h3>
-                <GoalProgress goal={g} items={items} today={today} />
-              </li>
+              <GoalCard key={g.id} goal={g} items={items} today={today} />
             ))}
           </ul>
         )}

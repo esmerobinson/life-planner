@@ -129,13 +129,6 @@ body {
   border-radius: var(--radius-tile);
 }
 
-/* Sticker look is undecided: magenta placeholder, system font, page text colour. */
-.overdue-sticker {
-  background: var(--placeholder);
-  color: var(--text);
-  font-family: system-ui;
-}
-
 .progress-bar {
   height: var(--bar-height);
   border-radius: var(--bar-radius);

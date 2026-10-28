@@ -117,7 +117,7 @@ test("two devices converge through the real server: import, own items, edits, a 
 
   // An edit on B after A's import reaches A.
   await b.goto(`/area/${AREA}`);
-  await b.getByRole("button", { name: "Done: Water the fictional ferns" }).click();
+  await b.getByRole("checkbox", { name: "Mark done: Water the fictional ferns" }).click();
   await expect.poll(async () => (await readStore(b, "items")).find((r) => r.id === "e2e-item-1")?.status).toBe("done");
   await syncNow(b);
   await syncNow(a);

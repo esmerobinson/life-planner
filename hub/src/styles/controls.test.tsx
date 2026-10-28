@@ -234,13 +234,13 @@ describe("controls.css (approved mockup A, soft pills)", () => {
     expect(screen.getByRole("button", { name: "Morning pages" }).parentElement?.classList.contains("btn-group")).toBe(true);
     journal.unmount();
 
+    // Move to is now a popover in the 1A menu look (strips.css), not a row of pills.
     render(<MoveToMenu itemId="x" today="2026-10-27" onMoved={() => {}} />);
     await userEvent.click(screen.getByRole("button", { name: "Move to" }));
     const menu = screen.getByRole("group", { name: "Move to" });
-    expect(menu.classList.contains("btn-group")).toBe(true);
+    expect(menu.classList.contains("pop-menu")).toBe(true);
     const choices = Array.from(menu.querySelectorAll("button"));
-    expect(choices.length).toBe(5);
-    for (const b of choices) expect(b.classList.contains("btn-secondary")).toBe(true);
+    expect(choices.length).toBe(10); // eight areas, This week, Archive (Remove from today is Today-only)
   });
 
   it("grid items can shrink", () => {

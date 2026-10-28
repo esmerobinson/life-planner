@@ -3,6 +3,7 @@ import { itemToGoal, updateItem } from "../data/repo";
 import type { AreaId, ISODate, Item, Priority } from "../domain/types";
 import { AREA_CHOICES } from "./areas";
 import { SAVE_ERROR } from "./messages";
+import { TaskRow } from "./TaskRow";
 
 const FILE_AREAS = AREA_CHOICES.filter((a) => a.id !== "inbox");
 
@@ -80,131 +81,139 @@ export function InboxRow({
   }
 
   return (
-    <li className="inbox-row form-row">
-      <input
-        type="checkbox"
-        aria-label={`Select ${item.title}`}
-        checked={selected}
-        onChange={onToggle}
-      />
-      <span className="inbox-title">{item.title}</span>
-      {item.tags?.map((t) => (
-        <span key={t} className="inbox-tag">
-          #{t}
-        </span>
-      ))}
-      {reason && <p className="inbox-check">{reason}</p>}
-      <div className="btn-group" role="group" aria-label={`File ${item.title} in`}>
-        {FILE_AREAS.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className="btn-secondary"
-            aria-label={`File ${item.title} in ${a.label}`}
-            disabled={busy}
-            onClick={() => void run(() => updateItem(item.id, { areaId: a.id }, today))}
-          >
-            {a.label}
-          </button>
-        ))}
-      </div>
-      <details>
-        <summary>More options</summary>
-        <div className="form-row">
-          <span>This is a:</span>
-          <div className="btn-group" role="group" aria-label="This is a:">
-            <button
-              type="button"
-              aria-pressed={item.kind === "task"}
-              disabled={busy}
-              onClick={() => setKind("task")}
-            >
-              To-do
-            </button>
-            <button
-              type="button"
-              aria-pressed={item.kind === "idea"}
-              disabled={busy}
-              onClick={() => setKind("idea")}
-            >
-              Idea
-            </button>
+    <TaskRow
+      item={item}
+      today={today}
+      onMoved={onFiled}
+      className="inbox-row"
+      lead={<input type="checkbox" aria-label={`Select ${item.title}`} checked={selected} onChange={onToggle} />}
+      meta={
+        (item.tags?.length || reason) && (
+          <div className="strip-meta">
+            {item.tags?.map((t) => (
+              <span key={t} className="inbox-tag">
+                #{t}{" "}
+              </span>
+            ))}
+            {reason && <p className="inbox-check">{reason}</p>}
           </div>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={busy}
-            onClick={() => void run(() => itemToGoal(item.id, areaId || "admin", today))}
-          >
-            Make it a goal
-          </button>
-        </div>
-        <div className="form-row">
-          <label className="form-field">
-            <span className="form-label">Area</span>
-            <select
-              aria-label={`Area for ${item.title}`}
-              value={areaId}
-              onChange={(e) => {
-                setAreaId(e.target.value as AreaId);
-                setGoalId("");
-              }}
-            >
-              <option value="">Choose</option>
-              {FILE_AREAS.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="form-field">
-            <span className="form-label">Goal</span>
-            <select
-              aria-label={`Goal for ${item.title}`}
-              value={goalId}
-              onChange={(e) => setGoalId(e.target.value)}
-            >
-              <option value="">None</option>
-              {goals
-                .filter((g) => g.areaId === areaId)
-                .map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.title}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="form-field">
-            <span className="form-label">Priority</span>
-            <select
-              aria-label={`Priority for ${item.title}`}
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value) as Priority)}
-            >
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-            </select>
-          </label>
-          {item.kind !== "idea" && (
-            <label className="form-field">
-              <span className="form-label">Due</span>
-              <input
-                type="date"
-                aria-label={`Due for ${item.title}`}
-                value={due}
-                onChange={(e) => setDue(e.target.value)}
-              />
-            </label>
-          )}
-          <button type="button" aria-label={`File ${item.title}`} disabled={busy} onClick={() => void file()}>
-            File it
-          </button>
-        </div>
-      </details>
-      {message && <span className="form-message">{message}</span>}
-    </li>
+        )
+      }
+      tray={
+        <>
+          <div className="btn-group" role="group" aria-label={`File ${item.title} in`}>
+            {FILE_AREAS.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className="btn-secondary"
+                aria-label={`File ${item.title} in ${a.label}`}
+                disabled={busy}
+                onClick={() => void run(() => updateItem(item.id, { areaId: a.id }, today))}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+          <details>
+            <summary>More options</summary>
+            <div className="form-row">
+              <span>This is a:</span>
+              <div className="btn-group" role="group" aria-label="This is a:">
+                <button
+                  type="button"
+                  aria-pressed={item.kind === "task"}
+                  disabled={busy}
+                  onClick={() => setKind("task")}
+                >
+                  To-do
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={item.kind === "idea"}
+                  disabled={busy}
+                  onClick={() => setKind("idea")}
+                >
+                  Idea
+                </button>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={busy}
+                onClick={() => void run(() => itemToGoal(item.id, areaId || "admin", today))}
+              >
+                Make it a goal
+              </button>
+            </div>
+            <div className="form-row">
+              <label className="form-field">
+                <span className="form-label">Area</span>
+                <select
+                  aria-label={`Area for ${item.title}`}
+                  value={areaId}
+                  onChange={(e) => {
+                    setAreaId(e.target.value as AreaId);
+                    setGoalId("");
+                  }}
+                >
+                  <option value="">Choose</option>
+                  {FILE_AREAS.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="form-field">
+                <span className="form-label">Goal</span>
+                <select
+                  aria-label={`Goal for ${item.title}`}
+                  value={goalId}
+                  onChange={(e) => setGoalId(e.target.value)}
+                >
+                  <option value="">None</option>
+                  {goals
+                    .filter((g) => g.areaId === areaId)
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.title}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="form-field">
+                <span className="form-label">Priority</span>
+                <select
+                  aria-label={`Priority for ${item.title}`}
+                  value={priority}
+                  onChange={(e) => setPriority(Number(e.target.value) as Priority)}
+                >
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
+              </label>
+              {item.kind !== "idea" && (
+                <label className="form-field">
+                  <span className="form-label">Due</span>
+                  <input
+                    type="date"
+                    aria-label={`Due for ${item.title}`}
+                    value={due}
+                    onChange={(e) => setDue(e.target.value)}
+                  />
+                </label>
+              )}
+              <button type="button" aria-label={`File ${item.title}`} disabled={busy} onClick={() => void file()}>
+                File it
+              </button>
+            </div>
+          </details>
+          {message && <span className="form-message">{message}</span>}
+        </>
+      }
+    />
   );
 }
 

@@ -46,3 +46,6 @@ export const AREA_CHOICES: { id: AreaId; label: string }[] = AREA_IDS.map((id) =
 
 /** Areas that have a page and can own goals: AREA_CHOICES without the inbox. */
 export const GOAL_AREAS = AREA_CHOICES.filter((a) => a.id !== "inbox");
+
+/** GOAL_AREAS in sidebar order (Admin first), for lists a person scans like the sidebar. */
+export const GOAL_AREAS_BY_SIDEBAR = NAV.flatMap((n) => GOAL_AREAS.filter((a) => a.id === n.id));

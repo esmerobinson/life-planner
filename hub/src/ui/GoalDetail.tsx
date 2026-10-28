@@ -1,9 +1,8 @@
 import { useContext } from "react";
 import { useParams } from "react-router-dom";
 import { toggleMilestone, untickItem, updateGoal } from "../data/repo";
-import { addDays, mondayOf } from "../domain/dates";
-import { monthlyProgress } from "../domain/progress";
-import type { ISODate, Item } from "../domain/types";
+import { groupGoalTasks, monthlyProgress } from "../domain/progress";
+import type { ISODate } from "../domain/types";
 import { DoneSection } from "./DoneSection";
 import { GoalEditForm } from "./GoalEditForm";
 import { areaLabel, GoalProgress } from "./GoalProgress";
@@ -11,19 +10,6 @@ import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow, useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
-
-function group(items: Item[], today: ISODate): { name: string; items: Item[] }[] {
-  const monday = mondayOf(today);
-  const sunday = addDays(monday, 6);
-  const out = { Today: [] as Item[], "This week": [] as Item[], Later: [] as Item[] };
-  for (const it of items) {
-    if (it.pinnedDate === today) out.Today.push(it);
-    else if (it.weekOf === monday || (it.pinnedDate && it.pinnedDate >= monday && it.pinnedDate <= sunday)) {
-      out["This week"].push(it);
-    } else out.Later.push(it);
-  }
-  return Object.entries(out).map(([name, items]) => ({ name, items }));
-}
 
 export function GoalDetail({ today }: { today: ISODate }) {
   const { id } = useParams();
@@ -37,16 +23,20 @@ export function GoalDetail({ today }: { today: ISODate }) {
   if (error) return <p>{error}</p>;
   if (!goal) return <p>That goal does not exist.</p>;
 
-  /** Write, then re-read here and tell the shell so every other page re-reads too. */
-  async function save(fn: () => Promise<unknown>) {
-    if (!(await attempt(fn))) return;
+  /** Re-read here and tell the shell so every other page re-reads too. */
+  async function changed() {
     await refresh();
     await shell?.refresh();
   }
 
+  /** Write, then re-read everywhere. */
+  async function save(fn: () => Promise<unknown>) {
+    if (!(await attempt(fn))) return;
+    await changed();
+  }
+
   const month = monthlyProgress(goal, items, today);
-  const open = items.filter((i) => i.goalId === goal.id && i.kind === "task" && i.status === "open");
-  const groups = group(open, today).filter((g) => g.items.length > 0);
+  const groups = groupGoalTasks(goal, items, today).filter((g) => g.items.length > 0);
 
   return (
     <section className="goal-detail">
@@ -72,7 +62,7 @@ export function GoalDetail({ today }: { today: ISODate }) {
         </p>
       )}
       {goal.kind === "finite" && goal.milestones.length > 0 && (
-        <ul aria-label="Milestones">
+        <ul aria-label="Milestones" className="plain-list">
           {goal.milestones.map((m) => (
             <li key={m.id}>
               <label>
@@ -91,15 +81,16 @@ export function GoalDetail({ today }: { today: ISODate }) {
       {groups.map((g) => (
         <div key={g.name}>
           <h2>{g.name}</h2>
-          <ul aria-label={g.name}>
+          <ul aria-label={g.name} className="strip-list">
             {g.items.map((it) => (
-              <TaskRow key={it.id} item={it} today={today} onTick={(i) => void tick(i)} onMoved={refresh} />
+              <TaskRow key={it.id} item={it} today={today} onTick={tick} onMoved={changed} />
             ))}
           </ul>
         </div>
       ))}
       <DoneSection
         items={items.filter((i) => i.goalId === goal.id && i.kind === "task")}
+        today={today}
         onUndo={(itemId) => void save(() => untickItem(itemId, today))}
       />
       <GoalEditForm

@@ -225,7 +225,7 @@ export function InboxPage({ today }: { today: ISODate }) {
       )}
       {result && <p>{result}</p>}
       {shown.length > 0 && (
-        <ul aria-label="Inbox items">
+        <ul aria-label="Inbox items" className="strip-list">
           {shown.map((it) => (
             <InboxRow key={it.id} item={it} today={today} goals={goals}
               onFiled={changed}
@@ -240,22 +240,26 @@ export function InboxPage({ today }: { today: ISODate }) {
       {archived.length > 0 && (
         <details>
           <summary>{`Archived from the inbox (${archived.length})`}</summary>
-          <ul aria-label="Archived from the inbox">
+          <ul aria-label="Archived from the inbox" className="strip-list">
             {archived.map((it) => (
-              <li key={it.id} className="today-row">
-                <span className="today-title">{it.title}</span>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  aria-label={`Restore: ${it.title}`}
-                  onClick={() =>
-                    void attempt(() => restoreItem(it.id, today)).then(async (ok) => {
-                      if (ok) await changed();
-                    })
-                  }
-                >
-                  Restore
-                </button>
+              <li key={it.id} className="strip no-tick">
+                <div className="strip-body">
+                  <div className="strip-title">{it.title}</div>
+                </div>
+                <div className="strip-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    aria-label={`Restore: ${it.title}`}
+                    onClick={() =>
+                      void attempt(() => restoreItem(it.id, today)).then(async (ok) => {
+                        if (ok) await changed();
+                      })
+                    }
+                  >
+                    Restore
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

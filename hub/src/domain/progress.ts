@@ -1,4 +1,4 @@
-import { addDays, monthOf } from "./dates";
+import { addDays, mondayOf, monthOf } from "./dates";
 import type { Goal, ISODate, Item } from "./types";
 
 export type MonthlyProgress = { done: number; target: number; ratio: number };
@@ -53,4 +53,44 @@ export function overallProgress(goal: Goal, items: Item[], today: ISODate): Over
     cursor = addDays(cursor, -1);
   }
   return { kind: "evidence", thisYear, monthsInARow, streakDays };
+}
+
+export type TickedOff = { thisMonth: number; lastMonth: number; ratio: number };
+
+/**
+ * Done tasks in one area completed this calendar month and last. The ratio compares this
+ * month with last month's total: min(1, thisMonth / max(lastMonth, 1)).
+ */
+export function tickedOff(areaId: string, items: Item[], today: ISODate): TickedOff {
+  const month = monthOf(today);
+  const last = prevMonth(month);
+  let thisMonth = 0;
+  let lastMonth = 0;
+  for (const it of items) {
+    if (it.areaId !== areaId || it.kind !== "task" || it.status !== "done" || !it.completedAt) continue;
+    const m = monthOf(it.completedAt);
+    if (m === month) thisMonth++;
+    else if (m === last) lastMonth++;
+  }
+  return { thisMonth, lastMonth, ratio: Math.min(1, thisMonth / Math.max(lastMonth, 1)) };
+}
+
+/** A goal's open tasks, grouped Today / This week / Later (each in listing order). */
+export function groupGoalTasks(goal: Goal, items: Item[], today: ISODate): { name: string; items: Item[] }[] {
+  const monday = mondayOf(today);
+  const sunday = addDays(monday, 6);
+  const out = { Today: [] as Item[], "This week": [] as Item[], Later: [] as Item[] };
+  for (const it of items) {
+    if (it.goalId !== goal.id || it.kind !== "task" || it.status !== "open") continue;
+    if (it.pinnedDate === today) out.Today.push(it);
+    else if (it.weekOf === monday || (it.pinnedDate && it.pinnedDate >= monday && it.pinnedDate <= sunday)) {
+      out["This week"].push(it);
+    } else out.Later.push(it);
+  }
+  return Object.entries(out).map(([name, items]) => ({ name, items }));
+}
+
+/** The goal's next step: its first open task in the goal page's order (Today, This week, Later). */
+export function nextStep(goal: Goal, items: Item[], today: ISODate): Item | undefined {
+  return groupGoalTasks(goal, items, today).flatMap((g) => g.items)[0];
 }

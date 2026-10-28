@@ -4,7 +4,7 @@ import { unstamped } from "../test/unstamped";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
   archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem, updateGoal, archiveItems,
-  itemToGoal,
+  itemToGoal, pinTo,
 } from "./repo";
 import { exportBackup, restoreBackup } from "./backup";
 
@@ -158,6 +158,37 @@ describe("updateItem", () => {
     expect(got.tags).toEqual(["x"]);
     expect(got.status).toBe("open");
     expect(got.touchedAt).toBe(today);
+  });
+});
+
+describe("pinTo (Schedule for)", () => {
+  it("pins to a day, clears a Remove-from-today hide, and never touches due", async () => {
+    const a = await createItem({ ...base, due: "2026-10-20" }, "2026-10-01");
+    await removeFromToday(a.id, today);
+    await pinTo(a.id, today, today);
+    const got = (await db.items.get(a.id))!;
+    expect(got.pinnedDate).toBe(today);
+    expect("hiddenOn" in got).toBe(false);
+    expect(got.due).toBe("2026-10-20");
+    expect(got.touchedAt).toBe(today);
+    await pinTo(a.id, "2026-11-02", today);
+    expect((await db.items.get(a.id))!.pinnedDate).toBe("2026-11-02");
+  });
+
+  it("clears the pin with undefined, keeping the rest", async () => {
+    const a = await createItem({ ...base, pinnedDate: "2026-10-29", weekOf: "2026-10-26", due: "2026-11-01" }, today);
+    await pinTo(a.id, undefined, today);
+    const got = (await db.items.get(a.id))!;
+    expect("pinnedDate" in got).toBe(false);
+    expect(got.weekOf).toBe("2026-10-26");
+    expect(got.due).toBe("2026-11-01");
+  });
+
+  it("rejects a date that is not real and ignores an unknown id", async () => {
+    const a = await createItem(base, today);
+    await expect(pinTo(a.id, "2026-02-30", today)).rejects.toThrow();
+    expect((await db.items.get(a.id))!.pinnedDate).toBeUndefined();
+    await expect(pinTo("nope", today, today)).resolves.toBeUndefined();
   });
 });
 

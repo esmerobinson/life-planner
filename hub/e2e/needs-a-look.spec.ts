@@ -49,8 +49,9 @@ test("Inbox shows overdue, due soon and stale tasks and the count drops when a d
   await expect(page.getByRole("heading", { name: "Overdue" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Due soon" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Not looked at in a while" })).toBeVisible();
-  await expect(page.getByText("Overdue by 3 days.")).toBeVisible();
-  await expect(page.getByText("Due in 2 days.")).toBeVisible();
+  // The due line (2D) says it: "Due <day> · 3 days late" and "Due <day>".
+  await expect(page.getByText(/^Due \w{3} \d{1,2} \w{3}( \d{4})? · 3 days late$/)).toBeVisible();
+  await expect(page.getByText(/^Due \w{3} \d{1,2} \w{3}( \d{4})?$/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Inbox (3)" })).toBeVisible();
 
   await page.getByLabel("Change due date for Pretend late errand").fill(await pageDate(page, 40));

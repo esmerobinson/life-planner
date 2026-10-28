@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { monthlyProgress, overallProgress } from "./progress";
+import { groupGoalTasks, monthlyProgress, nextStep, overallProgress, tickedOff } from "./progress";
 import type { Goal, Item } from "./types";
 
 const goal = (o: Partial<Goal> = {}): Goal => ({
@@ -68,5 +68,58 @@ describe("overallProgress", () => {
   });
   it("monthsInARow is 0 when this month has none", () => {
     expect(overallProgress(goal(), [done("2026-09-10")], "2026-10-27")).toMatchObject({ monthsInARow: 0 });
+  });
+});
+
+describe("tickedOff", () => {
+  const task = (o: Partial<Item>): Item => done("2026-10-01", { goalId: undefined, ...o });
+  it("counts this area's done tasks in this and last calendar month", () => {
+    const items = [
+      task({ completedAt: "2026-10-01" }),
+      task({ completedAt: "2026-10-28" }),
+      task({ completedAt: "2026-09-30" }),
+      task({ completedAt: "2026-09-01" }),
+      task({ completedAt: "2026-09-15" }),
+      task({ completedAt: "2026-08-31" }),
+      task({ completedAt: "2026-10-03", areaId: "art" }),
+      task({ completedAt: "2026-10-03", status: "open" }),
+      task({ completedAt: "2026-10-03", status: "archived" }),
+      task({ completedAt: "2026-10-03", kind: "idea" }),
+    ];
+    expect(tickedOff("writing", items, "2026-10-28")).toEqual({ thisMonth: 2, lastMonth: 3, ratio: 2 / 3 });
+  });
+  it("crosses the year and caps the ratio at 1, never dividing by zero", () => {
+    const items = [task({ completedAt: "2027-01-02" }), task({ completedAt: "2027-01-03" })];
+    expect(tickedOff("writing", items, "2027-01-05")).toEqual({ thisMonth: 2, lastMonth: 0, ratio: 1 });
+    expect(tickedOff("writing", [task({ completedAt: "2026-12-31" })], "2027-01-05")).toEqual({
+      thisMonth: 0,
+      lastMonth: 1,
+      ratio: 0,
+    });
+    expect(tickedOff("writing", [], "2027-01-05")).toEqual({ thisMonth: 0, lastMonth: 0, ratio: 0 });
+  });
+});
+
+describe("groupGoalTasks / nextStep", () => {
+  const open = (title: string, o: Partial<Item> = {}): Item =>
+    done("2026-10-01", { title, status: "open", completedAt: undefined, ...o });
+  it("groups a goal's open tasks into Today, This week and Later", () => {
+    const items = [
+      open("later"),
+      open("week", { weekOf: "2026-10-26" }),
+      open("today", { pinnedDate: "2026-10-28" }),
+      open("other goal", { goalId: "g2" }),
+      open("an idea", { kind: "idea" }),
+    ];
+    expect(groupGoalTasks(goal(), items, "2026-10-28").map((g) => [g.name, g.items.map((i) => i.title)])).toEqual([
+      ["Today", ["today"]],
+      ["This week", ["week"]],
+      ["Later", ["later"]],
+    ]);
+  });
+  it("the next step is the first open task in that order, or none", () => {
+    const items = [open("later"), open("week", { weekOf: "2026-10-26" })];
+    expect(nextStep(goal(), items, "2026-10-28")?.title).toBe("week");
+    expect(nextStep(goal(), [done("2026-10-02")], "2026-10-28")).toBeUndefined();
   });
 });

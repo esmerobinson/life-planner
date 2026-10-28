@@ -5,8 +5,8 @@ import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { useSaveError } from "./messages";
-import { MoveToMenu } from "./MoveToMenu";
 import { ShellContext } from "./shellContext";
+import { TaskRow } from "./TaskRow";
 import { useHubData } from "./useHubData";
 
 /** Completions this month per goal id, as pickToday expects. */
@@ -39,30 +39,15 @@ export function TodayPanel({ today }: { today: ISODate }) {
     [items, goals, today],
   );
 
-  async function tick(id: string) {
-    if (!(await attempt(() => tickItem(id, today)))) return;
+  async function tick(id: string): Promise<boolean> {
+    if (!(await attempt(() => tickItem(id, today)))) return false;
     setCelebrating(true);
     await changed();
+    return true;
   }
 
   function row(it: Item) {
-    const overdue = it.due !== undefined && it.due < today;
-    return (
-      <li key={it.id} className="today-row">
-        <button type="button" aria-label={`Done: ${it.title}`} onClick={() => void tick(it.id)}>
-          Done
-        </button>
-        <span className="today-title">{it.title}</span>
-        {overdue && (
-          <span
-            className="overdue-sticker"
-          >
-            OVERDUE
-          </span>
-        )}
-        <MoveToMenu itemId={it.id} today={today} onMoved={changed} label={it.title} />
-      </li>
-    );
+    return <TaskRow key={it.id} item={it} today={today} onTick={tick} onMoved={changed} onTodayList />;
   }
 
   if (error) {
@@ -83,13 +68,13 @@ export function TodayPanel({ today }: { today: ISODate }) {
       {saveError && <p className="form-message">{saveError}</p>}
       {empty && <p>Nothing planned for today.</p>}
       {rhythm.length > 0 && (
-        <ul aria-label="Rhythm">{rhythm.map(row)}</ul>
+        <ul aria-label="Rhythm" className="strip-list">{rhythm.map(row)}</ul>
       )}
-      {picks.length > 0 && <ul aria-label="Today">{picks.map(row)}</ul>}
+      {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
       {alsoDue.length > 0 && (
         <details>
           <summary>Also due</summary>
-          <ul aria-label="Also due">{alsoDue.map(row)}</ul>
+          <ul aria-label="Also due" className="strip-list">{alsoDue.map(row)}</ul>
         </details>
       )}
     </section>

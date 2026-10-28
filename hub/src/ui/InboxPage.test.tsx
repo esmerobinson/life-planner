@@ -18,6 +18,53 @@ beforeEach(async () => {
   await db.goals.clear();
 });
 
+describe("Inbox strips", () => {
+  it("a task is a strip: Select on the left (as before), the two icons on the right, filing under the title", async () => {
+    await createItem({ kind: "task", title: "Loose end", areaId: "inbox", priority: 2 }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    const row = (await screen.findByText("Loose end")).closest("li")!;
+    expect(row).toHaveClass("strip");
+    expect(screen.getByRole("list", { name: "Inbox items" })).toHaveClass("strip-list");
+    const select = within(row).getByRole("checkbox", { name: "Select Loose end" });
+    expect(row.firstElementChild).toBe(select);
+    expect(select).not.toHaveClass("tick");
+    const actions = row.querySelector(".strip-actions")!;
+    expect(within(actions as HTMLElement).getByRole("button", { name: "Schedule for: Loose end" })).toBeInTheDocument();
+    expect(within(actions as HTMLElement).getByRole("button", { name: "Move to: Loose end" })).toBeInTheDocument();
+    const tray = row.querySelector(".strip-tray") as HTMLElement;
+    expect(within(tray).getByRole("group", { name: "File Loose end in" })).toBeInTheDocument();
+    expect(within(tray).getByText("More options")).toBeInTheDocument();
+  });
+
+  it("an inbox task has no Done tick box (a done inbox item would have nowhere to be seen)", async () => {
+    await createItem({ kind: "task", title: "Quick one", areaId: "inbox", priority: 2 }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    const row = (await screen.findByText("Quick one")).closest("li")!;
+    expect(within(row).queryByRole("checkbox", { name: /^Mark done/ })).toBeNull();
+    expect(within(row).getAllByRole("checkbox").map((c) => c.getAttribute("aria-label"))).toEqual(["Select Quick one"]);
+  });
+
+  it("an inbox idea has no tick box and no Schedule for, but keeps Select, Move to and its filing", async () => {
+    await createItem({ kind: "idea", title: "Musing", areaId: "inbox", priority: 2 }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    const row = (await screen.findByText("Musing")).closest("li")!;
+    expect(row.firstElementChild).toBe(within(row).getByRole("checkbox", { name: "Select Musing" }));
+    expect(within(row).queryByRole("checkbox", { name: /^Mark done/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: "Schedule for: Musing" })).toBeNull();
+    expect(within(row).getByRole("button", { name: "Move to: Musing" })).toBeInTheDocument();
+    expect(within(row).getByRole("group", { name: "File Musing in" })).toBeInTheDocument();
+  });
+
+  it("Move to an area from the inbox files it", async () => {
+    const it = await createItem({ kind: "task", title: "Stray", areaId: "inbox", priority: 2 }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Move to: Stray" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Move Stray to" })).getByRole("button", { name: "Mind" }));
+    await vi.waitFor(() => expect(screen.queryByText("Stray")).toBeNull());
+    expect((await db.items.get(it.id))!.areaId).toBe("mind");
+  });
+});
+
 describe("InboxPage", () => {
   it("shows a calm sentence when empty", async () => {
     render(<InboxPage today={TODAY} />);
@@ -137,7 +184,7 @@ describe("bulk filing", () => {
     await seed(6);
     render(<InboxPage today={TODAY} />);
     for (let i = 1; i <= 5; i++) {
-      await userEvent.click(await screen.findByRole("checkbox", { name: new RegExp(`Loose ${i}$`) }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: new RegExp(`^Select Loose ${i}$`) }));
     }
     await userEvent.selectOptions(screen.getByLabelText("Move selected to"), "art");
     await userEvent.click(screen.getByRole("button", { name: "Move selected" }));
@@ -146,7 +193,7 @@ describe("bulk filing", () => {
     const all = await db.items.toArray();
     expect(all.filter((i) => i.areaId === "art")).toHaveLength(5);
     expect(all.find((i) => i.title === "Loose 6")!.areaId).toBe("inbox");
-    expect(screen.getByRole("checkbox", { name: /Loose 6$/ })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^Select Loose 6$/ })).not.toBeChecked();
   });
 
   it("select all shown then move empties the inbox", async () => {
@@ -166,7 +213,7 @@ describe("bulk filing", () => {
     expect(btn).toBeDisabled();
     await userEvent.selectOptions(screen.getByLabelText("Move selected to"), "body");
     expect(btn).toBeDisabled();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Loose 1$/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /^Select Loose 1$/ }));
     expect(btn).toBeEnabled();
     const sel = screen.getByLabelText("Move selected to");
     expect(within(sel).queryByRole("option", { name: "Inbox" })).toBeNull();
@@ -221,7 +268,7 @@ describe("bulk filing", () => {
     await vi.waitFor(() => expect(screen.queryByText("Loose 1")).toBeNull());
     await other.items.update(one.id, { areaId: "inbox" });
     await vi.waitFor(() => expect(screen.getByText("Loose 1")).toBeInTheDocument());
-    expect(screen.getByRole("checkbox", { name: /Loose 1$/ })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^Select Loose 1$/ })).not.toBeChecked();
     other.close();
   });
 });

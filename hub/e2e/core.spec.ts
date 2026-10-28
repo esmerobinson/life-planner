@@ -73,23 +73,26 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await page.goto("/today");
     const row = page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
     await expect(row).toBeVisible();
-    await expect(row.getByText("OVERDUE", { exact: true })).toBeVisible();
-    await row.getByRole("button", { name: "Done: Overdue pretend errand" }).click();
+    await expect(row.getByText(/· 3 days late$/)).toBeVisible();
+    await expect(row.getByText("OVERDUE", { exact: true })).toHaveCount(0);
+    await row.getByRole("checkbox", { name: "Mark done: Overdue pretend errand" }).click();
     await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toHaveCount(0);
 
-    // It sits under Done on its area page, with Undo; Undo brings it back.
+    // It sits under Done (1) on its area page, ticked; unticking brings it back.
     await page.goto("/area/admin");
-    await page.getByText("Done", { exact: true }).click();
-    await expect(page.getByRole("button", { name: "Undo: Overdue pretend errand" })).toBeVisible();
-    await page.getByRole("button", { name: "Undo: Overdue pretend errand" }).click();
-    await expect(page.getByRole("button", { name: "Undo: Overdue pretend errand" })).toHaveCount(0);
+    await expect(page.getByText("1 ticked off in", { exact: false })).toBeVisible();
+    await page.getByText("Done (1)", { exact: true }).click();
+    const ticked = page.getByRole("list", { name: "Done" }).getByRole("checkbox", { name: "Done: Overdue pretend errand" });
+    await expect(ticked).toBeChecked();
+    await ticked.click();
+    await expect(page.getByText("Done (0)", { exact: true })).toBeVisible();
     await page.goto("/today");
     await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toBeVisible();
   });
 
   await test.step("move to Tomorrow", async () => {
-    // Move it to Tomorrow: it leaves Today.
-    await page.getByRole("button", { name: "Move: Overdue pretend errand" }).click();
+    // Schedule it for Tomorrow: it leaves Today.
+    await page.getByRole("button", { name: "Schedule for: Overdue pretend errand" }).click();
     await page.getByRole("button", { name: "Tomorrow", exact: true }).click();
     await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toHaveCount(0);
   });
