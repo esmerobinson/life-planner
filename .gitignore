@@ -13,5 +13,6 @@ native/EsmeDay
 .superpowers/
 hub/node_modules/
 hub/dist/
+hub/dist-test/
 hub/test-results/
 hub/playwright-report/

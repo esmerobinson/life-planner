@@ -23,6 +23,8 @@ export default defineConfig({
         globPatterns: ["**/*.{html,js,css,png,svg,webmanifest}"],
         globIgnores: ["**/*.json"],
         navigateFallback: "index.html",
+        // Icons and the manifest are files, never answered with the app page.
+        navigateFallbackDenylist: [/^\/icons\//, /\.webmanifest$/],
         runtimeCaching: [],
         cleanupOutdatedCaches: true,
       },

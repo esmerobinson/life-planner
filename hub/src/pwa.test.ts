@@ -7,11 +7,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 // These tests read the BUILT output. They run `npm run build` themselves so that
 // `npx vitest run` is green from a clean checkout (the build takes a few seconds).
 const root = resolve(__dirname, "..");
-const dist = resolve(root, "dist");
+// A separate output directory: the test must never touch the shared dist/
+// (a running preview or Playwright's build may be using it).
+const dist = resolve(root, "dist-test");
 const read = (f: string) => readFileSync(resolve(dist, f), "utf8");
 
 beforeAll(() => {
-  execSync("npm run build", { cwd: root, stdio: "pipe" });
+  execSync("npx vite build --outDir dist-test --emptyOutDir", { cwd: root, stdio: "pipe" });
 }, 180_000);
 
 describe("built manifest", () => {
@@ -49,6 +51,9 @@ describe("built service worker", () => {
   it("has no runtime caching and falls back to index.html for navigation", () => {
     expect(sw()).not.toMatch(/StaleWhileRevalidate|CacheFirst|NetworkFirst/);
     expect(sw()).toMatch(/NavigationRoute/);
+    expect(sw()).toMatch(/denylist:\s*\[/);
+    expect(sw()).toMatch(/icons/);
+    expect(sw()).toMatch(/webmanifest/);
   });
 });
 

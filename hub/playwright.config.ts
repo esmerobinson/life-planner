@@ -20,7 +20,8 @@ export default defineConfig({
       // Production build, for the service worker (it is off in the dev server).
       command: "npm run build && npm run preview",
       url: "http://127.0.0.1:4173",
-      reuseExistingServer: true,
+      // Never reuse: a leftover preview could serve a stale dist/ and skip the build.
+      reuseExistingServer: false,
       timeout: 180_000,
     },
   ],

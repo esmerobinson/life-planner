@@ -91,6 +91,11 @@ The production build is an installable app that opens without a network. To try
 it, run `npm run build && npm run preview` and open `http://127.0.0.1:4173`
 (the service worker is off in `npm run dev`).
 
+`npx playwright test` builds and starts its own preview on 4173 every run and
+never reuses one, so a leftover preview makes it fail with a port-in-use error.
+If that happens, stop the old preview (check it is yours first):
+`lsof -ti tcp:4173 | xargs kill`, then rerun.
+
 - Chrome or Edge on Mac: click the install icon at the right of the address bar.
 - Safari on Mac: File > Add to Dock.
 - iPhone: Safari > Share > Add to Home Screen.
@@ -105,6 +110,7 @@ Honest limits:
   data. Use Backup to move data between them.
 - The offline copy holds only the app itself (page, scripts, styles, icons). Your
   tasks live in IndexedDB and the service worker never reads or caches them.
+- An installed window only checks for a new version when it next loads the app.
 - When a newer build exists the app shows "A new version is ready." with a
   Reload button; nothing updates under you until you press it.
 - The install icon is a magenta placeholder until you choose one (it is
@@ -114,12 +120,12 @@ Honest limits:
 
 ## Placeholders you must replace
 
-- App icon: solid magenta squares in `public/icons/` (see above)
 Colour values, type and motion come only from `VISUAL-LANGUAGE.md` at the repo
 root. Anything undecided is drawn in obvious magenta (`--placeholder` in
 `src/styles/tokens.css`) so it cannot be mistaken for a final look. Still to
 replace or confirm:
 
+- App icon: solid magenta squares in `public/icons/` (see above)
 - Celebration when a task is ticked
 - Overdue sticker
 - Active sidebar item outline
