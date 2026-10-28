@@ -151,17 +151,171 @@ button.chip {
   text-align: left;
 }
 
-/* The notes page for 3a: a plain textarea that grows (.notes). */
-textarea.peek-notes {
-  width: 100%;
-  min-height: 160px;
-  border: 0;
-  border-radius: var(--radius-tile);
+/* ---- The page (round 3b, mockup-round3 part 1 ".page") ----
+   From the mockup: --row background, --radius-tile corners, padding 14px 16px, line-height
+   1.5, min-height 200px; headings 17px with margin 4px 0 6px; checklist rows 8px gap and
+   6px apart with an 18px tick at radius 6px; the "Add:" row of 14px soft pills 6px apart;
+   pictures with --radius-tile corners, max-width 100%; the picture placeholder 120 x 84 in
+   --placeholder (magenta) until the photo has arrived.
+   Not in the mockup (please confirm): "##" headings use the panel's section size (15px,
+   .peek-sec); lines sit with no gap of their own (a blank line makes the gap); a ticked
+   checklist line is struck through at 60% like Done strips; list indents are the typed
+   spaces (in ch); the slash menu is the same pills under its line; "Remove picture" shows
+   under a picture on hover/focus. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.page-lines {
   background: var(--row);
-  padding: 12px;
+  border-radius: var(--radius-tile);
+  padding: 14px 16px;
   line-height: 1.5;
+  min-height: 200px;
+  cursor: text;
+}
+
+.page-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-text,
+textarea.page-field {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 1.5em;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  outline: none;
+}
+
+textarea.page-field {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
   resize: none;
   overflow: hidden;
+}
+
+.page-placeholder {
+  opacity: 0.6;
+}
+
+.page-h1,
+.page-h2 {
+  font-weight: 700;
+  margin: 4px 0 6px;
+}
+
+.page-h1 {
+  font-size: 17px;
+}
+
+.page-h2 {
+  font-size: 15px;
+}
+
+.page-check {
+  margin-bottom: 6px;
+}
+
+input[type="checkbox"].tick.page-tick {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  flex: none;
+  margin-top: 0.15em;
+}
+
+.page-check.is-done .page-text,
+.page-check.is-done textarea.page-field {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.page-dot {
+  flex: none;
+}
+
+.page-text a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.page-slash {
+  flex-basis: 100%;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+
+.page-slash .peek-pill.is-current {
+  outline: 2px solid var(--placeholder);
+}
+
+.page-pic {
+  margin: 6px 0;
+}
+
+.page-pic img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-tile);
+}
+
+.page-pic-wait {
+  width: 120px;
+  height: 84px;
+  border-radius: var(--radius-tile);
+  background: var(--placeholder);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  text-align: center;
+}
+
+.page-pic-remove {
+  margin-top: 6px;
+}
+
+.page-pic:not(:hover):not(:focus-within) .page-pic-remove {
+  visibility: hidden;
+}
+
+.page-add,
+.page-linkform {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.page-linkform input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+input[type="file"].page-file {
+  display: none;
+}
+
+.page-note {
+  margin: 0;
+  font-size: 14px;
 }
 
 .peek .strip-list {

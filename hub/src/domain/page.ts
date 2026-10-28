@@ -70,7 +70,7 @@ export function serializePage(blocks: Block[]): string {
  */
 export function withText(b: Block, text: string): string {
   if (b.type === "picture") return b.prefix;
-  const prefix = text !== "" && b.prefix !== "" && !/\s$/.test(b.prefix) ? `${b.prefix} ` : b.prefix;
+  const prefix = text !== "" && b.prefix !== "" && !/\s$/.test(b.prefix) && !/^\s/.test(text) ? `${b.prefix} ` : b.prefix;
   return prefix + text;
 }
 

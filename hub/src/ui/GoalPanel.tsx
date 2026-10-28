@@ -8,7 +8,7 @@ import { GOAL_AREAS, NAV } from "./areas";
 import { tickedOffToday } from "../domain/triage";
 import { DoneStrip } from "./DoneSection";
 import { areaLabel } from "./GoalProgress";
-import { NotesBox } from "./ItemPanel";
+import { PageEditor } from "./PageEditor";
 import { useSaveError } from "./messages";
 import { usePanel } from "./panelContext";
 import { PanelTop } from "./PanelTop";
@@ -385,7 +385,7 @@ export function GoalPanel({
       </section>
       <section>
         <h3 className="peek-sec">Notes</h3>
-        <NotesBox value={notes.value} onChange={notes.set} onBlur={notes.flush} maxLength={MAX_GOAL_TEXT} />
+        <PageEditor value={notes.value} onChange={notes.set} onBlur={notes.flush} today={today} />
       </section>
       {/* Delete goal: to the Bin (restorable there), after the same confirm step as Empty bin. */}
       {!asking ? (

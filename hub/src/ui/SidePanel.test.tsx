@@ -4,6 +4,7 @@ import { vi } from "vitest";
 import { db } from "../data/db";
 import { createGoal, createItem } from "../data/repo";
 import { currentUrl, renderApp } from "../test/renderApp";
+import { PAGE_WORDS } from "./PageEditor";
 import { clampPanelWidth, PANEL_DEFAULT_WIDTH, PANEL_MIN_WIDTH, PANEL_WIDTH_KEY } from "./SidePanel";
 
 const TODAY = "2026-10-28";
@@ -180,15 +181,16 @@ describe("the task panel", () => {
     await vi.waitFor(async () => expect((await db.items.get(a.id))!.title).toBe("After"));
   });
 
-  it("notes save after a pause and when the panel closes, kept exactly as typed", async () => {
+  it("notes (the page) save after a pause and when the panel closes, kept exactly as typed", async () => {
     const a = await task("Noted");
     renderApp(`/area/art?open=${a.id}`, TODAY);
     const p = within(await findPanel("Noted"));
-    fireEvent.change(p.getByLabelText("Notes"), { target: { value: "## Heading\n- [ ] pretend" } });
+    await userEvent.click(p.getByText(PAGE_WORDS.placeholder));
+    await userEvent.type(p.getByRole("textbox", { name: "Notes: text 1" }), "## Heading{Enter}- [[ ] pretend");
     await vi.waitFor(async () => expect((await db.items.get(a.id))!.notes).toBe("## Heading\n- [ ] pretend"), { timeout: 3000 });
-    fireEvent.change(p.getByLabelText("Notes"), { target: { value: "closing now" } });
+    await userEvent.keyboard(" closing now");
     await userEvent.click(p.getByRole("button", { name: "Close" }));
-    await vi.waitFor(async () => expect((await db.items.get(a.id))!.notes).toBe("closing now"));
+    await vi.waitFor(async () => expect((await db.items.get(a.id))!.notes).toBe("## Heading\n- [ ] pretend closing now"));
   });
 
   it("Edit: setting a goal makes the task appear in the goal's panel; Milestone flags it", async () => {

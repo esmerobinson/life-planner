@@ -9,6 +9,7 @@ import { useSaveError } from "./messages";
 import { usePanel } from "./panelContext";
 import { PanelTop } from "./PanelTop";
 import type { EscapeHandler } from "./SidePanel";
+import { PageEditor } from "./PageEditor";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
 
 const TYPE_LABEL: Record<Item["kind"], string> = { task: "To-do", idea: "Idea" };
@@ -255,7 +256,7 @@ export function ItemPanel({
           </>
         )}
       </div>
-      <NotesBox value={notes.value} onChange={notes.set} onBlur={notes.flush} />
+      <PageEditor value={notes.value} onChange={notes.set} onBlur={notes.flush} today={today} />
       </div>
     </div>
   );
@@ -302,38 +303,6 @@ function TitleBox({ value, onChange, onBlur }: { value: string; onChange: (v: st
         e.preventDefault();
         e.currentTarget.blur();
       }}
-    />
-  );
-}
-
-/**
- * The notes page for round 3a: a plain textarea that grows with its text (round 3b swaps
- * in the Notion-like editor). Markdown is kept exactly as typed.
- */
-export function NotesBox({
-  value,
-  onChange,
-  onBlur,
-  maxLength,
-  label = "Notes",
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onBlur: () => void;
-  maxLength?: number;
-  label?: string;
-}) {
-  const ref = useGrow(value);
-  return (
-    <textarea
-      ref={ref}
-      className="peek-notes"
-      aria-label={label}
-      placeholder="Start typing…"
-      value={value}
-      maxLength={maxLength}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
     />
   );
 }

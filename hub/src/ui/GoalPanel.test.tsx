@@ -156,11 +156,12 @@ describe("the goal panel (view)", () => {
   it("notes are typeable without Edit and save after a pause, keeping the text exactly", async () => {
     const g = await createGoal({ title: "Noted", areaId: "art", kind: "practice", notes: "Study <b>these</b>" }, TODAY);
     const p = await openGoal(g.id);
-    const notes = p.getByLabelText("Notes");
-    expect(notes).toHaveValue("Study <b>these</b>");
-    fireEvent.change(notes, { target: { value: "# Plan\n- [ ] a pretend step" } });
+    await userEvent.click(p.getByText("Study <b>these</b>"));
+    const line = p.getByRole("textbox", { name: "Notes: text 1" });
+    expect(line).toHaveValue("Study <b>these</b>");
+    await userEvent.clear(line);
+    await userEvent.type(line, "# Plan{Enter}- [[ ] a pretend step");
     await vi.waitFor(async () => expect((await db.goals.get(g.id))!.notes).toBe("# Plan\n- [ ] a pretend step"), { timeout: 3000 });
-    expect(notes).toHaveAttribute("maxlength", "4000");
   });
 });
 
