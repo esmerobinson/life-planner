@@ -19,7 +19,7 @@ export const PAGE_SIZE = 500;
  * Maximum total `data` bytes per response (a page always holds at least one row).
  * Keeps responses, and the Worker's memory, bounded even when rows are large.
  */
-export const MAX_RESPONSE_DATA_BYTES = 4 * 1024 * 1024;
+export const MAX_RESPONSE_DATA_BYTES = 1024 * 1024;
 /** Maximum size of one JSON chunk bound as a single D1 parameter (D1 caps strings at 2 MB). */
 export const DEFAULT_CHUNK_BYTES = 1_900_000;
 
@@ -150,6 +150,27 @@ SELECT tbl, id, updated_at, seq, CASE WHEN running <= ?5 OR running = size THEN 
 FROM sized
 ORDER BY seq`;
 
+// Returned winners, per chunk, run after ALL upserts of the request: for every (table, id)
+// named in the chunk, the stored row plus whether it is exactly a version the chunk sent
+// (same deviceId, updatedAt AND data). `data` is only returned when it is not.
+const WINNERS_SQL = `
+WITH c AS MATERIALIZED (
+  SELECT json_extract(value, '$.t') AS tbl,
+         json_extract(value, '$.i') AS id,
+         json_extract(value, '$.u') AS u,
+         json_extract(value, '$.d') AS d
+  FROM json_each(?1)
+),
+k AS (
+  SELECT r.tbl, r.id, r.updated_at, r.seq, r.data,
+         MAX(r.device_id = ?2 AND c.u = r.updated_at AND c.d = r.data) AS matched
+  FROM c JOIN rows AS r ON r.tbl = c.tbl AND r.id = c.id
+  GROUP BY r.tbl, r.id
+)
+SELECT tbl, id, updated_at, seq, matched, CASE WHEN matched THEN NULL ELSE data END AS data FROM k`;
+
+const CURRENT_SEQ_SQL = "SELECT value FROM meta WHERE key = 'seq'";
+
 interface PulledRow {
   tbl: string;
   id: string;
@@ -158,39 +179,74 @@ interface PulledRow {
   data: string | null;
 }
 
+interface WinnerRow extends PulledRow {
+  matched: number;
+}
+
 export interface SyncOptions {
   chunkBytes: number;
 }
 
-/** Applies the changes and pulls, atomically. Returns the response body as JSON text. */
+function rowJson(r: PulledRow): string {
+  // `data` is spliced in verbatim (it is already JSON text), so it round-trips byte-for-byte.
+  return `{"table":${JSON.stringify(r.tbl)},"id":${JSON.stringify(r.id)},"updatedAt":${r.updated_at},"data":${r.data}}`;
+}
+
+/**
+ * Applies the changes and pulls, atomically (one D1 batch). Returns the response body as JSON text.
+ * Response `changes` = paged rows (seq > cursor, exclusion rule, at most PAGE_SIZE / the byte
+ * budget) followed by "returned winners" (stored rows for this request's ids that are not
+ * exactly a version this request sent), each (table, id) at most once.
+ */
 export async function runSync(db: D1Database, request: SyncRequest, options: SyncOptions): Promise<string> {
+  const current = await db.prepare(CURRENT_SEQ_SQL).first<{ value: number }>();
+  if (request.cursor > (current?.value ?? 0)) throw new HttpError(409, "cursor_ahead");
+
+  const chunks = chunkEntries(request.changes, options.chunkBytes);
   const statements: D1PreparedStatement[] = [];
-  for (const chunk of chunkEntries(request.changes, options.chunkBytes)) {
+  for (const chunk of chunks) {
     statements.push(db.prepare(UPSERT_SQL).bind(chunk, request.deviceId));
     statements.push(db.prepare(BUMP_COUNTER_SQL));
   }
+  for (const chunk of chunks) statements.push(db.prepare(WINNERS_SQL).bind(chunk, request.deviceId));
   const exclusions = JSON.stringify(request.changes.map((c) => [c.table, c.id, c.updatedAt]));
   statements.push(
     db.prepare(PULL_SQL).bind(request.cursor, request.deviceId, exclusions, PAGE_SIZE + 1, MAX_RESPONSE_DATA_BYTES),
   );
+  statements.push(db.prepare(CURRENT_SEQ_SQL));
 
   const results = await db.batch(statements);
 
   let applied = 0;
-  for (let i = 0; i < results.length - 1; i += 2) applied += results[i]!.results.length;
-  const pulled = results.at(-1)!.results as unknown as PulledRow[];
+  for (let i = 0; i < chunks.length; i++) applied += results[2 * i]!.results.length;
+  const winnerResults = results.slice(2 * chunks.length, 3 * chunks.length);
+  const pulled = results.at(-2)!.results as unknown as PulledRow[];
+  const maxSeq = (results.at(-1)!.results[0] as { value: number } | undefined)?.value ?? 0;
 
-  const included: PulledRow[] = [];
+  const paged: PulledRow[] = [];
   for (const row of pulled) {
-    if (included.length === PAGE_SIZE || row.data === null) break;
-    included.push(row);
+    if (paged.length === PAGE_SIZE || row.data === null) break;
+    paged.push(row);
   }
-  const hasMore = pulled.length > included.length;
-  const cursor = included.length > 0 ? included.at(-1)!.seq : request.cursor;
+  const hasMore = pulled.length > paged.length;
+  // Without more pages, every row up to maxSeq was either sent or is the caller's own version.
+  const cursor = hasMore ? Math.max(request.cursor, paged.at(-1)?.seq ?? 0) : Math.max(request.cursor, maxSeq);
 
-  // `data` is spliced in verbatim (it is already JSON text), so it round-trips byte-for-byte.
-  const changes = included
-    .map((r) => `{"table":${JSON.stringify(r.tbl)},"id":${JSON.stringify(r.id)},"updatedAt":${r.updated_at},"data":${r.data}}`)
-    .join(",");
+  const key = (r: { tbl: string; id: string }) => JSON.stringify([r.tbl, r.id]);
+  const matched = new Set<string>();
+  const candidates = new Map<string, PulledRow>();
+  for (const result of winnerResults) {
+    for (const row of result.results as unknown as WinnerRow[]) {
+      if (row.matched) matched.add(key(row));
+      else candidates.set(key(row), row);
+    }
+  }
+  const pagedKeys = new Set(paged.map(key));
+  const winners = [...candidates.entries()]
+    .filter(([k]) => !matched.has(k) && !pagedKeys.has(k))
+    .map(([, row]) => row)
+    .sort((a, b) => a.seq - b.seq);
+
+  const changes = [...paged, ...winners].map(rowJson).join(",");
   return `{"cursor":${cursor},"applied":${applied},"ignored":${request.changes.length - applied},"hasMore":${hasMore},"changes":[${changes}]}`;
 }

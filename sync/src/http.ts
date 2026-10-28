@@ -30,6 +30,7 @@ export type ErrorCode =
   | "payload_too_large"
   | "unsupported_media_type"
   | "rate_limited"
+  | "cursor_ahead"
   | "server_misconfigured"
   | "internal";
 
