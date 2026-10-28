@@ -225,3 +225,22 @@ Changed from the first round: `restoreBackup` and the importers now throw
 `WAITING_FIRST_SYNC` / `REPLACE_OFF_WHILE_SYNCING` while sync is on; the v2 upgrade function
 was edited (not yet shipped to any device); a stuck change replaces the earlier
 "held but still pending" behaviour.
+
+## Fix round 2 (re-review `sync-client-rereview.md`: all findings addressed)
+
+| Item | Fix | Tests |
+| --- | --- | --- |
+| N1 `saveSyncSettings` outside the sync lock | it now runs under the same Web Lock as runs and restores, so a run in flight against the old address finishes first and cannot overwrite the fresh start | `syncGate.test.ts` "saving a new address waits for a run in flight…" (fake LockManager) |
+| N2 no way out after a 401 | "Stop syncing on this device" shows whenever sync is on, including after a refused passphrase; it clears the gate, so Replace, Merge and imports work again | `SyncPage.test.tsx` "after a refused passphrase, Stop syncing is still offered…" |
+| N3 stuck was permanent | stuck flags are cleared once per app start and on every "Sync now"; a change still refused is found again by bisecting and stays counted | `controller.test.ts`: refuse-then-accept on Sync now; refused again stays counted; accepted on the next app start; automatic runs do not retry |
+| N4 flaky "Sync now runs a sync" | waits until the button is enabled before clicking | full vitest run 5 times in a row: 629, 629, 629, 629, 629 passed |
+| Default address | `DEFAULT_SYNC_URL = "https://esmeworld-sync.esme-brain.workers.dev"` (in `src/sync/engine.ts`); the Sync page shows a saved address first, else `VITE_SYNC_URL`, else this default; still editable | `SyncPage.test.tsx` "a fresh page offers the deployed sync address…", "a saved address is shown instead of the default" |
+
+Counts after round 2: vitest 629 passed (5 runs in a row), tsc clean, build OK, playwright
+12 passed / 5 skipped (ports 5183/4183), e2e:sync 1 passed.
+
+Not done (noted by the re-review, not requested): N5 (check old data is valid before enabling
+sync on a device that already holds data: download a backup and Merge it into a scratch
+profile), N6 (day-resolution legacy stamps, accepted), N7 (a restore can wait behind a hung
+sync request: `fetch` has no timeout), and the e2e temp directory is not removed afterwards.
+Still unverified: a two-browser check against the DEPLOYED Worker from a scratch origin.

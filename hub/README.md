@@ -186,9 +186,10 @@ Your tasks live in this browser only, so back them up.
 
 ## Sync
 
-Open **Sync** (beside Backup at the bottom of the sidebar), enter the sync
-address (prefilled from `VITE_SYNC_URL` when that is set at build time) and the
-passphrase, then **Save**. The app works offline as before; it syncs on start,
+Open **Sync** (beside Backup at the bottom of the sidebar), type the
+passphrase and press **Save**. The sync address is already filled in with the
+deployed server (`https://esmeworld-sync.esme-brain.workers.dev`, or
+`VITE_SYNC_URL` if that is set at build time); it can still be changed. The app works offline as before; it syncs on start,
 when the network comes back, when the tab is shown again, shortly after you
 change something, and every minute while the tab is visible.
 
