@@ -180,6 +180,68 @@ describe("classification hook", () => {
   });
 });
 
+describe("the same task in the Backlog and in Google Tasks", () => {
+  const backlog = [
+    "## Inbox (to triage)",
+    "- [ ] Renew pretend passport (from Google Tasks) (overdue!)",
+    "- [ ] Water pretend plants (due today)",
+    "## Life admin",
+    "- [ ] Water pretend plants",
+    "- [ ] Renew pretend passport (due in 2d)",
+    "- [ ] Call [[Sam Example|Sam]] about the [[[[Art - Home|Art]] - Home|Art]] session",
+  ].join("\n");
+  const gtasks = JSON.stringify({
+    lists: [
+      {
+        id: "p",
+        title: "Paperwork",
+        tasks: [
+          { id: "p1", title: "Renew pretend passport", status: "needsAction", notes: "Take photos", due: "2026-12-15T00:00:00.000Z" },
+          { id: "p2", title: "Only in google", status: "needsAction" },
+        ],
+      },
+    ],
+  });
+  const t = () => buildTransfer({ backlog, gtasks, missing: [] }, TODAY);
+
+  it("keeps exactly one item per task, with cleaned titles", () => {
+    const titles = t().backup.items.map((i) => i.title).sort();
+    expect(titles).toEqual(["Call Sam about the Art session", "Only in google", "Renew pretend passport", "Water pretend plants"]);
+  });
+
+  it("keeps the Backlog row's area and adds the Google list tag, notes and due", () => {
+    const passport = t().backup.items.find((i) => i.title === "Renew pretend passport")!;
+    expect(passport).toMatchObject({
+      areaId: "admin", due: "2026-12-15", tags: ["paperwork"], source: { kind: "backlog", key: "backlog:renew pretend passport" },
+    });
+    expect(passport.notes?.split("\n").sort()).toEqual(["Take photos", "Was overdue on import"]);
+  });
+
+  it("does not overwrite a due date the Backlog row already has", () => {
+    const b = "## Life admin\n- [ ] Renew pretend passport [due 2026-11-30]";
+    const r = buildTransfer({ backlog: b, gtasks, missing: [] }, TODAY);
+    expect(r.backup.items.find((i) => i.title === "Renew pretend passport")!.due).toBe("2026-11-30");
+  });
+
+  it("lists every merged copy in the summary and counts them", () => {
+    const r = t();
+    expect(r.counts.backlogMerged).toBe(3);
+    expect(r.counts.gtasksDuplicates).toBe(1);
+    expect(r.counts.mergedIntoBacklog).toBe(1);
+    expect(r.summary).toContain("Backlog copies folded together");
+    expect(r.summary).toMatch(/Water pretend plants/);
+    expect(r.summary).toMatch(/Renew pretend passport \(from Paperwork\).*merged into the Backlog item/);
+  });
+
+  it("a Google task matching a Backlog task never creates a second item (inbox copies too)", () => {
+    const b = "## Inbox (to triage)\n- [ ] Order pretend seeds (from Google Tasks)";
+    const g = JSON.stringify({ lists: [{ id: "l", title: "Garden", tasks: [{ id: "g1", title: "Order pretend seeds", status: "needsAction" }] }] });
+    const r = buildTransfer({ backlog: b, gtasks: g, missing: [] }, TODAY);
+    expect(r.backup.items).toHaveLength(1);
+    expect(r.backup.items[0]).toMatchObject({ areaId: "inbox", tags: ["garden"] });
+  });
+});
+
 describe("--extra vault-review items", () => {
   const line = (o: Record<string, unknown>) => JSON.stringify(o);
   const EXTRA = [

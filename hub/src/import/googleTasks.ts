@@ -36,7 +36,7 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 
-const tagFor = (listTitle: string) => listTitle.toLowerCase().replace(/\s+/g, " ").trim();
+export const tagFor = (listTitle: string) => listTitle.toLowerCase().replace(/\s+/g, " ").trim();
 
 /** `due` is RFC 3339; only its date part is used, with no timezone conversion. */
 function dueDate(raw: string): ISODate | undefined {
@@ -121,6 +121,14 @@ const skipped = (p: ParsedGoogleTask, reason: SkippedDuplicate["reason"]): Skipp
   reason,
 });
 
+/** Notes lines a Google task brings: its notes, then "Part of: <parent>" for a subtask. */
+export function googleNoteLines(p: ParsedGoogleTask): string[] {
+  const parts: string[] = [];
+  if (p.notes) parts.push(p.notes);
+  if (p.parentTitle) parts.push(`Part of: ${p.parentTitle}`);
+  return parts;
+}
+
 /**
  * Decides which parsed tasks become new rows. Pure: nothing is read or written here.
  * `haveKeys` and `haveTitles` (normalised) describe what already exists; a task whose
@@ -131,11 +139,18 @@ const skipped = (p: ParsedGoogleTask, reason: SkippedDuplicate["reason"]): Skipp
 export function planGoogleTasks(
   parsed: ParsedGoogleTask[],
   haveKeys: Set<string>,
-  haveTitles: Set<string>,
+  haveTitles: Map<string, string>,
   today: ISODate,
-): { newItems: Item[]; alreadyHad: number; duplicates: SkippedDuplicate[] } {
+): {
+  newItems: Item[];
+  alreadyHad: number;
+  duplicates: SkippedDuplicate[];
+  /** The skipped tasks themselves, with the key of the existing row they matched (reason "existing"). */
+  skippedTasks: { task: ParsedGoogleTask; reason: SkippedDuplicate["reason"]; matchedKey?: string }[];
+} {
   let alreadyHad = 0;
   const duplicates: SkippedDuplicate[] = [];
+  const skippedTasks: { task: ParsedGoogleTask; reason: SkippedDuplicate["reason"]; matchedKey?: string }[] = [];
   const keys = new Set(haveKeys);
   // Rows added by this plan, by normalised title, so a duplicate inside the file can merge its tag.
   const addedByTitle = new Map<string, Item>();
@@ -151,17 +166,17 @@ export function planGoogleTasks(
       const earlier = addedByTitle.get(norm);
       if (earlier) {
         duplicates.push(skipped(p, "in-file"));
+        skippedTasks.push({ task: p, reason: "in-file", matchedKey: earlier.source?.key });
         if (tag && !(earlier.tags ?? []).includes(tag)) earlier.tags = [...(earlier.tags ?? []), tag];
         continue;
       }
       if (haveTitles.has(norm)) {
         duplicates.push(skipped(p, "existing"));
+        skippedTasks.push({ task: p, reason: "existing", matchedKey: haveTitles.get(norm) || undefined });
         continue;
       }
     }
-    const noteParts: string[] = [];
-    if (p.notes) noteParts.push(p.notes);
-    if (p.parentTitle) noteParts.push(`Part of: ${p.parentTitle}`);
+    const noteParts = googleNoteLines(p);
     const item: Item = {
       id: crypto.randomUUID(),
       kind: "task",
@@ -181,7 +196,7 @@ export function planGoogleTasks(
     if (norm) addedByTitle.set(norm, item);
     newItems.push(item);
   }
-  return { newItems, alreadyHad, duplicates };
+  return { newItems, alreadyHad, duplicates, skippedTasks };
 }
 
 export async function importGoogleTasks(
@@ -196,14 +211,14 @@ export async function importGoogleTasks(
   duplicates: SkippedDuplicate[];
 }> {
   const { items, notes } = parseGoogleTasks(raw);
-  let plan: ReturnType<typeof planGoogleTasks> = { newItems: [], alreadyHad: 0, duplicates: [] };
+  let plan: ReturnType<typeof planGoogleTasks> = { newItems: [], alreadyHad: 0, duplicates: [], skippedTasks: [] };
   await db.transaction("rw", db.items, async () => {
     const haveKeys = new Set<string>();
-    const haveTitles = new Set<string>();
+    const haveTitles = new Map<string, string>();
     await db.items.each((i) => {
       if (i.source?.key) haveKeys.add(i.source.key);
       const n = normaliseTitle(i.title);
-      if (n) haveTitles.add(n);
+      if (n && !haveTitles.has(n)) haveTitles.set(n, i.source?.key ?? "");
     });
     plan = planGoogleTasks(items, haveKeys, haveTitles, today);
     if (plan.newItems.length) await db.items.bulkAdd(plan.newItems);

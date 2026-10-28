@@ -1,5 +1,5 @@
-import { endOfMonth, isValidISODate } from "../domain/dates";
-import { AREA_IDS, WEEKDAYS, type AreaId, type Goal, type ISODate, type Item, type Weekday } from "../domain/types";
+import { endOfMonth } from "../domain/dates";
+import { WEEKDAYS, type AreaId, type ISODate, type Weekday } from "../domain/types";
 import { sectionToArea } from "./sectionAreas";
 
 export interface ParseNote {
@@ -42,6 +42,15 @@ export interface Selection {
 export const slug = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 const MAX_MILESTONE = 200;
+/** The most text a goal's why, cadence or notes may hold (the backup validator's limit). */
+export const MAX_GOAL_TEXT = 4000;
+
+/** Cuts text to the limit and, if it was cut, adds a note naming the line. */
+export function capText(text: string, field: string, line: string, notes: ParseNote[]): string {
+  if (text.length <= MAX_GOAL_TEXT) return text;
+  notes.push({ line, reason: `${field} cut to ${MAX_GOAL_TEXT} characters` });
+  return text.slice(0, MAX_GOAL_TEXT);
+}
 const ALL_DAYS: Weekday[] = [...WEEKDAYS];
 
 const lines = (md: unknown): string[] => (typeof md === "string" ? md.split(/\r?\n/) : []);
@@ -100,9 +109,9 @@ export function parseAreaGoals(md: string, today: ISODate): { goals: ProposedGoa
       milestones: cur.markers,
     };
     if (finite) g.deadline = `${yearIn(cur.markers[0]) ?? todayYear}-12-31`;
-    if (cur.identity.length) g.why = cur.identity.join("\n\n");
-    if (cur.cadence.length) g.cadence = cur.cadence.join("\n");
-    if (cur.study) g.notes = cur.study;
+    if (cur.identity.length) g.why = capText(cur.identity.join("\n\n"), "why", cur.title, notes);
+    if (cur.cadence.length) g.cadence = capText(cur.cadence.join("\n"), "cadence", cur.title, notes);
+    if (cur.study) g.notes = capText(cur.study, "notes", cur.title, notes);
     goals.push(g);
   }
 
@@ -210,7 +219,7 @@ export function parseMonthGoals(
         if (isNext || !stepTaken) {
           const title = n[2].trim();
           tasks.push({
-            key: `obsidian:task:${slug(last.title)}:${slug(title)}`,
+            key: `obsidian:month-task:${slug(last.title)}:${slug(title)}`,
             title,
             areaId: last.areaId,
             goalKey: last.key,
@@ -239,7 +248,7 @@ export function parseMonthGoals(
     seen.add(slug(title));
     stepTaken = false;
     const g: ProposedGoal = {
-      key: "obsidian:goal:" + slug(title),
+      key: "obsidian:month:" + slug(title),
       title,
       areaId: "admin",
       areaFallback: true,
@@ -248,7 +257,7 @@ export function parseMonthGoals(
       milestones: [],
     };
     const desc = b[2].trim();
-    if (desc) g.notes = desc;
+    if (desc) g.notes = capText(desc, "notes", title, notes);
     goals.push(g);
     last = g;
   }
@@ -304,72 +313,4 @@ export function parseHabits(md: string): {
   return { habits, metrics, weekly, notes };
 }
 
-const AREA_LIST: readonly string[] = AREA_IDS;
-
-function checkArea(areaId: string, what: string) {
-  if (!AREA_LIST.includes(areaId) || areaId === "inbox") throw new Error(`${what} needs an area other than the inbox`);
-}
-
-/**
- * Turns proposals into real rows (fresh ids, tasks linked to their goal's id). Pure:
- * nothing is written. Throws before building anything if a row is invalid: a finite
- * goal needs a real deadline, and no goal or task may be in the inbox.
- */
-export function buildObsidianRows(selection: Selection, today: ISODate): { goals: Goal[]; items: Item[] } {
-  for (const g of selection.goals) {
-    if (!g.title.trim()) throw new Error("a goal needs a title");
-    checkArea(g.areaId, "a goal");
-    if (g.kind === "finite" && !(g.deadline && isValidISODate(g.deadline))) {
-      throw new Error("finite goals need a deadline");
-    }
-  }
-  for (const t of selection.tasks) {
-    if (!t.title.trim()) throw new Error("a task needs a title");
-    checkArea(t.areaId, "a task");
-  }
-
-  const goalIds = new Map<string, string>();
-  const goals: Goal[] = [];
-  for (const p of selection.goals) {
-    if (goalIds.has(p.key)) continue;
-    const goal: Goal = {
-      id: crypto.randomUUID(),
-      title: p.title.trim(),
-      areaId: p.areaId,
-      kind: p.kind,
-      milestones: p.milestones.map((title) => ({ id: crypto.randomUUID(), title, done: false })),
-      source: { kind: "obsidian", key: p.key },
-      createdAt: today,
-    };
-    if (p.kind === "finite" && p.deadline) goal.deadline = p.deadline;
-    if (p.why) goal.why = p.why;
-    if (p.cadence) goal.cadence = p.cadence;
-    if (p.notes) goal.notes = p.notes;
-    goals.push(goal);
-    goalIds.set(p.key, goal.id);
-  }
-
-  const seen = new Set<string>();
-  const items: Item[] = [];
-  for (const p of selection.tasks) {
-    if (seen.has(p.key)) continue;
-    seen.add(p.key);
-    const item: Item = {
-      id: crypto.randomUUID(),
-      kind: "task",
-      title: p.title.trim(),
-      links: [],
-      areaId: p.areaId,
-      priority: 2,
-      status: "open",
-      createdAt: today,
-      touchedAt: today,
-      source: { kind: "obsidian", key: p.key },
-    };
-    const goalId = p.goalKey ? goalIds.get(p.goalKey) : undefined;
-    if (goalId) item.goalId = goalId;
-    if (p.recur) item.recur = p.recur;
-    items.push(item);
-  }
-  return { goals, items };
-}
+export { buildObsidianRows } from "./obsidianRows";

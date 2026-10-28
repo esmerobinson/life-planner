@@ -122,14 +122,14 @@ describe("parseMonthGoals", () => {
     expect(r.goals[0]).toMatchObject({
       kind: "finite", areaId: "admin", areaFallback: true, deadline: "2028-02-29", milestones: [],
       notes: "Get the whole first draft down, rough is fine.",
-      key: "obsidian:goal:finish the pretend zine",
+      key: "obsidian:month:finish the pretend zine",
     });
     expect(r.tasks).toHaveLength(3);
     expect(r.tasks[0]).toEqual({
-      key: "obsidian:task:finish the pretend zine:write the ending scene",
+      key: "obsidian:month-task:finish the pretend zine:write the ending scene",
       title: "Write the ending scene",
       areaId: "admin",
-      goalKey: "obsidian:goal:finish the pretend zine",
+      goalKey: "obsidian:month:finish the pretend zine",
     });
     expect(r.notes).toEqual([]);
   });
@@ -201,6 +201,34 @@ describe("parseMonthGoals", () => {
   });
 });
 
+describe("key spaces and length limits", () => {
+  it("a monthly goal and an area goal with the same title do not share a key", () => {
+    const a = parseAreaGoals("## Writing\n- Identity: x", TODAY).goals[0];
+    const m = parseMonthGoals("# Goals for May 2027\n## This month's goals\n*   **Writing:** d\n    *   Next step: Draft", TODAY);
+    expect(a.key).toBe("obsidian:goal:writing");
+    expect(m.goals[0].key).toBe("obsidian:month:writing");
+    expect(m.tasks[0].key).toBe("obsidian:month-task:writing:draft");
+    const rows = buildObsidianRows({ goals: [a, ...m.goals], tasks: m.tasks }, TODAY);
+    expect(rows.goals).toHaveLength(2);
+  });
+
+  it("cuts why, cadence and notes at 4000 characters and says which area", () => {
+    const long = "x".repeat(5000);
+    const r = parseAreaGoals(`## Writing\n- Identity: ${long}\n- Weekly: ${long}\n- Study these north stars: ${long}`, TODAY);
+    expect(r.goals[0].why).toHaveLength(4000);
+    expect(r.goals[0].cadence).toHaveLength(4000);
+    expect(r.goals[0].notes).toHaveLength(4000);
+    expect(r.notes).toHaveLength(3);
+    expect(r.notes.every((n) => n.line === "Writing" && /4000/.test(n.reason))).toBe(true);
+  });
+
+  it("cuts a monthly goal's description at 4000 characters and says which goal", () => {
+    const r = parseMonthGoals(`# Goals for May 2027\n## This month's goals\n*   **Big one:** ${"y".repeat(5000)}`, TODAY);
+    expect(r.goals[0].notes).toHaveLength(4000);
+    expect(r.notes).toEqual([{ line: "Big one", reason: "notes cut to 4000 characters" }]);
+  });
+});
+
 describe("parseHabits", () => {
   const r = parseHabits(habitsMd);
 
@@ -258,7 +286,7 @@ describe("buildObsidianRows", () => {
     expect(step).toMatchObject({
       kind: "task", goalId: zine.id, areaId: "admin", priority: 2, status: "open", links: [],
       createdAt: TODAY, touchedAt: TODAY,
-      source: { kind: "obsidian", key: "obsidian:task:finish the pretend zine:write the ending scene" },
+      source: { kind: "obsidian", key: "obsidian:month-task:finish the pretend zine:write the ending scene" },
     });
     expect(step.due).toBeUndefined();
     const habit = items.find((i) => i.title === "Drink water")!;
