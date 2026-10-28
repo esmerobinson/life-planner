@@ -19,6 +19,9 @@ import type { ISODate } from "../domain/types";
 
 /** Returns how many goals were converted (0 when blocked or nothing to do). */
 export async function migrateMilestones(today: ISODate, db: HubDB = defaultDb): Promise<number> {
+  // The common case (nothing left to convert) is a plain read: no write lock taken.
+  const anyLeft = (await db.goals.toArray()).some((g) => g.status === undefined && g.milestones.length > 0);
+  if (!anyLeft) return 0;
   return db.transaction("rw", db.items, db.goals, db.syncMeta, async () => {
     if (mergeBlocked(await readSyncGate(db.syncMeta))) return 0;
     const goals = (await db.goals.toArray()).filter((g) => g.status === undefined && g.milestones.length > 0);

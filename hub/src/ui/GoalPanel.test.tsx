@@ -210,7 +210,7 @@ describe("the goal panel (Edit)", () => {
     expect(await p.findByText("A monthly target is a whole number, 1 or more.")).toBeInTheDocument();
     fireEvent.change(p.getByLabelText("Monthly target"), { target: { value: "3" } });
     await userEvent.click(p.getByRole("button", { name: "Done" }));
-    expect(await p.findByText("Practice")).toBeInTheDocument();
+    expect(await p.findByText("Practice", { selector: ".chip" })).toBeInTheDocument();
     const got = (await db.goals.get("ef"))!;
     expect(got).toMatchObject({ kind: "practice", title: "ok", monthlyTarget: 3 });
     expect(got.deadline).toBeUndefined();

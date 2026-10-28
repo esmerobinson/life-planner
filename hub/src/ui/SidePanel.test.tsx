@@ -221,7 +221,7 @@ describe("the task panel", () => {
     await userEvent.click(p.getByRole("button", { name: "Done" }));
     await vi.waitFor(async () => expect((await db.items.get(a.id))!.kind).toBe("idea"));
     expect((await db.items.get(a.id))!.due).toBeUndefined();
-    expect(p.getByText("Idea")).toBeInTheDocument();
+    expect(await p.findByText("Idea", { selector: ".chip" })).toBeInTheDocument();
   });
 
   it("on a phone the panel fills the screen with a Back arrow and no Close or resize", async () => {
