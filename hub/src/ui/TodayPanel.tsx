@@ -16,7 +16,9 @@ function thisMonthDoneFor(goals: Goal[], items: Item[], today: ISODate): Record<
 
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
-export function TodayPanel({ today }: { today: ISODate }) {
+/** `headingLevel` 2 when the panel sits under another page title (the phone Home). */
+export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headingLevel?: 1 | 2 }) {
+  const Heading = headingLevel === 2 ? "h2" : "h1";
   const { items, goals, refresh, loaded, error } = useHubData(today);
   const [celebrating, setCelebrating] = useState(false);
   const { attempt, saveError } = useSaveError();
@@ -53,7 +55,7 @@ export function TodayPanel({ today }: { today: ISODate }) {
   if (error) {
     return (
       <section className="today-panel">
-        <h1>Today</h1>
+        <Heading>Today</Heading>
         <p>{error}</p>
       </section>
     );
@@ -63,7 +65,7 @@ export function TodayPanel({ today }: { today: ISODate }) {
 
   return (
     <section className="today-panel">
-      <h1>Today</h1>
+      <Heading>Today</Heading>
       {celebrating && <CelebrationPlaceholder />}
       {saveError && <p className="form-message">{saveError}</p>}
       {empty && <p>Nothing planned for today.</p>}

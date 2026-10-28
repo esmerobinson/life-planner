@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pinTo } from "../data/repo";
 import { addDays, isValidISODate } from "../domain/dates";
 import { nextMonday } from "../domain/display";
@@ -26,6 +26,15 @@ export function ScheduleMenu({
   const { attempt, saveError } = useSaveError();
   const [day, setDay] = useState(pinnedDate ?? "");
   useEffect(() => setDay(pinnedDate ?? ""), [pinnedDate]);
+  /**
+   * Set when a button in this popover is pressed. Safari/WebKit (the Mac app and iPhone)
+   * give a clicked button no focus, so the day field's blur arrives with no relatedTarget
+   * and would otherwise save the typed day before the pressed choice runs.
+   */
+  const pressing = useRef(false);
+  const press = () => {
+    pressing.current = true;
+  };
 
   async function pin(date: ISODate | undefined, close?: (refocus?: boolean) => void) {
     const ok = await attempt(() => pinTo(itemId, date, today));
@@ -55,13 +64,13 @@ export function ScheduleMenu({
     >
       {(close) => (
         <>
-          <button type="button" onClick={() => void pin(today, close)}>
+          <button type="button" onPointerDown={press} onClick={() => void pin(today, close)}>
             Today
           </button>
-          <button type="button" onClick={() => void pin(addDays(today, 1), close)}>
+          <button type="button" onPointerDown={press} onClick={() => void pin(addDays(today, 1), close)}>
             Tomorrow
           </button>
-          <button type="button" onClick={() => void pin(nextMonday(today), close)}>
+          <button type="button" onPointerDown={press} onClick={() => void pin(nextMonday(today), close)}>
             Next week
           </button>
           <hr />
@@ -77,18 +86,26 @@ export function ScheduleMenu({
                 commitDay(close);
               }
             }}
+            onFocus={() => {
+              pressing.current = false;
+            }}
             onBlur={(e) => {
-              // Moving to another choice in this popover is not "leaving" it.
+              // Moving to another choice in this popover is not "leaving" it: the pressed
+              // choice runs on its own click (and Set saves the typed day itself).
+              if (pressing.current) {
+                pressing.current = false;
+                return;
+              }
               const next = e.relatedTarget as Node | null;
               if (next && e.currentTarget.closest(".pop-menu")?.contains(next)) return;
               commitDay(close);
             }}
           />
-          <button type="button" onClick={() => commitDay(close)}>
+          <button type="button" onPointerDown={press} onClick={() => commitDay(close)}>
             Set
           </button>
           <hr />
-          <button type="button" onClick={() => void pin(undefined, close)}>
+          <button type="button" onPointerDown={press} onClick={() => void pin(undefined, close)}>
             Clear
           </button>
         </>

@@ -328,6 +328,42 @@ describe("TodayPanel", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("a typed day then a click on Tomorrow saves Tomorrow, even when the click gives no focus (Safari)", async () => {
+    const it = await task("Webkit", { pinnedDate: TODAY });
+    const spy = vi.spyOn(repo, "pinTo");
+    render(<TodayPanel today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Webkit" }));
+    const group = screen.getByRole("group", { name: "Schedule Webkit for" });
+    const day = within(group).getByLabelText("Day for Webkit");
+    fireEvent.change(day, { target: { value: "2026-11-09" } });
+    const tomorrow = within(group).getByRole("button", { name: "Tomorrow" });
+    // Safari/WebKit: buttons take no focus on click, so the field blurs with no relatedTarget.
+    fireEvent.pointerDown(tomorrow);
+    fireEvent.mouseDown(tomorrow);
+    fireEvent.blur(day, { relatedTarget: null });
+    fireEvent.pointerUp(tomorrow);
+    fireEvent.mouseUp(tomorrow);
+    fireEvent.click(tomorrow);
+    await vi.waitFor(async () => expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-10-28"));
+    await settle();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][1]).toBe("2026-10-28");
+  });
+
+  it("after pressing a choice, a later real leave of the day field still saves it", async () => {
+    const it = await task("Later", { pinnedDate: TODAY });
+    render(<TodayPanel today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Later" }));
+    const group = screen.getByRole("group", { name: "Schedule Later for" });
+    const day = within(group).getByLabelText("Day for Later");
+    // A press on Set with no valid day: nothing saves, and the press is used up.
+    fireEvent.pointerDown(within(group).getByRole("button", { name: "Set" }));
+    fireEvent.focus(day);
+    fireEvent.change(day, { target: { value: "2026-11-12" } });
+    fireEvent.blur(day, { relatedTarget: null });
+    await vi.waitFor(async () => expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-11-12"));
+  });
+
   it("Escape closes an open popover even when focus never went into it (Safari/Firefox clicks)", async () => {
     await task("Mac", { pinnedDate: TODAY });
     render(<TodayPanel today={TODAY} />);

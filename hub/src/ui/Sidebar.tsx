@@ -8,8 +8,23 @@ const GROUPS: { group: 1 | 2 | 3; name: string }[] = [
   { group: 3, name: "Reflect" },
 ];
 
-export function Sidebar() {
+/**
+ * The quiet links under the main nav (Backup, Sync, ...). One list for both layouts: the
+ * sidebar footer on desktop and the bottom of the phone Home, so a link added here shows
+ * in both.
+ */
+export function FooterLinks() {
   const sync = useSyncState();
+  return (
+    <>
+      <NavLink to="/backup">Backup</NavLink>{" "}
+      <NavLink to="/sync">{sync.status === "needs-passphrase" ? "Sync (needs passphrase)" : "Sync"}</NavLink>{" "}
+      <NavLink to="/bin">Bin</NavLink>
+    </>
+  );
+}
+
+export function Sidebar() {
   return (
     <aside className="sidebar">
       <nav className="sidebar-nav" aria-label="Main">
@@ -27,9 +42,7 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="sidebar-footer">
-        <NavLink to="/backup">Backup</NavLink>{" "}
-        <NavLink to="/sync">{sync.status === "needs-passphrase" ? "Sync (needs passphrase)" : "Sync"}</NavLink>{" "}
-        <NavLink to="/bin">Bin</NavLink>
+        <FooterLinks />
       </div>
     </aside>
   );
