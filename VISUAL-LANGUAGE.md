@@ -12,11 +12,12 @@ The source for art direction, per `CLAUDE.md`. Status of each line: **said** = E
 ## Said (2026-10-28, design round 2)
 - Tasks are hard to pick out everywhere they're listed; she wants a clean, clear list with a box around each task.
 - **Chosen: task "Strips" (option A).** Every task is its own rounded strip (`--row` on the page, radius `--radius-tile`), tick box on the left = Done, actions on the right. Applies everywhere tasks appear (area pages, Today, Inbox, Goals). Mockup: round-1 option A.
-- Done / Move to / Schedule for should not be three loose buttons: a dropdown or something different (options shown in round 2, not yet chosen).
-- The OVERDUE label "looks horrible" (options shown in round 2, not yet chosen).
+- Done / Move to / Schedule for should not be three loose buttons. **Chosen: round-2 option 1B, two small icons** always visible at the right of each strip: a line-drawn calendar (Schedule for) and a line-drawn right arrow (Move to), each in a 30px `--panel` square with 8px radius, 16px glyph, 1.6 stroke in `--text`. Ticking the box is Done.
+- The OVERDUE label "looks horrible". **Chosen: round-2 option 2D, just words**: no sticker; a small line under the title "Due Mon 26 Oct", which turns Happy Home red `#bf6564` and adds "· 2 days late" when overdue. The magenta `.overdue-sticker` placeholder is retired.
 - Hates how goals are displayed everywhere. **Chosen: goals are cards (round-2 option 3A)** to set them apart from tasks: one `--panel` card per goal, area tile, chips for area and "By <date>" / "Practice", overall bar and this-month bar, next step in a `--row` box.
 - **The Goals page is grouped by area** ("categories"), one heading per area.
-- Wants a way to see done tasks (a dropdown/fold-out) and a small "ticked off this month" progress at the top of each area, "just as a little nice thing" (options shown in round 2, not yet chosen).
+- Wants a way to see done tasks (a dropdown/fold-out) and a small "ticked off this month" progress at the top of each area, "just as a little nice thing". **Chosen: round-2 option 4A**: a `--panel` box at the top of each area, bold "14 ticked off in October", right side "last month 11", a progress bar (this month vs last month's total). At the bottom of the to-dos a fold-out "Done (N)" (closed by default) listing done tasks as strips with a ticked box, struck-through title and the done date; unticking brings one back.
+- Round-2 mockup file (for reference, not in repo): option IDs 1A–1C, 2A–2D, 3A–3C, 4A–4B.
 
 ## Extracted palette (from reference screenshots, 2026-10-27)
 **NookPhone tile colours** (sampled from the Nookipedia NookPhone page):
