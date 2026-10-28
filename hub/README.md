@@ -11,15 +11,18 @@ A local React + TypeScript app for planning your days, goals and areas.
     npm run e2e      # real-browser tests on your installed Chrome
 
 The e2e tests reuse the dev server if it is already running on 127.0.0.1:5173
-(or start one). Each test uses a fresh browser profile, so your own data is
+(or start one). If another checkout already serves 5173/4173, pick free ports so
+this checkout is the one tested: `E2E_DEV_PORT=5183 E2E_PREVIEW_PORT=4183 npx playwright test`. Each test uses a fresh browser profile, so your own data is
 never touched. The phone-width checks are marked `fixme` until the phone design
 round.
 
 ## Where your data lives
 
 In the browser's IndexedDB, on this machine, per browser. Manual backup and
-restore exist (see Backups below); sync, automatic backup and encryption are
-later plans. Clearing site data for the app deletes everything.
+restore exist (see Backups below), and optional sync (see Sync below) keeps a
+copy on the sync server and on your other devices. Automatic backup and
+encryption are later plans. Clearing site data for the app deletes this
+device's copy.
 
 ## Importing your backlog
 
@@ -137,7 +140,7 @@ in one go.
 
 Deliberately left for later plans (2 to 5):
 
-- Sync, automatic backup and encryption (manual backup/restore exists)
+- Automatic backup and encryption (manual backup/restore and sync exist)
 - Notifications and overdue reminders
 - Journal (the Home journal card is a stub with disabled buttons)
 - Vision board
@@ -166,6 +169,28 @@ Your tasks live in this browser only, so back them up.
 - The app asks the browser to keep its data; the Backup page says whether the
   browser agreed.
 
+## Sync
+
+Open **Sync** (beside Backup at the bottom of the sidebar), enter the sync
+address (prefilled from `VITE_SYNC_URL` when that is set at build time) and the
+passphrase, then **Save**. The app works offline as before; it syncs on start,
+when the network comes back, when the tab is shown again, shortly after you
+change something, and every minute while the tab is visible.
+
+- The passphrase is never stored. On Save it is turned into a key (PBKDF2,
+  see `src/sync/token.ts`) and only that key is kept, in this browser's
+  IndexedDB, so sync can run by itself. Anyone with this device's browser data
+  could sync as you; **Stop syncing on this device** removes the key and keeps
+  your tasks and goals here.
+- If the server refuses the key, sync stops and the Sync link reads
+  "Sync (needs passphrase)". Enter the passphrase again to carry on.
+- Each change is stamped with the time it was made; when two devices change the
+  same task, the later change wins on both. Nothing is ever deleted by sync.
+- Restoring a backup with Replace makes this device pull everything from the
+  server again, so tasks still on your other devices come back here.
+- How it works, and how each rule of the server contract is kept:
+  `SYNC-CLIENT-REPORT.md`.
+
 ## Install it as an app (works offline)
 
 The production build is an installable app that opens without a network. To try
@@ -185,7 +210,7 @@ Honest limits:
 
 - On `127.0.0.1` it installs on this Mac only. A phone cannot reach `127.0.0.1`
   on your Mac; it needs the app on a hosted HTTPS address (a later plan).
-- Data stays per browser (and per installed app) until sync arrives. The
+- Data stays per browser (and per installed app) unless sync is set up. The
   installed app and the browser tab at the same address share one store, but
   `127.0.0.1:4173` and `127.0.0.1:5173` are different addresses with separate
   data. Use Backup to move data between them.
