@@ -1,0 +1,17 @@
+{
+  // Node-side code: the vitest config, the passphrase helper and the Node tests.
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["vitest.config.ts", "tools/**/*.mjs", "test/node/**/*.ts", "shared/**/*.ts"]
+}

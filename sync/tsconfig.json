@@ -1,0 +1,18 @@
+{
+  // Worker code and the tests that run inside the Workers runtime (Miniflare).
+  // Node-side code (tools, node tests, vitest config) is checked by tsconfig.node.json.
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "shared/**/*.ts", "test/worker/**/*.ts"]
+}
