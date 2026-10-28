@@ -25,6 +25,7 @@ describe("limits match the contract", () => {
     expect(MAX_BODY_BYTES).toBe(5 * 1024 * 1024);
     expect(MAX_CHANGES).toBe(2000);
     expect(PAGE_SIZE).toBe(500);
+    expect(MAX_RESPONSE_DATA_BYTES).toBe(1024 * 1024);
     expect(MAX_FUTURE_MS).toBe(24 * 60 * 60 * 1000);
     expect(MAX_ID_LENGTH).toBe(128);
   });
@@ -33,7 +34,8 @@ describe("limits match the contract", () => {
 describe("POST /v1/sync: writing", () => {
   it("inserts new rows and assigns increasing sequence numbers", async () => {
     const body = await syncOk(DEVICE_A, 0, [change("a", T0 - 3), change("b", T0 - 2), change("g1", T0 - 1, { title: "goal" }, "goals")]);
-    expect(body).toMatchObject({ applied: 3, ignored: 0, hasMore: false, changes: [], cursor: 0 });
+    // Nothing to page and hasMore is false, so the cursor jumps to the server's highest seq.
+    expect(body).toMatchObject({ applied: 3, ignored: 0, hasMore: false, changes: [], cursor: 3 });
     const rows = await storedRows();
     expect(rows.map((r) => [r.tbl, r.id, r.updated_at, r.device_id])).toEqual([
       ["goals", "g1", T0 - 1, DEVICE_A],
@@ -205,7 +207,13 @@ describe("POST /v1/sync: exclusion rule", () => {
     await syncOk(DEVICE_B, 0, [change("fromB", 10)]);
     const body = await syncOk(DEVICE_A, 0, [change("fromA", 20)]);
     expect(ids(body.changes)).toEqual(["fromB"]);
-    expect(body.cursor).toBe(1);
+    expect(body.cursor).toBe(2); // hasMore false: past this request's own write too
+  });
+
+  it("does not send a device its own writes back on its next sync", async () => {
+    const first = await syncOk(DEVICE_A, 0, [change("mine", 20)]);
+    const next = await syncOk(DEVICE_A, first.cursor, []);
+    expect(next.changes).toEqual([]);
   });
 
   it("returns the caller's own rows from an earlier request (only this request's writes are hidden)", async () => {
@@ -228,21 +236,97 @@ describe("POST /v1/sync: exclusion rule", () => {
   });
 });
 
-/** A tiny client: local map + pending changes + cursor, accepting whatever the server sends. */
+describe("POST /v1/sync: returned winners", () => {
+  it("tells a device whose change lost to clock skew about the winner, even below its cursor", async () => {
+    await syncOk(DEVICE_B, 0, [change("x", 200, { v: "B" })]);
+    const pulled = await syncOk(DEVICE_A, 0, []);
+    expect(pulled.changes).toEqual([change("x", 200, { v: "B" })]);
+    // A's clock is behind: its later edit carries an older timestamp and loses.
+    const lost = await syncOk(DEVICE_A, pulled.cursor, [change("x", 150, { v: "A" })]);
+    expect(lost.ignored).toBe(1);
+    expect(lost.changes).toEqual([change("x", 200, { v: "B" })]);
+    expect(lost.cursor).toBe(pulled.cursor); // returned winners never move the cursor
+  });
+
+  it("returns the stored version when the same device reuses a timestamp with different data", async () => {
+    const first = await syncOk(DEVICE_A, 0, [change("x", 100, { v: 1 })]);
+    const second = await syncOk(DEVICE_A, first.cursor, [change("x", 100, { v: 2 })]);
+    expect(second.ignored).toBe(1);
+    expect(second.changes).toEqual([change("x", 100, { v: 1 })]);
+  });
+
+  it("returns no winners for changes that were applied or that exactly match the stored row", async () => {
+    await syncOk(DEVICE_B, 0, [change("other", 50, { v: "from B" })]);
+    const request = [change("x", 100, { v: 1 }), change("x", 90, { v: 0 }), change("y", 101, { v: 2 })];
+    const first = await syncOk(DEVICE_A, 0, request);
+    expect(ids(first.changes)).toEqual(["other"]);
+    const replay = await syncOk(DEVICE_A, 0, request);
+    expect(replay).toEqual({ ...first, applied: 0, ignored: 3 });
+    const replayAtCursor = await syncOk(DEVICE_A, first.cursor, request);
+    expect(replayAtCursor.changes).toEqual([]);
+  });
+
+  it("appends winners after the paged rows, outside the page limit, without moving the cursor", async () => {
+    await syncOk(DEVICE_B, 0, Array.from({ length: 600 }, (_, i) => change(`r${i}`, 1000 + i)));
+    await syncOk(DEVICE_B, 0, [change("x", 200, { v: "B" })]); // seq 601
+    const body = await syncOk(DEVICE_A, 0, [change("x", 150, { v: "A" })]);
+    expect(body.hasMore).toBe(true);
+    expect(body.changes).toHaveLength(PAGE_SIZE + 1);
+    expect(body.changes.at(-1)).toEqual(change("x", 200, { v: "B" }));
+    expect(body.cursor).toBe(500);
+  });
+
+  it("returns each winner at most once even if the request names the row several times", async () => {
+    await syncOk(DEVICE_B, 0, [change("x", 500, { v: "B" })]);
+    const pulled = await syncOk(DEVICE_A, 0, []);
+    const body = await syncOk(DEVICE_A, pulled.cursor, [change("x", 1, { v: 1 }), change("x", 2, { v: 2 })]);
+    expect(body.changes).toEqual([change("x", 500, { v: "B" })]);
+  });
+});
+
+describe("POST /v1/sync: cursor ahead of the server", () => {
+  it("answers 409 cursor_ahead and applies nothing", async () => {
+    await syncOk(DEVICE_A, 0, [change("a", 1)]); // server seq = 1
+    const response = await call("/v1/sync", { method: "POST", body: { deviceId: DEVICE_B, cursor: 2, changes: [change("b", 1)] } });
+    expect(response.status).toBe(409);
+    expect(await errorOf(response)).toBe("cursor_ahead");
+    expect((await storedRows()).map((r) => r.id)).toEqual(["a"]);
+    expect(await seqCounter()).toBe(1);
+  });
+
+  it("accepts a cursor equal to the server's highest seq", async () => {
+    await syncOk(DEVICE_A, 0, [change("a", 1)]);
+    const body = await syncOk(DEVICE_B, 1, []);
+    expect(body).toEqual({ cursor: 1, applied: 0, ignored: 0, hasMore: false, changes: [] });
+  });
+});
+
+/**
+ * A tiny client following the contract's client obligations: local rows + unsent changes +
+ * cursor. Sent changes are acknowledged after a successful response (unless edited again
+ * meanwhile); returned rows are applied unless a NEWER unsent local change exists.
+ */
 class SimDevice {
   rows = new Map<string, Change>();
-  pending: Change[] = [];
+  unsent = new Map<string, Change>();
   cursor = 0;
   constructor(readonly deviceId: string) {}
   edit(c: Change) {
-    this.rows.set(`${c.table}/${c.id}`, c);
-    this.pending.push(c);
+    const key = `${c.table}/${c.id}`;
+    this.rows.set(key, c);
+    this.unsent.set(key, c);
   }
   async sync() {
     for (;;) {
-      const body = await syncOk(this.deviceId, this.cursor, this.pending);
-      this.pending = [];
-      for (const c of body.changes) this.rows.set(`${c.table}/${c.id}`, c);
+      const sending = [...this.unsent.entries()];
+      const body = await syncOk(this.deviceId, this.cursor, sending.map(([, c]) => c));
+      for (const [key, c] of sending) if (this.unsent.get(key) === c) this.unsent.delete(key);
+      for (const c of body.changes) {
+        const key = `${c.table}/${c.id}`;
+        const local = this.unsent.get(key);
+        if (local && local.updatedAt > c.updatedAt) continue;
+        this.rows.set(key, c);
+      }
       this.cursor = body.cursor;
       if (!body.hasMore) return;
     }
@@ -253,6 +337,31 @@ class SimDevice {
 }
 
 describe("POST /v1/sync: convergence", () => {
+  it("converges when a device with a slow clock loses an edit to a row it already received", async () => {
+    const a = new SimDevice(DEVICE_A);
+    const b = new SimDevice(DEVICE_B);
+    b.edit(change("x", 200, { by: "B" }));
+    await b.sync();
+    await a.sync();
+    a.edit(change("x", 150, { by: "A, slow clock" })); // older timestamp: loses
+    await a.sync();
+    await b.sync();
+    expect(a.snapshot()).toEqual(b.snapshot());
+    expect(a.rows.get("items/x")!.data).toEqual({ by: "B" });
+  });
+
+  it("converges when a device reuses a timestamp for different content", async () => {
+    const a = new SimDevice(DEVICE_A);
+    const b = new SimDevice(DEVICE_B);
+    a.edit(change("x", 100, { v: 1 }));
+    await a.sync();
+    a.edit(change("x", 100, { v: 2 })); // same device, same timestamp: ignored by the server
+    await a.sync();
+    await b.sync();
+    expect(a.snapshot()).toEqual(b.snapshot());
+    expect(a.rows.get("items/x")!.data).toEqual({ v: 1 });
+  });
+
   const orders: Array<Array<"A" | "B">> = [
     ["A", "B", "A"],
     ["B", "A", "B"],
