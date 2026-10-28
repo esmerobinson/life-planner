@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EXPORT_PAGE_BYTES, EXPORT_PAGE_ROWS } from "../../src/export";
 import { call, change, DEVICE_A, DEVICE_B, errorOf, syncOk, T0 } from "./helpers";
 
 interface ExportBody {
@@ -40,7 +41,19 @@ describe("GET /v1/export", () => {
     expect(body.goals).toEqual([{ id: "g1", title: "goal" }]);
   });
 
+  it("splits large data across internal pages by bytes and still exports every row once", async () => {
+    const big = (n: number) => ({ id: `big${n}`, blob: String(n).padEnd(900_000, "x") });
+    await syncOk(DEVICE_A, 0, [0, 1, 2].map((n) => change(`big${n}`, 1, big(n))));
+    await syncOk(DEVICE_A, 0, [3, 4, 5].map((n) => change(`big${n}`, 1, big(n))));
+    await syncOk(DEVICE_A, 0, [change("small", 1, { id: "small" }, "goals")]);
+    expect(6 * 900_000).toBeGreaterThan(EXPORT_PAGE_BYTES);
+    const body = (await (await call("/v1/export")).json()) as ExportBody;
+    expect(body.items).toEqual([0, 1, 2, 3, 4, 5].map(big));
+    expect(body.goals).toEqual([{ id: "small" }]);
+  });
+
   it("exports many rows (multiple internal pages) exactly once each, data verbatim", async () => {
+    expect(EXPORT_PAGE_ROWS).toBe(1000); // 1000 items below hits the exact page boundary
     const count = 1234;
     const data = (i: number) => ({ id: `r${i}`, title: `é\u{1F600} ${i}`, nested: { n: i } });
     await syncOk(DEVICE_A, 0, Array.from({ length: 1000 }, (_, i) => change(`r${String(i).padStart(4, "0")}`, 1, data(i))));
