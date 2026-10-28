@@ -1,5 +1,5 @@
-import { endOfMonth, isValidISODate } from "../domain/dates";
-import { AREA_IDS, WEEKDAYS, type AreaId, type Goal, type ISODate, type Item, type Weekday } from "../domain/types";
+import { endOfMonth } from "../domain/dates";
+import { WEEKDAYS, type AreaId, type ISODate, type Weekday } from "../domain/types";
 import { sectionToArea } from "./sectionAreas";
 
 export interface ParseNote {
@@ -42,6 +42,15 @@ export interface Selection {
 export const slug = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 const MAX_MILESTONE = 200;
+/** The most text a goal's why, cadence or notes may hold (the backup validator's limit). */
+export const MAX_GOAL_TEXT = 4000;
+
+/** Cuts text to the limit and, if it was cut, adds a note naming the line. */
+export function capText(text: string, field: string, line: string, notes: ParseNote[]): string {
+  if (text.length <= MAX_GOAL_TEXT) return text;
+  notes.push({ line, reason: `${field} cut to ${MAX_GOAL_TEXT} characters` });
+  return text.slice(0, MAX_GOAL_TEXT);
+}
 const ALL_DAYS: Weekday[] = [...WEEKDAYS];
 
 const lines = (md: unknown): string[] => (typeof md === "string" ? md.split(/\r?\n/) : []);
@@ -100,9 +109,9 @@ export function parseAreaGoals(md: string, today: ISODate): { goals: ProposedGoa
       milestones: cur.markers,
     };
     if (finite) g.deadline = `${yearIn(cur.markers[0]) ?? todayYear}-12-31`;
-    if (cur.identity.length) g.why = cur.identity.join("\n\n");
-    if (cur.cadence.length) g.cadence = cur.cadence.join("\n");
-    if (cur.study) g.notes = cur.study;
+    if (cur.identity.length) g.why = capText(cur.identity.join("\n\n"), "why", cur.title, notes);
+    if (cur.cadence.length) g.cadence = capText(cur.cadence.join("\n"), "cadence", cur.title, notes);
+    if (cur.study) g.notes = capText(cur.study, "notes", cur.title, notes);
     goals.push(g);
   }
 
@@ -165,22 +174,35 @@ function monthNumber(name: string): number | undefined {
   return i >= 0 ? i + 1 : undefined;
 }
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * The monthly note. Each bold label under "This month's goals" is an AREA name (a trailing
+ * `(...)` is ignored when choosing the area but kept in the title). It becomes one finite goal
+ * titled "<Month> goal: <label>", due at month end, whose notes are the description plus a
+ * "Done when: ..." line from the first nested line (the success criterion). No tasks are made.
+ */
 export function parseMonthGoals(
   md: string,
   today: ISODate,
-): { goals: ProposedGoal[]; tasks: ProposedTask[]; monthEnd?: ISODate; notes: ParseNote[] } {
+): { goals: ProposedGoal[]; monthEnd?: ISODate; notes: ParseNote[] } {
   const goals: ProposedGoal[] = [];
-  const tasks: ProposedTask[] = [];
   const notes: ParseNote[] = [];
   const all = lines(md);
 
   let monthEnd: ISODate | undefined;
+  let monthName = MONTH_NAMES[Number(today.slice(5, 7)) - 1] ?? "This month";
   const head = all.map((l) => l.trim()).find((l) => /^#\s+goals for\b/i.test(l));
   if (head) {
     const m = /^#\s+goals for\s+(\S+)\s+(\d{4})\b/i.exec(head);
     const month = m ? monthNumber(m[1]) : undefined;
-    if (m && month) monthEnd = endOfMonth(Number(m[2]), month);
-    else notes.push({ line: head, reason: "month heading not readable, using the end of this month" });
+    if (m && month) {
+      monthEnd = endOfMonth(Number(m[2]), month);
+      monthName = MONTH_NAMES[month - 1];
+    } else notes.push({ line: head, reason: "month heading not readable, using the end of this month" });
   } else if (all.some((l) => l.trim())) {
     notes.push({ line: "", reason: "no month heading found, using the end of this month" });
   }
@@ -188,12 +210,22 @@ export function parseMonthGoals(
 
   let active = false;
   let last: ProposedGoal | undefined;
-  let stepTaken = false;
+  let desc = "";
+  let doneWhen: string | undefined;
   const seen = new Set<string>();
+
+  /** Writes the notes of the goal being read (description, then the Done when line). */
+  function closeGoal() {
+    if (!last) return;
+    const parts = [desc, doneWhen ? `Done when: ${doneWhen}` : ""].filter(Boolean);
+    if (parts.length) last.notes = capText(parts.join("\n"), "notes", last.title, notes);
+  }
+
   for (const raw of all) {
     const line = raw.trim();
     const h = /^##\s+(.*)$/.exec(line);
     if (h && !line.startsWith("###")) {
+      closeGoal();
       active = /^this month['’]?s goals$/i.test(stripEmoji(h[1]));
       last = undefined;
       continue;
@@ -201,65 +233,56 @@ export function parseMonthGoals(
     if (!active || !line) continue;
     const text = bulletText(line);
     if (text === undefined) continue;
-    const indented = /^\s/.test(raw);
-    if (indented) {
-      const n = /^([^:]{1,40}?)\s*:\s*(.*)$/.exec(text);
-      if (n && last && n[2].trim()) {
-        const isNext = /^next[\s-]?steps?$/i.test(n[1].trim());
-        // A different label is used only for the first nested line, and we say so.
-        if (isNext || !stepTaken) {
-          const title = n[2].trim();
-          tasks.push({
-            key: `obsidian:task:${slug(last.title)}:${slug(title)}`,
-            title,
-            areaId: last.areaId,
-            goalKey: last.key,
-          });
-          if (!isNext) notes.push({ line: last.title, reason: "nested line used as the next step (its label was not Next step)" });
-          stepTaken = true;
-        }
+    if (/^\s/.test(raw)) {
+      // The first nested line is the success criterion; its label ("Success-test:") is dropped.
+      if (last && doneWhen === undefined) {
+        const n = /^([^:]{1,40}?)\s*:\s*(.*)$/.exec(text);
+        const value = (n ? n[2] : text).trim();
+        if (value) doneWhen = value;
       }
       continue;
     }
+    closeGoal();
+    last = undefined;
+    desc = "";
+    doneWhen = undefined;
     const b = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(text);
-    const full = b ? b[1].trim().replace(/:\s*$/, "").trim().replace(/\s+/g, " ") : "";
-    let title = stripParenthetical(full);
-    if (!b || !title) {
+    const label = b ? b[1].trim().replace(/:\s*$/, "").trim().replace(/\s+/g, " ") : "";
+    if (!b || !label) {
       notes.push({ line: text, reason: "goal has no bold title, skipped" });
-      last = undefined;
       continue;
     }
-    // Two titles that differ only by a parenthetical keep the full text for the later one.
-    if (seen.has(slug(title)) && full !== title && !seen.has(slug(full))) title = full;
+    const title = `${monthName} goal: ${label}`;
     if (seen.has(slug(title))) {
       notes.push({ line: title, reason: "duplicate goal, skipped" });
-      last = undefined;
       continue;
     }
     seen.add(slug(title));
-    stepTaken = false;
+    // The monthly note says just "Production"; the Backlog heading is "Production & freelance".
+    const base = stripParenthetical(label);
+    const area = sectionToArea(base) !== "inbox" ? sectionToArea(base) : sectionToArea(`${base} & freelance`);
     const g: ProposedGoal = {
-      key: "obsidian:goal:" + slug(title),
+      key: "obsidian:month:" + slug(title),
       title,
-      areaId: "admin",
-      areaFallback: true,
+      areaId: area === "inbox" ? "admin" : area,
+      areaFallback: area === "inbox",
       kind: "finite",
       deadline,
       milestones: [],
     };
-    const desc = b[2].trim();
-    if (desc) g.notes = desc;
+    desc = b[2].trim();
     goals.push(g);
     last = g;
   }
-  const out: { goals: ProposedGoal[]; tasks: ProposedTask[]; monthEnd?: ISODate; notes: ParseNote[] } = {
-    goals,
-    tasks,
-    notes,
-  };
+  closeGoal();
+  const out: { goals: ProposedGoal[]; monthEnd?: ISODate; notes: ParseNote[] } = { goals, notes };
   if (monthEnd) out.monthEnd = monthEnd;
   return out;
 }
+
+/** Habits that are about moving the body go to Body; everything else to Mind. */
+const MOVEMENT =
+  /\b(mov(e|es|ing|ement)|walk(s|ing)?|run(s|ning)?|exercis(e|es|ing)|work ?outs?|calisthenics|stretch(es|ing)?|yoga|gym)\b/i;
 
 export function parseHabits(md: string): {
   habits: ProposedTask[];
@@ -298,78 +321,10 @@ export function parseHabits(md: string): {
         continue;
       }
       seen.add(k);
-      habits.push({ key: `obsidian:task:habits:${k}`, title: text, areaId: "mind", recur: [...ALL_DAYS] });
+      habits.push({ key: `obsidian:task:habits:${k}`, title: text, areaId: MOVEMENT.test(text) ? "body" : "mind", recur: [...ALL_DAYS] });
     }
   }
   return { habits, metrics, weekly, notes };
 }
 
-const AREA_LIST: readonly string[] = AREA_IDS;
-
-function checkArea(areaId: string, what: string) {
-  if (!AREA_LIST.includes(areaId) || areaId === "inbox") throw new Error(`${what} needs an area other than the inbox`);
-}
-
-/**
- * Turns proposals into real rows (fresh ids, tasks linked to their goal's id). Pure:
- * nothing is written. Throws before building anything if a row is invalid: a finite
- * goal needs a real deadline, and no goal or task may be in the inbox.
- */
-export function buildObsidianRows(selection: Selection, today: ISODate): { goals: Goal[]; items: Item[] } {
-  for (const g of selection.goals) {
-    if (!g.title.trim()) throw new Error("a goal needs a title");
-    checkArea(g.areaId, "a goal");
-    if (g.kind === "finite" && !(g.deadline && isValidISODate(g.deadline))) {
-      throw new Error("finite goals need a deadline");
-    }
-  }
-  for (const t of selection.tasks) {
-    if (!t.title.trim()) throw new Error("a task needs a title");
-    checkArea(t.areaId, "a task");
-  }
-
-  const goalIds = new Map<string, string>();
-  const goals: Goal[] = [];
-  for (const p of selection.goals) {
-    if (goalIds.has(p.key)) continue;
-    const goal: Goal = {
-      id: crypto.randomUUID(),
-      title: p.title.trim(),
-      areaId: p.areaId,
-      kind: p.kind,
-      milestones: p.milestones.map((title) => ({ id: crypto.randomUUID(), title, done: false })),
-      source: { kind: "obsidian", key: p.key },
-      createdAt: today,
-    };
-    if (p.kind === "finite" && p.deadline) goal.deadline = p.deadline;
-    if (p.why) goal.why = p.why;
-    if (p.cadence) goal.cadence = p.cadence;
-    if (p.notes) goal.notes = p.notes;
-    goals.push(goal);
-    goalIds.set(p.key, goal.id);
-  }
-
-  const seen = new Set<string>();
-  const items: Item[] = [];
-  for (const p of selection.tasks) {
-    if (seen.has(p.key)) continue;
-    seen.add(p.key);
-    const item: Item = {
-      id: crypto.randomUUID(),
-      kind: "task",
-      title: p.title.trim(),
-      links: [],
-      areaId: p.areaId,
-      priority: 2,
-      status: "open",
-      createdAt: today,
-      touchedAt: today,
-      source: { kind: "obsidian", key: p.key },
-    };
-    const goalId = p.goalKey ? goalIds.get(p.goalKey) : undefined;
-    if (goalId) item.goalId = goalId;
-    if (p.recur) item.recur = p.recur;
-    items.push(item);
-  }
-  return { goals, items };
-}
+export { buildObsidianRows } from "./obsidianRows";

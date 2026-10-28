@@ -2,16 +2,24 @@
 // backup file. It REUSES the app's own parsers, row builders and backup validator, so
 // the file is exactly what the Backup page's Merge accepts. Nothing here is bundled
 // into the app; run it with `npx tsx scripts/obsidian-transfer.ts`.
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import { isValidISODate } from "../src/domain/dates";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { checkOutputs, findRepoRoot, writeAllPrivate } from "./files";
 import { parseBackup, type BackupFile } from "../src/data/backup";
+import { parseExtra } from "./extra";
+import { makeSummary } from "./summary";
 import { AREA_IDS, type AreaId, type Goal, type ISODate, type Item } from "../src/domain/types";
 import { backlogItem, parseBacklog } from "../src/import/backlog";
 import {
   normaliseTitle,
   parseGoogleTasks,
+  googleNoteLines,
   planGoogleTasks,
+  tagFor,
+  type ParsedGoogleTask,
   type SkippedDuplicate,
 } from "../src/import/googleTasks";
 import {
@@ -59,101 +67,52 @@ export interface TransferResult {
 
 export const NOT_VALID = "The transfer does not validate as an Esmeworld backup. Nothing was written.";
 
-/** Area names for the summary (the same names the app shows). */
-const AREA_LABEL: Record<AreaId, string> = {
-  inbox: "Inbox",
-  writing: "Writing",
-  art: "Art",
-  content: "Content",
-  mind: "Mind",
-  body: "Body",
-  tech: "Tech projects",
-  production: "Production",
-  admin: "Admin",
-};
 const AREA_LIST: readonly string[] = AREA_IDS;
-const label = (a: AreaId) => AREA_LABEL[a] ?? a;
 
-const EXTRA_TAGS = ["from-daily-notes", "from-old-task-lists", "from-project-notes"];
-const EXTRA_KINDS = ["task", "idea", "goal"];
+/** The vault notes the transfer reads (all inside the vault folder). */
+const NOTE_FILES = ["Backlog.md", "Goals.md", "Goals for month.md", "Goals & Habits.md"];
 
 /**
- * Vault-review items, one JSON object per line:
- * `{ key, title, notes?, due?, kind: "task"|"idea"|"goal", areaId, tag, check? }`.
- * `tag` is one of from-daily-notes, from-old-task-lists, from-project-notes. An optional
- * `check` reason adds the `check` tag and a first notes line "Check: <reason>". A goal is a
- * practice goal (deadline only if `due` is given) and must not be in the inbox. Bad lines are
- * reported by number and skipped; nothing here ever throws.
+ * A UUID-shaped id made from a source key, so running the transfer twice gives the same ids
+ * and a second Merge restore adds nothing.
  */
-function parseExtra(
-  text: string,
-  today: ISODate,
-): { entries: { line: number; key: string; item?: Item; goal?: Goal }[]; notes: ParseNote[] } {
-  const entries: { line: number; key: string; item?: Item; goal?: Goal }[] = [];
-  const notes: ParseNote[] = [];
-  const bad = (n: number, why: string) => notes.push({ line: "", reason: `extra line ${n}: ${why}, skipped` });
-  text.split(/\r?\n/).forEach((raw, idx) => {
-    const n = idx + 1;
-    if (!raw.trim()) return;
-    let o: unknown;
-    try {
-      o = JSON.parse(raw);
-    } catch {
-      return bad(n, "not valid JSON");
+export function stableId(kind: string, key: string): string {
+  const h = createHash("sha256").update(`esmeworld-transfer:${kind}:${key}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+
+/** Gives every row a stable id and points each goalId at the matching goal. Throws if a link is broken. */
+function withStableIds(items: Item[], goals: Goal[]): void {
+  const goalIdByOld = new Map<string, string>();
+  for (const g of goals) {
+    const key = g.source?.key ?? g.title;
+    const id = stableId("goal", key);
+    goalIdByOld.set(g.id, id);
+    g.id = id;
+    g.milestones.forEach((m, n) => {
+      m.id = stableId("milestone", `${key}:${n}`);
+    });
+  }
+  for (const i of items) {
+    i.id = stableId("item", i.source?.key ?? i.title);
+    if (i.goalId) {
+      const id = goalIdByOld.get(i.goalId);
+      if (!id) throw new Error(NOT_VALID);
+      i.goalId = id;
     }
-    if (typeof o !== "object" || o === null || Array.isArray(o)) return bad(n, "not an object");
-    const r = o as Record<string, unknown>;
-    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    const key = str(r.key)?.trim();
-    const title = str(r.title)?.replace(/\s+/g, " ").trim();
-    if (!key) return bad(n, "no key");
-    if (!title) return bad(n, "no title");
-    if (!EXTRA_KINDS.includes(r.kind as string)) return bad(n, "kind must be task, idea or goal");
-    if (typeof r.areaId !== "string" || !AREA_LIST.includes(r.areaId)) return bad(n, "unknown area");
-    if (!EXTRA_TAGS.includes(r.tag as string)) return bad(n, "unknown tag");
-    const kind = r.kind as "task" | "idea" | "goal";
-    const areaId = r.areaId as AreaId;
-    const due = r.due === undefined ? undefined : str(r.due);
-    if (r.due !== undefined && !(due && isValidISODate(due))) return bad(n, "due is not a real date");
-    if (r.notes !== undefined && typeof r.notes !== "string") return bad(n, "notes must be text");
-    if (r.check !== undefined && typeof r.check !== "string") return bad(n, "check must be text");
-    const notesText = str(r.notes)?.trim();
-    if (kind === "goal") {
-      if (areaId === "inbox") return bad(n, "a goal cannot be in the inbox");
-      const goal: Goal = {
-        id: crypto.randomUUID(),
-        title,
-        areaId,
-        kind: "practice",
-        milestones: [],
-        source: { kind: "obsidian", key },
-        createdAt: today,
-      };
-      if (due) goal.deadline = due;
-      if (notesText) goal.notes = notesText;
-      entries.push({ line: n, key, goal });
-      return;
-    }
-    const check = str(r.check)?.trim();
-    const item: Item = {
-      id: crypto.randomUUID(),
-      kind,
-      title,
-      links: [],
-      tags: check ? [r.tag as string, "check"] : [r.tag as string],
-      areaId,
-      priority: 2,
-      status: "open",
-      createdAt: today,
-      touchedAt: today,
-      source: { kind: "obsidian", key },
-    };
-    const noteLines = [check ? `Check: ${check}` : "", notesText ?? ""].filter(Boolean);
-    if (noteLines.length) item.notes = noteLines.join("\n");
-    if (due) item.due = due;
-    entries.push({ line: n, key, item });
-  });
-  return { entries, notes };
+  }
+  const have = new Set(goals.map((g) => g.id));
+  if (items.some((i) => i.goalId && !have.has(i.goalId))) throw new Error(NOT_VALID);
+}
+
+/** Adds what a Google copy knows to the row that stays: its list tag, a due date if missing, new notes lines. */
+function foldGoogleInto(target: Item, g: ParsedGoogleTask): void {
+  const tag = tagFor(g.listTitle);
+  if (tag && !(target.tags ?? []).includes(tag)) target.tags = [...(target.tags ?? []), tag];
+  if (!target.due && g.due && target.kind !== "idea") target.due = g.due;
+  const have = (target.notes ?? "").split("\n").filter(Boolean);
+  const more = googleNoteLines(g).filter((l) => !have.includes(l));
+  if (more.length) target.notes = [...have, ...more].join("\n");
 }
 
 export function buildTransfer(
@@ -174,8 +133,10 @@ export function buildTransfer(
   // Backlog, filed by section exactly as importBacklog does.
   const sectionOf = new Map<string, string>();
   let backlogItems = 0;
+  let backlogMerged: { title: string; section: string }[] = [];
   if (inputs.backlog !== undefined) {
     const parsed = parseBacklog(inputs.backlog);
+    backlogMerged = parsed.merged;
     for (const p of parsed.items) {
       if (add(backlogItem(p, today))) {
         backlogItems++;
@@ -185,11 +146,10 @@ export function buildTransfer(
     notes.push(...parsed.skipped);
   }
 
-  // Goals, monthly goals with their next steps, and daily habits.
+  // Goals, monthly goals, and daily habits.
   const goals: ProposedGoal[] = [];
   const tasks: ProposedTask[] = [];
   let monthGoals: ProposedGoal[] = [];
-  let monthTasks: ProposedTask[] = [];
   let habitTasks: ProposedTask[] = [];
   let metrics: { name: string; current: number; target: number }[] = [];
   let weekly: string[] = [];
@@ -203,9 +163,7 @@ export function buildTransfer(
   if (inputs.month !== undefined) {
     const m = parseMonthGoals(inputs.month, today);
     monthGoals = m.goals;
-    monthTasks = m.tasks;
     goals.push(...m.goals);
-    tasks.push(...m.tasks);
     notes.push(...m.notes);
   }
   if (inputs.habits !== undefined) {
@@ -217,13 +175,9 @@ export function buildTransfer(
     notes.push(...h.notes);
   }
   const rows = buildObsidianRows({ goals, tasks }, today);
-  let nextSteps = 0;
   let habits = 0;
   for (const i of rows.items) {
-    if (add(i)) {
-      if (i.recur) habits++;
-      else nextSteps++;
-    }
+    if (add(i) && i.recur) habits++;
   }
 
   // Vault-review items (--extra), already decided by hand, tagged by where they came from.
@@ -254,6 +208,7 @@ export function buildTransfer(
   let gtasksAdded = 0;
   let listTitles = new Map<string, string>();
   let duplicates: SkippedDuplicate[] = [];
+  const googleMerges: { title: string; listTitle: string; into: string }[] = [];
   const classify: ClassifyEntry[] = [];
   if (inputs.gtasks !== undefined) {
     let raw: unknown;
@@ -264,13 +219,22 @@ export function buildTransfer(
     }
     const parsed = parseGoogleTasks(raw);
     notes.push(...parsed.notes);
-    const haveTitles = new Set<string>();
+    const haveTitles = new Map<string, string>();
     for (const i of items) {
       const n = normaliseTitle(i.title);
-      if (n) haveTitles.add(n);
+      if (n && !haveTitles.has(n)) haveTitles.set(n, i.source?.key ?? "");
     }
     const plan = planGoogleTasks(parsed.items, new Set(keys), haveTitles, today);
     duplicates = plan.duplicates;
+    // A Google copy of a task already in the transfer is not added; its list tag, notes and due
+    // are folded into the existing row (which keeps its own area and section).
+    const byKey = new Map(items.filter((i) => i.source).map((i) => [i.source!.key, i]));
+    for (const sk of plan.skippedTasks) {
+      const target = sk.reason === "existing" && sk.matchedKey ? byKey.get(sk.matchedKey) : undefined;
+      if (!target) continue;
+      foldGoogleInto(target, sk.task);
+      googleMerges.push({ title: sk.task.title, listTitle: sk.task.listTitle, into: target.source!.kind });
+    }
     listTitles = new Map(parsed.items.map((p) => [p.key, p.listTitle]));
     for (const i of plan.newItems) if (add(i)) gtasksAdded++;
   }
@@ -313,6 +277,7 @@ export function buildTransfer(
     }
   }
 
+  withStableIds(items, allGoals);
   const backup: BackupFile = { app: "life-hub", schema: 1, exportedOn: today, items, goals: allGoals };
   try {
     parseBackup(JSON.parse(JSON.stringify(backup)));
@@ -329,118 +294,21 @@ export function buildTransfer(
     areaGoals: areaGoalCount,
     monthGoals: monthGoals.length,
     backlogItems,
+    backlogMerged: backlogMerged.length,
+    mergedIntoBacklog: googleMerges.filter((m) => m.into === "backlog").length,
     gtasksAdded,
     gtasksDuplicates: duplicates.length,
-    nextSteps,
     habits,
     sorted: sorted.length,
     stillInInbox,
     notes: notes.length,
   };
   const summary = makeSummary({
-    extraItems, extraGoals,
-    today, backup, monthGoals, monthTasks, habitTasks, metrics, weekly, duplicates, notes, sorted, stillInInbox,
+    extraItems, extraGoals, backlogMerged, googleMerges,
+    today, backup, monthGoals, habitTasks, metrics, weekly, duplicates, notes, sorted, stillInInbox,
     goalsAsProposed: goals,
   });
   return { backup, summary, classify, notes, counts };
-}
-
-function makeSummary(s: {
-  extraItems: number;
-  extraGoals: number;
-  today: ISODate;
-  backup: BackupFile;
-  monthGoals: ProposedGoal[];
-  monthTasks: ProposedTask[];
-  habitTasks: ProposedTask[];
-  metrics: { name: string; current: number; target: number }[];
-  weekly: string[];
-  duplicates: SkippedDuplicate[];
-  notes: ParseNote[];
-  sorted: { title: string; areaId: AreaId }[];
-  stillInInbox: number;
-  goalsAsProposed: ProposedGoal[];
-}): string {
-  const L: string[] = [];
-  L.push(`# Esmeworld transfer summary, ${s.today}`, "");
-  L.push("This file is for you only. It contains your own titles and stays on this Mac.", "");
-
-  L.push("## Items by area", "");
-  for (const id of AREA_IDS) {
-    const n = s.backup.items.filter((i) => i.areaId === id).length;
-    if (n) L.push(`- ${label(id)}: ${n}`);
-  }
-  L.push(`- Total items: ${s.backup.items.length}`, "");
-
-  L.push("## Goals", "");
-  if (!s.backup.goals.length) L.push("No goals.");
-  for (const g of s.backup.goals) {
-    const when = g.deadline ? `, deadline ${g.deadline}` : "";
-    L.push(`- ${g.title}: ${label(g.areaId)}, ${g.kind}${when}, ${g.milestones.length} milestones`);
-  }
-  L.push("");
-
-  L.push("## Monthly goals and next steps", "");
-  if (!s.monthGoals.length) L.push("None.");
-  for (const g of s.monthGoals) {
-    L.push(`- ${g.title} (deadline ${g.deadline ?? "none"})`);
-    for (const t of s.monthTasks.filter((t) => t.goalKey === g.key)) L.push(`  - Next step: ${t.title}`);
-  }
-  L.push("");
-
-  L.push("## Daily habits", "");
-  if (!s.habitTasks.length) L.push("None.");
-  for (const h of s.habitTasks) L.push(`- ${h.title} (every day)`);
-  L.push("");
-
-  if (s.metrics.length || s.weekly.length) {
-    L.push("## Big goal numbers and this week (not transferred)", "");
-    for (const m of s.metrics) L.push(`- ${m.name}: ${m.current} of ${m.target}`);
-    for (const w of s.weekly) L.push(`- ${w}`);
-    L.push("");
-  }
-
-  const needsCheck = s.backup.items.filter((i) => i.tags?.includes("check"));
-  L.push("## Vault review", "", `${s.extraItems} items and ${s.extraGoals} goals came from the vault review.`, "");
-  if (needsCheck.length) {
-    L.push("Items that need your decision:");
-    for (const i of needsCheck) L.push(`- ${i.title}: ${(i.notes ?? "").split("\n")[0]}`);
-    L.push("");
-  }
-
-  L.push("## Google Tasks skipped as the same title", "");
-  if (!s.duplicates.length) L.push("None.");
-  for (const d of s.duplicates) {
-    const why = d.reason === "existing" ? "matches a transferred item" : "repeated in the Google file";
-    L.push(
-      `- ${d.title} (from ${d.listTitle})${d.hadNotes ? " - had notes" : ""}${d.hadDue ? " - had a due date" : ""} - ${why}`,
-    );
-  }
-  L.push("");
-
-  L.push("## Sorted for you", "");
-  if (!s.sorted.length) L.push("Nothing was re-filed by an areas file.");
-  for (const x of s.sorted) L.push(`- ${x.title} -> ${label(x.areaId)}`);
-  L.push("");
-
-  L.push("## Still in your Inbox", "", `${s.stillInInbox} items. Sort them in Esmeworld with the area buttons.`, "");
-
-  L.push("## Notes", "");
-  if (!s.notes.length) L.push("None.");
-  for (const n of s.notes) L.push(n.line ? `- ${n.reason}: ${n.line}` : `- ${n.reason}`);
-  L.push("");
-
-  L.push(
-    "## How to load this",
-    "",
-    "1. Open Esmeworld and go to Backup.",
-    "2. Choose the transfer .json file next to this summary.",
-    "3. Choose Merge (not Replace).",
-    "4. Load it ONCE, into ONE place: the hosted app. Sync will copy it to your other devices later.",
-    "5. Do not also import the same notes through the Inbox, or you will get duplicates.",
-    "",
-  );
-  return L.join("\n");
 }
 
 /** Reads the vault notes and the Google file. Never writes to them. */
@@ -454,18 +322,13 @@ export function readInputs(vault: string, gtasks: string): TransferInputs {
     return readFileSync(path, "utf8");
   };
   return {
-    backlog: read("Backlog.md", join(vault, "Backlog.md")),
-    goals: read("Goals.md", join(vault, "Goals.md")),
-    month: read("Goals for month.md", join(vault, "Goals for month.md")),
-    habits: read("Goals & Habits.md", join(vault, "Goals & Habits.md")),
+    backlog: read(NOTE_FILES[0], join(vault, NOTE_FILES[0])),
+    goals: read(NOTE_FILES[1], join(vault, NOTE_FILES[1])),
+    month: read(NOTE_FILES[2], join(vault, NOTE_FILES[2])),
+    habits: read(NOTE_FILES[3], join(vault, NOTE_FILES[3])),
     gtasks: read(basename(gtasks), gtasks),
     missing,
   };
-}
-
-function writePrivate(path: string, text: string) {
-  writeFileSync(path, text, { mode: 0o600 });
-  chmodSync(path, 0o600);
 }
 
 export interface RunOptions {
@@ -477,10 +340,38 @@ export interface RunOptions {
   areasFile?: string;
   /** JSONL of vault-review items (see parseExtra). */
   extraFile?: string;
+  /** Folders nothing may be written into. Default: the Obsidian vault folder and this git repository. */
+  protectedDirs?: string[];
+}
+
+/** One calm sentence for any failure; always says nothing was written. */
+export function formatFailure(e: unknown): string {
+  const msg = e instanceof Error && e.message ? e.message.trim() : "The transfer did not work.";
+  if (/Nothing was written\.$/.test(msg)) return msg;
+  return `${/[.!?]$/.test(msg) ? msg : msg + "."} Nothing was written.`;
 }
 
 /** Builds the transfer and writes the files. Returns terminal lines: counts only, never titles. */
 export function runTransfer(o: RunOptions): { lines: string[] } {
+  const backupPath = join(o.out, `esmeworld-transfer-${o.today}.json`);
+  const summaryPath = join(o.out, `esmeworld-transfer-${o.today}-summary.md`);
+
+  // Check where we may write before reading or building anything.
+  const protectedDirs = [
+    ...(o.protectedDirs ?? [
+      join(homedir(), "Desktop", "Esme's Brain"),
+      ...[findRepoRoot(dirname(fileURLToPath(import.meta.url)))].filter((d): d is string => !!d),
+    ]),
+    o.vault,
+  ];
+  const outputs = [backupPath, summaryPath, ...(o.classifyOut ? [o.classifyOut] : [])];
+  const inputs = [
+    o.gtasks,
+    ...NOTE_FILES.map((f) => join(o.vault, f)),
+    ...[o.areasFile, o.extraFile].filter((f): f is string => !!f),
+  ];
+  checkOutputs({ outputs, inputs, protectedDirs });
+
   let areas: Record<string, unknown> | undefined;
   if (o.areasFile) {
     try {
@@ -491,23 +382,24 @@ export function runTransfer(o: RunOptions): { lines: string[] } {
       throw new Error("The areas file could not be read as a JSON object of keys to areas. Nothing was written.");
     }
   }
-  const inputs = readInputs(o.vault, o.gtasks);
+  const read = readInputs(o.vault, o.gtasks);
   if (o.extraFile) {
     try {
-      inputs.extra = readFileSync(o.extraFile, "utf8");
+      read.extra = readFileSync(o.extraFile, "utf8");
     } catch {
       throw new Error("The extra file could not be read. Nothing was written.");
     }
   }
-  const t = buildTransfer(inputs, o.today, { areas });
-  mkdirSync(o.out, { recursive: true });
-  const backupPath = join(o.out, `esmeworld-transfer-${o.today}.json`);
-  const summaryPath = join(o.out, `esmeworld-transfer-${o.today}-summary.md`);
-  writePrivate(backupPath, JSON.stringify(t.backup, null, 2));
-  writePrivate(summaryPath, t.summary);
+  const t = buildTransfer(read, o.today, { areas });
+  writeAllPrivate([
+    { path: backupPath, text: JSON.stringify(t.backup, null, 2) },
+    { path: summaryPath, text: t.summary },
+    ...(o.classifyOut ? [{ path: o.classifyOut, text: JSON.stringify(t.classify, null, 2) }] : []),
+  ]);
   const lines = [
-    `Items: ${t.counts.items} (backlog ${t.counts.backlogItems}, google tasks ${t.counts.gtasksAdded}, next steps ${t.counts.nextSteps}, habits ${t.counts.habits})`,
+    `Items: ${t.counts.items} (backlog ${t.counts.backlogItems}, google tasks ${t.counts.gtasksAdded}, habits ${t.counts.habits})`,
     `Goals: ${t.counts.goals}`,
+    `Folded together: ${t.counts.backlogMerged} Backlog copies, ${t.counts.mergedIntoBacklog} Google copies`,
     `Vault review: ${t.counts.extraItems} items, ${t.counts.extraGoals} goals`,
     `Google tasks skipped as the same title: ${t.counts.gtasksDuplicates}`,
     `Sorted by the areas file: ${t.counts.sorted}`,
@@ -516,9 +408,6 @@ export function runTransfer(o: RunOptions): { lines: string[] } {
     `Wrote ${backupPath}`,
     `Wrote ${summaryPath}`,
   ];
-  if (o.classifyOut) {
-    writePrivate(o.classifyOut, JSON.stringify(t.classify, null, 2));
-    lines.push(`Wrote ${o.classifyOut} (${t.classify.length} items to classify)`);
-  }
+  if (o.classifyOut) lines.push(`Wrote ${o.classifyOut} (${t.classify.length} items to classify)`);
   return { lines };
 }

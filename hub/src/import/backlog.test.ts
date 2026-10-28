@@ -119,7 +119,7 @@ describe("importBacklog", () => {
 
   it("duplicate titles in one file collapse to one item", async () => {
     const r = await importBacklog("- [ ] Same  thing\n- [ ] same thing", TODAY);
-    expect(r).toMatchObject({ added: 1, alreadyHad: 1 });
+    expect(r).toMatchObject({ added: 1, alreadyHad: 0 }); // copies are folded together before the import
   });
 });
 

@@ -56,6 +56,7 @@ export function GoalDetail({ today }: { today: ISODate }) {
       {goal.why?.split(/\n+/).filter(Boolean).map((t, n) => (
         <p key={"w" + n} className="goal-why">{t}</p>
       ))}
+      {goal.notes && <p className="goal-notes">{goal.notes}</p>}
       {goal.cadence?.split(/\n+/).filter(Boolean).map((t, n) => (
         <p key={"c" + n} className="goal-cadence">{t}</p>
       ))}

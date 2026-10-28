@@ -4,12 +4,12 @@
 A pretend sentence that is ignored.
 
 ## This month's goals
-*   **Finish the pretend zine (draft one):** Get the whole first draft down, rough is fine.
-    *   Next step: Write the ending scene
-*   **Tidy the invented studio:** Clear the desk and shelves.
-    *   Next step: Sort the pencil jars
-*   **Send three pretend pitches:** Short emails to fictional editors.
-    *   Next step: List the editors
+*   **Writing (Pretend Zine):** Get the whole first draft down, rough is fine.
+    *   Success-test: Chapter three is finished and sent to a friend
+*   **Creative Technologist:** Build the small invented tool.
+    *   Done-check: It runs on my own machine
+*   **Gardening Corner:** Tidy the invented beds.
+    *   Done-sign: The beds are clear
 
 ## Watch out for
 *   **Not a goal:** this must be ignored.

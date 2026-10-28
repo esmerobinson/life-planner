@@ -9,7 +9,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { isValidISODate, todayISO } from "../src/domain/dates";
-import { runTransfer } from "./transfer";
+import { formatFailure, runTransfer } from "./transfer";
 
 const FLAGS = ["--vault", "--gtasks", "--out", "--today", "--classify-out", "--areas", "--extra"] as const;
 
@@ -41,6 +41,6 @@ function main(argv: string[]) {
 try {
   main(process.argv.slice(2));
 } catch (e) {
-  console.error(e instanceof Error ? e.message : "The transfer did not work. Nothing was written.");
+  console.error(formatFailure(e));
   process.exit(1);
 }

@@ -51,13 +51,24 @@ parsers and the same validator the Backup page uses. It only reads those
 files. Run it once, from `hub/`:
 
     npx tsx scripts/obsidian-transfer.ts [--vault DIR] [--gtasks FILE] [--out DIR] \
-        [--today YYYY-MM-DD] [--classify-out FILE] [--areas FILE]
+        [--today YYYY-MM-DD] [--classify-out FILE] [--areas FILE] [--extra FILE]
 
 It writes two private files (mode 0600) into `--out` (default `~/Downloads`):
 `esmeworld-transfer-<date>.json` (load it on the Backup page with **Merge**,
 once, into one place) and `esmeworld-transfer-<date>-summary.md` (a readable
 summary with your titles, for you only). The terminal prints counts only.
 A missing input is skipped with a note.
+
+Safe to repeat: ids are made from each row's source key, so a second run
+produces the same ids and loading it again with Merge adds nothing. The script
+refuses to write inside the vault, inside this git repository, or over any
+input file, and writes nothing if any check fails. Titles are tidied first:
+wiki-links become their text, old suffixes such as `(from Google Tasks)`,
+`(overdue!)`, `(due today)`, `(due in 3d)`, `(carried ...)` and
+`(was due 19 Jul)` are removed (a date is kept as a notes line), and copies of
+one task (same title ignoring case, punctuation and emoji) are folded into one
+item, also across the Backlog and Google Tasks. The summary lists every folded
+copy.
 
 `--classify-out FILE` writes a private list of every item the rules left in the
 Inbox (stable `key`, title, origin, section or list, first 200 characters of
@@ -101,13 +112,17 @@ How the notes map:
   least one marker is finite, otherwise a practice goal. A finite goal's
   deadline is 31 December of the year in its first marker, else this year.
   The `## Notes` section is ignored.
-- **Monthly note** (`# Goals for <Month> <Year>`): each bold bullet under
-  "This month's goals" becomes a finite goal (area Admin, deadline the last day
-  of that month, description as notes) and its first nested line (normally
-  `Next step:`) becomes an open task linked to that goal.
+- **Monthly note** (`# Goals for <Month> <Year>`): each bold label under
+  "This month's goals" is an area name (a trailing `(...)` is ignored when
+  choosing the area, so "Writing (Relationship Book)" is Writing, "Creative
+  Technologist" is Tech projects; no match means Admin). It becomes one finite
+  goal titled "<Month> goal: <label>", due on the last day of that month. Its
+  notes are the description plus a `Done when: ...` line taken from the first
+  nested line (the success criterion). No tasks are made from monthly goals.
 - **Habits note**: each item under "Daily habits" becomes a task that repeats
-  every day (area Mind). "Big goals" numbers and "This week" counts are listed
-  in the summary and not created.
+  every day. Habits about movement (walk, run, exercise, workout, calisthenics,
+  stretch, yoga, gym, move) go to Body; the rest to Mind. "Big goals" numbers
+  and "This week" counts are listed in the summary and not created.
 
 Goals also carry optional **why**, **cadence** and **notes** text (shown under
 the goal's title) and an Obsidian source marker; all are included in backups.

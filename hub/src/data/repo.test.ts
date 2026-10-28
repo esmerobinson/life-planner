@@ -6,6 +6,7 @@ import {
   archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem, updateGoal, archiveItems,
   itemToGoal,
 } from "./repo";
+import { exportBackup, restoreBackup } from "./backup";
 
 const today = "2026-10-27";
 const base = { kind: "task" as const, title: "t", areaId: "writing" as const, priority: 2 as const };
@@ -258,6 +259,27 @@ describe("itemToGoal", () => {
     spy.mockRestore();
     expect(await db.goals.count()).toBe(0);
     expect(await db.items.get(it1.id)).toMatchObject({ status: "open", title: "Keep me" });
+  });
+
+  it("copies at most 4000 characters of notes to the goal, keeps the full text on the item, and the result still restores", async () => {
+    const long = "n".repeat(5000);
+    const it1 = await createItem({ ...base, title: "Big notes", areaId: "inbox", notes: long }, "2026-10-01");
+    const goal = await itemToGoal(it1.id, "art", "2026-10-20");
+    expect(goal.notes).toHaveLength(4000);
+    expect((await db.items.get(it1.id))!.notes).toBe(`${long}\nBecame a goal: Big notes`);
+    const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-21")));
+    await db.items.clear();
+    await db.goals.clear();
+    await expect(restoreBackup(file, "replace")).resolves.toMatchObject({ addedGoals: 1, addedItems: 1 });
+  });
+
+  it("refuses an item that is not open, writing nothing", async () => {
+    const done = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");
+    await tickItem(done.id, "2026-10-02");
+    const arch = await createItem({ ...base, areaId: "inbox" }, "2026-10-01");
+    await archiveItem(arch.id, "2026-10-02");
+    for (const id of [done.id, arch.id]) await expect(itemToGoal(id, "art", today)).rejects.toThrow(/open/i);
+    expect(await db.goals.count()).toBe(0);
   });
 
   it("rejects a missing item and an unknown area, writing nothing", async () => {
