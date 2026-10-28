@@ -170,6 +170,31 @@ test.describe("phone layout at 390px", () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  test("fields are at least 16px (no iOS zoom on focus) on Sync, Goals and the Add form", async ({ page }) => {
+    for (const path of ["/sync", "/goals", "/today"]) {
+      await page.goto(path);
+      if (path === "/today") await page.getByRole("button", { name: "Add" }).click();
+      const fields = page.locator(".app-content").locator("input:not([type=checkbox]):not([type=file]), textarea, select");
+      expect(await fields.count()).toBeGreaterThan(0);
+      const sizes = await fields.evaluateAll((els) => els.map((e) => parseFloat(getComputedStyle(e).fontSize)));
+      for (const s of sizes) expect(s, path).toBeGreaterThanOrEqual(16);
+    }
+  });
+
+  test("Back looks 34px but takes a tap 3px outside it (a 40px target)", async ({ page }) => {
+    await page.goto("/goals");
+    const back = page.getByRole("button", { name: "Back" });
+    const box = (await back.boundingBox())!;
+    expect(box.width).toBe(34);
+    expect(box.height).toBe(34);
+    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("button")?.getAttribute("aria-label"), [
+      box.x + box.width + 2.5, box.y + box.height / 2, // the target is a 40px circle
+    ]);
+    expect(hit).toBe("Back");
+    await page.mouse.click(box.x - 2.5, box.y + box.height / 2);
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test("an opened goal fits and its Back returns to Goals", async ({ page }) => {
     await seedPretendWorld(page);
     await page.goto("/goals");

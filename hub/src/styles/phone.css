@@ -11,7 +11,9 @@
      on Home) starts 12px under it (the top bar's own 12px);
    - the footer links (Backup, Sync, Bin) sit in a wrapping row 20px under Today's list
      (the sidebar's 20px section gap), 16px apart (the gutter), in the content link style;
-   - the page's own h1 stays for screen readers, hidden visually, when the bar shows its title. */
+   - the page's own h1 stays for screen readers, hidden visually, when the bar shows its title.
+   Technical, not a look: fields are at least 16px on phone (iOS zooms into smaller ones),
+   and the Back circle has an invisible 40px tap target around its 34px look. */
 
 /* viewport-fit=cover also reaches the desktop layout (an iPhone on its side, an iPad):
    keep the sidebar and content clear of the notch there too. Every inset is 0 on the Mac,
@@ -54,6 +56,7 @@
 }
 
 button.phone-back {
+  position: relative;
   flex: none;
   width: 34px;
   height: 34px;
@@ -61,6 +64,21 @@ button.phone-back {
   border-radius: 999px;
   background: var(--track);
   font-size: 18px;
+}
+
+/* A 40px tap target around the 34px circle (invisible; the look stays 34px). */
+button.phone-back::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+}
+
+/* iOS Safari zooms into any field under 16px when it is focused. */
+.is-phone input,
+.is-phone textarea,
+.is-phone select {
+  font-size: max(16px, 1em);
 }
 
 .phone-top .shell-inbox {
