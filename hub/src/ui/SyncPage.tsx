@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { syncController, useSyncState } from "../sync";
 import type { SyncController } from "../sync/controller";
-import { saveSyncSettings, stopSyncing } from "../sync/engine";
+import { DEFAULT_SYNC_URL, saveSyncSettings, stopSyncing } from "../sync/engine";
 import { deriveToken } from "../sync/token";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
@@ -29,7 +29,9 @@ function validAddress(text: string): boolean {
 
 export function SyncPage({ controller = syncController }: { controller?: SyncController }) {
   const state = useSyncState(controller);
-  const [address, setAddress] = useState<string>(import.meta.env.VITE_SYNC_URL ?? "");
+  // A saved address (applied below once read) wins; else the build's VITE_SYNC_URL; else the
+  // deployed server, so on a new device only the passphrase has to be typed.
+  const [address, setAddress] = useState<string>(import.meta.env.VITE_SYNC_URL || DEFAULT_SYNC_URL);
   const addressEdited = useRef(false);
   // Never logged, never stored; cleared the moment it is used.
   const [passphrase, setPassphrase] = useState("");
@@ -133,7 +135,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
       </form>
 
       <h2>Status</h2>
-      {!state.configured && state.status !== "needs-passphrase" && <p>Sync is off on this device.</p>}
+      {!state.syncOn && <p>Sync is off on this device.</p>}
       {state.status === "syncing" && <p role="status">Syncing.</p>}
       {state.configured && (state.lastSyncedAt ? <p>{`Last synced ${when(state.lastSyncedAt)}`}</p> : <p>Not synced yet.</p>)}
       {waiting > 0 && <p>{waiting === 1 ? "1 change waiting" : `${waiting} changes waiting`}</p>}
@@ -164,7 +166,8 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
         >
           Sync now
         </button>
-        {state.configured && (
+        {/* Also after a refused passphrase, so Replace, Merge and imports are never stuck behind it. */}
+        {state.syncOn && (
           <button type="button" className="btn-secondary" onClick={() => void stop()}>
             Stop syncing on this device
           </button>

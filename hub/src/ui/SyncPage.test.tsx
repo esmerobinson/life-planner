@@ -5,7 +5,8 @@ import { vi } from "vitest";
 import { db } from "../data/db";
 import { FakeSyncServer } from "../sync/fakeServer";
 import { SyncController } from "../sync/controller";
-import { getMeta, saveSyncSettings } from "../sync/engine";
+import { DEFAULT_SYNC_URL, getMeta, saveSyncSettings } from "../sync/engine";
+import { readSyncGate } from "../data/syncGate";
 import { deriveToken } from "../sync/token";
 import { syncController } from "../sync";
 import { Sidebar } from "./Sidebar";
@@ -66,6 +67,7 @@ describe("SyncPage", () => {
     await db.items.add({ id: "x", kind: "task", title: "Mine", links: [], areaId: "art", priority: 2,
       status: "open", createdAt: "2026-10-01", touchedAt: "2026-10-01" });
     const { server } = setup();
+    await user.clear(screen.getByLabelText("Sync address")); // replaces the default address
     await user.type(screen.getByLabelText("Sync address"), ADDRESS);
     const field = screen.getByLabelText("Passphrase");
     expect(field).toHaveAttribute("type", "password");
@@ -153,8 +155,32 @@ describe("SyncPage", () => {
     const user = userEvent.setup();
     await saveSyncSettings(db, { serverUrl: ADDRESS, token });
     const { server } = setup();
-    await user.click(await screen.findByRole("button", { name: "Sync now" }));
+    const button = await screen.findByRole("button", { name: "Sync now" });
+    await waitFor(() => expect(button).toBeEnabled()); // enabled once the stored settings are read
+    await user.click(button);
     await waitFor(() => expect(server.syncRequests).toHaveLength(1));
+  });
+
+  it("after a refused passphrase, Stop syncing is still offered and turns sync off", async () => {
+    const user = userEvent.setup();
+    await db.syncMeta.bulkPut([{ key: "serverUrl", value: ADDRESS }, { key: "needsPassphrase", value: true }]);
+    setup();
+    await user.click(await screen.findByRole("button", { name: "Stop syncing on this device" }));
+    await waitFor(async () => expect(await getMeta(db, "needsPassphrase")).toBeUndefined());
+    expect(await screen.findByText("Sync is off on this device.")).toBeInTheDocument();
+    expect(await readSyncGate(db.syncMeta)).toEqual({ syncOn: false, firstPullDone: false });
+  });
+
+  it("a fresh page offers the deployed sync address; a saved address wins over it", async () => {
+    setup();
+    expect(screen.getByLabelText("Sync address")).toHaveValue(DEFAULT_SYNC_URL);
+    expect(DEFAULT_SYNC_URL).toBe("https://esmeworld-sync.esme-brain.workers.dev");
+  });
+
+  it("a saved address is shown instead of the default", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    setup();
+    await waitFor(() => expect(screen.getByLabelText("Sync address")).toHaveValue(ADDRESS));
   });
 });
 
