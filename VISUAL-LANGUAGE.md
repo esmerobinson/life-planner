@@ -9,6 +9,15 @@ The source for art direction, per `CLAUDE.md`. Status of each line: **said** = E
 - Likes the Animal Crossing-styled Notion dashboards on Pinterest (village header, calendar and checklist panels, character tiles).
 - Progress is shown as bars. Completion gets confetti and stars. Dark mode wanted, simple.
 
+## Said (2026-10-28, design round 2)
+- Tasks are hard to pick out everywhere they're listed; she wants a clean, clear list with a box around each task.
+- **Chosen: task "Strips" (option A).** Every task is its own rounded strip (`--row` on the page, radius `--radius-tile`), tick box on the left = Done, actions on the right. Applies everywhere tasks appear (area pages, Today, Inbox, Goals). Mockup: round-1 option A.
+- Done / Move to / Schedule for should not be three loose buttons: a dropdown or something different (options shown in round 2, not yet chosen).
+- The OVERDUE label "looks horrible" (options shown in round 2, not yet chosen).
+- Hates how goals are displayed everywhere. **Chosen: goals are cards (round-2 option 3A)** to set them apart from tasks: one `--panel` card per goal, area tile, chips for area and "By <date>" / "Practice", overall bar and this-month bar, next step in a `--row` box.
+- **The Goals page is grouped by area** ("categories"), one heading per area.
+- Wants a way to see done tasks (a dropdown/fold-out) and a small "ticked off this month" progress at the top of each area, "just as a little nice thing" (options shown in round 2, not yet chosen).
+
 ## Extracted palette (from reference screenshots, 2026-10-27)
 **NookPhone tile colours** (sampled from the Nookipedia NookPhone page):
 Camera purple `#b693ec`, Nook Miles blue `#9eb4e6`, Critterpedia gold `#ecca7d`, DIY terracotta `#d59770`, Nook Shopping yellow `#e8dd6e`, Island Designer brown `#90825b`, Custom Designs pink `#e6aeaf`, Map mint `#a3d5c2`, Happy Home red `#bf6564`, Room Sketch yellow `#e2cd5b`, Chat Log lime `#cedb6e`, Passport green `#98c293`, Best Friends orange `#e39876`, Call Resident sky `#a6ced6`, Rescue coral `#df7e6f`, Island Life 101 violet `#9285c5`.
