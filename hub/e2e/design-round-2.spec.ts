@@ -100,6 +100,13 @@ test("area page: strips, icons, due line, goal card, month count and the done fo
   await page.keyboard.press("Escape");
   await expect(page.getByRole("group", { name: "Schedule Varnish the practice canvas for" })).toHaveCount(0);
 
+  // Move to: Change to first (the types it is not), then the areas.
+  await page.getByRole("button", { name: "Move to: A comic about a snail who runs a post office" }).click();
+  const menu = page.getByRole("group", { name: "Move A comic about a snail who runs a post office to" });
+  await expect(menu.getByRole("group", { name: "Change to" }).getByRole("button")).toHaveText(["To-do", "Goal"]);
+  await shoot(page, "area-move-popover-1280");
+  await page.keyboard.press("Escape");
+
   await page.getByText("Done (5)", { exact: true }).click();
   await shoot(page, "area-done-open-1280");
 });
