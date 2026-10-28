@@ -10,7 +10,7 @@
 import { liveQuery, type Subscription } from "dexie";
 import type { HubDB } from "../data/db";
 import { onLocalWrite } from "../data/changeTracking";
-import { NEEDS_PASSPHRASE_MESSAGE, RATE_LIMITED_MESSAGE, syncOnce, type SyncOutcome } from "./engine";
+import { NEEDS_PASSPHRASE_MESSAGE, RATE_LIMITED_MESSAGE, retryStuck, syncOnce, type SyncOutcome } from "./engine";
 
 /** Wait after the last local write before syncing (a technical batching delay, not motion). */
 export const SYNC_DEBOUNCE_MS = 2000;
@@ -87,6 +87,8 @@ export class SyncController {
   private stopAll: (() => void) | null = null;
   private debounce: unknown = null;
   private retryTimer: unknown = null;
+  /** Set on app start and by "Sync now": the next run first lets stuck changes be retried. */
+  private retryStuckNext = false;
 
   constructor(env: { db: HubDB; fetch: typeof fetch; timers?: Timers }) {
     this.db = env.db;
@@ -121,6 +123,7 @@ export class SyncController {
 
   /** "Sync now": runs a sync (or joins the one in flight). Respects a 429 wait. */
   async syncNow(): Promise<void> {
+    this.retryStuckNext = true;
     await this.run();
   }
 
@@ -136,6 +139,7 @@ export class SyncController {
   }
 
   private attach(): () => void {
+    this.retryStuckNext = true; // once per app start
     const auto = () => void this.run();
     const onVisible = () => {
       if (document.visibilityState === "visible") auto();
@@ -203,6 +207,10 @@ export class SyncController {
     this.emit();
     let out: SyncOutcome;
     try {
+      if (this.retryStuckNext) {
+        this.retryStuckNext = false;
+        await retryStuck(this.db);
+      }
       out = await syncOnce({ db: this.db, fetch: this.fetchFn });
     } catch {
       out = { kind: "error", message: "Sync did not work this time. Your changes are kept on this device." };

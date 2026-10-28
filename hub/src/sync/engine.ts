@@ -21,6 +21,9 @@ import { withSyncLock } from "../data/syncGate";
 import { validGoal, validItem } from "../data/validate";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
+/** The deployed sync server. The Sync page offers it when no address is saved (still editable). */
+export const DEFAULT_SYNC_URL = "https://esmeworld-sync.esme-brain.workers.dev";
+
 /** Contract limits for one request (the server allows more; these keep requests small). */
 export const MAX_CHANGES_PER_REQUEST = 500;
 export const MAX_REQUEST_BYTES = 1_000_000;
@@ -102,6 +105,12 @@ export async function getDeviceId(db: HubDB): Promise<string> {
 /** Stores the address and the DERIVED token (never the passphrase) and re-enables sync. */
 export async function saveSyncSettings(db: HubDB, s: { serverUrl: string; token: string }): Promise<void> {
   const serverUrl = normaliseAddress(s.serverUrl);
+  // Under the sync lock: a run still in flight against the old address finishes first, so it
+  // cannot send the re-marked rows there or write its cursor over the fresh start.
+  await withSyncLock(db, () => saveUnderLock(db, serverUrl, s.token));
+}
+
+async function saveUnderLock(db: HubDB, serverUrl: string, token: string): Promise<void> {
   await db.transaction("rw", [db.items, db.goals, db.pending, db.syncMeta], async () => {
     // A different address is a different server: its cursor means nothing here, and rows
     // already "sent" went somewhere else. Start over: pull everything, send everything.
@@ -110,9 +119,23 @@ export async function saveSyncSettings(db: HubDB, s: { serverUrl: string; token:
       await setMeta(db, "cursorServerUrl", serverUrl);
     }
     await setMeta(db, "serverUrl", serverUrl);
-    await setMeta(db, "token", s.token);
+    await setMeta(db, "token", token);
     await setMeta(db, "tokenVersion", ((await getMeta<number>(db, "tokenVersion")) ?? 0) + 1);
     await db.syncMeta.delete("needsPassphrase");
+  });
+}
+
+/**
+ * Lets changes the server refused one by one be tried again (their cause may have been
+ * temporary, e.g. a wrong device clock). Called once per app start and on "Sync now"; a
+ * change that is still refused is found again by bisecting and stays counted.
+ */
+export async function retryStuck(db: HubDB): Promise<void> {
+  await db.transaction("rw", db.pending, async () => {
+    for (const p of await db.pending.filter((x) => x.stuck === true).toArray()) {
+      const { stuck: _s, ...rest } = p;
+      await db.pending.put(rest);
+    }
   });
 }
 

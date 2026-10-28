@@ -97,4 +97,33 @@ describe("the sync lock", () => {
     expect(order).toEqual(["sync request", "sync done", "restore"]);
     expect(new Set(locks.names)).toEqual(new Set(["esmeworld-sync:life-hub"]));
   });
+
+  it("saving a new address waits for a run in flight, so that run cannot overwrite the fresh start", async () => {
+    const locks = new FakeLocks();
+    Object.defineProperty(navigator, "locks", { value: locks, configurable: true });
+    await saveSyncSettings(db, { serverUrl: "https://old.example.test", token: TOKEN });
+    await db.items.bulkAdd([item("a"), item("b")]);
+    const server = new FakeSyncServer(TOKEN);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: typeof fetch = async (input, init) => {
+      await gate;
+      return server.fetch(input, init);
+    };
+    const before = locks.names.length;
+    const run = syncOnce({ db, fetch: slow });
+    await vi.waitFor(() => expect(locks.names).toHaveLength(before + 1));
+    let saved = false;
+    const save = saveSyncSettings(db, { serverUrl: "https://new.example.test", token: TOKEN }).then(() => (saved = true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(saved).toBe(false); // waits for the run
+    release();
+    await Promise.all([run, save]);
+    expect(locks.names).toHaveLength(before + 2); // the run, then the save
+    expect(new Set(locks.names)).toEqual(new Set(["esmeworld-sync:life-hub"]));
+    // The new address starts over, untouched by the old run.
+    expect((await db.syncMeta.get("cursor"))!.value).toBe(0);
+    expect(await db.pending.count()).toBe(2);
+    expect((await db.syncMeta.get("cursorServerUrl"))!.value).toBe("https://new.example.test");
+  });
 });

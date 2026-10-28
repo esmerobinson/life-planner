@@ -210,6 +210,49 @@ describe("SyncController", () => {
     await vi.waitFor(() => expect(server.rows.size).toBe(1));
   });
 
+  it("stuck changes are tried again on Sync now and on the next app start; still refused, they stay counted", async () => {
+    let refuse = true;
+    const server = new FakeSyncServer(TOKEN, { reject: (c) => (refuse && c.id === "x" ? "row_too_large" : undefined) });
+    const { db, fetch, timers, controller } = await setup({ fetch: server.fetch });
+    await db.items.add(item("x"));
+    await db.items.add(item("y"));
+    const stop = started(controller);
+    await vi.waitFor(() => expect(controller.getState().stuckCount).toBe(1));
+    expect(server.data("items", "y")).toBeDefined();
+
+    // Automatic runs do not retry it.
+    refuse = false;
+    timers.advance(SYNC_INTERVAL_MS);
+    await vi.waitFor(() => expect(controller.getState().status).toBe("idle"));
+    expect(server.data("items", "x")).toBeUndefined();
+
+    // Still refused when retried by Sync now: it stays counted.
+    refuse = true;
+    await controller.syncNow();
+    expect(controller.getState().stuckCount).toBe(1);
+
+    // Accepted on the next app start.
+    refuse = false;
+    stop();
+    started(controller);
+    await vi.waitFor(() => expect(server.data("items", "x")).toBeDefined());
+    await vi.waitFor(() => expect(controller.getState().stuckCount).toBe(0));
+    expect(fetch).toHaveBeenCalled();
+  });
+
+  it("Sync now retries a stuck change the server now accepts", async () => {
+    let refuse = true;
+    const server = new FakeSyncServer(TOKEN, { reject: (c) => (refuse && c.id === "x" ? "bad_change" : undefined) });
+    const { db, controller } = await setup({ fetch: server.fetch });
+    await db.items.add(item("x"));
+    await controller.syncNow();
+    expect(controller.getState().stuckCount).toBe(1);
+    refuse = false;
+    await controller.syncNow();
+    expect(server.data("items", "x")).toBeDefined();
+    expect(controller.getState().stuckCount).toBe(0);
+  });
+
   it("tells the app to refresh after rows arrive from the server", async () => {
     const { server, controller } = await setup();
     // Another device already put a row on the server.
