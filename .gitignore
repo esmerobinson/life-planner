@@ -10,3 +10,6 @@ native/Assets/
 .claude/worktrees/
 native/EsmeDay
 .build/
+.superpowers/
+hub/node_modules/
+hub/dist/

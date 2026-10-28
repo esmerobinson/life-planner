@@ -1,0 +1,128 @@
+/* Where every value here comes from. Nothing below is a final look until Esme says so.
+
+   (a) From VISUAL-LANGUAGE.md and the approved option-3 assignment / mockup:
+       --page #e2e8ff, --sidebar #3a412f, --sidebar-item #51553d, --panel #e9e3d6,
+       --row #e3ddcd, --track #d4d1c3 (approved role assignment); --bar-fill #98c293
+       (Passport green, a palette value used for bars in the mockup); system-ui type and
+       linear easing (the placeholders VISUAL-LANGUAGE.md asks for); --placeholder magenta.
+
+   (b) Provisional layout dimensions, NOT in VISUAL-LANGUAGE.md (taken from or fitted to
+       the mockup by the implementers): sidebar width 220px, sidebar tile 32px, icon 24px
+       (Sidebar.tsx), gaps and padding (24px content, 16px/12px sidebar, 20px/6px/10px gaps,
+       6px/8px item padding), Home right column 190px, bar height 10px, bar radius 6px,
+       radii 18px (panel) and 9px (tile).
+
+   (c) Role assignments made by the implementers/controller that Esme has NOT approved:
+       --text #3a412f (forest green used as body text), --sidebar-text #e9e3d6 (cream used
+       as sidebar text), the 2px thickness of the active sidebar outline, and --bar-fill's
+       use of Passport green as the progress-bar colour. The hex values are palette values;
+       giving them these jobs is the unapproved part. */
+:root {
+  --page: #e2e8ff;
+  --sidebar: #3a412f;
+  --sidebar-item: #51553d;
+  --sidebar-text: #e9e3d6;
+  --panel: #e9e3d6;
+  --row: #e3ddcd;
+  --track: #d4d1c3;
+  --text: #3a412f;
+  --bar-fill: #98c293; /* from approved mockup (option 3) */
+  --bar-height: 10px; /* from approved mockup (option 3) */
+  --bar-radius: 6px; /* from approved mockup (option 3) */
+
+  --radius-panel: 18px;
+  --radius-tile: 9px;
+
+  --placeholder: #ff00ff; /* undecided: obviously wrong on purpose */
+
+  font-family: system-ui;
+  color: var(--text);
+}
+
+* {
+  transition-timing-function: linear;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-content {
+  flex: 1;
+  padding: 24px;
+}
+
+.sidebar {
+  width: 220px;
+  flex: none;
+  background: var(--sidebar);
+  color: var(--sidebar-text);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: var(--sidebar-item);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  border-radius: var(--radius-tile);
+}
+
+/* Active highlight is undecided: magenta placeholder outline. */
+.sidebar-item[aria-current="page"] {
+  outline: 2px solid var(--placeholder);
+}
+
+.sidebar-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-tile);
+}
+
+/* Sticker look is undecided: magenta placeholder, system font, page text colour. */
+.overdue-sticker {
+  background: var(--placeholder);
+  color: var(--text);
+  font-family: system-ui;
+}
+
+.progress-bar {
+  height: var(--bar-height);
+  border-radius: var(--bar-radius);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--bar-fill);
+}
+
+/* Home layout A. Right column width from approved mockup (option 3); provisional. */
+.home-page {
+  display: grid;
+  grid-template-columns: 1fr 190px;
+}
