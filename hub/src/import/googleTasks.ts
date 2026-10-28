@@ -128,6 +128,69 @@ const skipped = (p: ParsedGoogleTask, reason: SkippedDuplicate["reason"]): Skipp
   reason,
 });
 
+/**
+ * Decides which parsed tasks become new rows. Pure: nothing is read or written here.
+ * `haveKeys` and `haveTitles` (normalised) describe what already exists; a task whose
+ * key exists is counted `alreadyHad`, and a task whose title matches an existing one
+ * (or an earlier one in the same file) is skipped and listed. Duplicates inside the
+ * file merge their list tag onto the row that was kept.
+ */
+export function planGoogleTasks(
+  parsed: ParsedGoogleTask[],
+  haveKeys: Set<string>,
+  haveTitles: Set<string>,
+  today: ISODate,
+): { newItems: Item[]; alreadyHad: number; duplicates: SkippedDuplicate[] } {
+  let alreadyHad = 0;
+  const duplicates: SkippedDuplicate[] = [];
+  const keys = new Set(haveKeys);
+  // Rows added by this plan, by normalised title, so a duplicate inside the file can merge its tag.
+  const addedByTitle = new Map<string, Item>();
+  const newItems: Item[] = [];
+  for (const p of parsed) {
+    if (keys.has(p.key)) {
+      alreadyHad++;
+      continue;
+    }
+    const norm = normaliseTitle(p.title);
+    const tag = tagFor(p.listTitle);
+    if (norm) {
+      const earlier = addedByTitle.get(norm);
+      if (earlier) {
+        duplicates.push(skipped(p, "in-file"));
+        if (tag && !(earlier.tags ?? []).includes(tag)) earlier.tags = [...(earlier.tags ?? []), tag];
+        continue;
+      }
+      if (haveTitles.has(norm)) {
+        duplicates.push(skipped(p, "existing"));
+        continue;
+      }
+    }
+    const noteParts: string[] = [];
+    if (p.notes) noteParts.push(p.notes);
+    if (p.parentTitle) noteParts.push(`Part of: ${p.parentTitle}`);
+    const item: Item = {
+      id: crypto.randomUUID(),
+      kind: "task",
+      title: p.title,
+      links: [],
+      areaId: "inbox",
+      priority: 2,
+      status: "open",
+      createdAt: today,
+      touchedAt: today,
+      source: { kind: "gtasks", key: p.key },
+    };
+    if (noteParts.length) item.notes = noteParts.join("\n");
+    if (p.due) item.due = p.due;
+    if (tag) item.tags = [tag];
+    keys.add(p.key);
+    if (norm) addedByTitle.set(norm, item);
+    newItems.push(item);
+  }
+  return { newItems, alreadyHad, duplicates };
+}
+
 export async function importGoogleTasks(
   raw: unknown,
   today: ISODate,
@@ -140,9 +203,7 @@ export async function importGoogleTasks(
   duplicates: SkippedDuplicate[];
 }> {
   const { items, notes } = parseGoogleTasks(raw);
-  let added = 0;
-  let alreadyHad = 0;
-  const duplicates: SkippedDuplicate[] = [];
+  let plan: ReturnType<typeof planGoogleTasks> = { newItems: [], alreadyHad: 0, duplicates: [] };
   await db.transaction("rw", db.items, async () => {
     const haveKeys = new Set<string>();
     const haveTitles = new Set<string>();
@@ -151,53 +212,15 @@ export async function importGoogleTasks(
       const n = normaliseTitle(i.title);
       if (n) haveTitles.add(n);
     });
-    // Rows added by this import, by normalised title, so a duplicate inside the file can merge its tag.
-    const addedByTitle = new Map<string, Item>();
-    const pending: Item[] = [];
-    for (const p of items) {
-      if (haveKeys.has(p.key)) {
-        alreadyHad++;
-        continue;
-      }
-      const norm = normaliseTitle(p.title);
-      const tag = tagFor(p.listTitle);
-      if (norm) {
-        const earlier = addedByTitle.get(norm);
-        if (earlier) {
-          duplicates.push(skipped(p, "in-file"));
-          if (tag && !(earlier.tags ?? []).includes(tag)) earlier.tags = [...(earlier.tags ?? []), tag];
-          continue;
-        }
-        if (haveTitles.has(norm)) {
-          duplicates.push(skipped(p, "existing"));
-          continue;
-        }
-      }
-      const noteParts: string[] = [];
-      if (p.notes) noteParts.push(p.notes);
-      if (p.parentTitle) noteParts.push(`Part of: ${p.parentTitle}`);
-      const item: Item = {
-        id: crypto.randomUUID(),
-        kind: "task",
-        title: p.title,
-        links: [],
-        areaId: "inbox",
-        priority: 2,
-        status: "open",
-        createdAt: today,
-        touchedAt: today,
-        source: { kind: "gtasks", key: p.key },
-      };
-      if (noteParts.length) item.notes = noteParts.join("\n");
-      if (p.due) item.due = p.due;
-      if (tag) item.tags = [tag];
-      haveKeys.add(p.key);
-      if (norm) addedByTitle.set(norm, item);
-      added++;
-      // Written after the loop, once every merged tag is known.
-      pending.push(item);
-    }
-    if (pending.length) await db.items.bulkAdd(pending);
+    plan = planGoogleTasks(items, haveKeys, haveTitles, today);
+    if (plan.newItems.length) await db.items.bulkAdd(plan.newItems);
   });
-  return { added, alreadyHad, duplicateTitles: duplicates.length, skipped: notes.length, notes, duplicates };
+  return {
+    added: plan.newItems.length,
+    alreadyHad: plan.alreadyHad,
+    duplicateTitles: plan.duplicates.length,
+    skipped: notes.length,
+    notes,
+    duplicates: plan.duplicates,
+  };
 }

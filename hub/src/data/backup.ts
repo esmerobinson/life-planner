@@ -95,7 +95,7 @@ function validSource(v: unknown) {
 const hasDuplicateIds = (rows: { id: string }[]) => new Set(rows.map((r) => r.id)).size !== rows.length;
 
 /** Checks the whole file before anything is written. Throws INVALID_BACKUP. */
-function parseBackup(raw: unknown): BackupFile {
+export function parseBackup(raw: unknown): BackupFile {
   let data = raw;
   if (typeof raw === "string") {
     try {

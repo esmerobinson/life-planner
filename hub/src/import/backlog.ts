@@ -101,6 +101,26 @@ export interface ImportNote {
   reason: string;
 }
 
+/** The row a parsed Backlog line becomes. Pure; shared with the one-time transfer script. */
+export function backlogItem(p: ParsedItem, today: ISODate): Item {
+  const item: Item = {
+    id: crypto.randomUUID(),
+    kind: "task",
+    title: p.title,
+    links: [],
+    areaId: sectionToArea(p.section),
+    priority: p.priority,
+    status: "open",
+    createdAt: today,
+    touchedAt: today,
+    source: { kind: "backlog", key: p.key },
+  };
+  if (p.tags.length) item.tags = p.tags;
+  if (p.due) item.due = p.due;
+  if (p.recur) item.recur = p.recur;
+  return item;
+}
+
 /** `skipped` is kept for older callers and always equals `notes.length`. */
 export async function importBacklog(
   markdown: string,
@@ -119,22 +139,7 @@ export async function importBacklog(
         alreadyHad++;
         continue;
       }
-      const item: Item = {
-        id: crypto.randomUUID(),
-        kind: "task",
-        title: p.title,
-        links: [],
-        areaId: sectionToArea(p.section),
-        priority: p.priority,
-        status: "open",
-        createdAt: today,
-        touchedAt: today,
-        source: { kind: "backlog", key: p.key },
-      };
-      if (p.tags.length) item.tags = p.tags;
-      if (p.due) item.due = p.due;
-      if (p.recur) item.recur = p.recur;
-      await db.items.add(item);
+      await db.items.add(backlogItem(p, today));
       existing.add(p.key);
       added++;
     }
