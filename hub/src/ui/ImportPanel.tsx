@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { importBacklog, type ImportNote } from "../import/backlog";
 import { importGoogleTasks, type SkippedDuplicate } from "../import/googleTasks";
 import type { ISODate } from "../domain/types";
+import { useSyncState } from "../sync";
+import { mergeBlocked, WAITING_FIRST_SYNC } from "../data/syncGate";
 
 interface Props {
   today: ISODate;
@@ -40,6 +42,9 @@ function ImportSection({
   const [duplicates, setDuplicates] = useState<SkippedDuplicate[]>([]);
   const [running, setRunning] = useState(false);
   const inFlight = useRef(false);
+  // While this device has not finished its first sync, imports would add copies of rows
+  // the server may already have; they wait.
+  const waiting = mergeBlocked(useSyncState());
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -69,8 +74,8 @@ function ImportSection({
       setNotes(r.notes);
       setDuplicates(r.duplicates ?? []);
       onImported?.();
-    } catch {
-      setResult("The import did not work.");
+    } catch (err) {
+      setResult(err instanceof Error && err.message === WAITING_FIRST_SYNC ? WAITING_FIRST_SYNC : "The import did not work.");
     } finally {
       inFlight.current = false;
       setRunning(false);
@@ -89,10 +94,11 @@ function ImportSection({
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} />
       </label>
       <div className="form-actions">
-        <button type="button" disabled={running} onClick={() => void run()}>
+        <button type="button" disabled={running || waiting} onClick={() => void run()}>
           {buttonLabel}
         </button>
       </div>
+      {waiting && <p>{WAITING_FIRST_SYNC}</p>}
       {result && <p>{result}</p>}
       {notes.length > 0 && (
         <details>

@@ -8,6 +8,7 @@ import { GoalDetail } from "./ui/GoalDetail";
 import { GoalsPage } from "./ui/GoalsPage";
 import { HomePage } from "./ui/HomePage";
 import { InboxPage } from "./ui/InboxPage";
+import { SyncPage } from "./ui/SyncPage";
 import { TodayPanel } from "./ui/TodayPanel";
 
 function TodayRoute() {
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/area/:areaId" element={<AreaRoute />} />
           <Route path="/inbox" element={<InboxRoute />} />
           <Route path="/backup" element={<BackupRoute />} />
+          <Route path="/sync" element={<SyncPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

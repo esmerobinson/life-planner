@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { NAV } from "./areas";
+import { useSyncState } from "../sync";
 
 const GROUPS: { group: 1 | 2 | 3; name: string }[] = [
   { group: 1, name: "Overview" },
@@ -8,6 +9,7 @@ const GROUPS: { group: 1 | 2 | 3; name: string }[] = [
 ];
 
 export function Sidebar() {
+  const sync = useSyncState();
   return (
     <aside className="sidebar">
       <nav className="sidebar-nav" aria-label="Main">
@@ -25,7 +27,8 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="sidebar-footer">
-        <NavLink to="/backup">Backup</NavLink>
+        <NavLink to="/backup">Backup</NavLink>{" "}
+        <NavLink to="/sync">{sync.status === "needs-passphrase" ? "Sync (needs passphrase)" : "Sync"}</NavLink>
       </div>
     </aside>
   );

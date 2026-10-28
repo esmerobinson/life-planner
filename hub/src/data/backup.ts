@@ -1,6 +1,11 @@
 import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
-import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type Goal, type ISODate, type Item } from "../domain/types";
+import { keepOwnStamps } from "./changeTracking";
+import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
+import type { Goal, ISODate, Item } from "../domain/types";
+import { isObj, isStr, validGoal, validItem } from "./validate";
+
+export { validGoal, validItem };
 
 export interface BackupFile {
   app: "life-hub";
@@ -16,81 +21,6 @@ export const INVALID_BACKUP =
 
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
-
-const AREAS: readonly string[] = AREA_IDS;
-const ITEM_KINDS = ["task", "idea"];
-const STATUSES = ["open", "done", "archived"];
-const GOAL_KINDS = ["finite", "practice"];
-
-const isObj = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-const isStr = (v: unknown): v is string => typeof v === "string";
-const isStrArray = (v: unknown) => Array.isArray(v) && v.every(isStr);
-
-function validItem(r: unknown): r is Item {
-  return (
-    isObj(r) &&
-    isStr(r.id) && r.id !== "" &&
-    ITEM_KINDS.includes(r.kind as string) &&
-    isStr(r.title) &&
-    isStrArray(r.links) &&
-    AREAS.includes(r.areaId as string) &&
-    (r.priority === 1 || r.priority === 2 || r.priority === 3) &&
-    STATUSES.includes(r.status as string) &&
-    isStr(r.createdAt) && isValidISODate(r.createdAt) &&
-    isStr(r.touchedAt) && isValidISODate(r.touchedAt) &&
-    optStr(r.notes) &&
-    optStrArray(r.tags) &&
-    optStr(r.goalId) &&
-    optDate(r.due) &&
-    (r.recur === undefined || (Array.isArray(r.recur) && r.recur.every((d) => WEEKDAY_LIST.includes(d as string)))) &&
-    optDate(r.pinnedDate) &&
-    optDate(r.weekOf) &&
-    optDate(r.hiddenOn) &&
-    optDate(r.completedAt) &&
-    validSource(r.source)
-  );
-}
-
-function validGoal(r: unknown): r is Goal {
-  return (
-    isObj(r) &&
-    isStr(r.id) && r.id !== "" &&
-    isStr(r.title) &&
-    AREAS.includes(r.areaId as string) &&
-    GOAL_KINDS.includes(r.kind as string) &&
-    Array.isArray(r.milestones) &&
-    r.milestones.every(
-      (m) => isObj(m) && isStr(m.id) && isStr(m.title) && typeof m.done === "boolean",
-    ) &&
-    isStr(r.createdAt) && isValidISODate(r.createdAt) &&
-    optDate(r.deadline) &&
-    optText(r.why) && optText(r.cadence) && optText(r.notes) &&
-    validGoalSource(r.source) &&
-    (r.monthlyTarget === undefined ||
-      (typeof r.monthlyTarget === "number" && Number.isFinite(r.monthlyTarget) && r.monthlyTarget > 0))
-  );
-}
-
-const WEEKDAY_LIST: readonly string[] = WEEKDAYS;
-const SOURCE_LIST: readonly string[] = SOURCE_KINDS;
-/** Absent, or a real "YYYY-MM-DD" date. */
-const optDate = (v: unknown) => v === undefined || (isStr(v) && isValidISODate(v));
-const optStr = (v: unknown) => v === undefined || isStr(v);
-const optStrArray = (v: unknown) => v === undefined || isStrArray(v);
-
-/** Absent, or a string of at most 4000 characters. */
-const optText = (v: unknown) => v === undefined || (isStr(v) && v.length <= 4000);
-
-function validGoalSource(v: unknown) {
-  if (v === undefined) return true;
-  return isObj(v) && v.kind === "obsidian" && isStr(v.key);
-}
-
-function validSource(v: unknown) {
-  if (v === undefined) return true;
-  return isObj(v) && SOURCE_LIST.includes(v.kind as string) && isStr(v.key);
-}
 
 const hasDuplicateIds = (rows: { id: string }[]) => new Set(rows.map((r) => r.id)).size !== rows.length;
 
@@ -138,18 +68,31 @@ export async function restoreBackup(
 ): Promise<{ addedItems: number; addedGoals: number; skipped: number }> {
   const file = parseBackup(raw); // nothing is written until every row has passed
   try {
-    return await writeBackup(file, mode);
-  } catch {
+    // Holding the sync lock: no sync run is in flight while the restore writes.
+    return await withSyncLock(db, () => writeBackup(file, mode));
+  } catch (err) {
     // The transaction aborted, so nothing was written.
+    if (err instanceof Error && (err.message === WAITING_FIRST_SYNC || err.message === REPLACE_OFF_WHILE_SYNCING)) throw err;
     throw new Error(RESTORE_FAILED);
   }
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
-  return db.transaction("rw", db.items, db.goals, async () => {
+  return db.transaction("rw", db.items, db.goals, db.syncMeta, async () => {
+    // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
+    // a copy the server already has, edited since on another device, wins over them.
+    keepOwnStamps();
+    const gate = await readSyncGate(db.syncMeta);
+    if (mode === "replace" && replaceBlocked(gate)) throw new Error(REPLACE_OFF_WHILE_SYNCING);
+    if (mode === "merge" && mergeBlocked(gate)) throw new Error(WAITING_FIRST_SYNC);
     if (mode === "replace") {
       await db.items.clear();
       await db.goals.clear();
+      // Sync never deletes, so rows removed here still exist on the server. Pulling from
+      // the start again brings them back instead of leaving this device silently missing
+      // them.
+      await db.syncMeta.put({ key: "cursor", value: 0 });
+      await db.syncMeta.delete("firstPullDone");
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       return { addedItems: file.items.length, addedGoals: file.goals.length, skipped: 0 };

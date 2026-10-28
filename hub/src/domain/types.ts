@@ -31,6 +31,11 @@ export interface Item {
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
+  /**
+   * Sync stamp: epoch ms of the latest write, set on EVERY write by the change tracker
+   * (data/changeTracking.ts). Optional only so older backups still load.
+   */
+  updatedAt?: number;
 }
 
 export interface Milestone {
@@ -54,4 +59,6 @@ export interface Goal {
   notes?: string;
   source?: { kind: "obsidian"; key: string };
   createdAt: ISODate;
+  /** Sync stamp, as on Item. */
+  updatedAt?: number;
 }

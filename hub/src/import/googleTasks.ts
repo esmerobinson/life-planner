@@ -1,4 +1,6 @@
 import { db } from "../data/db";
+import { keepOwnStamps } from "../data/changeTracking";
+import { mergeBlocked, readSyncGate, WAITING_FIRST_SYNC } from "../data/syncGate";
 import { isValidISODate } from "../domain/dates";
 import type { ISODate, Item } from "../domain/types";
 import { normaliseTitle } from "./titleClean";
@@ -212,7 +214,9 @@ export async function importGoogleTasks(
 }> {
   const { items, notes } = parseGoogleTasks(raw);
   let plan: ReturnType<typeof planGoogleTasks> = { newItems: [], alreadyHad: 0, duplicates: [], skippedTasks: [] };
-  await db.transaction("rw", db.items, async () => {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
+    keepOwnStamps(); // added rows are stamped from their createdAt, never "now"
+    if (mergeBlocked(await readSyncGate(db.syncMeta))) throw new Error(WAITING_FIRST_SYNC);
     const haveKeys = new Set<string>();
     const haveTitles = new Map<string, string>();
     await db.items.each((i) => {

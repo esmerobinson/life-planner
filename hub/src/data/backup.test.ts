@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import { db } from "./db";
 import { exportBackup, restoreBackup } from "./backup";
 import type { Goal, Item } from "../domain/types";
+import { unstamped } from "../test/unstamped";
 
 const item = (id: string, extra: Partial<Item> = {}): Item => ({
   id, kind: "task", title: `T ${id}`, links: [], areaId: "art", priority: 2,
@@ -18,7 +19,10 @@ beforeEach(async () => {
 });
 
 async function snapshot() {
-  return { items: await db.items.orderBy("id").toArray(), goals: await db.goals.orderBy("id").toArray() };
+  return {
+    items: (await db.items.orderBy("id").toArray()).map(unstamped),
+    goals: (await db.goals.orderBy("id").toArray()).map(unstamped),
+  };
 }
 
 describe("backup", () => {
@@ -34,6 +38,16 @@ describe("backup", () => {
     const r = await restoreBackup(roundTripped, "replace");
     expect(r).toEqual({ addedItems: 2, addedGoals: 1, skipped: 0 });
     expect(await snapshot()).toEqual(before);
+  });
+
+  it("replace resets the sync cursor (rows removed here come back from the server); merge keeps it", async () => {
+    await db.syncMeta.put({ key: "cursor", value: 57 });
+    const file = { app: "life-hub", schema: 1, exportedOn: "2026-10-28", items: [item("a")], goals: [] };
+    await restoreBackup(file, "merge");
+    expect((await db.syncMeta.get("cursor"))!.value).toBe(57);
+    await restoreBackup(file, "replace");
+    expect((await db.syncMeta.get("cursor"))!.value).toBe(0);
+    await db.syncMeta.clear();
   });
 
   it("merge adds missing ids and never changes an existing row", async () => {
@@ -122,6 +136,9 @@ describe("backup", () => {
       ["deadline", withGoal({ deadline: "nope" })],
       ["goal createdAt", withGoal({ createdAt: "nope" })],
       ["exportedOn", { ...good(), exportedOn: "yesterday" }],
+      ["item updatedAt string", withItem({ updatedAt: "2026-10-28" })],
+      ["item updatedAt negative", withItem({ updatedAt: -1 })],
+      ["goal updatedAt fraction", withGoal({ updatedAt: 1.5 })],
     ];
     it.each(cases)("rejects bad %s and changes nothing", async (_n, raw) => {
       await db.items.add(item("keep"));
@@ -140,8 +157,8 @@ describe("backup", () => {
       });
       const fullGoal = { ...goal("g"), deadline: "2026-12-01", monthlyTarget: 4 };
       await restoreBackup({ app: "life-hub", schema: 1, exportedOn: "2026-10-28", items: [full], goals: [fullGoal] }, "replace");
-      expect(await db.items.get("full")).toEqual(full);
-      expect(await db.goals.get("g")).toEqual(fullGoal);
+      expect(unstamped(await db.items.get("full"))).toEqual(full);
+      expect(unstamped(await db.goals.get("g"))).toEqual(fullGoal);
     });
   });
 
@@ -153,10 +170,10 @@ describe("backup", () => {
       const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
       await db.items.clear();
       await restoreBackup(file, "replace");
-      expect(await db.items.get("g1")).toEqual(g);
+      expect(unstamped(await db.items.get("g1"))).toEqual(g);
       await db.items.clear();
       await restoreBackup(file, "merge");
-      expect(await db.items.get("g1")).toEqual(g);
+      expect(unstamped(await db.items.get("g1"))).toEqual(g);
     });
 
     it("still rejects an unknown source kind", async () => {
@@ -181,13 +198,13 @@ describe("backup", () => {
       await db.goals.clear();
       await db.items.clear();
       await restoreBackup(out, "replace");
-      expect(await db.goals.get("og")).toEqual(g);
-      expect(await db.items.get("ot")).toEqual(t);
+      expect(unstamped(await db.goals.get("og"))).toEqual(g);
+      expect(unstamped(await db.items.get("ot"))).toEqual(t);
       await db.goals.clear();
       await db.items.clear();
       await restoreBackup(out, "merge");
-      expect(await db.goals.get("og")).toEqual(g);
-      expect(await db.items.get("ot")).toEqual(t);
+      expect(unstamped(await db.goals.get("og"))).toEqual(g);
+      expect(unstamped(await db.items.get("ot"))).toEqual(t);
     });
 
     it.each([

@@ -7,7 +7,10 @@ import { QuickAdd } from "./QuickAdd";
 import { ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
+import { DbClosedNotice } from "./DbClosedNotice";
+import { db } from "../data/db";
 import { useHubData } from "./useHubData";
+import { syncController } from "../sync";
 
 /** How often the shell re-reads the clock (a technical check, not a motion timing). */
 const CLOCK_CHECK_MS = 60_000;
@@ -54,6 +57,10 @@ export function AppShell() {
     setVersion((v) => v + 1);
   }, [refresh]);
 
+  // Automatic sync (does nothing until an address and passphrase are saved on the Sync
+  // page). Rows that arrive refresh every view the same way a local write does.
+  useEffect(() => syncController.start({ onSynced: () => void changed() }), [changed]);
+
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
 
   return (
@@ -62,6 +69,7 @@ export function AppShell() {
         <Sidebar />
         <main className="app-content">
           <UpdatePrompt />
+          <DbClosedNotice db={db} />
           <div className="shell-actions">
             <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
               Add

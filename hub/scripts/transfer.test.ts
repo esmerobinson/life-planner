@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { db } from "../src/data/db";
 import { parseBackup, restoreBackup } from "../src/data/backup";
+import { unstamped } from "../src/test/unstamped";
 import { buildTransfer, formatFailure, runTransfer, type TransferInputs } from "./transfer";
 
 const FIX = join(process.cwd(), "src/import/__fixtures__");
@@ -56,8 +57,8 @@ describe("buildTransfer", () => {
     expect(r).toEqual({ addedItems: t.backup.items.length, addedGoals: t.backup.goals.length, skipped: 0 });
     // the rows in the database are exactly the rows in the file, not just the same number of them
     const byId = <T extends { id: string }>(rows: T[]) => [...rows].sort((a, b) => a.id.localeCompare(b.id));
-    expect(byId(await db.items.toArray())).toEqual(byId(t.backup.items));
-    expect(byId(await db.goals.toArray())).toEqual(byId(t.backup.goals));
+    expect(byId((await db.items.toArray()).map(unstamped))).toEqual(byId(t.backup.items));
+    expect(byId((await db.goals.toArray()).map(unstamped))).toEqual(byId(t.backup.goals));
     expect(t.counts.goals).toBe(10);
     expect("nextSteps" in t.counts).toBe(false);
     expect(t.counts.habits).toBe(4);

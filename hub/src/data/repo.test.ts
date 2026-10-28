@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "./db";
+import { unstamped } from "../test/unstamped";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
   archiveItem, restoreItem, listItems, toggleMilestone, updateItems, updateItem, updateGoal, archiveItems,
@@ -357,8 +358,8 @@ describe("updateGoal", () => {
     await updateGoal(g.id, { title: "  New  ", areaId: "body", deadline: "2027-01-31", monthlyTarget: 5 }, "2026-11-01");
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
-    expect(await db.goals.get(g.id)).toEqual({
-      ...g, title: "New", areaId: "body", deadline: "2027-01-31", monthlyTarget: 5,
+    expect(unstamped(await db.goals.get(g.id))).toEqual({
+      ...unstamped(g), title: "New", areaId: "body", deadline: "2027-01-31", monthlyTarget: 5,
     });
   });
 
@@ -374,7 +375,7 @@ describe("updateGoal", () => {
   it("leaves fields that are not in the patch alone", async () => {
     const g = await seed();
     await updateGoal(g.id, { title: "Only title" }, today);
-    expect(await db.goals.get(g.id)).toEqual({ ...g, title: "Only title" });
+    expect(unstamped(await db.goals.get(g.id))).toEqual({ ...unstamped(g), title: "Only title" });
   });
 
   it("clears the monthly target and the deadline of a practice goal when set to undefined", async () => {
