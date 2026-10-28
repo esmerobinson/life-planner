@@ -16,3 +16,4 @@ hub/dist/
 hub/dist-test/
 hub/test-results/
 hub/playwright-report/
+mac/build/
