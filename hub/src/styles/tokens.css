@@ -12,6 +12,10 @@
        6px/8px item padding), Home right column 190px, bar height 10px, bar radius 6px,
        radii 18px (panel) and 9px (tile).
 
+   (b2) Form controls live in controls.css and use the approved mockup A (soft pills)
+       values listed there. Unapproved there: rounded-square checkbox, disabled colours
+       (--track background, sage #a09f88 text), magenta focus ring, no hover.
+
    (c) Role assignments made by the implementers/controller that Esme has NOT approved:
        --text #3a412f (forest green used as body text), --sidebar-text #e9e3d6 (cream used
        as sidebar text), the 2px thickness of the active sidebar outline, and --bar-fill's

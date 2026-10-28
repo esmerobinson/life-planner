@@ -133,6 +133,7 @@ export function AreaPage({ today }: { today: ISODate }) {
               <span className="today-title">{it.title}</span>
               <button
                 type="button"
+                className="btn-secondary"
                 aria-label={`Restore: ${it.title}`}
                 onClick={() => void save(() => restoreItem(it.id, today))}
               >

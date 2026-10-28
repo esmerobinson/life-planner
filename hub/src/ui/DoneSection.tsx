@@ -15,7 +15,7 @@ export function DoneSection({ items, onUndo }: { items: Item[]; onUndo: (id: str
           {done.map((it) => (
             <li key={it.id} className="today-row">
               <span className="today-title">{it.title}</span>
-              <button type="button" aria-label={`Undo: ${it.title}`} onClick={() => onUndo(it.id)}>
+              <button type="button" className="btn-secondary" aria-label={`Undo: ${it.title}`} onClick={() => onUndo(it.id)}>
                 Undo
               </button>
             </li>

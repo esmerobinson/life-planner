@@ -159,7 +159,7 @@ export function BackupPage({ today }: { today: ISODate }) {
       {replacing && (
         <div>
           <p>Download a backup first.</p>
-          <button type="button" onClick={() => void download()}>
+          <button type="button" className="btn-secondary" onClick={() => void download()}>
             Download backup
           </button>
           <p>Replace removes everything here and puts the file's tasks and goals in its place.</p>

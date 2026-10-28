@@ -53,6 +53,7 @@ export function MoveToMenu({
       <button
         ref={toggle}
         type="button"
+        className="btn-secondary"
         aria-expanded={open}
         aria-label={label ? `Move: ${label}` : "Move to"}
         onClick={() => setOpen((o) => !o)}

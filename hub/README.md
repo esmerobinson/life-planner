@@ -89,6 +89,12 @@ replace or confirm:
 - Celebration when a task is ticked
 - Overdue sticker
 - Active sidebar item outline
+- Controls (`src/styles/controls.css`) follow the approved mockup A (soft pills).
+  Not in the mockup and still to confirm: checkbox shape is a rounded square
+  (Esme has not said whether she wants a round bubble), disabled buttons use
+  pale stone `#d4d1c3` with sage `#a09f88` text, keyboard focus ring is the
+  magenta placeholder, no hover styling, radio buttons and file pickers keep
+  the browser look
 - Provisional sizes: sidebar 220px, tile 32px, icon 24px, gaps and padding, the
   190px Home right column, bar height 10px and radius 6px, panel and tile radii
   18px / 9px (taken from or fitted to the approved mockup, option 3)

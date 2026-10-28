@@ -1,0 +1,78 @@
+/* Form controls in the "soft pills" style, mockup A, approved 2026-10-28.
+   Colours come from the tokens in tokens.css (--bar-fill #98c293, --track #d4d1c3,
+   --row #e3ddcd, --text #3a412f). Selectors are element-level on purpose: sidebar
+   links are anchors, so nothing here reaches them.
+   Not in the mockup, filled in as stated in README "Placeholders you must replace":
+   disabled colours (palette greys), magenta focus ring, no hover, checkbox shape. */
+:root {
+  --control-disabled-text: #a09f88; /* sage, palette value; disabled text, not in mockup A */
+}
+
+button {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--bar-fill);
+  color: var(--text);
+  font: inherit;
+}
+
+button.btn-secondary {
+  background: var(--track);
+}
+
+button[aria-pressed] {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--track);
+  color: var(--text);
+}
+
+button[aria-pressed="true"] {
+  background: var(--bar-fill);
+}
+
+button:disabled {
+  background: var(--track);
+  color: var(--control-disabled-text);
+  cursor: default;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input:not([type]),
+select,
+textarea {
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--row);
+  color: var(--text);
+  font: inherit;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-block;
+  vertical-align: middle;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: 6px;
+  border: 0;
+  background: var(--track);
+}
+
+input[type="checkbox"]:checked {
+  background: var(--bar-fill);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--placeholder);
+}
