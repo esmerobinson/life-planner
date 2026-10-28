@@ -12,23 +12,66 @@
 // Writes made while applying server changes run inside `applyUntracked`, whose transaction
 // is skipped here: the server's row keeps its own updatedAt and is not sent back.
 
-import type Dexie from "dexie";
+import Dexie from "dexie";
 import type { DBCore, DBCoreMutateRequest, DBCoreMutateResponse, DBCoreTable, DBCoreTransaction, Transaction } from "dexie";
+import { validGoal, validItem } from "./validate";
 
 const TRACKED = new Set(["items", "goals"]);
 const PENDING = "pending";
 
 /** IndexedDB transactions whose writes are applied server changes (or the migration). */
 const untracked = new WeakSet<object>();
+/** Transactions whose rows keep their OWN stamp (imports and restores): see keepOwnStamps. */
+const ownStamps = new WeakSet<object>();
 /** Transactions whose listeners have already been told (one notice per transaction). */
 const announced = new WeakSet<object>();
 const listeners = new WeakMap<Dexie, Set<() => void>>();
 
 /** Marks a transaction (from inside its scope) so the tracker leaves its writes alone. */
 export function markTransactionUntracked(tx: Transaction): void {
+  untracked.add(idbOf(tx));
+}
+
+function idbOf(tx: Transaction): object {
   const idb = (tx as unknown as { idbtrans?: object }).idbtrans;
   if (!idb) throw new Error("transaction has no IndexedDB transaction yet");
-  untracked.add(idb);
+  return idb;
+}
+
+/**
+ * Marks the CURRENT transaction (call it first thing inside `db.transaction(...)`) so the rows
+ * it writes keep their own stamp instead of "now": the row's `updatedAt` if it has a valid
+ * one, else its `createdAt` as epoch ms, else 1. They are still validated and marked pending.
+ * Used by restores and importers: rows they ADD are "what was missing", so any copy the
+ * server already has (an edit made since, on another device) must win over them.
+ */
+export function keepOwnStamps(): void {
+  const tx = Dexie.currentTransaction;
+  if (!tx) throw new Error("keepOwnStamps must run inside a transaction");
+  ownStamps.add(idbOf(tx));
+}
+
+const isStamp = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+const dateMs = (v: unknown): number | undefined => {
+  const ms = typeof v === "string" ? Date.parse(v) : NaN;
+  return Number.isSafeInteger(ms) && ms > 0 ? ms : undefined;
+};
+
+/** An imported or restored row's own stamp: its updatedAt, else its createdAt, else 1. */
+export function ownStamp(row: { updatedAt?: unknown; createdAt?: unknown }): number {
+  if (isStamp(row.updatedAt)) return row.updatedAt;
+  return dateMs(row.createdAt) ?? 1;
+}
+
+/**
+ * The stamp for a row that existed before sync (the v1 -> v2 upgrade): the latest of its
+ * touchedAt, updatedAt and createdAt, else 1. Never "now", so a device that upgrades late
+ * cannot beat edits other devices made in the meantime.
+ */
+export function legacyStamp(row: { touchedAt?: unknown; updatedAt?: unknown; createdAt?: unknown }): number {
+  const found = [dateMs(row.touchedAt), isStamp(row.updatedAt) ? row.updatedAt : undefined, dateMs(row.createdAt)]
+    .filter((v): v is number => v !== undefined);
+  return found.length > 0 ? Math.max(...found) : 1;
 }
 
 /**
@@ -68,12 +111,16 @@ function trackTable(db: Dexie, core: DBCore, down: DBCoreTable): DBCoreTable {
     mutate(req: DBCoreMutateRequest): Promise<DBCoreMutateResponse> {
       if ((req.type !== "add" && req.type !== "put") || untracked.has(req.trans)) return down.mutate(req);
       const keys = (req.keys ?? req.values.map((v) => extractKey(v))) as string[];
+      const keepOwn = ownStamps.has(req.trans);
       const existing: Promise<({ updatedAt?: number } | undefined)[]> =
-        req.type === "put" ? down.getMany({ trans: req.trans, keys }) : Promise.resolve(keys.map(() => undefined));
+        req.type === "put" && !keepOwn
+          ? down.getMany({ trans: req.trans, keys })
+          : Promise.resolve(keys.map(() => undefined));
       return existing.then((prev) => {
         const now = Date.now();
         const latest = new Map<string, number>(); // repeated keys inside one bulk write
         const stamps = keys.map((key, i) => {
+          if (keepOwn) return ownStamp(req.values[i] as { updatedAt?: unknown; createdAt?: unknown });
           const before = latest.get(key) ?? prev[i]?.updatedAt;
           const stamp = Math.max(now, typeof before === "number" ? before + 1 : now);
           latest.set(key, stamp);
@@ -81,6 +128,10 @@ function trackTable(db: Dexie, core: DBCore, down: DBCoreTable): DBCoreTable {
         });
         // Copies: the caller's objects are never changed.
         const values = req.values.map((v, i) => ({ ...(v as object), updatedAt: stamps[i] }));
+        // Nothing invalid is ever stored or sent: the same check other devices apply.
+        const valid = name === "items" ? validItem : validGoal;
+        const bad = values.findIndex((v) => !valid(v));
+        if (bad !== -1) throw new Error(`That ${name === "items" ? "task" : "goal"} could not be saved: it is not valid.`);
         return down.mutate({ ...req, values } as DBCoreMutateRequest).then((res) => {
           const marks = keys
             .map((id, i) => ({ table: name, id, updatedAt: stamps[i]! }))

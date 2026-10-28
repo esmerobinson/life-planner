@@ -50,24 +50,35 @@ async function expectTracked(keys: string[], since: number) {
 }
 
 describe("v1 -> v2 migration", () => {
-  it("keeps every existing row, stamps updatedAt and marks every row pending", async () => {
+  it("keeps every existing row, stamps it from its own dates (never now) and marks every row pending", async () => {
     const name = "migration-test";
     const v1 = new Dexie(name);
     v1.version(1).stores({ items: "id, status, areaId, goalId, due", goals: "id" });
-    const rows = [item("a", { notes: "keep me" }), item("b", { status: "done", completedAt: "2026-10-02" })];
+    const rows = [
+      item("a", { notes: "keep me", createdAt: "2026-09-01", touchedAt: "2026-10-05" }),
+      item("b", { status: "done", completedAt: "2026-10-02", createdAt: "2026-10-03", touchedAt: "2026-10-02" }),
+    ];
     await v1.table("items").bulkAdd(rows);
+    await v1.table("items").add({ id: "nodates", title: "legacy" }); // no dates at all
     await v1.table("goals").add(goal("g"));
     v1.close();
 
     const v2 = new HubDB(name);
     const items = await v2.items.orderBy("id").toArray();
-    expect(items.map(({ updatedAt: _u, ...rest }) => rest)).toEqual(rows);
-    expect(items.every((i) => i.updatedAt === clock)).toBe(true);
+    expect(items.filter((i) => i.id !== "nodates").map(({ updatedAt: _u, ...rest }) => rest)).toEqual(rows);
+    const stamp = new Map(items.map((i) => [i.id, i.updatedAt]));
+    expect(stamp.get("a")).toBe(Date.parse("2026-10-05")); // the latest of its dates
+    expect(stamp.get("b")).toBe(Date.parse("2026-10-03"));
+    expect(stamp.get("nodates")).toBe(1);
     const goals = await v2.goals.toArray();
     expect(goals.map(({ updatedAt: _u, ...rest }) => rest)).toEqual([goal("g")]);
-    expect(goals[0]!.updatedAt).toBe(clock);
+    expect(goals[0]!.updatedAt).toBe(Date.parse("2026-10-01"));
     const pending = await pendingMap(v2);
-    expect(pending).toEqual(new Map([["items/a", clock], ["items/b", clock], ["goals/g", clock]]));
+    expect(pending).toEqual(new Map([
+      ["items/a", Date.parse("2026-10-05")], ["items/b", Date.parse("2026-10-03")], ["items/nodates", 1],
+      ["goals/g", Date.parse("2026-10-01")],
+    ]));
+    expect([...pending.values()]).not.toContain(clock);
     expect(await v2.syncMeta.count()).toBe(0);
     v2.close();
     await Dexie.delete(name);
@@ -148,28 +159,42 @@ describe("stamping every local write", () => {
     await expectTracked([`items/${b.id}`, `goals/${made.id}`], clock);
   });
 
-  it("importBacklog and importGoogleTasks stamp and mark pending", async () => {
+  it("importBacklog and importGoogleTasks stamp ADDED rows from their own createdAt (never now) and mark them pending", async () => {
     await importBacklog("- [ ] Water the ferns\n- [ ] Email Sam\n", today);
     await importGoogleTasks(googleFixture, today);
     const items = await db.items.toArray();
     expect(items.length).toBeGreaterThan(2);
-    await expectTracked(items.map((i) => `items/${i.id}`), clock);
+    const pending = await pendingMap();
+    for (const i of items) {
+      expect(i.updatedAt, i.title).toBe(Date.parse(i.createdAt));
+      expect(pending.get(`items/${i.id}`)).toBe(i.updatedAt);
+    }
   });
 
-  it("restoreBackup (merge and replace) stamps restored rows and marks them pending", async () => {
+  it("restoreBackup stamps ADDED rows with the file's updatedAt, else createdAt (never now), and marks them pending", async () => {
     const file = {
       app: "life-hub", schema: 1, exportedOn: today,
-      items: [item("r1", { updatedAt: 42 } as Partial<Item>), item("r2")],
+      items: [item("r1", { updatedAt: 42 } as Partial<Item>), item("r2", { createdAt: "2026-09-09" })],
       goals: [goal("rg")],
     };
-    await restoreBackup(file, "merge");
-    await expectTracked(["items/r1", "items/r2", "goals/rg"], clock);
-    expect((await db.items.get("r1"))!.updatedAt).toBe(clock);
+    for (const mode of ["merge", "replace"] as const) {
+      await db.pending.clear();
+      await db.items.clear();
+      await db.goals.clear();
+      await restoreBackup(file, mode);
+      expect((await db.items.get("r1"))!.updatedAt, mode).toBe(42);
+      expect((await db.items.get("r2"))!.updatedAt, mode).toBe(Date.parse("2026-09-09"));
+      expect((await db.goals.get("rg"))!.updatedAt, mode).toBe(Date.parse("2026-10-01"));
+      expect(await pendingMap()).toEqual(new Map([
+        ["items/r1", 42], ["items/r2", Date.parse("2026-09-09")], ["goals/rg", Date.parse("2026-10-01")],
+      ]));
+    }
+  });
 
-    await db.pending.clear();
-    clock += 5000;
-    await restoreBackup(file, "replace");
-    await expectTracked(["items/r1", "items/r2", "goals/rg"], clock);
+  it("a user edit after an import is stamped now as usual", async () => {
+    await restoreBackup({ app: "life-hub", schema: 1, exportedOn: today, items: [item("r1")], goals: [] }, "merge");
+    await db.items.update("r1", { title: "edited" });
+    expect((await db.items.get("r1"))!.updatedAt).toBe(clock);
   });
 
   it("writes made while applying server changes are not stamped and not pending", async () => {
@@ -194,5 +219,41 @@ describe("stamping every local write", () => {
     await db.items.add(item("y"));
     await vi.waitFor(() => expect(seen).toHaveBeenCalledTimes(1));
     off();
+  });
+});
+
+describe("local writes are held to the same validator as rows from the server", () => {
+  it("an invalid item or goal is refused and nothing is stored or marked pending", async () => {
+    await expect(db.items.add({ id: "bad", title: 3 } as never)).rejects.toThrow();
+    await expect(db.items.add(item("bad2", { areaId: "nowhere" as never }))).rejects.toThrow();
+    await db.goals.add(goal("g"));
+    await db.pending.clear();
+    await expect(db.goals.update("g", { why: "x".repeat(4001) })).rejects.toThrow();
+    expect(await db.items.count()).toBe(0);
+    expect((await db.goals.get("g"))!.why).toBeUndefined();
+    expect(await db.pending.count()).toBe(0);
+  });
+
+  it("an invalid row inside a transaction rolls the whole transaction back", async () => {
+    await expect(
+      db.transaction("rw", db.items, async () => {
+        await db.items.add(item("fine"));
+        await db.items.add(item("broken", { priority: 9 as never }));
+      }),
+    ).rejects.toThrow();
+    expect(await db.items.count()).toBe(0);
+    expect(await db.pending.count()).toBe(0);
+  });
+
+  it("itemToGoal with a very long note makes a valid goal (notes capped at 4000)", async () => {
+    const a = await createItem({ kind: "idea", title: "Long", areaId: "inbox", priority: 2, notes: "n".repeat(9000) }, today);
+    const g = await itemToGoal(a.id, "art", today);
+    expect(g.notes).toHaveLength(4000);
+    expect((await db.items.get(a.id))!.notes!.startsWith("n".repeat(9000))).toBe(true);
+  });
+
+  it("server applies are not checked here (they are validated, or quarantined, by the sync engine)", async () => {
+    await applyUntracked(db, () => db.items.put({ ...item("legacy"), updatedAt: 1 }));
+    expect(await db.items.get("legacy")).toBeTruthy();
   });
 });

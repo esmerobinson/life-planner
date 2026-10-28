@@ -1,4 +1,5 @@
 import { db } from "../data/db";
+import { keepOwnStamps } from "../data/changeTracking";
 import { isValidISODate } from "../domain/dates";
 import { sectionToArea } from "./sectionAreas";
 import { cleanTitle, normaliseTitle, unwikilink } from "./titleClean";
@@ -173,6 +174,7 @@ export async function importBacklog(
   let added = 0;
   let alreadyHad = 0;
   await db.transaction("rw", db.items, async () => {
+    keepOwnStamps(); // added rows are stamped from their createdAt, never "now"
     const existing = new Set<string>();
     await db.items.each((i) => {
       if (i.source?.key) existing.add(i.source.key);

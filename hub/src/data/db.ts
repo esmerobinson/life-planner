@@ -1,6 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import type { Item, Goal } from "../domain/types";
-import { installChangeTracking, markTransactionUntracked } from "./changeTracking";
+import { installChangeTracking, legacyStamp, markTransactionUntracked } from "./changeTracking";
 
 /** The two tables that sync. */
 export const SYNC_TABLES = ["items", "goals"] as const;
@@ -40,21 +40,24 @@ export class HubDB extends Dexie {
       goals: "id",
     });
     // v2: sync. Every existing row gets updatedAt and is marked pending, so a device that
-    // already has data uploads all of it on its first sync.
+    // already has data uploads all of it on its first sync (where the server has nothing newer).
     this.version(2)
       .stores({
         syncMeta: "key",
         pending: "[table+id]",
       })
       .upgrade(async (tx) => {
-        markTransactionUntracked(tx); // stamped explicitly below, with one shared time
-        const now = Date.now();
+        // Stamped explicitly below from each row's OWN dates, never "now": a device that
+        // upgrades late must not beat edits other devices made since (any copy the server
+        // already has is newer and wins). Not validated: old rows are kept exactly as they are.
+        markTransactionUntracked(tx);
         for (const table of SYNC_TABLES) {
-          await tx.table(table).toCollection().modify((row: { updatedAt?: number }) => {
-            row.updatedAt = now;
+          const marks: PendingChange[] = [];
+          await tx.table(table).toCollection().modify((row: { id: string; updatedAt?: number }) => {
+            row.updatedAt = legacyStamp(row);
+            marks.push({ table, id: row.id, updatedAt: row.updatedAt });
           });
-          const ids = (await tx.table(table).toCollection().primaryKeys()) as string[];
-          await tx.table("pending").bulkPut(ids.map((id) => ({ table, id, updatedAt: now })));
+          await tx.table("pending").bulkPut(marks);
         }
       });
     installChangeTracking(this);

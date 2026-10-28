@@ -17,7 +17,7 @@
 // (including no network) leaves every local change pending.
 
 import { applyUntracked } from "../data/changeTracking";
-import { validGoal, validItem } from "../data/backup";
+import { validGoal, validItem } from "../data/validate";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
 /** Contract limits for one request (the server allows more; these keep requests small). */
