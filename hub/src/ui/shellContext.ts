@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import { todayISO } from "../domain/dates";
+import type { PersistenceStatus } from "../data/storage";
 import type { ISODate } from "../domain/types";
 
 /**
@@ -11,6 +12,8 @@ export const ShellContext = createContext<{
   refresh: () => void | Promise<void>;
   version: number;
   today: ISODate;
+  /** The browser's answer to the one start-up persistence request (null until it answers). */
+  persistence?: PersistenceStatus | null;
 } | null>(null);
 
 /** The shell's current date; falls back to the clock when rendered outside a shell. */

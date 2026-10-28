@@ -3,6 +3,7 @@ import { useShellToday } from "./ui/shellContext";
 import { AppShell } from "./ui/AppShell";
 import { NAV } from "./ui/areas";
 import { AreaPage } from "./ui/AreaPage";
+import { BackupPage } from "./ui/BackupPage";
 import { GoalDetail } from "./ui/GoalDetail";
 import { GoalsPage } from "./ui/GoalsPage";
 import { HomePage } from "./ui/HomePage";
@@ -33,6 +34,10 @@ function InboxRoute() {
   return <InboxPage today={useShellToday()} />;
 }
 
+function BackupRoute() {
+  return <BackupPage today={useShellToday()} />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -51,6 +56,7 @@ export default function App() {
           <Route path="/goals/:id" element={<GoalDetailRoute />} />
           <Route path="/area/:areaId" element={<AreaRoute />} />
           <Route path="/inbox" element={<InboxRoute />} />
+          <Route path="/backup" element={<BackupRoute />} />
         </Route>
       </Routes>
     </BrowserRouter>

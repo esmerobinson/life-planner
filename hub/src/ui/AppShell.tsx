@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
+import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import { todayISO } from "../domain/dates";
 import { QuickAdd } from "./QuickAdd";
 import { ShellContext } from "./shellContext";
@@ -15,7 +16,17 @@ export function AppShell() {
   const { items, refresh } = useHubData(today);
   const [adding, setAdding] = useState(false);
   const [version, setVersion] = useState(0);
+  const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
   const inboxCount = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
+
+  // Ask the browser once, on start, to keep this data.
+  useEffect(() => {
+    let live = true;
+    void requestPersistence().then((s) => live && setPersistence(s));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     const bump = () => setClock((c) => c + 1);
@@ -38,7 +49,7 @@ export function AppShell() {
     setVersion((v) => v + 1);
   }, [refresh]);
 
-  const ctx = useMemo(() => ({ refresh: changed, version, today }), [changed, version, today]);
+  const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
 
   return (
     <ShellContext.Provider value={ctx}>
@@ -51,6 +62,7 @@ export function AppShell() {
             </button>
             {/* Always shown: on a fresh install it is the only way to reach Import. */}
             <Link to="/inbox">{inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox"}</Link>
+            <Link to="/backup">Backup</Link>
           </div>
           {adding && <QuickAdd today={today} onAdded={() => void changed()} />}
           <Outlet />
