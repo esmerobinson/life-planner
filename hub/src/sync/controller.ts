@@ -28,6 +28,10 @@ export interface SyncState {
   /** A token and an address are stored. */
   configured: boolean;
   serverUrl: string | null;
+  /** Sync is on (a token, or one refused and waiting for the passphrase). */
+  syncOn: boolean;
+  /** This device has pulled everything the server had at least once. */
+  firstPullDone: boolean;
 }
 
 export interface Timers {
@@ -50,6 +54,8 @@ interface Stored {
   configured: boolean;
   needsPassphrase: boolean;
   serverUrl: string | null;
+  syncOn: boolean;
+  firstPullDone: boolean;
 }
 
 export class SyncController {
@@ -57,7 +63,10 @@ export class SyncController {
   private readonly fetchFn: typeof fetch;
   private readonly timers: Timers;
 
-  private stored: Stored = { lastSyncedAt: null, pendingCount: 0, configured: false, needsPassphrase: false, serverUrl: null };
+  private stored: Stored = {
+    lastSyncedAt: null, pendingCount: 0, configured: false, needsPassphrase: false, serverUrl: null,
+    syncOn: false, firstPullDone: false,
+  };
   private running = false;
   private error: string | null = null;
   private state: SyncState;
@@ -234,6 +243,8 @@ export class SyncController {
         configured: Boolean(serverUrl && meta.get("token")),
         needsPassphrase: meta.get("needsPassphrase") === true,
         serverUrl,
+        syncOn: Boolean(meta.get("token")) || meta.get("needsPassphrase") === true,
+        firstPullDone: meta.get("firstPullDone") === true,
       };
     });
   }
@@ -267,6 +278,8 @@ export class SyncController {
       pendingCount: s.pendingCount,
       configured: s.configured,
       serverUrl: s.serverUrl,
+      syncOn: s.syncOn,
+      firstPullDone: s.firstPullDone,
     };
   }
 

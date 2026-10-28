@@ -4,6 +4,8 @@ import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import type { ISODate } from "../domain/types";
 import { ImportPanel } from "./ImportPanel";
 import { ShellContext } from "./shellContext";
+import { syncController, useSyncState } from "../sync";
+import { mergeBlocked, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC } from "../data/syncGate";
 
 /**
  * Cleanup delay before the temporary download link is released (a technical wait,
@@ -30,6 +32,18 @@ export function BackupPage({ today }: { today: ISODate }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  const sync = useSyncState();
+  const mergeOff = mergeBlocked(sync);
+  const replaceOff = replaceBlocked(sync);
+
+  useEffect(() => {
+    void syncController.reload();
+  }, []);
+
+  // Replace is not offered while sync is on; fall back to Merge if it was picked.
+  useEffect(() => {
+    if (replaceOff) setMode("merge");
+  }, [replaceOff]);
 
   // Inside the shell the status comes from its single start-up request.
   const inShell = shell !== null;
@@ -101,7 +115,8 @@ export function BackupPage({ today }: { today: ISODate }) {
       );
       setConfirmed(false);
     } catch (err) {
-      setError(err instanceof Error && err.message === INVALID_BACKUP ? INVALID_BACKUP : RESTORE_FAILED);
+      const known = [INVALID_BACKUP, WAITING_FIRST_SYNC, REPLACE_OFF_WHILE_SYNCING];
+      setError(err instanceof Error && known.includes(err.message) ? err.message : RESTORE_FAILED);
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -149,18 +164,26 @@ export function BackupPage({ today }: { today: ISODate }) {
           Merge (add what is missing)
         </label>
         <label className="form-check">
-          <input type="radio" name="restore-mode" checked={replacing} onChange={() => changeMode("replace")} />
+          <input
+            type="radio"
+            name="restore-mode"
+            checked={replacing}
+            disabled={replaceOff}
+            onChange={() => changeMode("replace")}
+          />
           Replace everything
         </label>
       </fieldset>
+      {replaceOff && <p>{REPLACE_OFF_WHILE_SYNCING}</p>}
 
       {!replacing && (
         <div className="form-actions">
-          <button type="button" disabled={busy || text === null} onClick={() => void restore()}>
+          <button type="button" disabled={busy || text === null || mergeOff} onClick={() => void restore()}>
             Merge
           </button>
         </div>
       )}
+      {!replacing && mergeOff && <p>{WAITING_FIRST_SYNC}</p>}
       {replacing && (
         <div>
           <p>Download a backup first.</p>

@@ -1,6 +1,7 @@
 import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
+import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { isObj, isStr, validGoal, validItem } from "./validate";
 
@@ -67,9 +68,11 @@ export async function restoreBackup(
 ): Promise<{ addedItems: number; addedGoals: number; skipped: number }> {
   const file = parseBackup(raw); // nothing is written until every row has passed
   try {
-    return await writeBackup(file, mode);
-  } catch {
+    // Holding the sync lock: no sync run is in flight while the restore writes.
+    return await withSyncLock(db, () => writeBackup(file, mode));
+  } catch (err) {
     // The transaction aborted, so nothing was written.
+    if (err instanceof Error && (err.message === WAITING_FIRST_SYNC || err.message === REPLACE_OFF_WHILE_SYNCING)) throw err;
     throw new Error(RESTORE_FAILED);
   }
 }
@@ -79,6 +82,9 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
     // a copy the server already has, edited since on another device, wins over them.
     keepOwnStamps();
+    const gate = await readSyncGate(db.syncMeta);
+    if (mode === "replace" && replaceBlocked(gate)) throw new Error(REPLACE_OFF_WHILE_SYNCING);
+    if (mode === "merge" && mergeBlocked(gate)) throw new Error(WAITING_FIRST_SYNC);
     if (mode === "replace") {
       await db.items.clear();
       await db.goals.clear();
@@ -86,6 +92,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       // the start again brings them back instead of leaving this device silently missing
       // them.
       await db.syncMeta.put({ key: "cursor", value: 0 });
+      await db.syncMeta.delete("firstPullDone");
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       return { addedItems: file.items.length, addedGoals: file.goals.length, skipped: 0 };

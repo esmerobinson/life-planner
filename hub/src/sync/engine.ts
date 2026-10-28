@@ -17,6 +17,7 @@
 // (including no network) leaves every local change pending.
 
 import { applyUntracked } from "../data/changeTracking";
+import { withSyncLock } from "../data/syncGate";
 import { validGoal, validItem } from "../data/validate";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
@@ -106,10 +107,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 
 /** Runs a whole sync. Never throws for network or server problems; returns what happened. */
 export async function syncOnce(env: SyncEnv): Promise<SyncOutcome> {
-  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
-  // One run at a time per database, across tabs too, where the browser supports it.
-  if (locks?.request) return locks.request(`esmeworld-sync:${env.db.name}`, () => run(env));
-  return run(env);
+  // One run at a time per database, across tabs too (and never during a restore).
+  return withSyncLock(env.db, () => run(env));
 }
 
 async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
@@ -235,7 +234,7 @@ async function applyReply(
   db: HubDB,
   sentChanges: WireChange[],
   pendingVersions: Map<string, number>,
-  reply: { cursor: number; changes: WireChange[] },
+  reply: { cursor: number; hasMore: boolean; changes: WireChange[] },
 ): Promise<number> {
   return applyUntracked(db, async () => {
     // The sent versions are answered: clear them unless the row was edited again meanwhile.
@@ -260,6 +259,8 @@ async function applyReply(
       written++;
     }
     await db.syncMeta.put({ key: "cursor", value: reply.cursor });
+    // Everything the server had has now been seen once: Merge and imports may run.
+    if (!reply.hasMore) await db.syncMeta.put({ key: "firstPullDone", value: true });
     await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
     return written;
   });
@@ -276,6 +277,7 @@ async function resetForCursorAhead(db: HubDB): Promise<void> {
       }
     }
     await db.syncMeta.put({ key: "cursor", value: 0 });
+    await db.syncMeta.delete("firstPullDone");
   });
 }
 

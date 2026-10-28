@@ -100,7 +100,7 @@ describe("SyncPage", () => {
     setup();
     expect(await screen.findByText("2 changes waiting")).toBeInTheDocument();
     expect(screen.getByText(/^Last synced /)).toBeInTheDocument();
-    expect(screen.getByLabelText("Sync address")).toHaveValue(ADDRESS);
+    await waitFor(() => expect(screen.getByLabelText("Sync address")).toHaveValue(ADDRESS));
   });
 
   it("asks for the passphrase again after it was not accepted", async () => {

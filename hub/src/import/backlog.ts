@@ -1,5 +1,6 @@
 import { db } from "../data/db";
 import { keepOwnStamps } from "../data/changeTracking";
+import { mergeBlocked, readSyncGate, WAITING_FIRST_SYNC } from "../data/syncGate";
 import { isValidISODate } from "../domain/dates";
 import { sectionToArea } from "./sectionAreas";
 import { cleanTitle, normaliseTitle, unwikilink } from "./titleClean";
@@ -173,8 +174,9 @@ export async function importBacklog(
   const { items, skipped } = parseBacklog(markdown);
   let added = 0;
   let alreadyHad = 0;
-  await db.transaction("rw", db.items, async () => {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
     keepOwnStamps(); // added rows are stamped from their createdAt, never "now"
+    if (mergeBlocked(await readSyncGate(db.syncMeta))) throw new Error(WAITING_FIRST_SYNC);
     const existing = new Set<string>();
     await db.items.each((i) => {
       if (i.source?.key) existing.add(i.source.key);
