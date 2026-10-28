@@ -159,7 +159,13 @@ describe("editing", () => {
     expect(changes[changes.length - 1]).toBe("1234567890ab");
     await userEvent.keyboard("c");
     expect(changes[changes.length - 1]).toBe("1234567890ab");
-    expect(page.getByRole("status")).toHaveTextContent(/This page is full/);
+    expect(page.getByRole("textbox", { name: /text 1/ })).toHaveValue("1234567890ab"); // nothing typed vanishes unseen
+    const note = page.getByRole("status");
+    expect(note).toHaveTextContent("This page is full (12 characters).");
+    // Shown right under the line being typed in, not far below the page (review m1).
+    expect(note.closest(".page-line")).toBe(page.getByRole("textbox", { name: /text 1/ }).closest(".page-line"));
+    await userEvent.keyboard("{Backspace}");
+    expect(page.queryByRole("status")).toBeNull();
   });
 });
 

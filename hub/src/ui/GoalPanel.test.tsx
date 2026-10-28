@@ -163,6 +163,15 @@ describe("the goal panel (view)", () => {
     await userEvent.type(line, "# Plan{Enter}- [[ ] a pretend step");
     await vi.waitFor(async () => expect((await db.goals.get(g.id))!.notes).toBe("# Plan\n- [ ] a pretend step"), { timeout: 3000 });
   });
+
+  it("a goal's page stops at 4,000 characters this release, saying so", async () => {
+    const g = await createGoal({ title: "Long", areaId: "art", kind: "practice", notes: "y".repeat(3999) }, TODAY);
+    const p = await openGoal(g.id);
+    await userEvent.click(p.getByText("y".repeat(3999)));
+    await userEvent.keyboard("ab");
+    expect(p.getByRole("status")).toHaveTextContent("This page is full (4,000 characters).");
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.notes).toBe(`${"y".repeat(3999)}a`), { timeout: 3000 });
+  });
 });
 
 describe("the goal panel (Edit)", () => {

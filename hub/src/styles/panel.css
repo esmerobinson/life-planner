@@ -323,6 +323,11 @@ input[type="file"].page-file {
   font-size: 14px;
 }
 
+/* "This page is full": under the line being typed in, so it is seen where typing stopped. */
+.page-full {
+  flex-basis: 100%;
+}
+
 .peek .strip-list {
   margin: 0;
 }

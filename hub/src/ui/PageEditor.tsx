@@ -26,7 +26,7 @@ export const PAGE_WORDS = {
   linkAdd: "Add link",
   cancel: "Cancel",
   notALink: "That is not a web or Obsidian link.",
-  full: `This page is full (${MAX_NOTES_TEXT.toLocaleString("en-GB")} characters).`,
+  full: (max: number) => `This page is full (${max.toLocaleString("en-GB")} characters).`,
   adding: "Adding the picture…",
   notSaved: "That picture could not be saved. Try again.",
   removePicture: "Remove picture",
@@ -96,6 +96,8 @@ export function PageEditor({
   const [linkForm, setLinkForm] = useState<{ key: string | null; at?: number } | null>(null);
   const [linkText, setLinkText] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  /** Typing was refused because the page is at its cap (shown under the line being typed in). */
+  const [full, setFull] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const pictureAfter = useRef<string | null>(null);
@@ -136,10 +138,10 @@ export function PageEditor({
   function commit(next: Row[], focus?: { key: string; caret: number }): boolean {
     const text = textOf(next);
     if (text.length > maxLength && text.length > textOf(rowsRef.current).length) {
-      setMessage(PAGE_WORDS.full);
+      setFull(true);
       return false;
     }
-    if (message === PAGE_WORDS.full) setMessage(null);
+    setFull(false);
     rowsRef.current = next;
     setRows(next);
     if (focus) {
@@ -520,6 +522,11 @@ export function PageEditor({
                   ))}
                 </div>
               )}
+              {full && editing && (
+                <p className="page-note page-full" role="status">
+                  {PAGE_WORDS.full(maxLength)}
+                </p>
+              )}
             </div>
           );
         })}
@@ -578,9 +585,9 @@ export function PageEditor({
           onChange={(e) => void pickedPicture(e.target.files?.[0])}
         />
       </div>
-      {(busy || message) && (
+      {(busy || message || (full && !active)) && (
         <p className="page-note" role="status">
-          {busy ? PAGE_WORDS.adding : message}
+          {busy ? PAGE_WORDS.adding : (message ?? PAGE_WORDS.full(maxLength))}
         </p>
       )}
     </div>

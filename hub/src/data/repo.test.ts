@@ -467,9 +467,9 @@ describe("updateGoal", () => {
     expect((await db.goals.get(g.id))!.notes).toBe("# Plan\nA pretend line");
     await saveGoalNotes(g.id, "   ");
     expect(await db.goals.get(g.id)).not.toHaveProperty("notes");
-    await saveGoalNotes(g.id, "x".repeat(20_000)); // round 3b: goal notes go up to 20,000
-    expect((await db.goals.get(g.id))!.notes).toHaveLength(20_000);
-    await expect(saveGoalNotes(g.id, "x".repeat(20_001))).rejects.toThrow();
+    await saveGoalNotes(g.id, "x".repeat(4000));
+    expect((await db.goals.get(g.id))!.notes).toHaveLength(4000);
+    await expect(saveGoalNotes(g.id, "x".repeat(4001))).rejects.toThrow();
   });
 
   it("leaves fields that are not in the patch alone", async () => {

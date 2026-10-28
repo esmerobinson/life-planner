@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createItem, deleteGoal, saveGoalNotes, untickItem, updateGoal, type GoalPatch } from "../data/repo";
-import { MAX_GOAL_TEXT } from "../data/validate";
+import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "../data/validate";
 import { monthName, shortDate } from "../domain/display";
 import { doneThisMonth, goalTaskSplit, milestoneProgress, monthlyProgress, monthsInARow, nextGoalOrder } from "../domain/progress";
 import type { AreaId, Goal, ISODate, Item } from "../domain/types";
@@ -385,7 +385,7 @@ export function GoalPanel({
       </section>
       <section>
         <h3 className="peek-sec">Notes</h3>
-        <PageEditor value={notes.value} onChange={notes.set} onBlur={notes.flush} today={today} />
+        <PageEditor value={notes.value} onChange={notes.set} onBlur={notes.flush} today={today} maxLength={MAX_GOAL_NOTES} />
       </section>
       {/* Delete goal: to the Bin (restorable there), after the same confirm step as Empty bin. */}
       {!asking ? (

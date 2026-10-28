@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { MAX_GOAL_TEXT, MAX_NOTES_TEXT } from "./validate";
+import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "./validate";
 import { pictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf } from "../domain/dates";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
@@ -56,7 +56,7 @@ export interface GoalPatch {
   kind?: Goal["kind"];
   deadline?: ISODate | undefined;
   monthlyTarget?: number | undefined;
-  /** Blank text removes them. At most MAX_GOAL_TEXT characters each (notes: MAX_NOTES_TEXT). */
+  /** Blank text removes them. At most MAX_GOAL_TEXT characters each (notes: MAX_GOAL_NOTES). */
   why?: string | undefined;
   cadence?: string | undefined;
   notes?: string | undefined;
@@ -92,8 +92,8 @@ export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate):
       if (!(key in patch)) continue;
       const text = patch[key];
       if (text === undefined || !text.trim()) delete next[key];
-      else if (text.length > (key === "notes" ? MAX_NOTES_TEXT : MAX_GOAL_TEXT)) {
-        throw new Error(`at most ${key === "notes" ? MAX_NOTES_TEXT : MAX_GOAL_TEXT} characters`);
+      else if (text.length > (key === "notes" ? MAX_GOAL_NOTES : MAX_GOAL_TEXT)) {
+        throw new Error(`at most ${key === "notes" ? MAX_GOAL_NOTES : MAX_GOAL_TEXT} characters`);
       }
       else next[key] = text;
     }
@@ -311,7 +311,7 @@ export async function setMilestone(id: string, milestone: boolean, today: ISODat
 
 /** Saves a goal's notes (the panel's page); blank text removes them. */
 export async function saveGoalNotes(id: string, notes: string): Promise<void> {
-  if (notes.length > MAX_NOTES_TEXT) throw new Error(`at most ${MAX_NOTES_TEXT} characters`);
+  if (notes.length > MAX_GOAL_NOTES) throw new Error(`at most ${MAX_GOAL_NOTES} characters`);
   await db.transaction("rw", db.goals, async () => {
     const goal = await db.goals.get(id);
     if (!goal || goal.status !== undefined) return;

@@ -213,7 +213,7 @@ describe("backup", () => {
       ["notes number", { notes: {} }],
       ["why too long", { why: "x".repeat(4001) }],
       ["cadence too long", { cadence: "x".repeat(4001) }],
-      ["notes too long", { notes: "x".repeat(20_001) }],
+      ["notes too long", { notes: "x".repeat(4001) }],
       ["source kind", { source: { kind: "backlog", key: "k" } }],
       ["source key", { source: { kind: "obsidian" } }],
       ["source not object", { source: "obsidian" }],

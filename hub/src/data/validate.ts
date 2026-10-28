@@ -10,12 +10,16 @@ import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item } 
 /** The longest goal why / cadence text (characters). */
 export const MAX_GOAL_TEXT = 4000;
 /**
- * The longest page (notes) a goal may hold, and the most the page editor lets anyone type
- * into a task's or goal's page (round 3b raised it from 4000: a page with headings and
- * checklists outgrows that). Item notes have never had a validator cap and still don't, so
- * no existing row can become invalid.
+ * The most the page editor lets anyone type into a task's or idea's page. Item notes have
+ * never had a validator cap and still don't, so no existing row can become invalid.
  */
 export const MAX_NOTES_TEXT = 20_000;
+/**
+ * The longest page (notes) a goal may hold. Stays at 4000 in round 3b: a pre-3b device
+ * refuses a longer goal and could then overwrite it with its older copy.
+ * TODO(after every device runs 3b): raise to MAX_NOTES_TEXT (validator, repo and editor).
+ */
+export const MAX_GOAL_NOTES = 4000;
 
 const AREAS: readonly string[] = AREA_IDS;
 const ITEM_KINDS = ["task", "idea"];
@@ -79,7 +83,7 @@ export function validGoal(r: unknown): r is Goal {
     isStr(r.createdAt) && isValidISODate(r.createdAt) &&
     optDate(r.deadline) &&
     optText(r.why) && optText(r.cadence) &&
-    (r.notes === undefined || (isStr(r.notes) && r.notes.length <= MAX_NOTES_TEXT)) &&
+    (r.notes === undefined || (isStr(r.notes) && r.notes.length <= MAX_GOAL_NOTES)) &&
     validGoalSource(r.source) &&
     optStamp(r.updatedAt) &&
     (r.status === undefined || r.status === "deleted" || r.status === "purged") &&

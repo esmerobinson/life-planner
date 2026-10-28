@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { db } from "./db";
 import { exportBackup, INVALID_BACKUP, restoreBackup } from "./backup";
 import { addPicture, deleteGoal, deleteItem, emptyBin, getFile, saveGoalNotes } from "./repo";
-import { MAX_FILE_DATA, MAX_NOTES_TEXT, validFile, validGoal, validItem } from "./validate";
+import { MAX_FILE_DATA, MAX_GOAL_NOTES, MAX_NOTES_TEXT, validFile, validGoal, validItem } from "./validate";
 import { pictureLine } from "../domain/page";
 import type { FileRow, Goal, Item } from "../domain/types";
 
@@ -59,10 +59,11 @@ describe("validFile", () => {
 });
 
 describe("notes caps (round 3b)", () => {
-  it("goal notes may hold up to 20,000 characters; item notes stay uncapped", () => {
-    expect(MAX_NOTES_TEXT).toBe(20_000);
-    expect(validGoal(goal("g", { notes: "x".repeat(20_000) }))).toBe(true);
-    expect(validGoal(goal("g", { notes: "x".repeat(20_001) }))).toBe(false);
+  it("goal notes stay at 4,000 this release (pre-3b devices must read every goal); item notes stay uncapped", () => {
+    expect(MAX_GOAL_NOTES).toBe(4000);
+    expect(MAX_NOTES_TEXT).toBe(20_000); // the page editor's stop for item pages
+    expect(validGoal(goal("g", { notes: "x".repeat(4000) }))).toBe(true);
+    expect(validGoal(goal("g", { notes: "x".repeat(4001) }))).toBe(false);
     expect(validGoal(goal("g", { why: "x".repeat(4001) }))).toBe(false); // why/cadence keep 4000
     expect(validItem(item("i", { notes: "x".repeat(30_000) }))).toBe(true);
   });
@@ -101,10 +102,11 @@ describe("writing pictures", () => {
     expect(await db.files.get("shared")).toMatchObject({ data: PIXEL });
   });
 
-  it("goal notes save up to the new cap", async () => {
+  it("goal notes save up to the cap and no further", async () => {
     await db.goals.add(goal("g"));
-    await saveGoalNotes("g", `# Page\n${"y".repeat(MAX_NOTES_TEXT - 7)}`);
-    expect((await db.goals.get("g"))!.notes).toHaveLength(MAX_NOTES_TEXT);
+    await saveGoalNotes("g", `# Page\n${"y".repeat(MAX_GOAL_NOTES - 7)}`);
+    expect((await db.goals.get("g"))!.notes).toHaveLength(MAX_GOAL_NOTES);
+    await expect(saveGoalNotes("g", "y".repeat(MAX_GOAL_NOTES + 1))).rejects.toThrow();
   });
 });
 
