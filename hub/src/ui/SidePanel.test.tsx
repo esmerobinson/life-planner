@@ -236,6 +236,37 @@ describe("the task panel", () => {
     await userEvent.click(p.getByRole("button", { name: "Back" }));
     await vi.waitFor(() => expect(queryPanel()).toBeNull());
   });
+
+  it("Done writes only the fields changed in Edit, so a change synced in meanwhile is kept (review M-3)", async () => {
+    const a = await task("Keep synced", { due: "2026-11-01" });
+    renderApp(`/area/art?open=${a.id}`, TODAY);
+    const p = within(await findPanel("Keep synced"));
+    await userEvent.click(p.getByRole("button", { name: "Edit" }));
+    // Another device moves the due date while Edit is open.
+    await db.items.update(a.id, { due: "2026-11-09" });
+    await userEvent.selectOptions(p.getByLabelText("Priority"), "1");
+    await userEvent.click(p.getByRole("button", { name: "Done" }));
+    await vi.waitFor(async () => expect((await db.items.get(a.id))!.priority).toBe(1));
+    expect((await db.items.get(a.id))!.due).toBe("2026-11-09");
+  });
+
+  it("an unknown or binned id is dropped from the URL (review M-7)", async () => {
+    const a = await task("Binned one");
+    await db.items.update(a.id, { status: "deleted", deletedAt: TODAY });
+    renderApp(`/area/art?open=${a.id}`, TODAY);
+    await vi.waitFor(() => expect(currentUrl).toBe("/area/art"));
+    expect(queryPanel()).toBeNull();
+  });
+
+  it("the resize handle says its range", async () => {
+    const a = await task("Ranged");
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(1280);
+    renderApp(`/area/art?open=${a.id}`, TODAY);
+    await findPanel("Ranged");
+    const handle = screen.getByRole("separator", { name: "Resize panel" });
+    expect(handle).toHaveAttribute("aria-valuemin", "360");
+    expect(handle).toHaveAttribute("aria-valuemax", "1152");
+  });
 });
 
 describe("Mark as milestone (arrow menu)", () => {

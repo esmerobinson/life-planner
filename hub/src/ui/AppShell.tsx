@@ -64,7 +64,11 @@ export function AppShell() {
     // Legacy goal milestones become flagged tasks (idempotent; waits for the first sync
     // pull; writes nothing when there is nothing to convert). Run on start, after every
     // sync and after local changes such as a restore, so late arrivals are converted too.
-    await migrateMilestones(todayISO()).catch(() => 0);
+    await migrateMilestones(todayISO()).catch((e: unknown) => {
+      // Retried on the next change; leave a trace rather than fail silently (review M-6).
+      console.warn("Milestone migration did not run:", e);
+      return 0;
+    });
     await refresh();
     setVersion((v) => v + 1);
   }, [refresh]);

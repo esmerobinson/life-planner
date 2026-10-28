@@ -56,6 +56,7 @@ export function ItemPanel({
   const { attempt, saveError } = useSaveError();
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<Fields>(() => fieldsOf(item));
+  const [snapshot, setSnapshot] = useState<Fields>(() => fieldsOf(item));
   const [busy, setBusy] = useState(false);
   const inbox = item.areaId === "inbox";
 
@@ -85,26 +86,33 @@ export function ItemPanel({
   }, [editing, escape]);
 
   function startEdit() {
-    setFields(fieldsOf(item));
+    const now = fieldsOf(item);
+    setFields(now);
+    setSnapshot(now);
     setEditing(true);
   }
 
   async function done() {
     if (busy) return;
+    // Only what was changed in Edit is written, so a change synced in meanwhile is kept (review M-3).
     const f = fields;
-    const patch: Partial<Item> = { priority: f.priority };
-    const isTask = inbox || f.kind === "task";
-    if (!inbox) {
-      patch.kind = f.kind;
-      patch.areaId = f.areaId;
-    }
-    if (isTask) {
-      patch.due = f.due || undefined;
-      patch.goalId = f.goalId || undefined;
-      patch.milestone = f.goalId && f.milestone ? true : undefined;
-    } else {
+    const was = snapshot;
+    const patch: Partial<Item> = {};
+    if (f.priority !== was.priority) patch.priority = f.priority;
+    if (!inbox && f.kind !== was.kind) patch.kind = f.kind;
+    if (!inbox && f.areaId !== was.areaId) patch.areaId = f.areaId;
+    if (inbox || f.kind === "task") {
+      if (f.due !== was.due) patch.due = f.due || undefined;
+      if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
+      const flag = Boolean(f.goalId && f.milestone);
+      if (flag !== was.milestone) patch.milestone = flag ? true : undefined;
+    } else if (patch.kind === "idea") {
       // An idea has no due date, repeat or day on Today (as Change to → Idea does).
       Object.assign(patch, { due: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, milestone: undefined });
+    }
+    if (Object.keys(patch).length === 0) {
+      setEditing(false);
+      return;
     }
     setBusy(true);
     try {

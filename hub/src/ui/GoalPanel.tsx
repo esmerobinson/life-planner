@@ -5,6 +5,7 @@ import { monthName, shortDate } from "../domain/display";
 import { doneThisMonth, goalTaskSplit, milestoneProgress, monthlyProgress, monthsInARow, nextGoalOrder } from "../domain/progress";
 import type { AreaId, Goal, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS, NAV } from "./areas";
+import { tickedOffToday } from "../domain/triage";
 import { DoneStrip } from "./DoneSection";
 import { areaLabel } from "./GoalProgress";
 import { NotesBox } from "./ItemPanel";
@@ -69,6 +70,7 @@ export function GoalPanel({
   const { tick, celebration, message } = useTick(today, onChanged);
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<Fields>(() => fieldsOf(goal));
+  const [snapshot, setSnapshot] = useState<Fields>(() => fieldsOf(goal));
   const [formMessage, setFormMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [allDone, setAllDone] = useState(false);
@@ -118,7 +120,9 @@ export function GoalPanel({
   }, [adding]);
 
   function startEdit() {
-    setFields(fieldsOf(goal));
+    const now = fieldsOf(goal);
+    setFields(now);
+    setSnapshot(now);
     setFormMessage("");
     setEditing(true);
   }
@@ -135,16 +139,21 @@ export function GoalPanel({
         return setFormMessage("A monthly target is a whole number, 1 or more.");
       }
     }
-    const patch: GoalPatch = {
-      title: f.title.trim(),
-      areaId: f.areaId,
-      kind: f.kind,
-      deadline: f.kind === "finite" ? f.deadline : undefined,
-      monthlyTarget,
-      cadence: f.cadence,
-      why: f.why,
-    };
+    // Only what was changed in Edit is written, so a change synced in meanwhile is kept (review M-3).
+    const was = snapshot;
+    const patch: GoalPatch = {};
+    if (f.title.trim() !== was.title) patch.title = f.title.trim();
+    if (f.areaId !== was.areaId) patch.areaId = f.areaId;
+    if (f.kind !== was.kind) patch.kind = f.kind; // practice drops the deadline in the repo
+    if (f.kind === "finite" && (f.kind !== was.kind || f.deadline !== was.deadline)) patch.deadline = f.deadline;
+    if (f.target.trim() !== was.target) patch.monthlyTarget = monthlyTarget;
+    if (f.cadence !== was.cadence) patch.cadence = f.cadence;
+    if (f.why !== was.why) patch.why = f.why;
     setFormMessage("");
+    if (Object.keys(patch).length === 0) {
+      setEditing(false);
+      return;
+    }
     setBusy(true);
     try {
       if (await write(() => updateGoal(goal.id, patch, today))) setEditing(false);
@@ -344,7 +353,15 @@ export function GoalPanel({
         ) : (
           <ul aria-label="To come" className="strip-list">
             {toCome.map((it) => (
-              <TaskRow key={it.id} item={it} today={today} onTick={tick} onMoved={onChanged} />
+              <TaskRow
+                key={it.id}
+                item={it}
+                today={today}
+                onTick={tick}
+                onUntick={(id) => void write(() => untickItem(id, today))}
+                crossed={tickedOffToday(it, today)}
+                onMoved={onChanged}
+              />
             ))}
           </ul>
         )}

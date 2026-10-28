@@ -240,10 +240,36 @@ describe("the goal panel (Edit)", () => {
     await db.goals.add(finite);
     const p = await openGoal("ef");
     await userEvent.click(p.getByRole("button", { name: "Edit" }));
+    fireEvent.change(p.getByLabelText("Title"), { target: { value: "Will not save" } });
     vi.spyOn(repo, "updateGoal").mockRejectedValue(new Error("boom"));
     await userEvent.click(p.getByRole("button", { name: "Done" }));
     expect(await p.findByText("That did not save. Try again.")).toBeInTheDocument();
     expect(p.getByLabelText("Title")).toBeInTheDocument();
+  });
+
+  it("Done writes only what was changed, so a why synced in meanwhile is kept (review M-3)", async () => {
+    await db.goals.add(finite);
+    const p = await openGoal("ef");
+    await userEvent.click(p.getByRole("button", { name: "Edit" }));
+    await db.goals.update("ef", { why: "Synced from the phone" });
+    fireEvent.change(p.getByLabelText("Title"), { target: { value: "Only the title" } });
+    await userEvent.click(p.getByRole("button", { name: "Done" }));
+    expect(await p.findByRole("heading", { level: 2, name: "Only the title" })).toBeInTheDocument();
+    expect(await db.goals.get("ef")).toMatchObject({ title: "Only the title", why: "Synced from the phone", deadline: "2026-12-31" });
+  });
+});
+
+describe("habits in a goal's To come (review M-4)", () => {
+  it("a habit ticked today shows crossed off there and can be unticked", async () => {
+    const g = await createGoal({ title: "Habit goal", areaId: "art", kind: "practice" }, TODAY);
+    const h = await createItem({ kind: "task", title: "Pretend daily sketch", areaId: "art", priority: 2, goalId: g.id, recur: ["wed"], doneDates: [TODAY] }, TODAY);
+    const p = await openGoal(g.id);
+    const box = p.getByRole("checkbox", { name: "Done: Pretend daily sketch" });
+    expect(box).toBeChecked();
+    expect(box.closest("li")).toHaveClass("crossed");
+    await userEvent.click(box);
+    expect(await p.findByRole("checkbox", { name: "Mark done: Pretend daily sketch" })).not.toBeChecked();
+    expect((await db.items.get(h.id))!.doneDates).toBeUndefined();
   });
 });
 

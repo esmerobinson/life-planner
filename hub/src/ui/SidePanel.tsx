@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { getItem, listGoals } from "../data/repo";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { GoalPanel } from "./GoalPanel";
 import { ItemPanel } from "./ItemPanel";
@@ -96,6 +97,24 @@ export function SidePanel({
     return () => document.removeEventListener("keydown", onKey);
   }, [shown, panel]);
 
+  // `?open=` for something that is not (or no longer) there: drop it from the URL, once a
+  // fresh read confirms it (the shell's lists can lag a moment behind a page's).
+  const close = panel?.close;
+  useEffect(() => {
+    if (!openId || shown || !close) return;
+    let live = true;
+    Promise.all([getItem(openId), listGoals()]).then(
+      ([it, gs]) => {
+        const there = (it && (it.status === "open" || it.status === "done")) || gs.some((g) => g.id === openId);
+        if (live && !there) close();
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [openId, shown, close]);
+
   if (!panel || !shown) return null;
 
   function onDrag(e: ReactPointerEvent<HTMLDivElement>) {
@@ -145,6 +164,7 @@ export function SidePanel({
           aria-orientation="vertical"
           aria-label="Resize panel"
           aria-valuemin={PANEL_MIN_WIDTH}
+          aria-valuemax={clampPanelWidth(Number.MAX_SAFE_INTEGER, window.innerWidth)}
           aria-valuenow={width}
           tabIndex={0}
           onPointerDown={onDrag}
