@@ -252,6 +252,53 @@ describe("AreaPage", () => {
     });
   });
 
+  describe("Move to: Change to", () => {
+    const changeTo = async (title: string) => {
+      await userEvent.click(await screen.findByRole("button", { name: `Move to: ${title}` }));
+      return within(within(screen.getByRole("group", { name: `Move ${title} to` })).getByRole("group", { name: "Change to" }));
+    };
+
+    it("an idea can become a to-do, and the menu does not offer Idea", async () => {
+      const it = await createItem({ kind: "idea", title: "Snail comic", areaId: "art", priority: 3 }, TODAY);
+      renderArea("art");
+      const menu = await changeTo("Snail comic");
+      expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["To-do", "Goal"]);
+      await userEvent.click(menu.getByRole("button", { name: "To-do" }));
+      const todos = await screen.findByRole("list", { name: "To-dos" });
+      expect(within(todos).getByRole("checkbox", { name: "Mark done: Snail comic" })).toBeInTheDocument();
+      expect((await db.items.get(it.id))!.kind).toBe("task");
+    });
+
+    it("a to-do can become an idea, losing its due date and day", async () => {
+      const it = await createItem(
+        { kind: "task", title: "Maybe later", areaId: "art", priority: 3, due: "2026-11-02", pinnedDate: "2026-10-29" },
+        TODAY,
+      );
+      renderArea("art");
+      const menu = await changeTo("Maybe later");
+      expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["Idea", "Goal"]);
+      await userEvent.click(menu.getByRole("button", { name: "Idea" }));
+      const ideas = await screen.findByRole("list", { name: "Ideas" });
+      expect(within(ideas).getByText("Maybe later")).toBeInTheDocument();
+      const stored = (await db.items.get(it.id))!;
+      expect(stored.kind).toBe("idea");
+      expect(stored.due).toBeUndefined();
+      expect(stored.pinnedDate).toBeUndefined();
+    });
+
+    it("a to-do can become a goal in its own area (the item is archived, not deleted)", async () => {
+      const it = await createItem({ kind: "task", title: "Paint weekly", areaId: "art", priority: 3 }, TODAY);
+      renderArea("art");
+      const menu = await changeTo("Paint weekly");
+      await userEvent.click(menu.getByRole("button", { name: "Goal" }));
+      const goals = await screen.findByRole("list", { name: "Goals" });
+      expect(within(goals).getByRole("link", { name: "Paint weekly" })).toBeInTheDocument();
+      const [goal] = await db.goals.toArray();
+      expect(goal.areaId).toBe("art");
+      expect((await db.items.get(it.id))!.status).toBe("archived");
+    });
+  });
+
   it("area goals are cards that link to the goal", async () => {
     const g = await createGoal({ title: "Paint daily", areaId: "art", kind: "practice", monthlyTarget: 4 }, TODAY);
     renderArea("art");

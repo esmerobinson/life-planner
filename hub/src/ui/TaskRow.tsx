@@ -97,7 +97,14 @@ export function TaskRow({
             label={item.title}
           />
         )}
-        <MoveToMenu itemId={item.id} areaId={item.areaId} today={today} onMoved={onMoved} label={item.title} />
+        <MoveToMenu
+          itemId={item.id}
+          areaId={item.areaId}
+          kind={item.kind}
+          today={today}
+          onMoved={onMoved}
+          label={item.title}
+        />
       </div>
       {tray && <div className="strip-tray">{tray}</div>}
     </li>

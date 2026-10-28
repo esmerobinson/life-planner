@@ -229,8 +229,13 @@ describe("TodayPanel", () => {
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     const group = screen.getByRole("group", { name: "Move Keys to" });
-    // The other areas (not Writing, where it is), then This week, Remove from today and Archive.
+    // Change to (not To-do, which it is), the other areas (not Writing, where it is), then
+    // This week, Remove from today and Archive.
+    expect(within(within(group).getByRole("group", { name: "Change to" })).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Idea", "Goal",
+    ]);
     expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Idea", "Goal",
       "Admin", "Art", "Content", "Mind", "Body", "Tech projects", "Production",
       "This week", "Remove from today", "Archive",
     ]);
