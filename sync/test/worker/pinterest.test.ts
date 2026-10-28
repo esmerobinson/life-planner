@@ -226,8 +226,8 @@ describe("GET /v1/pinterest-board", () => {
     expect(await errorOf(response)).toBe("pinterest_unavailable");
   });
 
-  it("refuses a feed over 2 MB, by declared length or by actual size", async () => {
-    expect(MAX_FEED_BYTES).toBe(2 * 1024 * 1024);
+  it("refuses a feed over 256 KB (the real one is ~18 KB), by declared length or by actual size", async () => {
+    expect(MAX_FEED_BYTES).toBe(256 * 1024);
     const big = FIXTURE_RSS.replace("<language>", `<!--${"x".repeat(MAX_FEED_BYTES)}--><language>`);
     const declared = upstream(() => feedResponse("x", { headers: { "Content-Length": String(MAX_FEED_BYTES + 1) } }));
     const r1 = await board(q(FIXTURE_BOARD), declared, await freshCache());
@@ -303,6 +303,23 @@ describe("GET /v1/pinterest-board", () => {
     const other = (await (await board(q("someone/else"), up, cache)).json()) as BoardBody;
     expect(other.board).toBe("someone/else");
     expect(up.requests).toHaveLength(3);
+  });
+
+  it("re-checks pins read from the cache (it is shared with other Workers on the zone)", async () => {
+    const cache = await freshCache();
+    const poisoned = {
+      board: FIXTURE_BOARD,
+      fetchedAt: T0 - 1000,
+      pins: [FIXTURE_PINS[0], { img: "https://evil.example/x.jpg", link: FIXTURE_PINS[1]!.link }, { img: FIXTURE_PINS[2]!.img, link: "javascript:alert(1)" }],
+    };
+    await cache.put(
+      "https://pinterest-board.esmeworld-sync.internal/v1/fictionaluser/dreamboard",
+      new Response(JSON.stringify(poisoned), { headers: { "Content-Type": "application/json", "Cache-Control": "max-age=900" } }),
+    );
+    const up = upstream();
+    const body = (await (await board(q(FIXTURE_BOARD), up, cache)).json()) as BoardBody;
+    expect(up.requests).toHaveLength(0); // it was a cache hit
+    expect(body).toEqual({ board: FIXTURE_BOARD, fetchedAt: T0 - 1000, pins: [FIXTURE_PINS[0]] });
   });
 
   it("works with no cache available", async () => {

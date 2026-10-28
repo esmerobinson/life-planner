@@ -7,23 +7,22 @@
 // https://pinterest.com/ are ever returned; anything else in the feed is dropped. Parsed
 // boards are kept in the edge cache for 15 minutes to be kind to Pinterest.
 
+import { parseBoardFeed, safePins, type Pin } from "../shared/pinterestFeed";
 import { HttpError, json, readCapped } from "./http";
+
+export { parseBoardFeed, MAX_PINS } from "../shared/pinterestFeed";
 
 export const BOARD_PATTERN = /^[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,100}$/;
 /** Whole upstream exchange (headers and body). */
 export const PINTEREST_TIMEOUT_MS = 5000;
-export const MAX_FEED_BYTES = 2 * 1024 * 1024;
+/** The real feed is about 18 KB; this leaves plenty of room and bounds parsing work. */
+export const MAX_FEED_BYTES = 256 * 1024;
 export const BOARD_CACHE_MS = 15 * 60 * 1000;
-/** More than the feed ever holds (about 25); a hostile feed cannot make a huge response. */
-export const MAX_PINS = 200;
 
 const USER_AGENT = "Esmeworld/1.0 (personal vision board; +https://life-hub-eoy.pages.dev)";
 const CACHE_PREFIX = "https://pinterest-board.esmeworld-sync.internal/v1/";
 
-export interface Pin {
-  img: string;
-  link: string;
-}
+export type { Pin };
 
 export interface BoardBody {
   board: string;
@@ -107,79 +106,6 @@ async function readFeed(board: string, upstreamFetch: typeof fetch, signal: Abor
   return new TextDecoder("utf-8").decode(bytes);
 }
 
-// ---- parsing ----
-
-const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
-
-function decodeEntities(text: string): string {
-  return text.replace(/&(#x[0-9a-fA-F]{1,6}|#[0-9]{1,7}|[a-zA-Z]+);/g, (whole, name: string) => {
-    if (name[0] === "#") {
-      const code = name[1] === "x" || name[1] === "X" ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
-      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
-    }
-    return NAMED_ENTITIES[name] ?? whole;
-  });
-}
-
-/** The text content of the first <tag> element in `xml` (CDATA kept raw, entities decoded). */
-function elementText(xml: string, tag: string): string | null {
-  const match = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "i").exec(xml);
-  if (!match) return null;
-  const inner = match[1]!.trim();
-  const cdata = /^<!\[CDATA\[([\s\S]*?)\]\]>$/.exec(inner);
-  return cdata ? cdata[1]! : decodeEntities(inner);
-}
-
-/** The src of the first <img> in an HTML fragment. */
-function imageSrc(html: string): string | null {
-  const tag = /<img\b[^>]*>/i.exec(html);
-  if (!tag) return null;
-  const src = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag[0]);
-  return src ? decodeEntities(src[1] ?? src[2] ?? "") : null;
-}
-
-function parseHttps(text: string): URL | null {
-  try {
-    const url = new URL(text.trim());
-    if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
-    return url;
-  } catch {
-    return null;
-  }
-}
-
-/** An https://i.pinimg.com/ image, at 736px wide when the feed gave the 236px one. */
-function safeImage(text: string): string | null {
-  const url = parseHttps(text);
-  if (!url || url.hostname !== "i.pinimg.com") return null;
-  if (url.pathname.startsWith("/236x/")) url.pathname = `/736x/${url.pathname.slice("/236x/".length)}`;
-  return url.href;
-}
-
-function safeLink(text: string): string | null {
-  const url = parseHttps(text);
-  if (!url || (url.hostname !== "www.pinterest.com" && url.hostname !== "pinterest.com")) return null;
-  return url.href;
-}
-
-/** The board's pins, or null when `xml` is not an RSS feed at all. */
-export function parseBoardFeed(xml: string): Pin[] | null {
-  if (!/<rss[\s>]/i.test(xml) || !/<channel[\s>]/i.test(xml)) return null;
-  const pins: Pin[] = [];
-  const seen = new Set<string>();
-  for (const match of xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)) {
-    if (pins.length >= MAX_PINS) break;
-    const item = match[1]!;
-    const link = safeLink(elementText(item, "link") ?? "");
-    const src = imageSrc(elementText(item, "description") ?? "");
-    const img = src === null ? null : safeImage(src);
-    if (!link || !img || seen.has(link)) continue;
-    seen.add(link);
-    pins.push({ img, link });
-  }
-  return pins;
-}
-
 // ---- edge cache ----
 
 function cacheKey(board: string): string {
@@ -192,8 +118,10 @@ async function readCache(cache: Cache | null, board: string, now: number): Promi
     const hit = await cache.match(cacheKey(board));
     if (!hit) return null;
     const body = (await hit.json()) as BoardBody;
-    const fresh = body.board === board && body.fetchedAt <= now && now - body.fetchedAt < BOARD_CACHE_MS;
-    return fresh && Array.isArray(body.pins) ? body : null;
+    const fresh =
+      body.board === board && typeof body.fetchedAt === "number" && body.fetchedAt <= now && now - body.fetchedAt < BOARD_CACHE_MS;
+    // Re-checked on the way out: the default cache is shared by every Worker on the zone.
+    return fresh && Array.isArray(body.pins) ? { board, fetchedAt: body.fetchedAt, pins: safePins(body.pins) } : null;
   } catch {
     return null; // a cache problem only costs a fetch
   }
