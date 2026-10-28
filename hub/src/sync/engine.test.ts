@@ -91,6 +91,19 @@ describe("syncOnce", () => {
     expect(server.rows.size).toBe(20);
   });
 
+  it("a single row too large for one request stays pending and does not block the others", async () => {
+    const d = await device();
+    await d.items.add(item("huge", { notes: "x".repeat(MAX_REQUEST_BYTES) }));
+    await d.items.add(item("small"));
+    const server = new FakeSyncServer(TOKEN);
+    const out = await syncOnce({ db: d, fetch: server.fetch });
+    expect(out).toMatchObject({ kind: "ok", sent: 1, held: 1 });
+    expect(server.data("items", "small")).toBeDefined();
+    expect(server.data("items", "huge")).toBeUndefined();
+    for (const r of server.syncRequests) expect(r.bodyBytes).toBeLessThanOrEqual(MAX_REQUEST_BYTES);
+    expect((await d.pending.toArray()).map((p) => p.id)).toEqual(["huge"]);
+  });
+
   it("two devices converge, and a conflicting edit goes to the later updatedAt on both", async () => {
     const server = new FakeSyncServer(TOKEN);
     const a = await device();

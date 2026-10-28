@@ -38,7 +38,8 @@ export const REJECTED_MESSAGE = "The sync server did not accept a change. Your c
 export const FAILED_MESSAGE = "Sync did not work this time. Your changes are kept on this device.";
 
 export type SyncOutcome =
-  | { kind: "ok"; sent: number; received: number }
+  /** `held`: changes too large for any request; they stay pending on this device. */
+  | { kind: "ok"; sent: number; received: number; held: number }
   | { kind: "not-configured" }
   | { kind: "needs-passphrase"; message: string }
   | { kind: "rate-limited"; retryAfterMs: number; message: string }
@@ -126,9 +127,12 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   let badChangeRetried = false;
   let sent = 0;
   let received = 0;
+  let held = 0;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const batch = await buildBatch(db, deviceId, cursor, attempted);
+    for (const k of batch.held) attempted.add(k);
+    held += batch.held.length;
     if (!needPull && !hasMore && batch.changes.length === 0) break;
     const body = JSON.stringify({ deviceId, cursor, changes: batch.changes });
 
@@ -188,7 +192,7 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
     hasMore = reply.hasMore;
     needPull = false;
   }
-  return { kind: "ok", sent, received };
+  return { kind: "ok", sent, received, held };
 }
 
 /** Pending changes not yet attempted in this run, within the count and size limits. */
@@ -197,7 +201,9 @@ async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted
     const changes: WireChange[] = [];
     /** The pending entry's updatedAt when the request was built, per key. */
     const pendingVersions = new Map<string, number>();
-    let bytes = utf8Length(JSON.stringify({ deviceId, cursor, changes: [] }));
+    const held: string[] = [];
+    const base = utf8Length(JSON.stringify({ deviceId, cursor, changes: [] }));
+    let bytes = base;
     for (const p of await db.pending.toArray()) {
       const key = keyOf(p.table, p.id);
       if (attempted.has(key)) continue;
@@ -208,14 +214,19 @@ async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted
       }
       const updatedAt = row.updatedAt ?? p.updatedAt;
       const change: WireChange = { table: p.table, id: p.id, updatedAt, data: { ...row, id: p.id, updatedAt } };
-      const size = utf8Length(JSON.stringify(change)) + (changes.length > 0 ? 1 : 0);
+      const own = utf8Length(JSON.stringify(change));
+      if (base + own > MAX_REQUEST_BYTES) {
+        held.push(key); // could never be sent; kept pending so nothing is lost
+        continue;
+      }
+      const size = own + (changes.length > 0 ? 1 : 0);
       if (changes.length >= MAX_CHANGES_PER_REQUEST) break;
       if (changes.length > 0 && bytes + size > MAX_REQUEST_BYTES) break;
       changes.push(change);
       pendingVersions.set(key, p.updatedAt);
       bytes += size;
     }
-    return { changes, pendingVersions };
+    return { changes, pendingVersions, held };
   });
 }
 
