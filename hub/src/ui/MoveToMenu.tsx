@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { archiveItem, deleteItem, itemToGoal, moveTo, removeFromToday, updateItem } from "../data/repo";
 import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
@@ -22,6 +23,8 @@ const TYPES: { to: "task" | "idea" | "goal"; label: string }[] = [
  * The arrow icon (Move to). When the item's kind is known: "Change to" first (the types
  * it is not: To-do, Idea, Goal), then the other areas, then This week (not for ideas)
  * and Remove from today (only on the Today list), then Archive and Delete (to the Bin).
+ * An unsorted Inbox item (`untyped`) has no type to change and no area to move between:
+ * its menu is "Sort this…" (Sort one by one, opened on it), then Archive and Delete.
  */
 export function MoveToMenu({
   itemId,
@@ -31,6 +34,7 @@ export function MoveToMenu({
   onMoved,
   label,
   onTodayList = false,
+  untyped = false,
 }: {
   itemId: string;
   areaId?: AreaId;
@@ -40,6 +44,8 @@ export function MoveToMenu({
   today: ISODate;
   onMoved: () => void | Promise<void>;
   label?: string;
+  /** An unsorted Inbox item: "Sort this…" instead of the types, areas and This week. */
+  untyped?: boolean;
 }) {
   const { attempt, saveError } = useSaveError();
 
@@ -75,7 +81,13 @@ export function MoveToMenu({
     >
       {(close) => (
         <>
-          {kind && (
+          {untyped && (
+            <>
+              <SortThis itemId={itemId} close={close} />
+              <hr />
+            </>
+          )}
+          {!untyped && kind && (
             <>
               <div role="group" aria-label="Change to">
                 <div className="pop-menu-label" aria-hidden="true">
@@ -90,12 +102,12 @@ export function MoveToMenu({
               <hr />
             </>
           )}
-          {GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id !== areaId).map((a) => (
+          {!untyped && GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id !== areaId).map((a) => (
             <button key={a.id} type="button" onClick={() => void pick({ kind: "area", areaId: a.id }, close)}>
               {a.label}
             </button>
           ))}
-          {kind !== "idea" && (
+          {!untyped && kind !== "idea" && (
             <>
               <hr />
               <button type="button" onClick={() => void pick({ kind: "week" }, close)}>
@@ -108,7 +120,7 @@ export function MoveToMenu({
               )}
             </>
           )}
-          <hr />
+          {!untyped && <hr />}
           <button type="button" onClick={() => void pick({ kind: "archive" }, close)}>
             Archive
           </button>
@@ -118,5 +130,21 @@ export function MoveToMenu({
         </>
       )}
     </IconPopover>
+  );
+}
+
+/** "Sort this…": Sort one by one, opened on this item (only on Inbox strips, which sit in a router). */
+function SortThis({ itemId, close }: { itemId: string; close: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        close();
+        navigate(`/inbox/sort?item=${encodeURIComponent(itemId)}`);
+      }}
+    >
+      Sort this…
+    </button>
   );
 }

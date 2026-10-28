@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("Inbox: quick capture, filter by source, archive, restore, delete to the Bin, Move to filing", async ({ page }) => {
+test("Inbox: quick capture, filter by source, archive, restore, delete to the Bin, Sort this…", async ({ page }) => {
   // Seed from two sources through the (moved) import panels on the Backup page.
   await page.goto("/backup");
   await page.getByText("Import from a file", { exact: true }).click();
@@ -55,10 +55,16 @@ test("Inbox: quick capture, filter by source, archive, restore, delete to the Bi
   await page.getByRole("button", { name: "Restore: Pretend thought one" }).click();
   await expect(page.getByText("The bin is empty.")).toBeVisible();
 
-  // Move to an area from a strip, then see it there.
+  // Sort this… from a strip's Move to: the sort card opens on it; file it, then see it there.
   await page.goto("/inbox");
   await page.getByRole("button", { name: "Move to: Pretend google one" }).click();
-  await page.getByRole("group", { name: "Move Pretend google one to" }).getByRole("button", { name: "Art" }).click();
+  await page.getByRole("group", { name: "Move Pretend google one to" }).getByRole("button", { name: "Sort this…" }).click();
+  const card = page.getByRole("region", { name: "Item to sort" });
+  await expect(card.getByText("Pretend google one")).toBeVisible();
+  await card.getByRole("button", { name: "To-do" }).click();
+  await card.getByRole("button", { name: "Art", exact: true }).click();
+  await expect(page.getByText("Filed as To-do in Art · Undo")).toBeVisible();
+  await page.goto("/inbox");
   await expect(list.getByRole("listitem")).toHaveCount(4);
   await page.goto("/area/art");
   await expect(page.getByText("Pretend google one")).toBeVisible();

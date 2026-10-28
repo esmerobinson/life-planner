@@ -120,6 +120,7 @@ export function TaskRow({
           itemId={item.id}
           areaId={item.areaId}
           kind={untyped ? undefined : item.kind}
+          untyped={untyped}
           today={today}
           onMoved={onMoved}
           label={item.title}

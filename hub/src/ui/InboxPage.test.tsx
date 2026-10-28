@@ -4,10 +4,11 @@ import type { ReactElement } from "react";
 import { vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { db } from "../data/db";
-import { createItem, listBin } from "../data/repo";
+import { createGoal, createItem, listBin } from "../data/repo";
 import { importBacklog } from "../import/backlog";
 import { AppShell } from "./AppShell";
 import { InboxPage } from "./InboxPage";
+import { SortPage } from "./SortPage";
 
 const TODAY = "2026-10-27";
 const BACKLOG = "- [ ] Water the ferns #home\n- [ ] Email Sam !p1\n- [ ] Call mum [due 2026-11-01]\n";
@@ -37,7 +38,8 @@ describe("Inbox strips (unsorted: no type yet)", () => {
     const del = within(actions).getByRole("button", { name: "Delete: Loose end" });
     expect(del).toHaveClass("icon");
     expect(del).toHaveAttribute("title", "Delete");
-    expect(row.querySelector(".strip-tray")).toBeNull();
+    // The only tray is the temporary More options (goal, priority, due).
+    expect(within(row.querySelector(".strip-tray") as HTMLElement).getByText("More options")).toBeInTheDocument();
   });
 
   it("a stored idea looks the same as a stored to-do: the stored kind is ignored until it is sorted", async () => {
@@ -52,24 +54,80 @@ describe("Inbox strips (unsorted: no type yet)", () => {
     expect(within(screen.getByRole("group", { name: "Move Musing to" })).queryByRole("group", { name: "Change to" })).toBeNull();
   });
 
-  it("no multi-select and no bulk tools, and no per-row filing controls", async () => {
+  it("no multi-select and no bulk tools, and no per-row area filing", async () => {
     await createItem({ kind: "task", title: "One", areaId: "inbox", priority: 2 }, TODAY);
     render(<InboxPage today={TODAY} />);
     await screen.findByText("One");
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
-    for (const gone of ["Select all shown", "Move selected to", "Move selected", "Archive selected", "More options"]) {
+    for (const gone of ["Select all shown", "Move selected to", "Move selected", "Archive selected", "File it", "Make it a goal"]) {
       expect(screen.queryByText(gone)).toBeNull();
     }
     expect(screen.queryByRole("group", { name: "File One in" })).toBeNull();
+    expect(screen.queryByLabelText("Area for One")).toBeNull();
   });
 
-  it("Move to an area from the inbox files it", async () => {
-    const it = await createItem({ kind: "task", title: "Stray", areaId: "inbox", priority: 2 }, TODAY);
+  it("Move to on an Inbox strip: Sort this…, then Archive and Delete; no areas, no This week", async () => {
+    await createItem({ kind: "task", title: "Stray", areaId: "inbox", priority: 2 }, TODAY);
     render(<InboxPage today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Move to: Stray" }));
-    await userEvent.click(within(screen.getByRole("group", { name: "Move Stray to" })).getByRole("button", { name: "Mind" }));
-    await vi.waitFor(() => expect(screen.queryByText("Stray")).toBeNull());
-    expect((await db.items.get(it.id))!.areaId).toBe("mind");
+    const menu = screen.getByRole("group", { name: "Move Stray to" });
+    expect(within(menu).getAllByRole("button").map((b) => b.textContent)).toEqual(["Sort this…", "Archive", "Delete"]);
+  });
+
+  it("Sort this… opens Sort one by one on that item", async () => {
+    await createItem({ kind: "task", title: "Older", areaId: "inbox", priority: 2 }, "2026-10-01");
+    await createItem({ kind: "task", title: "Chosen", areaId: "inbox", priority: 2 }, TODAY);
+    rtlRender(
+      <MemoryRouter initialEntries={["/inbox"]}>
+        <Routes>
+          <Route path="/inbox" element={<InboxPage today={TODAY} />} />
+          <Route path="/inbox/sort" element={<SortPage today={TODAY} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Move to: Chosen" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Move Chosen to" })).getByRole("button", { name: "Sort this…" }));
+    const card = await screen.findByRole("region", { name: "Item to sort" });
+    await vi.waitFor(() => expect(within(card).getByText("Chosen")).toBeInTheDocument());
+  });
+
+  it("More options (temporary, until the side panel) sets goal, priority and due; the item stays in the Inbox", async () => {
+    const goal = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
+    const it = await createItem({ kind: "idea", title: "Detailed", areaId: "inbox", priority: 2 }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    await screen.findByText("Detailed");
+    const row = rowOf("Detailed");
+    expect(row.querySelector(".strip-tray details")).not.toHaveAttribute("open");
+    await userEvent.click(within(row).getByText("More options"));
+    await userEvent.selectOptions(within(row).getByLabelText("Goal for Detailed"), goal.id);
+    await userEvent.selectOptions(within(row).getByLabelText("Priority for Detailed"), "1");
+    // An Inbox item has no type yet, so the due date is always offered.
+    await userEvent.type(within(row).getByLabelText("Due for Detailed"), "2026-11-05");
+    await userEvent.click(within(row).getByRole("button", { name: "Save Detailed" }));
+    await vi.waitFor(async () =>
+      expect(await db.items.get(it.id)).toMatchObject({ goalId: goal.id, priority: 1, due: "2026-11-05", areaId: "inbox" }),
+    );
+    expect(screen.getByText("Detailed")).toBeInTheDocument();
+  });
+
+  it("More options can clear the goal and the due date again", async () => {
+    const goal = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
+    const it = await createItem({ kind: "task", title: "Clear me", areaId: "inbox", priority: 3, goalId: goal.id, due: "2026-11-05" }, TODAY);
+    render(<InboxPage today={TODAY} />);
+    await screen.findByText("Clear me");
+    const row = rowOf("Clear me");
+    await userEvent.click(within(row).getByText("More options"));
+    expect(within(row).getByLabelText("Goal for Clear me")).toHaveValue(goal.id);
+    expect(within(row).getByLabelText("Priority for Clear me")).toHaveValue("3");
+    await userEvent.selectOptions(within(row).getByLabelText("Goal for Clear me"), "");
+    await userEvent.clear(within(row).getByLabelText("Due for Clear me"));
+    await userEvent.click(within(row).getByRole("button", { name: "Save Clear me" }));
+    await vi.waitFor(async () => {
+      const got = (await db.items.get(it.id))!;
+      expect(got.goalId).toBeUndefined();
+      expect(got.due).toBeUndefined();
+      expect(got.priority).toBe(3);
+    });
   });
 
   it("Delete moves it to the Bin with an Undo line; Undo brings it back", async () => {
