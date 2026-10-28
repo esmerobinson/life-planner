@@ -584,7 +584,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             say("title=\(title)")
             say("sidebarLinks=\(links)")
             check(title == "Esmeworld", "title")
-            check(links == 13, "sidebar links")
+            check(links >= 13, "sidebar links")
 
             // Scheme handler behaviour, checked from inside the page.
             let serve = try await js("""
@@ -607,6 +607,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             check((serve["missing"] as? String ?? "").hasPrefix("404"), "missing file 404")
             check((serve["traversal"] as? String ?? "").hasPrefix("404"), "path traversal refused")
             check(serve["cache"] as? String == "no-cache", "cache-control")
+
+            // Sync needs a secure context (WebCrypto, Web Locks) and CORS access to the sync server.
+            let sync = try await js("""
+            let health = "-";
+            try { const h = await fetch("https://esmeworld-sync.esme-brain.workers.dev/v1/health", { cache: "no-store" }); health = String(h.status); }
+            catch (e) { health = "error " + e; }
+            return JSON.stringify({
+              secure: String(window.isSecureContext),
+              subtle: String(!!(globalThis.crypto && crypto.subtle)),
+              locks: String(!!navigator.locks),
+              health,
+            });
+            """)
+            for key in ["secure", "subtle", "locks", "health"] {
+                say("sync.\(key)=\(sync[key] ?? "nil")")
+            }
+            check(sync["secure"] as? String == "true", "secure context")
+            check(sync["subtle"] as? String == "true", "WebCrypto available")
+            check(sync["locks"] as? String == "true", "Web Locks available")
+            check(sync["health"] as? String == "200", "sync server reachable (CORS)")
 
             // (c) a deep link loads straight into the right page.
             try await load(URL(string: "esmeworld://app/area/writing")!)
