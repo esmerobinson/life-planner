@@ -353,6 +353,30 @@ describe("syncOnce", () => {
     expect(await a.pending.count()).toBe(0);
   });
 
+  it("if applying a response fails part-way, nothing of it is kept, and the next run completes the sync", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const b = await device();
+    await b.items.bulkAdd([item("p"), item("q")]);
+    await syncOnce({ db: b, fetch: server.fetch });
+    const a = await device();
+    await a.items.add(item("mine"));
+    const realPut = a.syncMeta.put.bind(a.syncMeta);
+    const spy = vi.spyOn(a.syncMeta, "put").mockImplementation(((row: { key: string }) => {
+      if (row.key === "cursor") throw new Error("disk full"); // fails after the rows were written
+      return realPut(row as never);
+    }) as never);
+    await expect(syncOnce({ db: a, fetch: server.fetch })).rejects.toThrow();
+    spy.mockRestore();
+    expect(await a.items.get("p")).toBeUndefined(); // the half-applied rows were rolled back
+    expect((await a.pending.toArray()).map((p) => p.id)).toEqual(["mine"]); // still waiting
+    expect(await getMeta(a, "cursor")).toBe(0);
+
+    expect((await syncOnce({ db: a, fetch: server.fetch })).kind).toBe("ok");
+    expect(Object.keys(await titles(a)).sort()).toEqual(["mine", "p", "q"]);
+    expect(await a.pending.count()).toBe(0);
+    expect(server.rows.size).toBe(3);
+  });
+
   it("keeps asking while hasMore and pulls everything", async () => {
     const server = new FakeSyncServer(TOKEN, { pageSize: 7 });
     const b = await device();
