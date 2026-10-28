@@ -69,8 +69,37 @@ describe("VisionPage", () => {
     show(fetchFn);
     await waitFor(() => expect(pinLinks()).toHaveLength(4));
     expect(screen.getByText("from Pinterest · visionboardfuture · 4 pins · updated 3 hours ago")).toBeInTheDocument();
-    expect(screen.getByText(/Set up Sync on this device/)).toBeInTheDocument();
+    // It is already showing the board, so the line only says how to refresh it.
+    expect(screen.queryByText(/Set up Sync on this device to show/)).toBeNull();
+    expect(screen.getByText(/Set up Sync to refresh it/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sync" })).toHaveAttribute("href", "/sync");
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("asks for the passphrase (not set-up) when sync stopped after a refused passphrase", async () => {
+    await db.syncMeta.bulkPut([
+      { key: "serverUrl", value: "https://sync.example.test" },
+      { key: "needsPassphrase", value: true },
+    ]);
+    await cache(DEFAULT_BOARD, NOW - 60 * 60_000, 2);
+    const { fetchFn } = server(ok(3));
+    show(fetchFn);
+    await waitFor(() => expect(pinLinks()).toHaveLength(2));
+    expect(screen.getByText(/passphrase was not accepted/)).toBeInTheDocument();
+    expect(screen.queryByText(/Set up Sync/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("stops offering Refresh after the server refuses the token (each try would count against the shared limit)", async () => {
+    await configure();
+    await cache(DEFAULT_BOARD, NOW - STALE_MS, 3);
+    const { fetchFn } = server(() => ({ status: 401 }));
+    show(fetchFn);
+    expect(await screen.findByText(/passphrase was not accepted/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(pinLinks()).toHaveLength(3);
   });
 
   it("shows a fresh stored board straight away without asking again", async () => {

@@ -127,10 +127,20 @@ export async function readCachedBoard(db: HubDB): Promise<CachedBoard | null> {
   return { board: value.board, fetchedAt: value.fetchedAt, pins: safePins(value.pins) };
 }
 
-/** True when this device has a sync address and token (the board comes through the sync server). */
-export async function syncConfigured(db: HubDB): Promise<boolean> {
-  const [url, token] = await Promise.all([db.syncMeta.get("serverUrl"), db.syncMeta.get("token")]);
-  return typeof url?.value === "string" && url.value !== "" && typeof token?.value === "string" && token.value !== "";
+/**
+ * Whether the board can be asked for (it comes through the sync server): "on" with an address
+ * and token; "needs-passphrase" after sync removed a refused token; otherwise "off".
+ */
+export type SyncAccess = "on" | "needs-passphrase" | "off";
+
+export async function syncAccess(db: HubDB): Promise<SyncAccess> {
+  const [url, token, refused] = await Promise.all([
+    db.syncMeta.get("serverUrl"),
+    db.syncMeta.get("token"),
+    db.syncMeta.get("needsPassphrase"),
+  ]);
+  if (typeof url?.value === "string" && url.value !== "" && typeof token?.value === "string" && token.value !== "") return "on";
+  return refused?.value === true ? "needs-passphrase" : "off";
 }
 
 /**

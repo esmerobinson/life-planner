@@ -12,6 +12,7 @@ import {
   safePins,
   saveBoardSetting,
   STALE_MS,
+  syncAccess,
 } from "./board";
 
 // Fictional pins only.
@@ -206,5 +207,17 @@ describe("readCachedBoard", () => {
     expect(await readCachedBoard(db)).toBeNull();
     await db.syncMeta.put({ key: PINS_META_KEY, value: { board: DEFAULT_BOARD, fetchedAt: "x", pins: [] } });
     expect(await readCachedBoard(db)).toBeNull();
+  });
+});
+
+describe("syncAccess", () => {
+  it("is on with an address and token, needs-passphrase after a refused one, else off", async () => {
+    expect(await syncAccess(db)).toBe("off");
+    await db.syncMeta.put({ key: "serverUrl", value: ADDRESS });
+    expect(await syncAccess(db)).toBe("off");
+    await db.syncMeta.put({ key: "needsPassphrase", value: true });
+    expect(await syncAccess(db)).toBe("needs-passphrase");
+    await db.syncMeta.put({ key: "token", value: TOKEN });
+    expect(await syncAccess(db)).toBe("on");
   });
 });

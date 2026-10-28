@@ -9,7 +9,8 @@ import {
   readBoardSetting,
   readCachedBoard,
   saveBoardSetting,
-  syncConfigured,
+  syncAccess,
+  type SyncAccess,
   type CachedBoard,
   type FetchOutcome,
 } from "../vision/board";
@@ -19,10 +20,14 @@ const AGE_TICK_MS = 60_000;
 
 type Problem = Exclude<FetchOutcome["kind"], "ok">;
 
-function ProblemLine({ problem }: { problem: Problem }) {
+function ProblemLine({ problem, showingBoard }: { problem: Problem; showingBoard: boolean }) {
   switch (problem) {
     case "not-configured":
-      return (
+      return showingBoard ? (
+        <p className="vision-note">
+          Set up Sync to refresh it. <Link to="/sync">Sync</Link>
+        </p>
+      ) : (
         <p className="vision-note">
           Set up Sync on this device to show your Pinterest board here. <Link to="/sync">Sync</Link>
         </p>
@@ -93,9 +98,9 @@ export function VisionPage({
     void (async () => {
       let which: string;
       let cached: CachedBoard | null;
-      let hasSync: boolean;
+      let access: SyncAccess;
       try {
-        [which, cached, hasSync] = await Promise.all([readBoardSetting(db), readCachedBoard(db), syncConfigured(db)]);
+        [which, cached, access] = await Promise.all([readBoardSetting(db), readCachedBoard(db), syncAccess(db)]);
       } catch {
         if (active) setProblem("failed");
         return;
@@ -104,10 +109,11 @@ export function VisionPage({
       current.current = which;
       setBoard(which);
       setDraft(which);
-      setConfigured(hasSync);
+      setConfigured(access === "on");
       const mine = cached && cached.board === which ? cached : null;
       setShown(mine);
-      if (!hasSync) setProblem("not-configured");
+      if (access === "off") setProblem("not-configured");
+      else if (access === "needs-passphrase") setProblem("needs-passphrase");
       else if (!mine || isStale(mine.fetchedAt, now())) void refresh(which);
     })();
     const tick = setInterval(() => setClock(now()), AGE_TICK_MS);
@@ -139,9 +145,12 @@ export function VisionPage({
     setBoard(parsed.board);
     setDraft(parsed.board);
     if (shown?.board !== parsed.board) setShown(null);
-    if (configured) void refresh(parsed.board);
+    if (canAsk) void refresh(parsed.board);
   }
 
+  // After a refused token, every try would count against the rate limit sync shares, so
+  // nothing is sent until the passphrase is entered again on the Sync page.
+  const canAsk = configured === true && problem !== "needs-passphrase";
   const slug = board ? board.split("/")[1] : "";
   const pins = shown?.pins ?? [];
 
@@ -155,7 +164,7 @@ export function VisionPage({
             {describeAge(shown.fetchedAt, clock)}
           </span>
         )}
-        {configured && board && (
+        {canAsk && board && (
           <button type="button" className="btn-secondary" onClick={() => void refresh(board)} disabled={loading}>
             Refresh
           </button>
@@ -203,7 +212,7 @@ export function VisionPage({
           </form>
         </details>
       )}
-      {problem && <ProblemLine problem={problem} />}
+      {problem && <ProblemLine problem={problem} showingBoard={shown !== null} />}
       {!shown && loading && <p className="vision-note">Loading your board…</p>}
       {shown && pins.length === 0 && <p className="vision-note">This board has no pins yet.</p>}
       {pins.length > 0 && (
