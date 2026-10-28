@@ -8,7 +8,7 @@ import { corsHeaders, preflightHeaders } from "./cors";
 import type { Env } from "./env";
 import { exportResponse } from "./export";
 import { errorResponse, HttpError, json, jsonText, MAX_BODY_BYTES, readJsonBody } from "./http";
-import { checkGlobalLimit, checkIpLimit, clientIp, recordFailure } from "./ratelimit";
+import { checkBucket, clientBucket, recordFailure } from "./ratelimit";
 import { DEFAULT_CHUNK_BYTES, runSync, validateSyncRequest } from "./sync";
 
 export type { Env } from "./env";
@@ -69,26 +69,19 @@ async function route(path: string, request: Request, env: Env, deps: Deps): Prom
 }
 
 /**
- * Order matters: an IP over its failure limit gets 429 even with the correct token;
- * the global cap only applies to requests that do NOT present the correct token.
- * Attempts answered with 429 are not recorded (so the limits cannot be extended forever
- * and D1 writes stay bounded).
+ * Correct token: 429 if the caller's bucket is at its limit (even then: no oracle), else pass.
+ * Wrong or missing token: one atomic conditional insert records it while the bucket is under
+ * its limit; 429 if it was not recorded or the global cap was already reached, else 401.
  */
 async function authenticate(request: Request, env: Env, now: number): Promise<void> {
   const expected = configuredHash(env.SYNC_TOKEN_HASH);
   if (!expected) throw new HttpError(500, "server_misconfigured");
 
-  const ip = clientIp(request);
-  const ipLimit = await checkIpLimit(env.DB, ip, now);
-  if (ipLimit.limited) throw new HttpError(429, "rate_limited", { "Retry-After": String(ipLimit.retryAfter) });
-
-  if (await presentsValidToken(request, expected)) return;
-
-  const globalLimit = await checkGlobalLimit(env.DB, now);
-  if (globalLimit.limited) throw new HttpError(429, "rate_limited", { "Retry-After": String(globalLimit.retryAfter) });
-
-  await recordFailure(env.DB, ip, now);
-  throw new HttpError(401, "unauthorized", { "WWW-Authenticate": "Bearer" });
+  const bucket = clientBucket(request);
+  const valid = await presentsValidToken(request, expected);
+  const limit = valid ? await checkBucket(env.DB, bucket, now) : await recordFailure(env.DB, bucket, now);
+  if (limit.limited) throw new HttpError(429, "rate_limited", { "Retry-After": String(limit.retryAfter) });
+  if (!valid) throw new HttpError(401, "unauthorized", { "WWW-Authenticate": "Bearer" });
 }
 
 function finalize(request: Request, response: Response, preflight: boolean): Response {
