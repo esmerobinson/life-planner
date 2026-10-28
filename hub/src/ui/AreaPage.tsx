@@ -91,29 +91,38 @@ export function AreaPage({ today }: { today: ISODate }) {
       {saveError && <p className="form-message">{saveError}</p>}
       {empty && <p>Nothing here yet.</p>}
       {tasks.length > 0 && (
-        <ul aria-label="To-dos">
-          {tasks.map((it) => (
-            <TaskRow key={it.id} item={it} today={today} onTick={(i) => void tick(i)} onMoved={refresh} />
-          ))}
-        </ul>
+        <section>
+          {view === "all" && <h2>To-dos</h2>}
+          <ul aria-label="To-dos">
+            {tasks.map((it) => (
+              <TaskRow key={it.id} item={it} today={today} onTick={(i) => void tick(i)} onMoved={refresh} />
+            ))}
+          </ul>
+        </section>
       )}
       {ideas.length > 0 && (
-        <ul aria-label="Ideas">
-          {ideas.map((it) => (
-            <li key={it.id} className="today-row">
-              <span className="today-title">{it.title}</span>
-              {it.notes && <span>{it.notes}</span>}
-              <MoveToMenu itemId={it.id} today={today} onMoved={refresh} label={it.title} />
-            </li>
-          ))}
-        </ul>
+        <section>
+          {view === "all" && <h2>Ideas</h2>}
+          <ul aria-label="Ideas">
+            {ideas.map((it) => (
+              <li key={it.id} className="today-row">
+                <span className="today-title">{it.title}</span>
+                {it.notes && <span>{it.notes}</span>}
+                <MoveToMenu itemId={it.id} today={today} onMoved={refresh} label={it.title} />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {areaGoals.length > 0 && (
-        <ul aria-label="Goals" className="goal-list">
-          {areaGoals.map((g) => (
-            <GoalCard key={g.id} goal={g} items={items} today={today} />
-          ))}
-        </ul>
+        <section>
+          {view === "all" && <h2>Goals</h2>}
+          <ul aria-label="Goals" className="goal-list">
+            {areaGoals.map((g) => (
+              <GoalCard key={g.id} goal={g} items={items} today={today} />
+            ))}
+          </ul>
+        </section>
       )}
       {(view === "all" || view === "tasks") && (
         <DoneSection

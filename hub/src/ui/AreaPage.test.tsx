@@ -136,4 +136,50 @@ describe("AreaPage", () => {
     renderArea("inbox");
     expect(screen.getByText("That area does not exist.")).toBeInTheDocument();
   });
+
+  describe("All view sections", () => {
+    const headings = () => screen.queryAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    const SECTIONS = ["To-dos", "Ideas", "Goals"];
+
+    it("groups a to-do, an idea and a goal under three headings in order", async () => {
+      await createItem({ kind: "task", title: "A task", areaId: "art", priority: 3 }, TODAY);
+      await createItem({ kind: "idea", title: "An idea", areaId: "art", priority: 3 }, TODAY);
+      await createGoal({ title: "A goal", areaId: "art", kind: "practice" }, TODAY);
+      renderArea("art");
+      await screen.findByText("A task");
+      expect(headings().filter((h) => SECTIONS.includes(h ?? ""))).toEqual(SECTIONS);
+      const sec = (name: string) => screen.getByRole("heading", { level: 2, name }).closest("section") as HTMLElement;
+      expect(within(sec("To-dos")).getByText("A task")).toBeInTheDocument();
+      expect(within(sec("To-dos")).queryByText("An idea")).toBeNull();
+      expect(within(sec("To-dos")).queryByText("A goal")).toBeNull();
+      expect(within(sec("Ideas")).getByText("An idea")).toBeInTheDocument();
+      expect(within(sec("Ideas")).queryByText("A task")).toBeNull();
+      expect(within(sec("Goals")).getByText("A goal")).toBeInTheDocument();
+      expect(within(sec("Goals")).queryByText("An idea")).toBeNull();
+    });
+
+    it("shows only the Ideas heading when only an idea exists", async () => {
+      await createItem({ kind: "idea", title: "An idea", areaId: "art", priority: 3 }, TODAY);
+      renderArea("art");
+      await screen.findByText("An idea");
+      expect(headings().filter((h) => SECTIONS.includes(h ?? ""))).toEqual(["Ideas"]);
+    });
+
+    it("shows only Nothing here yet when empty", async () => {
+      renderArea("art");
+      expect(await screen.findByText("Nothing here yet.")).toBeInTheDocument();
+      expect(headings().filter((h) => SECTIONS.includes(h ?? ""))).toEqual([]);
+    });
+
+    it("a single filter shows just that group with no subheading", async () => {
+      await createItem({ kind: "task", title: "A task", areaId: "art", priority: 3 }, TODAY);
+      await createItem({ kind: "idea", title: "An idea", areaId: "art", priority: 3 }, TODAY);
+      renderArea("art");
+      await screen.findByText("A task");
+      await userEvent.click(within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "To-dos" }));
+      expect(screen.getByText("A task")).toBeInTheDocument();
+      expect(screen.queryByText("An idea")).toBeNull();
+      expect(headings().filter((h) => SECTIONS.includes(h ?? ""))).toEqual([]);
+    });
+  });
 });

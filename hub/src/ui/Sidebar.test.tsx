@@ -15,8 +15,8 @@ describe("Sidebar", () => {
     renderAt("/");
     const labels = screen.getAllByRole("link").map((a) => a.textContent?.trim());
     expect(labels).toEqual([
-      "Home", "Today", "Goals", "Writing", "Art", "Content", "Mind", "Body",
-      "Tech projects", "Production", "Admin", "Journal", "Vision board",
+      "Home", "Today", "Goals", "Admin", "Writing", "Art", "Content", "Mind", "Body",
+      "Tech projects", "Production", "Journal", "Vision board",
     ]);
   });
 
@@ -35,8 +35,8 @@ describe("Sidebar", () => {
     renderAt("/");
     const groups = screen.getAllByRole("group");
     expect(groups).toHaveLength(3);
-    expect(within(groups[0]).getAllByRole("link")).toHaveLength(3);
-    expect(within(groups[1]).getAllByRole("link")).toHaveLength(8);
+    expect(within(groups[0]).getAllByRole("link")).toHaveLength(4);
+    expect(within(groups[1]).getAllByRole("link")).toHaveLength(7);
     expect(within(groups[2]).getAllByRole("link")).toHaveLength(2);
     expect(screen.getByRole("group", { name: "Overview" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Areas" })).toBeInTheDocument();

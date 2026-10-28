@@ -10,10 +10,10 @@ describe("areas", () => {
 
   it("NAV has thirteen entries in order with exact labels and paths", () => {
     expect(NAV.map((n) => [n.label, n.path])).toEqual([
-      ["Home", "/"], ["Today", "/today"], ["Goals", "/goals"],
+      ["Home", "/"], ["Today", "/today"], ["Goals", "/goals"], ["Admin", "/area/admin"],
       ["Writing", "/area/writing"], ["Art", "/area/art"], ["Content", "/area/content"],
       ["Mind", "/area/mind"], ["Body", "/area/body"],
-      ["Tech projects", "/area/tech"], ["Production", "/area/production"], ["Admin", "/area/admin"],
+      ["Tech projects", "/area/tech"], ["Production", "/area/production"],
       ["Journal", "/journal"], ["Vision board", "/vision"],
     ]);
   });
