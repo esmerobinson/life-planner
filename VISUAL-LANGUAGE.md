@@ -17,6 +17,8 @@ The source for art direction, per `CLAUDE.md`. Status of each line: **said** = E
 - Hates how goals are displayed everywhere. **Chosen: goals are cards (round-2 option 3A)** to set them apart from tasks: one `--panel` card per goal, area tile, chips for area and "By <date>" / "Practice", overall bar and this-month bar, next step in a `--row` box.
 - **The Goals page is grouped by area** ("categories"), one heading per area.
 - Wants a way to see done tasks (a dropdown/fold-out) and a small "ticked off this month" progress at the top of each area, "just as a little nice thing". **Chosen: round-2 option 4A**: a `--panel` box at the top of each area, bold "14 ticked off in October", right side "last month 11", a progress bar (this month vs last month's total). At the bottom of the to-dos a fold-out "Done (N)" (closed by default) listing done tasks as strips with a ticked box, struck-through title and the done date; unticking brings one back.
+- Hates the current Inbox sorting flow. Wants: choose idea / to-do / goal first, then the area; plus Delete as well as Archive. **Chosen: "One at a time" sort mode**: a "Sort one by one" button on the Inbox opens one item big in the middle (a `--panel` card): title, source line, "What is it?" with three soft pills (To-do, Idea, Goal), then "Which area?" with the area tiles (sidebar tile colours and icons), a footer with Archive, Delete and "Skip →", and "1 of 95" under the card. Filing moves straight to the next item. The normal Inbox list stays.
+- **Delete goes to a Bin you can empty** (like the Mac's Trash): restore or empty from a Bin page.
 - Round-2 mockup file (for reference, not in repo): option IDs 1A–1C, 2A–2D, 3A–3C, 4A–4B.
 
 ## Extracted palette (from reference screenshots, 2026-10-27)
