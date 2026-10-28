@@ -21,6 +21,24 @@ button.btn-secondary {
   background: var(--track);
 }
 
+/* Native file inputs: the button part takes the secondary soft pill; the
+   "No file chosen" text stays in the normal text colour. Same values as the
+   secondary pill (--track #d4d1c3, --text #3a412f); nothing new. */
+input[type="file"] {
+  color: var(--text);
+}
+
+input[type="file"]::file-selector-button {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 0;
+  background: #d4d1c3;
+  color: #3a412f;
+  font: inherit;
+  margin-right: 8px;
+  cursor: default;
+}
+
 button[aria-pressed] {
   padding: 6px 14px;
   border-radius: 999px;

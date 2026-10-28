@@ -60,6 +60,22 @@ describe("controls.css (approved mockup A, soft pills)", () => {
     expect(rule("button.btn-secondary")).toContain("background: var(--track)");
   });
 
+  it("styles the native file input button as the soft-pill secondary", () => {
+    const r = rule('input[type="file"]::file-selector-button');
+    expect(r.split(";").map((d) => d.trim()).filter(Boolean)).toEqual([
+      "padding: 8px 16px",
+      "border-radius: 999px",
+      "border: 0",
+      "background: #d4d1c3",
+      "color: #3a412f",
+      "font: inherit",
+      "margin-right: 8px",
+      "cursor: default",
+    ]);
+    expect(rule('input[type="file"]')).toContain("color: var(--text)");
+    expect(allowed.has("#d4d1c3") && allowed.has("#3a412f")).toBe(true);
+  });
+
   it("styles toggle buttons", () => {
     const r = rule("button[aria-pressed]");
     expect(r).toContain("padding: 6px 14px");
