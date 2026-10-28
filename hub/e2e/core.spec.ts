@@ -1,0 +1,140 @@
+import { expect, test, type Page } from "@playwright/test";
+import { pageDate } from "./helpers";
+
+async function expectCalm(page: Page, text: string) {
+  await expect(page.getByText(text).first()).toBeVisible();
+  const body = await page.locator("body").innerText();
+  expect(body).not.toMatch(/NaN|undefined|error/i);
+}
+
+test("first run, import, file, tick, move, persist and backup round trip", async ({ page }, testInfo) => {
+  await page.goto("/");
+
+  // Calm empty states.
+  await expectCalm(page, "Nothing planned for today.");
+  await page.goto("/today");
+  await expectCalm(page, "Nothing planned for today.");
+  await page.goto("/goals");
+  await expectCalm(page, "No goals yet.");
+  await page.goto("/inbox");
+  await expectCalm(page, "Nothing waiting in the inbox.");
+
+  // Import a fictional backlog (one Writing item, one overdue).
+  const overdue = await pageDate(page, -3);
+  const backlog = [
+    "## Writing",
+    "- [ ] Draft the fictional zine intro",
+    "## Active",
+    "- [ ] Alpha pretend errand",
+    "- [ ] Beta pretend errand",
+    "- [ ] Gamma pretend errand",
+    `- [ ] Overdue pretend errand [due ${overdue}]`,
+  ].join("\n");
+  await page.getByLabel("Backlog text").fill(backlog);
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(page.getByText("Added 5, already had 0")).toBeVisible();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(page.getByText("Added 0, already had 5")).toBeVisible();
+
+  // Writing item filed by its heading.
+  await page.goto("/area/writing");
+  await expect(page.getByText("Draft the fictional zine intro")).toBeVisible();
+
+  // Bulk move two Inbox items to Art.
+  await page.goto("/inbox");
+  await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(4);
+  await page.getByLabel("Select Alpha pretend errand").check();
+  await page.getByLabel("Select Beta pretend errand").check();
+  await page.getByLabel("Move selected to").selectOption({ label: "Art" });
+  await page.getByRole("button", { name: "Move selected" }).click();
+  await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(2);
+  await page.goto("/area/art");
+  await expect(page.getByText("Alpha pretend errand")).toBeVisible();
+  await expect(page.getByText("Beta pretend errand")).toBeVisible();
+
+  // File one item with the per-row File it.
+  await page.goto("/inbox");
+  await page.getByLabel("Area for Overdue pretend errand").selectOption({ label: "Admin" });
+  await page.getByRole("button", { name: "File Overdue pretend errand" }).click();
+  await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(1);
+
+  // Today shows the overdue pick; tick it.
+  await page.goto("/today");
+  const row = page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
+  await expect(row).toBeVisible();
+  await expect(row.getByText("OVERDUE", { exact: true })).toBeVisible();
+  await row.getByRole("button", { name: "Done: Overdue pretend errand" }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toHaveCount(0);
+
+  // It sits under Done on its area page, with Undo; Undo brings it back.
+  await page.goto("/area/admin");
+  await page.getByText("Done", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "Undo: Overdue pretend errand" })).toBeVisible();
+  await page.getByRole("button", { name: "Undo: Overdue pretend errand" }).click();
+  await expect(page.getByRole("button", { name: "Undo: Overdue pretend errand" })).toHaveCount(0);
+  await page.goto("/today");
+  await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toBeVisible();
+
+  // Move it to Tomorrow: it leaves Today.
+  await page.getByRole("button", { name: "Move: Overdue pretend errand" }).click();
+  await page.getByRole("button", { name: "Tomorrow", exact: true }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toHaveCount(0);
+
+  // Reload: persisted.
+  await page.reload();
+  await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toHaveCount(0);
+  await page.goto("/area/art");
+  await expect(page.getByText("Alpha pretend errand")).toBeVisible();
+  await page.goto("/inbox");
+  await expect(page.getByText("Gamma pretend errand")).toBeVisible();
+
+  // When the clock reads tomorrow, the pinned item is back on Today.
+  await page.clock.setFixedTime(new Date(Date.now() + 24 * 3600 * 1000));
+  await page.goto("/today");
+  await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toBeVisible();
+  await page.clock.resume();
+  await page.goto("/today");
+
+  // Backup, wipe, restore with Replace.
+  await page.goto("/backup");
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download backup" }).click();
+  const download = await downloadPromise;
+  const file = testInfo.outputPath("backup.json");
+  await download.saveAs(file);
+
+  await page.evaluate(async () => {
+    const dbs = await indexedDB.databases();
+    await Promise.all(
+      dbs.map(
+        (d) =>
+          new Promise<void>((res, rej) => {
+            const r = indexedDB.deleteDatabase(d.name!);
+            r.onsuccess = () => res();
+            r.onerror = () => rej(r.error);
+            r.onblocked = () => res();
+          }),
+      ),
+    );
+  });
+  await page.goto("/inbox");
+  await page.reload();
+  await expectCalm(page, "Nothing waiting in the inbox.");
+
+  await page.goto("/backup");
+  await page.locator('input[type="file"]').setInputFiles(file);
+  await page.getByLabel("Replace everything").check();
+  await page.getByLabel("I understand replace removes what is here now").check();
+  await page.getByRole("button", { name: "Replace", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Added 5 tasks");
+
+  await page.goto("/area/writing");
+  await expect(page.getByText("Draft the fictional zine intro")).toBeVisible();
+  await page.goto("/area/art");
+  await expect(page.getByText("Alpha pretend errand")).toBeVisible();
+  await expect(page.getByText("Beta pretend errand")).toBeVisible();
+  await page.goto("/inbox");
+  await expect(page.getByText("Gamma pretend errand")).toBeVisible();
+  await page.goto("/area/admin");
+  await expect(page.getByText("Overdue pretend errand")).toBeVisible();
+});

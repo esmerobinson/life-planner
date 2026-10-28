@@ -8,6 +8,12 @@ A local React + TypeScript app for planning your days, goals and areas.
     npm run dev      # start the dev server (Vite prints the local URL)
     npm test         # run the test suite
     npm run build    # type-check and build
+    npm run e2e      # real-browser tests on your installed Chrome
+
+The e2e tests reuse the dev server if it is already running on 127.0.0.1:5173
+(or start one). Each test uses a fresh browser profile, so your own data is
+never touched. The phone-width checks are marked `fixme` until the phone design
+round.
 
 ## Where your data lives
 
