@@ -190,59 +190,41 @@ test("Escape goes back to the Inbox", async ({ page }) => {
   await expect(page).toHaveURL(/\/inbox$/);
 });
 
-test.describe("phone width (390px)", () => {
+test.describe("phone width (390px), in the phone layout", () => {
   test.use({ viewport: { width: 390, height: 844 } });
-
-  /** Hides the 220px sidebar to see the content at the full phone width (the phone round removes it). */
-  async function contentAtFullWidth(page: Page) {
-    await page.addStyleTag({ content: ".sidebar { display: none; }" });
-  }
 
   async function expectNoSideScroll(page: Page) {
     const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(wide).toBe(false);
   }
 
-  test("inbox, both sort steps and the Bin fit the phone width", async ({ page }) => {
+  test("inbox, both sort steps and the Bin fit the phone width; the Bin is reachable from Home", async ({ page }) => {
     await seedInbox(page);
     await page.goto("/inbox");
-    await expect(page.getByText("5 to sort")).toBeAttached();
+    await expect(page.getByText("5 to sort")).toBeVisible();
     await shoot(page, "inbox-list-390");
-    await contentAtFullWidth(page);
-    await shoot(page, "inbox-list-390-content");
     await expectNoSideScroll(page);
 
-    await page.goto("/inbox/sort");
-    await contentAtFullWidth(page);
+    await page.getByRole("link", { name: "Sort one by one" }).click();
     await expect(card(page)).toBeVisible();
-    await shoot(page, "sort-step1-390-content");
+    await shoot(page, "sort-step1-390");
     await expectNoSideScroll(page);
     const cardBox = (await card(page).boundingBox())!;
-    expect(cardBox.width).toBeGreaterThan(390 - 2 * 24 - 2); // full width inside the content padding
+    expect(cardBox.width).toBeGreaterThan(390 - 2 * 16 - 2); // full width inside the 16px gutters
     await card(page).getByRole("button", { name: "Idea" }).click();
     // Three apps per row on a phone.
     const apps = card(page).getByRole("group", { name: "Which area?" }).getByRole("button");
     const tops = await apps.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
     expect(tops.filter((t) => t === tops[0])).toHaveLength(3);
-    await shoot(page, "sort-step2-390-content");
+    await shoot(page, "sort-step2-390");
     await expectNoSideScroll(page);
 
     await card(page).getByRole("button", { name: "Delete" }).click();
     await expect(page.getByText("Moved to the Bin · Undo")).toBeVisible();
-    await page.goto("/bin");
-    await expect(page.getByRole("list", { name: "In the bin" })).toBeAttached();
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "More" }).getByRole("link", { name: "Bin" }).click();
+    await expect(page.getByRole("list", { name: "In the bin" })).toBeVisible();
     await shoot(page, "bin-390");
-    await contentAtFullWidth(page);
-    await shoot(page, "bin-390-content");
     await expectNoSideScroll(page);
-  });
-
-  test("the sort card with the real sidebar (until the phone layout lands)", async ({ page }) => {
-    await seedInbox(page);
-    await page.goto("/inbox/sort");
-    await expect(card(page)).toBeAttached();
-    await shoot(page, "sort-step1-390");
-    await card(page).getByRole("button", { name: "Goal" }).click();
-    await shoot(page, "sort-step2-390");
   });
 });
