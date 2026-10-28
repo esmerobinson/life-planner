@@ -245,8 +245,9 @@ export async function listItems(
   );
 }
 
+/** Live goals, for every list, picker and count. Bin goals (deleted or purged) never appear. */
 export async function listGoals(): Promise<Goal[]> {
-  return db.goals.toArray();
+  return (await db.goals.toArray()).filter((g) => g.status === undefined);
 }
 
 export async function toggleMilestone(goalId: string, milestoneId: string): Promise<void> {
@@ -310,11 +311,12 @@ export async function restoreFromBin(id: string, today: ISODate): Promise<void> 
 /**
  * Empty the Bin, in ONE transaction. Sync never hard-deletes, so each deleted row is
  * replaced by a content-free tombstone (status "purged": no title, notes, links, tags,
- * source or dates beyond createdAt/touchedAt) that syncs like any other change. Returns
- * how many were emptied.
+ * source or dates beyond createdAt/touchedAt) that syncs like any other change. Deleted
+ * goals become tombstones the same way (no title, why, cadence, notes, milestones,
+ * deadline, target or source). Returns how many were emptied (items and goals).
  */
 export async function emptyBin(today: ISODate): Promise<number> {
-  return db.transaction("rw", db.items, async () => {
+  return db.transaction("rw", db.items, db.goals, async () => {
     const bin = await db.items.where("status").equals("deleted").toArray();
     const tombs: Item[] = bin.map((i) => ({
       id: i.id,
@@ -328,7 +330,45 @@ export async function emptyBin(today: ISODate): Promise<number> {
       touchedAt: today,
     }));
     if (tombs.length) await db.items.bulkPut(tombs);
-    return tombs.length;
+    const goals = (await db.goals.toArray()).filter((g) => g.status === "deleted");
+    const goalTombs: Goal[] = goals.map((g) => ({
+      id: g.id,
+      title: "",
+      areaId: g.areaId,
+      kind: g.kind,
+      milestones: [],
+      createdAt: g.createdAt,
+      status: "purged",
+    }));
+    if (goalTombs.length) await db.goals.bulkPut(goalTombs);
+    return tombs.length + goalTombs.length;
+  });
+}
+
+/** Delete a goal: it goes to the Bin. Its tasks keep their goalId (it shows again on restore). */
+export async function deleteGoal(id: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.goals, async () => {
+    const goal = await db.goals.get(id);
+    if (!goal || goal.status !== undefined) return;
+    await db.goals.put({ ...goal, status: "deleted", deletedAt: today });
+  });
+}
+
+/** Deleted goals in the Bin, newest deletion first. */
+export async function listGoalBin(): Promise<Goal[]> {
+  const bin = (await db.goals.toArray()).filter((g) => g.status === "deleted");
+  return bin.sort(
+    (a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? "") || (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+  );
+}
+
+/** Restore a goal from the Bin, as it was. */
+export async function restoreGoalFromBin(id: string, _today: ISODate): Promise<void> {
+  await db.transaction("rw", db.goals, async () => {
+    const goal = await db.goals.get(id);
+    if (!goal || goal.status !== "deleted") return;
+    const { status: _s, deletedAt: _d, ...rest } = goal;
+    await db.goals.put(rest);
   });
 }
 

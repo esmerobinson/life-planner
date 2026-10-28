@@ -23,7 +23,7 @@ export const INVALID_BACKUP =
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
 
 /** Rows emptied from the Bin stay in files as tombstones but are never counted for the person. */
-const notPurged = (i: Item) => i.status !== "purged";
+const notPurged = (r: Item | Goal) => r.status !== "purged";
 
 const hasDuplicateIds =(rows: { id: string }[]) => new Set(rows.map((r) => r.id)).size !== rows.length;
 
@@ -98,7 +98,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.syncMeta.delete("firstPullDone");
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
-      return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.length, skipped: 0 };
+      return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0 };
     }
     const haveItems = new Set(await db.items.toCollection().primaryKeys());
     const haveGoals = new Set(await db.goals.toCollection().primaryKeys());
@@ -108,10 +108,12 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     await db.goals.bulkAdd(newGoals);
     const fileVisible = file.items.filter(notPurged).length;
     const addedVisible = newItems.filter(notPurged).length;
+    const fileGoalsVisible = file.goals.filter(notPurged).length;
+    const addedGoalsVisible = newGoals.filter(notPurged).length;
     return {
       addedItems: addedVisible,
-      addedGoals: newGoals.length,
-      skipped: fileVisible - addedVisible + (file.goals.length - newGoals.length),
+      addedGoals: addedGoalsVisible,
+      skipped: fileVisible - addedVisible + (fileGoalsVisible - addedGoalsVisible),
     };
   });
 }

@@ -1,7 +1,7 @@
 import Dexie from "dexie";
 import { vi } from "vitest";
 import { db, HubDB } from "../data/db";
-import { createItem, deleteItem, emptyBin, listBin } from "../data/repo";
+import { createGoal, createItem, deleteGoal, deleteItem, emptyBin, listBin, listGoals } from "../data/repo";
 import { FakeSyncServer } from "./fakeServer";
 import { saveSyncSettings, syncOnce } from "./engine";
 
@@ -71,5 +71,37 @@ describe("the Bin through sync", () => {
     expect(await phone.pending.count()).toBe(0);
     expect(await db.pending.count()).toBe(0);
     expect(await listBin()).toEqual([]);
+  });
+
+  it("a deleted goal, then its purged tombstone, reach the other device valid and content-free", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    await saveSyncSettings(db, { serverUrl: SERVER, token: TOKEN });
+    const g = await createGoal(
+      { title: "Made-up goal", areaId: "art", kind: "practice", why: "a reason", milestones: [{ id: "m", title: "x", done: false }] },
+      "2026-10-20",
+    );
+    await syncOnce({ db, fetch: server.fetch });
+    const phone = await otherDevice();
+    await syncOnce({ db: phone, fetch: server.fetch });
+    expect((await phone.goals.get(g.id))!.title).toBe("Made-up goal");
+
+    clock += 60_000;
+    await deleteGoal(g.id, "2026-10-28");
+    await syncOnce({ db, fetch: server.fetch });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    expect(await phone.goals.get(g.id)).toMatchObject({ status: "deleted", deletedAt: "2026-10-28", title: "Made-up goal" });
+
+    clock += 60_000;
+    await emptyBin("2026-10-28");
+    await syncOnce({ db, fetch: server.fetch });
+    expect(server.data("goals", g.id)).toMatchObject({ status: "purged", title: "", milestones: [] });
+    expect(server.data("goals", g.id)!.why).toBeUndefined();
+    await syncOnce({ db: phone, fetch: server.fetch });
+    const onPhone = (await phone.goals.get(g.id))!;
+    expect(onPhone).toMatchObject({ status: "purged", title: "", milestones: [] });
+    expect(onPhone.why).toBeUndefined();
+    expect(await phone.quarantine.count()).toBe(0);
+    expect(await phone.pending.count()).toBe(0);
+    expect(await listGoals()).toEqual([]);
   });
 });

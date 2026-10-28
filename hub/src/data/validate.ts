@@ -67,6 +67,12 @@ export function validGoal(r: unknown): r is Goal {
     optText(r.why) && optText(r.cadence) && optText(r.notes) &&
     validGoalSource(r.source) &&
     optStamp(r.updatedAt) &&
+    (r.status === undefined || r.status === "deleted" || r.status === "purged") &&
+    optDate(r.deletedAt) &&
+    // An emptied-from-the-Bin tombstone carries no content.
+    (r.status !== "purged" ||
+      (r.title === "" && r.why === undefined && r.cadence === undefined && r.notes === undefined &&
+        (r.milestones as unknown[]).length === 0)) &&
     (r.monthlyTarget === undefined ||
       (typeof r.monthlyTarget === "number" && Number.isFinite(r.monthlyTarget) && r.monthlyTarget > 0))
   );

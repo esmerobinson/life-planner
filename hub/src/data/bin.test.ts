@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "./db";
-import { validItem } from "./validate";
+import { validGoal, validItem } from "./validate";
 import {
-  createItem, deleteItem, emptyBin, fileItem, listBin, listItems, putItemBack, restoreFromBin, saveItemNotes,
-  updateItem,
+  createGoal, createItem, deleteGoal, deleteItem, emptyBin, fileItem, listBin, listGoalBin, listGoals, listItems,
+  putItemBack, restoreFromBin, restoreGoalFromBin, saveItemNotes, updateItem,
 } from "./repo";
 import { exportBackup, parseBackup, restoreBackup } from "./backup";
 
@@ -159,6 +159,80 @@ describe("filing from the sort card", () => {
     await putItemBack(snap, today);
     expect((await db.items.get(it1.id))!.status).toBe("open");
     expect("deletedAt" in (await db.items.get(it1.id))!).toBe(false);
+  });
+});
+
+describe("goals in the Bin", () => {
+  const goalRow = (extra: Record<string, unknown> = {}) => ({
+    id: "g1", title: "Made-up goal", areaId: "art", kind: "practice", milestones: [], createdAt: "2026-10-01", ...extra,
+  });
+
+  it("validator: deleted goals (with deletedAt) and content-free purged goals are valid; others are not", () => {
+    expect(validGoal(goalRow({ status: "deleted", deletedAt: today }))).toBe(true);
+    expect(validGoal(goalRow({ status: "purged", title: "" }))).toBe(true);
+    expect(validGoal(goalRow({ status: "open" }))).toBe(false);
+    expect(validGoal(goalRow({ status: "deleted", deletedAt: "soon" }))).toBe(false);
+    expect(validGoal(goalRow({ status: "purged", title: "still here" }))).toBe(false);
+    expect(validGoal(goalRow({ status: "purged", title: "", why: "secret" }))).toBe(false);
+    expect(validGoal(goalRow({ status: "purged", title: "", milestones: [{ id: "m", title: "x", done: false }] }))).toBe(false);
+  });
+
+  it("delete hides a goal from listGoals; its tasks keep their goalId; listGoalBin lists it", async () => {
+    const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, "2026-10-01");
+    const t = await createItem({ kind: "task", title: "Step", areaId: "art", priority: 2, goalId: g.id }, "2026-10-01");
+    await deleteGoal(g.id, today);
+    expect(await listGoals()).toEqual([]);
+    expect((await db.goals.get(g.id))!).toMatchObject({ status: "deleted", deletedAt: today });
+    expect((await listGoalBin()).map((x) => x.id)).toEqual([g.id]);
+    expect((await db.items.get(t.id))!.goalId).toBe(g.id);
+  });
+
+  it("restore brings the goal back exactly, without the Bin fields", async () => {
+    const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "finite", deadline: "2026-12-31" }, "2026-10-01");
+    await deleteGoal(g.id, today);
+    await restoreGoalFromBin(g.id, today);
+    const back = (await db.goals.get(g.id))!;
+    expect("status" in back).toBe(false);
+    expect("deletedAt" in back).toBe(false);
+    expect(back).toMatchObject({ title: "Pretend goal", deadline: "2026-12-31" });
+    expect((await listGoals()).map((x) => x.id)).toEqual([g.id]);
+  });
+
+  it("emptying purges deleted goals to tombstones too, and counts them", async () => {
+    const g = await createGoal(
+      { title: "Secret goal", areaId: "body", kind: "finite", deadline: "2026-12-31", why: "private", notes: "n", monthlyTarget: 3,
+        milestones: [{ id: "m1", title: "step", done: false }], source: { kind: "obsidian", key: "k" } },
+      "2026-10-01",
+    );
+    const live = await createGoal({ title: "Stays", areaId: "art", kind: "practice" }, "2026-10-01");
+    const i = await createItem(inboxItem, "2026-10-01");
+    await deleteGoal(g.id, today);
+    await deleteItem(i.id, today);
+    expect(await emptyBin(today)).toBe(2);
+    const tomb = (await db.goals.get(g.id))!;
+    expect(tomb).toEqual({
+      id: g.id, title: "", areaId: "body", kind: "finite", milestones: [], createdAt: "2026-10-01", status: "purged",
+      updatedAt: tomb.updatedAt,
+    });
+    expect(validGoal(tomb)).toBe(true);
+    expect(await db.pending.get(["goals", g.id])).toMatchObject({ updatedAt: tomb.updatedAt });
+    expect(await listGoalBin()).toEqual([]);
+    expect((await listGoals()).map((x) => x.id)).toEqual([live.id]);
+  });
+
+  it("a backup Merge adds deleted and purged goals when missing; purged ones are not counted", async () => {
+    const a = await createGoal({ title: "Binned goal", areaId: "art", kind: "practice" }, "2026-10-01");
+    const b = await createGoal({ title: "Gone goal", areaId: "art", kind: "practice" }, "2026-10-01");
+    await deleteGoal(b.id, today);
+    await emptyBin(today);
+    await deleteGoal(a.id, today);
+    const file = await exportBackup(today);
+    await db.goals.clear();
+    const r = await restoreBackup(JSON.stringify(file), "merge");
+    expect((await db.goals.get(a.id))!.status).toBe("deleted");
+    expect((await db.goals.get(b.id))!.status).toBe("purged");
+    expect(r.addedGoals).toBe(1);
+    expect(r.skipped).toBe(0);
   });
 });
 
