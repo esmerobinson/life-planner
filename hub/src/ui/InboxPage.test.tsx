@@ -138,6 +138,8 @@ describe("Inbox strips (unsorted: no type yet)", () => {
     expect((await listBin()).map((i) => i.id)).toEqual([it.id]);
     const line = screen.getByRole("status");
     expect(line).toHaveTextContent("Moved to the Bin · Undo");
+    // The pressed icon is gone with its strip: focus moves to Undo.
+    await vi.waitFor(() => expect(within(line).getByRole("button", { name: "Undo" })).toHaveFocus());
     await userEvent.click(within(line).getByRole("button", { name: "Undo" }));
     expect(await screen.findByText("Not needed")).toBeInTheDocument();
     expect((await db.items.get(it.id))!.status).toBe("open");

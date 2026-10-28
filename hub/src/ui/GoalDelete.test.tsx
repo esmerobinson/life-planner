@@ -36,6 +36,7 @@ describe("Delete goal", () => {
     renderAt(`/goals/${g.id}`);
     await userEvent.click(await screen.findByRole("button", { name: "Delete goal" }));
     expect(screen.getByText("Delete this goal? You can restore it from the Bin.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByText(/restore it from the Bin/)).toBeNull();
     expect((await db.goals.get(g.id))!.status).toBeUndefined();

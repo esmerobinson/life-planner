@@ -114,6 +114,22 @@ describe("Bin page", () => {
     expect(await db.goals.get(g.id)).toMatchObject({ status: "purged", title: "" });
   });
 
+  it("the question takes focus (on Cancel), and Confirm empties only what it named (review M-2, M-5)", async () => {
+    const shown = await binned("Shown one", "2026-10-26");
+    render(<BinPage today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Empty bin" }));
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveAccessibleDescription("Delete 1 item for good? This can't be undone.");
+    // Something is binned elsewhere while the question shows.
+    const late = await binned("Arrived later", "2026-10-27");
+    await screen.findByText("Arrived later");
+    expect(screen.getByText("Delete 1 item for good? This can't be undone.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await vi.waitFor(async () => expect((await db.items.get(shown.id))!.status).toBe("purged"));
+    expect((await db.items.get(late.id))!.status).toBe("deleted");
+    expect(await screen.findByRole("button", { name: "Restore: Arrived later" })).toBeInTheDocument();
+  });
+
   it("an empty Bin says so and offers no Empty bin", async () => {
     render(<BinPage today={TODAY} />);
     expect(await screen.findByText("The bin is empty.")).toBeInTheDocument();

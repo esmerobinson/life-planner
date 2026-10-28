@@ -30,7 +30,9 @@ export function BinPage({ today }: { today: ISODate }) {
   const [bin, setBin] = useState<Binned[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [readError, setReadError] = useState(false);
-  const [asking, setAsking] = useState(false);
+  /** The rows the confirmation names (snapshot when it opens): only these are emptied. */
+  const [asking, setAsking] = useState<{ items: string[]; goals: string[] } | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const { attempt, saveError } = useSaveError();
   const busy = useRef(false);
   const [reads, setReads] = useState(0);
@@ -68,6 +70,11 @@ export function BinPage({ today }: { today: ISODate }) {
   }
 
   const n = bin.length;
+  const askedN = asking ? asking.items.length + asking.goals.length : 0;
+  // The question replaces the focused Empty bin button: focus lands on Cancel, so it is heard.
+  useEffect(() => {
+    if (asking) cancelRef.current?.focus();
+  }, [asking]);
   return (
     <section className="bin-page">
       <h1>Bin</h1>
@@ -75,24 +82,39 @@ export function BinPage({ today }: { today: ISODate }) {
       {saveError && <p className="form-message">{saveError}</p>}
       {loaded && n === 0 && <p>The bin is empty.</p>}
       {n > 0 && !asking && (
-        <button type="button" className="btn-secondary" onClick={() => setAsking(true)}>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() =>
+            setAsking({
+              items: bin.filter((b) => b.what === "item").map((b) => b.row.id),
+              goals: bin.filter((b) => b.what === "goal").map((b) => b.row.id),
+            })
+          }
+        >
           Empty bin
         </button>
       )}
       {n > 0 && asking && (
         <div className="btn-group">
-          <p>{`Delete ${n} ${n === 1 ? "item" : "items"} for good? This can't be undone.`}</p>
+          <p id="bin-question">{`Delete ${askedN} ${askedN === 1 ? "item" : "items"} for good? This can't be undone.`}</p>
           <button
             type="button"
             onClick={() =>
-              void write(() => emptyBin(today)).then((ok) => {
-                if (ok) setAsking(false);
+              void write(() => emptyBin(today, asking)).then((ok) => {
+                if (ok) setAsking(null);
               })
             }
           >
             Confirm
           </button>
-          <button type="button" className="btn-secondary" onClick={() => setAsking(false)}>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="btn-secondary"
+            aria-describedby="bin-question"
+            onClick={() => setAsking(null)}
+          >
             Cancel
           </button>
         </div>

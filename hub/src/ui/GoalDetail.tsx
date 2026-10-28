@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { deleteGoal, toggleMilestone, untickItem, updateGoal } from "../data/repo";
 import { groupGoalTasks, monthlyProgress } from "../domain/progress";
@@ -20,6 +20,11 @@ export function GoalDetail({ today }: { today: ISODate }) {
   const goal = goals.find((g) => g.id === id);
   const navigate = useNavigate();
   const [asking, setAsking] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // The question replaces the focused Delete goal button: focus lands on Cancel, so it is heard.
+  useEffect(() => {
+    if (asking) cancelRef.current?.focus();
+  }, [asking]);
 
   if (!loaded) return null;
   if (error) return <p>{error}</p>;
@@ -107,7 +112,7 @@ export function GoalDetail({ today }: { today: ISODate }) {
         </button>
       ) : (
         <div className="btn-group">
-          <p>Delete this goal? You can restore it from the Bin.</p>
+          <p id="goal-delete-question">Delete this goal? You can restore it from the Bin.</p>
           <button
             type="button"
             onClick={() =>
@@ -120,7 +125,13 @@ export function GoalDetail({ today }: { today: ISODate }) {
           >
             Confirm
           </button>
-          <button type="button" className="btn-secondary" onClick={() => setAsking(false)}>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="btn-secondary"
+            aria-describedby="goal-delete-question"
+            onClick={() => setAsking(false)}
+          >
             Cancel
           </button>
         </div>

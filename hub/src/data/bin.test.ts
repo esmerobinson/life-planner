@@ -3,7 +3,7 @@ import { db } from "./db";
 import { validGoal, validItem } from "./validate";
 import {
   createGoal, createItem, deleteGoal, deleteItem, emptyBin, fileItem, listBin, listGoalBin, listGoals, listItems,
-  putItemBack, restoreFromBin, restoreGoalFromBin, saveItemNotes, updateItem,
+  putItemBack, restoreFromBin, restoreGoalFromBin, saveItemNotes, tickItem, updateItem,
 } from "./repo";
 import { exportBackup, parseBackup, restoreBackup } from "./backup";
 
@@ -233,6 +233,47 @@ describe("goals in the Bin", () => {
     expect((await db.goals.get(b.id))!.status).toBe("purged");
     expect(r.addedGoals).toBe(1);
     expect(r.skipped).toBe(0);
+  });
+});
+
+describe("review minors", () => {
+  it("M-2: emptyBin with the shown ids purges only those (a row binned since stays in the Bin)", async () => {
+    const shown = await createItem({ ...inboxItem, title: "shown" }, "2026-10-01");
+    const later = await createItem({ ...inboxItem, title: "arrived later" }, "2026-10-01");
+    const g = await createGoal({ title: "shown goal", areaId: "art", kind: "practice" }, "2026-10-01");
+    await deleteItem(shown.id, today);
+    await deleteGoal(g.id, today);
+    await deleteItem(later.id, today);
+    expect(await emptyBin(today, { items: [shown.id], goals: [g.id] })).toBe(2);
+    expect((await db.items.get(shown.id))!.status).toBe("purged");
+    expect((await db.goals.get(g.id))!.status).toBe("purged");
+    expect((await db.items.get(later.id))!.status).toBe("deleted");
+  });
+
+  it("M-2: a shown id that was restored meanwhile is not purged", async () => {
+    const it1 = await createItem(inboxItem, "2026-10-01");
+    await deleteItem(it1.id, today);
+    await restoreFromBin(it1.id, today);
+    expect(await emptyBin(today, { items: [it1.id], goals: [] })).toBe(0);
+    expect((await db.items.get(it1.id))!.status).toBe("open");
+  });
+
+  it("M-3: fileItem refuses an item that is no longer an open Inbox item", async () => {
+    const filed = await createItem({ ...inboxItem, areaId: "art" }, "2026-10-01");
+    await expect(fileItem(filed.id, "idea", "writing", today)).rejects.toThrow();
+    expect(await db.items.get(filed.id)).toMatchObject({ kind: "task", areaId: "art" });
+    const binned = await createItem(inboxItem, "2026-10-01");
+    await deleteItem(binned.id, today);
+    await expect(fileItem(binned.id, "task", "writing", today)).rejects.toThrow();
+    expect((await db.items.get(binned.id))!.status).toBe("deleted");
+  });
+
+  it("M-4: restoring a deleted done item brings it back done", async () => {
+    const it1 = await createItem({ ...inboxItem, areaId: "art" }, "2026-10-01");
+    await tickItem(it1.id, "2026-10-20");
+    await deleteItem(it1.id, today);
+    await restoreFromBin(it1.id, today);
+    expect(await db.items.get(it1.id)).toMatchObject({ status: "done", completedAt: "2026-10-20" });
   });
 });
 

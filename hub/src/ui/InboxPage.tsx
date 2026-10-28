@@ -164,7 +164,7 @@ export function InboxPage({ today }: { today: ISODate }) {
           ))}
         </div>
       )}
-      <UndoLine message={last?.message} onUndo={last?.undo} />
+      <UndoLine message={last?.message} onUndo={last?.undo} takeFocus />
       {shown.length > 0 && (
         <ul aria-label="Inbox items" className="strip-list">
           {shown.map((it) => (

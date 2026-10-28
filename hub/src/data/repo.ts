@@ -298,13 +298,13 @@ export async function listBin(): Promise<Item[]> {
   );
 }
 
-/** Restore from the Bin: back to open, in the area it was in. */
+/** Restore from the Bin, in the area it was in: done if it had been done, else open. */
 export async function restoreFromBin(id: string, today: ISODate): Promise<void> {
   await db.transaction("rw", db.items, async () => {
     const item = await db.items.get(id);
     if (!item || item.status !== "deleted") return;
     const { deletedAt: _d, ...rest } = item;
-    await db.items.put({ ...rest, status: "open", touchedAt: today });
+    await db.items.put({ ...rest, status: item.completedAt ? "done" : "open", touchedAt: today });
   });
 }
 
@@ -315,9 +315,12 @@ export async function restoreFromBin(id: string, today: ISODate): Promise<void> 
  * goals become tombstones the same way (no title, why, cadence, notes, milestones,
  * deadline, target or source). Returns how many were emptied (items and goals).
  */
-export async function emptyBin(today: ISODate): Promise<number> {
+export async function emptyBin(today: ISODate, only?: { items: string[]; goals: string[] }): Promise<number> {
+  // With `only` (the rows the confirmation showed), nothing binned since is purged unasked.
+  const pickItem = (i: Item) => !only || only.items.includes(i.id);
+  const pickGoal = (g: Goal) => !only || only.goals.includes(g.id);
   return db.transaction("rw", db.items, db.goals, async () => {
-    const bin = await db.items.where("status").equals("deleted").toArray();
+    const bin = (await db.items.where("status").equals("deleted").toArray()).filter(pickItem);
     const tombs: Item[] = bin.map((i) => ({
       id: i.id,
       kind: i.kind,
@@ -330,7 +333,7 @@ export async function emptyBin(today: ISODate): Promise<number> {
       touchedAt: today,
     }));
     if (tombs.length) await db.items.bulkPut(tombs);
-    const goals = (await db.goals.toArray()).filter((g) => g.status === "deleted");
+    const goals = (await db.goals.toArray()).filter((g) => g.status === "deleted" && pickGoal(g));
     const goalTombs: Goal[] = goals.map((g) => ({
       id: g.id,
       title: "",
@@ -383,18 +386,19 @@ export async function fileItem(id: string, type: SortType, areaId: AreaId, today
   if (areaId === "inbox" || !(AREA_IDS as readonly string[]).includes(areaId)) {
     throw new Error("choose an area other than the inbox");
   }
-  if (type === "goal") return itemToGoal(id, areaId, today);
-  await db.transaction("rw", db.items, async () => {
+  return db.transaction("rw", db.items, db.goals, async () => {
     const item = await db.items.get(id);
-    if (!item) throw new Error("that item does not exist");
+    // A stale card (filed or binned elsewhere meanwhile) must not re-file a sorted row.
+    if (!item || item.status !== "open" || item.areaId !== "inbox") throw new Error("that item is no longer in the inbox");
+    if (type === "goal") return itemToGoal(id, areaId, today);
     if (type === "idea") {
       const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, ...rest } = item;
       await db.items.put({ ...rest, kind: "idea", areaId, touchedAt: today });
     } else {
       await db.items.put({ ...item, kind: "task", areaId, touchedAt: today });
     }
+    return undefined;
   });
-  return undefined;
 }
 
 /** Saves an item's notes; blank text removes them. */

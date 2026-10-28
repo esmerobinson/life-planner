@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 /* A simple line-drawn bin in the round-2 1B icon style: 16px, 1.6 stroke, currentColor.
    The drawing is the implementer's (the brief asked for "a simple line bin"). */
 export const BIN_GLYPH = (
@@ -19,14 +21,27 @@ export function DeleteButton({ label, onDelete, disabled }: { label: string; onD
  * The line after an action: "Filed as To-do in Writing · Undo" (Undo only when it can be
  * undone). Always rendered (empty until something happens) so screen readers hear it.
  */
-export function UndoLine({ message, onUndo }: { message?: string; onUndo?: () => void }) {
+export function UndoLine({
+  message,
+  onUndo,
+  takeFocus = false,
+}: {
+  message?: string;
+  onUndo?: () => void;
+  /** Move focus to Undo when a new message shows (the focused control was just removed). */
+  takeFocus?: boolean;
+}) {
+  const undo = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (takeFocus && message) undo.current?.focus();
+  }, [takeFocus, message, onUndo]);
   return (
     <p className="undo-line" role="status">
       {message}
       {message && onUndo && (
         <>
           {" · "}
-          <button type="button" className="link-button" onClick={onUndo}>
+          <button ref={undo} type="button" className="link-button" onClick={onUndo}>
             Undo
           </button>
         </>
