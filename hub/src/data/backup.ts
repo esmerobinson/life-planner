@@ -48,6 +48,7 @@ function validItem(r: unknown): r is Item {
     optDate(r.weekOf) &&
     optDate(r.hiddenOn) &&
     optDate(r.completedAt) &&
+    optStamp(r.updatedAt) &&
     validSource(r.source)
   );
 }
@@ -67,6 +68,7 @@ function validGoal(r: unknown): r is Goal {
     optDate(r.deadline) &&
     optText(r.why) && optText(r.cadence) && optText(r.notes) &&
     validGoalSource(r.source) &&
+    optStamp(r.updatedAt) &&
     (r.monthlyTarget === undefined ||
       (typeof r.monthlyTarget === "number" && Number.isFinite(r.monthlyTarget) && r.monthlyTarget > 0))
   );
@@ -78,6 +80,8 @@ const SOURCE_LIST: readonly string[] = SOURCE_KINDS;
 const optDate = (v: unknown) => v === undefined || (isStr(v) && isValidISODate(v));
 const optStr = (v: unknown) => v === undefined || isStr(v);
 const optStrArray = (v: unknown) => v === undefined || isStrArray(v);
+/** Absent, or a sync stamp (epoch ms). Restored rows are re-stamped on write anyway. */
+const optStamp = (v: unknown) => v === undefined || (typeof v === "number" && Number.isSafeInteger(v) && v >= 0);
 
 /** Absent, or a string of at most 4000 characters. */
 const optText = (v: unknown) => v === undefined || (isStr(v) && v.length <= 4000);
@@ -146,10 +150,14 @@ export async function restoreBackup(
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
-  return db.transaction("rw", db.items, db.goals, async () => {
+  return db.transaction("rw", db.items, db.goals, db.syncMeta, async () => {
     if (mode === "replace") {
       await db.items.clear();
       await db.goals.clear();
+      // Sync never deletes, so rows removed here still exist on the server. Pulling from
+      // the start again brings them back instead of leaving this device silently missing
+      // them. The restored rows are newer (stamped now), so they win where both exist.
+      await db.syncMeta.put({ key: "cursor", value: 0 });
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       return { addedItems: file.items.length, addedGoals: file.goals.length, skipped: 0 };

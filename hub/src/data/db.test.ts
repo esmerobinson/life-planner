@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { unstamped } from "../test/unstamped";
 import type { Item, Goal } from "../domain/types";
 
 describe("db", () => {
@@ -13,7 +14,7 @@ describe("db", () => {
     };
     await db.items.put(item);
     await db.goals.put(goal);
-    expect(await db.items.get("i1")).toEqual(item);
-    expect(await db.goals.get("g1")).toEqual(goal);
+    expect(unstamped(await db.items.get("i1"))).toEqual(item);
+    expect(unstamped(await db.goals.get("g1"))).toEqual(goal);
   });
 });

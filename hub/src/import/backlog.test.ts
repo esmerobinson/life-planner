@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { unstamped } from "../test/unstamped";
 import { db } from "../data/db";
 import { parseBacklog, importBacklog } from "./backlog";
 import { sectionToArea } from "./sectionAreas";
@@ -175,7 +176,7 @@ describe("import filing by section", () => {
     const row = (await db.items.filter((i) => i.title === "Sort the made-up paperwork").first())!;
     await db.items.update(row.id, { areaId: "art" });
     await importBacklog(md, "2026-10-28");
-    expect(await db.items.get(row.id)).toEqual({ ...row, areaId: "art" });
+    expect(unstamped(await db.items.get(row.id))).toEqual({ ...unstamped(row), areaId: "art" });
   });
 
   it("re-import after ticking and archiving leaves both untouched", async () => {

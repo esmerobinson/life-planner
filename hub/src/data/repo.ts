@@ -15,7 +15,7 @@ export async function createItem(
     touchedAt: today,
   };
   await db.items.add(item);
-  return item;
+  return (await db.items.get(item.id)) ?? item; // as stored, with its updatedAt
 }
 
 export async function createGoal(
@@ -32,7 +32,7 @@ export async function createGoal(
     createdAt: today,
   };
   await db.goals.add(goal);
-  return goal;
+  return (await db.goals.get(goal.id)) ?? goal; // as stored, with its updatedAt
 }
 
 /** The only goal fields the Edit section may change. */
@@ -118,7 +118,7 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
       touchedAt: today,
       notes: item.notes ? `${item.notes}\n${line}` : line,
     });
-    return goal;
+    return (await db.goals.get(goal.id)) ?? goal; // as stored, with its updatedAt
   });
 }
 
