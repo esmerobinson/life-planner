@@ -34,13 +34,15 @@ export function ScheduleMenu({
   }
 
   /**
-   * A typed or picked day saves as soon as it is a real day, today or later, and the
-   * popover stays open (typing a year digit by digit passes through early years, which
-   * are skipped; a later correction simply saves again).
+   * The typed or picked day is saved only on an explicit action: Set, Enter, or leaving
+   * the field for somewhere outside the popover. Never on each change: typing passes
+   * through real days on the way (30 Oct before 30 Nov), and on Today an early save
+   * would move the row away mid-edit. Only a real day, today or later, that differs
+   * from the current pin is saved.
    */
-  function onDay(value: string) {
-    setDay(value);
-    if (isValidISODate(value) && value >= today) void pin(value);
+  function commitDay(close: (refocus?: boolean) => void) {
+    if (!isValidISODate(day) || day < today || day === pinnedDate) return;
+    void pin(day, close);
   }
 
   return (
@@ -68,8 +70,23 @@ export function ScheduleMenu({
             aria-label={`Day for ${label}`}
             min={today}
             value={day}
-            onChange={(e) => onDay(e.target.value)}
+            onChange={(e) => setDay(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitDay(close);
+              }
+            }}
+            onBlur={(e) => {
+              // Moving to another choice in this popover is not "leaving" it.
+              const next = e.relatedTarget as Node | null;
+              if (next && e.currentTarget.closest(".pop-menu")?.contains(next)) return;
+              commitDay(close);
+            }}
           />
+          <button type="button" onClick={() => commitDay(close)}>
+            Set
+          </button>
           <hr />
           <button type="button" onClick={() => void pin(undefined, close)}>
             Clear

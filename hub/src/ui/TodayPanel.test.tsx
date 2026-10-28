@@ -258,24 +258,90 @@ describe("TodayPanel", () => {
     expect(screen.getByText("Wander")).toBeInTheDocument(); // still pinned to today
   });
 
-  it("Schedule for offers Today, Tomorrow, Next week, a day and Clear; a day sets the pin, never the due date", async () => {
-    const it = await task("Plan", { pinnedDate: TODAY, due: "2026-11-30" });
+  it("Schedule for offers Today, Tomorrow, Next week, a day with Set, and Clear", async () => {
+    await task("Plan", { pinnedDate: TODAY });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Plan" }));
     const group = screen.getByRole("group", { name: "Schedule Plan for" });
     expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Today", "Tomorrow", "Next week", "Clear",
+      "Today", "Tomorrow", "Next week", "Set", "Clear",
     ]);
+    expect(within(group).getByLabelText("Day for Plan")).toHaveValue(TODAY);
+  });
+
+  /** Waits long enough for any stray write to land. */
+  const settle = () => act(async () => {
+    await new Promise((r) => setTimeout(r, 30));
+  });
+
+  it("editing the day saves nothing until Set, then pins it (never the due date) and closes", async () => {
+    const it = await task("Plan", { pinnedDate: TODAY, due: "2026-11-30" });
+    const spy = vi.spyOn(repo, "pinTo");
+    render(<TodayPanel today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Plan" }));
+    const group = screen.getByRole("group", { name: "Schedule Plan for" });
     const day = within(group).getByLabelText("Day for Plan");
-    expect(day).toHaveValue(TODAY);
-    fireEvent.change(day, { target: { value: "2026-11-04" } });
-    await vi.waitFor(async () => expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-11-04"));
+    // Typing the day first passes through real future dates (30 Oct) on the way to 30 Nov.
+    for (const v of ["2026-10-03", "2026-10-30", "2026-11-30"]) fireEvent.change(day, { target: { value: v } });
+    await settle();
+    expect(spy).not.toHaveBeenCalled();
+    expect((await db.items.get(it.id))!.pinnedDate).toBe(TODAY);
+    expect(screen.getByRole("group", { name: "Schedule Plan for" })).toBeInTheDocument(); // still open, still on Today
+    await userEvent.click(within(group).getByRole("button", { name: "Set" }));
+    await vi.waitFor(async () => expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-11-30"));
+    expect(spy).toHaveBeenCalledTimes(1);
     expect((await db.items.get(it.id))!.due).toBe("2026-11-30");
-    fireEvent.change(day, { target: { value: "0002-11-04" } }); // a half-typed year is not saved
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 20));
-    });
-    expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-11-04");
+    expect(screen.queryByRole("group", { name: "Schedule Plan for" })).toBeNull();
+  });
+
+  it("Enter in the day field saves it; a past or half-typed day is never saved", async () => {
+    const it = await task("Keyed", { pinnedDate: TODAY });
+    const spy = vi.spyOn(repo, "pinTo");
+    render(<TodayPanel today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Keyed" }));
+    const day = screen.getByLabelText("Day for Keyed");
+    fireEvent.change(day, { target: { value: "0002-11-04" } });
+    fireEvent.keyDown(day, { key: "Enter" });
+    fireEvent.change(day, { target: { value: "2026-10-01" } });
+    fireEvent.keyDown(day, { key: "Enter" });
+    await settle();
+    expect(spy).not.toHaveBeenCalled();
+    fireEvent.change(day, { target: { value: "2026-11-04" } });
+    fireEvent.keyDown(day, { key: "Enter" });
+    await vi.waitFor(async () => expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-11-04"));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaving the day field saves it, but not when moving to another choice in the popover", async () => {
+    const it = await task("Blurry", { pinnedDate: TODAY });
+    const spy = vi.spyOn(repo, "pinTo");
+    render(<TodayPanel today={TODAY} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Blurry" }));
+    const group = screen.getByRole("group", { name: "Schedule Blurry for" });
+    const day = within(group).getByLabelText("Day for Blurry");
+    fireEvent.change(day, { target: { value: "2026-11-09" } });
+    fireEvent.blur(day, { relatedTarget: within(group).getByRole("button", { name: "Clear" }) });
+    await settle();
+    expect(spy).not.toHaveBeenCalled();
+    fireEvent.blur(day, { relatedTarget: null });
+    await vi.waitFor(async () => expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-11-09"));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("Escape closes an open popover even when focus never went into it (Safari/Firefox clicks)", async () => {
+    await task("Mac", { pinnedDate: TODAY });
+    render(<TodayPanel today={TODAY} />);
+    for (const [icon, group] of [["Schedule for: Mac", "Schedule Mac for"], ["Move to: Mac", "Move Mac to"]]) {
+      const toggle = await screen.findByRole("button", { name: icon });
+      await userEvent.click(toggle);
+      expect(screen.getByRole("group", { name: group })).toBeInTheDocument();
+      toggle.blur(); // Safari and Firefox on macOS leave focus on <body> after a click
+      expect(document.activeElement).toBe(document.body);
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("group", { name: group })).toBeNull();
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(toggle).toHaveFocus();
+    }
   });
 
   it("Schedule for Next week pins next Monday, and Clear removes the pin", async () => {

@@ -53,19 +53,23 @@ export function IconPopover({
     const onDown = (e: MouseEvent) => {
       if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
     };
+    // On the document, not the popover: Safari and Firefox on macOS leave focus on <body>
+    // after a click on the icon, so a key handler on the popover would never hear Escape.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      toggle.current?.focus();
+    };
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Escape" && open) {
-      e.stopPropagation();
-      close(true);
-    }
-  }
-
   return (
-    <span className="pop" ref={wrap} onKeyDown={onKeyDown}>
+    <span className="pop" ref={wrap}>
       <button
         ref={toggle}
         type="button"
