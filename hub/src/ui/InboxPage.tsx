@@ -1,9 +1,10 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { archiveItems, createItem, listItems, restoreItem, updateItems } from "../data/repo";
-import type { AreaId, ISODate, Item } from "../domain/types";
-import { GOAL_AREAS } from "./areas";
+import { Link } from "react-router-dom";
+import { createItem, deleteItem, getItem, listItems, putItemBack, restoreItem } from "../data/repo";
+import type { ISODate, Item } from "../domain/types";
+import { UndoLine } from "./DeleteButton";
 import { InboxRow } from "./InboxRow";
-import { INBOX_SOURCES, inboxSource, type InboxSource } from "./inboxSource";
+import { INBOX_SOURCES, inboxOrder, inboxSource, type InboxSource } from "./inboxSource";
 import { NeedsALook } from "./NeedsALook";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
@@ -12,7 +13,8 @@ import { useHubData } from "./useHubData";
 export function InboxPage({ today }: { today: ISODate }) {
   const { items, goals, refresh, loaded, error } = useHubData(today);
   const shell = useContext(ShellContext);
-  const inbox = items.filter((i) => i.areaId === "inbox" && i.status === "open");
+  // The same order as Sort one by one (oldest first).
+  const inbox = inboxOrder(items.filter((i) => i.areaId === "inbox" && i.status === "open"));
 
   const sourcesPresent = INBOX_SOURCES.filter((s) => inbox.some((i) => inboxSource(i) === s));
   const [from, setFrom] = useState<InboxSource | "All">("All");
@@ -26,30 +28,16 @@ export function InboxPage({ today }: { today: ISODate }) {
   }, [stale]);
   const shown = effectiveFrom === "All" ? inbox : inbox.filter((i) => inboxSource(i) === effectiveFrom);
 
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [moveArea, setMoveArea] = useState<AreaId | "">("");
   const { attempt, saveError } = useSaveError();
-  const shownPicked = shown.filter((i) => picked.has(i.id));
-  const [moving, setMoving] = useState(false);
-  const movingRef = useRef(false);
-  const [result, setResult] = useState("");
   const [archived, setArchived] = useState<Item[]>([]);
+  const [last, setLast] = useState<{ message: string; undo?: () => void } | null>(null);
+  const deleting = useRef(false);
+  const [busy, setBusy] = useState(false);
 
   const [draft, setDraft] = useState("");
   const draftRef = useRef("");
   const captureBox = useRef<HTMLInputElement>(null);
   const captureChain = useRef<Promise<void>>(Promise.resolve());
-
-  // Drop ticks for items no longer shown (filtered out, moved or archived), so a stale or hidden id is never acted on.
-  const shownKey = shown.map((i) => i.id).join("|");
-  useEffect(() => {
-    if (!loaded) return;
-    const ids = new Set(shownKey ? shownKey.split("|") : []);
-    setPicked((prev) => {
-      const next = new Set([...prev].filter((id) => ids.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [shownKey, loaded]);
 
   // Archived inbox items are not in useHubData; re-read whenever the open items change.
   useEffect(() => {
@@ -63,51 +51,39 @@ export function InboxPage({ today }: { today: ISODate }) {
     };
   }, [items]);
 
-  function toggle(id: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   async function changed() {
     await refresh();
     await shell?.refresh();
   }
 
-  /** Runs one bulk write under the in-flight guard. Returns the write's result, or undefined on failure. */
-  async function bulk<T>(write: () => Promise<T>): Promise<T | undefined> {
-    if (movingRef.current) return undefined;
-    movingRef.current = true;
-    setMoving(true);
-    setResult("");
+  /** Delete from a strip: to the Bin, with an Undo line. */
+  async function remove(item: Item) {
+    if (deleting.current) return;
+    deleting.current = true;
+    setBusy(true);
     try {
-      let out: T | undefined;
+      const before: { row?: Item } = {};
       const ok = await attempt(async () => {
-        out = await write();
+        before.row = await getItem(item.id);
+        await deleteItem(item.id, today);
       });
-      if (!ok) return undefined;
-      setPicked(new Set());
+      if (!ok) return;
+      const was = before.row;
+      setLast({
+        message: "Moved to the Bin",
+        undo: was
+          ? () =>
+              void attempt(() => putItemBack(was, today)).then(async (back) => {
+                if (!back) return;
+                setLast(null);
+                await changed();
+              })
+          : undefined,
+      });
       await changed();
-      return out;
     } finally {
-      movingRef.current = false;
-      setMoving(false);
-    }
-  }
-
-  async function moveSelected() {
-    if (!moveArea || shownPicked.length === 0) return;
-    await bulk(() => updateItems(shownPicked.map((i) => i.id), { areaId: moveArea }, today));
-  }
-
-  async function archiveSelected() {
-    if (shownPicked.length === 0) return;
-    const n = await bulk(() => archiveItems(shownPicked.map((i) => i.id), today));
-    if (n !== undefined) {
-      setResult(`Archived ${n}. You can restore them under Archived from the inbox, below.`);
+      deleting.current = false;
+      setBusy(false);
     }
   }
 
@@ -144,6 +120,14 @@ export function InboxPage({ today }: { today: ISODate }) {
   return (
     <section className="inbox-page">
       <h1>Inbox</h1>
+      {inbox.length > 0 && (
+        <div className="btn-group inbox-sort">
+          <span>{`${inbox.length} to sort`}</span>
+          <Link to="/inbox/sort" className="btn-secondary">
+            Sort one by one
+          </Link>
+        </div>
+      )}
       <form
         className="inbox-capture form-row"
         onSubmit={(e) => {
@@ -180,58 +164,11 @@ export function InboxPage({ today }: { today: ISODate }) {
           ))}
         </div>
       )}
-      {inbox.length > 0 && (
-        <div className="inbox-bulk form-row">
-          <label className="form-check">
-            <input
-              type="checkbox"
-              aria-label="Select all shown"
-              checked={shown.length > 0 && shownPicked.length === shown.length}
-              onChange={(e) => setPicked(e.target.checked ? new Set(shown.map((i) => i.id)) : new Set())}
-            />
-            Select all shown
-          </label>
-          <label className="form-field">
-            <span className="form-label">Move selected to</span>
-            <select
-              aria-label="Move selected to"
-              value={moveArea}
-              onChange={(e) => setMoveArea(e.target.value as AreaId | "")}
-            >
-              <option value="">Choose</option>
-              {GOAL_AREAS.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={moving || !moveArea || shownPicked.length === 0}
-            onClick={() => void moveSelected()}
-          >
-            Move selected
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={moving || shownPicked.length === 0}
-            onClick={() => void archiveSelected()}
-          >
-            Archive selected
-          </button>
-        </div>
-      )}
-      {result && <p>{result}</p>}
+      <UndoLine message={last?.message} onUndo={last?.undo} takeFocus />
       {shown.length > 0 && (
         <ul aria-label="Inbox items" className="strip-list">
           {shown.map((it) => (
-            <InboxRow key={it.id} item={it} today={today} goals={goals}
-              onFiled={changed}
-              selected={picked.has(it.id)}
-              onToggle={() => toggle(it.id)}
-            />
+            <InboxRow key={it.id} item={it} today={today} goals={goals} onFiled={changed} onDelete={() => void remove(it)} busy={busy} />
           ))}
         </ul>
       )}

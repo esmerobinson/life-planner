@@ -23,7 +23,13 @@ export interface Item {
   priority: Priority;
   due?: ISODate;
   recur?: Weekday[];
-  status: "open" | "done" | "archived";
+  /**
+   * "deleted": in the Bin (restorable). "purged": emptied from the Bin for good; the row
+   * stays as a content-free tombstone because sync never hard-deletes.
+   */
+  status: "open" | "done" | "archived" | "deleted" | "purged";
+  /** When it went into the Bin (status "deleted"). */
+  deletedAt?: ISODate;
   pinnedDate?: ISODate;
   weekOf?: ISODate;
   hiddenOn?: ISODate;
@@ -59,6 +65,13 @@ export interface Goal {
   notes?: string;
   source?: { kind: "obsidian"; key: string };
   createdAt: ISODate;
+  /**
+   * Absent for a live goal. "deleted": in the Bin (restorable); "purged": emptied from the
+   * Bin, kept as a content-free tombstone because sync never hard-deletes.
+   */
+  status?: "deleted" | "purged";
+  /** When it went into the Bin (status "deleted"). */
+  deletedAt?: ISODate;
   /** Sync stamp, as on Item. */
   updatedAt?: number;
 }

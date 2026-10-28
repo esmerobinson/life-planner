@@ -77,7 +77,7 @@ describe("phone layout (below 700px)", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inbox (1)" })).toHaveAttribute("href", "/inbox");
     const footer = screen.getByRole("navigation", { name: "More" });
-    expect(within(footer).getAllByRole("link").map((a) => a.textContent)).toEqual(["Backup", "Sync"]);
+    expect(within(footer).getAllByRole("link").map((a) => a.textContent)).toEqual(["Backup", "Sync", "Bin"]);
     // Desktop-only parts of Home stay off the phone Home.
     expect(screen.queryByText("Goals this month")).toBeNull();
   });

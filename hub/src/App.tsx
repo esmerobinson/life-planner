@@ -8,6 +8,8 @@ import { GoalDetail } from "./ui/GoalDetail";
 import { GoalsPage } from "./ui/GoalsPage";
 import { HomePage } from "./ui/HomePage";
 import { InboxPage } from "./ui/InboxPage";
+import { BinPage } from "./ui/BinPage";
+import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
 import { TodayPanel } from "./ui/TodayPanel";
 
@@ -35,6 +37,14 @@ function InboxRoute() {
   return <InboxPage today={useShellToday()} />;
 }
 
+function SortRoute() {
+  return <SortPage today={useShellToday()} />;
+}
+
+function BinRoute() {
+  return <BinPage today={useShellToday()} />;
+}
+
 function BackupRoute() {
   return <BackupPage today={useShellToday()} />;
 }
@@ -57,6 +67,8 @@ export default function App() {
           <Route path="/goals/:id" element={<GoalDetailRoute />} />
           <Route path="/area/:areaId" element={<AreaRoute />} />
           <Route path="/inbox" element={<InboxRoute />} />
+          <Route path="/inbox/sort" element={<SortRoute />} />
+          <Route path="/bin" element={<BinRoute />} />
           <Route path="/backup" element={<BackupRoute />} />
           <Route path="/sync" element={<SyncPage />} />
         </Route>

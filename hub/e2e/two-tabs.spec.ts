@@ -32,12 +32,17 @@ test("a tick in one tab updates another tab's Today without reload", async ({ co
   const a = await context.newPage();
   await a.goto("/");
 
-  // Seed one item: add it, then file it into Art (priority 2 makes it a Today pick).
+  // Seed one item: add it, then sort it into Art as a To-do (priority 2 makes it a Today pick).
   await a.getByRole("button", { name: "Add", exact: true }).click();
   await a.getByLabel("Title").fill("Cross tab pretend errand");
   await a.getByRole("button", { name: "Add item" }).click();
   await a.getByRole("link", { name: /^Inbox/ }).click();
-  await a.getByRole("button", { name: "File Cross tab pretend errand in Art" }).click();
+  await a.getByRole("button", { name: "Move to: Cross tab pretend errand" }).click();
+  await a.getByRole("group", { name: "Move Cross tab pretend errand to" }).getByRole("button", { name: "Sort this…" }).click();
+  const card = a.getByRole("region", { name: "Item to sort" });
+  await card.getByRole("button", { name: "To-do" }).click();
+  await card.getByRole("button", { name: "Art", exact: true }).click();
+  await expect(a.getByText("Filed as To-do in Art · Undo")).toBeVisible();
 
   const b = await context.newPage();
   await b.goto("/");

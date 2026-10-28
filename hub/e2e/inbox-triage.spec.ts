@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("Inbox: quick capture, filter by source, select all shown, archive, restore, one-tap filing", async ({ page }) => {
+test("Inbox: quick capture, filter by source, archive, restore, delete to the Bin, Sort this…", async ({ page }) => {
   // Seed from two sources through the (moved) import panels on the Backup page.
   await page.goto("/backup");
   await page.getByText("Import from a file", { exact: true }).click();
@@ -18,6 +18,9 @@ test("Inbox: quick capture, filter by source, select all shown, archive, restore
   await page.getByRole("link", { name: /^Inbox/ }).click();
   const list = page.getByLabel("Inbox items");
   await expect(list.getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByText("3 to sort")).toBeVisible();
+  // No multi-select anywhere.
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
 
   // Quick capture: several thoughts in a row, focus stays in the box.
   const box = page.getByRole("textbox", { name: "Add to inbox" });
@@ -28,24 +31,41 @@ test("Inbox: quick capture, filter by source, select all shown, archive, restore
   await expect(list.getByRole("listitem")).toHaveCount(5);
   await expect(box).toBeFocused();
 
-  // Filter to one source, select all shown, archive.
+  // Filter to one source and archive one through Move to.
   const from = page.getByRole("group", { name: "From" });
   await from.getByRole("button", { name: "Backlog" }).click();
   await expect(list.getByRole("listitem")).toHaveCount(2);
-  await page.getByLabel("Select all shown").check();
-  await page.getByRole("button", { name: "Archive selected" }).click();
-  await expect(page.getByText(/^Archived 2\./)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Inbox (3)" })).toBeVisible();
-  await expect(list.getByRole("listitem")).toHaveCount(3);
+  await page.getByRole("button", { name: "Move to: Pretend backlog one" }).click();
+  await page.getByRole("group", { name: "Move Pretend backlog one to" }).getByRole("button", { name: "Archive" }).click();
+  await expect(page.getByRole("link", { name: "Inbox (4)" })).toBeVisible();
+  await expect(list.getByRole("listitem")).toHaveCount(1);
 
-  // They are still there, in the archived list, and can be restored.
-  await page.getByText("Archived from the inbox (2)").click();
+  // It is still there, in the archived list, and can be restored.
+  await page.getByText("Archived from the inbox (1)").click();
   await page.getByRole("button", { name: "Restore: Pretend backlog one" }).click();
-  await expect(list.getByRole("listitem")).toHaveCount(4);
+  await expect(list.getByRole("listitem")).toHaveCount(2);
 
-  // One-tap filing into an area, then see it there.
-  await page.getByRole("button", { name: "File Pretend google one in Art" }).click();
-  await expect(list.getByRole("listitem")).toHaveCount(3);
+  // Delete goes to the Bin, with Undo.
+  await from.getByRole("button", { name: "All" }).click();
+  await page.getByRole("button", { name: "Delete: Pretend thought one" }).click();
+  await expect(page.getByText("Moved to the Bin · Undo")).toBeVisible();
+  await expect(list.getByRole("listitem")).toHaveCount(4);
+  await page.getByRole("link", { name: "Bin", exact: true }).click();
+  await expect(page.getByRole("list", { name: "In the bin" }).getByText("Pretend thought one")).toBeVisible();
+  await page.getByRole("button", { name: "Restore: Pretend thought one" }).click();
+  await expect(page.getByText("The bin is empty.")).toBeVisible();
+
+  // Sort this… from a strip's Move to: the sort card opens on it; file it, then see it there.
+  await page.goto("/inbox");
+  await page.getByRole("button", { name: "Move to: Pretend google one" }).click();
+  await page.getByRole("group", { name: "Move Pretend google one to" }).getByRole("button", { name: "Sort this…" }).click();
+  const card = page.getByRole("region", { name: "Item to sort" });
+  await expect(card.getByText("Pretend google one")).toBeVisible();
+  await card.getByRole("button", { name: "To-do" }).click();
+  await card.getByRole("button", { name: "Art", exact: true }).click();
+  await expect(page.getByText("Filed as To-do in Art · Undo")).toBeVisible();
+  await page.goto("/inbox");
+  await expect(list.getByRole("listitem")).toHaveCount(4);
   await page.goto("/area/art");
   await expect(page.getByText("Pretend google one")).toBeVisible();
 });

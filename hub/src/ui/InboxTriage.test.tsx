@@ -1,15 +1,20 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import * as repo from "../data/repo";
-import { createGoal, createItem } from "../data/repo";
+import { createItem } from "../data/repo";
 import type { Item } from "../domain/types";
 import { inboxSource } from "./inboxSource";
 import { InboxPage } from "./InboxPage";
 import { ShellContext } from "./shellContext";
 
 const TODAY = "2026-10-28";
+
+/** The Inbox links to Sort one by one, so it renders inside a router. */
+const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 beforeEach(async () => {
   await db.items.clear();
@@ -26,8 +31,7 @@ const backlog = (title: string): Seed => ({ title, source: { kind: "backlog", ke
 const gtask = (title: string): Seed => ({ title, source: { kind: "gtasks", key: `gtasks:${title}` } });
 
 const box = () => screen.getByRole("textbox", { name: "Add to inbox" });
-const rowOf = (title: string) =>
-  screen.getByRole("checkbox", { name: `Select ${title}` }).closest("li") as HTMLElement;
+const rowOf = (title: string) => screen.getByText(title, { selector: ".strip-title" }).closest("li") as HTMLElement;
 
 describe("quick capture", () => {
   it("is the first thing under the heading, above To sort", async () => {
@@ -111,150 +115,11 @@ describe("quick capture", () => {
   });
 });
 
-describe("one-tap area buttons and More options", () => {
-  it("each row has a button per area with an accessible name, in a pill group", async () => {
-    await seed({ title: "Loose" });
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Loose" });
-    const group = within(rowOf("Loose")).getByRole("group", { name: "File Loose in" });
-    expect(group).toHaveClass("btn-group");
-    const buttons = within(group).getAllByRole("button");
-    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual(
-      ["Writing", "Art", "Content", "Mind", "Body", "Tech projects", "Production", "Admin"].map((a) => `File Loose in ${a}`),
-    );
-    expect(buttons.every((b) => b.classList.contains("btn-secondary"))).toBe(true);
-    expect(buttons.map((b) => b.textContent)).toContain("Tech projects");
-  });
-
-  it("one tap files the item and the row leaves the list", async () => {
-    await seed({ title: "Loose" }, { title: "Stays" });
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(await screen.findByRole("button", { name: "File Loose in Art" }));
-    await vi.waitFor(() => expect(screen.queryByRole("checkbox", { name: "Select Loose" })).toBeNull());
-    expect(screen.getByRole("checkbox", { name: "Select Stays" })).toBeInTheDocument();
-    const got = (await db.items.filter((i) => i.title === "Loose").first())!;
-    expect(got).toMatchObject({ areaId: "art", touchedAt: TODAY, priority: 2 });
-  });
-
-  it("one tap tells the shell", async () => {
-    await seed({ title: "Loose" });
-    const refresh = vi.fn();
-    render(
-      <ShellContext.Provider value={{ refresh, version: 0, today: TODAY }}>
-        <InboxPage today={TODAY} />
-      </ShellContext.Provider>,
-    );
-    await userEvent.click(await screen.findByRole("button", { name: "File Loose in Body" }));
-    await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
-  });
-
-  it("a failed tap shows the calm message and keeps the row", async () => {
-    await seed({ title: "Loose" });
-    render(<InboxPage today={TODAY} />);
-    const btn = await screen.findByRole("button", { name: "File Loose in Art" });
-    const spy = vi.spyOn(db.items, "update").mockRejectedValue(new Error("boom"));
-    await userEvent.click(btn);
-    expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
-    spy.mockRestore();
-    expect((await db.items.toArray())[0].areaId).toBe("inbox");
-  });
-
-  it("the detailed controls sit in a collapsed More options and still file with goal, priority and due", async () => {
-    await createGoal({ title: "Zine", areaId: "writing", kind: "practice" }, TODAY);
-    await seed({ title: "Loose" });
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Loose" });
-    const summary = within(rowOf("Loose")).getByText("More options", { selector: "summary" });
-    const details = summary.closest("details")!;
-    expect(details).not.toHaveAttribute("open");
-    for (const l of ["Area for Loose", "Goal for Loose", "Priority for Loose", "Due for Loose"]) {
-      expect(within(details).getByLabelText(l)).toBeInTheDocument();
-    }
-    expect(within(details).getByRole("button", { name: "File Loose" })).toBeInTheDocument();
-    // The default view is just the title and the area buttons.
-    expect(within(rowOf("Loose")).getByRole("button", { name: "File Loose in Art" }).closest("details")).toBeNull();
-
-    await userEvent.click(summary);
-    await userEvent.selectOptions(within(details).getByLabelText("Area for Loose"), "writing");
-    await userEvent.selectOptions(within(details).getByLabelText("Goal for Loose"), "Zine");
-    await userEvent.selectOptions(within(details).getByLabelText("Priority for Loose"), "3");
-    fireEvent.change(within(details).getByLabelText("Due for Loose"), { target: { value: "2026-11-05" } });
-    await userEvent.click(within(details).getByRole("button", { name: "File Loose" }));
-    await vi.waitFor(async () => expect((await db.items.toArray())[0].areaId).toBe("writing"));
-    const got = (await db.items.toArray())[0];
-    expect(got).toMatchObject({ priority: 3, due: "2026-11-05" });
-    expect(got.goalId).toBeTruthy();
-  });
-});
-
-describe("Archive selected", () => {
-  it("is disabled until something is selected", async () => {
-    await seed({ title: "A" });
-    render(<InboxPage today={TODAY} />);
-    const btn = await screen.findByRole("button", { name: "Archive selected" });
-    expect(btn).toBeDisabled();
-    await userEvent.click(screen.getByRole("checkbox", { name: "Select A" }));
-    expect(btn).toBeEnabled();
-  });
-
-  it("archives the selection, never deletes, says so, and lists them to restore", async () => {
-    await seed({ title: "A" }, { title: "B" }, { title: "C" });
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Select A" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Select B" }));
-    await userEvent.click(screen.getByRole("button", { name: "Archive selected" }));
-    expect(
-      await screen.findByText("Archived 2. You can restore them under Archived from the inbox, below."),
-    ).toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.queryByRole("checkbox", { name: "Select A" })).toBeNull());
-    expect(screen.getByRole("checkbox", { name: "Select C" })).toBeInTheDocument();
-    const all = await db.items.toArray();
-    expect(all).toHaveLength(3);
-    expect(all.filter((i) => i.status === "archived").map((i) => i.title).sort()).toEqual(["A", "B"]);
-
-    const details = screen.getByText("Archived from the inbox (2)", { selector: "summary" }).closest("details")!;
-    expect(details).not.toHaveAttribute("open");
-    await userEvent.click(within(details).getByRole("button", { name: "Restore: A" }));
-    await screen.findByRole("checkbox", { name: "Select A" });
-    expect((await db.items.filter((i) => i.title === "A").first())!.status).toBe("open");
-    expect(screen.getByText("Archived from the inbox (1)", { selector: "summary" })).toBeInTheDocument();
-  });
-
-  it("double-clicking archives once", async () => {
-    await seed({ title: "A" }, { title: "B" });
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Select all shown" }));
-    const spy = vi.spyOn(repo, "archiveItems");
-    const btn = screen.getByRole("button", { name: "Archive selected" });
-    fireEvent.click(btn);
-    fireEvent.click(btn);
-    await screen.findByText("Nothing waiting in the inbox.");
-    expect(spy).toHaveBeenCalledTimes(1);
-    spy.mockRestore();
-  });
-
-  it("a failing archive shows the calm message and archives nothing", async () => {
-    await seed({ title: "A" }, { title: "B" });
-    render(<InboxPage today={TODAY} />);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Select all shown" }));
-    const real = db.items.update.bind(db.items);
-    let n = 0;
-    const spy = vi.spyOn(db.items, "update").mockImplementation(((...a: Parameters<typeof real>) => {
-      if (++n === 2) throw new Error("boom");
-      return real(...a);
-    }) as never);
-    await userEvent.click(screen.getByRole("button", { name: "Archive selected" }));
-    expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
-    spy.mockRestore();
-    expect((await db.items.toArray()).every((i) => i.status === "open")).toBe(true);
-  });
-});
-
 describe("From filter", () => {
   it("is hidden when everything comes from one source", async () => {
     await seed(backlog("One"), backlog("Two"));
     render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select One" });
+    await screen.findByText("One", { selector: ".strip-title" });
     expect(screen.queryByRole("group", { name: "From" })).toBeNull();
   });
 
@@ -275,10 +140,10 @@ describe("From filter", () => {
     const group = await screen.findByRole("group", { name: "From" });
     await userEvent.click(within(group).getByRole("button", { name: "Google Tasks" }));
     expect(within(group).getByRole("button", { name: "Google Tasks" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByRole("checkbox", { name: "Select Ba" })).toBeNull();
-    expect(screen.getByRole("checkbox", { name: "Select Gt" })).toBeInTheDocument();
+    expect(screen.queryByText("Ba", { selector: ".strip-title" })).toBeNull();
+    expect(screen.getByText("Gt", { selector: ".strip-title" })).toBeInTheDocument();
     await userEvent.click(within(group).getByRole("button", { name: "All" }));
-    expect(screen.getByRole("checkbox", { name: "Select Ba" })).toBeInTheDocument();
+    expect(screen.getByText("Ba", { selector: ".strip-title" })).toBeInTheDocument();
   });
 
   it("vault-review tags choose the source, ahead of the source kind", () => {
@@ -306,44 +171,19 @@ describe("From filter", () => {
     ]);
   });
 
-  it("Select all shown and the bulk actions respect the filter", async () => {
-    await seed(backlog("Ba1"), backlog("Ba2"), gtask("Gt"));
-    render(<InboxPage today={TODAY} />);
-    const group = await screen.findByRole("group", { name: "From" });
-    await userEvent.click(within(group).getByRole("button", { name: "Backlog" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Select all shown" }));
-    expect(screen.getByRole("checkbox", { name: "Select Ba1" })).toBeChecked();
-    await userEvent.click(screen.getByRole("button", { name: "Archive selected" }));
-    await vi.waitFor(async () =>
-      expect((await db.items.toArray()).filter((i) => i.status === "archived").map((i) => i.title).sort()).toEqual(["Ba1", "Ba2"]),
-    );
-    expect((await db.items.filter((i) => i.title === "Gt").first())!.status).toBe("open");
-  });
-
-  it("changing the filter drops selections that are no longer shown", async () => {
-    await seed(backlog("Ba"), gtask("Gt"));
-    render(<InboxPage today={TODAY} />);
-    const group = await screen.findByRole("group", { name: "From" });
-    await userEvent.click(screen.getByRole("checkbox", { name: "Select Ba" }));
-    await userEvent.click(within(group).getByRole("button", { name: "Google Tasks" }));
-    expect(screen.getByRole("button", { name: "Archive selected" })).toBeDisabled();
-    await userEvent.click(within(group).getByRole("button", { name: "All" }));
-    expect(screen.getByRole("checkbox", { name: "Select Ba" })).not.toBeChecked();
-  });
-
   it("once a chosen source has emptied, it does not come back filtered when items return", async () => {
     await seed(backlog("Ba"), gtask("Gt"), { title: "Plain" });
     render(<InboxPage today={TODAY} />);
     const group = await screen.findByRole("group", { name: "From" });
     await userEvent.click(within(group).getByRole("button", { name: "Backlog" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Select Ba" }));
-    await userEvent.click(screen.getByRole("button", { name: "Archive selected" }));
+    await userEvent.click(screen.getByRole("button", { name: "Move to: Ba" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Move Ba to" })).getByRole("button", { name: "Archive" }));
     await screen.findByText("Archived from the inbox (1)", { selector: "summary" });
     await userEvent.click(screen.getByRole("button", { name: "Restore: Ba" }));
     const again = await screen.findByRole("group", { name: "From" });
     expect(within(again).getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("checkbox", { name: "Select Gt" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Select Plain" })).toBeInTheDocument();
+    expect(screen.getByText("Gt", { selector: ".strip-title" })).toBeInTheDocument();
+    expect(screen.getByText("Plain", { selector: ".strip-title" })).toBeInTheDocument();
   });
 
   it("falls back to All when the chosen source has nothing left", async () => {
@@ -351,126 +191,9 @@ describe("From filter", () => {
     render(<InboxPage today={TODAY} />);
     const group = await screen.findByRole("group", { name: "From" });
     await userEvent.click(within(group).getByRole("button", { name: "Backlog" }));
-    await userEvent.click(screen.getByRole("button", { name: "File Ba in Art" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete: Ba" }));
     await vi.waitFor(() => expect(screen.queryByRole("group", { name: "From" })).toBeNull());
-    expect(screen.getByRole("checkbox", { name: "Select Gt" })).toBeInTheDocument();
-  });
-});
-
-describe("type control and Make it a goal (inside More options)", () => {
-  const more = (title: string) =>
-    within(rowOf(title)).getByText("More options", { selector: "summary" }).closest("details") as HTMLElement;
-
-  it("offers To-do and Idea toggle pills, reflecting the item's kind", async () => {
-    await seed({ title: "Loose" });
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Loose" });
-    const group = within(more("Loose")).getByRole("group", { name: "This is a:" });
-    expect(group).toHaveClass("btn-group");
-    expect(within(group).getByRole("button", { name: "To-do" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(group).getByRole("button", { name: "Idea" })).toHaveAttribute("aria-pressed", "false");
-  });
-
-  it("choosing Idea saves the kind, drops due and recur, and keeps the row in the inbox", async () => {
-    await createItem(
-      { kind: "task", title: "Loose", areaId: "inbox", priority: 2, due: "2026-11-01", recur: ["mon"], pinnedDate: "2026-10-28", hiddenOn: "2026-10-28" },
-      TODAY,
-    );
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Loose" });
-    await userEvent.click(within(more("Loose")).getByRole("button", { name: "Idea" }));
-    await vi.waitFor(async () => expect((await db.items.toArray())[0].kind).toBe("idea"));
-    const got = (await db.items.toArray())[0];
-    for (const k of ["due", "recur", "pinnedDate", "hiddenOn"] as const) expect(k in got).toBe(false);
-    expect(got.areaId).toBe("inbox");
-    await vi.waitFor(() =>
-      expect(within(more("Loose")).getByRole("button", { name: "Idea" })).toHaveAttribute("aria-pressed", "true"),
-    );
-    expect(screen.getByRole("checkbox", { name: "Select Loose" })).toBeInTheDocument();
-    // and back to a to-do
-    await userEvent.click(within(more("Loose")).getByRole("button", { name: "To-do" }));
-    await vi.waitFor(async () => expect((await db.items.toArray())[0].kind).toBe("task"));
-  });
-
-  it("Make it a goal creates a practice goal in the chosen area and archives the item", async () => {
-    await seed({ title: "Learn pottery" });
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Learn pottery" });
-    const d = more("Learn pottery");
-    await userEvent.click(within(rowOf("Learn pottery")).getByText("More options", { selector: "summary" }));
-    await userEvent.selectOptions(within(d).getByLabelText("Area for Learn pottery"), "art");
-    await userEvent.click(within(d).getByRole("button", { name: "Make it a goal" }));
-    await vi.waitFor(async () => expect(await db.goals.count()).toBe(1));
-    expect((await db.goals.toArray())[0]).toMatchObject({ title: "Learn pottery", areaId: "art", kind: "practice" });
-    const item = (await db.items.toArray())[0];
-    expect(item).toMatchObject({ status: "archived", notes: "Became a goal: Learn pottery" });
-    await vi.waitFor(() => expect(screen.queryByRole("checkbox", { name: "Select Learn pottery" })).toBeNull());
-  });
-
-  it("Make it a goal with no area chosen proposes admin", async () => {
-    await seed({ title: "Vague" });
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Vague" });
-    await userEvent.click(within(more("Vague")).getByRole("button", { name: "Make it a goal" }));
-    await vi.waitFor(async () => expect(await db.goals.count()).toBe(1));
-    expect((await db.goals.toArray())[0].areaId).toBe("admin");
-  });
-
-  it("a failing Make it a goal shows the calm message and changes nothing", async () => {
-    await seed({ title: "Vague" });
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Vague" });
-    const spy = vi.spyOn(db.items, "update").mockRejectedValue(new Error("boom"));
-    await userEvent.click(within(more("Vague")).getByRole("button", { name: "Make it a goal" }));
-    expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
-    spy.mockRestore();
-    expect(await db.goals.count()).toBe(0);
-    expect((await db.items.toArray())[0].status).toBe("open");
-  });
-});
-
-describe("filing details", () => {
-  it("an idea is filed without a due date and has no Due field", async () => {
-    await createItem({ kind: "idea", title: "Dreamy", areaId: "inbox", priority: 2, due: "2026-11-01" }, TODAY);
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Dreamy" });
-    expect(screen.queryByLabelText("Due for Dreamy")).toBeNull();
-    const row = rowOf("Dreamy");
-    await userEvent.click(within(row).getByText("More options", { selector: "summary" }));
-    await userEvent.selectOptions(within(row).getByLabelText("Area for Dreamy"), "art");
-    await userEvent.click(within(row).getByRole("button", { name: "File Dreamy" }));
-    await vi.waitFor(async () => expect((await db.items.toArray())[0].areaId).toBe("art"));
-    expect("due" in (await db.items.toArray())[0]).toBe(false);
-  });
-
-  it("File it is disabled while the write is running", async () => {
-    await seed({ title: "Slow" });
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Slow" });
-    const row = rowOf("Slow");
-    await userEvent.click(within(row).getByText("More options", { selector: "summary" }));
-    await userEvent.selectOptions(within(row).getByLabelText("Area for Slow"), "art");
-    let release: () => void = () => undefined;
-    const spy = vi.spyOn(repo, "updateItem").mockImplementation(() => new Promise<void>((res) => (release = res)));
-    const btn = within(row).getByRole("button", { name: "File Slow" });
-    fireEvent.click(btn);
-    await vi.waitFor(() => expect(btn).toBeDisabled());
-    fireEvent.click(btn);
-    expect(spy).toHaveBeenCalledTimes(1);
-    release();
-    spy.mockRestore();
-  });
-
-  it("a failed switch to Idea keeps the due date in the field", async () => {
-    await createItem({ kind: "task", title: "Dated", areaId: "inbox", priority: 2, due: "2026-11-01" }, TODAY);
-    render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Dated" });
-    const spy = vi.spyOn(db.items, "update").mockRejectedValue(new Error("boom"));
-    await userEvent.click(within(rowOf("Dated")).getByRole("button", { name: "Idea" }));
-    expect(await screen.findByText("That did not save. Try again.")).toBeInTheDocument();
-    spy.mockRestore();
-    expect(within(rowOf("Dated")).getByLabelText("Due for Dated")).toHaveValue("2026-11-01");
-    expect((await db.items.toArray())[0].kind).toBe("task");
+    expect(screen.getByText("Gt", { selector: ".strip-title" })).toBeInTheDocument();
   });
 });
 
@@ -485,7 +208,7 @@ describe("check reasons", () => {
       TODAY,
     );
     render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Maybe done" });
+    await screen.findByText("Maybe done", { selector: ".strip-title" });
     expect(within(rowOf("Maybe done")).getByText("Check: not sure if this is still open")).toBeInTheDocument();
     expect(screen.queryByText("more detail")).toBeNull();
     expect(screen.queryByText("Check: this should not show")).toBeNull();
@@ -498,7 +221,7 @@ describe("check reasons", () => {
       TODAY,
     );
     render(<InboxPage today={TODAY} />);
-    await screen.findByRole("checkbox", { name: "Select Tagged" });
+    await screen.findByText("Tagged", { selector: ".strip-title" });
     expect(document.querySelectorAll(".inbox-check")).toHaveLength(1);
     expect(screen.getByText("Check: <b>idea</b> or to-do?")).toBeInTheDocument();
     expect(document.querySelector("b")).toBeNull();

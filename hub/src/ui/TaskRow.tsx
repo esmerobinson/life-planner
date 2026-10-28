@@ -49,7 +49,10 @@ export function DueLine({ item, today }: { item: Item; today: ISODate }) {
  * One task (or idea) as a strip: tick box on the left (Done; tasks only), title with the
  * due line under it, and the Schedule for (tasks only) and Move to icons on the right.
  * `meta` adds lines under the title, `extra` sits before the icons, `tray` is a second
- * line under the title for a page's own controls.
+ * line under the title for a page's own controls, `trail` sits after the icons.
+ * `untyped` is for Inbox items, which have no type until they are sorted: no tick box,
+ * and nothing that depends on the stored kind (the calendar shows, Move to has no
+ * "Change to").
  */
 export function TaskRow({
   item,
@@ -59,7 +62,8 @@ export function TaskRow({
   meta,
   extra,
   tray,
-  lead,
+  trail,
+  untyped = false,
   className,
   onTodayList,
 }: {
@@ -71,20 +75,18 @@ export function TaskRow({
   meta?: ReactNode;
   extra?: ReactNode;
   tray?: ReactNode;
-  /** Sits in the tick box's place when there is no tick box (the Inbox's Select checkbox). */
-  lead?: ReactNode;
+  trail?: ReactNode;
+  untyped?: boolean;
   className?: string;
   /** This strip is on the Today list (offers Remove from today). */
   onTodayList?: boolean;
 }) {
   // Shows the box ticked until the refresh removes the row (React would otherwise snap it back).
   const [ticked, setTicked] = useState(false);
-  const isTask = item.kind === "task";
-  const tick = isTask && onTick !== undefined;
-  const first = tick || lead !== undefined;
+  const isTask = untyped || item.kind === "task";
+  const tick = !untyped && isTask && onTick !== undefined;
   return (
-    <li className={["strip", first ? "" : "no-tick", className ?? ""].filter(Boolean).join(" ")}>
-      {!tick && lead}
+    <li className={["strip", tick ? "" : "no-tick", className ?? ""].filter(Boolean).join(" ")}>
       {tick && (
         <input
           type="checkbox"
@@ -117,12 +119,14 @@ export function TaskRow({
         <MoveToMenu
           itemId={item.id}
           areaId={item.areaId}
-          kind={item.kind}
+          kind={untyped ? undefined : item.kind}
+          untyped={untyped}
           today={today}
           onMoved={onMoved}
           label={item.title}
           onTodayList={onTodayList}
         />
+        {trail}
       </div>
       {tray && <div className="strip-tray">{tray}</div>}
     </li>

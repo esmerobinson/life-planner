@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { vi } from "vitest";
@@ -9,6 +10,9 @@ import { AppShell } from "./AppShell";
 import { InboxPage } from "./InboxPage";
 
 const TODAY = "2026-10-27";
+
+/** The Inbox links to Sort one by one, so it renders inside a router (unless the test brings its own). */
+const render = (ui: ReactElement) => rtlRender(ui.type === MemoryRouter ? ui : <MemoryRouter>{ui}</MemoryRouter>);
 
 beforeEach(async () => {
   await db.items.clear();
@@ -68,7 +72,7 @@ describe("Inbox: To sort and Needs a look", () => {
   it("does not list unsorted inbox items under Needs a look", async () => {
     await seed("Loose", { areaId: "inbox", due: "2026-10-01" });
     render(<InboxPage today={TODAY} />);
-    await screen.findByLabelText("Area for Loose");
+    await screen.findByText("Loose", { selector: ".strip-title" });
     expect(screen.getByText("Nothing needs a look.")).toBeInTheDocument();
   });
 

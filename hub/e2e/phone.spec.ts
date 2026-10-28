@@ -64,7 +64,7 @@ async function seedPretendWorld(page: Page) {
   await seed(page, items, goals);
 }
 
-/** Every route. /bin and /inbox/sort come with the Inbox work; until then they are an empty shell. */
+/** Every route. */
 const ROUTES = [
   ["home", "/"],
   ["today", "/today"],
@@ -108,8 +108,6 @@ for (const width of [360, 390, 430]) {
         await seedPretendWorld(page);
         await page.goto(path);
         await page.waitForLoadState("networkidle");
-        // /bin and /inbox/sort have no route until the Inbox work merges; skip them till then.
-        test.skip((await page.locator(".app-shell").count()) === 0, `${path} is not a route on this branch yet`);
         await expect(page.locator(".phone-top")).toBeVisible();
         await page.waitForLoadState("networkidle");
         const m = await sideways(page);
@@ -137,7 +135,7 @@ for (const width of [360, 390, 430]) {
 test.describe("phone layout at 390px", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("Home: no sidebar, Esmeworld and the Inbox pill, the app grid, Today, then Backup and Sync", async ({ page }) => {
+  test("Home: no sidebar, Esmeworld and the Inbox pill, the app grid, Today, then Backup, Sync and Bin", async ({ page }) => {
     await seedPretendWorld(page);
     await page.reload();
     await expect(page.locator("aside.sidebar")).toHaveCount(0);
@@ -153,6 +151,7 @@ test.describe("phone layout at 390px", () => {
     const more = page.getByRole("navigation", { name: "More" });
     await expect(more.getByRole("link", { name: "Backup" })).toBeVisible();
     await expect(more.getByRole("link", { name: "Sync" })).toBeVisible();
+    await expect(more.getByRole("link", { name: "Bin" })).toBeVisible();
   });
 
   test("an app opens full-screen with a back arrow that returns Home; opened directly, Back goes Home", async ({ page }) => {

@@ -28,3 +28,11 @@ export function inboxSource(item: Item): InboxSource {
   if (item.source?.kind === "gtasks") return "Google Tasks";
   return "Other";
 }
+
+/**
+ * The Inbox in its listing order: oldest first, then by id. Never by the sync stamp, so
+ * saving a note (or any edit from elsewhere) cannot move an item.
+ */
+export function inboxOrder(inbox: Item[]): Item[] {
+  return [...inbox].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}

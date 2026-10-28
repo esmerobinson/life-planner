@@ -1,6 +1,6 @@
-import { useContext } from "react";
-import { useParams } from "react-router-dom";
-import { toggleMilestone, untickItem, updateGoal } from "../data/repo";
+import { useContext, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { deleteGoal, toggleMilestone, untickItem, updateGoal } from "../data/repo";
 import { groupGoalTasks, monthlyProgress } from "../domain/progress";
 import type { ISODate } from "../domain/types";
 import { DoneSection } from "./DoneSection";
@@ -18,6 +18,13 @@ export function GoalDetail({ today }: { today: ISODate }) {
   const { attempt, saveError } = useSaveError();
   const shell = useContext(ShellContext);
   const goal = goals.find((g) => g.id === id);
+  const navigate = useNavigate();
+  const [asking, setAsking] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // The question replaces the focused Delete goal button: focus lands on Cancel, so it is heard.
+  useEffect(() => {
+    if (asking) cancelRef.current?.focus();
+  }, [asking]);
 
   if (!loaded) return null;
   if (error) return <p>{error}</p>;
@@ -89,7 +96,7 @@ export function GoalDetail({ today }: { today: ISODate }) {
         </div>
       ))}
       <DoneSection
-        items={items.filter((i) => i.goalId === goal.id && i.kind === "task")}
+        items={items.filter((i) => i.goalId === goal.id && i.kind === "task" && i.areaId !== "inbox")}
         today={today}
         onUndo={(itemId) => void save(() => untickItem(itemId, today))}
       />
@@ -98,6 +105,37 @@ export function GoalDetail({ today }: { today: ISODate }) {
         goal={goal}
         onSave={(patch) => save(() => updateGoal(goal.id, patch, today))}
       />
+      {/* Delete goal: to the Bin (restorable there), after the same confirm step as Empty bin. */}
+      {!asking ? (
+        <button type="button" className="btn-secondary" onClick={() => setAsking(true)}>
+          Delete goal
+        </button>
+      ) : (
+        <div className="btn-group">
+          <p id="goal-delete-question">Delete this goal? You can restore it from the Bin.</p>
+          <button
+            type="button"
+            onClick={() =>
+              void attempt(() => deleteGoal(goal.id, today)).then(async (ok) => {
+                if (!ok) return;
+                await shell?.refresh();
+                navigate("/goals");
+              })
+            }
+          >
+            Confirm
+          </button>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="btn-secondary"
+            aria-describedby="goal-delete-question"
+            onClick={() => setAsking(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </section>
   );
 }
