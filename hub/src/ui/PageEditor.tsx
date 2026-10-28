@@ -705,7 +705,8 @@ function PictureLine({ id, alt, onRemove }: { id: string; alt: string; onRemove:
   const file = useFile(id);
   const shown = file && file.status !== "purged" && file.data !== "";
   return (
-    <figure className="page-pic">
+    // Focusable, so Tab reaches it and shows its (otherwise hover-only) Remove button.
+    <figure className="page-pic" tabIndex={0}>
       {shown ? (
         <img src={`data:${file.mime};base64,${file.data}`} alt={alt || "Picture"} width={file.width} height={file.height} />
       ) : file === undefined ? (

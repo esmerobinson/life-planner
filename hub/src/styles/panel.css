@@ -208,6 +208,11 @@ textarea.page-field {
   overflow: hidden;
 }
 
+/* phone.css's rule against iOS focus zoom, kept for the page's fields (font: inherit above). */
+.is-phone textarea.page-field {
+  font-size: max(16px, 1em);
+}
+
 .page-placeholder {
   opacity: 0.6;
 }
