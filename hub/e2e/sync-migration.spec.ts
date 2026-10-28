@@ -45,7 +45,7 @@ test("an existing v1 database upgrades with every row kept, stamped and pending"
         };
       }),
   );
-  expect(stored.version).toBe(30); // Dexie version 3
+  expect(stored.version).toBe(40); // Dexie version 4 (round 3b: files)
   expect(stored.items).toHaveLength(1);
   expect(typeof stored.items[0]!.updatedAt).toBe("number");
   expect(stored.pending).toHaveLength(2);

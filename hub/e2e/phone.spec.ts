@@ -16,10 +16,17 @@ async function seed(page: Page, items: Row[], goals: Row[]) {
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
       });
+      // A wide made-up picture for the task page (round 3b), drawn here so it is a real JPEG.
+      const canvas = document.createElement("canvas");
+      canvas.width = 1600;
+      canvas.height = 400;
+      canvas.getContext("2d")!.fillRect(0, 0, 1600, 400);
+      const data = canvas.toDataURL("image/jpeg", 0.8).split(",")[1]!;
       await new Promise<void>((res, rej) => {
-        const tx = db.transaction(["items", "goals"], "readwrite");
+        const tx = db.transaction(["items", "goals", "files"], "readwrite");
         for (const r of is) tx.objectStore("items").put(r);
         for (const g of gs) tx.objectStore("goals").put(g);
+        tx.objectStore("files").put({ id: "ph1", mime: "image/jpeg", data, width: 1600, height: 400, createdAt: "2026-10-28" });
         tx.oncomplete = () => res();
         tx.onerror = () => rej(tx.error);
       });
@@ -42,7 +49,17 @@ async function seedPretendWorld(page: Page) {
   });
   const items: Row[] = [
     task("t1", "Sketch the pretend lighthouse for the zine cover", { due: await d(-2), priority: 1, goalId: "g1" }),
-    task("t2", "Sort the imaginary paint drawer by colour family, then label every jar so it is easy to find later", { due: today }),
+    task("t2", "Sort the imaginary paint drawer by colour family, then label every jar so it is easy to find later", {
+      due: today,
+      // The page (round 3b): a heading, a checklist, an unbroken long link, a wide picture.
+      notes: [
+        "# Pretend drawer plan",
+        "- [x] Empty the pretend drawer onto the table",
+        "- [ ] Group the made-up jars by colour family and write a label for every single one",
+        "https://example.com/a/very/long/pretend/link/without/any/spaces/that/must/still/wrap/inside/the/phone/width",
+        "![](file:ph1)",
+      ].join("\n"),
+    }),
     task("t3", "Supercalifragilisticexpialidociouspretendwordwithnobreaks", { pinnedDate: today, areaId: "writing" }),
     task("t4", "Book the pretend life-drawing class", { due: await d(3), areaId: "admin" }),
     { ...task("i1", "A comic about a snail who runs a pretend post office"), kind: "idea", notes: "Maybe four panels" },
