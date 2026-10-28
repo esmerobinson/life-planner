@@ -157,6 +157,10 @@ export function PageEditor({
 
   /** Starts typing in a line (synchronously, so the phone keyboard opens on the tap). */
   function activate(key: string, caret: number) {
+    // A lone old-Mac "\r" inside a line would become a line break in a text field, so such a
+    // (very rare) line is shown but not typed into; it is kept exactly as stored.
+    const row = rowsRef.current.find((r) => r.key === key);
+    if (row && parseLine(row.line).text.includes("\r")) return;
     flushSync(() => setActive(key));
     const el = areas.current.get(key);
     if (!el) return;
@@ -180,13 +184,19 @@ export function PageEditor({
     const target = rs[idx];
     const block = parseLine(line);
     const focus = block.type === "picture" ? undefined : block.text.length;
-    if (target && target.line === "") {
-      replaceLine(target.key, line, focus);
+    if (target && (target.line === "" || target.line === "\r")) {
+      replaceLine(target.key, line + target.line, focus);
       if (block.type === "picture") lastKey.current = target.key;
       return;
     }
     const key = newKey();
-    commit([...rs.slice(0, idx + 1), { key, line }, ...rs.slice(idx + 1)], focus === undefined ? undefined : { key, caret: focus });
+    // Windows (CRLF) notes stay CRLF: the new line ends like the line it follows, and after the
+    // last line of a CRLF note that line gains the "\r" its new line break needs.
+    const crlf = rs.some((r) => r.line.endsWith("\r"));
+    const targetEol = target?.line.endsWith("\r") ? "\r" : "";
+    const before = rs.slice(0, idx + 1);
+    if (target && crlf && !targetEol && idx === rs.length - 1) before[idx] = { key: target.key, line: `${target.line}\r` };
+    commit([...before, { key, line: line + targetEol }, ...rs.slice(idx + 1)], focus === undefined ? undefined : { key, caret: focus });
     if (block.type === "picture") lastKey.current = key;
   }
 
@@ -212,7 +222,7 @@ export function PageEditor({
     }
     if (cmd === "heading" || cmd === "checklist") {
       const marker = cmd === "heading" ? NEW_LINE.heading : NEW_LINE.checklist;
-      if (at) replaceLine(at.key, marker + at.text, at.caret);
+      if (at) replaceLine(at.key, marker + at.text + at.block.eol, at.caret);
       else placeLine(marker);
       return;
     }
@@ -281,7 +291,8 @@ export function PageEditor({
       // Pasted lines become lines of their own (the first keeps this line's marker).
       const parts = typedText.split("\n");
       const first = withText(block, parts[0]!);
-      const added = parts.slice(1).map((line) => ({ key: newKey(), line }));
+      // Every new line break in a CRLF line is CRLF too (the original "\r" stays at the end).
+      const added = parts.slice(1).map((line) => ({ key: newKey(), line: line + block.eol }));
       const rs = rowsRef.current;
       const i = rs.findIndex((r) => r.key === row.key);
       const last = added[added.length - 1]!;
@@ -352,17 +363,17 @@ export function PageEditor({
       e.preventDefault();
       setSlash(null);
       if ((block.type === "check" || block.type === "bullet") && text === "") {
-        replaceLine(row.key, "", 0); // Enter on an empty list line ends the list
+        replaceLine(row.key, block.eol, 0); // Enter on an empty list line ends the list
         return;
       }
       if (start === 0 && end === 0 && text !== "") {
         // At the very start: a new empty line above, the caret stays put.
         const key = newKey();
-        commit([...rs.slice(0, i), { key, line: continuation(block) }, ...rs.slice(i)], { key: row.key, caret: 0 });
+        commit([...rs.slice(0, i), { key, line: continuation(block) + block.eol }, ...rs.slice(i)], { key: row.key, caret: 0 });
         return;
       }
       const key = newKey();
-      const next = continuation(block) + text.slice(end);
+      const next = continuation(block) + text.slice(end) + block.eol;
       commit(
         [...rs.slice(0, i), { key: row.key, line: withText(block, text.slice(0, start)) }, { key, line: next }, ...rs.slice(i + 1)],
         { key, caret: 0 },
@@ -373,7 +384,7 @@ export function PageEditor({
     if (e.key === "Backspace" && start === 0 && end === 0) {
       if (block.type !== "p") {
         e.preventDefault(); // the marker goes first: the line becomes plain text
-        replaceLine(row.key, text, 0);
+        replaceLine(row.key, text + block.eol, 0);
         return;
       }
       const prev = rs[i - 1];
@@ -385,7 +396,7 @@ export function PageEditor({
         return;
       }
       commit(
-        [...rs.slice(0, i - 1), { key: prev.key, line: withText(prevBlock, prevBlock.text + text) }, ...rs.slice(i + 1)],
+        [...rs.slice(0, i - 1), { key: prev.key, line: withText({ ...prevBlock, eol: block.eol }, prevBlock.text + text) }, ...rs.slice(i + 1)],
         { key: prev.key, caret: prevBlock.text.length },
       );
       return;
@@ -397,7 +408,7 @@ export function PageEditor({
       const nextBlock = parseLine(nxt.line);
       if (nextBlock.type === "picture") return;
       e.preventDefault();
-      commit([...rs.slice(0, i), { key: row.key, line: withText(block, text + nextBlock.text) }, ...rs.slice(i + 2)], {
+      commit([...rs.slice(0, i), { key: row.key, line: withText({ ...block, eol: nextBlock.eol }, text + nextBlock.text) }, ...rs.slice(i + 2)], {
         key: row.key,
         caret: text.length,
       });

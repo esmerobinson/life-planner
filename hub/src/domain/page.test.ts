@@ -51,8 +51,20 @@ describe("page Markdown round trip", () => {
     expect(parsePage("Check: not sure if this is still open")[0]).toMatchObject({ type: "p", text: "Check: not sure if this is still open" });
   });
 
+  it("Windows (CRLF) lines keep their \\r outside the typed text", () => {
+    const md = "# Plan\r\n- [ ] Call Sam\r\n- [x]\r\n![](file:p1)\r\nDone when: booked";
+    expect(roundTrip(md)).toBe(md);
+    const blocks = parsePage(md);
+    expect(blocks.map((b) => [b.type, b.text, b.eol])).toEqual([
+      ["h1", "Plan", "\r"], ["check", "Call Sam", "\r"], ["check", "", "\r"], ["picture", "", "\r"], ["p", "Done when: booked", ""],
+    ]);
+    expect(withText(blocks[1]!, "Call Sam now")).toBe("- [ ] Call Sam now\r");
+    expect(toggleCheckLine("- [ ] Call Sam\r")).toBe("- [x] Call Sam\r");
+    expect(toggleCheckLine("- [x]\r")).toBe("- [ ]\r");
+  });
+
   it("empty notes are a single empty paragraph", () => {
-    expect(parsePage("")).toEqual([{ type: "p", prefix: "", text: "", indent: 0 }]);
+    expect(parsePage("")).toEqual([{ type: "p", prefix: "", text: "", indent: 0, eol: "" }]);
     expect(serializePage(parsePage(""))).toBe("");
   });
 

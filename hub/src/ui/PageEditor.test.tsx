@@ -117,6 +117,28 @@ describe("editing", () => {
     expect(last()).toBe("abovebelow");
   });
 
+  it("typing in a Windows (CRLF) note changes only what was typed; Enter keeps CRLF", async () => {
+    const { page, last } = setup("Call Sam\r\n- [ ] book\r\nDone when: booked");
+    await userEvent.click(page.getByText("Call Sam"));
+    const box = page.getByRole("textbox", { name: /text 1/ }) as HTMLTextAreaElement;
+    expect(box.value).toBe("Call Sam");
+    await userEvent.keyboard("X");
+    expect(last()).toBe("Call SamX\r\n- [ ] book\r\nDone when: booked");
+    await userEvent.click(page.getByText("book"));
+    await userEvent.keyboard(" it{Enter}pay");
+    expect(last()).toBe("Call SamX\r\n- [ ] book it\r\n- [ ] pay\r\nDone when: booked");
+    await userEvent.click(page.getByRole("checkbox", { name: "Done: pay" }));
+    expect(last()).toBe("Call SamX\r\n- [ ] book it\r\n- [x] pay\r\nDone when: booked");
+  });
+
+  it("a line with a lone old-style \\r inside is kept as it is, never split by typing", async () => {
+    const { page, changes } = setup("one\rtwo\nnext");
+    await userEvent.click(page.getByText(/one/));
+    expect(page.queryByRole("textbox")).toBeNull();
+    await userEvent.keyboard("X");
+    expect(changes).toEqual([]);
+  });
+
   it("pasting several lines makes several lines", async () => {
     const { page, last } = setup("start");
     await userEvent.click(page.getByText("start"));

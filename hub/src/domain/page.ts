@@ -24,6 +24,11 @@ export interface Block {
   fileId?: string;
   /** Leading spaces/tabs before a list marker (for indenting nested lists). */
   indent: number;
+  /**
+   * "\r" when the line ends a Windows (CRLF) line, else "". Kept outside `text`, so typing
+   * never touches it (a text field would turn it into a line break).
+   */
+  eol: string;
 }
 
 const CHECK = /^([ \t]*)[-*+] \[([ xX])\](?: |$)/;
@@ -34,25 +39,27 @@ const PICTURE = /^!\[[^\]\n]*\]\(file:([A-Za-z0-9_-]{1,128})\)$/;
 const PICTURE_ANYWHERE = /!\[[^\]\n]*\]\(file:([A-Za-z0-9_-]{1,128})\)/g;
 
 /** One line as a block. `lineOf(parseLine(x)) === x` for every line without "\n". */
-export function parseLine(line: string): Block {
+export function parseLine(raw: string): Block {
+  const eol = raw.endsWith("\r") ? "\r" : "";
+  const line = eol ? raw.slice(0, -1) : raw;
   const pic = PICTURE.exec(line);
-  if (pic) return { type: "picture", prefix: line, text: "", fileId: pic[1], indent: 0 };
+  if (pic) return { type: "picture", prefix: line, text: "", fileId: pic[1], indent: 0, eol };
   const check = CHECK.exec(line);
   if (check) {
     const prefix = check[0];
-    return { type: "check", prefix, text: line.slice(prefix.length), done: check[2] !== " ", indent: check[1]!.length };
+    return { type: "check", prefix, text: line.slice(prefix.length), done: check[2] !== " ", indent: check[1]!.length, eol };
   }
   const bullet = BULLET.exec(line);
-  if (bullet) return { type: "bullet", prefix: bullet[0], text: line.slice(bullet[0].length), indent: bullet[1]!.length };
+  if (bullet) return { type: "bullet", prefix: bullet[0], text: line.slice(bullet[0].length), indent: bullet[1]!.length, eol };
   const heading = HEADING.exec(line);
   if (heading) {
-    return { type: heading[1] === "#" ? "h1" : "h2", prefix: heading[0], text: line.slice(heading[0].length), indent: 0 };
+    return { type: heading[1] === "#" ? "h1" : "h2", prefix: heading[0], text: line.slice(heading[0].length), indent: 0, eol };
   }
-  return { type: "p", prefix: "", text: line, indent: 0 };
+  return { type: "p", prefix: "", text: line, indent: 0, eol };
 }
 
 /** The line a block stands for. */
-export const lineOf = (b: Block): string => b.prefix + b.text;
+export const lineOf = (b: Block): string => b.prefix + b.text + b.eol;
 
 /** Notes as blocks (empty notes are one empty paragraph). */
 export function parsePage(md: string): Block[] {
@@ -69,14 +76,14 @@ export function serializePage(blocks: Block[]): string {
  * once there is text after it ("- [ ]" + "x" becomes "- [ ] x", never "- [ ]x").
  */
 export function withText(b: Block, text: string): string {
-  if (b.type === "picture") return b.prefix;
+  if (b.type === "picture") return b.prefix + b.eol;
   const prefix = text !== "" && b.prefix !== "" && !/\s$/.test(b.prefix) && !/^\s/.test(text) ? `${b.prefix} ` : b.prefix;
-  return prefix + text;
+  return prefix + text + b.eol;
 }
 
 /** A checklist line ticked or unticked; any other line is returned as it was. */
 export function toggleCheckLine(line: string): string {
-  const m = CHECK.exec(line);
+  const m = CHECK.exec(line.endsWith("\r") ? line.slice(0, -1) : line);
   if (!m) return line;
   const at = m[1]!.length + 3; // indent, marker, space, "["
   return line.slice(0, at) + (m[2] === " " ? "x" : " ") + line.slice(at + 1);
