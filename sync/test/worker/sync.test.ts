@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { MAX_BODY_BYTES, MAX_CHANGES, MAX_FUTURE_MS, MAX_ID_LENGTH, MAX_ROW_BYTES } from "../../src/http";
-import { MAX_RESPONSE_DATA_BYTES, PAGE_SIZE } from "../../src/sync";
+import { chunkEntries, MAX_RESPONSE_DATA_BYTES, PAGE_SIZE, validateSyncRequest } from "../../src/sync";
 import {
   call,
   change,
@@ -474,6 +474,22 @@ describe("POST /v1/sync: atomicity", () => {
     expect(response.status).toBe(500);
     expect(await storedRows()).toEqual([]);
     expect(await seqCounter()).toBe(0);
+  });
+
+  it("chunkEntries keeps order, respects the byte budget and isolates oversize entries", () => {
+    const valid = validateSyncRequest(
+      { deviceId: DEVICE_A, cursor: 0, changes: [change("a", 1), change("b", 1, { pad: "x".repeat(500) }), change("c", 1), change("d", 1)] },
+      T0,
+    );
+    const chunks = chunkEntries(valid.changes, 200);
+    expect(chunks.length).toBeGreaterThan(1);
+    const flattened = chunks.flatMap((c) => JSON.parse(c) as Array<{ i: string }>).map((e) => e.i);
+    expect(flattened).toEqual(["a", "b", "c", "d"]);
+    for (const c of chunks) {
+      if ((JSON.parse(c) as unknown[]).length > 1) expect(new TextEncoder().encode(c).byteLength).toBeLessThanOrEqual(200);
+    }
+    expect(chunkEntries(valid.changes, 1_000_000)).toHaveLength(1);
+    expect(chunkEntries([], 1_000_000)).toEqual([]);
   });
 
   it("small chunks give the same result as one big statement", async () => {
