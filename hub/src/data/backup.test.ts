@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { db } from "./db";
 import { exportBackup, restoreBackup } from "./backup";
 import type { Goal, Item } from "../domain/types";
@@ -79,5 +80,68 @@ describe("backup", () => {
       await expect(restoreBackup(file, mode)).rejects.toThrow();
       expect(await snapshot()).toEqual(before);
     }
+  });
+
+  it("a write failing inside the transaction rolls back both tables, in both modes", async () => {
+    await db.items.add(item("keep"));
+    await db.goals.add(goal("kg"));
+    const before = await snapshot();
+    const file = { app: "life-hub", schema: 1, exportedOn: "2026-10-28",
+      items: [item("n1")], goals: [goal("g2")] };
+    for (const mode of ["merge", "replace"] as const) {
+      const spy = vi.spyOn(db.goals, "bulkAdd").mockRejectedValueOnce(new Error("boom"));
+      await expect(restoreBackup(file, mode)).rejects.toThrow(/backup|restore/i);
+      spy.mockRestore();
+      expect(await snapshot()).toEqual(before);
+    }
+  });
+
+  describe("field validation", () => {
+    const good = () => ({ app: "life-hub", schema: 1, exportedOn: "2026-10-28", items: [item("n")], goals: [goal("g")] });
+    const withItem = (extra: Record<string, unknown>) => ({ ...good(), items: [{ ...item("n"), ...extra }] });
+    const withGoal = (extra: Record<string, unknown>) => ({ ...good(), goals: [{ ...goal("g"), ...extra }] });
+    const cases: [string, unknown][] = [
+      ["recur object", withItem({ recur: {} })],
+      ["recur bad day", withItem({ recur: ["funday"] })],
+      ["due number", withItem({ due: 5 })],
+      ["due impossible", withItem({ due: "2026-13-45" })],
+      ["pinnedDate", withItem({ pinnedDate: "soon" })],
+      ["weekOf", withItem({ weekOf: "2026-02-30" })],
+      ["hiddenOn", withItem({ hiddenOn: 1 })],
+      ["completedAt", withItem({ completedAt: "x" })],
+      ["createdAt", withItem({ createdAt: "yesterday" })],
+      ["touchedAt", withItem({ touchedAt: "2026-1-1" })],
+      ["tags", withItem({ tags: [1] })],
+      ["links", withItem({ links: "a" })],
+      ["notes", withItem({ notes: 3 })],
+      ["goalId", withItem({ goalId: 3 })],
+      ["source kind", withItem({ source: { kind: "x", key: "k" } })],
+      ["source key", withItem({ source: { kind: "manual" } })],
+      ["monthlyTarget NaN", withGoal({ monthlyTarget: NaN })],
+      ["monthlyTarget 0", withGoal({ monthlyTarget: 0 })],
+      ["deadline", withGoal({ deadline: "nope" })],
+      ["goal createdAt", withGoal({ createdAt: "nope" })],
+      ["exportedOn", { ...good(), exportedOn: "yesterday" }],
+    ];
+    it.each(cases)("rejects bad %s and changes nothing", async (_n, raw) => {
+      await db.items.add(item("keep"));
+      const before = await snapshot();
+      for (const mode of ["merge", "replace"] as const) {
+        await expect(restoreBackup(raw, mode)).rejects.toThrow(/backup/i);
+        expect(await snapshot()).toEqual(before);
+      }
+    });
+
+    it("a fully valid backup with every optional field round-trips", async () => {
+      const full = item("full", {
+        notes: "n", tags: ["a"], goalId: "g", due: "2026-10-30", recur: ["mon", "sun"],
+        pinnedDate: "2026-10-29", weekOf: "2026-10-26", hiddenOn: "2026-10-28",
+        completedAt: "2026-10-27", source: { kind: "backlog", key: "k" },
+      });
+      const fullGoal = { ...goal("g"), deadline: "2026-12-01", monthlyTarget: 4 };
+      await restoreBackup({ app: "life-hub", schema: 1, exportedOn: "2026-10-28", items: [full], goals: [fullGoal] }, "replace");
+      expect(await db.items.get("full")).toEqual(full);
+      expect(await db.goals.get("g")).toEqual(fullGoal);
+    });
   });
 });

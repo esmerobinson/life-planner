@@ -1,3 +1,4 @@
+import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
 import type { Goal, ISODate, Item } from "../domain/types";
 
@@ -12,6 +13,9 @@ export interface BackupFile {
 /** The one message for any file that is not a usable backup. */
 export const INVALID_BACKUP =
   "That file is not a Life Hub backup, or it is damaged. Nothing was changed.";
+
+/** Shown when the write itself fails; the transaction leaves the data as it was. */
+export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
 
 const AREAS = ["writing", "art", "content", "mind", "body", "inbox"];
 const ITEM_KINDS = ["task", "idea"];
@@ -33,8 +37,18 @@ function validItem(r: unknown): r is Item {
     AREAS.includes(r.areaId as string) &&
     (r.priority === 1 || r.priority === 2 || r.priority === 3) &&
     STATUSES.includes(r.status as string) &&
-    isStr(r.createdAt) &&
-    isStr(r.touchedAt)
+    isStr(r.createdAt) && isValidISODate(r.createdAt) &&
+    isStr(r.touchedAt) && isValidISODate(r.touchedAt) &&
+    optStr(r.notes) &&
+    optStrArray(r.tags) &&
+    optStr(r.goalId) &&
+    optDate(r.due) &&
+    (r.recur === undefined || (Array.isArray(r.recur) && r.recur.every((d) => WEEKDAYS.includes(d as string)))) &&
+    optDate(r.pinnedDate) &&
+    optDate(r.weekOf) &&
+    optDate(r.hiddenOn) &&
+    optDate(r.completedAt) &&
+    validSource(r.source)
   );
 }
 
@@ -49,8 +63,22 @@ function validGoal(r: unknown): r is Goal {
     r.milestones.every(
       (m) => isObj(m) && isStr(m.id) && isStr(m.title) && typeof m.done === "boolean",
     ) &&
-    isStr(r.createdAt)
+    isStr(r.createdAt) && isValidISODate(r.createdAt) &&
+    optDate(r.deadline) &&
+    (r.monthlyTarget === undefined ||
+      (typeof r.monthlyTarget === "number" && Number.isFinite(r.monthlyTarget) && r.monthlyTarget > 0))
   );
+}
+
+const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+/** Absent, or a real "YYYY-MM-DD" date. */
+const optDate = (v: unknown) => v === undefined || (isStr(v) && isValidISODate(v));
+const optStr = (v: unknown) => v === undefined || isStr(v);
+const optStrArray = (v: unknown) => v === undefined || isStrArray(v);
+
+function validSource(v: unknown) {
+  if (v === undefined) return true;
+  return isObj(v) && (v.kind === "backlog" || v.kind === "manual") && isStr(v.key);
 }
 
 const hasDuplicateIds = (rows: { id: string }[]) => new Set(rows.map((r) => r.id)).size !== rows.length;
@@ -70,6 +98,7 @@ function parseBackup(raw: unknown): BackupFile {
     data.app !== "life-hub" ||
     data.schema !== 1 ||
     !isStr(data.exportedOn) ||
+    !isValidISODate(data.exportedOn) ||
     !Array.isArray(data.items) ||
     !Array.isArray(data.goals) ||
     !data.items.every(validItem) ||
@@ -97,6 +126,15 @@ export async function restoreBackup(
   mode: "merge" | "replace",
 ): Promise<{ addedItems: number; addedGoals: number; skipped: number }> {
   const file = parseBackup(raw); // nothing is written until every row has passed
+  try {
+    return await writeBackup(file, mode);
+  } catch {
+    // The transaction aborted, so nothing was written.
+    throw new Error(RESTORE_FAILED);
+  }
+}
+
+async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
   return db.transaction("rw", db.items, db.goals, async () => {
     if (mode === "replace") {
       await db.items.clear();

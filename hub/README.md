@@ -11,8 +11,9 @@ A local React + TypeScript app for planning your days, goals and areas.
 
 ## Where your data lives
 
-In the browser's IndexedDB, on this machine, per browser. There is no sync or
-backup yet. Clearing site data for the app deletes everything.
+In the browser's IndexedDB, on this machine, per browser. Manual backup and
+restore exist (see Backups below); sync, automatic backup and encryption are
+later plans. Clearing site data for the app deletes everything.
 
 ## Importing your backlog
 
@@ -25,7 +26,7 @@ import could not fully read are listed under **Notes** below the counts.
 
 Deliberately left for later plans (2 to 5):
 
-- Sync, backup and encryption
+- Sync, automatic backup and encryption (manual backup/restore exists)
 - Notifications and overdue reminders
 - Journal (the Home journal card is a stub with disabled buttons)
 - Vision board
@@ -49,6 +50,8 @@ Your tasks live in this browser only, so back them up.
   address, so a different address or port shows an empty hub (your data is still
   at the old address). The dev server is fixed to that port and will refuse to
   start rather than move to another (preview is fixed to `127.0.0.1:4173`).
+- If you used `localhost:5173` before, that is a different address with its own
+  saved data. Open it, download a backup there, then restore it here with Merge.
 - The app asks the browser to keep its data; the Backup page says whether the
   browser agreed.
 

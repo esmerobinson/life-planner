@@ -1,8 +1,15 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { exportBackup, INVALID_BACKUP, restoreBackup } from "../data/backup";
+import { exportBackup, INVALID_BACKUP, RESTORE_FAILED, restoreBackup } from "../data/backup";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import type { ISODate } from "../domain/types";
 import { ShellContext } from "./shellContext";
+
+/**
+ * Cleanup delay before the temporary download link is released (a technical wait,
+ * not an animation timing). Releasing it straight after click() can cancel the
+ * download in Safari.
+ */
+const REVOKE_AFTER_MS = 60000;
 
 const PERSISTENCE_TEXT: Record<PersistenceStatus, string> = {
   persisted: "Your browser has agreed to keep this data.",
@@ -46,12 +53,17 @@ export function BackupPage({ today }: { today: ISODate }) {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
-      setMessage("Backup downloaded.");
+      setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
+      setMessage("Backup file made.");
     } catch {
       setMessage("");
       setError("The backup could not be made. Try again.");
     }
+  }
+
+  function changeMode(m: "merge" | "replace") {
+    setMode(m);
+    setConfirmed(false);
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -77,20 +89,29 @@ export function BackupPage({ today }: { today: ISODate }) {
     setBusy(true);
     setMessage("");
     setError("");
+    let done = false;
     try {
       const r = await restoreBackup(text, mode);
+      done = true;
       setMessage(
         `Added ${r.addedItems} ${r.addedItems === 1 ? "task" : "tasks"} and ${r.addedGoals} ${
           r.addedGoals === 1 ? "goal" : "goals"
         }. ${r.skipped} already here.`,
       );
       setConfirmed(false);
-      await shell?.refresh();
     } catch (err) {
-      setError(err instanceof Error && err.message === INVALID_BACKUP ? INVALID_BACKUP : "The restore did not work. Nothing was changed.");
+      setError(err instanceof Error && err.message === INVALID_BACKUP ? INVALID_BACKUP : RESTORE_FAILED);
     } finally {
       inFlight.current = false;
       setBusy(false);
+    }
+    // Outside the try: a refresh problem must never read as a failed restore.
+    if (done) {
+      try {
+        await shell?.refresh();
+      } catch {
+        /* the data is saved; views re-read on the next visit */
+      }
     }
   }
 
@@ -101,6 +122,11 @@ export function BackupPage({ today }: { today: ISODate }) {
       <h1>Backup</h1>
       <p>Your tasks are saved in this browser only.</p>
       {persistence && <p>{PERSISTENCE_TEXT[persistence]}</p>}
+
+      <p>
+        If you used localhost:5173 before, that is a different address with its own saved data. Open it, download a
+        backup there, then restore it here with Merge.
+      </p>
 
       <h2>Download a backup</h2>
       <button type="button" onClick={() => void download()}>
@@ -116,11 +142,11 @@ export function BackupPage({ today }: { today: ISODate }) {
       <fieldset>
         <legend>How to restore</legend>
         <label>
-          <input type="radio" name="restore-mode" checked={!replacing} onChange={() => setMode("merge")} />
+          <input type="radio" name="restore-mode" checked={!replacing} onChange={() => changeMode("merge")} />
           Merge (add what is missing)
         </label>
         <label>
-          <input type="radio" name="restore-mode" checked={replacing} onChange={() => setMode("replace")} />
+          <input type="radio" name="restore-mode" checked={replacing} onChange={() => changeMode("replace")} />
           Replace everything
         </label>
       </fieldset>
