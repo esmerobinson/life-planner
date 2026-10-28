@@ -176,10 +176,12 @@ export class SyncController {
     this.inFlight = (async () => {
       let out: SyncOutcome | null = null;
       try {
+        let rounds = 0;
         do {
           this.rerun = false;
           out = await this.once();
-        } while (this.rerun && out.kind === "ok");
+          // A token saved during the run: run again with it (bounded, never a loop).
+        } while (++rounds < 5 && ((this.rerun && out.kind === "ok") || out.kind === "superseded"));
         return out;
       } finally {
         this.inFlight = null;
@@ -204,6 +206,7 @@ export class SyncController {
         this.error = out.held > 0 ? TOO_LARGE_MESSAGE : null;
         break;
       case "not-configured":
+      case "superseded":
         this.error = null;
         break;
       case "needs-passphrase":

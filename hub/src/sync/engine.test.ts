@@ -325,6 +325,21 @@ describe("syncOnce", () => {
     expect(server.requests).toHaveLength(1);
   });
 
+  it("a 401 for an OLD token never deletes a token saved while that run was in flight", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const a = await device();
+    await setMeta(a, "token", "0".repeat(64)); // a wrong token, in use by the run below
+    const NEW = "1".padEnd(64, "2");
+    const saveDuringRequest: typeof fetch = async (input, init) => {
+      await saveSyncSettings(a, { serverUrl: SERVER, token: NEW }); // Esme saves the right one
+      return server.fetch(input, init); // ...but this request carried the old one: 401
+    };
+    const out = await syncOnce({ db: a, fetch: saveDuringRequest });
+    expect(out.kind).not.toBe("needs-passphrase");
+    expect(await getMeta(a, "token")).toBe(NEW);
+    expect(await getMeta(a, "needsPassphrase")).toBeUndefined();
+  });
+
   it("429 reports how long to wait from Retry-After and keeps everything pending", async () => {
     const server = new FakeSyncServer(TOKEN);
     const a = await device();

@@ -42,6 +42,8 @@ export type SyncOutcome =
   /** `held`: changes too large for any request; they stay pending on this device. */
   | { kind: "ok"; sent: number; received: number; held: number }
   | { kind: "not-configured" }
+  /** The run used a token that was replaced while it was in flight; run again. */
+  | { kind: "superseded" }
   | { kind: "needs-passphrase"; message: string }
   | { kind: "rate-limited"; retryAfterMs: number; message: string }
   | { kind: "offline"; message: string }
@@ -154,6 +156,7 @@ export async function syncOnce(env: SyncEnv): Promise<SyncOutcome> {
 async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   const serverUrl = await getMeta<string>(db, "serverUrl");
   const token = await getMeta<string>(db, "token");
+  const tokenVersion = await getMeta<number>(db, "tokenVersion");
   if (!serverUrl || !token) return { kind: "not-configured" };
   const deviceId = await getDeviceId(db);
   const url = `${serverUrl.replace(/\/+$/, "")}/v1/sync`;
@@ -189,10 +192,18 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
     if (!res.ok) {
       const code = await errorCode(res);
       if (res.status === 401) {
-        await db.transaction("rw", db.syncMeta, async () => {
-          await db.syncMeta.delete("token");
-          await setMeta(db, "needsPassphrase", true);
+        // Only forget the token THIS run used: one saved meanwhile (Sync page) is kept.
+        const stillSame = await db.transaction("rw", db.syncMeta, async () => {
+          const same =
+            (await getMeta<string>(db, "token")) === token &&
+            (await getMeta<number>(db, "tokenVersion")) === tokenVersion;
+          if (same) {
+            await db.syncMeta.delete("token");
+            await setMeta(db, "needsPassphrase", true);
+          }
+          return same;
         });
+        if (!stillSame) return { kind: "superseded" };
         return { kind: "needs-passphrase", message: NEEDS_PASSPHRASE_MESSAGE };
       }
       if (res.status === 429) {
