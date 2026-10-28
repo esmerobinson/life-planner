@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // Runs against `vite preview` (the production build, where the service worker is on).
-test.use({ baseURL: "http://127.0.0.1:4173" });
+test.use({ baseURL: `http://127.0.0.1:${process.env.E2E_PREVIEW_PORT ?? 4173}` });
 
 test("installable: manifest, service worker, works offline, data survives", async ({ page, context }) => {
   test.setTimeout(90_000);
