@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { constantTimeEqual, parseBearer, sha256Hex } from "../../src/auth";
-import { GLOBAL_MAX_FAILURES, GLOBAL_WINDOW_MS, IP_MAX_FAILURES, IP_WINDOW_MS } from "../../src/ratelimit";
+import { bucketFor, GLOBAL_MAX_FAILURES, GLOBAL_WINDOW_MS, IP_MAX_FAILURES, IP_WINDOW_MS } from "../../src/ratelimit";
 import { call, errorOf, T0 } from "./helpers";
 
 const WRONG = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"; // fake
@@ -97,6 +97,48 @@ describe("authentication", () => {
   });
 });
 
+describe("bucketFor (rate-limit key)", () => {
+  it("keeps IPv4 addresses as they are (canonical dotted quad)", () => {
+    expect(bucketFor("203.0.113.7")).toBe("203.0.113.7");
+    expect(bucketFor(" 203.0.113.7 ")).toBe("203.0.113.7");
+  });
+
+  it("keys IPv6 on the /64 (first four groups), whatever the spelling", () => {
+    const key = bucketFor("2001:db8:1:2:3:4:5:6");
+    expect(key).toBe("2001:db8:1:2::/64");
+    for (const same of [
+      "2001:db8:1:2::",
+      "2001:db8:1:2::9",
+      "2001:DB8:1:2:ffff::1",
+      "2001:0db8:0001:0002:0000:0000:0000:0001",
+      "2001:db8:1:2:0:0:1.2.3.4",
+      "fe80::1%eth0".replace("fe80::1", "2001:db8:1:2::1"),
+    ]) {
+      expect(bucketFor(same), same).toBe(key);
+    }
+    expect(bucketFor("2001:db8:1:3::1")).not.toBe(key);
+    expect(bucketFor("2001:db8::1")).toBe("2001:db8:0:0::/64");
+  });
+
+  it("handles the compressed forms :: and ::1", () => {
+    expect(bucketFor("::")).toBe("0:0:0:0::/64");
+    expect(bucketFor("::1")).toBe("0:0:0:0::/64");
+    expect(bucketFor("1::")).toBe("1:0:0:0::/64");
+  });
+
+  it("treats IPv4-mapped IPv6 addresses as the IPv4 address", () => {
+    expect(bucketFor("::ffff:203.0.113.7")).toBe("203.0.113.7");
+    expect(bucketFor("::FFFF:cb00:7107")).toBe("203.0.113.7");
+    expect(bucketFor("0:0:0:0:0:ffff:203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("puts missing or unparseable values in the shared 'unknown' bucket", () => {
+    for (const bad of [null, undefined, "", "   ", "not-an-ip", "1.2.3", "1.2.3.256", "1:2:3", "1::2::3", "12345::", "1:2:3:4:5:6:7:8:9"]) {
+      expect(bucketFor(bad), String(bad)).toBe("unknown");
+    }
+  });
+});
+
 describe("rate limiting", () => {
   it("uses the contract's limits", () => {
     expect(IP_MAX_FAILURES).toBe(5);
@@ -143,29 +185,76 @@ describe("rate limiting", () => {
     expect(response.status).toBe(429);
   });
 
-  it("applies the global cap to everyone except requests with the correct token", async () => {
-    // 20 IPs x 5 failures = 100 failures within the hour, each IP at its own limit.
-    for (let ip = 0; ip < 20; ip++) {
-      for (let i = 0; i < 5; i++) {
+  /** Adds failures, 5 per bucket, until there are exactly 100 within the hour (global cap reached). */
+  async function reachGlobalCap() {
+    let count = (await failures()).length;
+    for (let ip = 0; count < GLOBAL_MAX_FAILURES; ip++) {
+      for (let i = 0; i < 5 && count < GLOBAL_MAX_FAILURES; i++, count++) {
         const response = await call("/v1/export", { token: WRONG, ip: `198.51.100.${ip}`, now: T0 + ip * 1000 + i });
         expect(response.status).toBe(401);
       }
     }
-    expect(await failures()).toHaveLength(100);
+    expect(await failures()).toHaveLength(GLOBAL_MAX_FAILURES);
+  }
 
-    const freshWrong = await call("/v1/export", { token: WRONG, ip: "192.0.2.77", now: T0 + 60_000 });
-    expect(freshWrong.status).toBe(429);
-    expect(Number(freshWrong.headers.get("Retry-After"))).toBe(3600 - 60);
-    const freshMissing = await call("/v1/export", { token: null, ip: "192.0.2.78", now: T0 + 60_000 });
-    expect(freshMissing.status).toBe(429);
-    expect(await failures()).toHaveLength(100); // capped attempts are not recorded
+  it("during a global lockout: wrong tokens are still recorded, the per-bucket limit drops to 1, correct tokens from clean buckets pass", async () => {
+    await reachGlobalCap();
+    const now = T0 + 60_000;
 
-    const freshCorrect = await call("/v1/export", { ip: "192.0.2.79", now: T0 + 60_000 });
-    expect(freshCorrect.status).toBe(200);
+    // A fresh bucket's first wrong token is recorded and answered 429 (global cap).
+    const firstWrong = await call("/v1/export", { token: WRONG, ip: "192.0.2.77", now });
+    expect(firstWrong.status).toBe(429);
+    expect(await errorOf(firstWrong)).toBe("rate_limited");
+    expect(await failures()).toHaveLength(101);
+    // The cap lifts when the 100th most recent failure (T0 + 1 ms) leaves the hour.
+    expect(Number(firstWrong.headers.get("Retry-After"))).toBe(3541);
+
+    // Its second attempt is over the lowered per-bucket limit (1): not recorded, 429.
+    const secondWrong = await call("/v1/export", { token: WRONG, ip: "192.0.2.77", now: now + 1000 });
+    expect(secondWrong.status).toBe(429);
+    expect(secondWrong.headers.get("Retry-After")).toBe(String(900 - 1));
+    expect(await failures()).toHaveLength(101);
+
+    // No oracle: that bucket's correct token is also refused now.
+    const bucketCorrect = await call("/v1/export", { ip: "192.0.2.77", now: now + 2000 });
+    expect(bucketCorrect.status).toBe(429);
+
+    // Missing tokens count the same way.
+    const missing = await call("/v1/export", { token: null, ip: "192.0.2.78", now });
+    expect(missing.status).toBe(429);
+    expect(await failures()).toHaveLength(102);
+
+    // A clean bucket with the correct token is not affected by the global cap.
+    const cleanCorrect = await call("/v1/export", { ip: "192.0.2.79", now });
+    expect(cleanCorrect.status).toBe(200);
 
     // After the hour the cap lifts.
-    const later = await call("/v1/export", { token: WRONG, ip: "192.0.2.80", now: T0 + GLOBAL_WINDOW_MS + 60_000 });
+    const later = await call("/v1/export", { token: WRONG, ip: "192.0.2.80", now: T0 + GLOBAL_WINDOW_MS + 120_000 });
     expect(later.status).toBe(401);
+  });
+
+  it("a bucket under 5 failures cannot keep guessing once the global cap is reached (no 429/200 oracle)", async () => {
+    const attacker = "192.0.2.50";
+    for (let i = 0; i < 2; i++) await call("/v1/export", { token: WRONG, ip: attacker, now: T0 - 1000 + i });
+    await reachGlobalCap(); // 2 attacker failures + 98 others
+    for (let i = 0; i < 10; i++) {
+      const guess = await call("/v1/export", { token: `${WRONG.slice(0, 60)}${String(i).padStart(4, "0")}`, ip: attacker, now: T0 + 30_000 + i });
+      expect(guess.status).toBe(429);
+    }
+    const attackerRows = (await failures()).filter((r) => r.ip === attacker);
+    expect(attackerRows).toHaveLength(2); // nothing more recorded: the bucket is locked at limit 1
+    const correct = await call("/v1/export", { ip: attacker, now: T0 + 31_000 });
+    expect(correct.status).toBe(429);
+  });
+
+  it("concurrent wrong-token requests from one bucket record and allow at most five failures", async () => {
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => call("/v1/export", { token: WRONG, ip: IP_A, now: T0 + i })),
+    );
+    const statuses = responses.map((r) => r.status);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(5);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(15);
+    expect((await failures()).filter((r) => r.ip === IP_A)).toHaveLength(5);
   });
 
   it("prunes failures older than the longest window on write", async () => {
@@ -188,6 +277,17 @@ describe("rate limiting", () => {
     expect(dump).not.toContain(presented);
     expect(dump).not.toContain(presentedHash);
     expect(dump).not.toContain(presented.slice(0, 16));
+  });
+
+  it("groups IPv6 clients by /64: five failures across one /64 lock the whole /64, not its neighbours", async () => {
+    for (let i = 1; i <= 5; i++) {
+      const response = await call("/v1/export", { token: WRONG, ip: `2001:db8:1:2::${i}`, now: T0 + i });
+      expect(response.status).toBe(401);
+    }
+    const sameSlash64 = await call("/v1/export", { ip: "2001:0DB8:0001:0002:ffff:eeee:dddd:cccc", now: T0 + 10 });
+    expect(sameSlash64.status).toBe(429);
+    const neighbour = await call("/v1/export", { ip: "2001:db8:1:3::1", now: T0 + 10 });
+    expect(neighbour.status).toBe(200);
   });
 
   it("falls back to a shared bucket when CF-Connecting-IP is absent", async () => {
