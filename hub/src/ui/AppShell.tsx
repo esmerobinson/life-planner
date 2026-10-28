@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
+import { PhoneTopBar, phoneTitle } from "./PhoneTopBar";
+import { usePhone } from "./usePhone";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
@@ -26,6 +28,9 @@ export function AppShell() {
   const look = needsALook(items, today);
   // Unsorted items are excluded from needsALook, so nothing is counted twice.
   const inboxCount = unsorted + look.overdue.length + look.dueSoon.length + look.stale.length;
+  const inboxLabel = inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox";
+  const phone = usePhone();
+  const location = useLocation();
 
   // Ask the browser once, on start, to keep this data.
   useEffect(() => {
@@ -65,17 +70,18 @@ export function AppShell() {
 
   return (
     <ShellContext.Provider value={ctx}>
-      <div className="app-shell">
-        <Sidebar />
-        <main className="app-content">
+      <div className={phone ? "app-shell is-phone" : "app-shell"}>
+        {!phone && <Sidebar />}
+        <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
+          {phone && <PhoneTopBar inboxLabel={inboxLabel} />}
           <UpdatePrompt />
           <DbClosedNotice db={db} />
           <div className="shell-actions">
             <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
               Add
             </button>
-            {/* Always shown: on a fresh install it is the only way to reach Import. */}
-            <Link to="/inbox" className="btn-secondary shell-inbox">{inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox"}</Link>
+            {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import. */}
+            {!phone && <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>}
           </div>
           {adding && <QuickAdd today={today} onAdded={() => void changed()} />}
           <Outlet />

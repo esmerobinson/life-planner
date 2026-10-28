@@ -1,0 +1,133 @@
+/* Phone layout (below 700px; the shell adds .is-phone from usePhone). Esme's choice:
+   VISUAL-LANGUAGE.md "Phone layout", option A of mockup-phone.html. Every value here is
+   copied from that mockup (tab A) or the phone brief: 16px side gutter; top bar 10px gap,
+   6px/12px padding, 26px bold title, 34px round --track back arrow with an 18px "←";
+   app grid 4 columns, 16px row / 8px column gap, 62px tiles at radius 18px, icon at 60%,
+   12px labels 6px under the tile; the Today heading as the mockup's section line (bold,
+   14px above, 8px below). Colours are tokens only; nothing animates.
+
+   Composition calls the mockup does not show, made by the implementer (Esme may veto):
+   - the Add button keeps its desktop place, first under the top bar, and the page (the app grid
+     on Home) starts 12px under it (the top bar's own 12px);
+   - the footer links (Backup, Sync, Bin) sit in a wrapping row 20px under Today's list
+     (the sidebar's 20px section gap), 16px apart (the gutter), in the content link style;
+   - the page's own h1 stays for screen readers, hidden visually, when the bar shows its title. */
+
+/* viewport-fit=cover also reaches the desktop layout (an iPhone on its side, an iPad):
+   keep the sidebar and content clear of the notch there too. Every inset is 0 on the Mac,
+   so these resolve to the existing tokens.css paddings and nothing changes. */
+.sidebar {
+  padding: max(16px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+}
+
+.app-content {
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) 24px;
+}
+
+.app-shell.is-phone {
+  display: block;
+}
+
+/* Safe areas: the notch on top, the home bar below, the sides in landscape. */
+.is-phone .app-content {
+  min-width: 0;
+  padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right))
+    calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.phone-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 12px;
+}
+
+.phone-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+button.phone-back {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--track);
+  font-size: 18px;
+}
+
+.phone-top .shell-inbox {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* The page's own title, kept for screen readers while the bar shows it. */
+.is-phone .has-bar-title h1:not(.phone-title) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 12px under the Add row: the page's own (visually hidden) h1 no longer spaces it. */
+.is-phone .shell-actions {
+  margin-bottom: 12px;
+}
+
+.phone-apps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px 8px;
+}
+
+.app-content a.phone-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.phone-app-tile {
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+}
+
+.phone-app-tile img {
+  width: 60%;
+  height: auto;
+}
+
+.phone-home .today-panel h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 14px 0 8px;
+}
+
+.phone-footer {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
