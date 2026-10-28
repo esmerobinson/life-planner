@@ -7,7 +7,6 @@ import { INBOX_SOURCES, inboxSource, type InboxSource } from "./inboxSource";
 import { NeedsALook } from "./NeedsALook";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
-import { useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
 
 export function InboxPage({ today }: { today: ISODate }) {
@@ -77,7 +76,6 @@ export function InboxPage({ today }: { today: ISODate }) {
     await refresh();
     await shell?.refresh();
   }
-  const { tick, celebration, message: tickMessage } = useTick(today, changed);
 
   /** Runs one bulk write under the in-flight guard. Returns the write's result, or undefined on failure. */
   async function bulk<T>(write: () => Promise<T>): Promise<T | undefined> {
@@ -172,8 +170,6 @@ export function InboxPage({ today }: { today: ISODate }) {
       </form>
       {saveError && <p className="form-message">{saveError}</p>}
       <h2>To sort</h2>
-      {celebration}
-      {tickMessage}
       {loaded && inbox.length === 0 && <p>Nothing waiting in the inbox.</p>}
       {showFilter && (
         <div className="btn-group" role="group" aria-label="From">
@@ -233,7 +229,6 @@ export function InboxPage({ today }: { today: ISODate }) {
           {shown.map((it) => (
             <InboxRow key={it.id} item={it} today={today} goals={goals}
               onFiled={changed}
-              onTick={(id) => void tick(id)}
               selected={picked.has(it.id)}
               onToggle={() => toggle(it.id)}
             />

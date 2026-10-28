@@ -19,16 +19,16 @@ beforeEach(async () => {
 });
 
 describe("Inbox strips", () => {
-  it("a task is a strip: Done tick on the left, Select and the two icons on the right, filing under the title", async () => {
+  it("a task is a strip: Select on the left (as before), the two icons on the right, filing under the title", async () => {
     await createItem({ kind: "task", title: "Loose end", areaId: "inbox", priority: 2 }, TODAY);
     render(<InboxPage today={TODAY} />);
     const row = (await screen.findByText("Loose end")).closest("li")!;
     expect(row).toHaveClass("strip");
     expect(screen.getByRole("list", { name: "Inbox items" })).toHaveClass("strip-list");
-    const tick = within(row).getByRole("checkbox", { name: "Mark done: Loose end" });
-    expect(row.firstElementChild).toBe(tick);
+    const select = within(row).getByRole("checkbox", { name: "Select Loose end" });
+    expect(row.firstElementChild).toBe(select);
+    expect(select).not.toHaveClass("tick");
     const actions = row.querySelector(".strip-actions")!;
-    expect(within(actions as HTMLElement).getByRole("checkbox", { name: "Select Loose end" })).toBeInTheDocument();
     expect(within(actions as HTMLElement).getByRole("button", { name: "Schedule for: Loose end" })).toBeInTheDocument();
     expect(within(actions as HTMLElement).getByRole("button", { name: "Move to: Loose end" })).toBeInTheDocument();
     const tray = row.querySelector(".strip-tray") as HTMLElement;
@@ -36,20 +36,19 @@ describe("Inbox strips", () => {
     expect(within(tray).getByText("More options")).toBeInTheDocument();
   });
 
-  it("ticking an inbox task marks it done and it leaves the inbox", async () => {
-    const it = await createItem({ kind: "task", title: "Quick one", areaId: "inbox", priority: 2 }, TODAY);
+  it("an inbox task has no Done tick box (a done inbox item would have nowhere to be seen)", async () => {
+    await createItem({ kind: "task", title: "Quick one", areaId: "inbox", priority: 2 }, TODAY);
     render(<InboxPage today={TODAY} />);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Quick one" }));
-    await vi.waitFor(() => expect(screen.queryByText("Quick one")).toBeNull());
-    expect((await db.items.get(it.id))!.status).toBe("done");
-    expect(screen.getByTestId("celebration-placeholder")).toBeInTheDocument();
+    const row = (await screen.findByText("Quick one")).closest("li")!;
+    expect(within(row).queryByRole("checkbox", { name: /^Mark done/ })).toBeNull();
+    expect(within(row).getAllByRole("checkbox").map((c) => c.getAttribute("aria-label"))).toEqual(["Select Quick one"]);
   });
 
-  it("an inbox idea has no tick box and no Schedule for, but keeps Move to and its filing", async () => {
+  it("an inbox idea has no tick box and no Schedule for, but keeps Select, Move to and its filing", async () => {
     await createItem({ kind: "idea", title: "Musing", areaId: "inbox", priority: 2 }, TODAY);
     render(<InboxPage today={TODAY} />);
     const row = (await screen.findByText("Musing")).closest("li")!;
-    expect(row).toHaveClass("no-tick");
+    expect(row.firstElementChild).toBe(within(row).getByRole("checkbox", { name: "Select Musing" }));
     expect(within(row).queryByRole("checkbox", { name: /^Mark done/ })).toBeNull();
     expect(within(row).queryByRole("button", { name: "Schedule for: Musing" })).toBeNull();
     expect(within(row).getByRole("button", { name: "Move to: Musing" })).toBeInTheDocument();

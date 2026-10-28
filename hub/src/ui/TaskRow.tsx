@@ -57,6 +57,7 @@ export function TaskRow({
   meta,
   extra,
   tray,
+  lead,
   className,
 }: {
   item: Item;
@@ -66,12 +67,16 @@ export function TaskRow({
   meta?: ReactNode;
   extra?: ReactNode;
   tray?: ReactNode;
+  /** Sits in the tick box's place when there is no tick box (the Inbox's Select checkbox). */
+  lead?: ReactNode;
   className?: string;
 }) {
   const isTask = item.kind === "task";
   const tick = isTask && onTick !== undefined;
+  const first = tick || lead !== undefined;
   return (
-    <li className={["strip", tick ? "" : "no-tick", className ?? ""].filter(Boolean).join(" ")}>
+    <li className={["strip", first ? "" : "no-tick", className ?? ""].filter(Boolean).join(" ")}>
+      {!tick && lead}
       {tick && (
         <input
           type="checkbox"

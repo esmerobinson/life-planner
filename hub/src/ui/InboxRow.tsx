@@ -21,7 +21,6 @@ export function InboxRow({
   onFiled,
   selected,
   onToggle,
-  onTick,
 }: {
   item: Item;
   today: ISODate;
@@ -29,7 +28,6 @@ export function InboxRow({
   onFiled: () => void | Promise<void>;
   selected: boolean;
   onToggle: () => void;
-  onTick?: (id: string) => void;
 }) {
   const [areaId, setAreaId] = useState<AreaId | "">("");
   const [goalId, setGoalId] = useState("");
@@ -86,9 +84,9 @@ export function InboxRow({
     <TaskRow
       item={item}
       today={today}
-      onTick={onTick}
       onMoved={onFiled}
       className="inbox-row"
+      lead={<input type="checkbox" aria-label={`Select ${item.title}`} checked={selected} onChange={onToggle} />}
       meta={
         (item.tags?.length || reason) && (
           <div className="strip-meta">
@@ -100,12 +98,6 @@ export function InboxRow({
             {reason && <p className="inbox-check">{reason}</p>}
           </div>
         )
-      }
-      extra={
-        <label className="form-check">
-          <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected} onChange={onToggle} />
-          Select
-        </label>
       }
       tray={
         <>
