@@ -198,13 +198,36 @@ change something, and every minute while the tab is visible.
   could sync as you; **Stop syncing on this device** removes the key and keeps
   your tasks and goals here.
 - If the server refuses the key, sync stops and the Sync link reads
-  "Sync (needs passphrase)". Enter the passphrase again to carry on.
+  "Sync (needs passphrase)". Enter the passphrase again to carry on. After
+  several wrong tries the server waits 15 minutes before accepting another.
 - Each change is stamped with the time it was made; when two devices change the
-  same task, the later change wins on both. Nothing is ever deleted by sync.
-- Restoring a backup with Replace makes this device pull everything from the
-  server again, so tasks still on your other devices come back here.
+  same task, the later change wins on both (the whole task, not field by
+  field). Nothing is ever deleted by sync.
+- Tasks that existed before sync, and tasks added by Merge or an import, keep
+  their own dates as their stamp, so a copy another device has edited since
+  always wins over them.
+- While sync is on, **Replace** is off (Merge still works), and Merge and the
+  imports wait until this device's first sync has finished.
+- Changing the sync address starts over: this device pulls everything from the
+  new server and sends everything it has.
+- A change the server refuses is kept on this device and counted on the Sync
+  page; it is tried again after you edit it. Items from another device that this
+  version of the app cannot read yet are kept aside and counted, and applied
+  after an update.
 - How it works, and how each rule of the server contract is kept:
   `SYNC-CLIENT-REPORT.md`.
+
+### Checking sync against the real server (opt-in)
+
+    (cd ../sync && npm install)   # once: wrangler
+    npm run e2e:sync
+
+This runs the real server code locally with `wrangler dev --local` (from an
+empty temp folder, with an explicit `--config ../sync/wrangler.jsonc`, a local
+D1 database and a throwaway test passphrase), serves the app's production build
+on `127.0.0.1:4173`, and drives three separate browser profiles as three
+devices. Nothing is deployed and no Cloudflare account is used. Ports 4173 and
+8790 must be free.
 
 ## Install it as an app (works offline)
 
