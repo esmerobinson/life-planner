@@ -132,16 +132,7 @@ export function ItemPanel({
         onCancel={() => setEditing(false)}
       />
       <div className="peek-content">
-      <input
-        className="peek-title"
-        aria-label="Title"
-        value={title.value}
-        onChange={(e) => title.set(e.target.value)}
-        onBlur={title.flush}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-      />
+      <TitleBox value={title.value} onChange={title.set} onBlur={title.flush} />
       {saveError && <p className="form-message">{saveError}</p>}
       <div className="peek-props">
         {!inbox && (
@@ -262,6 +253,51 @@ export function ItemPanel({
   );
 }
 
+/** A textarea that is always as tall as its text (also when the panel is resized). */
+function useGrow(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [value]);
+  return ref;
+}
+
+/** The task title: typed straight into, wraps like the heading it is, saved on blur or Enter. */
+function TitleBox({ value, onChange, onBlur }: { value: string; onChange: (v: string) => void; onBlur: () => void }) {
+  const ref = useGrow(value);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      className="peek-title"
+      aria-label="Title"
+      value={value}
+      onChange={(e) => onChange(e.target.value.replace(/\n/g, " "))}
+      onBlur={onBlur}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        e.currentTarget.blur();
+      }}
+    />
+  );
+}
+
 /**
  * The notes page for round 3a: a plain textarea that grows with its text (round 3b swaps
  * in the Notion-like editor). Markdown is kept exactly as typed.
@@ -279,13 +315,7 @@ export function NotesBox({
   maxLength?: number;
   label?: string;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  const ref = useGrow(value);
   return (
     <textarea
       ref={ref}

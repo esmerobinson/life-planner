@@ -49,6 +49,10 @@ async function seedPretendWorld(page: Page) {
     task("d1", "Ink the fictional map", { status: "done", completedAt: `${thisMonth}01`, goalId: "g1" }),
     task("x1", "Pretend loose thought to file somewhere sensible eventually", { areaId: "inbox", priority: 2 }),
     { ...task("x2", "Pretend idea to sort later", { areaId: "inbox", priority: 2 }), kind: "idea" },
+    task("h1", "Pretend daily sketch: one small drawing of anything nearby", {
+      recur: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"], doneDates: [today],
+    }),
+    task("h2", "Pretend scales practice", { recur: ["mon", "wed", "fri"] }),
   ];
   const goals: Row[] = [
     { id: "g1", title: "Draw every week, even the pretend weeks with long names", areaId: "art", kind: "practice", monthlyTarget: 4, milestones: [], createdAt: today },
@@ -69,7 +73,9 @@ const ROUTES = [
   ["home", "/"],
   ["today", "/today"],
   ["goals", "/goals"],
-  ["goal-detail", "/goals/g1"],
+  ["goal-panel", "/goals?open=g2"],
+  ["task-panel", "/area/art?open=t2"],
+  ["inbox-panel", "/inbox?open=x1"],
   ["admin", "/area/admin"],
   ["writing", "/area/writing"],
   ["art", "/area/art"],
@@ -87,11 +93,15 @@ const ROUTES = [
   ["sync", "/sync"],
 ] as const;
 
+/** The page's width, or the open side panel's (it scrolls on its own, over the page). */
 async function sideways(page: Page) {
-  return page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    innerWidth: window.innerWidth,
-  }));
+  return page.evaluate(() => {
+    const peek = document.querySelector<HTMLElement>(".peek-scroll");
+    return {
+      scrollWidth: Math.max(document.documentElement.scrollWidth, peek ? peek.scrollWidth + (window.innerWidth - peek.clientWidth) : 0),
+      innerWidth: window.innerWidth,
+    };
+  });
 }
 
 async function shoot(page: Page, name: string) {
@@ -194,14 +204,34 @@ test.describe("phone layout at 390px", () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test("an opened goal fits and its Back returns to Goals", async ({ page }) => {
+  test("an opened goal fills the screen, fits, and its Back returns to Goals", async ({ page }) => {
     await seedPretendWorld(page);
     await page.goto("/goals");
     await page.getByRole("link", { name: /^Draw every week/ }).click();
-    await expect(page).toHaveURL(/\/goals\/g1$/);
-    await expect(page.getByRole("heading", { level: 1, name: /^Draw every week/ })).toBeVisible();
-    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/goals\?open=g1$/);
+    const peek = page.locator(".peek");
+    await expect(peek.getByRole("heading", { level: 2, name: /^Draw every week/ })).toBeVisible();
+    const box = (await peek.boundingBox())!;
+    expect(box.x).toBe(0);
+    expect(box.width).toBe(390);
+    await expect(peek.getByRole("button", { name: "Close" })).toHaveCount(0);
+    await expect(peek.getByRole("separator")).toHaveCount(0);
+    const m = await sideways(page);
+    expect(m.scrollWidth).toBeLessThanOrEqual(m.innerWidth);
+    await peek.getByRole("button", { name: "Back" }).click();
     await expect(page).toHaveURL(/\/goals$/);
+    await expect(page.locator(".peek")).toHaveCount(0);
+  });
+
+  test("tapping a task opens it full screen; its Back returns to the list", async ({ page }) => {
+    await seedPretendWorld(page);
+    await page.goto("/area/art");
+    await page.getByRole("button", { name: /^Sort the imaginary paint drawer/ }).click();
+    const peek = page.locator(".peek");
+    await expect(peek.getByLabel("Title")).toHaveValue(/^Sort the imaginary paint drawer/);
+    await shoot(page, "phone-390-task-panel-open");
+    await peek.getByRole("button", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/area\/art$/);
   });
 });
 

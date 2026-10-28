@@ -84,8 +84,8 @@ describe("Today keeps what was ticked off today", () => {
     const titles = () => within(list).getAllByRole("listitem").map((li) => li.querySelector(".strip-title")!.textContent);
     expect(titles().sort()).toEqual(["First pretend", "Second pretend"]);
     await userEvent.click(within(list).getByRole("checkbox", { name: "Mark done: First pretend" }));
-    await vi.waitFor(() => expect(titles()).toEqual(["Second pretend", "First pretend"]));
-    const crossed = within(list).getByRole("checkbox", { name: "Done: First pretend" });
+    const crossed = await within(list).findByRole("checkbox", { name: "Done: First pretend" });
+    expect(titles()).toEqual(["Second pretend", "First pretend"]);
     expect(crossed).toBeChecked();
     expect(crossed.closest("li")).toHaveClass("crossed");
     await userEvent.click(crossed);

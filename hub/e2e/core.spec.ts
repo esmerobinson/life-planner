@@ -87,7 +87,10 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(row.getByText(/· 3 days late$/)).toBeVisible();
     await expect(row.getByText("OVERDUE", { exact: true })).toHaveCount(0);
     await row.getByRole("checkbox", { name: "Mark done: Overdue pretend errand" }).click();
-    await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toHaveCount(0);
+    // Round 3: it stays on Today for the rest of the day, ticked and crossed out.
+    const crossed = page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
+    await expect(crossed.getByRole("checkbox", { name: "Done: Overdue pretend errand" })).toBeChecked();
+    await expect(crossed).toHaveClass(/crossed/);
 
     // It sits under Done (1) on its area page, ticked; unticking brings it back.
     await page.goto("/area/admin");
@@ -98,7 +101,7 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await ticked.click();
     await expect(page.getByText("Done (0)", { exact: true })).toBeVisible();
     await page.goto("/today");
-    await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Mark done: Overdue pretend errand" })).not.toBeChecked();
   });
 
   await test.step("move to Tomorrow", async () => {

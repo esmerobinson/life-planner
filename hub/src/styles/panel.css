@@ -106,8 +106,10 @@ button.peek-pill.is-done {
   gap: 16px;
 }
 
-/* The task title (.dtitle): typed straight into, saved on blur. */
-input.peek-title {
+/* The task title (.dtitle): typed straight into, saved on blur. A one-line textarea that
+   grows, so a long title wraps instead of being cut off (the mockup's titles were short). */
+textarea.peek-title {
+  display: block;
   font-size: 24px;
   font-weight: 700;
   border: 0;
@@ -116,6 +118,8 @@ input.peek-title {
   width: 100%;
   padding: 0;
   color: var(--text);
+  resize: none;
+  overflow: hidden;
 }
 
 /* Properties (.props). */
