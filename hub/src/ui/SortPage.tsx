@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   archiveItem, deleteItem, fileItem, getItem, putItemBack, saveItemNotes, type SortType,
 } from "../data/repo";
@@ -7,7 +7,7 @@ import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR, NAV } from "./areas";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { UndoLine } from "./DeleteButton";
-import { inboxSource } from "./inboxSource";
+import { inboxOrder, inboxSource } from "./inboxSource";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { useHubData } from "./useHubData";
@@ -40,20 +40,12 @@ export function sourceLine(item: Item): string | null {
   return null;
 }
 
-/** The queue: inbox items oldest first, skipped ones at the end in skip order, an undone one first. */
-function orderQueue(inbox: Item[], skipped: string[], front: string | null): Item[] {
-  const byAge = [...inbox].sort(
-    (a, b) => a.createdAt.localeCompare(b.createdAt) || (a.updatedAt ?? 0) - (b.updatedAt ?? 0) || a.id.localeCompare(b.id),
-  );
-  const later = new Set(skipped);
-  const queue = [
-    ...byAge.filter((i) => !later.has(i.id)),
-    ...skipped.map((id) => byAge.find((i) => i.id === id)).filter((i): i is Item => i !== undefined),
-  ];
-  const f = front ? queue.findIndex((i) => i.id === front) : -1;
-  if (f > 0) queue.unshift(...queue.splice(f, 1));
-  return queue;
-}
+const moveTo = (ids: string[], id: string, where: "front" | "end") => {
+  const i = ids.indexOf(id);
+  if (i !== -1) ids.splice(i, 1);
+  if (where === "front") ids.unshift(id);
+  else ids.push(id);
+};
 
 type Last = { message: string; undo?: () => Promise<void> };
 type Action = { kind: "file"; type: SortType; areaId: AreaId } | { kind: "archive" } | { kind: "delete" } | { kind: "skip" };
@@ -62,15 +54,33 @@ export function SortPage({ today }: { today: ISODate }) {
   const { items, refresh, loaded, error } = useHubData(today);
   const shell = useContext(ShellContext);
   const navigate = useNavigate();
-  const [skipped, setSkipped] = useState<string[]>([]);
-  const [front, setFront] = useState<string | null>(null);
+  const asked = useSearchParams()[0].get("item");
+  /**
+   * The queue's order, fixed for this visit: a snapshot of the Inbox when it first loads
+   * (an item asked for with ?item= first); items that arrive later join at the end; Skip
+   * moves one to the end and Undo brings one back to the front. Items no longer in the
+   * Inbox (sorted, here or elsewhere) are simply not shown.
+   */
+  const order = useRef<string[] | null>(null);
+  const [, reordered] = useState(0);
   const [last, setLast] = useState<Last | null>(null);
   const { attempt, saveError } = useSaveError();
   const busy = useRef(false);
   const acted = useRef(false); // after the first action, each new card takes focus
 
-  const inbox = items.filter((i) => i.areaId === "inbox" && i.status === "open");
-  const queue = orderQueue(inbox, skipped, front);
+  const inbox = inboxOrder(items.filter((i) => i.areaId === "inbox" && i.status === "open"));
+  if (loaded) {
+    // Idempotent, so safe during render: only ever appends ids it has not seen.
+    if (order.current === null) {
+      order.current = inbox.map((i) => i.id);
+      if (asked && order.current.includes(asked)) moveTo(order.current, asked, "front");
+    } else {
+      const seen = new Set(order.current);
+      for (const i of inbox) if (!seen.has(i.id)) order.current.push(i.id);
+    }
+  }
+  const byId = new Map(inbox.map((i) => [i.id, i]));
+  const queue = (order.current ?? []).map((id) => byId.get(id)).filter((i): i is Item => i !== undefined);
   const current = queue[0];
 
   const changed = useCallback(async () => {
@@ -84,8 +94,8 @@ export function SortPage({ today }: { today: ISODate }) {
     busy.current = true;
     try {
       if (a.kind === "skip") {
-        setSkipped((s) => [...s.filter((id) => id !== item.id), item.id]);
-        setFront((f) => (f === item.id ? null : f));
+        if (order.current) moveTo(order.current, item.id, "end");
+        reordered((n) => n + 1);
         setLast({ message: "Skipped (it comes back at the end)" });
         acted.current = true;
         return;
@@ -109,12 +119,11 @@ export function SortPage({ today }: { today: ISODate }) {
       const undoable = was !== undefined && !(a.kind === "file" && a.type === "goal");
       const undo = async () => {
         if (!was || !(await attempt(() => putItemBack(was, today)))) return;
-        setFront(was.id);
-        setSkipped((s) => s.filter((id) => id !== was.id));
+        if (order.current) moveTo(order.current, was.id, "front");
+        reordered((n) => n + 1);
         setLast(null);
         await changed();
       };
-      setFront((f) => (f === item.id ? null : f));
       setLast(undoable ? { message, undo } : { message });
       acted.current = true;
       await changed();
@@ -211,6 +220,19 @@ function SortCard({
     if (!(await saveNotes())) return;
     await onAct(a);
   }
+
+  // The card goes (filed elsewhere, or she leaves the page) with unsaved typing: save it.
+  // A blur does not reliably fire when the box is removed.
+  const latest = useRef({ item, today, attempt });
+  latest.current = { item, today, attempt };
+  useEffect(
+    () => () => {
+      const { item: it, today: d, attempt: tryIt } = latest.current;
+      const text = draftRef.current;
+      if (text !== saved.current) void tryIt(() => saveItemNotes(it.id, text, d));
+    },
+    [],
+  );
 
   // Auto-grow the notes box to fit its text.
   useLayoutEffect(() => {

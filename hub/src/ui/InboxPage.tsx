@@ -4,7 +4,7 @@ import { createItem, deleteItem, getItem, listItems, putItemBack, restoreItem } 
 import type { ISODate, Item } from "../domain/types";
 import { UndoLine } from "./DeleteButton";
 import { InboxRow } from "./InboxRow";
-import { INBOX_SOURCES, inboxSource, type InboxSource } from "./inboxSource";
+import { INBOX_SOURCES, inboxOrder, inboxSource, type InboxSource } from "./inboxSource";
 import { NeedsALook } from "./NeedsALook";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
@@ -13,7 +13,8 @@ import { useHubData } from "./useHubData";
 export function InboxPage({ today }: { today: ISODate }) {
   const { items, refresh, loaded, error } = useHubData(today);
   const shell = useContext(ShellContext);
-  const inbox = items.filter((i) => i.areaId === "inbox" && i.status === "open");
+  // The same order as Sort one by one (oldest first).
+  const inbox = inboxOrder(items.filter((i) => i.areaId === "inbox" && i.status === "open"));
 
   const sourcesPresent = INBOX_SOURCES.filter((s) => inbox.some((i) => inboxSource(i) === s));
   const [from, setFrom] = useState<InboxSource | "All">("All");

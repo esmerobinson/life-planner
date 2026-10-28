@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { db } from "../data/db";
+import { db, HubDB } from "../data/db";
 import * as repo from "../data/repo";
 import { createItem, listBin } from "../data/repo";
 import type { Item } from "../domain/types";
@@ -26,9 +26,9 @@ async function seed(...rows: (Partial<Item> & { title: string })[]) {
   return out;
 }
 
-function show() {
+function show(path = "/inbox/sort") {
   return render(
-    <MemoryRouter initialEntries={["/inbox/sort"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/inbox/sort" element={<SortPage today={TODAY} />} />
         <Route path="/inbox" element={<h1>Inbox page</h1>} />
@@ -276,5 +276,88 @@ describe("Sort one by one: notes", () => {
       expect((await db.items.get(b.id))!.notes).toBe("note for Archive me");
       expect((await db.items.get(c.id))!.notes).toBe("note for Delete me");
     });
+  });
+});
+
+describe("Sort one by one: a steady queue (review I-1)", () => {
+  /** Items made the same day, as an import or a day of quick captures makes them. */
+  async function sameDay(...titles: string[]) {
+    const out: Item[] = [];
+    for (const t of titles) out.push(await createItem({ kind: "task", areaId: "inbox", priority: 2, title: t }, "2026-10-05"));
+    return out;
+  }
+
+  it("saving a note never swaps the card or loses the step (same-day items)", async () => {
+    await sameDay("Alpha", "Bravo", "Charlie");
+    show();
+    const first = await vi.waitFor(() => {
+      const t = card().querySelector(".sort-title")!.textContent!;
+      expect(t).toBeTruthy();
+      return t;
+    });
+    const box = within(card()).getByRole("textbox", { name: "Notes" });
+    await userEvent.type(box, "a note");
+    await userEvent.click(within(card()).getByRole("button", { name: "To-do" }));
+    await vi.waitFor(async () => expect((await db.items.toArray()).find((i) => i.title === first)!.notes).toBe("a note"));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(card().querySelector(".sort-title")!.textContent).toBe(first);
+    expect(within(card()).getByRole("button", { name: "← To-do · change" })).toBeInTheDocument();
+  });
+
+  it("the order is fixed for the visit: edits from elsewhere do not reorder it, new items join at the end, items sorted elsewhere drop out", async () => {
+    const [a, b] = await seed({ title: "First" }, { title: "Second" }, { title: "Third" });
+    const other = new HubDB();
+    show();
+    await title("First");
+    expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    // An older item arrives (as from a sync): it goes to the end, not in front.
+    await other.items.add({ id: "older", kind: "task", title: "Older arrival", links: [], areaId: "inbox", priority: 2, status: "open", createdAt: "2026-09-01", touchedAt: "2026-09-01" });
+    await vi.waitFor(() => expect(screen.getByText("1 of 4")).toBeInTheDocument());
+    await title("First");
+    // Second is sorted on another device: it drops out.
+    await other.items.update(b.id, { areaId: "art" });
+    await vi.waitFor(() => expect(screen.getByText("1 of 3")).toBeInTheDocument());
+    await userEvent.click(within(card()).getByRole("button", { name: "Skip →" }));
+    await title("Third");
+    await userEvent.click(within(card()).getByRole("button", { name: "Skip →" }));
+    await title("Older arrival");
+    await userEvent.click(within(card()).getByRole("button", { name: "Skip →" }));
+    await title("First");
+    expect((await db.items.get(a.id))!.areaId).toBe("inbox");
+    other.close();
+  });
+
+  it("typing survives a sync that changes the same item's notes, and is saved when the card goes", async () => {
+    const [a] = await seed({ title: "Busy one", notes: "old" }, { title: "Next" });
+    const other = new HubDB();
+    show();
+    await title("Busy one");
+    const box = within(card()).getByRole("textbox", { name: "Notes" });
+    await userEvent.type(box, " plus mine");
+    await other.items.update(a.id, { notes: "changed elsewhere", touchedAt: TODAY });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(within(card()).getByRole("textbox", { name: "Notes" })).toHaveValue("old plus mine");
+    // Filed on the other device while she types: the card goes, her text is saved first.
+    await other.items.update(a.id, { areaId: "art" });
+    await title("Next");
+    await vi.waitFor(async () => expect((await db.items.get(a.id))!.notes).toBe("old plus mine"));
+    other.close();
+  });
+
+  it("leaving the page saves what was typed", async () => {
+    const [a] = await seed({ title: "Leaving with a note" });
+    const view = show();
+    await title("Leaving with a note");
+    fireEvent.change(within(card()).getByRole("textbox", { name: "Notes" }), { target: { value: "unsaved words" } });
+    view.unmount();
+    await vi.waitFor(async () => expect((await db.items.get(a.id))!.notes).toBe("unsaved words"));
+  });
+
+  it("?item=<id> opens the card on that item first (Sort this…)", async () => {
+    const [, b] = await seed({ title: "First" }, { title: "Picked" }, { title: "Third" });
+    show(`/inbox/sort?item=${b.id}`);
+    await title("Picked");
+    await userEvent.click(within(card()).getByRole("button", { name: "Skip →" }));
+    await title("First");
   });
 });
