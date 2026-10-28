@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { tickItem } from "../data/repo";
+import { dueLine } from "../domain/display";
 import type { ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
+import { ScheduleMenu } from "./ScheduleMenu";
 
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
@@ -28,26 +30,76 @@ export function useTick(today: ISODate, refresh: () => Promise<void>) {
   };
 }
 
+/** The small line under a task's title (2D): due date, red with how late when overdue; and the pinned day. */
+export function DueLine({ item, today }: { item: Item; today: ISODate }) {
+  const line = dueLine(item, today);
+  if (!line.due && !line.on) return null;
+  return (
+    <div className="strip-meta">
+      {line.due && <span className={line.late ? "strip-late" : undefined}>{line.due}</span>}
+      {line.due && line.on && " · "}
+      {line.on && <span>{line.on}</span>}
+    </div>
+  );
+}
+
+/**
+ * One task (or idea) as a strip: tick box on the left (Done; tasks only), title with the
+ * due line under it, and the Schedule for (tasks only) and Move to icons on the right.
+ * `meta` adds lines under the title, `extra` sits before the icons, `tray` is a second
+ * line under the title for a page's own controls.
+ */
 export function TaskRow({
   item,
   today,
   onTick,
   onMoved,
+  meta,
+  extra,
+  tray,
+  className,
 }: {
   item: Item;
   today: ISODate;
-  onTick: (id: string) => void;
-  onMoved: () => Promise<void>;
+  onTick?: (id: string) => void;
+  onMoved: () => void | Promise<void>;
+  meta?: ReactNode;
+  extra?: ReactNode;
+  tray?: ReactNode;
+  className?: string;
 }) {
-  const overdue = item.due !== undefined && item.due < today;
+  const isTask = item.kind === "task";
+  const tick = isTask && onTick !== undefined;
   return (
-    <li className="today-row">
-      <button type="button" aria-label={`Done: ${item.title}`} onClick={() => onTick(item.id)}>
-        Done
-      </button>
-      <span className="today-title">{item.title}</span>
-      {overdue && <span className="overdue-sticker">OVERDUE</span>}
-      <MoveToMenu itemId={item.id} today={today} onMoved={onMoved} label={item.title} />
+    <li className={["strip", tick ? "" : "no-tick", className ?? ""].filter(Boolean).join(" ")}>
+      {tick && (
+        <input
+          type="checkbox"
+          className="tick"
+          aria-label={`Mark done: ${item.title}`}
+          checked={false}
+          onChange={() => onTick(item.id)}
+        />
+      )}
+      <div className="strip-body">
+        <div className="strip-title">{item.title}</div>
+        {isTask && <DueLine item={item} today={today} />}
+        {meta}
+      </div>
+      <div className="strip-actions">
+        {extra}
+        {isTask && (
+          <ScheduleMenu
+            itemId={item.id}
+            pinnedDate={item.pinnedDate}
+            today={today}
+            onScheduled={onMoved}
+            label={item.title}
+          />
+        )}
+        <MoveToMenu itemId={item.id} areaId={item.areaId} today={today} onMoved={onMoved} label={item.title} />
+      </div>
+      {tray && <div className="strip-tray">{tray}</div>}
     </li>
   );
 }

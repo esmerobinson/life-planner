@@ -7,6 +7,7 @@ import { INBOX_SOURCES, inboxSource, type InboxSource } from "./inboxSource";
 import { NeedsALook } from "./NeedsALook";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
+import { useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
 
 export function InboxPage({ today }: { today: ISODate }) {
@@ -76,6 +77,7 @@ export function InboxPage({ today }: { today: ISODate }) {
     await refresh();
     await shell?.refresh();
   }
+  const { tick, celebration, message: tickMessage } = useTick(today, changed);
 
   /** Runs one bulk write under the in-flight guard. Returns the write's result, or undefined on failure. */
   async function bulk<T>(write: () => Promise<T>): Promise<T | undefined> {
@@ -170,6 +172,8 @@ export function InboxPage({ today }: { today: ISODate }) {
       </form>
       {saveError && <p className="form-message">{saveError}</p>}
       <h2>To sort</h2>
+      {celebration}
+      {tickMessage}
       {loaded && inbox.length === 0 && <p>Nothing waiting in the inbox.</p>}
       {showFilter && (
         <div className="btn-group" role="group" aria-label="From">
@@ -225,10 +229,11 @@ export function InboxPage({ today }: { today: ISODate }) {
       )}
       {result && <p>{result}</p>}
       {shown.length > 0 && (
-        <ul aria-label="Inbox items">
+        <ul aria-label="Inbox items" className="strip-list">
           {shown.map((it) => (
             <InboxRow key={it.id} item={it} today={today} goals={goals}
               onFiled={changed}
+              onTick={(id) => void tick(id)}
               selected={picked.has(it.id)}
               onToggle={() => toggle(it.id)}
             />
@@ -240,22 +245,26 @@ export function InboxPage({ today }: { today: ISODate }) {
       {archived.length > 0 && (
         <details>
           <summary>{`Archived from the inbox (${archived.length})`}</summary>
-          <ul aria-label="Archived from the inbox">
+          <ul aria-label="Archived from the inbox" className="strip-list">
             {archived.map((it) => (
-              <li key={it.id} className="today-row">
-                <span className="today-title">{it.title}</span>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  aria-label={`Restore: ${it.title}`}
-                  onClick={() =>
-                    void attempt(() => restoreItem(it.id, today)).then(async (ok) => {
-                      if (ok) await changed();
-                    })
-                  }
-                >
-                  Restore
-                </button>
+              <li key={it.id} className="strip no-tick">
+                <div className="strip-body">
+                  <div className="strip-title">{it.title}</div>
+                </div>
+                <div className="strip-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    aria-label={`Restore: ${it.title}`}
+                    onClick={() =>
+                      void attempt(() => restoreItem(it.id, today)).then(async (ok) => {
+                        if (ok) await changed();
+                      })
+                    }
+                  >
+                    Restore
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

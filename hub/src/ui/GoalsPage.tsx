@@ -1,5 +1,6 @@
 import { useContext } from "react";
 import type { ISODate } from "../domain/types";
+import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
 import { GoalCard } from "./GoalProgress";
 import { GoalForm } from "./GoalForm";
 import { ShellContext } from "./shellContext";
@@ -27,13 +28,20 @@ export function GoalsPage({ today }: { today: ISODate }) {
     <section className="goals-page">
       <h1>Goals</h1>
       {loaded && goals.length === 0 && <p>No goals yet.</p>}
-      {goals.length > 0 && (
-        <ul aria-label="Goals" className="goal-list">
-          {goals.map((g) => (
-            <GoalCard key={g.id} goal={g} items={items} today={today} />
-          ))}
-        </ul>
-      )}
+      {GOAL_AREAS_BY_SIDEBAR.map((area) => {
+        const mine = goals.filter((g) => g.areaId === area.id);
+        if (mine.length === 0) return null;
+        return (
+          <section key={area.id}>
+            <h2>{area.label}</h2>
+            <ul aria-label={`${area.label} goals`} className="goal-list">
+              {mine.map((g) => (
+                <GoalCard key={g.id} goal={g} items={items} today={today} />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
       <GoalForm today={today} onSaved={saved} />
     </section>
   );

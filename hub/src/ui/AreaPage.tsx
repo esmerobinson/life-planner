@@ -4,9 +4,8 @@ import { listItems, restoreItem, untickItem } from "../data/repo";
 import type { ISODate, Item } from "../domain/types";
 import { GOAL_AREAS } from "./areas";
 import { DoneSection } from "./DoneSection";
-import { GoalCard } from "./GoalProgress";
+import { GoalCard, MonthProgress } from "./GoalProgress";
 import { DATA_ERROR, useSaveError } from "./messages";
-import { MoveToMenu } from "./MoveToMenu";
 import { ShellContext } from "./shellContext";
 import { TaskRow, useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
@@ -58,11 +57,16 @@ export function AreaPage({ today }: { today: ISODate }) {
     );
   }
 
-  /** Write, then re-read here and tell the shell so every other page re-reads too. */
-  async function save(fn: () => Promise<unknown>) {
-    if (!(await attempt(fn))) return;
+  /** Re-read here and tell the shell so every other page re-reads too. */
+  async function changed() {
     await refresh();
     await shell?.refresh();
+  }
+
+  /** Write, then re-read everywhere. */
+  async function save(fn: () => Promise<unknown>) {
+    if (!(await attempt(fn))) return;
+    await changed();
   }
 
   const mine = items.filter((i) => i.areaId === area.id && i.status === "open");
@@ -74,6 +78,7 @@ export function AreaPage({ today }: { today: ISODate }) {
   return (
     <section className="area-page">
       <h1>{area.label}</h1>
+      {loaded && <MonthProgress areaId={area.id} items={items} today={today} />}
       <div role="group" aria-label="Show" className="btn-group">
         {FILTERS.map((t) => (
           <button
@@ -93,23 +98,32 @@ export function AreaPage({ today }: { today: ISODate }) {
       {tasks.length > 0 && (
         <section>
           {view === "all" && <h2>To-dos</h2>}
-          <ul aria-label="To-dos">
+          <ul aria-label="To-dos" className="strip-list">
             {tasks.map((it) => (
-              <TaskRow key={it.id} item={it} today={today} onTick={(i) => void tick(i)} onMoved={refresh} />
+              <TaskRow key={it.id} item={it} today={today} onTick={(i) => void tick(i)} onMoved={changed} />
             ))}
           </ul>
         </section>
       )}
+      {(view === "all" || view === "tasks") && (
+        <DoneSection
+          items={items.filter((i) => i.areaId === area.id)}
+          today={today}
+          onUndo={(itemId) => void save(() => untickItem(itemId, today))}
+        />
+      )}
       {ideas.length > 0 && (
         <section>
           {view === "all" && <h2>Ideas</h2>}
-          <ul aria-label="Ideas">
+          <ul aria-label="Ideas" className="strip-list">
             {ideas.map((it) => (
-              <li key={it.id} className="today-row">
-                <span className="today-title">{it.title}</span>
-                {it.notes && <span>{it.notes}</span>}
-                <MoveToMenu itemId={it.id} today={today} onMoved={refresh} label={it.title} />
-              </li>
+              <TaskRow
+                key={it.id}
+                item={it}
+                today={today}
+                onMoved={changed}
+                meta={it.notes ? <div className="strip-meta">{it.notes}</div> : undefined}
+              />
             ))}
           </ul>
         </section>
@@ -124,30 +138,28 @@ export function AreaPage({ today }: { today: ISODate }) {
           </ul>
         </section>
       )}
-      {(view === "all" || view === "tasks") && (
-        <DoneSection
-          items={items.filter((i) => i.areaId === area.id)}
-          onUndo={(itemId) => void save(() => untickItem(itemId, today))}
-        />
-      )}
       <h2>Archive</h2>
       {archiveFailed ? (
         <p>{DATA_ERROR}</p>
       ) : archived.length === 0 ? (
         <p>Nothing archived.</p>
       ) : (
-        <ul aria-label="Archive">
+        <ul aria-label="Archive" className="strip-list">
           {archived.map((it) => (
-            <li key={it.id} className="today-row">
-              <span className="today-title">{it.title}</span>
-              <button
-                type="button"
-                className="btn-secondary"
-                aria-label={`Restore: ${it.title}`}
-                onClick={() => void save(() => restoreItem(it.id, today))}
-              >
-                Restore
-              </button>
+            <li key={it.id} className="strip no-tick">
+              <div className="strip-body">
+                <div className="strip-title">{it.title}</div>
+              </div>
+              <div className="strip-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  aria-label={`Restore: ${it.title}`}
+                  onClick={() => void save(() => restoreItem(it.id, today))}
+                >
+                  Restore
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -38,11 +38,13 @@ describe("Inbox: To sort and Needs a look", () => {
     const h3 = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(h3).toEqual(["Overdue", "Due soon", "Not looked at in a while"]);
     const row = (t: string) => screen.getByText(t).closest("li") as HTMLElement;
-    expect(within(row("Late two")).getByText("Overdue by 2 days.")).toBeInTheDocument();
-    expect(within(row("Late one")).getByText("Overdue by 1 day.")).toBeInTheDocument();
-    expect(within(row("Today job")).getByText("Due today.")).toBeInTheDocument();
-    expect(within(row("Tomorrow job")).getByText("Due in 1 day.")).toBeInTheDocument();
-    expect(within(row("Soon job")).getByText("Due in 3 days.")).toBeInTheDocument();
+    // The due line (2D) says why an overdue or due-soon row is here; late ones in red.
+    expect(within(row("Late two")).getByText("Due Sun 25 Oct · 2 days late")).toHaveClass("strip-late");
+    expect(within(row("Late one")).getByText("Due Mon 26 Oct · 1 day late")).toHaveClass("strip-late");
+    expect(within(row("Today job")).getByText("Due today")).not.toHaveClass("strip-late");
+    expect(within(row("Tomorrow job")).getByText("Due tomorrow")).toBeInTheDocument();
+    expect(within(row("Soon job")).getByText("Due Fri 30 Oct")).toBeInTheDocument();
+    expect(screen.queryByText(/Overdue by/)).toBeNull();
     expect(
       within(row("Old job")).getByText("Not looked at for 26 days. What do you want to do with this?"),
     ).toBeInTheDocument();
@@ -95,9 +97,9 @@ describe("Inbox: To sort and Needs a look", () => {
     await seed("Archive me", { due: "2026-10-21" });
     render(<InboxPage today={TODAY} />);
     await screen.findByText("Tick me");
-    await userEvent.click(screen.getByRole("button", { name: "Done: Tick me" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Tick me" }));
     await vi.waitFor(() => expect(screen.queryByText("Tick me")).toBeNull());
-    await userEvent.click(screen.getByRole("button", { name: "Move: Archive me" }));
+    await userEvent.click(screen.getByRole("button", { name: "Move to: Archive me" }));
     await userEvent.click(screen.getByRole("button", { name: "Archive" }));
     await vi.waitFor(() => expect(screen.queryByText("Archive me")).toBeNull());
   });
@@ -125,7 +127,7 @@ describe("Inbox pill count", () => {
     await seed("Calm", { due: addDays(t, 30) }, t);
     shell(t);
     expect(await screen.findByRole("link", { name: "Inbox (4)" })).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("button", { name: "Done: Late" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Late" }));
     expect(await screen.findByRole("link", { name: "Inbox (3)" })).toBeInTheDocument();
   });
 

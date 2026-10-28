@@ -66,7 +66,7 @@ describe("failing writes show the save line", () => {
     await repo.createItem({ kind: "task", title: "Stretch", areaId: "body", priority: 3 }, TODAY);
     vi.spyOn(repo, "tickItem").mockRejectedValueOnce(new Error("write failed"));
     at("/area/body", "/area/:areaId", <AreaPage today={TODAY} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Done: Stretch" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Stretch" }));
     expect(await screen.findByText(SAVE_LINE)).toBeInTheDocument();
     expect(screen.queryByTestId("celebration-placeholder")).toBeNull();
   });

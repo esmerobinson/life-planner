@@ -39,7 +39,9 @@ describe("HomePage", () => {
     expect(screen.getByRole("button", { name: "Daily check-in" })).toBeDisabled();
     expect(screen.getByText("Coming in a later update")).toBeInTheDocument();
     expect(await screen.findByRole("progressbar", { name: /3\/10/ })).toBeInTheDocument();
-    expect(screen.getByText("Write more")).toBeInTheDocument();
+    const card = screen.getByRole("link", { name: "Write more" }).closest("li")!;
+    expect(card).toHaveClass("goal-card");
+    expect(card).toHaveTextContent("October: 3 of 10");
   });
 
   it("home with no data renders three calm empty states and no console errors", async () => {
@@ -81,7 +83,7 @@ describe("HomePage", () => {
     );
     const bar = await screen.findByRole("progressbar", { name: /3\/10/ });
     expect(bar).toHaveAttribute("aria-valuenow", "30");
-    await userEvent.click(await screen.findByRole("button", { name: "Done: Open goal task" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Open goal task" }));
     const updated = await screen.findByRole("progressbar", { name: /4\/10/ });
     expect(updated).toHaveAttribute("aria-valuenow", "40");
   });

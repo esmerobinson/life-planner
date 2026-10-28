@@ -5,19 +5,15 @@ import { daysBetween } from "../domain/dates";
 import type { ISODate, Item } from "../domain/types";
 import { AREA_CHOICES } from "./areas";
 import { useSaveError } from "./messages";
-import { MoveToMenu } from "./MoveToMenu";
-import { useTick } from "./TaskRow";
+import { TaskRow, useTick } from "./TaskRow";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 type Kind = "overdue" | "dueSoon" | "stale";
 
-function reason(kind: Kind, it: Item, today: ISODate): string {
-  if (kind === "overdue") return `Overdue by ${plural(daysBetween(it.due!, today), "day")}.`;
-  if (kind === "dueSoon") {
-    const n = daysBetween(today, it.due!);
-    return n === 0 ? "Due today." : `Due in ${plural(n, "day")}.`;
-  }
+/** Why a row is here, beyond its due line: overdue and due-soon rows say it in the due line (2D). */
+function reason(kind: Kind, it: Item, today: ISODate): string | null {
+  if (kind !== "stale") return null;
   return `Not looked at for ${plural(daysBetween(it.touchedAt, today), "day")}. What do you want to do with this?`;
 }
 
@@ -44,34 +40,47 @@ function Row({
     if (ok) await onChanged();
   }
 
+  const why = reason(kind, item, today);
   return (
-    <li className="today-row form-row">
-      <button type="button" aria-label={`Done: ${item.title}`} onClick={() => onTick(item.id)}>
-        Done
-      </button>
-      <span className="today-title">{item.title}</span>
-      <span>{area}</span>
-      <span>{reason(kind, item, today)}</span>
-      <MoveToMenu itemId={item.id} today={today} onMoved={onChanged} label={item.title} />
-      <label className="form-field">
-        <span className="form-label">Change due date</span>
-        <input
-          type="date"
-          aria-label={`Change due date for ${item.title}`}
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
-        />
-      </label>
-      <button
-        type="button"
-        className="btn-secondary"
-        aria-label={`Save date for ${item.title}`}
-        onClick={() => void saveDate()}
-      >
-        Save date
-      </button>
-      {saveError && <span className="form-message">{saveError}</span>}
-    </li>
+    <TaskRow
+      item={item}
+      today={today}
+      onTick={onTick}
+      onMoved={onChanged}
+      meta={
+        <div className="strip-meta">
+          <span>{area}</span>
+          {why && (
+            <>
+              {" · "}
+              <span>{why}</span>
+            </>
+          )}
+        </div>
+      }
+      tray={
+        <>
+          <label className="form-field">
+            <span className="form-label">Change due date</span>
+            <input
+              type="date"
+              aria-label={`Change due date for ${item.title}`}
+              value={due}
+              onChange={(e) => setDue(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn-secondary"
+            aria-label={`Save date for ${item.title}`}
+            onClick={() => void saveDate()}
+          >
+            Save date
+          </button>
+          {saveError && <span className="form-message">{saveError}</span>}
+        </>
+      }
+    />
   );
 }
 
@@ -102,7 +111,7 @@ export function NeedsALook({
         found[kind].length === 0 ? null : (
           <section key={kind}>
             <h3>{heading}</h3>
-            <ul aria-label={heading}>
+            <ul aria-label={heading} className="strip-list">
               {found[kind].map((it) => (
                 <Row key={it.id} item={it} kind={kind} today={today} onTick={(id) => void tick(id)} onChanged={onChanged} />
               ))}

@@ -49,7 +49,9 @@ describe("AreaPage", () => {
     await userEvent.click(within(filter).getByRole("button", { name: "Ideas" }));
     expect(screen.getByText("An idea")).toBeInTheDocument();
     expect(screen.queryByText("A task")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Done:/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /^Mark done:/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Schedule for: An idea" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move to: An idea" })).toBeInTheDocument();
 
     await userEvent.click(within(filter).getByRole("button", { name: "Goals" }));
     expect(screen.getByText("A goal")).toBeInTheDocument();
@@ -65,32 +67,37 @@ describe("AreaPage", () => {
     await userEvent.click(within(archive).getByRole("button", { name: "Restore: Old plan" }));
     await screen.findByText("Nothing archived.");
     await userEvent.click(screen.getByRole("button", { name: "To-dos" }));
-    expect(screen.getByRole("button", { name: "Done: Old plan" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Mark done: Old plan" })).toBeInTheDocument();
   });
 
   it("ticking a task marks it done", async () => {
     await createItem({ kind: "task", title: "Tick me", areaId: "body", priority: 3 }, TODAY);
     renderArea("body");
-    await userEvent.click(await screen.findByRole("button", { name: "Done: Tick me" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Tick me" }));
     await screen.findByText("Nothing here yet.");
     expect((await db.items.toArray())[0].status).toBe("done");
   });
 
-  it("a ticked task appears under Done and Undo returns it to To-dos", async () => {
+  it("a ticked task appears under Done (N) and unticking returns it to To-dos", async () => {
     await createItem({ kind: "task", title: "Oops", areaId: "art", priority: 3 }, TODAY);
     renderArea("art");
-    await userEvent.click(await screen.findByRole("button", { name: "Done: Oops" }));
-    const done = screen.getByText("Done", { selector: "summary" }).closest("details")!;
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Oops" }));
+    const summary = await screen.findByText("Done (1)", { selector: "summary" });
+    const done = summary.closest("details")!;
     expect(done).not.toHaveAttribute("open");
-    await userEvent.click(within(done).getByText("Done", { selector: "summary" }));
+    await userEvent.click(summary);
     const doneList = await within(done).findByRole("list", { name: "Done" });
     expect(within(doneList).getByText("Oops")).toBeInTheDocument();
+    expect(within(doneList).getByText("27 Oct")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "To-dos" })).toBeNull();
 
-    await userEvent.click(within(doneList).getByRole("button", { name: "Undo: Oops" }));
+    const box = within(doneList).getByRole("checkbox", { name: "Mark done: Oops" });
+    expect(box).toBeChecked();
+    await userEvent.click(box);
     const todos = await screen.findByRole("list", { name: "To-dos" });
     expect(within(todos).getByText("Oops")).toBeInTheDocument();
     expect(within(done).getByText("Nothing done yet.")).toBeInTheDocument();
+    expect(within(done).getByText("Done (0)", { selector: "summary" })).toBeInTheDocument();
     const stored = (await db.items.toArray())[0];
     expect(stored.status).toBe("open");
     expect(stored.completedAt).toBeUndefined();
@@ -181,5 +188,77 @@ describe("AreaPage", () => {
       expect(screen.queryByText("An idea")).toBeNull();
       expect(headings().filter((h) => SECTIONS.includes(h ?? ""))).toEqual([]);
     });
+  });
+
+  describe("Month count (4A)", () => {
+    async function doneOn(title: string, day: string, areaId: "art" | "body" = "art") {
+      const it = await createItem({ kind: "task", title, areaId, priority: 3 }, day);
+      await tickItem(it.id, day);
+    }
+
+    it("says how many were ticked off this month and last month, under the heading", async () => {
+      for (const d of ["2026-10-01", "2026-10-15", "2026-10-26"]) await doneOn(`Oct ${d}`, d);
+      for (const d of ["2026-09-03", "2026-09-30"]) await doneOn(`Sep ${d}`, d);
+      await doneOn("Other area", "2026-10-02", "body");
+      await doneOn("Too old", "2026-08-31");
+      renderArea("art");
+      const box = await screen.findByRole("region", { name: "Ticked off this month" });
+      expect(within(box).getByText("3 ticked off in October")).toBeInTheDocument();
+      expect(within(box).getByText("last month 2")).toBeInTheDocument();
+      expect(within(box).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+      // Directly under the h1, above the filter pills.
+      const h1 = screen.getByRole("heading", { level: 1, name: "Art" });
+      expect(h1.nextElementSibling).toBe(box);
+    });
+
+    it("compares with last month's total", async () => {
+      await doneOn("One", "2026-10-03");
+      for (const d of ["2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04"]) await doneOn(`Sep ${d}`, d);
+      renderArea("art");
+      const box = await screen.findByRole("region", { name: "Ticked off this month" });
+      expect(within(box).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "25");
+    });
+
+    it("has a calm zero state with an empty bar", async () => {
+      renderArea("art");
+      const box = await screen.findByRole("region", { name: "Ticked off this month" });
+      expect(within(box).getByText("Nothing ticked off yet in October")).toBeInTheDocument();
+      expect(within(box).getByText("last month 0")).toBeInTheDocument();
+      expect(within(box).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
+    });
+  });
+
+  describe("Done fold-out (4A)", () => {
+    it("sits right after the to-dos and lists at most 50, with Show all for the rest", async () => {
+      for (let i = 1; i <= 52; i++) {
+        const it = await createItem({ kind: "task", title: `Did ${i}`, areaId: "mind", priority: 3 }, TODAY);
+        await tickItem(it.id, `2026-${i > 26 ? "10" : "09"}-${String(((i - 1) % 26) + 1).padStart(2, "0")}`);
+      }
+      await createItem({ kind: "task", title: "Still open", areaId: "mind", priority: 3 }, TODAY);
+      renderArea("mind");
+      const todos = await screen.findByRole("list", { name: "To-dos" });
+      const details = screen.getByText("Done (52)", { selector: "summary" }).closest("details")!;
+      expect(todos.closest("section")!.nextElementSibling).toBe(details);
+      const list = within(details).getByRole("list", { name: "Done", hidden: true });
+      const rows = within(list).getAllByRole("listitem", { hidden: true });
+      expect(rows).toHaveLength(50);
+      expect(rows[0]).toHaveTextContent("Did 52");
+      expect(rows[0]).toHaveTextContent("26 Oct");
+      await userEvent.click(within(details).getByText("Done (52)", { selector: "summary" }));
+      await userEvent.click(within(details).getByRole("button", { name: "Show all" }));
+      expect(within(list).getAllByRole("listitem")).toHaveLength(52);
+      expect(within(details).queryByRole("button", { name: "Show all" })).toBeNull();
+      expect(within(details).getByText("Untick to bring one back.")).toBeInTheDocument();
+    });
+  });
+
+  it("area goals are cards that link to the goal", async () => {
+    const g = await createGoal({ title: "Paint daily", areaId: "art", kind: "practice", monthlyTarget: 4 }, TODAY);
+    renderArea("art");
+    const list = await screen.findByRole("list", { name: "Goals" });
+    const card = within(list).getByRole("listitem");
+    expect(card).toHaveClass("goal-card");
+    expect(within(card).getByRole("link", { name: "Paint daily" })).toHaveAttribute("href", `/goals/${g.id}`);
+    expect(within(card).getByText("October: 0 of 4")).toBeInTheDocument();
   });
 });

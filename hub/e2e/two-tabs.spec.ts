@@ -48,7 +48,7 @@ test("a tick in one tab updates another tab's Today without reload", async ({ co
     await expect(p.getByRole("heading", { name: "Today" }).first()).toBeVisible();
   }
   await mark(b);
-  const done = (p: Page) => p.getByRole("button", { name: "Done: Cross tab pretend errand" });
+  const done = (p: Page) => p.getByRole("checkbox", { name: "Mark done: Cross tab pretend errand" });
   await expect(done(a)).toBeVisible();
   await expect(done(b)).toBeVisible();
 
