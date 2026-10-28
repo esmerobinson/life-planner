@@ -16,7 +16,8 @@
 //   of data (at least one row), EXCLUDING a row only when it belongs to the caller's
 //   deviceId and this request carries exactly that table/id/updatedAt. Then RETURNED
 //   WINNERS: for every (table, id) in the request whose stored row is not exactly a version
-//   this request sent, the stored row is appended (once per row, never duplicated).
+//   this request sent (same deviceId, updatedAt AND data), the stored row is appended (once
+//   per row, never duplicated).
 // - Response cursor: highest seq among paged rows when hasMore; otherwise the server's
 //   highest seq (or the request cursor when that is higher, which 409 rules out). Returned
 //   winners never move it.
@@ -213,13 +214,18 @@ export class FakeSyncServer {
     const hasMore = candidates.length > paged.length;
     const nextCursor = hasMore ? paged.at(-1)!.seq : Math.max(cursor, this.seq);
 
+    // Returned winners: "exactly a version this request sent" means same deviceId,
+    // updatedAt AND data (v1.1 C.5), so a reused timestamp with different data comes back.
+    const sentExact = new Set(valid.map((c) => `${key(c.table, c.id)}\u0000${c.updatedAt}\u0000${JSON.stringify(c.data)}`));
+    const isExactSent = (r: FakeRow) =>
+      r.deviceId === deviceId && sentExact.has(`${key(r.table, r.id)}\u0000${r.updatedAt}\u0000${r.data}`);
     const out = paged.map(wire);
     const included = new Set(paged.map((r) => key(r.table, r.id)));
     for (const c of valid) {
       const k = key(c.table, c.id);
       if (included.has(k)) continue;
       const stored = this.rows.get(k);
-      if (!stored || isOwnSentVersion(stored)) continue;
+      if (!stored || isExactSent(stored)) continue;
       included.add(k);
       out.push(wire(stored));
     }

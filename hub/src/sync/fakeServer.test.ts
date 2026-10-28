@@ -50,6 +50,14 @@ describe("FakeSyncServer (contract v1.1)", () => {
     expect(r.body).toMatchObject({ applied: 1, ignored: 1, hasMore: false, cursor: 2 });
   });
 
+  it("returns the stored row when this request reused its own timestamp for different data", async () => {
+    const s = make();
+    await post(s, { deviceId: DEV_A, cursor: 0, changes: [change("x", 7, { title: "first" })] });
+    const r = await post(s, { deviceId: DEV_A, cursor: 0, changes: [change("x", 7, { title: "second" })] });
+    expect(r.body).toMatchObject({ applied: 0, ignored: 1 });
+    expect(r.body.changes.map((c: { data: { title: string } }) => c.data.title)).toEqual(["first"]);
+  });
+
   it("pages with hasMore, cursor = last paged seq, and 409 when the cursor is ahead", async () => {
     const s = make({ pageSize: 2 });
     await post(s, { deviceId: DEV_B, cursor: 0, changes: [change("a", 1), change("b", 1), change("c", 1)] });

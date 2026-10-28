@@ -6,7 +6,7 @@ import type { Item } from "../domain/types";
 import { FakeSyncServer } from "./fakeServer";
 import {
   FUTURE_RESTAMP_MS, MAX_CHANGES_PER_REQUEST, MAX_REQUEST_BYTES, NEEDS_PASSPHRASE_MESSAGE,
-  getDeviceId, getMeta, saveSyncSettings, syncOnce,
+  getDeviceId, getMeta, saveSyncSettings, setMeta, syncOnce,
 } from "./engine";
 
 const TOKEN = "c0ffee".padEnd(64, "0"); // fake, never a real token
@@ -155,62 +155,110 @@ describe("syncOnce", () => {
     const server = new FakeSyncServer(TOKEN);
     const a = await device();
     const b = await device();
+    await a.items.bulkAdd([item("x", { title: "start" }), item("y")]);
+    await syncOnce({ db: a, fetch: server.fetch });
+    await syncOnce({ db: b, fetch: server.fetch });
+    clock += 1_000;
+    await b.items.update("x", { title: "B edit" });
+    await syncOnce({ db: b, fetch: server.fetch });
+
+    // A sends an unrelated change; while that request is in flight A edits x (later than B).
+    clock += 1_000;
+    await a.items.update("y", { title: "y2" });
+    let edited = false;
+    const editDuringRequest: typeof fetch = async (input, init) => {
+      if (!edited) {
+        edited = true;
+        clock += 1_000;
+        await a.items.update("x", { title: "A during request" });
+      }
+      return server.fetch(input, init);
+    };
+    const before = server.syncRequests.length;
+    await syncOnce({ db: a, fetch: editDuringRequest });
+    const [first, second] = server.syncRequests.slice(before) as unknown as {
+      body: { cursor: number; changes: { data: { title: string } }[] };
+      response: { changes: { data: { title: string } }[] };
+    }[];
+    // The first response carried B's (older) x while A's newer edit was waiting: it was not
+    // applied over it, and the edit was sent in the next request.
+    expect(first!.body.changes.map((c) => c.data.title)).toEqual(["y2"]);
+    expect(first!.response.changes.map((c) => c.data.title)).toContain("B edit");
+    expect(second!.body.changes.map((c) => c.data.title)).toEqual(["A during request"]);
+    expect((await a.items.get("x"))!.title).toBe("A during request");
+    expect(server.data("items", "x")!.title).toBe("A during request");
+    expect(await a.pending.count()).toBe(0);
+    await syncOnce({ db: b, fetch: server.fetch });
+    expect(await titles(b)).toEqual(await titles(a));
+  });
+
+  it("an unsent local change OLDER than a row in the response gives way to it (v1.1 F.3)", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const a = await device();
+    const b = await device();
     await a.items.add(item("x", { title: "start" }));
     await syncOnce({ db: a, fetch: server.fetch });
     await syncOnce({ db: b, fetch: server.fetch });
     clock += 10_000;
     await b.items.update("x", { title: "B (newest)" });
     await syncOnce({ db: b, fetch: server.fetch });
-
-    // A edits x offline, older than B's edit; then edits it AGAIN while its request is in flight.
-    clock -= 8_000;
-    await a.items.update("x", { title: "A first" });
+    clock -= 8_000; // A's clock is behind
     let edited = false;
     const editDuringRequest: typeof fetch = async (input, init) => {
       if (!edited) {
         edited = true;
-        clock += 1;
         await a.items.update("x", { title: "A during request" });
       }
       return server.fetch(input, init);
     };
     await syncOnce({ db: a, fetch: editDuringRequest });
-    // The in-flight edit survived the response that carried B's row, and is still pending.
-    expect((await a.items.get("x"))!.title).toBe("A during request");
-    const p = await a.pending.get(["items", "x"]);
-    expect(p!.updatedAt).toBe((await a.items.get("x"))!.updatedAt);
-
-    // Next time it is sent; B's edit is still newer, so the server returns it as a winner.
-    const before = server.syncRequests.length;
-    await syncOnce({ db: a, fetch: server.fetch });
-    const next = server.syncRequests[before]!;
-    expect(next.body!.changes.map((c) => c.data.title)).toEqual(["A during request"]);
-    // The cursor is already past B's row, so it can only arrive as a RETURNED WINNER.
-    expect(next.body!.cursor).toBe(server.seq);
-    expect((next.response as { changes: { data: { title: string } }[] }).changes.map((c) => c.data.title)).toEqual(["B (newest)"]);
     expect((await a.items.get("x"))!.title).toBe("B (newest)");
     expect(await a.pending.count()).toBe(0);
+    // It lost on arrival, so it was never sent.
+    const sentTitles = server.syncRequests.flatMap((r) => r.body!.changes.map((c) => c.data.title));
+    expect(sentTitles).not.toContain("A during request");
   });
 
-  it("a local edit made during a request that is newer wins everywhere", async () => {
+  it("a device that loses a tie learns the winner from a returned winner", async () => {
     const server = new FakeSyncServer(TOKEN);
     const a = await device();
-    await a.items.add(item("x", { title: "v1" }));
+    const b = await device();
+    await setMeta(a, "deviceId", "device-aaaaaaaaaaaaaaaa");
+    await setMeta(b, "deviceId", "device-bbbbbbbbbbbbbbbb"); // greater: wins a tie
+    await a.items.add(item("seed"));
+    await syncOnce({ db: a, fetch: server.fetch });
+    await syncOnce({ db: b, fetch: server.fetch });
+
+    // Both write x at the same millisecond. B syncs first.
+    clock += 5_000;
+    await b.items.add(item("x", { title: "from B" }));
+    await syncOnce({ db: b, fetch: server.fetch });
+    // A's write happens while A's pull is in flight, so A keeps it (a tie stays pending for
+    // the server to decide) and its cursor moves past B's row.
     let edited = false;
     const editDuringRequest: typeof fetch = async (input, init) => {
-      const res = await server.fetch(input, init);
       if (!edited) {
         edited = true;
-        clock += 5;
-        await a.items.update("x", { title: "v2" });
+        await a.items.add(item("x", { title: "from A" }));
       }
-      return res;
+      return server.fetch(input, init);
     };
+    const before = server.syncRequests.length;
     await syncOnce({ db: a, fetch: editDuringRequest });
-    expect((await a.items.get("x"))!.title).toBe("v2");
-    expect(await a.pending.count()).toBe(1);
-    await syncOnce({ db: a, fetch: server.fetch });
-    expect(server.data("items", "x")!.title).toBe("v2");
+    const [first, second] = server.syncRequests.slice(before) as unknown as {
+      body: { cursor: number; changes: { data: { title: string } }[] };
+      response: { applied: number; ignored: number; cursor: number; changes: { data: { title: string } }[] };
+    }[];
+    // The pull carried B's x; A's tied write stayed pending (the server decides a tie)...
+    expect(first!.response.changes.map((c) => c.data.title)).toEqual(["from B"]);
+    // ...and was sent next, with a cursor already past B's row, so B's row came back only
+    // as a RETURNED WINNER.
+    expect(second!.body.changes.map((c) => c.data.title)).toEqual(["from A"]);
+    expect(second!.body.cursor).toBe(first!.response.cursor);
+    expect(second!.body.cursor).toBe(server.seq);
+    expect(second!.response).toMatchObject({ applied: 0, ignored: 1 });
+    expect(second!.response.changes.map((c) => c.data.title)).toEqual(["from B"]);
+    expect((await a.items.get("x"))!.title).toBe("from B");
     expect(await a.pending.count()).toBe(0);
   });
 

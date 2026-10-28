@@ -8,8 +8,8 @@
 //   2. send it with the stored cursor;
 //   3. apply the response in ONE IndexedDB transaction: clear the pending entries whose
 //      sent version is still the latest local one, apply each returned row unless this
-//      device has a newer local change to it waiting (that change stays pending and is
-//      sent later; the server then returns the winner), store the new cursor;
+//      device has a NEWER (or tied) local change to it waiting (that change stays pending
+//      and is sent later; the server then returns the winner), store the new cursor;
 //   4. repeat while there are unsent pending changes or the server says hasMore.
 // Errors: 401 clears the stored token and stops (never retried automatically); 429 reports
 // Retry-After; 409 cursor_ahead resets the cursor to 0 and re-sends every local row; 400
@@ -245,14 +245,18 @@ async function applyReply(
     }
     let written = 0;
     for (const c of reply.changes) {
-      // A local change still waiting (made after this request was built, or not sent yet)
-      // stays: it is sent later, and the server answers with whichever version wins.
-      if (await db.pending.get([c.table, c.id])) continue;
+      // v1.1 F.3: a local change still waiting (made while this request was in flight, or
+      // not sent yet) that is NEWER than the returned row stays, and is sent later. A tie
+      // stays too: only the server can break it (by deviceId), and it answers with the
+      // winner. An OLDER waiting change has already lost: the returned row replaces it.
+      const waiting = await db.pending.get([c.table, c.id]);
+      if (waiting && waiting.updatedAt >= c.updatedAt) continue;
       const local = await db[c.table].get(c.id);
-      if (typeof local?.updatedAt === "number" && local.updatedAt > c.updatedAt) continue; // stale repeat
+      if (!waiting && typeof local?.updatedAt === "number" && local.updatedAt > c.updatedAt) continue; // stale repeat
       const row = { ...c.data, id: c.id, updatedAt: c.updatedAt };
       if (c.table === "items" ? !validItem(row) : !validGoal(row)) continue; // never store a broken row
       await db.table(c.table).put(row);
+      if (waiting) await db.pending.delete([c.table, c.id]);
       written++;
     }
     await db.syncMeta.put({ key: "cursor", value: reply.cursor });
