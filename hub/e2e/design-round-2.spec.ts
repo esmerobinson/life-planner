@@ -96,6 +96,8 @@ test("area page: strips, icons, due line, goal card, month count and the done fo
   // Schedule for: the popover opens under the icon, Escape closes it.
   await page.getByRole("button", { name: "Schedule for: Varnish the practice canvas" }).click();
   await expect(page.getByRole("group", { name: "Schedule Varnish the practice canvas for" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Do it on" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Deadline" })).toBeVisible();
   await shoot(page, "area-schedule-popover-1280");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("group", { name: "Schedule Varnish the practice canvas for" })).toHaveCount(0);

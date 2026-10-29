@@ -107,7 +107,7 @@ test("first run, import, file, tick, move, persist and backup round trip", async
   await test.step("move to Tomorrow", async () => {
     // Schedule it for Tomorrow: it leaves Today.
     await page.getByRole("button", { name: "Schedule for: Overdue pretend errand" }).click();
-    await page.getByRole("button", { name: "Tomorrow", exact: true }).click();
+    await page.getByRole("group", { name: "Do it on" }).getByRole("button", { name: "Tomorrow", exact: true }).click();
     await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toHaveCount(0);
   });
 
@@ -119,6 +119,18 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(page.getByText("Alpha pretend errand")).toBeVisible();
     await page.goto("/inbox");
     await expect(page.getByText("Gamma pretend errand")).toBeVisible();
+  });
+
+  await test.step("deadline from the calendar menu", async () => {
+    // The Deadline part sets the due date (the strip shows a Due line); it survives a reload.
+    await page.goto("/area/art");
+    const row = () => page.getByRole("listitem").filter({ hasText: "Alpha pretend errand" });
+    await expect(row().getByText(/^Due /)).toHaveCount(0);
+    await page.getByRole("button", { name: "Schedule for: Alpha pretend errand" }).click();
+    await page.getByRole("group", { name: "Deadline" }).getByRole("button", { name: "Friday" }).click();
+    await expect(row().getByText(/^Due /)).toBeVisible();
+    await page.reload();
+    await expect(row().getByText(/^Due /)).toBeVisible();
   });
 
   await test.step("tomorrow clock", async () => {
