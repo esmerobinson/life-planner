@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayLabel, dueLine, monthName, nextMonday, shortDate } from "./display";
+import { dayLabel, dueLine, monthName, nextFriday, nextMonday, shortDate } from "./display";
 import type { Item } from "./types";
 
 const TODAY = "2026-10-28"; // a Wednesday
@@ -28,6 +28,12 @@ describe("dayLabel / shortDate / monthName", () => {
     expect(nextMonday("2026-10-28")).toBe("2026-11-02");
     expect(nextMonday("2026-11-01")).toBe("2026-11-02"); // a Sunday
     expect(nextMonday("2026-11-02")).toBe("2026-11-09"); // a Monday: the following one
+  });
+  it("Friday is the next Friday after today; on a Friday, the one a week later", () => {
+    expect(nextFriday("2026-10-28")).toBe("2026-10-30"); // a Wednesday
+    expect(nextFriday("2026-10-30")).toBe("2026-11-06"); // a Friday
+    expect(nextFriday("2026-10-31")).toBe("2026-11-06"); // a Saturday
+    expect(nextFriday("2026-11-02")).toBe("2026-11-06"); // a Monday
   });
 });
 

@@ -36,6 +36,12 @@ export function nextMonday(today: ISODate): ISODate {
   return addDays(mondayOf(today), 7);
 }
 
+/** The next Friday after today; when today is a Friday, the Friday a week later. */
+export function nextFriday(today: ISODate): ISODate {
+  const dow = new Date(`${today}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(today, ((5 - dow + 7) % 7) || 7);
+}
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
