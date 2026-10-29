@@ -21,6 +21,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** A choice in the open menu; the calendar menu has the same names in two parts, so its choices are taken from "Do it on". */
+function choiceIn(icon: string, choice: string) {
+  const scope = icon === "Schedule for" ? within(screen.getByRole("group", { name: "Do it on" })) : screen;
+  return scope.getByRole("button", { name: choice });
+}
+
 const DATA_LINE = "Your data could not be read. Reload to try again.";
 const SAVE_LINE = "That did not save. Try again.";
 
@@ -95,7 +101,7 @@ describe("TodayPanel", () => {
     const it = await task("Move me", { pinnedDate: TODAY, due: "2026-11-20" });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Move me" }));
-    await userEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
+    await userEvent.click(choiceIn("Schedule for", "Tomorrow"));
     await screen.findByText("Nothing planned for today.");
     expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-10-28");
     expect((await db.items.get(it.id))!.due).toBe("2026-11-20");
@@ -115,7 +121,7 @@ describe("TodayPanel", () => {
       const also = await screen.findByRole("list", { name: "Also due", hidden: true });
       expect(within(also).getByText("Urgent")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: `${icon}: Urgent` }));
-      await userEvent.click(screen.getByRole("button", { name: choice }));
+      await userEvent.click(choiceIn(icon, choice));
       await vi.waitFor(() => expect(screen.queryByText("Urgent")).toBeNull());
       expect(screen.queryByRole("list", { name: "Also due", hidden: true })).toBeNull();
     });
@@ -126,7 +132,7 @@ describe("TodayPanel", () => {
       const main = await screen.findByRole("list", { name: "Today" });
       expect(within(main).getByText("Urgent")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: `${icon}: Urgent` }));
-      await userEvent.click(screen.getByRole("button", { name: choice }));
+      await userEvent.click(choiceIn(icon, choice));
       await screen.findByText("Nothing planned for today.");
       expect(screen.queryByRole("list", { name: "Today" })).toBeNull();
       expect(screen.queryByText("Urgent")).toBeNull();
@@ -188,7 +194,7 @@ describe("TodayPanel", () => {
       vi.spyOn(repo, fn).mockRejectedValueOnce(new Error("write failed"));
       render(<TodayPanel today={TODAY} />);
       await userEvent.click(await screen.findByRole("button", { name: `${icon}: Stuck` }));
-      await userEvent.click(screen.getByRole("button", { name: choice }));
+      await userEvent.click(choiceIn(icon, choice));
       expect(await screen.findByText(SAVE_LINE)).toBeInTheDocument();
       expect(screen.queryByRole("group", { name: group })).toBeNull(); // the menu closed
       expect(screen.getByRole("button", { name: `${icon}: Stuck` })).toHaveAttribute("aria-expanded", "false");
@@ -262,7 +268,7 @@ describe("TodayPanel", () => {
     await task("Plan", { pinnedDate: TODAY });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Plan" }));
-    const group = screen.getByRole("group", { name: "Schedule Plan for" });
+    const group = within(screen.getByRole("group", { name: "Schedule Plan for" })).getByRole("group", { name: "Do it on" });
     expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual([
       "Today", "Tomorrow", "Next week", "Set", "Clear",
     ]);
@@ -279,7 +285,7 @@ describe("TodayPanel", () => {
     const spy = vi.spyOn(repo, "pinTo");
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Plan" }));
-    const group = screen.getByRole("group", { name: "Schedule Plan for" });
+    const group = within(screen.getByRole("group", { name: "Schedule Plan for" })).getByRole("group", { name: "Do it on" });
     const day = within(group).getByLabelText("Day for Plan");
     // Typing the day first passes through real future dates (30 Oct) on the way to 30 Nov.
     for (const v of ["2026-10-03", "2026-10-30", "2026-11-30"]) fireEvent.change(day, { target: { value: v } });
@@ -317,7 +323,7 @@ describe("TodayPanel", () => {
     const spy = vi.spyOn(repo, "pinTo");
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Blurry" }));
-    const group = screen.getByRole("group", { name: "Schedule Blurry for" });
+    const group = within(screen.getByRole("group", { name: "Schedule Blurry for" })).getByRole("group", { name: "Do it on" });
     const day = within(group).getByLabelText("Day for Blurry");
     fireEvent.change(day, { target: { value: "2026-11-09" } });
     fireEvent.blur(day, { relatedTarget: within(group).getByRole("button", { name: "Clear" }) });
@@ -333,7 +339,7 @@ describe("TodayPanel", () => {
     const spy = vi.spyOn(repo, "pinTo");
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Webkit" }));
-    const group = screen.getByRole("group", { name: "Schedule Webkit for" });
+    const group = within(screen.getByRole("group", { name: "Schedule Webkit for" })).getByRole("group", { name: "Do it on" });
     const day = within(group).getByLabelText("Day for Webkit");
     fireEvent.change(day, { target: { value: "2026-11-09" } });
     const tomorrow = within(group).getByRole("button", { name: "Tomorrow" });
@@ -354,7 +360,7 @@ describe("TodayPanel", () => {
     const it = await task("Later", { pinnedDate: TODAY });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Later" }));
-    const group = screen.getByRole("group", { name: "Schedule Later for" });
+    const group = within(screen.getByRole("group", { name: "Schedule Later for" })).getByRole("group", { name: "Do it on" });
     const day = within(group).getByLabelText("Day for Later");
     // A press on Set with no valid day: nothing saves, and the press is used up.
     fireEvent.pointerDown(within(group).getByRole("button", { name: "Set" }));
@@ -384,14 +390,14 @@ describe("TodayPanel", () => {
     const it = await task("Later", { pinnedDate: TODAY });
     const first = render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Later" }));
-    await userEvent.click(screen.getByRole("button", { name: "Next week" }));
+    await userEvent.click(choiceIn("Schedule for", "Next week"));
     await screen.findByText("Nothing planned for today.");
     expect((await db.items.get(it.id))!.pinnedDate).toBe("2026-11-02");
     first.unmount();
     await db.items.update(it.id, { pinnedDate: TODAY });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("button", { name: "Schedule for: Later" }));
-    await userEvent.click(screen.getByRole("button", { name: "Clear" }));
+    await userEvent.click(choiceIn("Schedule for", "Clear"));
     await vi.waitFor(async () => expect((await db.items.get(it.id))!.pinnedDate).toBeUndefined());
   });
 

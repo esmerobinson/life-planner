@@ -179,6 +179,7 @@ export function TaskRow({
           <ScheduleMenu
             itemId={item.id}
             pinnedDate={item.pinnedDate}
+            due={item.due}
             today={today}
             onScheduled={onMoved}
             label={item.title}
