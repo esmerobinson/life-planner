@@ -20,16 +20,23 @@ export const JOURNAL_KEY_META = "journalKey";
 export interface StoredJournalKey {
   key: CryptoKey;
   tokenVersion: number | null;
+  /** A random id per stored key, so the UI can tell a replaced key from the same one re-read. */
+  id?: string;
+}
+
+/** The stored key and its id, or undefined. */
+export async function loadJournalKeyInfo(db: HubDB): Promise<{ key: CryptoKey; id: string } | undefined> {
+  const value = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as StoredJournalKey | undefined;
+  return value && typeof value === "object" && value.key ? { key: value.key, id: value.id ?? "" } : undefined;
 }
 
 /** The journal key on this device, or undefined (the Journal then shows "Unlock journal"). */
 export async function loadJournalKey(db: HubDB): Promise<CryptoKey | undefined> {
-  const value = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as StoredJournalKey | undefined;
-  return value && typeof value === "object" && value.key ? value.key : undefined;
+  return (await loadJournalKeyInfo(db))?.key;
 }
 
 async function store(db: HubDB, key: CryptoKey, tokenVersion: number | null): Promise<void> {
-  const value: StoredJournalKey = { key, tokenVersion };
+  const value: StoredJournalKey = { key, tokenVersion, id: crypto.randomUUID() };
   await db.syncMeta.put({ key: JOURNAL_KEY_META, value });
 }
 

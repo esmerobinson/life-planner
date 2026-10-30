@@ -4,14 +4,16 @@
 // Rows are sealed with the journal key before they reach IndexedDB; the plaintext exists
 // only in memory. A row that does not open with this device's key (wrong key, tampered,
 // or a shape this version does not know) is reported as unreadable and is NEVER written
-// over. Morning pages' finished text is never returned to the UI: reads give only whether
-// the day is done, the current draft and the photo ids.
+// over. Morning pages' finished text is not returned to the UI until MORNING_LOCK_DAYS (28)
+// days after its date: the calendar reads give only whether the day is done, the current
+// draft and the photo ids, and readMorningText refuses (without decrypting) while locked.
 
 import { db } from "./db";
+import { addDays } from "../domain/dates";
 import { journalId } from "./validate";
 import { fileAad, journalAad, openBytes, openJson, sealBytes, sealJson } from "../journal/crypto";
 import {
-  ENTRY_CHECK, morningDone, type CheckinEntry, type EntryOf, type MorningEntry,
+  ENTRY_CHECK, MORNING_LOCK_DAYS, morningDone, type CheckinEntry, type EntryOf, type MorningEntry,
 } from "../journal/entries";
 import type { FileRow, ISODate, JournalKind, JournalRow } from "../domain/types";
 
@@ -64,7 +66,7 @@ async function change<K extends JournalKind>(
 
 // ---- morning pages -----------------------------------------------------------------------
 
-/** One day's morning pages as the UI may see them: never the finished text. */
+/** One day's morning pages as the calendar may see them: never the finished text. */
 export interface MorningDay {
   date: ISODate;
   state: "ok" | "unreadable";
@@ -95,6 +97,28 @@ export async function readMorningDay(key: CryptoKey, date: ISODate): Promise<Mor
 
 const emptyMorning = (): MorningEntry => ({ v: 1, text: "", pages: 0, photos: [] });
 
+/** The day a morning page's text opens in Read back. */
+export const morningOpensOn = (date: ISODate): ISODate => addDays(date, MORNING_LOCK_DAYS);
+
+export type MorningText =
+  | { state: "locked"; opensOn: ISODate }
+  | { state: "ok"; text: string }
+  | { state: "none" }
+  | { state: "unreadable" };
+
+/**
+ * Read back: a day's finished pages, only once MORNING_LOCK_DAYS have passed since that day
+ * (`today` is injected). While locked the row is not even decrypted.
+ */
+export async function readMorningText(key: CryptoKey, date: ISODate, today: ISODate): Promise<MorningText> {
+  const opensOn = morningOpensOn(date);
+  if (today < opensOn) return { state: "locked", opensOn };
+  const o = await open(key, await db.journal.get(journalId("morning", date)), "morning");
+  if (o.state === "unreadable") return { state: "unreadable" };
+  if (o.state === "none" || o.entry.pages === 0) return { state: "none" };
+  return { state: "ok", text: o.entry.text };
+}
+
 /** Autosaves the page being written (sealed). */
 export async function saveMorningDraft(key: CryptoKey, date: ISODate, draft: string): Promise<void> {
   await change(key, "morning", date, (prev) => {
@@ -107,7 +131,7 @@ export async function saveMorningDraft(key: CryptoKey, date: ISODate, draft: str
 
 /**
  * "I'm done": the page is added to the day's text (after any earlier pages that day), the
- * draft is cleared and the day gets its star. The text is never shown again.
+ * draft is cleared and the day gets its star. The text stays hidden for 4 weeks.
  */
 export async function finishMorningPage(key: CryptoKey, date: ISODate, text: string): Promise<void> {
   await change(key, "morning", date, (prev) => {

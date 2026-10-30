@@ -1,0 +1,279 @@
+/* The Journal (journal round). Every value is from the journal mockup (journal.html: part 1
+   tab C "Star calendar", part 2 tab A "One question at a time") and the existing tokens:
+   the Journal tile violet is the sidebar's Journal tile (Island Life 101 violet, in
+   VISUAL-LANGUAGE.md's palette); stars stay the magenta placeholder until Esme picks star
+   art. Not in the mockup (builder's call, not yet seen by Esme): the writing box's height
+   and 16px text (the brief asks for 16px+), the month arrows as small secondary pills, the
+   Read back / Past check-ins / Choose questions fold-outs, and the Show/Hide pill under a
+   proof photo. */
+:root {
+  --journal-violet: #9285c5; /* Journal sidebar tile (areas.ts), Island Life 101 violet */
+}
+
+.journal-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+}
+
+.journal-page > h1 {
+  margin: 0;
+}
+
+/* .card in the mockup */
+.journal-card {
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-margin-top: 16px;
+}
+
+.journal-card > *,
+.journal-card p {
+  margin: 0;
+}
+
+.journal-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.journal-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--journal-violet);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.journal-tile img {
+  width: 26px;
+}
+
+.journal-big {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.journal-muted {
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.journal-star {
+  width: 18px;
+  height: 18px;
+  background: var(--placeholder);
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  display: inline-block;
+  vertical-align: -3px;
+}
+
+.journal-month-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.journal-month-step {
+  padding: 6px 14px;
+}
+
+.journal-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.journal-cal-head {
+  text-align: center;
+}
+
+.journal-day {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: var(--row);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  position: relative;
+}
+
+.journal-day.on::after {
+  content: "";
+  position: absolute;
+  inset: 22%;
+  background: var(--placeholder);
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.journal-day.today {
+  outline: 2px solid var(--journal-violet);
+}
+
+.journal-day.blank {
+  background: none;
+}
+
+.journal-done {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 12px;
+}
+
+.journal-tick {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--bar-fill);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  flex: none;
+}
+
+.journal-photos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journal-photo-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  overflow: hidden;
+  border-radius: var(--radius-tile);
+}
+
+.journal-photo {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: var(--radius-tile);
+}
+
+.journal-photo.blurred {
+  filter: blur(10px);
+}
+
+/* A photo that hasn't synced to this device yet (as pictures on pages, round 3b). */
+.journal-photo-missing {
+  width: 100%;
+  height: 120px;
+  border-radius: var(--radius-tile);
+  background: var(--placeholder);
+}
+
+.journal-writing {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.journal-page-box {
+  width: 100%;
+  min-height: 260px;
+  border-radius: var(--radius-tile);
+  padding: 10px 14px;
+  font-size: max(16px, 1em);
+  resize: vertical;
+}
+
+.journal-words {
+  margin-bottom: 6px;
+}
+
+.journal-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.journal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--track);
+}
+
+.journal-dot.on {
+  background: var(--journal-violet);
+}
+
+.journal-question {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.journal-q {
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.journal-skill {
+  margin: 4px 0 0;
+}
+
+.journal-answer {
+  width: 100%;
+  min-height: 110px;
+  border-radius: var(--radius-tile);
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.journal-question-actions {
+  justify-content: space-between;
+}
+
+.journal-answers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.journal-answers .journal-answer {
+  margin-top: 8px;
+}
+
+.journal-past,
+.journal-choose {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journal-past-answer,
+.journal-readback-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.journal-card-home h2 {
+  margin-top: 0;
+}

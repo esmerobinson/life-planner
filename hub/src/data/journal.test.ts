@@ -4,7 +4,7 @@ import { db, HubDB } from "./db";
 import { exportBackup, INVALID_BACKUP, parseBackup, restoreBackup } from "./backup";
 import {
   addMorningPhoto, CANT_OPEN, finishMorningPage, listCheckins, listMorningDays, openJournalPhoto, readCheckin,
-  readMorningDay, saveCheckin, saveMorningDraft,
+  morningOpensOn, readMorningDay, readMorningText, saveCheckin, saveMorningDraft,
 } from "./repo";
 import { journalId, validFile, validJournal } from "./validate";
 import { deriveJournalKey, journalAad, openJson, sealJson, toBase64 } from "../journal/crypto";
@@ -135,6 +135,28 @@ describe("morning pages", () => {
     const other = (await db.journal.get("morning:2026-10-27"))!;
     await db.journal.put({ ...r, iv: other.iv, ct: other.ct });
     expect((await readMorningDay(key, DAY)).state).toBe("unreadable");
+  });
+});
+
+describe("read back (typed pages hidden for 4 weeks)", () => {
+  it("locked before day 28 (and not even decrypted), readable read-only on and after day 28", async () => {
+    await finishMorningPage(key, "2026-10-01", WORDS);
+    expect(morningOpensOn("2026-10-01")).toBe("2026-10-29");
+    const decrypt = vi.spyOn(crypto.subtle, "decrypt");
+    expect(await readMorningText(key, "2026-10-01", "2026-10-01")).toEqual({ state: "locked", opensOn: "2026-10-29" });
+    expect(await readMorningText(key, "2026-10-01", "2026-10-28")).toEqual({ state: "locked", opensOn: "2026-10-29" });
+    expect(decrypt).not.toHaveBeenCalled();
+    expect(await readMorningText(key, "2026-10-01", "2026-10-29")).toEqual({ state: "ok", text: WORDS });
+    expect(await readMorningText(key, "2026-10-01", "2027-03-01")).toEqual({ state: "ok", text: WORDS });
+  });
+
+  it("across a month and year boundary; a draft-only day or a wrong key has nothing to read", async () => {
+    await finishMorningPage(key, "2026-12-20", "Pretend winter page");
+    expect((await readMorningText(key, "2026-12-20", "2027-01-16")).state).toBe("locked");
+    expect(await readMorningText(key, "2026-12-20", "2027-01-17")).toEqual({ state: "ok", text: "Pretend winter page" });
+    await saveMorningDraft(key, "2026-09-01", "Pretend draft");
+    expect((await readMorningText(key, "2026-09-01", "2026-10-28")).state).toBe("none");
+    expect((await readMorningText(otherKey, "2026-12-20", "2027-02-01")).state).toBe("unreadable");
   });
 });
 

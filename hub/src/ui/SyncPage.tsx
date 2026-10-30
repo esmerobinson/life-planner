@@ -3,6 +3,7 @@ import { syncController, useSyncState } from "../sync";
 import type { SyncController } from "../sync/controller";
 import { DEFAULT_SYNC_URL, saveSyncSettings, stopSyncing } from "../sync/engine";
 import { deriveToken } from "../sync/token";
+import { saveJournalKeyFromSync } from "../journal/keyStore";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
@@ -68,6 +69,9 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
     try {
       const token = await deriveToken(secret);
       await saveSyncSettings(controller.db, { serverUrl, token });
+      // The journal's key comes from the same passphrase (journal brief §3). If the server
+      // refuses this passphrase, the sync engine forgets this key along with the token.
+      await saveJournalKeyFromSync(controller.db, secret);
       controller.clearError();
       await controller.reload();
       setNote("Saved.");
@@ -124,7 +128,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
         </label>
         <p>
           The passphrase itself is not kept. A key made from it is stored on this device so sync can run by itself;
-          Stop syncing removes it.
+          Stop syncing removes it. The same passphrase also unlocks your journal on this device.
         </p>
         <p>{LOCKOUT_LINE}</p>
         <div className="form-actions">

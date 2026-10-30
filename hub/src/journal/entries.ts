@@ -4,10 +4,10 @@
 
 import { isObj, isStr } from "../data/validate";
 
-/** A day's morning pages. `text` is every finished page of the day; it is never shown again. */
+/** A day's morning pages. `text` is every finished page of the day; hidden for 4 weeks. */
 export interface MorningEntry {
   v: 1;
-  /** All finished pages of the day, oldest first (Artist's Way: never reread, so never shown). */
+  /** All finished pages of the day, oldest first (no rereading: locked until MORNING_LOCK_DAYS after the day). */
   text: string;
   /** How many pages were finished ("I'm done") that day. */
   pages: number;
@@ -59,6 +59,12 @@ export function countWords(text: string): number {
   const t = text.trim();
   return t ? t.split(/\s+/).length : 0;
 }
+
+/**
+ * A finished typed page is hidden this many days from its date (Esme, journal round: "hidden
+ * for 4 weeks, then readable"), then opens read-only in "Read back".
+ */
+export const MORNING_LOCK_DAYS = 28;
 
 /** Three pages (the Artist's Way's rough count), shown as "N of 750 words". */
 export const MORNING_WORDS = 750;
