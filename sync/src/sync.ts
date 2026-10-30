@@ -23,8 +23,12 @@ export const MAX_RESPONSE_DATA_BYTES = 1024 * 1024;
 /** Maximum size of one JSON chunk bound as a single D1 parameter (D1 caps strings at 2 MB). */
 export const DEFAULT_CHUNK_BYTES = 1_900_000;
 
-/** The synced tables. "files": pictures on pages (base64 JPEG rows, kept under 1 MB by the app). */
-const TABLES = new Set(["items", "goals", "files"]);
+/**
+ * The synced tables. "files": pictures on pages (base64 JPEG rows, kept under 1 MB by the
+ * app). "journal": end-to-end encrypted journal entries (the server only ever sees `id`,
+ * `kind`, `date`, `iv` and the ciphertext `ct`; it cannot read them).
+ */
+const TABLES = new Set(["items", "goals", "files", "journal"]);
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 export interface ValidChange {

@@ -2,10 +2,10 @@ import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
-import type { FileRow, Goal, ISODate, Item } from "../domain/types";
-import { isObj, isStr, validFile, validGoal, validItem } from "./validate";
+import type { FileRow, Goal, ISODate, Item, JournalRow } from "../domain/types";
+import { isObj, isStr, validFile, validGoal, validItem, validJournal } from "./validate";
 
-export { validFile, validGoal, validItem };
+export { validFile, validGoal, validItem, validJournal };
 
 export interface BackupFile {
   app: "life-hub";
@@ -15,6 +15,11 @@ export interface BackupFile {
   goals: Goal[];
   /** Pictures on pages (round 3b). Optional: older backups have none and still load. */
   files?: FileRow[];
+  /**
+   * The journal (journal round), exactly as stored: sealed rows only, never plaintext.
+   * Optional: older backups have none and still load.
+   */
+  journal?: JournalRow[];
 }
 
 /** The one message for any file that is not a usable backup. */
@@ -52,7 +57,9 @@ export function parseBackup(raw: unknown): BackupFile {
     hasDuplicateIds(data.items as Item[]) ||
     hasDuplicateIds(data.goals as Goal[]) ||
     (data.files !== undefined &&
-      (!Array.isArray(data.files) || !data.files.every(validFile) || hasDuplicateIds(data.files as FileRow[])))
+      (!Array.isArray(data.files) || !data.files.every(validFile) || hasDuplicateIds(data.files as FileRow[]))) ||
+    (data.journal !== undefined &&
+      (!Array.isArray(data.journal) || !data.journal.every(validJournal) || hasDuplicateIds(data.journal as JournalRow[])))
   ) {
     throw new Error(INVALID_BACKUP);
   }
@@ -60,13 +67,14 @@ export function parseBackup(raw: unknown): BackupFile {
 }
 
 export async function exportBackup(today: ISODate): Promise<BackupFile> {
-  return db.transaction("r", db.items, db.goals, db.files, async () => ({
+  return db.transaction("r", [db.items, db.goals, db.files, db.journal], async () => ({
     app: "life-hub" as const,
     schema: 1 as const,
     exportedOn: today,
     items: await db.items.toArray(),
     goals: await db.goals.toArray(),
     files: await db.files.toArray(),
+    journal: await db.journal.toArray(),
   }));
 }
 
@@ -86,7 +94,7 @@ export async function restoreBackup(
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
-  return db.transaction("rw", [db.items, db.goals, db.files, db.syncMeta], async () => {
+  return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.syncMeta], async () => {
     // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
     // a copy the server already has, edited since on another device, wins over them.
     keepOwnStamps();
@@ -97,6 +105,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.items.clear();
       await db.goals.clear();
       await db.files.clear();
+      await db.journal.clear();
       // Sync never deletes, so rows removed here still exist on the server. Pulling from
       // the start again brings them back instead of leaving this device silently missing
       // them.
@@ -105,6 +114,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       await db.files.bulkAdd(file.files ?? []);
+      await db.journal.bulkAdd(file.journal ?? []);
       return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0 };
     }
     const haveItems = new Set(await db.items.toCollection().primaryKeys());
@@ -116,6 +126,9 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     // Pictures: only the missing ones (they are never edited, so a copy here is the same picture).
     const haveFiles = new Set(await db.files.toCollection().primaryKeys());
     await db.files.bulkAdd((file.files ?? []).filter((f) => !haveFiles.has(f.id)));
+    // Journal entries: only the missing ones (an entry already here is this device's own copy).
+    const haveJournal = new Set(await db.journal.toCollection().primaryKeys());
+    await db.journal.bulkAdd((file.journal ?? []).filter((j) => !haveJournal.has(j.id)));
     const fileVisible = file.items.filter(notPurged).length;
     const addedVisible = newItems.filter(notPurged).length;
     const fileGoalsVisible = file.goals.filter(notPurged).length;

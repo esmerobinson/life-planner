@@ -18,7 +18,8 @@
 
 import { applyUntracked } from "../data/changeTracking";
 import { withSyncLock } from "../data/syncGate";
-import { validFile, validGoal, validItem } from "../data/validate";
+import { validFile, validGoal, validItem, validJournal } from "../data/validate";
+import { JOURNAL_KEY_META, type StoredJournalKey } from "../journal/keyStore";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
 /** The deployed sync server. The Sync page offers it when no address is saved (still editable). */
@@ -111,7 +112,7 @@ export async function saveSyncSettings(db: HubDB, s: { serverUrl: string; token:
 }
 
 async function saveUnderLock(db: HubDB, serverUrl: string, token: string): Promise<void> {
-  await db.transaction("rw", [db.items, db.goals, db.files, db.pending, db.syncMeta], async () => {
+  await db.transaction("rw", [...syncTables(db), db.pending, db.syncMeta], async () => {
     // A different address is a different server: its cursor means nothing here, and rows
     // already "sent" went somewhere else. Start over: pull everything, send everything.
     if ((await getMeta<string>(db, "cursorServerUrl")) !== serverUrl) {
@@ -138,6 +139,9 @@ export async function retryStuck(db: HubDB): Promise<void> {
     }
   });
 }
+
+/** Every synced table of `db`, for transactions that must cover them all. */
+const syncTables = (db: HubDB) => SYNC_TABLES.map((t) => db.table(t));
 
 /** Trimmed, without trailing slashes, so "https://x/" and "https://x" are one address. */
 export function normaliseAddress(text: string): string {
@@ -170,7 +174,9 @@ export async function stopSyncing(db: HubDB): Promise<void> {
 // ---- one run ----------------------------------------------------------------------------
 
 /** The row check for each synced table (the same one every local write passes). */
-const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = { items: validItem, goals: validGoal, files: validFile };
+const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = {
+  items: validItem, goals: validGoal, files: validFile, journal: validJournal,
+};
 /** A table this build syncs (a later build may add more; their rows are skipped here). */
 const isSyncTable = (t: unknown): t is SyncTable => (SYNC_TABLES as readonly unknown[]).includes(t);
 
@@ -243,6 +249,10 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
           if (same) {
             await db.syncMeta.delete("token");
             await setMeta(db, "needsPassphrase", true);
+            // A journal key made from that same (refused) passphrase goes too: entries are
+            // never sealed with a key from a mistyped passphrase (journal brief §3).
+            const journal = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as StoredJournalKey | undefined;
+            if (journal && journal.tokenVersion === tokenVersion) await db.syncMeta.delete(JOURNAL_KEY_META);
           }
           return same;
         });
@@ -327,7 +337,7 @@ async function markStuck(db: HubDB, keys: { key: string; table: SyncTable; id: s
 
 /** Pending changes not yet attempted in this run, within the count and size limits. */
 async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted: Set<string>) {
-  return db.transaction("rw", [db.items, db.goals, db.files, db.pending], async () => {
+  return db.transaction("rw", [...syncTables(db), db.pending], async () => {
     const changes: WireChange[] = [];
     /** The pending entry's updatedAt when the request was built, per key. */
     const pendingVersions = new Map<string, number>();

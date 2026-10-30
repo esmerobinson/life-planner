@@ -1,4 +1,4 @@
-// Change tracking for sync: EVERY local write to `items`, `goals` or `files` gets
+// Change tracking for sync: EVERY local write to `items`, `goals`, `files` or `journal` gets
 //   updatedAt = max(Date.now(), previous updatedAt + 1)
 // and a `pending` entry, in the SAME IndexedDB transaction as the write.
 //
@@ -14,13 +14,14 @@
 
 import Dexie from "dexie";
 import type { DBCore, DBCoreMutateRequest, DBCoreMutateResponse, DBCoreTable, DBCoreTransaction, Transaction } from "dexie";
-import { validFile, validGoal, validItem } from "./validate";
+import { validFile, validGoal, validItem, validJournal } from "./validate";
 
 /** The synced tables, each with the row check other devices apply and its name in messages. */
 const TRACKED_TABLES: Record<string, { valid: (r: unknown) => boolean; noun: string }> = {
   items: { valid: validItem, noun: "task" },
   goals: { valid: validGoal, noun: "goal" },
   files: { valid: validFile, noun: "picture" },
+  journal: { valid: validJournal, noun: "journal entry" },
 };
 const TRACKED = new Set(Object.keys(TRACKED_TABLES));
 const PENDING = "pending";

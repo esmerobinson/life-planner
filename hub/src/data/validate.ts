@@ -5,7 +5,7 @@
 
 import { isValidISODate } from "../domain/dates";
 import { MAX_DONE_DATES } from "../domain/habits";
-import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item } from "../domain/types";
+import { AREA_IDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 
 /** The longest goal why / cadence text (characters). */
 export const MAX_GOAL_TEXT = 4000;
@@ -145,6 +145,37 @@ export function validFile(r: unknown): r is FileRow {
     (purged
       ? r.data === "" && r.width === 0 && r.height === 0
       : r.data !== "" && side(r.width, 1) && side(r.height, 1)) &&
+    // A journal photo (sealed with the journal key) carries its IV; a plain picture has neither.
+    ((r.encrypted === undefined && r.iv === undefined) || (r.encrypted === true && !purged && validIv(r.iv))) &&
+    optStamp(r.updatedAt)
+  );
+}
+
+/** Base64 of a 12-byte AES-GCM IV (always 16 characters, no padding). */
+const IV = /^[A-Za-z0-9+/]{16}$/;
+const validIv = (v: unknown) => isStr(v) && IV.test(v);
+/** The most base64 ciphertext one journal entry may hold (the same room as a picture). */
+export const MAX_JOURNAL_CT = MAX_FILE_DATA;
+const JOURNAL_KEYS = new Set(["id", "kind", "date", "iv", "ct", "updatedAt"]);
+const JOURNAL_KIND_LIST: readonly string[] = JOURNAL_KINDS;
+
+/** The id a journal row must have: `${kind}:${date}` (one row per kind per day). */
+export const journalId = (kind: JournalRow["kind"], date: string) => `${kind}:${date}`;
+
+/**
+ * One journal row is valid (backup, sync, local writes). Nothing but the sealed entry and
+ * its clear kind/date/id may be in it: any other field (say, plaintext by mistake) makes
+ * the row invalid, so it is never stored or sent.
+ */
+export function validJournal(r: unknown): r is JournalRow {
+  return (
+    isObj(r) &&
+    Object.keys(r).every((k) => JOURNAL_KEYS.has(k)) &&
+    isStr(r.kind) && JOURNAL_KIND_LIST.includes(r.kind) &&
+    isStr(r.date) && isValidISODate(r.date) &&
+    r.id === journalId(r.kind as JournalRow["kind"], r.date) &&
+    validIv(r.iv) &&
+    isStr(r.ct) && r.ct !== "" && r.ct.length <= MAX_JOURNAL_CT && r.ct.length % 4 === 0 && BASE64.test(r.ct) &&
     optStamp(r.updatedAt)
   );
 }

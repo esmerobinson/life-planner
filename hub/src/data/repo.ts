@@ -4,6 +4,7 @@ import { pictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf } from "../domain/dates";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
 import { milestoneTask } from "../domain/milestones";
+export * from "./journalRepo";
 import { AREA_IDS, type AreaId, type FileRow, type Goal, type ISODate, type Item, type Milestone } from "../domain/types";
 
 export async function createItem(

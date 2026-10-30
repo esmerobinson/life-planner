@@ -86,3 +86,8 @@ export async function sealJson(key: CryptoKey, value: unknown, aad: string): Pro
 export async function openJson<T = unknown>(key: CryptoKey, sealed: Sealed, aad: string): Promise<T> {
   return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await openBytes(key, sealed, aad))) as T;
 }
+
+/** What a journal row's ciphertext is bound to (its id, which carries its kind and day). */
+export const journalAad = (id: string) => `journal|${id}`;
+/** What a journal photo's ciphertext is bound to (its file id). */
+export const fileAad = (id: string) => `file|${id}`;

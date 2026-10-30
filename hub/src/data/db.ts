@@ -1,9 +1,9 @@
 import Dexie, { type Table } from "dexie";
-import type { FileRow, Item, Goal } from "../domain/types";
+import type { FileRow, Item, Goal, JournalRow } from "../domain/types";
 import { installChangeTracking, legacyStamp, markTransactionUntracked } from "./changeTracking";
 
-/** The tables that sync (files: the pictures on pages, round 3b). */
-export const SYNC_TABLES = ["items", "goals", "files"] as const;
+/** The tables that sync (files: the pictures on pages, round 3b; journal: the encrypted journal). */
+export const SYNC_TABLES = ["items", "goals", "files", "journal"] as const;
 export type SyncTable = (typeof SYNC_TABLES)[number];
 
 /**
@@ -54,6 +54,7 @@ export class HubDB extends Dexie {
   items!: Table<Item, string>;
   goals!: Table<Goal, string>;
   files!: Table<FileRow, string>;
+  journal!: Table<JournalRow, string>;
   pending!: Table<PendingChange, [string, string]>;
   syncMeta!: Table<SyncMetaRow, string>;
   quarantine!: Table<QuarantinedRow, [string, string]>;
@@ -89,6 +90,8 @@ export class HubDB extends Dexie {
     this.version(3).stores({ quarantine: "[table+id]" });
     // v4: pictures on pages (round 3b). New and empty, so nothing to stamp or mark pending.
     this.version(4).stores({ files: "id" });
+    // v5: the journal (end-to-end encrypted entries). New and empty, so nothing to stamp.
+    this.version(5).stores({ journal: "id, kind, date" });
     installChangeTracking(this);
   }
 }

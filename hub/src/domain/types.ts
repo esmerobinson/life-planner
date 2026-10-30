@@ -106,6 +106,35 @@ export interface FileRow {
    * tombstone (no data) because sync never hard-deletes.
    */
   status?: "purged";
+  /**
+   * A journal photo (journal round): `data` is the AES-GCM ciphertext (base64) of the JPEG,
+   * sealed with the journal key and `iv`. Only the Journal page shows these.
+   */
+  encrypted?: true;
+  /** Base64 of the 12-byte AES-GCM IV, on encrypted rows only. */
+  iv?: string;
+  /** Sync stamp, as on Item. */
+  updatedAt?: number;
+}
+
+/** The kinds of journal entry: a day's morning pages and a day's check-in. */
+export const JOURNAL_KINDS = ["morning", "checkin"] as const;
+export type JournalKind = (typeof JOURNAL_KINDS)[number];
+
+/**
+ * One journal entry (journal round), end-to-end encrypted. Only `kind` and `date` are in
+ * clear (the star calendar needs them); everything typed is inside `ct`, sealed with the
+ * journal key (journal/crypto.ts). One row per kind per day: id `${kind}:${date}`. Two
+ * devices merge by last-write-wins like every row.
+ */
+export interface JournalRow {
+  id: string;
+  kind: JournalKind;
+  date: ISODate;
+  /** Base64 of the 12-byte AES-GCM IV. */
+  iv: string;
+  /** Base64 of the AES-GCM ciphertext (with its tag) of the entry's JSON. */
+  ct: string;
   /** Sync stamp, as on Item. */
   updatedAt?: number;
 }
