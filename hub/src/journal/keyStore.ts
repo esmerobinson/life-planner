@@ -179,7 +179,7 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
         const row = await sealedVerifier(c, todayStamp());
         await db.transaction("rw", db.journal, db.syncMeta, async () => {
           if ((await loadCandidate(db))?.id !== c.id || (await db.journal.get(VERIFIER_ID))) return;
-          if ((await meta<string>(db, ACCEPTED_TOKEN_META)) !== c.token) return;
+          if ((await meta<string>(db, ACCEPTED_TOKEN_META)) !== c.token || (await meta<string>(db, "token")) !== c.token) return;
           await db.syncMeta.put({ key: JOURNAL_KEY_META, value: asStored(c) });
           await db.syncMeta.delete(JOURNAL_CANDIDATE_META);
           await db.journal.put(row);
