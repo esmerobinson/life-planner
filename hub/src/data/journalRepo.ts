@@ -16,10 +16,11 @@
 
 import { db } from "./db";
 import { addDays } from "../domain/dates";
-import { journalId, validJournal } from "./validate";
+import { journalId, MAX_JOURNAL_CT, validJournal } from "./validate";
 import { fileAad, journalAad, openBytes, openJson, promptKey, sealBytes, sealJson, type JournalKey } from "../journal/crypto";
 import { ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
+import { mergeStars, type CardSet, type ExerciseMark, type StarMark } from "../journal/exercise";
 import type { FileRow, ISODate, JournalKind, JournalRow } from "../domain/types";
 
 /** Shown for any row (or photo) that does not open on this device. */
@@ -340,4 +341,87 @@ export async function readPromptSettings(jk: JournalKey): Promise<string[] | nul
 
 export async function savePromptSettings(jk: JournalKey, active: string[], today: ISODate): Promise<void> {
   await write(jk, [await seal(jk, "settings", today, undefined, { v: 1, active: [...new Set(active)] })]);
+}
+
+// ---- mental health exercise (exercise brief) ------------------------------------------------
+
+/** Shown when a card file is too big to store as one synced row. */
+export const CARDS_TOO_BIG = "That card file is too big to store. Nothing was changed.";
+
+export type CardsState = { state: "none" } | { state: "ok"; set: CardSet } | { state: "unreadable" };
+
+/** The imported exercise cards (the one sealed `cards` row), if any. */
+export async function readExerciseCards(jk: JournalKey): Promise<CardsState> {
+  const row = await db.journal.get("cards");
+  if (!row) return { state: "none" };
+  const o = await openRow(jk, row, "cards");
+  return o.state === "ok" ? { state: "ok", set: { source: o.entry.source, cards: o.entry.cards } } : { state: "unreadable" };
+}
+
+/**
+ * Import: the whole set as one sealed row `cards` (synced like any journal row). A new import
+ * replaces it whole. Refused (nothing stored) if it would not fit in one synced row.
+ */
+export async function importExerciseCards(jk: JournalKey, set: CardSet, today: ISODate): Promise<void> {
+  const id = journalId("cards", today);
+  const sealed = await sealJson(jk.key, { v: 1, source: set.source, cards: set.cards, at: Date.now() }, journalAad(id));
+  if (sealed.ct.length > MAX_JOURNAL_CT) throw new Error(CARDS_TOO_BIG);
+  const row: JournalRow = { id, kind: "cards", date: today, fp: jk.fp, ...sealed };
+  if (!validJournal(row)) throw new Error("That journal entry could not be saved.");
+  await write(jk, [row]);
+}
+
+export interface ExerciseProgress {
+  /** Every device's card for each day, and whether it was ticked. */
+  marks: ExerciseMark[];
+  /** Starred cards (per card, the newest mark from any device). */
+  starred: Set<number>;
+  /** Rows this device can't open (each skipped on its own). */
+  unreadable: number;
+}
+
+/** All exercise progress and stars, from every device's rows. */
+export async function readExerciseProgress(jk: JournalKey): Promise<ExerciseProgress> {
+  const marks: ExerciseMark[] = [];
+  const stars: StarMark[][] = [];
+  let unreadable = 0;
+  for (const row of await db.journal.where("kind").anyOf("exercise", "stars").toArray()) {
+    if (row.kind === "exercise") {
+      const o = await openRow(jk, row, "exercise");
+      if (o.state === "ok") marks.push({ date: row.date, device: suffixOf(row), day: o.entry.day, done: o.entry.done });
+      else unreadable++;
+    } else {
+      const o = await openRow(jk, row, "stars");
+      if (o.state === "ok") stars.push(o.entry.marks);
+      else unreadable++;
+    }
+  }
+  return { marks, starred: mergeStars(stars), unreadable };
+}
+
+/** Ticks (or unticks) today's card on this device's own row for the day. */
+export async function saveExerciseMark(jk: JournalKey, date: ISODate, deviceId: string, day: number, done: boolean): Promise<void> {
+  await write(jk, [await seal(jk, "exercise", date, deviceId, { v: 1, day, done, at: Date.now() })]);
+}
+
+/**
+ * Records the card shown today on this device (unticked), so it stays today's card all day.
+ * Returns false (nothing written) if this device already has a row for the day.
+ */
+export async function recordExerciseShown(jk: JournalKey, date: ISODate, deviceId: string, day: number): Promise<boolean> {
+  return write(jk, [await seal(jk, "exercise", date, deviceId, { v: 1, day, done: false, at: Date.now() })], { onlyIfAbsent: true });
+}
+
+/** Stars or un-stars a card in this device's own stars row (only this device writes it). */
+export async function setExerciseStar(jk: JournalKey, today: ISODate, deviceId: string, day: number, on: boolean): Promise<void> {
+  const id = journalId("stars", today, deviceId);
+  const existing = await db.journal.get(id);
+  let marks: StarMark[] = [];
+  if (existing) {
+    const o = await openRow(jk, existing, "stars");
+    if (o.state !== "ok") throw new Error(CANT_OPEN); // never written over
+    marks = o.entry.marks;
+  }
+  marks = [...marks.filter((m) => m.day !== day), { day, on, at: Date.now() }];
+  await write(jk, [await seal(jk, "stars", today, deviceId, { v: 1, marks })]);
 }

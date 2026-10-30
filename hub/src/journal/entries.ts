@@ -3,6 +3,7 @@
 // as "can't open" and is skipped on its own.
 
 import { isObj, isStr } from "../data/validate";
+import { MAX_CARD_DAY, validCardSet, type CardSet, type StarMark } from "./exercise";
 
 /** One finished morning page ("I'm done"). Hidden for MORNING_LOCK_DAYS from its date. */
 export interface PageEntry {
@@ -47,6 +48,26 @@ export interface SettingsEntry {
   active: string[];
 }
 
+/** The imported exercise cards, the whole set (exercise brief). */
+export interface CardsEntry extends CardSet {
+  v: 1;
+  at: number;
+}
+
+/** One device's exercise card for a day, and whether it was ticked. */
+export interface ExerciseEntry {
+  v: 1;
+  day: number;
+  done: boolean;
+  at: number;
+}
+
+/** One device's star marks (per card, the newest mark from any device wins). */
+export interface StarsEntry {
+  v: 1;
+  marks: StarMark[];
+}
+
 /** The earlier one-row-per-day morning shape (read and split; never written). */
 export interface LegacyMorningEntry {
   v: 1;
@@ -67,6 +88,7 @@ export interface LegacyCheckinEntry {
 
 const strList = (v: unknown) => Array.isArray(v) && v.every(isStr);
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+const cardDay = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_CARD_DAY;
 
 export const ENTRY_CHECK = {
   page: (v: unknown): v is PageEntry => isObj(v) && v.v === 1 && isStr(v.text) && num(v.at),
@@ -76,6 +98,13 @@ export const ENTRY_CHECK = {
     isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at),
   set: (v: unknown): v is SetEntry => isObj(v) && v.v === 1 && strList(v.prompts) && num(v.at),
   settings: (v: unknown): v is SettingsEntry => isObj(v) && v.v === 1 && strList(v.active),
+  cards: (v: unknown): v is CardsEntry =>
+    isObj(v) && v.v === 1 && num(v.at) && validCardSet({ source: v.source, cards: v.cards }),
+  exercise: (v: unknown): v is ExerciseEntry =>
+    isObj(v) && v.v === 1 && cardDay(v.day) && typeof v.done === "boolean" && num(v.at),
+  stars: (v: unknown): v is StarsEntry =>
+    isObj(v) && v.v === 1 && Array.isArray(v.marks) &&
+    v.marks.every((m) => isObj(m) && cardDay(m.day) && typeof m.on === "boolean" && num(m.at)),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&
     (v.draft === undefined || isStr(v.draft)) && strList(v.photos),

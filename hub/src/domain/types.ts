@@ -129,10 +129,13 @@ export interface FileRow {
  * - "set"      `set:<date>`                the day's questions (written by the first device to open it)
  * - "settings" `settings`                  Choose questions (synced)
  * - "verifier" `verifier`                  a known value sealed with the first confirmed key
+ * - "cards"    `cards`                     the imported exercise cards, the whole set (exercise brief)
+ * - "exercise" `exercise:<date>:<deviceId>` one device's exercise card for a day, and whether it was ticked
+ * - "stars"    `stars:<deviceId>`          one device's exercise card stars (newest mark per card wins)
  * - "morning" / "checkin" `${kind}:<date>` the earlier one-row-per-day shape: read (split), never written
  */
 export const JOURNAL_KINDS = [
-  "page", "photo", "draft", "answer", "set", "settings", "verifier", "morning", "checkin",
+  "page", "photo", "draft", "answer", "set", "settings", "verifier", "morning", "checkin", "cards", "exercise", "stars",
 ] as const;
 export type JournalKind = (typeof JOURNAL_KINDS)[number];
 

@@ -172,7 +172,10 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
   switch (kind) {
     case "settings":
     case "verifier":
+    case "cards":
       return kind;
+    case "stars":
+      return `${kind}:${suffix ?? ""}`;
     case "set":
     case "morning":
     case "checkin":
@@ -184,7 +187,8 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
 
 /** The id rule for one row: the id matches its kind and day (and a part has a plain suffix). */
 function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
-  if (["page", "photo", "draft", "answer"].includes(kind)) {
+  if (kind === "stars") return id.startsWith("stars:") && SUFFIX.test(id.slice("stars:".length));
+  if (["page", "photo", "draft", "answer", "exercise"].includes(kind)) {
     const prefix = `${kind}:${date}:`;
     if (!id.startsWith(prefix)) return false;
     const rest = id.slice(prefix.length);
