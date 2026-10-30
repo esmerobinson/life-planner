@@ -378,3 +378,25 @@ button.exercise-next-link {
 .exercise-reimport {
   margin-top: 12px;
 }
+
+/* The response box under Try this (journal polish brief §1): the check-in answer box
+   (.journal-answer) at 16px+, six rows tall and growing with the text (the height is set as
+   she types). Builder's calls, not yet seen by Esme: Submit / "Saved" under the box on the
+   right, the 8px gap, and "Your response" in Past exercises as a bold label like Learn. */
+.exercise-response-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.journal-answer.exercise-response {
+  font-size: max(16px, 1em);
+  resize: none;
+  overflow: hidden;
+}
+
+.exercise-response-actions {
+  justify-content: flex-end;
+  align-items: center;
+}

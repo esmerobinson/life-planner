@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, readExerciseCards, readExerciseProgress, recordExerciseShown,
-  saveExerciseMark, setExerciseStar, type CardsState, type ExerciseProgress,
+  CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseEntry,
+  readExerciseProgress, recordExerciseShown, saveExerciseDraft, saveExerciseMark, setExerciseStar, submitExerciseEntry,
+  type CardsState, type ExerciseProgress, type ExerciseResponse,
 } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
 import { INVALID_CARD_FILE, parseCardFile, planExercise, type CardSet, type ExerciseCard } from "../../journal/exercise";
 import type { ISODate } from "../../domain/types";
-import { JournalHead, PromptText } from "./bits";
+import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
+import { JournalHead, longDate, PromptText } from "./bits";
 import { useDbChanges } from "./useJournalKey";
 
 /** Under today's card once it is ticked. */
@@ -26,6 +28,7 @@ const MAX_FILE_BYTES = 16 * 1024 * 1024;
 export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; today: ISODate; deviceId: string }) {
   const [cards, setCards] = useState<CardsState | null>(null);
   const [progress, setProgress] = useState<ExerciseProgress | null>(null);
+  const [past, setPast] = useState<ExerciseResponse[]>([]);
   const [problem, setProblem] = useState("");
   const [asking, setAsking] = useState<CardSet | null>(null);
   const [showNext, setShowNext] = useState(false);
@@ -38,14 +41,15 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const [c, p] = await Promise.all([readExerciseCards(jk), readExerciseProgress(jk)]);
+      const [c, p, earlier] = await Promise.all([readExerciseCards(jk), readExerciseProgress(jk), listExerciseEntries(jk, today)]);
       if (id !== latest.current) return;
       setCards(c);
       setProgress(p);
+      setPast(earlier.entries);
     } catch {
       if (id === latest.current) setProblem(READ_PROBLEM);
     }
-  }, [jk]);
+  }, [jk, today]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
 
@@ -118,7 +122,16 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       {plan && (
         <>
           <article className="exercise-card" aria-label="Today's card">
-            <CardBody card={plan.today.card} />
+            <CardBody card={plan.today.card}>
+              <ResponseBox
+                key={`${today}|${plan.today.card.day}|${plan.today.card.theme}`}
+                jk={jk}
+                today={today}
+                deviceId={deviceId}
+                card={plan.today.card}
+                onProblem={setProblem}
+              />
+            </CardBody>
             <div className="exercise-actions">
               <label className="form-check">
                 <input
@@ -151,6 +164,11 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
               </div>
             </article>
           )}
+        </>
+      )}
+      <PastExercises past={past} cards={cards?.state === "ok" ? cards.set.cards : []} />
+      {plan && (
+        <>
           <AllCards
             cards={cards?.state === "ok" ? cards.set.cards : []}
             done={plan.doneThisRound}
@@ -219,13 +237,18 @@ function ImportPill({ busy, onFile }: { busy: boolean; onFile: (f: File) => void
   );
 }
 
-/** One card: "Day N · Theme", Learn, Try this, the book, the skill, and the session line. */
-function CardBody({ card }: { card: ExerciseCard }) {
+/**
+ * One card: "Day N · Theme", Learn, Try this, the book, the skill, and the session line.
+ * `children` go right under Try this (today's card: the response box).
+ */
+function CardBody({ card, dayLine = true, children }: { card: ExerciseCard; dayLine?: boolean; children?: ReactNode }) {
   return (
     <>
-      <p className="exercise-day-line">
-        <span className="chip exercise-day">{`Day ${card.day}`}</span> <span>{card.theme}</span>
-      </p>
+      {dayLine && (
+        <p className="exercise-day-line">
+          <span className="chip exercise-day">{`Day ${card.day}`}</span> <span>{card.theme}</span>
+        </p>
+      )}
       <div>
         <h3 className="exercise-label">Learn</h3>
         <p className="exercise-text">
@@ -238,6 +261,7 @@ function CardBody({ card }: { card: ExerciseCard }) {
           <PromptText text={card.try} />
         </p>
       </div>
+      {children}
       {(card.book || card.skill || card.session) && (
         <div className="exercise-meta">
           {card.book && <p className="journal-muted exercise-text">{`In your book: ${card.book}`}</p>}
@@ -246,6 +270,188 @@ function CardBody({ card }: { card: ExerciseCard }) {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Her response to today's card (journal polish brief §1): the check-in's answer box, growing
+ * with what she writes. Autosaved as a draft after a pause in typing, on blur, when the app is
+ * hidden or the page left (a draft never marks Done). Submit saves it and ticks today's card;
+ * "Saved" shows while the box holds what was submitted, and editing brings Submit back.
+ * Another device's newer response comes in while nothing typed here is waiting.
+ */
+function ResponseBox({
+  jk, today, deviceId, card, onProblem,
+}: { jk: JournalKey; today: ISODate; deviceId: string; card: ExerciseCard; onProblem: (p: string) => void }) {
+  const ref = useMemo(() => ({ day: card.day, theme: card.theme }), [card.day, card.theme]);
+  const [entry, setEntry] = useState<ExerciseResponse | null | undefined>(undefined);
+  const latestRead = useRef(0);
+  const load = useCallback(async () => {
+    const id = ++latestRead.current;
+    try {
+      const r = await readExerciseEntry(jk, today, ref);
+      if (id === latestRead.current) setEntry(r.entry);
+    } catch {
+      if (id === latestRead.current) onProblem(SAVE_PROBLEM);
+    }
+  }, [jk, today, ref, onProblem]);
+  useEffect(() => void load(), [load]);
+  useDbChanges(() => void load());
+  if (entry === undefined) return null; // the box opens once what is stored is known
+  return <ResponseField jk={jk} today={today} deviceId={deviceId} card={ref} entry={entry} onProblem={onProblem} />;
+}
+
+const UNSAVED = "\u0000unsaved";
+
+function ResponseField({
+  jk, today, deviceId, card, entry, onProblem,
+}: {
+  jk: JournalKey;
+  today: ISODate;
+  deviceId: string;
+  card: { day: number; theme: string };
+  entry: ExerciseResponse | null;
+  onProblem: (p: string) => void;
+}) {
+  const stored = entry?.text ?? "";
+  const [text, setText] = useState(stored);
+  const [busy, setBusy] = useState(false);
+  const latest = useRef(stored);
+  const saved = useRef(stored);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const box = useRef<HTMLTextAreaElement>(null);
+
+  // One save at a time, in order: a draft never lands after the Submit that followed it.
+  const enqueue = useCallback((op: () => Promise<unknown>) => {
+    const next = queue.current.then(op, op);
+    queue.current = next.catch(() => undefined);
+    return next;
+  }, []);
+
+  // A newer stored response (another device, or this one read back): take it while nothing typed waits.
+  useEffect(() => {
+    if (latest.current === saved.current && stored !== saved.current) {
+      latest.current = stored;
+      saved.current = stored;
+      setText(stored);
+    }
+  }, [stored]);
+
+  // The box grows with the text (at least its six rows).
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = "auto";
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  const saveNow = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const value = latest.current;
+    if (value === saved.current) return;
+    saved.current = value;
+    void enqueue(() => saveExerciseDraft(jk, today, deviceId, card, value)).catch(() => {
+      if (saved.current === value) saved.current = UNSAVED; // the next save tries again
+      onProblem(SAVE_PROBLEM);
+    });
+  }, [jk, today, deviceId, card, enqueue, onProblem]);
+
+  useEffect(() => () => saveNow(), [saveNow]);
+  useHiddenFlush(saveNow);
+
+  async function submit() {
+    if (busy) return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const value = latest.current;
+    if (!value.trim()) return;
+    setBusy(true);
+    const before = saved.current;
+    saved.current = value;
+    try {
+      await enqueue(() => submitExerciseEntry(jk, today, deviceId, card, value));
+      onProblem("");
+    } catch {
+      if (saved.current === value) saved.current = before === value ? UNSAVED : before;
+      onProblem(SAVE_PROBLEM); // the text stays in the box
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const showSaved = entry?.saved === true && text === entry.text;
+  return (
+    <div className="exercise-response-wrap">
+      <textarea
+        ref={box}
+        className="journal-answer exercise-response"
+        aria-label="Your response"
+        placeholder="Write your response…"
+        rows={6}
+        value={text}
+        onChange={(e) => {
+          latest.current = e.target.value;
+          setText(e.target.value);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(saveNow, AUTOSAVE_MS);
+        }}
+        onBlur={saveNow}
+      />
+      <div className="btn-group exercise-response-actions">
+        {showSaved ? (
+          <p className="journal-muted" role="status">
+            Saved
+          </p>
+        ) : (
+          <button type="button" disabled={busy || !text.trim()} onClick={() => void submit()}>
+            Submit
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Past exercises (journal polish brief §2): earlier days' responses, newest first, each
+ * "Day N · Theme · <date>". Opening one shows the card (from the stored set; if the set was
+ * replaced and the card is gone, just the theme stored with the response) and her response.
+ * These are readable any time.
+ */
+function PastExercises({ past, cards }: { past: ExerciseResponse[]; cards: ExerciseCard[] }) {
+  if (past.length === 0) return null;
+  return (
+    <details className="journal-fold">
+      <summary>Past exercises</summary>
+      <ul className="journal-past" aria-label="Past exercises">
+        {past.map((e) => (
+          <li key={`${e.date}|${e.day}|${e.theme}`}>
+            <PastExercise entry={e} card={cards.find((c) => c.day === e.day && c.theme === e.theme) ?? null} />
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function PastExercise({ entry, card }: { entry: ExerciseResponse; card: ExerciseCard | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>{`Day ${entry.day} · ${entry.theme} · ${longDate(entry.date)}`}</summary>
+      {open && (
+        <div className="exercise-card exercise-boxed">
+          {card && <CardBody card={card} dayLine={false} />}
+          <div>
+            <h3 className="exercise-label">Your response</h3>
+            <p className="journal-past-answer">{entry.text}</p>
+            {!entry.submitted && <p className="journal-muted">Not submitted</p>}
+          </div>
+        </div>
+      )}
+    </details>
   );
 }
 
