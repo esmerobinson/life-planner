@@ -7,6 +7,7 @@ import { syncController } from "../../sync";
 import type { SyncController } from "../../sync/controller";
 import { getDeviceId } from "../../sync/engine";
 import { DailyCheckIn } from "./DailyCheckIn";
+import { MentalHealthExercise } from "./MentalHealthExercise";
 import { MorningPages } from "./MorningPages";
 import { useJournalKey } from "./useJournalKey";
 
@@ -57,7 +58,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           <>
             <MorningPages jk={view.jk} today={today} deviceId={deviceId} />
             <DailyCheckIn jk={view.jk} today={today} deviceId={deviceId} />
-            {/* A third section ("Mental health exercise") is planned below these, in a later round. */}
+            <MentalHealthExercise jk={view.jk} today={today} deviceId={deviceId} />
           </>
         )
       ) : view.state === "checking" ? (

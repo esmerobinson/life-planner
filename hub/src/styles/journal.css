@@ -277,3 +277,98 @@
 .journal-card-home h2 {
   margin-top: 0;
 }
+
+/* Mental health exercise (exercise brief): the section is a journal card; the "Day N" chip is
+   the Journal violet; the Done box is the task strips' tick; the star toggle is line-drawn in
+   --text (filled with --text while starred). Builder's calls, not yet seen by Esme: the
+   gaps, the 13px "Day N · Theme" line, the bold Learn / Try this labels at body size, the
+   next card and the cards opened under All cards as --row boxes (like the Done box), the
+   20px star in a 30px tap square, and the small tick / star after a card under All cards. */
+.exercise-empty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.exercise-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.exercise-card p {
+  margin: 0;
+}
+
+.exercise-boxed {
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.exercise-day-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.chip.exercise-day {
+  background: var(--journal-violet);
+}
+
+.exercise-label {
+  margin: 0 0 4px;
+  font-size: inherit;
+  font-weight: 700;
+}
+
+.exercise-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.exercise-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+button.exercise-star[aria-pressed] {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+.exercise-star-glyph {
+  width: 20px;
+  height: 20px;
+}
+
+.exercise-mark .exercise-star-glyph {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+
+button.exercise-next-link {
+  align-self: flex-start;
+  font-size: 14px;
+}
+
+.exercise-reimport {
+  margin-top: 12px;
+}

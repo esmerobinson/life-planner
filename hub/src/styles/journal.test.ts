@@ -24,4 +24,9 @@ describe("journal.css", () => {
     expect(code).toMatch(/\.journal-day\.today \{[^}]*outline: 2px solid var\(--journal-violet\)/);
     expect(code).toMatch(/\.journal-photo\.blurred \{[^}]*filter: blur\(10px\)/);
   });
+
+  it("exercise cards: the Day chip is the Journal violet; the star is drawn in --text on no background", () => {
+    expect(code).toMatch(/\.chip\.exercise-day \{[^}]*background: var\(--journal-violet\)/);
+    expect(code).toMatch(/button\.exercise-star\[aria-pressed\] \{[^}]*background: none;[^}]*color: var\(--text\)/);
+  });
 });
