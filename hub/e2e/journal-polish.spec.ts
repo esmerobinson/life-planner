@@ -111,6 +111,8 @@ for (const width of [1280, 1920]) {
       for (const c of w.cards) expect(Math.abs(c - w.column)).toBeLessThanOrEqual(1);
 
       // The star calendar: 7 equal columns across the card, cells a fixed ~56px tall.
+      // It renders after the morning rows are read, so wait for it before measuring.
+      await expect(page.locator(".journal-cal .journal-day:not(.blank)").first()).toBeVisible();
       const cal = await page.evaluate(() => {
         const cells = [...document.querySelectorAll(".journal-cal .journal-day:not(.blank)")].map((c) => c.getBoundingClientRect());
         const grid = document.querySelector(".journal-cal")!.getBoundingClientRect();
