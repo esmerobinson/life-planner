@@ -14,6 +14,7 @@ import { deriveToken } from "../../sync/token";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
 import { CHECKING_LINE, JournalPage } from "./JournalPage";
+import { DailyCheckIn } from "./DailyCheckIn";
 
 // The Journal page (journal brief; review fix round 1). Fictional passphrases and words only.
 
@@ -89,6 +90,7 @@ describe("locked", () => {
     await userEvent.type(await screen.findByLabelText("Sync passphrase"), PASS);
     await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
     expect(await screen.findByText(CHECKING_LINE, {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sync" })).toHaveAttribute("href", "/sync");
     expect(screen.queryByRole("button", { name: "Write now" })).toBeNull();
     expect(await db.journal.count()).toBe(0);
     await waitFor(() => expect(server.syncRequests).toHaveLength(1)); // the page asked once (offline)
@@ -246,14 +248,14 @@ describe("daily check-in", () => {
   it("re-reads today live: another device's answers show, and are never written over", async () => {
     await unlocked();
     await ensureCheckinSet(jk, TODAY, ["M1", "D3", "K2"]);
-    await saveAnswer(jk, TODAY, "M1", "Pretend mine", true);
+    await saveAnswer(jk, TODAY, "M1", "device-phone-01", "Pretend mine", true);
     renderApp("/journal", TODAY);
     const s = await section();
     expect(await within(s).findByRole("img", { name: "Question 2 of 3" })).toBeInTheDocument();
     // The phone answers D3 and K2; sync brings them in.
     await act(async () => {
-      await saveAnswer(jk, TODAY, "D3", "Pretend phone D3", true);
-      await saveAnswer(jk, TODAY, "K2", "Pretend phone K2", true);
+      await saveAnswer(jk, TODAY, "D3", "device-phone-01", "Pretend phone D3", true);
+      await saveAnswer(jk, TODAY, "K2", "device-phone-01", "Pretend phone K2", true);
     });
     expect(await within(s).findByText("Checked in for today")).toBeInTheDocument();
     const answers = s.querySelector<HTMLElement>(".journal-answers")!;
@@ -262,13 +264,46 @@ describe("daily check-in", () => {
     expect(within(answers).getByText("Observe · Workbook p. 134")).toBeInTheDocument();
   });
 
+  it("Skip on a box showing another device's answer, untouched, never copies or blanks it", async () => {
+    await unlocked();
+    await ensureCheckinSet(jk, TODAY, ["M1", "D3", "K2"]);
+    await saveAnswer(jk, TODAY, "M1", "device-phone-01", "Pretend phone typing", false); // not moved past there
+    renderApp("/journal", TODAY);
+    const s = await section();
+    expect(await within(s).findByLabelText("Your answer")).toHaveValue("Pretend phone typing");
+    await userEvent.click(within(s).getByRole("button", { name: "Skip" }));
+    expect(await within(s).findByRole("img", { name: "Question 2 of 3" })).toBeInTheDocument();
+    expect((await readCheckinDay(jk, TODAY)).answers.get("M1")).toMatchObject({ answer: "Pretend phone typing", done: true });
+    const device = await me();
+    const mine = (await db.journal.where("kind").equals("answer").toArray()).filter((r) => r.id.endsWith(`:${device}`));
+    expect(mine).toHaveLength(1); // only "moved past", sealed with no text
+  });
+
+  it("a check-in left open past midnight stores the new day's questions too", async () => {
+    await unlocked();
+    const device = await me();
+    const view = render(
+      <MemoryRouter>
+        <DailyCheckIn jk={jk} today="2026-10-28" deviceId={device} />
+      </MemoryRouter>,
+    );
+    await waitFor(async () => expect(await db.journal.get("set:2026-10-28")).toBeTruthy());
+    view.rerender(
+      <MemoryRouter>
+        <DailyCheckIn jk={jk} today="2026-10-29" deviceId={device} />
+      </MemoryRouter>,
+    );
+    await waitFor(async () => expect(await db.journal.get("set:2026-10-29")).toBeTruthy());
+    expect(await screen.findByRole("img", { name: /Question 1 of/ })).toBeInTheDocument();
+  });
+
   it("past check-ins open newest first and can be reread", async () => {
     await unlocked();
     await ensureCheckinSet(jk, "2026-10-20", ["E3"]);
-    await saveAnswer(jk, "2026-10-20", "E3", "Pretend older", true);
+    await saveAnswer(jk, "2026-10-20", "E3", "device-phone-01", "Pretend older", true);
     await ensureCheckinSet(jk, "2026-10-27", ["K4", "K2"]);
-    await saveAnswer(jk, "2026-10-27", "K4", "Pretend newer", true);
-    await saveAnswer(jk, "2026-10-27", "K2", null, true);
+    await saveAnswer(jk, "2026-10-27", "K4", "device-phone-01", "Pretend newer", true);
+    await saveAnswer(jk, "2026-10-27", "K2", "device-phone-01", null, true);
     renderApp("/journal", TODAY);
     await userEvent.click(await screen.findByText("Past check-ins"));
     const days = screen.getAllByText(/^(Tuesday 27 October|Tuesday 20 October)$/);

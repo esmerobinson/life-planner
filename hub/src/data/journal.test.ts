@@ -88,7 +88,7 @@ describe("only the confirmed key writes", () => {
     await expect(saveMorningDraft(other, DAY, ME, "Pretend")).rejects.toThrow(NOT_CONFIRMED);
     await db.syncMeta.delete("journalKey"); // e.g. the view still holds a key that is gone
     await expect(saveMorningDraft(jk, DAY, ME, "Pretend")).rejects.toThrow(NOT_CONFIRMED);
-    await expect(saveAnswer(jk, DAY, "M1", "Pretend", false)).rejects.toThrow(NOT_CONFIRMED);
+    await expect(saveAnswer(jk, DAY, "M1", ME, "Pretend", false)).rejects.toThrow(NOT_CONFIRMED);
     expect(await db.journal.count()).toBe(before);
   });
 });
@@ -189,21 +189,41 @@ describe("check-in (a set row plus one row per answer)", () => {
 
   it("answers are separate rows; a typed-but-not-moved-past answer keeps the step; done moves on", async () => {
     await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
-    await saveAnswer(jk, DAY, "M1", "Pretend typing", false);
+    await saveAnswer(jk, DAY, "M1", ME, "Pretend typing", false);
     let day = await readCheckinDay(jk, DAY);
     expect(day.answers.get("M1")).toMatchObject({ answer: "Pretend typing", done: false });
     expect(currentStep(day)).toBe(0);
-    await saveAnswer(jk, DAY, "M1", "Pretend typing", true);
-    await saveAnswer(jk, DAY, "D3", null, true);
-    await saveAnswer(jk, DAY, "K2", "Pretend kind", true);
+    await saveAnswer(jk, DAY, "M1", ME, "Pretend typing", true);
+    await saveAnswer(jk, DAY, "D3", ME, null, true);
+    await saveAnswer(jk, DAY, "K2", ME, "Pretend kind", true);
     day = await readCheckinDay(jk, DAY);
     expect(currentStep(day)).toBe(-1);
     expect(JSON.stringify(await db.journal.toArray())).not.toContain("Pretend");
   });
 
+  it("each device answers in its own row, named by an opaque prompt key (no prompt id in clear)", async () => {
+    await saveAnswer(jk, DAY, "M1", ME, "Pretend", false);
+    const [row] = await db.journal.where("kind").equals("answer").toArray();
+    expect(row!.id).toMatch(/^answer:2026-10-28:[0-9a-f]{12}:device-mac-0001$/);
+    expect(row!.id).not.toContain("M1");
+    expect(validJournal(row)).toBe(true);
+    expect(validJournal({ ...row, id: "answer:2026-10-28:M1" })).toBe(true); // the earlier shared shape still reads
+    expect(validJournal({ ...row, id: "answer:2026-10-28:ABCDEF:device-mac-0001" })).toBe(false);
+  });
+
+  it("merging devices: the newest non-empty answer shows; an empty skip from another device never hides it", async () => {
+    await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
+    await saveAnswer(jk, DAY, "M1", "device-phone-01", "Pretend phone answer", true);
+    await saveAnswer(jk, DAY, "M1", ME, null, true); // the Mac skips later
+    expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend phone answer", done: true });
+    await saveAnswer(jk, DAY, "M1", ME, "Pretend mac edit", true); // she edits on the Mac
+    expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend mac edit" });
+    expect(await db.journal.where("kind").equals("answer").count()).toBe(2);
+  });
+
   it("answers to prompts outside the set (another device's set) are kept and shown after it", async () => {
     await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
-    await saveAnswer(jk, DAY, "E3", "Pretend from the phone's set", true);
+    await saveAnswer(jk, DAY, "E3", ME, "Pretend from the phone's set", true);
     const day = await readCheckinDay(jk, DAY);
     expect(day.prompts).toEqual(["M1", "D3", "K2", "E3"]);
   });
@@ -231,7 +251,7 @@ describe("check-in (a set row plus one row per answer)", () => {
 describe("backup with the journal", () => {
   it("contains the sealed rows as they are; replace brings them back; a plaintext field refuses the file", async () => {
     await finishMorningPage(jk, DAY, ME, WORDS);
-    await saveAnswer(jk, DAY, "M1", "Pretend", true);
+    await saveAnswer(jk, DAY, "M1", ME, "Pretend", true);
     const exported = JSON.parse(JSON.stringify(await exportBackup(DAY)));
     expect(exported.journal.length).toBeGreaterThanOrEqual(3);
     expect(JSON.stringify(exported)).not.toContain("Pretend");

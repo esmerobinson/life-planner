@@ -56,7 +56,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
         deviceId && (
           <>
             <MorningPages jk={view.jk} today={today} deviceId={deviceId} />
-            <DailyCheckIn jk={view.jk} today={today} />
+            <DailyCheckIn jk={view.jk} today={today} deviceId={deviceId} />
             {/* A third section ("Mental health exercise") is planned below these, in a later round. */}
           </>
         )
@@ -66,6 +66,9 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
             Unlock journal
           </h2>
           <p role="status">{CHECKING_LINE}</p>
+          <p>
+            <Link to="/sync">Sync</Link>
+          </p>
         </section>
       ) : (
         <UnlockJournal />

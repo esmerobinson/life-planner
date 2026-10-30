@@ -26,13 +26,15 @@ const SAVE_PROBLEM = "That didn't save. Try again.";
  *   goes to the background. Today is re-read whenever sync brings rows, so another device's
  *   answers show here and are never written over.
  */
-export function DailyCheckIn({ jk, today }: { jk: JournalKey; today: ISODate }) {
+export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: ISODate; deviceId: string }) {
   const [day, setDay] = useState<CheckinDay | null>(null);
   const [past, setPast] = useState<CheckinDay[]>([]);
   const [active, setActive] = useState<string[] | null>(null);
   const [problem, setProblem] = useState("");
   const latest = useRef(0);
-  const ensuring = useRef<Promise<unknown> | null>(null);
+  // The first-open write of a day's questions, per day (a check-in left open past midnight
+  // picks and stores the new day's questions too).
+  const ensuring = useRef<{ date: ISODate; done: Promise<unknown> } | null>(null);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
@@ -43,12 +45,15 @@ export function DailyCheckIn({ jk, today }: { jk: JournalKey; today: ISODate }) 
       if (!todayDay.hasSet && todayDay.prompts.length === 0) {
         // This device is the first to open today's check-in: pick and store the questions
         // (once; a reload meanwhile waits for that same write).
-        if (!ensuring.current) {
+        if (ensuring.current?.date !== today) {
           const history = all.filter((d) => d.date < today).map((d) => ({ date: d.date, prompts: d.prompts }));
           const prompts = pickPrompts({ date: today, hour: new Date().getHours(), active: ids, history });
-          ensuring.current = prompts.length > 0 ? ensureCheckinSet(jk, today, prompts) : Promise.resolve(false);
+          ensuring.current = {
+            date: today,
+            done: prompts.length > 0 ? ensureCheckinSet(jk, today, prompts) : Promise.resolve(false),
+          };
         }
-        await ensuring.current;
+        await ensuring.current.done;
         todayDay = await readCheckinDay(jk, today);
       }
       if (id !== latest.current) return;
@@ -79,9 +84,9 @@ export function DailyCheckIn({ jk, today }: { jk: JournalKey; today: ISODate }) 
       {day && day.prompts.length === 0 && <p>No questions are switched on. Choose some under Choose questions.</p>}
       {day && day.prompts.length > 0 &&
         (step === -1 ? (
-          <CheckedIn jk={jk} day={day} onProblem={setProblem} />
+          <CheckedIn jk={jk} day={day} deviceId={deviceId} onProblem={setProblem} />
         ) : (
-          <Question key={day.prompts[step]} jk={jk} day={day} step={step} onProblem={setProblem} />
+          <Question key={`${day.date}|${day.prompts[step]}`} jk={jk} day={day} step={step} deviceId={deviceId} onProblem={setProblem} />
         ))}
       {problem && <p role="alert">{problem}</p>}
       <PastCheckIns past={past} />
@@ -105,13 +110,15 @@ function QuestionText({ id }: { id: string }) {
 }
 
 /**
- * One question. The answer box saves itself (its own row, not yet "moved past") after a pause
- * in typing, on blur, when it goes away and when the app is hidden. Next and Skip save it as
- * moved past; Skip keeps anything already typed.
+ * One question. The answer box shows the newest answer from any device and saves this
+ * device's own row (not yet "moved past") after a pause in typing, on blur, when it goes away
+ * and when the app is hidden. Next and Skip save it as moved past; Skip keeps anything typed.
+ * Next / Skip on a box left untouched never copies or blanks another device's answer: it
+ * writes nothing when the question is already moved past anywhere, else only "moved past".
  */
 function Question({
-  jk, day, step, onProblem,
-}: { jk: JournalKey; day: CheckinDay; step: number; onProblem: (p: string) => void }) {
+  jk, day, step, deviceId, onProblem,
+}: { jk: JournalKey; day: CheckinDay; step: number; deviceId: string; onProblem: (p: string) => void }) {
   const prompt = day.prompts[step]!;
   const stored = day.answers.get(prompt)?.answer ?? "";
   const [text, setText] = useState(stored);
@@ -146,11 +153,11 @@ function Question({
     const value = latest.current;
     if (moved.current || value === saved.current) return;
     saved.current = value;
-    void enqueue(() => saveAnswer(jk, day.date, prompt, value, doneThere.current)).catch(() => {
+    void enqueue(() => saveAnswer(jk, day.date, prompt, deviceId, value, doneThere.current)).catch(() => {
       if (saved.current === value) saved.current = "\u0000unsaved"; // the next save tries again
       onProblem(SAVE_PROBLEM);
     });
-  }, [jk, day.date, prompt, enqueue, onProblem]);
+  }, [jk, day.date, prompt, deviceId, enqueue, onProblem]);
 
   useEffect(() => () => saveNow(), [saveNow]);
   useHiddenFlush(saveNow);
@@ -161,9 +168,14 @@ function Question({
     timer.current = null;
     setBusy(true);
     const value = latest.current;
+    const untouched = value === saved.current && value === stored;
     try {
-      await enqueue(() => saveAnswer(jk, day.date, prompt, value, true));
-      moved.current = true; // the next question shows once the save is read back
+      if (untouched && doneThere.current) {
+        moved.current = true; // already moved past on another device: nothing to write
+      } else {
+        await enqueue(() => saveAnswer(jk, day.date, prompt, deviceId, untouched ? null : value, true));
+        moved.current = true; // the next question shows once the save is read back
+      }
       onProblem("");
     } catch {
       onProblem(SAVE_PROBLEM); // stays on this question, text kept
@@ -207,7 +219,9 @@ function Question({
 }
 
 /** "Checked in for today", then today's questions and answers, still editable. */
-function CheckedIn({ jk, day, onProblem }: { jk: JournalKey; day: CheckinDay; onProblem: (p: string) => void }) {
+function CheckedIn({
+  jk, day, deviceId, onProblem,
+}: { jk: JournalKey; day: CheckinDay; deviceId: string; onProblem: (p: string) => void }) {
   return (
     <>
       <DoneBox title="Checked in for today" line={CHECKED_IN_LINE} />
@@ -219,7 +233,7 @@ function CheckedIn({ jk, day, onProblem }: { jk: JournalKey; day: CheckinDay; on
               stored={day.answers.get(id)?.answer ?? ""}
               onSave={async (text) => {
                 try {
-                  await saveAnswer(jk, day.date, id, text, true);
+                  await saveAnswer(jk, day.date, id, deviceId, text, true); // this device's own row
                 } catch (err) {
                   onProblem(SAVE_PROBLEM);
                   throw err;

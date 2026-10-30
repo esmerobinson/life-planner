@@ -17,7 +17,7 @@
 import { db } from "./db";
 import { addDays } from "../domain/dates";
 import { journalId, validJournal } from "./validate";
-import { fileAad, journalAad, openBytes, openJson, sealBytes, sealJson, type JournalKey } from "../journal/crypto";
+import { fileAad, journalAad, openBytes, openJson, promptKey, sealBytes, sealJson, type JournalKey } from "../journal/crypto";
 import { ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import type { FileRow, ISODate, JournalKind, JournalRow } from "../domain/types";
@@ -219,10 +219,25 @@ export async function readMorningPage(jk: JournalKey, id: string, today: ISODate
 
 // ---- check-in ----------------------------------------------------------------------------
 
+/**
+ * One question's answer for the day, merged across devices (each device writes its own row):
+ * the newest non-empty answer, moved past if any device moved past it.
+ */
 export interface CheckinAnswer {
   answer: string | null;
   done: boolean;
   at: number;
+}
+
+function mergeAnswer(prev: CheckinAnswer | undefined, next: CheckinAnswer): CheckinAnswer {
+  if (!prev) return next;
+  const pick = (a: CheckinAnswer, b: CheckinAnswer) => {
+    if (a.answer === null) return b.answer === null ? (a.at >= b.at ? a : b) : b;
+    if (b.answer === null) return a;
+    return a.at >= b.at ? a : b;
+  };
+  const best = pick(prev, next);
+  return { answer: best.answer, done: prev.done || next.done, at: Math.max(prev.at, next.at) };
 }
 
 export interface CheckinDay {
@@ -249,8 +264,10 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
       else unreadable++;
     } else if (row.kind === "answer") {
       const o = await openRow(jk, row, "answer");
-      if (o.state === "ok") answers.set(o.entry.prompt, { answer: o.entry.answer, done: o.entry.done, at: o.entry.at });
-      else unreadable++;
+      if (o.state === "ok") {
+        const e = o.entry;
+        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), { answer: e.answer, done: e.done, at: e.at }));
+      } else unreadable++;
     } else if (row.kind === "checkin") {
       const o = await openRow(jk, row, "checkin");
       if (o.state === "ok") legacy = o.entry;
@@ -286,16 +303,22 @@ export async function ensureCheckinSet(jk: JournalKey, date: ISODate, prompts: s
   return write(jk, [row], { onlyIfAbsent: true });
 }
 
-/** Saves one answer (its own row: other answers, and other devices' answers, are untouched). */
+/**
+ * Saves this device's answer to one question: its own row
+ * `answer:<date>:<promptKey>:<deviceId>`, so it can never replace another device's answer
+ * (or another question's). The prompt id is only inside the sealed entry; the row id carries
+ * an opaque HMAC of it.
+ */
 export async function saveAnswer(
   jk: JournalKey,
   date: ISODate,
   prompt: string,
+  deviceId: string,
   answer: string | null,
   done: boolean,
 ): Promise<void> {
   const entry: AnswerEntry = { v: 1, prompt, answer: answer && answer.trim() ? answer : null, done, at: Date.now() };
-  await write(jk, [await seal(jk, "answer", date, prompt, entry)]);
+  await write(jk, [await seal(jk, "answer", date, `${await promptKey(jk, prompt)}:${deviceId}`, entry)]);
 }
 
 /** Every day with a check-in, newest first. */

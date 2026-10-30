@@ -6,7 +6,7 @@ import {
   saveMorningDraft,
 } from "../data/repo";
 import { journalId } from "../data/validate";
-import { fileAad, journalAad, openBytes, sealBytes, sealJson, toBase64, type JournalKey } from "../journal/crypto";
+import { fileAad, journalAad, openBytes, promptKey, sealBytes, sealJson, toBase64, type JournalKey } from "../journal/crypto";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import { FakeSyncServer } from "./fakeServer";
 import { saveSyncSettings, syncOnce } from "./engine";
@@ -117,8 +117,8 @@ it("two check-ins started offline with different questions: every answer is kept
   await phone.journal.add(await sealed("answer", DAY, "D3", { v: 1, prompt: "D3", answer: "Pretend phone D3", done: true, at: clock }));
   // The Mac (not synced) opens later in the evening with other questions and answers them.
   await ensureCheckinSet(jk, DAY, ["M6", "E5", "K2"]);
-  await saveAnswer(jk, DAY, "M6", "Pretend mac M6", true);
-  await saveAnswer(jk, DAY, "K2", "Pretend mac K2", true);
+  await saveAnswer(jk, DAY, "M6", MAC, "Pretend mac M6", true);
+  await saveAnswer(jk, DAY, "K2", MAC, "Pretend mac K2", true);
   await syncOnce({ db: phone, fetch: server.fetch });
   await syncOnce({ db, fetch: server.fetch });
   const day = await readCheckinDay(jk, DAY);
@@ -129,6 +129,26 @@ it("two check-ins started offline with different questions: every answer is kept
     expect(day.answers.get(p!)?.answer).toBe(text);
     expect(day.prompts).toContain(p);
   }
+});
+
+it("the phone answers, the Mac (not yet synced) skips the same question: the phone's answer survives everywhere", async () => {
+  const server = new FakeSyncServer(TOKEN);
+  const phone = await phoneDevice();
+  await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
+  await syncOnce({ db, fetch: server.fetch });
+  await syncOnce({ db: phone, fetch: server.fetch }); // both have the day's questions
+  // The phone answers M1 in its own row (as the repo writes it).
+  const pk = await promptKey(jk, "M1");
+  await phone.journal.add(await sealed("answer", DAY, `${pk}:${PHONE}`, { v: 1, prompt: "M1", answer: "Pretend phone answer", done: true, at: clock }));
+  // Later, the Mac skips M1 without having pulled the phone's answer.
+  await saveAnswer(jk, DAY, "M1", MAC, null, true);
+  await syncOnce({ db: phone, fetch: server.fetch });
+  await syncOnce({ db, fetch: server.fetch });
+  await syncOnce({ db: phone, fetch: server.fetch });
+  expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend phone answer", done: true });
+  expect(await phone.journal.where("kind").equals("answer").count()).toBe(2); // both rows, nothing replaced
+  const ids = (await phone.journal.where("kind").equals("answer").toArray()).map((r) => r.id);
+  expect(ids.every((id) => !id.includes("M1"))).toBe(true);
 });
 
 it("a journal row an older build held in quarantine applies once this build has the table", async () => {

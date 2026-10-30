@@ -164,6 +164,8 @@ const JOURNAL_KEYS = new Set(["id", "kind", "date", "fp", "iv", "ct", "updatedAt
 const JOURNAL_KIND_LIST: readonly string[] = JOURNAL_KINDS;
 /** The part after `<kind>:<date>:` in a part id (a uuid, file id, device id or prompt id). */
 const SUFFIX = /^[A-Za-z0-9_-]{1,64}$/;
+/** A per-device answer's suffix: `<12 hex promptKey>:<deviceId>`. */
+const ANSWER_SUFFIX = /^[0-9a-f]{12}:[A-Za-z0-9_-]{8,64}$/;
 
 /** A journal row's id for its kind, day and (for parts) suffix. */
 export function journalId(kind: JournalRow["kind"], date: string, suffix?: string): string {
@@ -184,7 +186,12 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
 function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
   if (["page", "photo", "draft", "answer"].includes(kind)) {
     const prefix = `${kind}:${date}:`;
-    return id.startsWith(prefix) && SUFFIX.test(id.slice(prefix.length));
+    if (!id.startsWith(prefix)) return false;
+    const rest = id.slice(prefix.length);
+    // An answer is per device and names its prompt only by an opaque key:
+    // `answer:<date>:<12 hex promptKey>:<deviceId>` (the earlier shared `answer:<date>:<promptId>` still reads).
+    if (kind === "answer" && ANSWER_SUFFIX.test(rest)) return true;
+    return SUFFIX.test(rest);
   }
   return id === journalId(kind, date);
 }
