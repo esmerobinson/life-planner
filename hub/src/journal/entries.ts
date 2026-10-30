@@ -68,6 +68,20 @@ export interface StarsEntry {
   marks: StarMark[];
 }
 
+/**
+ * One device's written response to a day's exercise card (journal polish brief). The card's
+ * day and theme are kept so it reads back even after the card set is replaced. `submittedAt`
+ * is null until Submit; `at` is the last save (an autosave after Submit leaves `submittedAt`).
+ */
+export interface ExerciseResponseEntry {
+  v: 1;
+  day: number;
+  theme: string;
+  text: string;
+  submittedAt: number | null;
+  at: number;
+}
+
 /** The earlier one-row-per-day morning shape (read and split; never written). */
 export interface LegacyMorningEntry {
   v: 1;
@@ -105,6 +119,9 @@ export const ENTRY_CHECK = {
   stars: (v: unknown): v is StarsEntry =>
     isObj(v) && v.v === 1 && Array.isArray(v.marks) &&
     v.marks.every((m) => isObj(m) && cardDay(m.day) && typeof m.on === "boolean" && num(m.at)),
+  "exercise-entry": (v: unknown): v is ExerciseResponseEntry =>
+    isObj(v) && v.v === 1 && cardDay(v.day) && isStr(v.theme) && isStr(v.text) &&
+    (v.submittedAt === null || num(v.submittedAt)) && num(v.at),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&
     (v.draft === undefined || isStr(v.draft)) && strList(v.photos),

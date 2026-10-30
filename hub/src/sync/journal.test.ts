@@ -3,10 +3,12 @@ import { vi } from "vitest";
 import { db, HubDB } from "../data/db";
 import {
   addMorningPhoto, ensureCheckinSet, finishMorningPage, readCheckinDay, readMorningDay, readMorningPage, saveAnswer,
-  saveMorningDraft,
+  saveMorningDraft, readExerciseEntry, submitExerciseEntry, listExerciseEntries,
 } from "../data/repo";
 import { journalId } from "../data/validate";
-import { fileAad, journalAad, openBytes, promptKey, sealBytes, sealJson, toBase64, type JournalKey } from "../journal/crypto";
+import {
+  exerciseCardKey, fileAad, journalAad, openBytes, promptKey, sealBytes, sealJson, toBase64, type JournalKey,
+} from "../journal/crypto";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import { FakeSyncServer } from "./fakeServer";
 import { saveSyncSettings, syncOnce } from "./engine";
@@ -149,6 +151,29 @@ it("the phone answers, the Mac (not yet synced) skips the same question: the pho
   expect(await phone.journal.where("kind").equals("answer").count()).toBe(2); // both rows, nothing replaced
   const ids = (await phone.journal.where("kind").equals("answer").toArray()).map((r) => r.id);
   expect(ids.every((id) => !id.includes("M1"))).toBe(true);
+});
+
+it("exercise responses on two devices: each keeps its own row, the newest non-empty one shows, sealed all the way", async () => {
+  const server = new FakeSyncServer(TOKEN);
+  const phone = await phoneDevice();
+  const card = { day: 2, theme: "The fictional kettle" };
+  // The phone responds first (offline), as the repo writes it: its own row.
+  const pk = await exerciseCardKey(jk, card.day, card.theme);
+  await phone.journal.add(
+    await sealed("exercise-entry", DAY, `${pk}:${PHONE}`, { v: 1, ...card, text: "Pretend phone response", submittedAt: clock, at: clock }),
+  );
+  // Later the Mac (not synced) submits its own response to the same card.
+  await submitExerciseEntry(jk, DAY, MAC, card, "Pretend mac response");
+  await syncOnce({ db: phone, fetch: server.fetch });
+  await syncOnce({ db, fetch: server.fetch });
+  await syncOnce({ db: phone, fetch: server.fetch });
+  const onServer = JSON.stringify([...server.rows.values()]);
+  expect(onServer).not.toContain("Pretend");
+  expect(onServer).not.toContain("kettle");
+  for (const d of [db, phone]) expect(await d.journal.where("kind").equals("exercise-entry").count()).toBe(2);
+  expect((await readExerciseEntry(jk, DAY, card)).entry).toMatchObject({ text: "Pretend mac response", saved: true });
+  // The day after, it is one entry in Past exercises.
+  expect((await listExerciseEntries(jk, "2026-10-29")).entries).toEqual([expect.objectContaining({ day: 2, text: "Pretend mac response" })]);
 });
 
 it("a journal row an older build held in quarantine applies once this build has the table", async () => {

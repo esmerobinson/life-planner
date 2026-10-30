@@ -46,6 +46,15 @@ export async function promptKey(jk: JournalKey, promptId: string): Promise<strin
   return hex(sig.subarray(0, 6));
 }
 
+/**
+ * An opaque stand-in for an exercise card in a response row id (journal polish brief): like
+ * `promptKey`, of the card's day and theme, so the id says neither which card nor which day of
+ * the set it was (and a replaced set's card with the same number gets its own key).
+ */
+export function exerciseCardKey(jk: JournalKey, day: number, theme: string): Promise<string> {
+  return promptKey(jk, `exercise-card|${day}|${theme}`);
+}
+
 async function pbkdf2Base(passphrase: string): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase.normalize("NFC")), "PBKDF2", false, [
     "deriveKey",

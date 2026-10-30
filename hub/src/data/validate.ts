@@ -188,10 +188,12 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
 /** The id rule for one row: the id matches its kind and day (and a part has a plain suffix). */
 function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
   if (kind === "stars") return id.startsWith("stars:") && SUFFIX.test(id.slice("stars:".length));
-  if (["page", "photo", "draft", "answer", "exercise"].includes(kind)) {
+  if (["page", "photo", "draft", "answer", "exercise", "exercise-entry"].includes(kind)) {
     const prefix = `${kind}:${date}:`;
     if (!id.startsWith(prefix)) return false;
     const rest = id.slice(prefix.length);
+    // An exercise response names its card only by an opaque key: `<12 hex cardKey>:<deviceId>`.
+    if (kind === "exercise-entry") return ANSWER_SUFFIX.test(rest);
     // An answer is per device and names its prompt only by an opaque key:
     // `answer:<date>:<12 hex promptKey>:<deviceId>` (the earlier shared `answer:<date>:<promptId>` still reads).
     if (kind === "answer" && ANSWER_SUFFIX.test(rest)) return true;
