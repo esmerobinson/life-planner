@@ -21,14 +21,14 @@ import type { JournalRow } from "../domain/types";
 import { deriveToken } from "../sync/token";
 import { deriveJournalKeyAndFp, fileAad, journalAad, openBytes, openJson, sealBytes, sealJson, type JournalKey } from "./crypto";
 
-/** syncMeta: the confirmed key `{key, fp, id}`. */
+/** syncMeta: the confirmed key `{key, mac, fp, id}`. */
 export const JOURNAL_KEY_META = "journalKey";
-/** syncMeta: the candidate key `{key, fp, tokenVersion, id}` waiting to be confirmed. */
+/** syncMeta: the candidate key `{key, mac, fp, token, id}` waiting to be confirmed. */
 export const JOURNAL_CANDIDATE_META = "journalCandidate";
-/** syncMeta: retired keys `[{key, fp}]` (never seal; only for the repair pass). */
+/** syncMeta: retired keys `[{key, mac, fp}]` (never seal; only for the repair pass). */
 export const JOURNAL_RETIRED_META = "journalRetired";
-/** syncMeta (written by the sync engine): the token version the server last accepted. */
-export const ACCEPTED_TOKEN_META = "acceptedTokenVersion";
+/** syncMeta (written by the sync engine): the exact token the server last accepted in a whole run. */
+export const ACCEPTED_TOKEN_META = "acceptedToken";
 
 /** The verifier row's id and the value sealed in it. */
 export const VERIFIER_ID = "verifier";
@@ -42,13 +42,18 @@ export interface StoredJournalKey extends JournalKey {
 }
 
 export interface StoredCandidate extends StoredJournalKey {
-  /** The sync token version saved with the same passphrase (null: none). */
-  tokenVersion: number | null;
+  /**
+   * The sync token derived from the SAME passphrase as this key (null: made by opening the
+   * verifier). Rule (b) confirms the candidate only when the server accepted exactly this
+   * token, so a second Save finishing in another order can never confirm the wrong key.
+   */
+  token: string | null;
 }
 
 const isKey = (v: unknown): v is StoredJournalKey =>
   !!v && typeof v === "object" && typeof (v as StoredJournalKey).key === "object" &&
-  (v as StoredJournalKey).key !== null && typeof (v as StoredJournalKey).fp === "string";
+  (v as StoredJournalKey).key !== null && typeof (v as StoredJournalKey).mac === "object" &&
+  (v as StoredJournalKey).mac !== null && typeof (v as StoredJournalKey).fp === "string";
 
 async function meta<T>(db: HubDB, key: string): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -63,7 +68,7 @@ export async function loadJournalKeyInfo(db: HubDB): Promise<StoredJournalKey | 
 /** The confirmed key, or undefined. */
 export async function loadJournalKey(db: HubDB): Promise<JournalKey | undefined> {
   const v = await loadJournalKeyInfo(db);
-  return v ? { key: v.key, fp: v.fp } : undefined;
+  return v ? { key: v.key, mac: v.mac, fp: v.fp } : undefined;
 }
 
 export async function loadCandidate(db: HubDB): Promise<StoredCandidate | undefined> {
@@ -73,7 +78,7 @@ export async function loadCandidate(db: HubDB): Promise<StoredCandidate | undefi
 
 async function loadRetired(db: HubDB): Promise<JournalKey[]> {
   const v = await meta<unknown[]>(db, JOURNAL_RETIRED_META);
-  return Array.isArray(v) ? v.filter(isKey).map((k) => ({ key: k.key, fp: k.fp })) : [];
+  return Array.isArray(v) ? v.filter(isKey).map((k) => ({ key: k.key, mac: k.mac, fp: k.fp })) : [];
 }
 
 /** Moves the candidate (if any) to the retired list, inside the caller's transaction. */
@@ -84,32 +89,35 @@ async function retireCandidateIn(db: HubDB): Promise<void> {
   const confirmed = await loadJournalKeyInfo(db);
   if (confirmed?.fp === c.fp) return; // the same key as the confirmed one: nothing to keep
   const retired = (await loadRetired(db)).filter((k) => k.fp !== c.fp);
-  retired.unshift({ key: c.key, fp: c.fp });
+  retired.unshift({ key: c.key, mac: c.mac, fp: c.fp });
   await db.syncMeta.put({ key: JOURNAL_RETIRED_META, value: retired.slice(0, MAX_RETIRED) });
 }
 
 /**
- * The sync engine, on a refused passphrase (401) for `tokenVersion`: the candidate made with
- * that passphrase is retired. A confirmed key is never touched. Runs inside the engine's
- * syncMeta transaction.
+ * The sync engine, on a refused passphrase (401) for `token`: the candidate made with that
+ * passphrase is retired. A confirmed key is never touched. Runs inside the engine's syncMeta
+ * transaction.
  */
-export async function retireCandidateForToken(db: HubDB, tokenVersion: number | undefined): Promise<void> {
+export async function retireCandidateForToken(db: HubDB, token: string): Promise<void> {
   const c = await loadCandidate(db);
-  if (c && c.tokenVersion === (tokenVersion ?? null)) await retireCandidateIn(db);
+  if (c && c.token === token) await retireCandidateIn(db);
 }
 
-async function storeCandidate(db: HubDB, jk: JournalKey, tokenVersion: number | null): Promise<void> {
-  await db.transaction("rw", db.syncMeta, async () => {
+/**
+ * Stores a candidate. One bound to a sync token is stored only while that token is still the
+ * device's sync token: a slower, older Save (another passphrase) finishing late is dropped.
+ */
+async function storeCandidate(db: HubDB, jk: JournalKey, token: string | null): Promise<boolean> {
+  return db.transaction("rw", db.syncMeta, async () => {
+    if (token !== null && (await meta<string>(db, "token")) !== token) return false;
     await retireCandidateIn(db); // a superseded candidate is kept for repair, never used
-    const value: StoredCandidate = { ...jk, tokenVersion, id: crypto.randomUUID() };
+    const value: StoredCandidate = { key: jk.key, mac: jk.mac, fp: jk.fp, token, id: crypto.randomUUID() };
     await db.syncMeta.put({ key: JOURNAL_CANDIDATE_META, value });
+    return true;
   });
 }
 
-async function currentTokenVersion(db: HubDB): Promise<number | null> {
-  const v = await meta<number>(db, "tokenVersion");
-  return typeof v === "number" ? v : null;
-}
+const asStored = (c: StoredCandidate): StoredJournalKey => ({ key: c.key, mac: c.mac, fp: c.fp, id: c.id });
 
 async function opensVerifier(jk: JournalKey, row: JournalRow): Promise<boolean> {
   try {
@@ -152,7 +160,7 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
       await db.transaction("rw", db.syncMeta, async () => {
         if ((await loadCandidate(db))?.id !== c.id) return;
         if (ok) {
-          await db.syncMeta.put({ key: JOURNAL_KEY_META, value: { key: c.key, fp: c.fp, id: c.id } satisfies StoredJournalKey });
+          await db.syncMeta.put({ key: JOURNAL_KEY_META, value: asStored(c) });
           await db.syncMeta.delete(JOURNAL_CANDIDATE_META);
         } else {
           await retireCandidateIn(db); // a typo, or a passphrase other than the journal's
@@ -160,19 +168,19 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
       });
     } else if (!confirmed) {
       const token = await meta<string>(db, "token");
-      const version = await currentTokenVersion(db);
-      const accepted = await meta<number>(db, ACCEPTED_TOKEN_META);
-      if (!token || c.tokenVersion === null || version !== c.tokenVersion) {
+      const accepted = await meta<string>(db, ACCEPTED_TOKEN_META);
+      if (!token || c.token === null || token !== c.token) {
         // Its passphrase's token is gone (refused) or replaced: it can never be confirmed.
         await db.transaction("rw", db.syncMeta, async () => {
           if ((await loadCandidate(db))?.id === c.id) await retireCandidateIn(db);
         });
-      } else if (accepted === c.tokenVersion) {
+      } else if (accepted === c.token) {
         // The server accepted this passphrase and no device has a verifier: this one writes it.
         const row = await sealedVerifier(c, todayStamp());
         await db.transaction("rw", db.journal, db.syncMeta, async () => {
           if ((await loadCandidate(db))?.id !== c.id || (await db.journal.get(VERIFIER_ID))) return;
-          await db.syncMeta.put({ key: JOURNAL_KEY_META, value: { key: c.key, fp: c.fp, id: c.id } satisfies StoredJournalKey });
+          if ((await meta<string>(db, ACCEPTED_TOKEN_META)) !== c.token) return;
+          await db.syncMeta.put({ key: JOURNAL_KEY_META, value: asStored(c) });
           await db.syncMeta.delete(JOURNAL_CANDIDATE_META);
           await db.journal.put(row);
         });
@@ -193,8 +201,8 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
  * server accepting the token (a later sync), never by being typed.
  */
 export async function saveJournalKeyFromSync(db: HubDB, passphrase: string): Promise<JournalKeyState> {
-  const jk = await deriveJournalKeyAndFp(passphrase);
-  await storeCandidate(db, jk, await currentTokenVersion(db));
+  const [jk, token] = await Promise.all([deriveJournalKeyAndFp(passphrase), deriveToken(passphrase)]);
+  await storeCandidate(db, jk, token);
   return confirmJournalKey(db);
 }
 
@@ -215,16 +223,14 @@ export async function unlockJournal(db: HubDB, passphrase: string): Promise<Unlo
   if (verifier) {
     const jk = await deriveJournalKeyAndFp(passphrase);
     if (!(await opensVerifier(jk, verifier))) return "wrong";
-    await storeCandidate(db, jk, await currentTokenVersion(db));
+    await storeCandidate(db, jk, null);
     return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "wrong";
   }
   const token = await meta<string>(db, "token");
   if (typeof token !== "string" || !token) return "no-sync";
-  const version = await currentTokenVersion(db);
-  if ((await deriveToken(passphrase)) !== token) {
-    return (await meta<number>(db, ACCEPTED_TOKEN_META)) === version ? "wrong" : "sync-unconfirmed";
-  }
-  await storeCandidate(db, await deriveJournalKeyAndFp(passphrase), version);
+  const typed = await deriveToken(passphrase);
+  if (typed !== token) return (await meta<string>(db, ACCEPTED_TOKEN_META)) === token ? "wrong" : "sync-unconfirmed";
+  if (!(await storeCandidate(db, await deriveJournalKeyAndFp(passphrase), typed))) return "wrong";
   return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "checking";
 }
 

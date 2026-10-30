@@ -24,7 +24,7 @@ async function syncSetUp(page: Page) {
     const { db } = await at("/src/data/db.ts");
     await engine.saveSyncSettings(db, { serverUrl: "https://sync.example.test", token: await token.deriveToken(pass) });
     // The made-up address never answers: record the token as accepted, as a real first sync would.
-    await db.syncMeta.put({ key: "acceptedTokenVersion", value: (await db.syncMeta.get("tokenVersion")).value });
+    await db.syncMeta.put({ key: "acceptedToken", value: (await db.syncMeta.get("token")).value });
   }, PASS);
 }
 

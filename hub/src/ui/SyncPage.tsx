@@ -65,6 +65,8 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
     }
     const secret = passphrase;
     setPassphrase("");
+    // Save stays disabled until the whole save (both derivations) is done, so two Saves never
+    // overlap (security re-review, fix round 2).
     setBusy(true);
     try {
       const token = await deriveToken(secret);
@@ -74,16 +76,21 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
       setNote("Saved.");
     } catch {
       setProblem("That did not save. Try again.");
+      setBusy(false);
       return;
+    }
+    // The journal's key from the same passphrase is only a candidate, bound to this token: it
+    // can't seal anything until the verifier or the server accepting exactly this token
+    // confirms it (review C1). Sync is saved either way; a failure here only means the Journal
+    // asks to unlock.
+    const journal = saveJournalKeyFromSync(controller.db, secret).catch(() => undefined);
+    const sync = controller.syncNow();
+    try {
+      await journal;
     } finally {
       setBusy(false);
     }
-    // The journal's key from the same passphrase is only a candidate: it can't seal anything
-    // until the verifier or the server's acceptance of this token confirms it (review C1).
-    // Sync is saved either way; a failure here only means the Journal asks to unlock.
-    const journal = saveJournalKeyFromSync(controller.db, secret).catch(() => undefined);
-    await controller.syncNow();
-    await journal;
+    await sync;
     await confirmJournalKey(controller.db).catch(() => undefined);
   }
 

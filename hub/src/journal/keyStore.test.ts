@@ -124,6 +124,33 @@ describe("C1: a typo never seals anything", () => {
     expect(await loadCandidate(d)).toBeUndefined();
   });
 
+  it("two quick Saves (typo, then the right one), the typo's key finishing LAST: only the right key confirms", async () => {
+    const server = new FakeSyncServer(token);
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: SERVER, token: typoToken });
+    await saveSyncSettings(d, { serverUrl: SERVER, token });
+    expect(await saveJournalKeyFromSync(d, PASS)).toBe("checking");
+    expect(await saveJournalKeyFromSync(d, TYPO)).toBe("checking"); // late typo: dropped, not stored
+    expect((await loadCandidate(d))!.fp).toBe((await keyFor(PASS)).fp);
+    await syncOnce({ db: d, fetch: server.fetch });
+    expect(await confirmJournalKey(d)).toBe("confirmed");
+    expect((await loadJournalKey(d))!.fp).toBe((await keyFor(PASS)).fp);
+  });
+
+  it("two quick Saves, the typo's key finishing FIRST (stored while its token was current): it can never confirm", async () => {
+    const server = new FakeSyncServer(token);
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: SERVER, token: typoToken });
+    expect(await saveJournalKeyFromSync(d, TYPO)).toBe("checking"); // stored, bound to the typo's token
+    await saveSyncSettings(d, { serverUrl: SERVER, token }); // the second Save's token
+    await syncOnce({ db: d, fetch: server.fetch }); // the server accepts the RIGHT token
+    expect(await d.syncMeta.get("acceptedToken")).toMatchObject({ value: token });
+    expect(await confirmJournalKey(d)).toBe("locked"); // the typo candidate is retired, not confirmed
+    expect(await loadJournalKey(d)).toBeUndefined();
+    expect(await saveJournalKeyFromSync(d, PASS)).toBe("confirmed"); // the second Save's key arrives
+    expect((await loadJournalKey(d))!.fp).toBe((await keyFor(PASS)).fp);
+  });
+
   it("the right passphrase typed on the Sync page waits for the server, then confirms", async () => {
     const server = new FakeSyncServer(token);
     const d = device();

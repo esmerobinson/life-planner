@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  deriveJournalKey, deriveJournalKeyAndFp, fromBase64, IV_BYTES, JOURNAL_ITERATIONS, JOURNAL_SALT, openBytes, openJson, sealBytes, sealJson, toBase64,
+  deriveJournalKey, deriveJournalKeyAndFp, fromBase64, promptKey, IV_BYTES, JOURNAL_ITERATIONS, JOURNAL_SALT, openBytes, openJson, sealBytes, sealJson, toBase64,
 } from "./crypto";
 
 // Fixed vector, computed independently with Node's crypto module (not WebCrypto):
@@ -40,6 +40,15 @@ describe("journal key derivation", () => {
     expect(await openJson(jk.key, { iv: VECTOR.iv, ct: VECTOR.ct }, VECTOR.aad)).toEqual({ pretend: "words" });
     expect((await deriveJournalKeyAndFp("pretend other")).fp).not.toBe(jk.fp);
     expect(jk.key.extractable).toBe(false);
+  });
+
+  it("a prompt's opaque key is the first 12 hex of HMAC-SHA256(key bits, promptId) (vector from Node)", async () => {
+    // node: createHmac("sha256", Buffer.from("e409de51…2d12", "hex")).update("M1").digest("hex").slice(0, 12)
+    const jk = await deriveJournalKeyAndFp(VECTOR.passphrase);
+    expect(await promptKey(jk, "M1")).toBe("bae6397a2f99");
+    expect(await promptKey(jk, "M2")).not.toBe("bae6397a2f99");
+    expect(await promptKey(await deriveJournalKeyAndFp("pretend other"), "M1")).not.toBe("bae6397a2f99");
+    expect(jk.mac.extractable).toBe(false);
   });
 
   it("sealing never takes a caller's IV", () => {

@@ -159,5 +159,6 @@ it("the server accepting the token records it (what confirms a journal key)", as
   const server = new FakeSyncServer(TOKEN);
   const v = (await db.syncMeta.get("tokenVersion"))!.value;
   await syncOnce({ db, fetch: server.fetch });
-  expect((await db.syncMeta.get("acceptedTokenVersion"))!.value).toBe(v);
+  expect((await db.syncMeta.get("acceptedToken"))!.value).toBe(TOKEN);
+  expect((await db.syncMeta.get("tokenVersion"))!.value).toBe(v);
 });

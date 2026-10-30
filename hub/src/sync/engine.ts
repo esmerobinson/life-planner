@@ -83,8 +83,8 @@ export type MetaKey =
   | "firstPullDone"
   /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
   | "tokenVersion"
-  /** The token version the server last accepted in a whole run (confirms a journal key). */
-  | "acceptedTokenVersion";
+  /** The exact token the server last accepted in a whole run (confirms a journal key). */
+  | "acceptedToken";
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -253,7 +253,7 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
             await setMeta(db, "needsPassphrase", true);
             // A journal key CANDIDATE made from that same (refused) passphrase is retired: it
             // can never be confirmed (journal review C1). A confirmed journal key is never touched.
-            await retireCandidateForToken(db, tokenVersion);
+            await retireCandidateForToken(db, token);
           }
           return same;
         });
@@ -317,11 +317,11 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   }
   // The loop ran out while there was still work: say so rather than loop on.
   if (!finished) return { kind: "error", message: STOPPED_EARLY_MESSAGE };
-  // The server accepted this token for a whole run: remember which version (the journal key
-  // made with the same passphrase may now be confirmed, journal/keyStore.ts).
+  // The server accepted this token for a whole run: remember it (the journal key candidate
+  // made with exactly this token may now be confirmed, journal/keyStore.ts).
   await db.transaction("rw", db.syncMeta, async () => {
     if ((await getMeta<string>(db, "token")) === token && (await getMeta<number>(db, "tokenVersion")) === tokenVersion) {
-      await setMeta(db, "acceptedTokenVersion", tokenVersion ?? null);
+      await setMeta(db, "acceptedToken", token);
     }
   });
   return { kind: "ok", sent, received, held };

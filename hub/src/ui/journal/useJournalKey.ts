@@ -27,7 +27,7 @@ export function useJournalKey(): KeyView {
     const info = state === "confirmed" ? await loadJournalKeyInfo(db).catch(() => undefined) : undefined;
     if (!mounted.current) return;
     setView((prev) => {
-      if (info) return prev.v.state === "confirmed" && prev.id === info.id ? prev : { v: { state: "confirmed", jk: { key: info.key, fp: info.fp } }, id: info.id };
+      if (info) return prev.v.state === "confirmed" && prev.id === info.id ? prev : { v: { state: "confirmed", jk: { key: info.key, mac: info.mac, fp: info.fp } }, id: info.id };
       const s = state === "confirmed" ? "locked" : state;
       return prev.v.state === s ? prev : { v: { state: s }, id: null };
     });

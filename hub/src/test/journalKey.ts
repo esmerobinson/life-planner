@@ -18,6 +18,6 @@ export async function verifierRow(jk: JournalKey, date = "2026-10-01") {
 
 /** Sets a device up as if this key had been confirmed there (key stored + verifier row). */
 export async function confirmedDevice(db: HubDB, jk: JournalKey): Promise<void> {
-  await db.syncMeta.put({ key: JOURNAL_KEY_META, value: { key: jk.key, fp: jk.fp, id: crypto.randomUUID() } });
+  await db.syncMeta.put({ key: JOURNAL_KEY_META, value: { key: jk.key, mac: jk.mac, fp: jk.fp, id: crypto.randomUUID() } });
   if (!(await db.journal.get(VERIFIER_ID))) await db.journal.put(await verifierRow(jk));
 }

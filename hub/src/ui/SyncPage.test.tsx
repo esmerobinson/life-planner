@@ -97,6 +97,10 @@ describe("SyncPage", () => {
     await user.type(screen.getByLabelText("Sync address"), ADDRESS);
     await user.type(screen.getByLabelText("Passphrase"), PASSPHRASE);
     await user.click(screen.getByRole("button", { name: "Save" }));
+    // Save stays disabled until both derivations are done (no overlapping Saves).
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toBeEnabled(), { timeout: 5000 });
+    expect((await db.syncMeta.get("journalCandidate")) ?? (await loadJournalKey(db))).toBeTruthy(); // the key was made before Save came back
     await waitFor(async () => expect(await loadJournalKey(db)).toBeTruthy(), { timeout: 5000 });
     const { key } = (await loadJournalKey(db))!;
     expect(key.extractable).toBe(false);

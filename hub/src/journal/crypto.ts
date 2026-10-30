@@ -26,8 +26,24 @@ export const FINGERPRINT_INPUT = "esmeworld-journal-fp";
 /** A journal key with its fingerprint (stored in clear on every row it seals). */
 export interface JournalKey {
   key: CryptoKey;
+  /**
+   * The same derived bits as a non-extractable HMAC-SHA256 key (sign only): makes the
+   * fingerprint and the opaque prompt keys in answer row ids.
+   */
+  mac: CryptoKey;
   /** First 8 bytes of HMAC-SHA256(key bits, "esmeworld-journal-fp"), as 16 hex characters. */
   fp: string;
+}
+
+const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
+ * An opaque stand-in for a prompt id in a row id (so ids in clear don't say which question
+ * was asked): the first 12 hex characters of HMAC-SHA256(key bits, promptId).
+ */
+export async function promptKey(jk: JournalKey, promptId: string): Promise<string> {
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", jk.mac, new TextEncoder().encode(promptId)));
+  return hex(sig.subarray(0, 6));
 }
 
 async function pbkdf2Base(passphrase: string): Promise<CryptoKey> {
@@ -49,16 +65,16 @@ export async function deriveJournalKey(passphrase: string): Promise<CryptoKey> {
 }
 
 /**
- * The journal key and its fingerprint. The fingerprint is an HMAC keyed with the same derived
- * bits (derived again as a non-extractable HMAC key, used once and dropped), so it names the
- * key without revealing it; guessing a passphrase from it costs the full PBKDF2.
+ * The journal key, its HMAC twin and its fingerprint. The HMAC key is the same derived bits
+ * (derived again as a non-extractable HMAC key), so the fingerprint names the key without
+ * revealing it; guessing a passphrase from it costs the full PBKDF2.
  */
 export async function deriveJournalKeyAndFp(passphrase: string): Promise<JournalKey> {
   const base = await pbkdf2Base(passphrase);
   const key = await crypto.subtle.deriveKey(pbkdf2(), base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
   const mac = await crypto.subtle.deriveKey(pbkdf2(), base, { name: "HMAC", hash: "SHA-256", length: 256 }, false, ["sign"]);
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", mac, new TextEncoder().encode(FINGERPRINT_INPUT)));
-  return { key, fp: [...sig.subarray(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("") };
+  return { key, mac, fp: hex(sig.subarray(0, 8)) };
 }
 
 /** Base64 of bytes (no prefix). */
