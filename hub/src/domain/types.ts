@@ -132,10 +132,13 @@ export interface FileRow {
  * - "cards"    `cards`                     the imported exercise cards, the whole set (exercise brief)
  * - "exercise" `exercise:<date>:<deviceId>` one device's exercise card for a day, and whether it was ticked
  * - "stars"    `stars:<deviceId>`          one device's exercise card stars (newest mark per card wins)
+ * - "exercise-entry" `exercise-entry:<date>:<cardKey>:<deviceId>` one device's written response to
+ *                                          a day's card (journal polish brief; cardKey is an opaque HMAC)
  * - "morning" / "checkin" `${kind}:<date>` the earlier one-row-per-day shape: read (split), never written
  */
 export const JOURNAL_KINDS = [
   "page", "photo", "draft", "answer", "set", "settings", "verifier", "morning", "checkin", "cards", "exercise", "stars",
+  "exercise-entry",
 ] as const;
 export type JournalKind = (typeof JOURNAL_KINDS)[number];
 

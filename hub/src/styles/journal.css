@@ -10,11 +10,13 @@
   --journal-violet: #9285c5; /* Journal sidebar tile (areas.ts), Island Life 101 violet */
 }
 
+/* The whole content column (journal polish brief §3: "expand to fill the size of the
+   screen"), inside .app-content's 24px padding; no width cap. */
 .journal-page {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 640px;
+  min-width: 0;
 }
 
 .journal-page > h1 {
@@ -124,6 +126,14 @@
   background: none;
 }
 
+/* Desktop (journal polish brief §3): the calendar stretches across the full width in 7 equal
+   columns, so the cells keep a fixed height instead of growing into big squares. 56px is
+   PROVISIONAL (the brief's "~56px"), not yet seen by Esme. Phone keeps its squares. */
+.app-shell:not(.is-phone) .journal-day {
+  aspect-ratio: auto;
+  height: 56px;
+}
+
 .journal-done {
   display: flex;
   gap: 12px;
@@ -194,6 +204,12 @@
   padding: 10px 14px;
   font-size: max(16px, 1em);
   resize: vertical;
+}
+
+/* Desktop "Write now" (journal polish brief §3): the box fills the width and at least 60% of
+   the window height (PROVISIONAL, the brief's minimum; not yet seen by Esme). Phone unchanged. */
+.app-shell:not(.is-phone) .journal-page-box {
+  min-height: max(260px, 60vh);
 }
 
 .journal-words {
@@ -377,4 +393,26 @@ button.exercise-next-link {
 
 .exercise-reimport {
   margin-top: 12px;
+}
+
+/* The response box under Try this (journal polish brief §1): the check-in answer box
+   (.journal-answer) at 16px+, six rows tall and growing with the text (the height is set as
+   she types). Builder's calls, not yet seen by Esme: Submit / "Saved" under the box on the
+   right, the 8px gap, and "Your response" in Past exercises as a bold label like Learn. */
+.exercise-response-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.journal-answer.exercise-response {
+  font-size: max(16px, 1em);
+  resize: none;
+  overflow: hidden;
+}
+
+.exercise-response-actions {
+  justify-content: flex-end;
+  align-items: center;
 }

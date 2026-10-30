@@ -25,6 +25,18 @@ describe("journal.css", () => {
     expect(code).toMatch(/\.journal-photo\.blurred \{[^}]*filter: blur\(10px\)/);
   });
 
+  it("the Journal page fills the content column (no width cap); desktop calendar cells are a fixed height", () => {
+    expect(code).toMatch(/\.journal-page \{[^}]*\}/);
+    expect(code.match(/\.journal-page \{[^}]*\}/)![0]).not.toContain("max-width");
+    expect(code).not.toMatch(/\.journal-(card|page) \{[^}]*max-width/);
+    expect(code).toMatch(/\.app-shell:not\(\.is-phone\) \.journal-day \{[^}]*aspect-ratio: auto;[^}]*height: 56px/);
+    expect(code).toMatch(/\.app-shell:not\(\.is-phone\) \.journal-page-box \{[^}]*min-height: max\(260px, 60vh\)/);
+  });
+
+  it("the exercise response box is the check-in answer box at 16px or more", () => {
+    expect(code).toMatch(/\.journal-answer\.exercise-response \{[^}]*font-size: max\(16px, 1em\)/);
+  });
+
   it("exercise cards: the Day chip is the Journal violet; the star is drawn in --text on no background", () => {
     expect(code).toMatch(/\.chip\.exercise-day \{[^}]*background: var\(--journal-violet\)/);
     expect(code).toMatch(/button\.exercise-star\[aria-pressed\] \{[^}]*background: none;[^}]*color: var\(--text\)/);

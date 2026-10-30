@@ -17,8 +17,10 @@
 import { db } from "./db";
 import { addDays } from "../domain/dates";
 import { journalId, MAX_JOURNAL_CT, validJournal } from "./validate";
-import { fileAad, journalAad, openBytes, openJson, promptKey, sealBytes, sealJson, type JournalKey } from "../journal/crypto";
-import { ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry } from "../journal/entries";
+import {
+  exerciseCardKey, fileAad, journalAad, openBytes, openJson, promptKey, sealBytes, sealJson, type JournalKey,
+} from "../journal/crypto";
+import { ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseResponseEntry } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import { mergeStars, type CardSet, type ExerciseMark, type StarMark } from "../journal/exercise";
 import type { FileRow, ISODate, JournalKind, JournalRow } from "../domain/types";
@@ -410,6 +412,128 @@ export async function saveExerciseMark(jk: JournalKey, date: ISODate, deviceId: 
  */
 export async function recordExerciseShown(jk: JournalKey, date: ISODate, deviceId: string, day: number): Promise<boolean> {
   return write(jk, [await seal(jk, "exercise", date, deviceId, { v: 1, day, done: false, at: Date.now() })], { onlyIfAbsent: true });
+}
+
+// ---- exercise responses (journal polish brief) ---------------------------------------------
+
+/** The card a response belongs to (its day and theme are stored in the entry). */
+export interface ExerciseCardRef {
+  day: number;
+  theme: string;
+}
+
+/** A day's response to one card, merged across devices. */
+export interface ExerciseResponse {
+  date: ISODate;
+  day: number;
+  theme: string;
+  /** The newest non-empty response from any device (else the newest). */
+  text: string;
+  at: number;
+  /** The text shown is exactly what was last submitted (nothing typed since). */
+  saved: boolean;
+  /** Submitted on some device at least once (a draft only, if not). */
+  submitted: boolean;
+}
+
+const ENTRY_PREFIX = "exercise-entry:";
+
+async function entryRowId(jk: JournalKey, date: ISODate, card: ExerciseCardRef, deviceId: string): Promise<string> {
+  return journalId("exercise-entry", date, `${await exerciseCardKey(jk, card.day, card.theme)}:${deviceId}`);
+}
+
+/** The newest non-empty of one card's rows (each device writes its own), as the check-in merges answers. */
+function mergeResponses(date: ISODate, rows: ExerciseResponseEntry[]): ExerciseResponse | null {
+  if (rows.length === 0) return null;
+  const newest = (list: ExerciseResponseEntry[]) => list.reduce((a, b) => (b.at > a.at ? b : a));
+  const filled = rows.filter((r) => r.text.trim() !== "");
+  const best = newest(filled.length ? filled : rows);
+  return {
+    date, day: best.day, theme: best.theme, text: best.text, at: best.at,
+    saved: best.submittedAt !== null && best.submittedAt === best.at,
+    submitted: rows.some((r) => r.submittedAt !== null),
+  };
+}
+
+/** One row group per day and card (the row id without its device), opened. */
+async function openResponses(jk: JournalKey, rows: JournalRow[]) {
+  const groups = new Map<string, { date: ISODate; entries: ExerciseResponseEntry[] }>();
+  let unreadable = 0;
+  for (const row of rows) {
+    if (row.kind !== "exercise-entry") continue;
+    const o = await openRow(jk, row, "exercise-entry");
+    if (o.state !== "ok") {
+      unreadable++;
+      continue;
+    }
+    const group = row.id.slice(0, row.id.lastIndexOf(":"));
+    const g = groups.get(group) ?? { date: row.date, entries: [] };
+    g.entries.push(o.entry);
+    groups.set(group, g);
+  }
+  return { groups: [...groups.values()], unreadable };
+}
+
+/** Today's response to one card, from every device's row. */
+export async function readExerciseEntry(
+  jk: JournalKey,
+  date: ISODate,
+  card: ExerciseCardRef,
+): Promise<{ entry: ExerciseResponse | null; unreadable: number }> {
+  const prefix = `${ENTRY_PREFIX}${date}:${await exerciseCardKey(jk, card.day, card.theme)}:`;
+  const { groups, unreadable } = await openResponses(jk, (await rowsOn(date)).filter((r) => r.id.startsWith(prefix)));
+  return { entry: groups[0] ? mergeResponses(date, groups[0].entries) : null, unreadable };
+}
+
+/** This device's own response row for the card, opened (never written over if it won't open). */
+async function ownResponse(jk: JournalKey, id: string): Promise<ExerciseResponseEntry | null> {
+  const existing = await db.journal.get(id);
+  if (!existing) return null;
+  const o = await openRow(jk, existing, "exercise-entry");
+  if (o.state !== "ok") throw new Error(CANT_OPEN);
+  return o.entry;
+}
+
+/**
+ * Autosaves this device's response as typed (a draft: never marks the card Done). After a
+ * Submit it keeps the submit time, so the response stays submitted but no longer "Saved".
+ */
+export async function saveExerciseDraft(jk: JournalKey, date: ISODate, deviceId: string, card: ExerciseCardRef, text: string): Promise<void> {
+  const id = await entryRowId(jk, date, card, deviceId);
+  const prev = await ownResponse(jk, id);
+  const entry: ExerciseResponseEntry = {
+    v: 1, day: card.day, theme: card.theme, text, submittedAt: prev?.submittedAt ?? null, at: Date.now(),
+  };
+  await write(jk, [await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), entry)]);
+}
+
+/**
+ * Submit: this device's response row (written whole, again on each Submit) and the card's
+ * done mark on this device's progress row, in one transaction.
+ */
+export async function submitExerciseEntry(jk: JournalKey, date: ISODate, deviceId: string, card: ExerciseCardRef, text: string): Promise<void> {
+  if (!text.trim()) throw new Error("There is nothing to submit yet.");
+  const id = await entryRowId(jk, date, card, deviceId);
+  await ownResponse(jk, id);
+  const at = Date.now();
+  const entry: ExerciseResponseEntry = { v: 1, day: card.day, theme: card.theme, text, submittedAt: at, at };
+  const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), entry);
+  const mark = await seal(jk, "exercise", date, deviceId, { v: 1, day: card.day, done: true, at });
+  await write(jk, [response, mark]);
+}
+
+/**
+ * Past exercises: every earlier day's response (one per day and card, merged across devices),
+ * newest first. Empty drafts are left out; responses are readable any time.
+ */
+export async function listExerciseEntries(jk: JournalKey, before: ISODate): Promise<{ entries: ExerciseResponse[]; unreadable: number }> {
+  const rows = (await db.journal.where("kind").equals("exercise-entry").toArray()).filter((r) => r.date < before);
+  const { groups, unreadable } = await openResponses(jk, rows);
+  const entries = groups
+    .map((g) => mergeResponses(g.date, g.entries)!)
+    .filter((e) => e.text.trim() !== "")
+    .sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at);
+  return { entries, unreadable };
 }
 
 /** Stars or un-stars a card in this device's own stars row (only this device writes it). */
