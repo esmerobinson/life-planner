@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  addMorningPhoto, CANT_OPEN, finishMorningPage, listMorningDays, morningOpensOn, openJournalPhoto, readMorningText,
-  saveMorningDraft, type MorningDay, type MorningText,
+  addMorningPhoto, CANT_OPEN, finishMorningPage, listMorningDone, listReadBack, morningOpensOn, openJournalPhoto,
+  readMorningDay, readMorningPage, saveMorningDraft, type MorningDay, type MorningText,
 } from "../../data/repo";
 import { monthGrid, shiftMonth, streakLine } from "../../journal/calendar";
+import type { JournalKey } from "../../journal/crypto";
 import { countWords, MORNING_WORDS } from "../../journal/entries";
 import type { ISODate } from "../../domain/types";
 import { downscalePicture, PICTURE_UNREADABLE } from "../picture";
 import { ProgressBar } from "../ProgressBar";
-import { AUTOSAVE_MS } from "../useDraft";
+import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { DoneBox, JournalHead, longDate, monthLabel, Star } from "./bits";
 import { useDbChanges } from "./useJournalKey";
 
@@ -17,13 +18,17 @@ export const MORNING_RULES =
   "Three pages, longhand if you can, first thing in the morning. Don't edit, don't reread, just keep the pen moving.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
 
+type Props = { jk: JournalKey; today: ISODate; deviceId: string };
+
 /**
  * Morning pages (journal brief §1, VISUAL-LANGUAGE.md "Morning pages", mockup tab C): the star
- * calendar, "Write now" and "Add photo". A finished page stays hidden for 4 weeks, then
- * opens read-only in "Read back".
+ * calendar, "Write now" and "Add photo". A finished page stays hidden for 4 weeks, then opens
+ * read-only in "Read back". Entries that don't open here are noted, never in the way.
  */
-export function MorningPages({ cryptoKey, today }: { cryptoKey: CryptoKey; today: ISODate }) {
-  const [days, setDays] = useState<MorningDay[] | null>(null);
+export function MorningPages({ jk, today, deviceId }: Props) {
+  const [done, setDone] = useState<Set<ISODate> | null>(null);
+  const [day, setDay] = useState<MorningDay | null>(null);
+  const [readBack, setReadBack] = useState<{ id: string; date: ISODate }[]>([]);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [writing, setWriting] = useState(false);
   const [problem, setProblem] = useState("");
@@ -34,19 +39,19 @@ export function MorningPages({ cryptoKey, today }: { cryptoKey: CryptoKey; today
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const all = await listMorningDays(cryptoKey);
-      if (id === latest.current) setDays(all);
+      const [d, t, rb] = await Promise.all([listMorningDone(jk), readMorningDay(jk, today, deviceId), listReadBack()]);
+      if (id !== latest.current) return;
+      setDone(d);
+      setDay(t);
+      setReadBack(rb);
     } catch {
-      if (id === latest.current) setDays([]);
+      if (id === latest.current) setDone((prev) => prev ?? new Set());
     }
-  }, [cryptoKey]);
+  }, [jk, today, deviceId]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
 
-  const done = useMemo(() => new Set((days ?? []).filter((d) => d.done).map((d) => d.date)), [days]);
-  const todayDay = days?.find((d) => d.date === today);
-  const unreadableToday = todayDay?.state === "unreadable";
-  const streak = streakLine(done, today);
+  const streak = useMemo(() => (done ? streakLine(done, today) : null), [done, today]);
 
   async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -56,7 +61,7 @@ export function MorningPages({ cryptoKey, today }: { cryptoKey: CryptoKey; today
     setAdding(true);
     try {
       const picture = await downscalePicture(file);
-      await addMorningPhoto(cryptoKey, today, picture);
+      await addMorningPhoto(jk, today, picture);
       await load();
     } catch (err) {
       setProblem(err instanceof Error && err.message === PICTURE_UNREADABLE ? PICTURE_UNREADABLE : SAVE_PROBLEM);
@@ -65,16 +70,16 @@ export function MorningPages({ cryptoKey, today }: { cryptoKey: CryptoKey; today
     }
   }
 
-  if (days === null) return <section className="journal-card" aria-labelledby="morning-pages" id="morning-pages-section" />;
-
+  const doneToday = !!day?.done;
   return (
     <section className="journal-card" aria-labelledby="morning-pages" id="morning-pages-section">
       <JournalHead id="morning-pages" title="Morning pages" sub={longDate(today)} />
-      {writing ? (
+      {done === null ? null : writing ? (
         <WritingView
-          cryptoKey={cryptoKey}
-          today={today}
-          initialDraft={todayDay?.draft ?? ""}
+          jk={jk}
+          date={today}
+          deviceId={deviceId}
+          initialDraft={day?.draft ?? ""}
           onClose={() => {
             setWriting(false);
             void load();
@@ -93,46 +98,41 @@ export function MorningPages({ cryptoKey, today }: { cryptoKey: CryptoKey; today
             </button>
           </div>
           <StarCalendar month={month} done={done} today={today} />
-          {streak && !todayDay?.done && (
+          {streak && !doneToday && (
             <p className="journal-muted journal-streak">
               <Star /> {streak}
             </p>
           )}
-          {unreadableToday ? (
-            <p role="alert">{CANT_OPEN}</p>
-          ) : (
-            <>
-              {todayDay?.done && <DoneBox title="Done for today" line={streak} star />}
-              {todayDay && todayDay.photos.length > 0 && (
-                <ul className="journal-photos" aria-label="Today's photos">
-                  {todayDay.photos.map((id) => (
-                    <li key={id}>
-                      <ProofPhoto cryptoKey={cryptoKey} id={id} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="btn-group">
-                <button type="button" onClick={() => setWriting(true)}>
-                  Write now
-                </button>
-                <button type="button" className="btn-secondary" disabled={adding} onClick={() => fileInput.current?.click()}>
-                  Add photo
-                </button>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  hidden
-                  aria-label="Photo of today's pages"
-                  onChange={(e) => void onPhoto(e)}
-                />
-              </div>
-            </>
+          {doneToday && <DoneBox title="Done for today" line={streak} star />}
+          {day && day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
+          {day && day.photos.length > 0 && (
+            <ul className="journal-photos" aria-label="Today's photos">
+              {day.photos.map((id) => (
+                <li key={id}>
+                  <ProofPhoto jk={jk} id={id} />
+                </li>
+              ))}
+            </ul>
           )}
+          <div className="btn-group">
+            <button type="button" onClick={() => setWriting(true)}>
+              Write now
+            </button>
+            <button type="button" className="btn-secondary" disabled={adding} onClick={() => fileInput.current?.click()}>
+              Add photo
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              aria-label="Photo of today's pages"
+              onChange={(e) => void onPhoto(e)}
+            />
+          </div>
           {problem && <p role="alert">{problem}</p>}
-          <ReadBack cryptoKey={cryptoKey} days={days} today={today} />
+          <ReadBack jk={jk} pages={readBack} today={today} />
         </>
       )}
     </section>
@@ -165,15 +165,15 @@ function StarCalendar({ month, done, today }: { month: string; done: ReadonlySet
   );
 }
 
-/** A proof photo: blurred until "Show" (photos may be looked at; typed pages may not). */
-function ProofPhoto({ cryptoKey, id }: { cryptoKey: CryptoKey; id: string }) {
+/** A proof photo: blurred until "Show" (photos may be looked at; typed pages wait 4 weeks). */
+function ProofPhoto({ jk, id }: { jk: JournalKey; id: string }) {
   const [state, setState] = useState<"loading" | "missing" | "unreadable" | "ok">("loading");
   const [url, setUrl] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
   useEffect(() => {
     let alive = true;
     let made: string | null = null;
-    void openJournalPhoto(cryptoKey, id).then((r) => {
+    void openJournalPhoto(jk, id).then((r) => {
       if (!alive) return;
       if (r.state === "ok") {
         made = URL.createObjectURL(r.blob);
@@ -185,10 +185,10 @@ function ProofPhoto({ cryptoKey, id }: { cryptoKey: CryptoKey; id: string }) {
       alive = false;
       if (made) URL.revokeObjectURL(made);
     };
-  }, [cryptoKey, id]);
+  }, [jk, id]);
   if (state === "loading") return null;
   if (state === "missing") return <div className="journal-photo-missing" aria-label="Photo not on this device yet" role="img" />;
-  if (state === "unreadable") return <p>{CANT_OPEN}</p>;
+  if (state === "unreadable") return <p className="journal-muted">{CANT_OPEN}</p>;
   return (
     <div className="journal-photo-wrap">
       <img className={shown ? "journal-photo" : "journal-photo blurred"} src={url ?? undefined} alt="Photo of a morning page" />
@@ -201,12 +201,14 @@ function ProofPhoto({ cryptoKey, id }: { cryptoKey: CryptoKey; id: string }) {
 
 /**
  * Write now: one big plain box, "N of 750 words" with the progress bar, "I'm done". The draft
- * saves itself (sealed) after a pause in typing and when the view closes; "I'm done" adds the
- * page to the day, hidden for 4 weeks.
+ * (this device's own row) saves itself, sealed, after a pause in typing, on blur, when the
+ * view closes and when the app goes to the background. The day is fixed when the view opens,
+ * so writing past midnight stays on the day it was started.
  */
 function WritingView({
-  cryptoKey, today, initialDraft, onClose,
-}: { cryptoKey: CryptoKey; today: ISODate; initialDraft: string; onClose: () => void }) {
+  jk, date: startDate, deviceId, initialDraft, onClose,
+}: { jk: JournalKey; date: ISODate; deviceId: string; initialDraft: string; onClose: () => void }) {
+  const [date] = useState(startDate); // pinned when the view opens (midnight stays on the same day)
   const [text, setText] = useState(initialDraft);
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
@@ -229,14 +231,15 @@ function WritingView({
     const draft = latest.current;
     if (finished.current || draft === saved.current) return;
     saved.current = draft;
-    void enqueue(() => saveMorningDraft(cryptoKey, today, draft)).catch(() => {
-      if (saved.current === draft) saved.current = "\u0000unsaved";
+    void enqueue(() => saveMorningDraft(jk, date, deviceId, draft)).catch(() => {
+      if (saved.current === draft) saved.current = "\u0000unsaved"; // the next save tries again
       setProblem(SAVE_PROBLEM);
     });
-  }, [cryptoKey, today, enqueue]);
+  }, [jk, date, deviceId, enqueue]);
 
-  // Leaving mid-way (Back, another page, closing the app's view) keeps the draft.
+  // Leaving mid-way (Back, another page) or the app going to the background keeps the draft.
   useEffect(() => () => saveDraft(), [saveDraft]);
+  useHiddenFlush(saveDraft);
 
   function onChange(value: string) {
     latest.current = value;
@@ -253,7 +256,7 @@ function WritingView({
     setBusy(true);
     const page = latest.current;
     try {
-      await enqueue(() => finishMorningPage(cryptoKey, today, page));
+      await enqueue(() => finishMorningPage(jk, date, deviceId, page));
       finished.current = true;
       latest.current = "";
       saved.current = "";
@@ -302,27 +305,29 @@ function WritingView({
 }
 
 /**
- * Read back: every day with finished typed pages, newest first. Younger than 4 weeks: "Opens
- * on <date>" and nothing else (the entry is not decrypted). Older: opens read-only.
+ * Read back: every finished page, newest day first, each with its own 4-week lock. Locked:
+ * "Opens on <date>" and nothing else (the page is not decrypted). Older: opens read-only.
  */
-function ReadBack({ cryptoKey, days, today }: { cryptoKey: CryptoKey; days: MorningDay[]; today: ISODate }) {
-  const written = days.filter((d) => d.state === "ok" && d.pages > 0).sort((a, b) => b.date.localeCompare(a.date));
-  if (written.length === 0) return null;
+function ReadBack({ jk, pages, today }: { jk: JournalKey; pages: { id: string; date: ISODate }[]; today: ISODate }) {
+  if (pages.length === 0) return null;
+  const count = new Map<ISODate, number>();
   return (
     <details className="journal-fold">
       <summary>Read back</summary>
       <ul className="journal-past">
-        {written.map((d) => {
-          const opensOn = morningOpensOn(d.date);
+        {pages.map((p) => {
+          const n = (count.get(p.date) ?? 0) + 1;
+          count.set(p.date, n);
+          const label = n > 1 ? `${longDate(p.date)} · page ${n}` : longDate(p.date);
+          const opensOn = morningOpensOn(p.date);
           return (
-            <li key={d.date}>
+            <li key={p.id}>
               {today < opensOn ? (
                 <p className="journal-readback-locked">
-                  <b>{longDate(d.date)}</b>{" "}
-                  <span className="journal-muted">{`Opens on ${longDate(opensOn)}`}</span>
+                  <b>{label}</b> <span className="journal-muted">{`Opens on ${longDate(opensOn)}`}</span>
                 </p>
               ) : (
-                <OpenPage cryptoKey={cryptoKey} date={d.date} today={today} />
+                <OpenPage jk={jk} id={p.id} label={label} today={today} />
               )}
             </li>
           );
@@ -332,18 +337,18 @@ function ReadBack({ cryptoKey, days, today }: { cryptoKey: CryptoKey; days: Morn
   );
 }
 
-/** One readable day: decrypted only when she opens it. */
-function OpenPage({ cryptoKey, date, today }: { cryptoKey: CryptoKey; date: ISODate; today: ISODate }) {
+/** One readable page: decrypted only when she opens it. */
+function OpenPage({ jk, id, label, today }: { jk: JournalKey; id: string; label: string; today: ISODate }) {
   const [text, setText] = useState<MorningText | null>(null);
   return (
     <details
       onToggle={(e) => {
         if ((e.currentTarget as HTMLDetailsElement).open && !text) {
-          void readMorningText(cryptoKey, date, today).then(setText, () => setText({ state: "unreadable" }));
+          void readMorningPage(jk, id, today).then(setText, () => setText({ state: "unreadable" }));
         }
       }}
     >
-      <summary>{longDate(date)}</summary>
+      <summary>{label}</summary>
       {text?.state === "ok" && <p className="journal-readback-text">{text.text}</p>}
       {text?.state === "unreadable" && <p>{CANT_OPEN}</p>}
     </details>

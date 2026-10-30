@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { db } from "../../data/db";
-import { CANT_OPEN, listCheckins, readCheckin, saveCheckin, type CheckinDay } from "../../data/repo";
-import type { CheckinEntry } from "../../journal/entries";
-import { PROMPTS, PROMPT_BY_ID, workbookPage } from "../../journal/prompts";
+import {
+  CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, readCheckinDay, readPromptSettings, saveAnswer,
+  savePromptSettings, type CheckinDay,
+} from "../../data/repo";
+import type { JournalKey } from "../../journal/crypto";
+import { PROMPTS, PROMPT_BY_ID, STARTER_IDS, workbookPage } from "../../journal/prompts";
 import { pickPrompts } from "../../journal/rotation";
-import { loadActivePrompts, saveActivePrompts } from "../../journal/settings";
 import type { ISODate } from "../../domain/types";
-import { AUTOSAVE_MS, useDraft } from "../useDraft";
+import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
 import { DoneBox, JournalHead, longDate, PromptText } from "./bits";
 import { useDbChanges } from "./useJournalKey";
 
@@ -14,108 +15,73 @@ import { useDbChanges } from "./useJournalKey";
 export const CHECKED_IN_LINE = "Kind to yourself today? That counts.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
 
-type Today =
-  | { kind: "loading" }
-  | { kind: "unreadable" }
-  | { kind: "ready"; entry: Omit<CheckinEntry, "v">; saved: boolean };
-
 /**
- * Daily check-in (journal brief §2, VISUAL-LANGUAGE.md "Daily check-in", mockup tab A): three
- * of her questions, one at a time, Skip / Next, then "Checked in for today" with the answers
- * (editable the same day). Past check-ins can be reread.
+ * Daily check-in (journal brief §2, VISUAL-LANGUAGE.md "Daily check-in", mockup tab A):
+ * the day's questions one at a time, Skip / Next, then "Checked in for today" with the
+ * answers (editable the same day). Past check-ins can be reread.
+ *
+ * - The first device to open the check-in on a day writes the day's questions (a synced
+ *   `set` row); every other device uses them.
+ * - Each answer is its own row, autosaved while typing, on blur, when leaving and when the app
+ *   goes to the background. Today is re-read whenever sync brings rows, so another device's
+ *   answers show here and are never written over.
  */
-export function DailyCheckIn({ cryptoKey, today }: { cryptoKey: CryptoKey; today: ISODate }) {
-  const [state, setState] = useState<Today>({ kind: "loading" });
+export function DailyCheckIn({ jk, today }: { jk: JournalKey; today: ISODate }) {
+  const [day, setDay] = useState<CheckinDay | null>(null);
   const [past, setPast] = useState<CheckinDay[]>([]);
   const [active, setActive] = useState<string[] | null>(null);
   const [problem, setProblem] = useState("");
-  // Every write in order (answers typed quickly must not overtake one another).
-  const queue = useRef<Promise<unknown>>(Promise.resolve());
-  const current = useRef<Omit<CheckinEntry, "v"> | null>(null);
+  const latest = useRef(0);
+  const ensuring = useRef<Promise<unknown> | null>(null);
 
-  const loadPast = useCallback(async () => {
+  const load = useCallback(async () => {
+    const id = ++latest.current;
     try {
-      setPast((await listCheckins(cryptoKey)).filter((c) => c.date !== today));
-    } catch {
-      setPast([]);
-    }
-  }, [cryptoKey, today]);
-
-  const loadToday = useCallback(
-    async (activeIds?: string[]) => {
-      const ids = activeIds ?? (await loadActivePrompts(db));
+      const [chosen, all] = await Promise.all([readPromptSettings(jk), listCheckinDays(jk)]);
+      const ids = chosen ?? [...STARTER_IDS];
+      let todayDay = all.find((d) => d.date === today) ?? (await readCheckinDay(jk, today));
+      if (!todayDay.hasSet && todayDay.prompts.length === 0) {
+        // This device is the first to open today's check-in: pick and store the questions
+        // (once; a reload meanwhile waits for that same write).
+        if (!ensuring.current) {
+          const history = all.filter((d) => d.date < today).map((d) => ({ date: d.date, prompts: d.prompts }));
+          const prompts = pickPrompts({ date: today, hour: new Date().getHours(), active: ids, history });
+          ensuring.current = prompts.length > 0 ? ensureCheckinSet(jk, today, prompts) : Promise.resolve(false);
+        }
+        await ensuring.current;
+        todayDay = await readCheckinDay(jk, today);
+      }
+      if (id !== latest.current) return;
       setActive(ids);
-      const opened = await readCheckin(cryptoKey, today);
-      if (opened.state === "unreadable") {
-        setState({ kind: "unreadable" });
-        return;
-      }
-      if (opened.state === "ok") {
-        const { v: _v, ...entry } = opened.entry;
-        current.current = entry;
-        setState({ kind: "ready", entry, saved: true });
-        return;
-      }
-      const history = (await listCheckins(cryptoKey)).flatMap((c) =>
-        c.opened.state === "ok" ? [{ date: c.date, prompts: c.opened.entry.prompts }] : [],
-      );
-      const prompts = pickPrompts({ date: today, hour: new Date().getHours(), active: ids, history });
-      const entry = { prompts, answers: prompts.map(() => null), step: 0, finished: false };
-      current.current = entry;
-      setState({ kind: "ready", entry, saved: false });
-    },
-    [cryptoKey, today],
-  );
-
-  useEffect(() => {
-    void loadToday().catch(() => setState({ kind: "unreadable" }));
-    void loadPast();
-  }, [loadToday, loadPast]);
-  useDbChanges(() => void loadPast());
-
-  const save = useCallback(
-    (entry: Omit<CheckinEntry, "v">) => {
-      current.current = entry;
-      setState({ kind: "ready", entry, saved: true });
-      const op = () => saveCheckin(cryptoKey, today, entry);
-      const next = queue.current.then(op, op);
-      queue.current = next.catch(() => undefined);
-      return next.then(
-        () => setProblem(""),
-        () => setProblem(SAVE_PROBLEM),
-      );
-    },
-    [cryptoKey, today],
-  );
-
-  function answer(text: string | null) {
-    const entry = current.current;
-    if (!entry) return;
-    const answers = entry.answers.slice();
-    answers[entry.step] = text && text.trim() ? text : null;
-    const step = entry.step + 1;
-    void save({ ...entry, answers, step, finished: step >= entry.prompts.length });
-  }
+      setDay(todayDay);
+      setPast(all.filter((d) => d.date !== today));
+    } catch {
+      if (id === latest.current) setProblem(SAVE_PROBLEM);
+    }
+  }, [jk, today]);
+  useEffect(() => void load(), [load]);
+  useDbChanges(() => void load());
 
   async function choose(ids: string[]) {
-    await saveActivePrompts(db, ids);
-    // A day not started yet takes the new choice at once; a started one keeps its questions.
-    if (state.kind === "ready" && !state.saved) await loadToday(ids);
-    else setActive(ids);
+    setActive(ids);
+    try {
+      await savePromptSettings(jk, ids, today);
+    } catch {
+      setProblem(SAVE_PROBLEM);
+    }
   }
 
+  const step = day ? currentStep(day) : -1;
   return (
     <section className="journal-card" aria-labelledby="daily-check-in" id="daily-check-in-section">
       <JournalHead id="daily-check-in" title="Daily check-in" sub="Today's three questions · 🔒 private" />
-      {state.kind === "unreadable" && <p role="alert">{CANT_OPEN}</p>}
-      {state.kind === "ready" && state.entry.prompts.length === 0 && (
-        <p>No questions are switched on. Choose some under Choose questions.</p>
-      )}
-      {state.kind === "ready" && state.entry.prompts.length > 0 &&
-        (state.entry.finished ? (
-          <CheckedIn entry={state.entry} onEdit={(answers) => void save({ ...current.current!, answers })} />
+      {day && day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
+      {day && day.prompts.length === 0 && <p>No questions are switched on. Choose some under Choose questions.</p>}
+      {day && day.prompts.length > 0 &&
+        (step === -1 ? (
+          <CheckedIn jk={jk} day={day} onProblem={setProblem} />
         ) : (
-          <Question key={state.entry.step} entry={state.entry} onAnswer={answer} />
+          <Question key={day.prompts[step]} jk={jk} day={day} step={step} onProblem={setProblem} />
         ))}
       {problem && <p role="alert">{problem}</p>}
       <PastCheckIns past={past} />
@@ -138,30 +104,101 @@ function QuestionText({ id }: { id: string }) {
   );
 }
 
-function Question({ entry, onAnswer }: { entry: Omit<CheckinEntry, "v">; onAnswer: (text: string | null) => void }) {
-  const [text, setText] = useState(entry.answers[entry.step] ?? "");
-  const last = entry.step === entry.prompts.length - 1;
-  const n = entry.prompts.length;
+/**
+ * One question. The answer box saves itself (its own row, not yet "moved past") after a pause
+ * in typing, on blur, when it goes away and when the app is hidden. Next and Skip save it as
+ * moved past; Skip keeps anything already typed.
+ */
+function Question({
+  jk, day, step, onProblem,
+}: { jk: JournalKey; day: CheckinDay; step: number; onProblem: (p: string) => void }) {
+  const prompt = day.prompts[step]!;
+  const stored = day.answers.get(prompt)?.answer ?? "";
+  const [text, setText] = useState(stored);
+  const latest = useRef(stored);
+  const saved = useRef(stored);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const moved = useRef(false);
+  const [busy, setBusy] = useState(false);
+  // If another device already moved past this question, an autosave here keeps it moved past.
+  const doneThere = useRef(false);
+  doneThere.current = day.answers.get(prompt)?.done ?? false;
+
+  const enqueue = useCallback((op: () => Promise<unknown>) => {
+    const next = queue.current.then(op, op);
+    queue.current = next.catch(() => undefined);
+    return next;
+  }, []);
+
+  // Another device's answer to this question arrives: take it while nothing here is unsaved.
+  useEffect(() => {
+    if (latest.current === saved.current && stored !== saved.current) {
+      latest.current = stored;
+      saved.current = stored;
+      setText(stored);
+    }
+  }, [stored]);
+
+  const saveNow = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const value = latest.current;
+    if (moved.current || value === saved.current) return;
+    saved.current = value;
+    void enqueue(() => saveAnswer(jk, day.date, prompt, value, doneThere.current)).catch(() => {
+      if (saved.current === value) saved.current = "\u0000unsaved"; // the next save tries again
+      onProblem(SAVE_PROBLEM);
+    });
+  }, [jk, day.date, prompt, enqueue, onProblem]);
+
+  useEffect(() => () => saveNow(), [saveNow]);
+  useHiddenFlush(saveNow);
+
+  async function move() {
+    if (busy) return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    setBusy(true);
+    const value = latest.current;
+    try {
+      await enqueue(() => saveAnswer(jk, day.date, prompt, value, true));
+      moved.current = true; // the next question shows once the save is read back
+      onProblem("");
+    } catch {
+      onProblem(SAVE_PROBLEM); // stays on this question, text kept
+      setBusy(false);
+    }
+  }
+
+  const last = step === day.prompts.length - 1;
+  const n = day.prompts.length;
   return (
     <div className="journal-question">
-      <div className="journal-dots" role="img" aria-label={`Question ${entry.step + 1} of ${n}`}>
-        {entry.prompts.map((_, i) => (
-          <span key={i} className={i <= entry.step ? "journal-dot on" : "journal-dot"} />
+      <div className="journal-dots" role="img" aria-label={`Question ${step + 1} of ${n}`}>
+        {day.prompts.map((_, i) => (
+          <span key={i} className={i <= step ? "journal-dot on" : "journal-dot"} />
         ))}
       </div>
-      <QuestionText id={entry.prompts[entry.step]!} />
+      <QuestionText id={prompt} />
       <textarea
         className="journal-answer"
         aria-label="Your answer"
         placeholder="Anything you like…"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          latest.current = e.target.value;
+          setText(e.target.value);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(saveNow, AUTOSAVE_MS);
+        }}
+        onBlur={saveNow}
       />
       <div className="btn-group journal-question-actions">
-        <button type="button" className="btn-secondary" onClick={() => onAnswer(null)}>
+        <button type="button" className="btn-secondary" disabled={busy} onClick={() => void move()}>
           Skip
         </button>
-        <button type="button" onClick={() => onAnswer(text)}>
+        <button type="button" disabled={busy} onClick={() => void move()}>
           {last ? "Finish" : "Next →"}
         </button>
       </div>
@@ -170,23 +207,23 @@ function Question({ entry, onAnswer }: { entry: Omit<CheckinEntry, "v">; onAnswe
 }
 
 /** "Checked in for today", then today's questions and answers, still editable. */
-function CheckedIn({ entry, onEdit }: { entry: Omit<CheckinEntry, "v">; onEdit: (answers: (string | null)[]) => void }) {
-  const answers = useRef(entry.answers);
-  answers.current = entry.answers;
+function CheckedIn({ jk, day, onProblem }: { jk: JournalKey; day: CheckinDay; onProblem: (p: string) => void }) {
   return (
     <>
       <DoneBox title="Checked in for today" line={CHECKED_IN_LINE} />
       <ol className="journal-answers">
-        {entry.prompts.map((id, i) => (
+        {day.prompts.map((id) => (
           <li key={id}>
             <QuestionText id={id} />
             <EditableAnswer
-              stored={entry.answers[i] ?? ""}
+              stored={day.answers.get(id)?.answer ?? ""}
               onSave={async (text) => {
-                const next = answers.current.slice();
-                next[i] = text.trim() ? text : null;
-                answers.current = next;
-                onEdit(next);
+                try {
+                  await saveAnswer(jk, day.date, id, text, true);
+                } catch (err) {
+                  onProblem(SAVE_PROBLEM);
+                  throw err;
+                }
               }}
             />
           </li>
@@ -221,21 +258,18 @@ function PastCheckIns({ past }: { past: CheckinDay[] }) {
           <li key={c.date}>
             <details>
               <summary>{longDate(c.date)}</summary>
-              {c.opened.state === "ok" ? (
-                <ol className="journal-answers">
-                  {c.opened.entry.prompts.map((id, i) => {
-                    const a = c.opened.state === "ok" ? c.opened.entry.answers[i] : null;
-                    return (
-                      <li key={id}>
-                        <QuestionText id={id} />
-                        <p className="journal-past-answer">{a ?? <span className="journal-muted">Skipped</span>}</p>
-                      </li>
-                    );
-                  })}
-                </ol>
-              ) : (
-                <p>{CANT_OPEN}</p>
-              )}
+              <ol className="journal-answers">
+                {c.prompts.map((id) => {
+                  const a = c.answers.get(id)?.answer ?? null;
+                  return (
+                    <li key={id}>
+                      <QuestionText id={id} />
+                      <p className="journal-past-answer">{a ?? <span className="journal-muted">Skipped</span>}</p>
+                    </li>
+                  );
+                })}
+              </ol>
+              {c.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
             </details>
           </li>
         ))}
@@ -244,7 +278,7 @@ function PastCheckIns({ past }: { past: CheckinDay[] }) {
   );
 }
 
-/** Choose questions: the whole bank with a tick each (this device; defaults to her starters). */
+/** Choose questions: the whole bank with a tick each (synced; defaults to her starters). */
 function ChooseQuestions({ active, onChange }: { active: string[]; onChange: (ids: string[]) => void }) {
   const on = new Set(active);
   return (

@@ -23,6 +23,8 @@ async function syncSetUp(page: Page) {
     const token = await at("/src/sync/token.ts");
     const { db } = await at("/src/data/db.ts");
     await engine.saveSyncSettings(db, { serverUrl: "https://sync.example.test", token: await token.deriveToken(pass) });
+    // The made-up address never answers: record the token as accepted, as a real first sync would.
+    await db.syncMeta.put({ key: "acceptedTokenVersion", value: (await db.syncMeta.get("tokenVersion")).value });
   }, PASS);
 }
 
@@ -35,7 +37,7 @@ async function pastPages(page: Page, offsets: number[]) {
     const keys = await at("/src/journal/keyStore.ts");
     const { db } = await at("/src/data/db.ts");
     const key = (await keys.loadJournalKey(db))!;
-    for (const d of ds) await repo.finishMorningPage(key, d, "Pretend earlier page");
+    for (const d of ds) await repo.finishMorningPage(key, d, "e2e-other-device", "Pretend earlier page");
   }, dates);
 }
 
@@ -79,7 +81,7 @@ async function walkThrough(page: Page, prefix: string) {
   await shoot(page, `${prefix}-unlock`);
   await page.getByLabel("Sync passphrase").fill("fake-wrong-passphrase");
   await page.getByRole("button", { name: "Unlock" }).click();
-  await expect(page.getByRole("alert")).toContainText("isn't the sync passphrase");
+  await expect(page.getByRole("alert")).toContainText("isn't the journal's passphrase");
   await page.getByLabel("Sync passphrase").fill(PASS);
   await page.getByRole("button", { name: "Unlock" }).click();
   await expect(page.getByRole("heading", { name: "Morning pages" })).toBeVisible();
@@ -172,7 +174,7 @@ for (const width of [360, 390, 430]) {
       await pastPages(page, [-1, -2]);
       await page.goto("/journal");
       await expect(page.getByRole("heading", { name: "Morning pages", exact: true })).toBeVisible();
-      await page.getByText("Choose questions").click();
+      await page.getByText("Choose questions", { exact: true }).click();
       await page.getByText("Read back").click();
       const m = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, w: window.innerWidth }));
       expect(m.s).toBeLessThanOrEqual(m.w);
