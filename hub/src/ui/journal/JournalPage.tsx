@@ -18,7 +18,8 @@ export const CHECKIN_HASH = "#daily-check-in";
 export const CHECKING_LINE = "Checking your passphrase with sync…";
 
 /**
- * The Journal (journal brief): morning pages, then the daily check-in. Everything here is
+ * The Journal (journal brief): morning pages, the daily check-in, then the mental health
+ * exercise card (exercise brief). Everything here is
  * end-to-end encrypted. Only a CONFIRMED key shows or writes entries; without one the page
  * shows "Unlock journal", or "Checking your passphrase with sync…" while a typed passphrase
  * waits for sync to accept it. Synced entries still arrive and wait, sealed.

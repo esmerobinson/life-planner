@@ -30,6 +30,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const [asking, setAsking] = useState<CardSet | null>(null);
   const [showNext, setShowNext] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [ticking, setTicking] = useState<boolean | null>(null);
   const latest = useRef(0);
   const recorded = useRef<string | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -123,11 +124,12 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
                 <input
                   type="checkbox"
                   className="tick"
-                  checked={done}
+                  checked={ticking ?? done}
                   disabled={busy}
                   onChange={(e) => {
                     const on = e.target.checked;
-                    void attempt(() => saveExerciseMark(jk, today, deviceId, plan.today.card.day, on));
+                    setTicking(on); // shown at once; the saved state takes over once read back
+                    void attempt(() => saveExerciseMark(jk, today, deviceId, plan.today.card.day, on)).finally(() => setTicking(null));
                   }}
                 />
                 <span>Done</span>
@@ -236,9 +238,13 @@ function CardBody({ card }: { card: ExerciseCard }) {
           <PromptText text={card.try} />
         </p>
       </div>
-      {card.book && <p className="journal-muted exercise-text">{`In your book: ${card.book}`}</p>}
-      {card.skill && <p className="journal-muted exercise-text">{card.skill}</p>}
-      {card.session && <p className="journal-muted">Good one to bring to a session</p>}
+      {(card.book || card.skill || card.session) && (
+        <div className="exercise-meta">
+          {card.book && <p className="journal-muted exercise-text">{`In your book: ${card.book}`}</p>}
+          {card.skill && <p className="journal-muted exercise-text">{card.skill}</p>}
+          {card.session && <p className="journal-muted">Good one to bring to a session</p>}
+        </div>
+      )}
     </>
   );
 }
