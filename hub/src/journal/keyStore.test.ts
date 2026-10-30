@@ -3,17 +3,25 @@ import { HubDB } from "../data/db";
 import { deriveToken } from "../sync/token";
 import { FakeSyncServer } from "../sync/fakeServer";
 import { saveSyncSettings, syncOnce } from "../sync/engine";
-import { journalAad, sealJson } from "./crypto";
-import { JOURNAL_KEY_META, loadJournalKey, saveJournalKeyFromSync, unlockJournal } from "./keyStore";
+import { journalAad, openJson, sealJson } from "./crypto";
+import {
+  confirmJournalKey, JOURNAL_CANDIDATE_META, JOURNAL_RETIRED_META, loadCandidate, loadJournalKey, repairJournal,
+  saveJournalKeyFromSync, unlockJournal, VERIFIER_ID,
+} from "./keyStore";
+import { keyFor, verifierRow } from "../test/journalKey";
 
-// The journal key on a device (journal brief §3): made from the sync passphrase, checked
-// before it is kept, stored as a non-extractable CryptoKey, never the passphrase.
+// The journal key on a device (journal brief §3; review C1): a typed passphrase only makes a
+// CANDIDATE, which never seals anything; it is confirmed by the synced verifier, or by the
+// server accepting the same passphrase's token when no verifier exists yet.
 
-const PASS = "pretend sync passphrase";
+const PASS = "fake-journal-passphrase-good";
+const TYPO = "fake-journal-passphrase-goof";
 const SERVER = "https://sync.example.test";
 let token: string;
+let typoToken: string;
 beforeAll(async () => {
   token = await deriveToken(PASS);
+  typoToken = await deriveToken(TYPO);
 });
 
 let n = 0;
@@ -30,77 +38,162 @@ function device() {
   return d;
 }
 
-describe("unlock journal", () => {
-  it("with this device's sync token: the right passphrase stores a key; a wrong one stores nothing", async () => {
+/** A device whose journal is confirmed with PASS through a real first sync. */
+async function confirmedThroughSync(server: FakeSyncServer) {
+  const d = device();
+  await saveSyncSettings(d, { serverUrl: SERVER, token });
+  expect(await saveJournalKeyFromSync(d, PASS)).toBe("checking");
+  expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("ok");
+  expect(await confirmJournalKey(d)).toBe("confirmed");
+  return d;
+}
+
+describe("confirming a key", () => {
+  it("first device: Save makes a candidate; the server accepting the token confirms it and writes the verifier", async () => {
+    const server = new FakeSyncServer(token);
     const d = device();
     await saveSyncSettings(d, { serverUrl: SERVER, token });
-    expect(await unlockJournal(d, "pretend sync passphrasE")).toBe("wrong");
-    expect(await unlockJournal(d, "")).toBe("wrong");
-    expect(await loadJournalKey(d)).toBeUndefined();
-    expect(await unlockJournal(d, PASS)).toBe("ok");
-    const key = await loadJournalKey(d);
-    expect(key).toBeInstanceOf(CryptoKey);
-    expect(key!.extractable).toBe(false);
-    // The passphrase is nowhere in the database.
-    const meta = await d.syncMeta.toArray();
-    expect(JSON.stringify(meta)).not.toContain(PASS);
+    expect(await saveJournalKeyFromSync(d, PASS)).toBe("checking");
+    expect(await loadJournalKey(d)).toBeUndefined(); // nothing may seal yet
+    expect(await d.journal.count()).toBe(0);
+    await syncOnce({ db: d, fetch: server.fetch });
+    expect(await confirmJournalKey(d)).toBe("confirmed");
+    const jk = (await loadJournalKey(d))!;
+    expect(jk.fp).toBe((await keyFor(PASS)).fp);
+    expect(jk.key.extractable).toBe(false);
+    const verifier = (await d.journal.get(VERIFIER_ID))!;
+    expect(verifier).toMatchObject({ kind: "verifier", fp: jk.fp });
+    expect(await openJson(jk.key, verifier, journalAad(VERIFIER_ID))).toMatchObject({ v: 1 });
+    expect(await loadCandidate(d)).toBeUndefined();
+    expect(JSON.stringify(await d.syncMeta.toArray())).not.toContain(PASS);
   });
 
-  it("the stored key survives closing and reopening the database, and still works", async () => {
-    const d = device();
-    await saveSyncSettings(d, { serverUrl: SERVER, token });
-    await unlockJournal(d, PASS);
-    const sealed = await sealJson((await loadJournalKey(d))!, { a: 1 }, "x");
-    d.close();
-    const again = new HubDB(d.name);
-    open.push(again);
-    const key = await loadJournalKey(again);
-    expect(key).toBeInstanceOf(CryptoKey);
-    const { openJson } = await import("./crypto");
-    expect(await openJson(key!, sealed, "x")).toEqual({ a: 1 });
-  });
-
-  it("without a token: nothing to check against (set up sync first), or an entry here must open", async () => {
-    const d = device();
-    expect(await unlockJournal(d, PASS)).toBe("no-sync");
-    expect(await loadJournalKey(d)).toBeUndefined();
-    // An entry from this passphrase arrives (e.g. a restored backup).
-    const { deriveJournalKey } = await import("./crypto");
-    const id = "morning:2026-10-28";
-    const sealed = await sealJson(await deriveJournalKey(PASS), { v: 1, text: "Pretend", pages: 1, photos: [] }, journalAad(id));
-    await d.journal.add({ id, kind: "morning", date: "2026-10-28", ...sealed });
-    expect(await unlockJournal(d, "pretend typo")).toBe("wrong");
-    expect(await loadJournalKey(d)).toBeUndefined();
-    expect(await unlockJournal(d, PASS)).toBe("ok");
-    expect(await loadJournalKey(d)).toBeInstanceOf(CryptoKey);
+  it("a second device: the synced verifier confirms the right passphrase at once", async () => {
+    const server = new FakeSyncServer(token);
+    await syncOnce({ db: await confirmedThroughSync(server), fetch: server.fetch });
+    const phone = device();
+    await saveSyncSettings(phone, { serverUrl: SERVER, token });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    expect(await phone.journal.get(VERIFIER_ID)).toBeTruthy();
+    expect(await unlockJournal(phone, TYPO)).toBe("wrong");
+    expect(await loadJournalKey(phone)).toBeUndefined();
+    expect(await unlockJournal(phone, PASS)).toBe("ok");
+    expect((await loadJournalKey(phone))!.fp).toBe((await keyFor(PASS)).fp);
   });
 });
 
-describe("the Sync page's Save and a refused passphrase", () => {
-  it("Save stores the key tied to the new token; a 401 for that token forgets both", async () => {
-    const d = device();
+describe("C1: a typo never seals anything", () => {
+  it("offline typo on Sync Save with a confirmed key: the confirmed key stays; the typo is retired", async () => {
     const server = new FakeSyncServer(token);
-    const typo = await deriveToken("pretend typo");
-    await saveSyncSettings(d, { serverUrl: SERVER, token: typo });
-    await saveJournalKeyFromSync(d, "pretend typo");
-    expect(await loadJournalKey(d)).toBeInstanceOf(CryptoKey);
+    const d = await confirmedThroughSync(server);
+    const good = (await loadJournalKey(d))!.fp;
+    await saveSyncSettings(d, { serverUrl: SERVER, token: typoToken });
+    expect(await saveJournalKeyFromSync(d, TYPO)).toBe("confirmed"); // it doesn't open the verifier
+    expect((await loadJournalKey(d))!.fp).toBe(good);
+    expect(await loadCandidate(d)).toBeUndefined();
+    // Later the server refuses the typo: the confirmed key is never touched.
     expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("needs-passphrase");
+    expect((await loadJournalKey(d))!.fp).toBe(good);
+  });
+
+  it("offline typo on first set-up: only a candidate, the Journal can't write, and the refusal retires it", async () => {
+    const server = new FakeSyncServer(token);
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: SERVER, token: typoToken });
+    expect(await saveJournalKeyFromSync(d, TYPO)).toBe("checking");
+    expect(await loadJournalKey(d)).toBeUndefined();
+    const { saveMorningDraft, NOT_CONFIRMED } = await import("../data/journalRepo");
+    // Even a caller holding the candidate's key cannot write with it.
+    const cand = (await loadCandidate(d))!;
+    const { db } = await import("../data/db");
+    await expect(saveMorningDraft(cand, "2026-10-28", "device-aaaa", "Pretend")).rejects.toThrow(NOT_CONFIRMED);
+    expect(await db.journal.count()).toBe(0);
+    expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("needs-passphrase");
+    expect(await confirmJournalKey(d)).toBe("locked");
+    expect(await loadCandidate(d)).toBeUndefined();
+    expect((await d.syncMeta.get(JOURNAL_RETIRED_META))!.value).toHaveLength(1);
+  });
+
+  it("a refusal landing between token save and key store (the Save race): the late candidate can never confirm", async () => {
+    const server = new FakeSyncServer(token);
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: SERVER, token: typoToken });
+    expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("needs-passphrase"); // before the key exists
+    expect(await saveJournalKeyFromSync(d, TYPO)).toBe("locked");
+    expect(await loadJournalKey(d)).toBeUndefined();
+    expect(await loadCandidate(d)).toBeUndefined();
+  });
+
+  it("the right passphrase typed on the Sync page waits for the server, then confirms", async () => {
+    const server = new FakeSyncServer(token);
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: SERVER, token });
+    expect(await saveJournalKeyFromSync(d, PASS)).toBe("checking");
+    server.inject({ networkError: true });
+    await syncOnce({ db: d, fetch: server.fetch }); // offline: still checking
+    expect(await confirmJournalKey(d)).toBe("checking");
+    await syncOnce({ db: d, fetch: server.fetch });
+    expect(await confirmJournalKey(d)).toBe("confirmed");
+  });
+});
+
+describe("unlock journal", () => {
+  it("no token and no verifier: set up sync first; a key that only opens some other row is refused", async () => {
+    const d = device();
+    expect(await unlockJournal(d, PASS)).toBe("no-sync");
+    // A page sealed with this passphrase is here (e.g. from a restore) but no verifier: still no.
+    const jk = await keyFor(PASS);
+    const id = "page:2026-10-28:p1";
+    await d.journal.add({ id, kind: "page", date: "2026-10-28", fp: jk.fp, ...(await sealJson(jk.key, { v: 1, text: "x", at: 1 }, journalAad(id))) });
+    expect(await unlockJournal(d, PASS)).toBe("no-sync");
     expect(await loadJournalKey(d)).toBeUndefined();
   });
 
-  it("a key checked against entries (not a token) is kept after a 401", async () => {
+  it("no token, a verifier here: the passphrase must open it", async () => {
     const d = device();
-    await d.syncMeta.put({ key: JOURNAL_KEY_META, value: { key: await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]), tokenVersion: null } });
-    await saveSyncSettings(d, { serverUrl: SERVER, token: await deriveToken("pretend typo") });
-    expect((await syncOnce({ db: d, fetch: new FakeSyncServer(token).fetch })).kind).toBe("needs-passphrase");
-    expect(await loadJournalKey(d)).toBeInstanceOf(CryptoKey);
+    await d.journal.put(await verifierRow(await keyFor(PASS)));
+    expect(await unlockJournal(d, TYPO)).toBe("wrong");
+    expect(await loadJournalKey(d)).toBeUndefined();
+    expect(await d.syncMeta.get(JOURNAL_CANDIDATE_META)).toBeUndefined();
+    expect(await unlockJournal(d, PASS)).toBe("ok");
   });
 
-  it("the right passphrase keeps its key through syncing", async () => {
+  it("with a token the server has accepted: a different passphrase is wrong", async () => {
+    const server = new FakeSyncServer(token);
     const d = device();
     await saveSyncSettings(d, { serverUrl: SERVER, token });
-    await saveJournalKeyFromSync(d, PASS);
-    expect((await syncOnce({ db: d, fetch: new FakeSyncServer(token).fetch })).kind).toBe("ok");
-    expect(await loadJournalKey(d)).toBeInstanceOf(CryptoKey);
+    await syncOnce({ db: d, fetch: server.fetch });
+    expect(await unlockJournal(d, TYPO)).toBe("wrong");
+    expect(await unlockJournal(d, PASS)).toBe("ok"); // accepted already: confirmed at once
+    expect(await d.journal.get(VERIFIER_ID)).toBeTruthy();
+  });
+
+  it("with a token not yet accepted (maybe the Sync page's typo): a mismatch says so instead of 'wrong'", async () => {
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: SERVER, token: typoToken });
+    expect(await unlockJournal(d, PASS)).toBe("sync-unconfirmed");
+    expect(await unlockJournal(d, TYPO)).toBe("checking"); // matches, waits for the server
+    expect(await loadJournalKey(d)).toBeUndefined();
+  });
+});
+
+describe("repair pass", () => {
+  it("rows sealed with a retired key of the same fingerprint are re-sealed with the confirmed key", async () => {
+    const d = device();
+    const good = await keyFor(PASS);
+    const old = await keyFor(TYPO);
+    await d.journal.put(await verifierRow(good));
+    await d.syncMeta.put({ key: "journalKey", value: { ...good, id: "g" } });
+    await d.syncMeta.put({ key: JOURNAL_RETIRED_META, value: [{ ...old }] });
+    const id = "page:2026-10-20:old1";
+    await d.journal.add({ id, kind: "page", date: "2026-10-20", fp: old.fp, ...(await sealJson(old.key, { v: 1, text: "Pretend old", at: 1 }, journalAad(id))) });
+    const stranger = await keyFor("fake-someone-else");
+    const id2 = "page:2026-10-21:x1";
+    await d.journal.add({ id: id2, kind: "page", date: "2026-10-21", fp: stranger.fp, ...(await sealJson(stranger.key, { v: 1, text: "x", at: 1 }, journalAad(id2))) });
+    expect(await repairJournal(d)).toBe(1);
+    const fixed = (await d.journal.get(id))!;
+    expect(fixed.fp).toBe(good.fp);
+    expect(await openJson(good.key, fixed, journalAad(id))).toMatchObject({ text: "Pretend old" });
+    expect((await d.journal.get(id2))!.fp).toBe(stranger.fp); // nothing here opens it: left as it is
   });
 });

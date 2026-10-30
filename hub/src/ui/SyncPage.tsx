@@ -3,7 +3,7 @@ import { syncController, useSyncState } from "../sync";
 import type { SyncController } from "../sync/controller";
 import { DEFAULT_SYNC_URL, saveSyncSettings, stopSyncing } from "../sync/engine";
 import { deriveToken } from "../sync/token";
-import { saveJournalKeyFromSync } from "../journal/keyStore";
+import { confirmJournalKey, saveJournalKeyFromSync } from "../journal/keyStore";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
@@ -69,9 +69,6 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
     try {
       const token = await deriveToken(secret);
       await saveSyncSettings(controller.db, { serverUrl, token });
-      // The journal's key comes from the same passphrase (journal brief §3). If the server
-      // refuses this passphrase, the sync engine forgets this key along with the token.
-      await saveJournalKeyFromSync(controller.db, secret);
       controller.clearError();
       await controller.reload();
       setNote("Saved.");
@@ -81,7 +78,13 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
     } finally {
       setBusy(false);
     }
+    // The journal's key from the same passphrase is only a candidate: it can't seal anything
+    // until the verifier or the server's acceptance of this token confirms it (review C1).
+    // Sync is saved either way; a failure here only means the Journal asks to unlock.
+    const journal = saveJournalKeyFromSync(controller.db, secret).catch(() => undefined);
     await controller.syncNow();
+    await journal;
+    await confirmJournalKey(controller.db).catch(() => undefined);
   }
 
   async function stop() {

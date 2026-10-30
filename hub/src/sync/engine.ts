@@ -19,7 +19,7 @@
 import { applyUntracked } from "../data/changeTracking";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
-import { JOURNAL_KEY_META, type StoredJournalKey } from "../journal/keyStore";
+import { retireCandidateForToken } from "../journal/keyStore";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
 /** The deployed sync server. The Sync page offers it when no address is saved (still editable). */
@@ -82,7 +82,9 @@ export type MetaKey =
   /** This device has pulled everything the server had at least once. */
   | "firstPullDone"
   /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
-  | "tokenVersion";
+  | "tokenVersion"
+  /** The token version the server last accepted in a whole run (confirms a journal key). */
+  | "acceptedTokenVersion";
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -249,10 +251,9 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
           if (same) {
             await db.syncMeta.delete("token");
             await setMeta(db, "needsPassphrase", true);
-            // A journal key made from that same (refused) passphrase goes too: entries are
-            // never sealed with a key from a mistyped passphrase (journal brief §3).
-            const journal = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as StoredJournalKey | undefined;
-            if (journal && journal.tokenVersion === tokenVersion) await db.syncMeta.delete(JOURNAL_KEY_META);
+            // A journal key CANDIDATE made from that same (refused) passphrase is retired: it
+            // can never be confirmed (journal review C1). A confirmed journal key is never touched.
+            await retireCandidateForToken(db, tokenVersion);
           }
           return same;
         });
@@ -316,6 +317,13 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   }
   // The loop ran out while there was still work: say so rather than loop on.
   if (!finished) return { kind: "error", message: STOPPED_EARLY_MESSAGE };
+  // The server accepted this token for a whole run: remember which version (the journal key
+  // made with the same passphrase may now be confirmed, journal/keyStore.ts).
+  await db.transaction("rw", db.syncMeta, async () => {
+    if ((await getMeta<string>(db, "token")) === token && (await getMeta<number>(db, "tokenVersion")) === tokenVersion) {
+      await setMeta(db, "acceptedTokenVersion", tokenVersion ?? null);
+    }
+  });
   return { kind: "ok", sent, received, held };
 }
 
