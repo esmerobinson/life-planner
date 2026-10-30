@@ -4,7 +4,8 @@ import type { SyncController } from "../sync/controller";
 import { DEFAULT_SYNC_URL, getMeta, saveSyncSettings, stopSyncing } from "../sync/engine";
 import { deriveToken } from "../sync/token";
 import { confirmJournalKey, saveJournalKeyFromSync } from "../journal/keyStore";
-import { PairingCode, ScanPairingCode } from "./Pairing";
+import { MAX_PAIRING_PASSPHRASE } from "../pairing/pairingText";
+import { PairingCode, ScanPairingCode, TOO_LONG } from "./Pairing";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
@@ -119,6 +120,16 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
     await confirmJournalKey(controller.db).catch(() => undefined);
   }
 
+  /**
+   * The code was hidden (Hide, after 60 s, or the app going to the background): the passphrase
+   * is forgotten too, so showing it again needs the passphrase typed or pasted.
+   */
+  function hideCode() {
+    setShownSecret(null);
+    setSavedSecret(null);
+    setShowField("");
+  }
+
   /** "Show pairing code" from a pasted passphrase: only the one this device syncs with. */
   async function showFromField(e: React.FormEvent) {
     e.preventDefault();
@@ -126,6 +137,10 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
     setShowField("");
     setShowProblem("");
     if (!secret) return;
+    if (secret.length > MAX_PAIRING_PASSPHRASE) {
+      setShowProblem(TOO_LONG);
+      return;
+    }
     try {
       const token = await getMeta<string>(controller.db, "token");
       if (token && (await deriveToken(secret)) !== token) {
@@ -200,7 +215,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
       <h2>Pair a device</h2>
       <p>Set up another device without typing: show a pairing code here, then scan it on the other device.</p>
       {shownSecret !== null ? (
-        <PairingCode passphrase={shownSecret} onHide={() => setShownSecret(null)} />
+        <PairingCode passphrase={shownSecret} onHide={hideCode} />
       ) : savedSecret !== null && canPair ? (
         <div className="form-actions">
           <button type="button" className="btn-secondary" onClick={() => setShownSecret(savedSecret)}>

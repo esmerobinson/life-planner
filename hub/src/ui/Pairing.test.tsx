@@ -12,7 +12,7 @@ import { pairingText } from "../pairing/pairingText";
 import { qrModules, qrPath, readFrame } from "../pairing/qr";
 import { keyFor, verifierRow } from "../test/journalKey";
 import { renderApp } from "../test/renderApp";
-import { CAMERA_DENIED, NOT_PAIRING, PAIRING_WARNING, PairingCode, hidesIn } from "./Pairing";
+import { CAMERA_DENIED, CODE_FAILED, NOT_PAIRING, PAIRING_WARNING, PairingCode, SCANNER_FAILED, ScanPairingCode, TOO_LONG, hidesIn } from "./Pairing";
 import { SyncPage } from "./SyncPage";
 
 // Pair a device by QR code. Fictional passphrases only; the camera and the frame decoder are
@@ -181,7 +181,28 @@ describe("the shown code hides itself", () => {
     expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
   });
 
-  it("on the Sync page: backgrounding hides it; Pair another device shows it again", async () => {
+  it("hides at 60 seconds even when the countdown's ticks never run (a timeout for the exact time)", () => {
+    vi.useFakeTimers();
+    const realSetInterval = window.setInterval;
+    vi.spyOn(window, "setInterval").mockImplementation((() => 0) as unknown as typeof realSetInterval);
+    render(<Harness />);
+    act(() => vi.advanceTimersByTime(59_999));
+    expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+  });
+
+  it("a passphrase too long for a QR code shows a plain error instead of throwing", () => {
+    const onHide = vi.fn();
+    render(<PairingCode passphrase={"p".repeat(3000)} onHide={onHide} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(CODE_FAILED);
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+    expect(document.body.innerHTML).not.toContain("p".repeat(100));
+    fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+    expect(onHide).toHaveBeenCalled();
+  });
+
+  it("on the Sync page: backgrounding hides it and forgets the passphrase (showing again needs it typed)", async () => {
     setup();
     const user = await setAddress();
     await saveTyped(user);
@@ -190,8 +211,10 @@ describe("the shown code hides itself", () => {
     setVisibility("hidden");
     expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
     setVisibility("visible");
-    await user.click(screen.getByRole("button", { name: "Pair another device" }));
-    expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pair another device" })).toBeNull();
+    await user.type(screen.getByLabelText("Passphrase for the pairing code"), PASSPHRASE);
+    await user.click(screen.getByRole("button", { name: "Show pairing code" }));
+    expect(await screen.findByRole("img", { name: "Pairing code" })).toBeInTheDocument();
     expect(screen.getByText("Hides in 1:00")).toBeInTheDocument();
   });
 });
@@ -215,7 +238,9 @@ describe("show a pairing code (Sync page)", () => {
 
     await user.click(screen.getByRole("button", { name: "Hide" }));
     expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Pair another device" })).toBeInTheDocument();
+    // Hidden means forgotten: showing it again needs the passphrase.
+    expect(screen.queryByRole("button", { name: "Pair another device" })).toBeNull();
+    expect(screen.getByLabelText("Passphrase for the pairing code")).toHaveValue("");
     expect(await everythingStored()).not.toContain(PASSPHRASE);
   });
 
@@ -253,6 +278,17 @@ describe("show a pairing code (Sync page)", () => {
     expect(qr.querySelector("path")!.getAttribute("d")).toBe(qrPath(qrModules(pairingText(PASSPHRASE))));
     notInDom();
     expect(await everythingStored()).not.toContain(PASSPHRASE);
+  });
+
+  it("'Show pairing code' refuses a passphrase over 1024 characters", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    setup();
+    const field = await screen.findByLabelText("Passphrase for the pairing code");
+    fireEvent.change(field, { target: { value: "p".repeat(3000) } });
+    fireEvent.click(screen.getByRole("button", { name: "Show pairing code" }));
+    expect(await screen.findByText(TOO_LONG)).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+    expect(field).toHaveValue("");
   });
 
   it("no code is offered while the passphrase is refused", async () => {
@@ -344,6 +380,75 @@ describe("scan a pairing code (Sync page)", () => {
     expect(field).toHaveValue("");
     notInDom();
     expect(await everythingStored()).not.toContain(PASSPHRASE);
+  });
+});
+
+describe("scanning safeguards", () => {
+  it("a double tap on Scan asks for the camera once; Scan is disabled while it starts", async () => {
+    let resolve!: (s: MediaStream) => void;
+    const stop = vi.fn();
+    const track = { stop } as unknown as MediaStreamTrack;
+    const stream = { getTracks: () => [track] } as unknown as MediaStream;
+    const getUserMedia = vi.fn(() => new Promise<MediaStream>((r) => (resolve = r)));
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
+    render(<ScanPairingCode onPassphrase={vi.fn()} />);
+    const scan = screen.getByRole("button", { name: "Scan pairing code" });
+    fireEvent.click(scan);
+    fireEvent.click(scan);
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(scan).toBeDisabled();
+    await act(async () => resolve(stream));
+    expect(await screen.findByLabelText("Camera")).toBeInTheDocument();
+    expect(stop).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("a camera that arrives after leaving the page is stopped at once", async () => {
+    let resolve!: (s: MediaStream) => void;
+    const stop = vi.fn();
+    const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: vi.fn(() => new Promise<MediaStream>((r) => (resolve = r))) },
+    });
+    const view = render(<ScanPairingCode onPassphrase={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Scan pairing code" }));
+    view.unmount();
+    await act(async () => resolve(stream));
+    expect(stop).toHaveBeenCalled();
+  });
+
+  it("if the scanner can't load: stops the camera and the loop, says to paste instead", async () => {
+    const { stop } = fakeCamera();
+    vi.mocked(readFrame).mockRejectedValue(new Error("chunk failed to load"));
+    render(<ScanPairingCode onPassphrase={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Scan pairing code" }));
+    expect(await screen.findByText(SCANNER_FAILED)).toBeInTheDocument();
+    expect(stop).toHaveBeenCalled();
+    expect(screen.queryByLabelText("Camera")).toBeNull();
+    const reads = vi.mocked(readFrame).mock.calls.length;
+    await new Promise((r) => setTimeout(r, 400));
+    expect(vi.mocked(readFrame).mock.calls.length).toBe(reads);
+  });
+
+  it("a code read while busy is kept and used once busy clears (never dropped)", async () => {
+    const { stop } = fakeCamera();
+    vi.mocked(readFrame).mockResolvedValue(pairingText(PASSPHRASE));
+    const onPassphrase = vi.fn();
+    const view = render(<ScanPairingCode onPassphrase={onPassphrase} />);
+    fireEvent.click(screen.getByRole("button", { name: "Scan pairing code" }));
+    await screen.findByLabelText("Camera");
+    view.rerender(<ScanPairingCode onPassphrase={onPassphrase} busy />);
+    await waitFor(() => expect(stop).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(onPassphrase).not.toHaveBeenCalled();
+    view.rerender(<ScanPairingCode onPassphrase={onPassphrase} busy={false} />);
+    await waitFor(() => expect(onPassphrase).toHaveBeenCalledTimes(1));
+    expect(onPassphrase).toHaveBeenCalledWith(PASSPHRASE);
+    view.rerender(<ScanPairingCode onPassphrase={onPassphrase} busy />);
+    view.rerender(<ScanPairingCode onPassphrase={onPassphrase} busy={false} />);
+    expect(onPassphrase).toHaveBeenCalledTimes(1);
   });
 });
 

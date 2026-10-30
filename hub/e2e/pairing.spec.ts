@@ -99,15 +99,20 @@ test("Sync page: after Save, Pair another device shows the pairing code; Hide an
 
   await expect(page.getByText(/^Hides in [01]:\d\d$/)).toBeVisible();
 
+  // Hidden means forgotten: showing it again needs the passphrase pasted.
+  const showAgain = async () => {
+    await expect(page.getByRole("button", { name: "Pair another device" })).toHaveCount(0);
+    await page.getByLabel("Passphrase for the pairing code").fill(PASS);
+    await page.getByRole("button", { name: "Show pairing code" }).click();
+    await expect(qr).toBeVisible();
+  };
   await page.getByRole("button", { name: "Hide" }).click();
   await expect(qr).toHaveCount(0);
-  // The Mac app losing focus hides it too; another tap shows it again.
-  await page.getByRole("button", { name: "Pair another device" }).click();
-  await expect(qr).toBeVisible();
+  await showAgain();
+  // The Mac app losing focus hides it too.
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await expect(qr).toHaveCount(0);
-  await page.getByRole("button", { name: "Pair another device" }).click();
-  await expect(qr).toBeVisible();
+  await showAgain();
   // Leaving the page: gone, and not offered again without the passphrase.
   await page.getByRole("link", { name: "Backup" }).first().click();
   await page.getByRole("link", { name: "Sync", exact: true }).first().click();
