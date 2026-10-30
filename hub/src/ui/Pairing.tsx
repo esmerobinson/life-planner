@@ -11,15 +11,61 @@ export const NOT_PAIRING = "That isn't an Esmeworld pairing code.";
 /** How often a camera frame is read while scanning, in ms (a technical rate, not an animation). */
 const SCAN_EVERY_MS = 150;
 
+/** The shown code hides itself after this long (coordinator's rule, concern 1). */
+export const PAIRING_SHOW_MS = 60_000;
+
+/** "Hides in 0:45". */
+export function hidesIn(seconds: number): string {
+  const s = Math.max(0, seconds);
+  return `Hides in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 /**
- * The pairing code for `passphrase` as a black-on-white QR code (SVG), the warning and Hide.
- * The passphrase is only in the drawn modules: never in an attribute, label or text here.
+ * The pairing code for `passphrase` as a black-on-white QR code (SVG), the warning, a countdown
+ * and Hide. The passphrase is only in the drawn modules: never in an attribute, label or text.
+ * It hides itself after 60 seconds, and at once when the page or app goes to the background
+ * (visibilitychange to hidden, pagehide, or the window losing focus, as the Mac app does).
+ * Showing it again needs another tap.
  */
 export function PairingCode({ passphrase, onHide }: { passphrase: string; onHide: () => void }) {
   const { n, d } = useMemo(() => {
     const m = qrModules(pairingText(passphrase));
     return { n: m.length, d: qrPath(m) };
   }, [passphrase]);
+  const hide = useRef(onHide);
+  hide.current = onHide;
+  const [left, setLeft] = useState(PAIRING_SHOW_MS / 1000);
+
+  useEffect(() => {
+    // Measured against the clock, so a throttled background timer can't stretch the minute.
+    const deadline = Date.now() + PAIRING_SHOW_MS;
+    let done = false;
+    const close = () => {
+      if (done) return;
+      done = true;
+      hide.current();
+    };
+    const tick = () => {
+      const ms = deadline - Date.now();
+      if (ms <= 0) close();
+      else setLeft(Math.ceil(ms / 1000));
+    };
+    const timer = setInterval(tick, 1000);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") close();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", close);
+    window.addEventListener("blur", close);
+    return () => {
+      done = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", close);
+      window.removeEventListener("blur", close);
+    };
+  }, [passphrase]);
+
   return (
     <div className="pairing-code">
       {/* The modules include the 4-module quiet zone; the white square fills it. */}
@@ -36,6 +82,9 @@ export function PairingCode({ passphrase, onHide }: { passphrase: string; onHide
         <path d={d} fill="#000000" />
       </svg>
       <p>{PAIRING_WARNING}</p>
+      <p className="journal-muted" aria-live="off">
+        {hidesIn(left)}
+      </p>
       <div className="form-actions">
         <button type="button" className="btn-secondary" onClick={onHide}>
           Hide

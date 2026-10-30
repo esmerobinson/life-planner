@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import { FakeSyncServer } from "../sync/fakeServer";
@@ -11,7 +12,7 @@ import { pairingText } from "../pairing/pairingText";
 import { qrModules, qrPath, readFrame } from "../pairing/qr";
 import { keyFor, verifierRow } from "../test/journalKey";
 import { renderApp } from "../test/renderApp";
-import { CAMERA_DENIED, NOT_PAIRING, PAIRING_WARNING } from "./Pairing";
+import { CAMERA_DENIED, NOT_PAIRING, PAIRING_WARNING, PairingCode, hidesIn } from "./Pairing";
 import { SyncPage } from "./SyncPage";
 
 // Pair a device by QR code. Fictional passphrases only; the camera and the frame decoder are
@@ -109,6 +110,91 @@ async function saveTyped(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(async () => expect(await getMeta(db, "token")).toBe(token));
 }
+
+/** Shows the code until it hides itself; "Show" brings it back (another tap). */
+function Harness() {
+  const [shown, setShown] = useState(true);
+  return shown ? (
+    <PairingCode passphrase={PASSPHRASE} onHide={() => setShown(false)} />
+  ) : (
+    <button type="button" onClick={() => setShown(true)}>
+      Show
+    </button>
+  );
+}
+
+function setVisibility(state: DocumentVisibilityState) {
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+  fireEvent(document, new Event("visibilitychange"));
+}
+
+describe("the shown code hides itself", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    Reflect.deleteProperty(document, "visibilityState");
+  });
+
+  it("formats the countdown", () => {
+    expect(hidesIn(60)).toBe("Hides in 1:00");
+    expect(hidesIn(45)).toBe("Hides in 0:45");
+    expect(hidesIn(5)).toBe("Hides in 0:05");
+    expect(hidesIn(-1)).toBe("Hides in 0:00");
+  });
+
+  it("counts down under the warning and hides at 60 seconds; showing again starts a new minute", () => {
+    vi.useFakeTimers();
+    render(<Harness />);
+    const line = screen.getByText("Hides in 1:00");
+    expect(line).toHaveClass("journal-muted");
+    expect(screen.getByText(PAIRING_WARNING).nextElementSibling).toBe(line);
+    act(() => vi.advanceTimersByTime(15_000));
+    expect(screen.getByText("Hides in 0:45")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(44_000));
+    expect(screen.getByText("Hides in 0:01")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+    // Only another tap shows it again, for a fresh minute.
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.getByText("Hides in 1:00")).toBeInTheDocument();
+  });
+
+  it("hides at once when the page goes to the background (visibilitychange), not when it comes back", () => {
+    render(<Harness />);
+    setVisibility("visible");
+    expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    setVisibility("hidden");
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+    setVisibility("visible");
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+  });
+
+  it("hides at once on pagehide and when the window loses focus (the Mac app)", () => {
+    render(<Harness />);
+    fireEvent(window, new Event("pagehide"));
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    fireEvent(window, new Event("blur"));
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+  });
+
+  it("on the Sync page: backgrounding hides it; Pair another device shows it again", async () => {
+    setup();
+    const user = await setAddress();
+    await saveTyped(user);
+    await user.click(await screen.findByRole("button", { name: "Pair another device" }));
+    expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    setVisibility("hidden");
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+    setVisibility("visible");
+    await user.click(screen.getByRole("button", { name: "Pair another device" }));
+    expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    expect(screen.getByText("Hides in 1:00")).toBeInTheDocument();
+  });
+});
 
 describe("show a pairing code (Sync page)", () => {
   it("after Save: 'Pair another device' shows the code for esmeworld-pair:v1:<passphrase>, the warning and Hide", async () => {

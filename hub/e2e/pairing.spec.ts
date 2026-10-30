@@ -97,7 +97,14 @@ test("Sync page: after Save, Pair another device shows the pairing code; Hide an
   expect(await everythingKept(page)).not.toContain(PASS);
   await shoot(page, "pairing-desktop-code");
 
+  await expect(page.getByText(/^Hides in [01]:\d\d$/)).toBeVisible();
+
   await page.getByRole("button", { name: "Hide" }).click();
+  await expect(qr).toHaveCount(0);
+  // The Mac app losing focus hides it too; another tap shows it again.
+  await page.getByRole("button", { name: "Pair another device" }).click();
+  await expect(qr).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await expect(qr).toHaveCount(0);
   await page.getByRole("button", { name: "Pair another device" }).click();
   await expect(qr).toBeVisible();
