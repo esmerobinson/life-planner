@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  deriveJournalKey, fromBase64, IV_BYTES, JOURNAL_ITERATIONS, JOURNAL_SALT, openBytes, openJson, sealBytes, sealJson, toBase64,
+  deriveJournalKey, deriveJournalKeyAndFp, fromBase64, IV_BYTES, JOURNAL_ITERATIONS, JOURNAL_SALT, openBytes, openJson, sealBytes, sealJson, toBase64,
 } from "./crypto";
 
 // Fixed vector, computed independently with Node's crypto module (not WebCrypto):
@@ -24,9 +24,26 @@ describe("journal key derivation", () => {
   it("matches the fixed vector computed outside WebCrypto", async () => {
     const key = await deriveJournalKey(VECTOR.passphrase);
     expect(await openJson(key, { iv: VECTOR.iv, ct: VECTOR.ct }, VECTOR.aad)).toEqual({ pretend: "words" });
-    // And sealing with the same IV gives the same bytes.
-    const again = await sealBytes(key, new TextEncoder().encode('{"pretend":"words"}'), VECTOR.aad, fromBase64(VECTOR.iv));
-    expect(again.ct).toBe(VECTOR.ct);
+    // And the same IV gives the same bytes (a fixed IV only here, straight through WebCrypto).
+    const again = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: fromBase64(VECTOR.iv) as BufferSource, additionalData: new TextEncoder().encode(VECTOR.aad) },
+      key,
+      new TextEncoder().encode('{"pretend":"words"}'),
+    );
+    expect(toBase64(new Uint8Array(again))).toBe(VECTOR.ct);
+  });
+
+  it("the fingerprint is the first 8 bytes of HMAC-SHA256(key bits, 'esmeworld-journal-fp') (vector from Node)", async () => {
+    // node: createHmac("sha256", Buffer.from("e409de51…2d12", "hex")).update("esmeworld-journal-fp").digest("hex").slice(0, 16)
+    const jk = await deriveJournalKeyAndFp(VECTOR.passphrase);
+    expect(jk.fp).toBe("768feba679209ed9");
+    expect(await openJson(jk.key, { iv: VECTOR.iv, ct: VECTOR.ct }, VECTOR.aad)).toEqual({ pretend: "words" });
+    expect((await deriveJournalKeyAndFp("pretend other")).fp).not.toBe(jk.fp);
+    expect(jk.key.extractable).toBe(false);
+  });
+
+  it("sealing never takes a caller's IV", () => {
+    expect(sealBytes.length).toBe(3);
   });
 
   it("is an AES-GCM key that can never be exported", async () => {

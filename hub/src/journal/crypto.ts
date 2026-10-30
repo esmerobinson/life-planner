@@ -20,19 +20,45 @@ export interface Sealed {
   ct: string;
 }
 
-/** Derives the journal key from the sync passphrase. Non-extractable; encrypt/decrypt only. */
-export async function deriveJournalKey(passphrase: string): Promise<CryptoKey> {
-  const encoder = new TextEncoder();
-  const base = await crypto.subtle.importKey("raw", encoder.encode(passphrase.normalize("NFC")), "PBKDF2", false, [
+/** The text the key fingerprint is an HMAC of. */
+export const FINGERPRINT_INPUT = "esmeworld-journal-fp";
+
+/** A journal key with its fingerprint (stored in clear on every row it seals). */
+export interface JournalKey {
+  key: CryptoKey;
+  /** First 8 bytes of HMAC-SHA256(key bits, "esmeworld-journal-fp"), as 16 hex characters. */
+  fp: string;
+}
+
+async function pbkdf2Base(passphrase: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase.normalize("NFC")), "PBKDF2", false, [
     "deriveKey",
   ]);
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", hash: "SHA-256", salt: encoder.encode(JOURNAL_SALT), iterations: JOURNAL_ITERATIONS },
-    base,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
+}
+
+const pbkdf2 = () => ({
+  name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(JOURNAL_SALT), iterations: JOURNAL_ITERATIONS,
+});
+
+/** Derives the journal key from the sync passphrase. Non-extractable; encrypt/decrypt only. */
+export async function deriveJournalKey(passphrase: string): Promise<CryptoKey> {
+  return crypto.subtle.deriveKey(pbkdf2(), await pbkdf2Base(passphrase), { name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+    "decrypt",
+  ]);
+}
+
+/**
+ * The journal key and its fingerprint. The fingerprint is an HMAC keyed with the same derived
+ * bits (derived again as a non-extractable HMAC key, used once and dropped), so it names the
+ * key without revealing it; guessing a passphrase from it costs the full PBKDF2.
+ */
+export async function deriveJournalKeyAndFp(passphrase: string): Promise<JournalKey> {
+  const base = await pbkdf2Base(passphrase);
+  const key = await crypto.subtle.deriveKey(pbkdf2(), base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  const mac = await crypto.subtle.deriveKey(pbkdf2(), base, { name: "HMAC", hash: "SHA-256", length: 256 }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", mac, new TextEncoder().encode(FINGERPRINT_INPUT)));
+  return { key, fp: [...sig.subarray(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("") };
 }
 
 /** Base64 of bytes (no prefix). */
@@ -57,8 +83,9 @@ const utf8 = (s: string) => new TextEncoder().encode(s);
  * Encrypts bytes. `aad` binds the ciphertext to where it is stored (e.g. the row id), so a
  * sealed value moved to another row does not open there.
  */
-export async function sealBytes(key: CryptoKey, bytes: Uint8Array, aad: string, iv?: Uint8Array): Promise<Sealed> {
-  const nonce = iv ?? crypto.getRandomValues(new Uint8Array(IV_BYTES));
+export async function sealBytes(key: CryptoKey, bytes: Uint8Array, aad: string): Promise<Sealed> {
+  // Always a fresh random IV: there is deliberately no way to pass one in.
+  const nonce = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const ct = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: nonce as BufferSource, additionalData: utf8(aad) as BufferSource },
     key,
