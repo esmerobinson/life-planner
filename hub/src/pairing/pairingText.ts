@@ -8,6 +8,8 @@
 // just after it is scanned or pasted.
 
 export const PAIRING_PREFIX = "esmeworld-pair:v1:";
+/** Longest passphrase a pairing code may carry (security review: bounded work and QR size). */
+export const MAX_PAIRING_PASSPHRASE = 1024;
 
 /** The text to put in the QR code for `passphrase`. */
 export function pairingText(passphrase: string): string {
@@ -23,5 +25,6 @@ export function parsePairingText(text: string): string | null {
   const t = text.replace(/^\s+/, "").replace(/[\r\n]+$/, "");
   if (!t.startsWith(PAIRING_PREFIX)) return null;
   const passphrase = t.slice(PAIRING_PREFIX.length);
+  if (passphrase.length > MAX_PAIRING_PASSPHRASE) return null;
   return passphrase.length > 0 && passphrase.trim().length > 0 ? passphrase : null;
 }

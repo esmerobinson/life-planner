@@ -1,5 +1,5 @@
 import { decodeQR } from "qr/decode.js";
-import { PAIRING_PREFIX, pairingText, parsePairingText } from "./pairingText";
+import { MAX_PAIRING_PASSPHRASE, PAIRING_PREFIX, pairingText, parsePairingText } from "./pairingText";
 import { qrModules, qrPath } from "./qr";
 
 // Fictional passphrases only.
@@ -39,6 +39,13 @@ describe("pairing text", () => {
   it("drops whitespace before the code and line breaks after it; keeps spaces inside the passphrase", () => {
     expect(parsePairingText(`  \n${pairingText(PASS)}\r\n`)).toBe(PASS);
     expect(parsePairingText(`\t${pairingText("fake pass ")}\n`)).toBe("fake pass ");
+  });
+
+  it("refuses a passphrase over 1024 characters (a 3000-character code is refused, not decoded)", () => {
+    expect(MAX_PAIRING_PASSPHRASE).toBe(1024);
+    expect(parsePairingText(pairingText("p".repeat(1024)))).toBe("p".repeat(1024));
+    expect(parsePairingText(pairingText("p".repeat(1025)))).toBeNull();
+    expect(parsePairingText(pairingText("p".repeat(3000)))).toBeNull();
   });
 
   it("refuses anything that isn't a pairing code", () => {

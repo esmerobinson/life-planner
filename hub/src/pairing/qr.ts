@@ -31,7 +31,13 @@ let decoder: Promise<Decode> | null = null;
 
 /** Loads the decoder (a separate chunk) once. */
 export function loadDecoder(): Promise<Decode> {
-  decoder ??= import("qr/decode.js").then((m) => m.decodeQR as Decode);
+  decoder ??= import("qr/decode.js").then(
+    (m) => m.decodeQR as Decode,
+    (e: unknown) => {
+      decoder = null; // a later Scan tries to load it again
+      throw e;
+    },
+  );
   return decoder;
 }
 
