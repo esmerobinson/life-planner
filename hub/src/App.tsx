@@ -12,6 +12,7 @@ import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
 import { TodayPanel } from "./ui/TodayPanel";
 import { VisionPage } from "./ui/VisionPage";
+import { JournalPage } from "./ui/journal/JournalPage";
 
 function TodayRoute() {
   return <TodayPanel today={useShellToday()} />;
@@ -47,6 +48,10 @@ function BinRoute() {
   return <BinPage today={useShellToday()} />;
 }
 
+function JournalRoute() {
+  return <JournalPage today={useShellToday()} />;
+}
+
 function BackupRoute() {
   return <BackupPage today={useShellToday()} />;
 }
@@ -71,6 +76,8 @@ export function AppRoutes() {
               <Route key={n.id} path={n.path} element={<TodayRoute />} />
             ) : n.id === "vision" ? (
               <Route key={n.id} path={n.path} element={<VisionPage />} />
+            ) : n.id === "journal" ? (
+              <Route key={n.id} path={n.path} element={<JournalRoute />} />
             ) : n.id === "goals" || n.path.startsWith("/area/") ? null : (
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
             ),

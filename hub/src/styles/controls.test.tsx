@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { QuickAdd } from "../ui/QuickAdd";
 import { MoveToMenu } from "../ui/MoveToMenu";
-import { JournalCardStub } from "../ui/JournalCardStub";
+import { JournalCard } from "../ui/JournalCard";
 import { AreaPage } from "../ui/AreaPage";
 
 // The project has no @types/node; vitest runs in node, so declare just what is used.
@@ -230,7 +230,11 @@ describe("controls.css (approved mockup A, soft pills)", () => {
     expect((await screen.findByRole("group", { name: "Show" })).classList.contains("btn-group")).toBe(true);
     area.unmount();
 
-    const journal = render(<JournalCardStub />);
+    const journal = render(
+      <MemoryRouter>
+        <JournalCard />
+      </MemoryRouter>,
+    );
     expect(screen.getByRole("button", { name: "Morning pages" }).parentElement?.classList.contains("btn-group")).toBe(true);
     journal.unmount();
 

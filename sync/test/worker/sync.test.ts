@@ -67,6 +67,22 @@ describe("POST /v1/sync: writing", () => {
     expect(pulled.changes).toContainEqual({ table: "files", id: "p1", updatedAt: T0 - 1, data: picture });
   });
 
+  it("accepts the journal table (sealed entries) and returns its rows to other devices", async () => {
+    const entry = { id: "morning:2026-10-28", kind: "morning", date: "2026-10-28", iv: "AAAAAAAAAAAAAAAA", ct: "c2VhbGVkIHByZXRlbmQ=" };
+    const body = await syncOk(DEVICE_A, 0, [change(entry.id, T0 - 1, entry, "journal")]);
+    expect(body).toMatchObject({ applied: 1, ignored: 0 });
+    expect((await storedRows()).map((r) => [r.tbl, r.id])).toEqual([["journal", "morning:2026-10-28"]]);
+    const pulled = await pullAll(DEVICE_B);
+    expect(pulled.changes).toContainEqual({ table: "journal", id: entry.id, updatedAt: T0 - 1, data: entry });
+  });
+
+  it("journal rows merge by last write wins like every table", async () => {
+    await syncOk(DEVICE_A, 0, [change("checkin:2026-10-28", 100, { ct: "a" }, "journal")]);
+    expect(await syncOk(DEVICE_B, 0, [change("checkin:2026-10-28", 99, { ct: "b" }, "journal")])).toMatchObject({ applied: 0, ignored: 1 });
+    expect(await syncOk(DEVICE_B, 0, [change("checkin:2026-10-28", 101, { ct: "c" }, "journal")])).toMatchObject({ applied: 1 });
+    expect(JSON.parse((await storedRows())[0]!.data)).toEqual({ ct: "c" });
+  });
+
   it("a picture row just under 700 KB of JPEG (about 933,000 base64 characters) fits the row cap and pulls alone", async () => {
     const big = (id: string) => ({ id, mime: "image/jpeg", data: "A".repeat(933_336), width: 1600, height: 1200, createdAt: "2026-10-28" });
     await syncOk(DEVICE_A, 0, [change("b1", T0 - 2, big("b1"), "files")]);
@@ -420,7 +436,8 @@ describe("POST /v1/sync: convergence", () => {
 describe("POST /v1/sync: validation", () => {
   const good = () => change("ok", T0 - 1);
   const cases: Array<[string, unknown, string]> = [
-    ["bad table name", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "journal")] }, "bad_change"],
+    ["bad table name", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "diary")] }, "bad_change"],
+    ["journal table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Journal")] }, "bad_change"],
     ["table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Items")] }, "bad_change"],
     ["files table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Files")] }, "bad_change"],
     ["empty id", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("", 1)] }, "bad_change"],

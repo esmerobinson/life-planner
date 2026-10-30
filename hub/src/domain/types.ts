@@ -106,6 +106,51 @@ export interface FileRow {
    * tombstone (no data) because sync never hard-deletes.
    */
   status?: "purged";
+  /**
+   * A journal photo (journal round): `data` is the AES-GCM ciphertext (base64) of the JPEG,
+   * sealed with the journal key and `iv`. Only the Journal page shows these.
+   */
+  encrypted?: true;
+  /** Base64 of the 12-byte AES-GCM IV, on encrypted rows only. */
+  iv?: string;
+  /** Fingerprint of the key that sealed it (journal/crypto.ts), on encrypted rows. */
+  fp?: string;
+  /** Sync stamp, as on Item. */
+  updatedAt?: number;
+}
+
+/**
+ * The kinds of journal row (journal round, fix round 1). Every part of a day is its own row,
+ * so two devices never overwrite each other's part (rows only ever replace themselves):
+ * - "page"     `page:<date>:<uuid>`        one finished morning page ("I'm done")
+ * - "photo"    `photo:<date>:<fileId>`     one morning photo (the sealed image is the file row)
+ * - "draft"    `draft:<date>:<deviceId>`   the page being written on one device (emptied when done)
+ * - "answer"   `answer:<date>:<promptId>`  one check-in answer
+ * - "set"      `set:<date>`                the day's questions (written by the first device to open it)
+ * - "settings" `settings`                  Choose questions (synced)
+ * - "verifier" `verifier`                  a known value sealed with the first confirmed key
+ * - "morning" / "checkin" `${kind}:<date>` the earlier one-row-per-day shape: read (split), never written
+ */
+export const JOURNAL_KINDS = [
+  "page", "photo", "draft", "answer", "set", "settings", "verifier", "morning", "checkin",
+] as const;
+export type JournalKind = (typeof JOURNAL_KINDS)[number];
+
+/**
+ * One journal row (journal round), end-to-end encrypted. Only `kind`, `date`, the id and
+ * the key fingerprint are in clear; everything typed is inside `ct`, sealed with the
+ * journal key (journal/crypto.ts). Rows merge by last-write-wins like every row.
+ */
+export interface JournalRow {
+  id: string;
+  kind: JournalKind;
+  date: ISODate;
+  /** Fingerprint of the key that sealed it (absent only on the earlier shape). */
+  fp?: string;
+  /** Base64 of the 12-byte AES-GCM IV. */
+  iv: string;
+  /** Base64 of the AES-GCM ciphertext (with its tag) of the entry's JSON. */
+  ct: string;
   /** Sync stamp, as on Item. */
   updatedAt?: number;
 }

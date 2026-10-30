@@ -8,6 +8,9 @@ import { SyncController } from "../sync/controller";
 import { DEFAULT_SYNC_URL, getMeta, saveSyncSettings } from "../sync/engine";
 import { readSyncGate } from "../data/syncGate";
 import { deriveToken } from "../sync/token";
+import { deriveJournalKey, deriveJournalKeyAndFp, openJson, sealJson } from "../journal/crypto";
+import { confirmedDevice } from "../test/journalKey";
+import { loadJournalKey } from "../journal/keyStore";
 import { syncController } from "../sync";
 import { Sidebar } from "./Sidebar";
 import { LOCKOUT_LINE, SyncPage } from "./SyncPage";
@@ -26,6 +29,7 @@ beforeEach(async () => {
   await db.goals.clear();
   await db.pending.clear();
   await db.syncMeta.clear();
+  await db.journal.clear();
   localStorage.clear();
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -84,6 +88,41 @@ describe("SyncPage", () => {
     expect(stored).not.toContain(PASSPHRASE);
     expect(stored).not.toContain(PASSPHRASE.normalize("NFD"));
     expect(screen.queryByDisplayValue(PASSPHRASE)).toBeNull();
+  });
+
+  it("Save makes a journal key from the same passphrase, confirmed once the server accepts it (never the passphrase stored)", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.clear(screen.getByLabelText("Sync address"));
+    await user.type(screen.getByLabelText("Sync address"), ADDRESS);
+    await user.type(screen.getByLabelText("Passphrase"), PASSPHRASE);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    // Save stays disabled until both derivations are done (no overlapping Saves).
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toBeEnabled(), { timeout: 5000 });
+    expect((await db.syncMeta.get("journalCandidate")) ?? (await loadJournalKey(db))).toBeTruthy(); // the key was made before Save came back
+    await waitFor(async () => expect(await loadJournalKey(db)).toBeTruthy(), { timeout: 5000 });
+    const { key } = (await loadJournalKey(db))!;
+    expect(key.extractable).toBe(false);
+    // The same key the Journal's unlock would make: it opens what that key seals.
+    const sealed = await sealJson(await deriveJournalKey(PASSPHRASE), { a: 1 }, "x");
+    expect(await openJson(key, sealed, "x")).toEqual({ a: 1 });
+    expect(await db.journal.get("verifier")).toBeTruthy();
+    expect(await everythingStored()).not.toContain(PASSPHRASE);
+  });
+
+  it("a mistyped passphrase on Save never replaces a confirmed journal key, and is refused by the server", async () => {
+    const user = userEvent.setup();
+    const { server } = setup();
+    const jk = await deriveJournalKeyAndFp(PASSPHRASE);
+    await confirmedDevice(db, jk);
+    await user.clear(screen.getByLabelText("Sync address"));
+    await user.type(screen.getByLabelText("Sync address"), ADDRESS);
+    await user.type(screen.getByLabelText("Passphrase"), "fake-mistyped-passphrase");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(server.syncRequests.length).toBeGreaterThan(0));
+    await waitFor(async () => expect(await db.syncMeta.get("journalCandidate")).toBeUndefined(), { timeout: 5000 });
+    expect((await loadJournalKey(db))!.fp).toBe(jk.fp);
   });
 
   it("says that wrong passphrases are limited and how long to wait", () => {

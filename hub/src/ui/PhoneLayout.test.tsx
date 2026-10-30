@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useNavigationType } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from "react-router-dom";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import { createItem } from "../data/repo";
@@ -29,6 +29,11 @@ function HomeRoute() {
   );
 }
 
+function JournalSpy() {
+  const l = useLocation();
+  return <h1>{`Journal at ${l.pathname}${l.hash}`}</h1>;
+}
+
 function TodayRoute() {
   return <TodayPanel today={useShellToday()} />;
 }
@@ -43,6 +48,7 @@ function renderAt(entries: string[], index = entries.length - 1) {
           <Route path="/goals" element={<h1>Goals</h1>} />
           <Route path="/area/art" element={<h1>Art</h1>} />
           <Route path="/goals/:id" element={<h1>A goal opened</h1>} />
+          <Route path="/journal" element={<JournalSpy />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -113,11 +119,22 @@ describe("phone layout (below 700px)", () => {
     const grid = screen.getByRole("navigation", { name: "Main" });
     const journal = screen.getByRole("region", { name: "Journal" });
     const today = screen.getByRole("heading", { level: 2, name: "Today" });
-    expect(within(journal).getByRole("button", { name: "Morning pages" })).toBeDisabled();
-    expect(within(journal).getByRole("button", { name: "Daily check-in" })).toBeDisabled();
+    expect(within(journal).getByRole("button", { name: "Morning pages" })).toBeEnabled();
+    expect(within(journal).getByRole("button", { name: "Daily check-in" })).toBeEnabled();
     const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(follows(grid, journal)).toBe(true);
     expect(follows(journal, today)).toBe(true);
+  });
+
+  it("the phone Home card's buttons open the Journal's two parts", async () => {
+    setPhone(true);
+    const first = renderAt(["/"]);
+    await userEvent.click(await screen.findByRole("button", { name: "Morning pages" }));
+    expect(await screen.findByRole("heading", { name: "Journal at /journal#morning-pages" })).toBeInTheDocument();
+    first.unmount();
+    renderAt(["/"]);
+    await userEvent.click(await screen.findByRole("button", { name: "Daily check-in" }));
+    expect(await screen.findByRole("heading", { name: "Journal at /journal#daily-check-in" })).toBeInTheDocument();
   });
 
   it("an opened goal keeps its own heading visible and the bar title empty", async () => {

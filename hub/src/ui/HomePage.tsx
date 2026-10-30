@@ -5,7 +5,7 @@ import { NAV } from "./areas";
 import { GoalCard } from "./GoalProgress";
 import { FooterLinks } from "./Sidebar";
 import { usePhone } from "./usePhone";
-import { JournalCardStub } from "./JournalCardStub";
+import { JournalCard } from "./JournalCard";
 import { TodayPanel } from "./TodayPanel";
 import { useHubData } from "./useHubData";
 
@@ -36,7 +36,7 @@ function PhoneHome({ today }: { today: ISODate }) {
           ))}
         </ul>
       </nav>
-      <JournalCardStub />
+      <JournalCard />
       <TodayPanel today={today} headingLevel={2} />
       <nav aria-label="More" className="phone-footer">
         <FooterLinks />
@@ -62,7 +62,7 @@ function DesktopHome({ today }: { today: ISODate }) {
     <div className="home-page">
       <div className="home-centre">
         <TodayPanel today={today} />
-        <JournalCardStub />
+        <JournalCard />
       </div>
       <aside className="home-goals" aria-label="Goals this month">
         <h2>Goals this month</h2>

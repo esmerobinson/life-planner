@@ -6,7 +6,7 @@ import { db } from "../data/db";
 import { createGoal, createItem, tickItem } from "../data/repo";
 import { AppShell } from "./AppShell";
 import { HomePage } from "./HomePage";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 
 const TODAY = "2026-10-27";
 
@@ -14,6 +14,11 @@ beforeEach(async () => {
   await db.items.clear();
   await db.goals.clear();
 });
+
+function JournalAt() {
+  const l = useLocation();
+  return <p>{`At ${l.pathname}${l.hash}`}</p>;
+}
 
 function renderHome() {
   return render(
@@ -24,7 +29,7 @@ function renderHome() {
 }
 
 describe("HomePage", () => {
-  it("home shows Today picks, the journal card with two disabled buttons, and a bar per goal with a target", async () => {
+  it("home shows Today picks, the journal card with its two buttons, and a bar per goal with a target", async () => {
     const goal = await createGoal({ title: "Write more", areaId: "writing", kind: "practice", monthlyTarget: 10 }, TODAY);
     for (let i = 0; i < 3; i++) {
       const it = await createItem({ kind: "task", title: `Finished ${i}`, areaId: "writing", priority: 3, goalId: goal.id }, TODAY);
@@ -35,9 +40,9 @@ describe("HomePage", () => {
     renderHome();
     expect(await screen.findByText("Pick alpha")).toBeInTheDocument();
     expect(screen.getByText("Pick beta")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Morning pages" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Daily check-in" })).toBeDisabled();
-    expect(screen.getByText("Coming in a later update")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Morning pages" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Daily check-in" })).toBeEnabled();
+    expect(screen.queryByText("Coming in a later update")).toBeNull();
     expect(await screen.findByRole("progressbar", { name: /3\/10/ })).toBeInTheDocument();
     const card = screen.getByRole("link", { name: "Write more" }).closest("li")!;
     expect(card).toHaveClass("goal-card");
@@ -55,6 +60,32 @@ describe("HomePage", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it("the desktop Journal card's Daily check-in button opens the check-in", async () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<HomePage today={TODAY} />} />
+          <Route path="/journal" element={<JournalAt />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Daily check-in" }));
+    expect(await screen.findByText("At /journal#daily-check-in")).toBeInTheDocument();
+  });
+
+  it("the desktop Journal card's Morning pages button opens morning pages", async () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<HomePage today={TODAY} />} />
+          <Route path="/journal" element={<JournalAt />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Morning pages" }));
+    expect(await screen.findByText("At /journal#morning-pages")).toBeInTheDocument();
   });
 
   it("goals without a target are not listed as bars", async () => {

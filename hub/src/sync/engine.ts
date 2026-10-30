@@ -18,7 +18,8 @@
 
 import { applyUntracked } from "../data/changeTracking";
 import { withSyncLock } from "../data/syncGate";
-import { validFile, validGoal, validItem } from "../data/validate";
+import { validFile, validGoal, validItem, validJournal } from "../data/validate";
+import { retireCandidateForToken } from "../journal/keyStore";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
 /** The deployed sync server. The Sync page offers it when no address is saved (still editable). */
@@ -81,7 +82,9 @@ export type MetaKey =
   /** This device has pulled everything the server had at least once. */
   | "firstPullDone"
   /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
-  | "tokenVersion";
+  | "tokenVersion"
+  /** The exact token the server last accepted in a whole run (confirms a journal key). */
+  | "acceptedToken";
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -111,7 +114,7 @@ export async function saveSyncSettings(db: HubDB, s: { serverUrl: string; token:
 }
 
 async function saveUnderLock(db: HubDB, serverUrl: string, token: string): Promise<void> {
-  await db.transaction("rw", [db.items, db.goals, db.files, db.pending, db.syncMeta], async () => {
+  await db.transaction("rw", [...syncTables(db), db.pending, db.syncMeta], async () => {
     // A different address is a different server: its cursor means nothing here, and rows
     // already "sent" went somewhere else. Start over: pull everything, send everything.
     if ((await getMeta<string>(db, "cursorServerUrl")) !== serverUrl) {
@@ -138,6 +141,9 @@ export async function retryStuck(db: HubDB): Promise<void> {
     }
   });
 }
+
+/** Every synced table of `db`, for transactions that must cover them all. */
+const syncTables = (db: HubDB) => SYNC_TABLES.map((t) => db.table(t));
 
 /** Trimmed, without trailing slashes, so "https://x/" and "https://x" are one address. */
 export function normaliseAddress(text: string): string {
@@ -170,7 +176,9 @@ export async function stopSyncing(db: HubDB): Promise<void> {
 // ---- one run ----------------------------------------------------------------------------
 
 /** The row check for each synced table (the same one every local write passes). */
-const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = { items: validItem, goals: validGoal, files: validFile };
+const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = {
+  items: validItem, goals: validGoal, files: validFile, journal: validJournal,
+};
 /** A table this build syncs (a later build may add more; their rows are skipped here). */
 const isSyncTable = (t: unknown): t is SyncTable => (SYNC_TABLES as readonly unknown[]).includes(t);
 
@@ -243,6 +251,9 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
           if (same) {
             await db.syncMeta.delete("token");
             await setMeta(db, "needsPassphrase", true);
+            // A journal key CANDIDATE made from that same (refused) passphrase is retired: it
+            // can never be confirmed (journal review C1). A confirmed journal key is never touched.
+            await retireCandidateForToken(db, token);
           }
           return same;
         });
@@ -306,6 +317,13 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   }
   // The loop ran out while there was still work: say so rather than loop on.
   if (!finished) return { kind: "error", message: STOPPED_EARLY_MESSAGE };
+  // The server accepted this token for a whole run: remember it (the journal key candidate
+  // made with exactly this token may now be confirmed, journal/keyStore.ts).
+  await db.transaction("rw", db.syncMeta, async () => {
+    if ((await getMeta<string>(db, "token")) === token && (await getMeta<number>(db, "tokenVersion")) === tokenVersion) {
+      await setMeta(db, "acceptedToken", token);
+    }
+  });
   return { kind: "ok", sent, received, held };
 }
 
@@ -327,7 +345,7 @@ async function markStuck(db: HubDB, keys: { key: string; table: SyncTable; id: s
 
 /** Pending changes not yet attempted in this run, within the count and size limits. */
 async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted: Set<string>) {
-  return db.transaction("rw", [db.items, db.goals, db.files, db.pending], async () => {
+  return db.transaction("rw", [...syncTables(db), db.pending], async () => {
     const changes: WireChange[] = [];
     /** The pending entry's updatedAt when the request was built, per key. */
     const pendingVersions = new Map<string, number>();

@@ -5,7 +5,7 @@
 
 import { isValidISODate } from "../domain/dates";
 import { MAX_DONE_DATES } from "../domain/habits";
-import { AREA_IDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item } from "../domain/types";
+import { AREA_IDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 
 /** The longest goal why / cadence text (characters). */
 export const MAX_GOAL_TEXT = 4000;
@@ -145,6 +145,73 @@ export function validFile(r: unknown): r is FileRow {
     (purged
       ? r.data === "" && r.width === 0 && r.height === 0
       : r.data !== "" && side(r.width, 1) && side(r.height, 1)) &&
+    // A journal photo (sealed with the journal key) carries its IV; a plain picture has neither.
+    ((r.encrypted === undefined && r.iv === undefined && r.fp === undefined) ||
+      (r.encrypted === true && !purged && validIv(r.iv) && (r.fp === undefined || validFp(r.fp)))) &&
+    optStamp(r.updatedAt)
+  );
+}
+
+/** A key fingerprint: 16 lowercase hex characters. */
+const validFp = (v: unknown) => isStr(v) && /^[0-9a-f]{16}$/.test(v);
+
+/** Base64 of a 12-byte AES-GCM IV (always 16 characters, no padding). */
+const IV = /^[A-Za-z0-9+/]{16}$/;
+const validIv = (v: unknown) => isStr(v) && IV.test(v);
+/** The most base64 ciphertext one journal entry may hold (the same room as a picture). */
+export const MAX_JOURNAL_CT = MAX_FILE_DATA;
+const JOURNAL_KEYS = new Set(["id", "kind", "date", "fp", "iv", "ct", "updatedAt"]);
+const JOURNAL_KIND_LIST: readonly string[] = JOURNAL_KINDS;
+/** The part after `<kind>:<date>:` in a part id (a uuid, file id, device id or prompt id). */
+const SUFFIX = /^[A-Za-z0-9_-]{1,64}$/;
+/** A per-device answer's suffix: `<12 hex promptKey>:<deviceId>`. */
+const ANSWER_SUFFIX = /^[0-9a-f]{12}:[A-Za-z0-9_-]{8,64}$/;
+
+/** A journal row's id for its kind, day and (for parts) suffix. */
+export function journalId(kind: JournalRow["kind"], date: string, suffix?: string): string {
+  switch (kind) {
+    case "settings":
+    case "verifier":
+      return kind;
+    case "set":
+    case "morning":
+    case "checkin":
+      return `${kind}:${date}`;
+    default:
+      return `${kind}:${date}:${suffix ?? ""}`;
+  }
+}
+
+/** The id rule for one row: the id matches its kind and day (and a part has a plain suffix). */
+function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
+  if (["page", "photo", "draft", "answer"].includes(kind)) {
+    const prefix = `${kind}:${date}:`;
+    if (!id.startsWith(prefix)) return false;
+    const rest = id.slice(prefix.length);
+    // An answer is per device and names its prompt only by an opaque key:
+    // `answer:<date>:<12 hex promptKey>:<deviceId>` (the earlier shared `answer:<date>:<promptId>` still reads).
+    if (kind === "answer" && ANSWER_SUFFIX.test(rest)) return true;
+    return SUFFIX.test(rest);
+  }
+  return id === journalId(kind, date);
+}
+
+/**
+ * One journal row is valid (backup, sync, local writes). Nothing but the sealed entry and
+ * its clear kind/date/id/fingerprint may be in it: any other field (say, plaintext by
+ * mistake) makes the row invalid, so it is never stored or sent. Every new row carries the
+ * fingerprint of the key that sealed it; only the earlier one-row-per-day shape may lack it.
+ */
+export function validJournal(r: unknown): r is JournalRow {
+  return (
+    isObj(r) &&
+    Object.keys(r).every((k) => JOURNAL_KEYS.has(k)) &&
+    isStr(r.kind) && JOURNAL_KIND_LIST.includes(r.kind) &&
+    isStr(r.date) && isValidISODate(r.date) &&
+    isStr(r.id) && validJournalId(r.kind as JournalRow["kind"], r.date, r.id) &&
+    (r.kind === "morning" || r.kind === "checkin" ? r.fp === undefined || validFp(r.fp) : validFp(r.fp)) &&
+    validIv(r.iv) &&
+    isStr(r.ct) && r.ct !== "" && r.ct.length <= MAX_JOURNAL_CT && r.ct.length % 4 === 0 && BASE64.test(r.ct) &&
     optStamp(r.updatedAt)
   );
 }

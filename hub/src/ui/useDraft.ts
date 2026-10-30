@@ -1,5 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/**
+ * Calls `flush` when the page is hidden (app switched away, phone locked) or being unloaded:
+ * a backgrounded phone app may be ended without any blur or unmount.
+ */
+export function useHiddenFlush(flush: () => void): void {
+  const ref = useRef(flush);
+  ref.current = flush;
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") ref.current();
+    };
+    const onPageHide = () => ref.current();
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, []);
+}
+
 /** Autosave pause for typed text (round-3 brief: "debounced ~800ms"; a save delay, not motion). */
 export const AUTOSAVE_MS = 800;
 
@@ -60,6 +81,8 @@ export function useDraft(stored: string, save: (text: string) => Promise<unknown
 
   // Closing or swapping the panel unmounts the field: save what was typed.
   useEffect(() => () => flush(), [flush]);
+  // The app going to the background (a phone may end it there without a blur or unmount).
+  useHiddenFlush(flush);
 
   return { value, set, flush, reset };
 }

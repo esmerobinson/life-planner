@@ -3,6 +3,7 @@ import { syncController, useSyncState } from "../sync";
 import type { SyncController } from "../sync/controller";
 import { DEFAULT_SYNC_URL, saveSyncSettings, stopSyncing } from "../sync/engine";
 import { deriveToken } from "../sync/token";
+import { confirmJournalKey, saveJournalKeyFromSync } from "../journal/keyStore";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
@@ -64,6 +65,8 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
     }
     const secret = passphrase;
     setPassphrase("");
+    // Save stays disabled until the whole save (both derivations) is done, so two Saves never
+    // overlap (security re-review, fix round 2).
     setBusy(true);
     try {
       const token = await deriveToken(secret);
@@ -73,11 +76,22 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
       setNote("Saved.");
     } catch {
       setProblem("That did not save. Try again.");
+      setBusy(false);
       return;
+    }
+    // The journal's key from the same passphrase is only a candidate, bound to this token: it
+    // can't seal anything until the verifier or the server accepting exactly this token
+    // confirms it (review C1). Sync is saved either way; a failure here only means the Journal
+    // asks to unlock.
+    const journal = saveJournalKeyFromSync(controller.db, secret).catch(() => undefined);
+    const sync = controller.syncNow();
+    try {
+      await journal;
     } finally {
       setBusy(false);
     }
-    await controller.syncNow();
+    await sync;
+    await confirmJournalKey(controller.db).catch(() => undefined);
   }
 
   async function stop() {
@@ -124,7 +138,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
         </label>
         <p>
           The passphrase itself is not kept. A key made from it is stored on this device so sync can run by itself;
-          Stop syncing removes it.
+          Stop syncing removes it. The same passphrase also unlocks your journal on this device.
         </p>
         <p>{LOCKOUT_LINE}</p>
         <div className="form-actions">
