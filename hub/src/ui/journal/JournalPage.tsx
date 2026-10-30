@@ -6,6 +6,7 @@ import type { ISODate } from "../../domain/types";
 import { syncController } from "../../sync";
 import type { SyncController } from "../../sync/controller";
 import { getDeviceId } from "../../sync/engine";
+import { ScanPairingCode } from "../Pairing";
 import { DailyCheckIn } from "./DailyCheckIn";
 import { MentalHealthExercise } from "./MentalHealthExercise";
 import { MorningPages } from "./MorningPages";
@@ -103,9 +104,14 @@ function UnlockJournal() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
     const secret = passphrase;
     setPassphrase("");
+    await unlock(secret);
+  }
+
+  /** Unlock: the one routine for a typed passphrase and for a scanned or pasted pairing code. */
+  async function unlock(secret: string) {
+    if (busy) return;
     setProblem(null);
     setBusy(true);
     try {
@@ -123,7 +129,7 @@ function UnlockJournal() {
       <h2 id="unlock-journal" className="journal-big">
         Unlock journal
       </h2>
-      <p>Your journal is private to you. Type your sync passphrase to open it on this device.</p>
+      <p>Your journal is private to you. Type your sync passphrase, or scan a pairing code, to open it on this device.</p>
       <form onSubmit={(e) => void submit(e)}>
         <label className="form-field">
           <span className="form-label">Sync passphrase</span>
@@ -140,6 +146,7 @@ function UnlockJournal() {
           </button>
         </div>
       </form>
+      <ScanPairingCode busy={busy} onPassphrase={(secret) => unlock(secret)} />
       {problem && <p role="alert">{PROBLEMS[problem]}</p>}
     </section>
   );

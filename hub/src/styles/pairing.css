@@ -1,0 +1,26 @@
+/* Pair a device by QR code (Sync page, Journal "Unlock journal").
+   - The code is black #000000 on white #ffffff with the standard 4-module quiet zone, drawn in
+     the SVG itself (Pairing.tsx): asked for in the pairing brief so any camera reads it; these
+     are not palette colours and stay that way on any theme.
+   - 240px square, shrinking to fit a narrow screen (from the brief).
+   - Not in VISUAL-LANGUAGE.md (placeholders, obviously wrong on purpose): the camera view's
+     size and frame (magenta --placeholder outline) and the code's placement. Pills are the
+     existing secondary soft pill; nothing new. */
+.pairing-code,
+.pairing-scan {
+  margin: 8px 0 4px;
+}
+
+.pairing-qr {
+  display: block;
+  width: min(240px, 100%);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.pairing-camera {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  outline: 2px solid var(--placeholder);
+}
