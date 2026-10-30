@@ -146,26 +146,54 @@ export function validFile(r: unknown): r is FileRow {
       ? r.data === "" && r.width === 0 && r.height === 0
       : r.data !== "" && side(r.width, 1) && side(r.height, 1)) &&
     // A journal photo (sealed with the journal key) carries its IV; a plain picture has neither.
-    ((r.encrypted === undefined && r.iv === undefined) || (r.encrypted === true && !purged && validIv(r.iv))) &&
+    ((r.encrypted === undefined && r.iv === undefined && r.fp === undefined) ||
+      (r.encrypted === true && !purged && validIv(r.iv) && (r.fp === undefined || validFp(r.fp)))) &&
     optStamp(r.updatedAt)
   );
 }
+
+/** A key fingerprint: 16 lowercase hex characters. */
+const validFp = (v: unknown) => isStr(v) && /^[0-9a-f]{16}$/.test(v);
 
 /** Base64 of a 12-byte AES-GCM IV (always 16 characters, no padding). */
 const IV = /^[A-Za-z0-9+/]{16}$/;
 const validIv = (v: unknown) => isStr(v) && IV.test(v);
 /** The most base64 ciphertext one journal entry may hold (the same room as a picture). */
 export const MAX_JOURNAL_CT = MAX_FILE_DATA;
-const JOURNAL_KEYS = new Set(["id", "kind", "date", "iv", "ct", "updatedAt"]);
+const JOURNAL_KEYS = new Set(["id", "kind", "date", "fp", "iv", "ct", "updatedAt"]);
 const JOURNAL_KIND_LIST: readonly string[] = JOURNAL_KINDS;
+/** The part after `<kind>:<date>:` in a part id (a uuid, file id, device id or prompt id). */
+const SUFFIX = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** The id a journal row must have: `${kind}:${date}` (one row per kind per day). */
-export const journalId = (kind: JournalRow["kind"], date: string) => `${kind}:${date}`;
+/** A journal row's id for its kind, day and (for parts) suffix. */
+export function journalId(kind: JournalRow["kind"], date: string, suffix?: string): string {
+  switch (kind) {
+    case "settings":
+    case "verifier":
+      return kind;
+    case "set":
+    case "morning":
+    case "checkin":
+      return `${kind}:${date}`;
+    default:
+      return `${kind}:${date}:${suffix ?? ""}`;
+  }
+}
+
+/** The id rule for one row: the id matches its kind and day (and a part has a plain suffix). */
+function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
+  if (["page", "photo", "draft", "answer"].includes(kind)) {
+    const prefix = `${kind}:${date}:`;
+    return id.startsWith(prefix) && SUFFIX.test(id.slice(prefix.length));
+  }
+  return id === journalId(kind, date);
+}
 
 /**
  * One journal row is valid (backup, sync, local writes). Nothing but the sealed entry and
- * its clear kind/date/id may be in it: any other field (say, plaintext by mistake) makes
- * the row invalid, so it is never stored or sent.
+ * its clear kind/date/id/fingerprint may be in it: any other field (say, plaintext by
+ * mistake) makes the row invalid, so it is never stored or sent. Every new row carries the
+ * fingerprint of the key that sealed it; only the earlier one-row-per-day shape may lack it.
  */
 export function validJournal(r: unknown): r is JournalRow {
   return (
@@ -173,7 +201,8 @@ export function validJournal(r: unknown): r is JournalRow {
     Object.keys(r).every((k) => JOURNAL_KEYS.has(k)) &&
     isStr(r.kind) && JOURNAL_KIND_LIST.includes(r.kind) &&
     isStr(r.date) && isValidISODate(r.date) &&
-    r.id === journalId(r.kind as JournalRow["kind"], r.date) &&
+    isStr(r.id) && validJournalId(r.kind as JournalRow["kind"], r.date, r.id) &&
+    (r.kind === "morning" || r.kind === "checkin" ? r.fp === undefined || validFp(r.fp) : validFp(r.fp)) &&
     validIv(r.iv) &&
     isStr(r.ct) && r.ct !== "" && r.ct.length <= MAX_JOURNAL_CT && r.ct.length % 4 === 0 && BASE64.test(r.ct) &&
     optStamp(r.updatedAt)

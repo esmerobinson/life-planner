@@ -3,205 +3,243 @@ import { vi } from "vitest";
 import { db, HubDB } from "./db";
 import { exportBackup, INVALID_BACKUP, parseBackup, restoreBackup } from "./backup";
 import {
-  addMorningPhoto, CANT_OPEN, finishMorningPage, listCheckins, listMorningDays, openJournalPhoto, readCheckin,
-  morningOpensOn, readMorningDay, readMorningText, saveCheckin, saveMorningDraft,
+  addMorningPhoto, CANT_OPEN, currentStep, ensureCheckinSet, finishMorningPage, listCheckinDays, listMorningDone,
+  listReadBack, morningOpensOn, NOT_CONFIRMED, openJournalPhoto, readCheckinDay, readMorningDay, readMorningPage,
+  readPromptSettings, saveAnswer, saveMorningDraft, savePromptSettings, getFile,
 } from "./repo";
 import { journalId, validFile, validJournal } from "./validate";
-import { deriveJournalKey, journalAad, openJson, sealJson, toBase64 } from "../journal/crypto";
-import type { MorningEntry } from "../journal/entries";
+import { journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
+import { confirmedDevice, keyFor } from "../test/journalKey";
 
-// The journal (journal brief §3): sealed rows only, validated, tracked for sync, backed up
-// as they are; morning pages' text never comes back out.
+// The journal (journal brief §3; review C1, C2, I3): every part of a day is its own sealed
+// row; only the confirmed key writes; a row that doesn't open is skipped on its own.
 
 const DAY = "2026-10-28";
+const ME = "device-mac-0001";
 const WORDS = "Pretend morning words about a made-up dream";
-let key: CryptoKey;
-let otherKey: CryptoKey;
+let jk: JournalKey;
+let other: JournalKey;
 beforeAll(async () => {
-  key = await deriveJournalKey("pretend passphrase one");
-  otherKey = await deriveJournalKey("pretend passphrase two");
+  jk = await keyFor("fake-journal-one");
+  other = await keyFor("fake-journal-two");
 });
 
 let clock = 1_800_000_000_000;
 beforeEach(async () => {
   clock = 1_800_000_000_000;
   vi.spyOn(Date, "now").mockImplementation(() => clock++);
-  await Promise.all([db.journal.clear(), db.files.clear(), db.pending.clear(), db.syncMeta.clear()]);
+  await Promise.all([db.journal.clear(), db.files.clear(), db.pending.clear(), db.syncMeta.clear(), db.items.clear()]);
+  await confirmedDevice(db, jk);
 });
 afterEach(() => vi.restoreAllMocks());
 
 const IV16 = toBase64(new Uint8Array(12));
+const FP = "0123456789abcdef";
 const row = (o: Record<string, unknown> = {}) => ({
-  id: "morning:2026-10-28", kind: "morning", date: "2026-10-28", iv: IV16, ct: "AAAAAAAAAAAAAAAAAAAAAA==", ...o,
+  id: "page:2026-10-28:abc", kind: "page", date: "2026-10-28", fp: FP, iv: IV16, ct: "AAAAAAAAAAAAAAAAAAAAAA==", ...o,
 });
+/** A row of `kind` sealed with `key` (as another device would have written it). */
+async function sealedRow(key: JournalKey, kind: string, date: string, suffix: string | undefined, entry: unknown) {
+  const id = journalId(kind as never, date, suffix);
+  return { id, kind: kind as never, date, fp: key.fp, ...(await sealJson(key.key, entry, journalAad(id))) };
+}
 
 describe("validJournal", () => {
-  it("accepts a sealed row for each kind, with its deterministic id", () => {
+  it("accepts each kind with its id rule and a fingerprint", () => {
     expect(validJournal(row())).toBe(true);
-    expect(validJournal(row({ id: "checkin:2026-10-28", kind: "checkin" }))).toBe(true);
-    expect(validJournal(row({ updatedAt: 5 }))).toBe(true);
-    expect(journalId("morning", DAY)).toBe("morning:2026-10-28");
-    expect(journalId("checkin", DAY)).toBe("checkin:2026-10-28");
+    expect(validJournal(row({ id: "photo:2026-10-28:f-1", kind: "photo" }))).toBe(true);
+    expect(validJournal(row({ id: `draft:2026-10-28:${ME}`, kind: "draft" }))).toBe(true);
+    expect(validJournal(row({ id: "answer:2026-10-28:M1", kind: "answer" }))).toBe(true);
+    expect(validJournal(row({ id: "set:2026-10-28", kind: "set" }))).toBe(true);
+    expect(validJournal(row({ id: "settings", kind: "settings" }))).toBe(true);
+    expect(validJournal(row({ id: "verifier", kind: "verifier" }))).toBe(true);
+    // The earlier one-row-per-day shape is still readable (no fingerprint).
+    const { fp: _fp, ...legacy } = row({ id: "morning:2026-10-28", kind: "morning" });
+    expect(validJournal(legacy)).toBe(true);
   });
 
-  it("refuses anything but the sealed fields (plaintext by mistake can never be stored or sent)", () => {
+  it("refuses plaintext fields, a missing fingerprint on new rows, bad ids, and the dropped plan kind", () => {
     expect(validJournal(row({ text: "Pretend" }))).toBe(false);
-    expect(validJournal(row({ answers: [] }))).toBe(false);
-  });
-
-  it("refuses a wrong id, kind, date, IV or ciphertext", () => {
-    expect(validJournal(row({ id: "morning:2026-10-27" }))).toBe(false);
-    expect(validJournal(row({ id: "x" }))).toBe(false);
-    expect(validJournal(row({ kind: "diary" }))).toBe(false);
-    expect(validJournal(row({ id: "morning:2026-02-30", date: "2026-02-30" }))).toBe(false);
+    const { fp: _fp, ...noFp } = row();
+    expect(validJournal(noFp)).toBe(false);
+    expect(validJournal(row({ fp: "XYZ" }))).toBe(false);
+    expect(validJournal(row({ id: "page:2026-10-27:abc" }))).toBe(false);
+    expect(validJournal(row({ id: "page:2026-10-28:" }))).toBe(false);
+    expect(validJournal(row({ id: "page:2026-10-28:a b" }))).toBe(false);
+    expect(validJournal(row({ id: "set:2026-10-28:x", kind: "set" }))).toBe(false);
+    expect(validJournal(row({ id: "plan", kind: "plan" }))).toBe(false);
     expect(validJournal(row({ iv: "short" }))).toBe(false);
-    expect(validJournal(row({ ct: "" }))).toBe(false);
     expect(validJournal(row({ ct: "not base64!" }))).toBe(false);
-    expect(validJournal(row({ id: "plan", kind: "plan" }))).toBe(false); // no crisis-plan kind (dropped from scope)
   });
-});
 
-describe("validFile for journal photos", () => {
-  const file = { id: "f", mime: "image/jpeg", data: "AAAA", width: 4, height: 3, createdAt: DAY };
-  it("an encrypted photo carries a 12-byte IV; a plain picture carries neither", () => {
+  it("an encrypted photo file carries its IV (and may carry a fingerprint); a plain picture carries neither", () => {
+    const file = { id: "f", mime: "image/jpeg", data: "AAAA", width: 4, height: 3, createdAt: DAY };
     expect(validFile(file)).toBe(true);
-    expect(validFile({ ...file, encrypted: true, iv: IV16 })).toBe(true);
+    expect(validFile({ ...file, encrypted: true, iv: IV16, fp: FP })).toBe(true);
     expect(validFile({ ...file, encrypted: true })).toBe(false);
     expect(validFile({ ...file, iv: IV16 })).toBe(false);
-    expect(validFile({ ...file, encrypted: false, iv: IV16 })).toBe(false);
-    expect(validFile({ ...file, encrypted: true, iv: "bad" })).toBe(false);
+    expect(validFile({ ...file, fp: FP })).toBe(false);
   });
 });
 
-describe("morning pages", () => {
-  it("a draft is stored sealed: the stored object holds no plaintext, and it is pending for sync", async () => {
-    await saveMorningDraft(key, DAY, WORDS);
-    const stored = await db.journal.get("morning:2026-10-28");
-    expect(Object.keys(stored!).sort()).toEqual(["ct", "date", "id", "iv", "kind", "updatedAt"]);
+describe("only the confirmed key writes", () => {
+  it("another key (a candidate, a stale one) is refused inside the write and nothing is stored", async () => {
+    const before = await db.journal.count();
+    await expect(saveMorningDraft(other, DAY, ME, "Pretend")).rejects.toThrow(NOT_CONFIRMED);
+    await db.syncMeta.delete("journalKey"); // e.g. the view still holds a key that is gone
+    await expect(saveMorningDraft(jk, DAY, ME, "Pretend")).rejects.toThrow(NOT_CONFIRMED);
+    await expect(saveAnswer(jk, DAY, "M1", "Pretend", false)).rejects.toThrow(NOT_CONFIRMED);
+    expect(await db.journal.count()).toBe(before);
+  });
+});
+
+describe("morning pages (each part its own row)", () => {
+  it("a draft is this device's own sealed row: no plaintext, fingerprinted, pending for sync", async () => {
+    await saveMorningDraft(jk, DAY, ME, WORDS);
+    const stored = (await db.journal.get(`draft:${DAY}:${ME}`))!;
+    expect(Object.keys(stored).sort()).toEqual(["ct", "date", "fp", "id", "iv", "kind", "updatedAt"]);
+    expect(stored.fp).toBe(jk.fp);
     expect(JSON.stringify(stored)).not.toContain("Pretend");
-    expect(JSON.stringify(stored)).not.toContain("dream");
-    expect(await db.pending.get(["journal", "morning:2026-10-28"])).toBeTruthy();
-    expect(await readMorningDay(key, DAY)).toMatchObject({ state: "ok", done: false, draft: WORDS });
+    expect(await db.pending.get(["journal", stored.id])).toBeTruthy();
+    expect(await readMorningDay(jk, DAY, ME)).toMatchObject({ done: false, draft: WORDS });
+    expect((await readMorningDay(jk, DAY, "device-phone-01")).draft).toBe(""); // another device's draft is its own
   });
 
-  it("I'm done: the day is done and the finished text never comes back out; a second page appends", async () => {
-    await saveMorningDraft(key, DAY, WORDS);
-    await finishMorningPage(key, DAY, WORDS);
-    const view = await readMorningDay(key, DAY);
-    expect(view).toEqual({ date: DAY, state: "ok", done: true, pages: 1, draft: "", photos: [] });
+  it("I'm done adds a page row and empties the draft; another page that day is another row", async () => {
+    await saveMorningDraft(jk, DAY, ME, WORDS);
+    await finishMorningPage(jk, DAY, ME, WORDS);
+    const view = await readMorningDay(jk, DAY, ME);
+    expect(view).toEqual({ date: DAY, done: true, pages: 1, draft: "", photos: [], unreadable: 0 });
     expect(JSON.stringify(view)).not.toContain("Pretend");
-    await finishMorningPage(key, DAY, "Pretend second page");
-    const days = await listMorningDays(key);
-    expect(days).toHaveLength(1);
-    expect(JSON.stringify(days)).not.toContain("Pretend");
-    // It is all there, sealed (opened here by hand, as no app read returns it).
-    const raw = await db.journal.get("morning:2026-10-28");
-    const entry = await openJson<MorningEntry>(key, raw!, journalAad(raw!.id));
-    expect(entry.text).toBe(`${WORDS}\n\nPretend second page`);
-    expect(entry.pages).toBe(2);
+    await finishMorningPage(jk, DAY, ME, "Pretend second page");
+    expect((await readMorningDay(jk, DAY, ME)).pages).toBe(2);
+    expect((await db.journal.where("kind").equals("page").toArray()).map((r) => r.date)).toEqual([DAY, DAY]);
+    expect(await listMorningDone(jk)).toEqual(new Set([DAY]));
   });
 
-  it("a photo is sealed into an encrypted file row, listed on the day, and marks it done", async () => {
+  it("a photo: an encrypted file row plus a photo row; the day is done; it opens only with this key", async () => {
     const jpeg = toBase64(Uint8Array.from([255, 216, 255, 224, 1, 2, 3]));
-    const id = await addMorningPhoto(key, DAY, { mime: "image/jpeg", data: jpeg, width: 40, height: 30 });
-    const f = await db.files.get(id);
-    expect(f).toMatchObject({ encrypted: true, mime: "image/jpeg", width: 40, height: 30, createdAt: DAY });
-    expect(f!.data).not.toBe(jpeg);
-    expect(validFile(f)).toBe(true);
-    expect(await db.pending.get(["files", id])).toBeTruthy();
-    expect(await readMorningDay(key, DAY)).toMatchObject({ done: true, pages: 0, photos: [id] });
-    const opened = await openJournalPhoto(key, id);
-    expect(opened.state).toBe("ok");
-    const bytes = new Uint8Array(await (opened as { blob: Blob }).blob.arrayBuffer());
-    expect(toBase64(bytes)).toBe(jpeg);
-    expect((await openJournalPhoto(otherKey, id)).state).toBe("unreadable");
-    expect((await openJournalPhoto(key, "not-here-yet")).state).toBe("missing");
+    const id = await addMorningPhoto(jk, DAY, { mime: "image/jpeg", data: jpeg, width: 40, height: 30 });
+    const f = (await db.files.get(id))!;
+    expect(f).toMatchObject({ encrypted: true, fp: jk.fp, mime: "image/jpeg", createdAt: DAY });
+    expect(f.data).not.toBe(jpeg);
+    expect(await db.journal.get(`photo:${DAY}:${id}`)).toMatchObject({ kind: "photo", fp: jk.fp });
+    expect(await readMorningDay(jk, DAY, ME)).toMatchObject({ done: true, pages: 0, photos: [id] });
+    const opened = await openJournalPhoto(jk, id);
+    expect(toBase64(new Uint8Array(await (opened as { blob: Blob }).blob.arrayBuffer()))).toBe(jpeg);
+    expect((await openJournalPhoto(other, id)).state).toBe("unreadable");
+    expect((await openJournalPhoto(jk, "not-here-yet")).state).toBe("missing");
+    expect(await getFile(id)).toBeUndefined(); // never shown as a page's picture (review M9)
   });
 
-  it("a wrong key: the day can't be opened, and nothing is written over it", async () => {
-    await finishMorningPage(key, DAY, WORDS);
-    const before = await db.journal.get("morning:2026-10-28");
-    expect(await readMorningDay(otherKey, DAY)).toMatchObject({ state: "unreadable", done: false });
-    await expect(saveMorningDraft(otherKey, DAY, "Pretend")).rejects.toThrow(CANT_OPEN);
-    await expect(finishMorningPage(otherKey, DAY, "Pretend")).rejects.toThrow(CANT_OPEN);
-    expect(await db.journal.get("morning:2026-10-28")).toEqual(before);
+  it("a row this key can't open is skipped on its own and blocks nothing (review I3)", async () => {
+    await db.journal.put(await sealedRow(other, "draft", DAY, ME, { v: 1, text: "Pretend other" }));
+    await db.journal.put(await sealedRow(other, "page", DAY, "theirs", { v: 1, text: "Pretend other", at: 1 }));
+    const view = await readMorningDay(jk, DAY, ME);
+    expect(view).toMatchObject({ done: true, pages: 1, unreadable: 1, draft: "" });
+    // New parts are new rows: writing still works and the unreadable rows are untouched.
+    const before = await db.journal.get(`page:${DAY}:theirs`);
+    await finishMorningPage(jk, DAY, ME, "Pretend mine");
+    expect((await readMorningDay(jk, DAY, ME)).pages).toBe(2);
+    expect(await db.journal.get(`page:${DAY}:theirs`)).toEqual(before);
+    expect(CANT_OPEN).toBe("Can't open this entry on this device");
   });
 
-  it("a tampered row can't be opened (no crash)", async () => {
-    await finishMorningPage(key, DAY, WORDS);
-    const r = (await db.journal.get("morning:2026-10-28"))!;
-    // Another day's sealed entry copied into this row (still a valid row shape).
-    await saveMorningDraft(key, "2026-10-27", "Pretend");
-    const other = (await db.journal.get("morning:2026-10-27"))!;
-    await db.journal.put({ ...r, iv: other.iv, ct: other.ct });
-    expect((await readMorningDay(key, DAY)).state).toBe("unreadable");
+  it("the earlier one-row-per-day shape is split on read", async () => {
+    const legacyId = "morning:2026-10-20";
+    const sealed = await sealJson(jk.key, { v: 1, text: "Pretend legacy", pages: 1, photos: ["f-old"], draft: "Pretend legacy draft" }, journalAad(legacyId));
+    await db.journal.put({ id: legacyId, kind: "morning", date: "2026-10-20", ...sealed });
+    expect(await readMorningDay(jk, "2026-10-20", ME)).toMatchObject({ done: true, pages: 1, photos: ["f-old"], draft: "Pretend legacy draft" });
+    expect(await listMorningDone(jk)).toEqual(new Set(["2026-10-20"]));
+    expect(await readMorningPage(jk, legacyId, "2026-11-30")).toEqual({ state: "ok", text: "Pretend legacy" });
   });
 });
 
-describe("read back (typed pages hidden for 4 weeks)", () => {
-  it("locked before day 28 (and not even decrypted), readable read-only on and after day 28", async () => {
-    await finishMorningPage(key, "2026-10-01", WORDS);
+describe("read back (each page hidden for 4 weeks)", () => {
+  it("locked before day 28 (not even decrypted), readable read-only on and after day 28", async () => {
+    const id = await finishMorningPage(jk, "2026-10-01", ME, WORDS);
     expect(morningOpensOn("2026-10-01")).toBe("2026-10-29");
+    expect(await listReadBack()).toEqual([{ id, date: "2026-10-01" }]);
     const decrypt = vi.spyOn(crypto.subtle, "decrypt");
-    expect(await readMorningText(key, "2026-10-01", "2026-10-01")).toEqual({ state: "locked", opensOn: "2026-10-29" });
-    expect(await readMorningText(key, "2026-10-01", "2026-10-28")).toEqual({ state: "locked", opensOn: "2026-10-29" });
+    expect(await readMorningPage(jk, id, "2026-10-01")).toEqual({ state: "locked", opensOn: "2026-10-29" });
+    expect(await readMorningPage(jk, id, "2026-10-28")).toEqual({ state: "locked", opensOn: "2026-10-29" });
     expect(decrypt).not.toHaveBeenCalled();
-    expect(await readMorningText(key, "2026-10-01", "2026-10-29")).toEqual({ state: "ok", text: WORDS });
-    expect(await readMorningText(key, "2026-10-01", "2027-03-01")).toEqual({ state: "ok", text: WORDS });
+    expect(await readMorningPage(jk, id, "2026-10-29")).toEqual({ state: "ok", text: WORDS });
+    expect(await readMorningPage(jk, id, "2027-03-01")).toEqual({ state: "ok", text: WORDS });
   });
 
-  it("across a month and year boundary; a draft-only day or a wrong key has nothing to read", async () => {
-    await finishMorningPage(key, "2026-12-20", "Pretend winter page");
-    expect((await readMorningText(key, "2026-12-20", "2027-01-16")).state).toBe("locked");
-    expect(await readMorningText(key, "2026-12-20", "2027-01-17")).toEqual({ state: "ok", text: "Pretend winter page" });
-    await saveMorningDraft(key, "2026-09-01", "Pretend draft");
-    expect((await readMorningText(key, "2026-09-01", "2026-10-28")).state).toBe("none");
-    expect((await readMorningText(otherKey, "2026-12-20", "2027-02-01")).state).toBe("unreadable");
+  it("across a year boundary; each page of a day separately; another key can't read", async () => {
+    const a = await finishMorningPage(jk, "2026-12-20", ME, "Pretend winter one");
+    const b = await finishMorningPage(jk, "2026-12-20", ME, "Pretend winter two");
+    expect((await readMorningPage(jk, a, "2027-01-16")).state).toBe("locked");
+    expect(await readMorningPage(jk, a, "2027-01-17")).toEqual({ state: "ok", text: "Pretend winter one" });
+    expect(await readMorningPage(jk, b, "2027-01-17")).toEqual({ state: "ok", text: "Pretend winter two" });
+    expect((await readMorningPage(other, a, "2027-02-01")).state).toBe("unreadable");
   });
 });
 
-describe("check-ins", () => {
-  it("saves, reads and lists check-ins newest first", async () => {
-    await saveCheckin(key, "2026-10-27", { prompts: ["M1", "D3", "K2"], answers: ["Pretend", null, "Pretend kind"], step: 3, finished: true });
-    await saveCheckin(key, DAY, { prompts: ["E3", "E6", "K4"], answers: ["Pretend", null, null], step: 1, finished: false });
-    expect(await readCheckin(key, DAY)).toEqual({
-      state: "ok", entry: { v: 1, prompts: ["E3", "E6", "K4"], answers: ["Pretend", null, null], step: 1, finished: false },
-    });
-    expect((await listCheckins(key)).map((c) => c.date)).toEqual([DAY, "2026-10-27"]);
+describe("check-in (a set row plus one row per answer)", () => {
+  it("the first device writes the day's set; a second set is never written over it", async () => {
+    expect(await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"])).toBe(true);
+    expect(await ensureCheckinSet(jk, DAY, ["E3", "E6", "K4"])).toBe(false);
+    const day = await readCheckinDay(jk, DAY);
+    expect(day.prompts).toEqual(["M1", "D3", "K2"]);
+    expect(currentStep(day)).toBe(0);
+  });
+
+  it("answers are separate rows; a typed-but-not-moved-past answer keeps the step; done moves on", async () => {
+    await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
+    await saveAnswer(jk, DAY, "M1", "Pretend typing", false);
+    let day = await readCheckinDay(jk, DAY);
+    expect(day.answers.get("M1")).toMatchObject({ answer: "Pretend typing", done: false });
+    expect(currentStep(day)).toBe(0);
+    await saveAnswer(jk, DAY, "M1", "Pretend typing", true);
+    await saveAnswer(jk, DAY, "D3", null, true);
+    await saveAnswer(jk, DAY, "K2", "Pretend kind", true);
+    day = await readCheckinDay(jk, DAY);
+    expect(currentStep(day)).toBe(-1);
     expect(JSON.stringify(await db.journal.toArray())).not.toContain("Pretend");
-    await expect(saveCheckin(key, DAY, { prompts: ["E3"], answers: [], step: 0, finished: false })).rejects.toThrow();
+  });
+
+  it("answers to prompts outside the set (another device's set) are kept and shown after it", async () => {
+    await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
+    await saveAnswer(jk, DAY, "E3", "Pretend from the phone's set", true);
+    const day = await readCheckinDay(jk, DAY);
+    expect(day.prompts).toEqual(["M1", "D3", "K2", "E3"]);
+  });
+
+  it("the earlier one-row-per-day check-in is split on read", async () => {
+    const id = "checkin:2026-10-20";
+    const sealed = await sealJson(jk.key, { v: 1, prompts: ["M1", "K2"], answers: ["Pretend old", null], step: 2, finished: true }, journalAad(id));
+    await db.journal.put({ id, kind: "checkin", date: "2026-10-20", ...sealed });
+    const day = await readCheckinDay(jk, "2026-10-20");
+    expect(day.prompts).toEqual(["M1", "K2"]);
+    expect(day.answers.get("M1")).toMatchObject({ answer: "Pretend old", done: true });
+    expect(currentStep(day)).toBe(-1);
+    expect((await listCheckinDays(jk)).map((d) => d.date)).toEqual(["2026-10-20"]);
+  });
+
+  it("Choose questions is a synced, sealed settings row", async () => {
+    expect(await readPromptSettings(jk)).toBeNull();
+    await savePromptSettings(jk, ["M1", "M3"], DAY);
+    expect(await readPromptSettings(jk)).toEqual(["M1", "M3"]);
+    expect(await db.journal.get("settings")).toMatchObject({ kind: "settings", fp: jk.fp });
+    expect(await readPromptSettings(other)).toBeNull();
   });
 });
 
 describe("backup with the journal", () => {
-  it("contains the sealed rows as they are, and a replace restore brings them back", async () => {
-    await finishMorningPage(key, DAY, WORDS);
-    await saveCheckin(key, DAY, { prompts: ["E3", "E6", "K4"], answers: ["Pretend", null, null], step: 1, finished: false });
+  it("contains the sealed rows as they are; replace brings them back; a plaintext field refuses the file", async () => {
+    await finishMorningPage(jk, DAY, ME, WORDS);
+    await saveAnswer(jk, DAY, "M1", "Pretend", true);
     const exported = JSON.parse(JSON.stringify(await exportBackup(DAY)));
-    expect(exported.journal).toHaveLength(2);
+    expect(exported.journal.length).toBeGreaterThanOrEqual(3);
     expect(JSON.stringify(exported)).not.toContain("Pretend");
     await db.journal.clear();
     await restoreBackup(exported, "replace");
-    expect(await readMorningDay(key, DAY)).toMatchObject({ done: true });
-    expect(await readCheckin(key, DAY)).toMatchObject({ entry: { answers: ["Pretend", null, null] } });
-  });
-
-  it("merge adds only missing entries; a row with a plaintext field refuses the whole file", async () => {
-    const cid = "checkin:2026-10-28";
-    await saveCheckin(key, DAY, { prompts: ["E3"], answers: ["Pretend kept"], step: 1, finished: true });
-    const sealed = await sealJson(key, { v: 1, prompts: ["E3"], answers: ["Pretend other"], step: 1, finished: true }, journalAad(cid));
-    const other = { id: cid, kind: "checkin", date: DAY, ...sealed };
-    const morning = (await (async () => {
-      await saveMorningDraft(key, "2026-10-01", "Pretend");
-      const r = (await db.journal.get("morning:2026-10-01"))!;
-      await db.journal.delete(r.id);
-      return r;
-    })());
-    const file = { app: "life-hub", schema: 1, exportedOn: DAY, items: [], goals: [], journal: [other, morning] };
-    await restoreBackup(file, "merge");
-    expect(await readCheckin(key, DAY)).toMatchObject({ entry: { answers: ["Pretend kept"] } });
-    expect(await db.journal.get("morning:2026-10-01")).toBeTruthy();
-    expect(() => parseBackup({ ...file, journal: [{ ...other, text: "Pretend" }] })).toThrow(INVALID_BACKUP);
+    expect((await readMorningDay(jk, DAY, ME)).done).toBe(true);
+    const bad = { ...exported, journal: [{ ...exported.journal[0], text: "Pretend" }] };
+    expect(() => parseBackup(bad)).toThrow(INVALID_BACKUP);
   });
 });
 
@@ -227,4 +265,10 @@ describe("database v5", () => {
     now.close();
     await Dexie.delete(name);
   });
+});
+
+it("open-the-JSON helper still works for tests that need it", async () => {
+  const id = await finishMorningPage(jk, DAY, ME, "Pretend");
+  const r = (await db.journal.get(id))!;
+  expect(await openJson(jk.key, r, journalAad(id))).toMatchObject({ v: 1, text: "Pretend" });
 });

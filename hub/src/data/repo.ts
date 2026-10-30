@@ -500,7 +500,7 @@ async function purgePictures(pages: (string | undefined)[]): Promise<void> {
   for (const id of gone) {
     if (stillShown.has(id)) continue;
     const f = await db.files.get(id);
-    if (!f || f.status === "purged") continue;
+    if (!f || f.status === "purged" || f.encrypted === true) continue; // journal photos are never a page's
     tombs.push({ id, mime: f.mime, data: "", width: 0, height: 0, createdAt: f.createdAt, status: "purged" });
   }
   if (tombs.length) await db.files.bulkPut(tombs);
@@ -508,7 +508,8 @@ async function purgePictures(pages: (string | undefined)[]): Promise<void> {
 
 /** A picture as stored (undefined until it has arrived on this device). */
 export async function getFile(id: string): Promise<FileRow | undefined> {
-  return db.files.get(id);
+  const f = await db.files.get(id);
+  return f?.encrypted === true ? undefined : f; // a journal photo is never shown on a page
 }
 
 /** Stores a new picture for a page; returns its id (the page refers to it as `![](file:<id>)`). */
