@@ -5,7 +5,8 @@ import { vi } from "vitest";
 import { db } from "../data/db";
 import { createGoal, createItem, deleteGoal, setGoalOnHome, tickItem } from "../data/repo";
 import { AppShell } from "./AppShell";
-import { HomePage } from "./HomePage";
+import type { Goal } from "../domain/types";
+import { HomePage, homeGoals } from "./HomePage";
 import { Route, Routes, useLocation } from "react-router-dom";
 
 const TODAY = "2026-10-27";
@@ -91,7 +92,7 @@ describe("HomePage", () => {
   it("goals without a target are not listed as bars", async () => {
     await createGoal({ title: "Targetless", areaId: "mind", kind: "practice" }, TODAY);
     renderHome();
-    expect(await screen.findByText("No monthly targets yet.")).toBeInTheDocument();
+    expect(await screen.findByText("Choose which goals show here.")).toBeInTheDocument();
     expect(screen.queryByText("Targetless")).toBeNull();
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
@@ -141,6 +142,32 @@ describe("HomePage", () => {
     await vi.waitFor(async () => expect(await db.goals.get(mind.id)).not.toHaveProperty("onHome"));
     await userEvent.click(within(column).getByRole("button", { name: "Done" }));
     expect(await within(column).findByRole("link", { name: "Pretend target goal" })).toBeInTheDocument();
+  });
+
+  it("goals all set not to show (onHome false) fall back to the goals with a monthly target", async () => {
+    const a = await createGoal({ title: "Pretend target goal", areaId: "art", kind: "practice", monthlyTarget: 4 }, TODAY);
+    await db.goals.update(a.id, { onHome: false });
+    renderHome();
+    const column = await screen.findByRole("complementary", { name: "Goals this month" });
+    expect(await within(column).findByRole("link", { name: "Pretend target goal" })).toBeInTheDocument();
+  });
+
+  it("goals but none chosen and none with a monthly target: the heading, one line and Choose goals", async () => {
+    await createGoal({ title: "Targetless", areaId: "mind", kind: "practice" }, TODAY);
+    renderHome();
+    const column = await screen.findByRole("complementary", { name: "Goals this month" });
+    expect(within(column).getByRole("heading", { level: 2, name: "Goals this month" })).toBeInTheDocument();
+    expect(await within(column).findByText("Choose which goals show here.")).toBeInTheDocument();
+    expect(within(column).getByRole("button", { name: "Choose goals" })).toBeInTheDocument();
+  });
+
+  it("homeGoals: chosen first; else monthly targets; else nothing (the column still shows)", () => {
+    const g = (id: string, extra: Record<string, unknown> = {}) =>
+      ({ id, title: id, areaId: "art", kind: "practice", milestones: [], createdAt: TODAY, ...extra }) as Goal;
+    expect(homeGoals([g("a", { monthlyTarget: 2 }), g("b")], [], TODAY)).toEqual({ goals: [g("a", { monthlyTarget: 2 })], chosen: false });
+    expect(homeGoals([g("a", { monthlyTarget: 2 }), g("b", { onHome: true })], [], TODAY).goals.map((x) => x.id)).toEqual(["b"]);
+    expect(homeGoals([g("a", { onHome: false, monthlyTarget: 2 })], [], TODAY).goals.map((x) => x.id)).toEqual(["a"]);
+    expect(homeGoals([g("b")], [], TODAY).goals).toEqual([]);
   });
 
   it("no Choose goals link before there are any goals", async () => {

@@ -144,5 +144,20 @@ body {
 /* Home layout A. Right column width from approved mockup (option 3); provisional. */
 .home-page {
   display: grid;
-  grid-template-columns: 1fr 190px;
+  /* minmax(0, …): long Today strips wrap inside their column instead of pushing the goals
+     column over. 32px clear between Today and the goals column (Esme, 2026-11-02: "it sits
+     too closely to Today"). */
+  grid-template-columns: minmax(0, 1fr) 190px;
+  column-gap: 32px;
+  row-gap: 32px;
+}
+/* Under 1000px wide the goals column goes below Today instead of squashing against it
+   (2026-11-02). It keeps its 190px width; how it should look there is not decided yet. */
+@media (max-width: 999.98px) {
+  .home-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-page .home-goals {
+    width: 190px;
+  }
 }
