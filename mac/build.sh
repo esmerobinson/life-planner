@@ -5,7 +5,11 @@
 #   mac/build.sh --skip-web   reuse the existing hub/dist (no npm run build)
 #   mac/build.sh --install    also copy the app to ~/Applications/Esmeworld.app
 #
-# Requires: node/npm (unless --skip-web), swiftc, sips, iconutil, codesign, plutil.
+# Signing: $ESMEWORLD_SIGN_IDENTITY if set, else a login-keychain code-signing
+# identity named exactly "Esmeworld Local Signing", else ad hoc (see README).
+#
+# Requires: node/npm (unless --skip-web), swiftc, sips, iconutil, codesign, plutil,
+# security; --install also uses ditto and /usr/bin/python3 (for an atomic swap).
 # Never writes to /Applications. Never touches hub/dist except via `npm run build`.
 
 set -euo pipefail
@@ -16,7 +20,7 @@ for arg in "$@"; do
     case "$arg" in
         --skip-web) SKIP_WEB=1 ;;
         --install) INSTALL=1 ;;
-        -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
         *) echo "error: unknown option $arg" >&2; exit 2 ;;
     esac
 done
@@ -29,6 +33,7 @@ APP="$BUILD_DIR/Esmeworld.app"
 CONTENTS="$APP/Contents"
 ICON_SRC="$HUB_DIR/public/icons/icon-512.png"
 SELFTEST_TIMEOUT=60
+AUTO_SIGN_IDENTITY="Esmeworld Local Signing"
 
 step() { echo ""; echo "== $1 =="; }
 
@@ -112,15 +117,40 @@ cp -R "$HUB_DIR/dist" "$CONTENTS/Resources/web"
 echo "$CONTENTS/Resources/web ($(find "$CONTENTS/Resources/web" -type f | wc -l | tr -d ' ') files)"
 
 # --- 6. sign -------------------------------------------------------------------
-step "6/7: ad-hoc code signature"
-codesign --force --deep --sign - "$APP"
-codesign --verify --deep --strict "$APP"
-echo "signed (ad-hoc) and verified"
+# A stable identity keeps the app's signature the same from build to build, so
+# the keychain item WebKit uses for WebCrypto keys ("Esmeworld WebCrypto Master
+# Key") stays trusted after an update. Ad hoc gives every build a new identity.
+step "6/7: code signature"
+SIGN_IDENTITY="${ESMEWORLD_SIGN_IDENTITY:-}"
+SIGN_LABEL="$SIGN_IDENTITY (from ESMEWORLD_SIGN_IDENTITY)"
+if [[ -z "$SIGN_IDENTITY" ]]; then
+    LOGIN_KEYCHAIN="$(security login-keychain 2>/dev/null | tr -d ' "' || true)"
+    # Valid (trusted, unexpired) code-signing identities only. Signs by SHA-1 hash,
+    # so two certificates with the same name can't make codesign refuse.
+    SIGN_IDENTITY="$(security find-identity -v -p codesigning ${LOGIN_KEYCHAIN:+"$LOGIN_KEYCHAIN"} 2>/dev/null \
+        | grep -F "\"$AUTO_SIGN_IDENTITY\"" | head -1 | awk '{print $2}' || true)"
+    SIGN_LABEL="$AUTO_SIGN_IDENTITY (login keychain, $SIGN_IDENTITY)"
+    if [[ -z "$SIGN_IDENTITY" ]] && security find-identity -p codesigning ${LOGIN_KEYCHAIN:+"$LOGIN_KEYCHAIN"} 2>/dev/null \
+        | grep -qF "\"$AUTO_SIGN_IDENTITY\""; then
+        echo "note: \"$AUTO_SIGN_IDENTITY\" is in the keychain but not valid (not trusted, or expired); see mac/README.md 'Stable signing', step 3"
+    fi
+fi
+if [[ -n "$SIGN_IDENTITY" ]]; then
+    codesign --force --deep --sign "$SIGN_IDENTITY" "$APP"
+    codesign --verify --deep --strict "$APP"
+    echo "signed with $SIGN_LABEL and verified"
+else
+    codesign --force --deep --sign - "$APP"
+    codesign --verify --deep --strict "$APP"
+    echo "signed (ad-hoc) and verified"
+    echo "warning: Ad-hoc signed: macOS will ask for the keychain password after each update. See mac/README.md 'Stable signing'."
+fi
 
 # --- 7. self-test ----------------------------------------------------------------
-# Two launches against the app's real (default) data store. The first resets only
-# the throwaway `esmeworld-selftest` database, so run 1 must print launchCount=1 and
-# run 2 launchCount=2: IndexedDB survived a quit and relaunch.
+# Two launches against the self-test's own persistent data store
+# (WKWebsiteDataStore(forIdentifier:)), never her real one, so this works while
+# her Esmeworld is open. The first launch deletes that store, so run 1 must print
+# launchCount=1 and run 2 launchCount=2: IndexedDB survived a quit and relaunch.
 step "7/7: self-test (two launches)"
 run_selftest() {
     local n="$1" reset="$2" log="$BUILD_DIR/selftest-$1.log" status=0
@@ -149,14 +179,31 @@ echo "self-test passed: both launches exited 0; launchCount $first -> $second"
 # --- install (only with --install) -----------------------------------------------
 if [[ "$INSTALL" == 1 ]]; then
     step "install: ~/Applications/Esmeworld.app"
-    if pgrep -x Esmeworld >/dev/null 2>&1; then
-        echo "note: Esmeworld is running; quit and reopen it to use the new build"
+    # Copy next to the target first, then swap it in with one rename, so a running
+    # Esmeworld (which keeps its old files open) never sees a half-written bundle.
+    # Her data is not in the bundle (it lives in ~/Library/WebKit/world.esme.esmeworld),
+    # so this never touches it.
+    DEST_DIR="$HOME/Applications"
+    DEST="$DEST_DIR/Esmeworld.app"
+    mkdir -p "$DEST_DIR"
+    STAGE="$(mktemp -d "$DEST_DIR/.Esmeworld-install.XXXXXX")"
+    trap 'rm -rf "$STAGE"' EXIT
+    ditto "$APP" "$STAGE/Esmeworld.app"
+    if [[ -e "$DEST" ]]; then
+        # Atomic swap of the new bundle and the old one (renamex_np RENAME_SWAP).
+        /usr/bin/python3 -c '
+import ctypes, sys
+libc = ctypes.CDLL(None, use_errno=True)
+if libc.renamex_np(sys.argv[1].encode(), sys.argv[2].encode(), 0x2) != 0:
+    e = ctypes.get_errno(); sys.exit("renamex_np: " + __import__("os").strerror(e))
+' "$STAGE/Esmeworld.app" "$DEST"
+    else
+        mv "$STAGE/Esmeworld.app" "$DEST"
     fi
-    mkdir -p "$HOME/Applications"
-    # rsync --delete replaces the old bundle's files. Her data is not in the bundle
-    # (it lives in ~/Library/WebKit/world.esme.esmeworld), so this never touches it.
-    rsync -a --delete "$APP/" "$HOME/Applications/Esmeworld.app/"
-    echo "installed: $HOME/Applications/Esmeworld.app"
+    rm -rf "$STAGE"   # now holds the old bundle (if any)
+    trap - EXIT
+    echo "installed: $DEST"
+    echo "Quit and reopen Esmeworld to use the new version."
 fi
 
 echo ""
