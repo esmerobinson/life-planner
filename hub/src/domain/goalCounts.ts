@@ -11,7 +11,11 @@ import { rowStatus, type RowStatus } from "../journal/rows";
 
 /** Everything a goal can count from. */
 export interface GoalSources {
-  /** Days with a morning page, a morning photo or a check-in answer (by the rows' clear dates). */
+  /**
+   * The days the Journal rows ticked (a morning page or photo, a finished check-in, an exercise
+   * card done) when the journal opens here; while it is locked, the days with a page, photo or
+   * check-in answer row (by the rows' clear dates).
+   */
   journalDays: ReadonlySet<ISODate>;
   /**
    * Exercise cards marked done (or tracker days logged), one per card per day; null while the

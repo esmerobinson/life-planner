@@ -32,13 +32,13 @@ export function goalKindLabel(goal: Goal, today: ISODate): string {
 
 /**
  * The line under an automatic count, from its sources (mockup wording where it has one):
- * "Counts itself: morning pages or check-in", "…: exercises, Mind to-dos, Mind habits",
+ * "Counts itself: exercise, morning pages or check-in", "…: exercises, Mind to-dos, Mind habits",
  * "…: today's exercise card, or a linked to-do".
  */
 export function countsItselfText(goal: Goal): string {
   const daily = isDaily(goal);
   const part = (s: CountSource): string => {
-    if (s === "journal") return "morning pages or check-in";
+    if (s === "journal") return "exercise, morning pages or check-in";
     if (s === "exercise") return daily ? "today's exercise card" : "exercises";
     if (s === "linked") return daily ? "a linked to-do" : "linked to-dos";
     const a = areaLabel(s.area);

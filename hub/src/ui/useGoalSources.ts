@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { db } from "../data/db";
-import { listJournalledDays, readExerciseProgress } from "../data/repo";
+import { listCheckinDays, listJournalledDays, listMorningDone, readExerciseProgress } from "../data/repo";
 import type { GoalSources } from "../domain/goalCounts";
 import type { ISODate, Item } from "../domain/types";
 import { loadJournalKey } from "../journal/keyStore";
+import { journalRowDays } from "../journal/rows";
 import { useDbChanges } from "./journal/useJournalKey";
 
 /** What the goals count from, and what this device can't see. */
@@ -32,21 +33,28 @@ export function useGoalSources(items: readonly Item[]): GoalSourcesView {
 
   const load = useCallback(async () => {
     const id = ++latest.current;
-    let days = new Set<ISODate>();
+    let days: Set<ISODate> | null = null;
     let exercise: { date: ISODate; card: string }[] | null = null;
-    try {
-      days = await listJournalledDays();
-    } catch {
-      // Unreadable: nothing counts from the journal on this device.
-    }
     try {
       const jk = await loadJournalKey(db);
       if (jk) {
-        const { marks } = await readExerciseProgress(jk);
-        exercise = marks.filter((m) => m.done || m.logged).map((m) => ({ date: m.date, card: m.id }));
+        // With the confirmed key: exactly the days the Journal rows tick (fix round 1, I1),
+        // through the journal repo's key-gated reads, held in memory only.
+        const [morning, checkins, progress] = await Promise.all([listMorningDone(jk), listCheckinDays(jk), readExerciseProgress(jk)]);
+        days = journalRowDays(morning, checkins, progress.marks);
+        exercise = progress.marks.filter((m) => m.done || m.logged).map((m) => ({ date: m.date, card: m.id }));
       }
     } catch {
+      days = null;
       exercise = null;
+    }
+    if (days === null) {
+      // Locked (or unreadable) here: the rows' clear dates (a page, a photo or an answer).
+      try {
+        days = await listJournalledDays();
+      } catch {
+        days = new Set(); // nothing counts from the journal on this device
+      }
     }
     if (mounted.current && id === latest.current) setJournal({ days, exercise, loaded: true });
   }, []);

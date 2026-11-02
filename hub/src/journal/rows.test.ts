@@ -1,4 +1,4 @@
-import { checkedIn, checkinDoneDays, exerciseDoneDays, lastSevenDays, rowStatus, type CheckinDayLike } from "./rows";
+import { checkedIn, checkinDoneDays, exerciseDoneDays, journalRowDays, lastSevenDays, rowStatus, type CheckinDayLike } from "./rows";
 
 const set = (...d: string[]) => new Set(d);
 
@@ -85,5 +85,23 @@ describe("journal rows: exercise done", () => {
       { date: "2026-10-30", device: "d1", id: "day-9", done: true, primary: false }, // a further card that day
     ];
     expect(exerciseDoneDays(marks)).toEqual(set("2026-11-01", "2026-10-31", "2026-10-30"));
+  });
+});
+
+describe("journalRowDays (goals: Journal daily, fix round 1)", () => {
+  it("a page day, a finished check-in day and an exercise day; an unfinished check-in and a shown card don't count", () => {
+    const answers = (done: boolean) => new Map([["K2", { done }]]);
+    const days = journalRowDays(
+      set("2026-11-01"),
+      [
+        { date: "2026-10-31", prompts: ["K2"], answers: answers(true) },
+        { date: "2026-11-02", prompts: ["K2", "K4"], answers: answers(true) }, // K4 not reached
+      ],
+      [
+        { date: "2026-10-30", device: "d1", id: "day-1", done: true, primary: true },
+        { date: "2026-10-29", device: "d1", id: "day-2", done: false, primary: true }, // shown, not done
+      ],
+    );
+    expect(days).toEqual(set("2026-11-01", "2026-10-31", "2026-10-30"));
   });
 });

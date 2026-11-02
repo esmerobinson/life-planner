@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import {
-  addSuggestedGoal, createGoal, createItem, finishMorningPage, importExerciseCards, saveExerciseMark, tickItem,
+  addSuggestedGoal, createGoal, createItem, ensureCheckinSet, finishMorningPage, importExerciseCards, saveAnswer, saveExerciseMark,
+  tickItem,
 } from "../data/repo";
 import type { JournalKey } from "../journal/crypto";
 import { checkCardFile } from "../journal/exercise";
@@ -81,7 +82,7 @@ describe("the BPD practice row", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(1);
   });
 
-  it("Journal daily ticks from a morning page's clear date", async () => {
+  it("Journal daily ticks from a finished morning page", async () => {
     await confirmedDevice(db, jk);
     await addSuggestedGoal("suggested-journal-daily", TODAY);
     await finishMorningPage(jk, TODAY, OTHER, "Pretend page");
@@ -90,6 +91,53 @@ describe("the BPD practice row", () => {
     await vi.waitFor(() =>
       expect(within(list).getByRole("checkbox", { name: "Journal daily done today" })).toHaveAttribute("aria-checked", "true"),
     );
+  });
+});
+
+describe("Journal daily counts exactly the days the Journal rows tick (fix round 1, I1)", () => {
+  const journalTick = async () =>
+    (await within(await dailyRows()).findByRole("checkbox", { name: "Journal daily done today" })).getAttribute("aria-checked");
+  const rowTick = async (title: string) =>
+    within((await screen.findByRole("button", { name: title })).closest("li")!).getByRole("checkbox").getAttribute("aria-checked");
+
+  it("a half-typed autosave or a lone Skip doesn't tick it (the check-in isn't finished)", async () => {
+    await confirmedDevice(db, jk);
+    await addSuggestedGoal("suggested-journal-daily", TODAY);
+    await ensureCheckinSet(jk, TODAY, ["K2", "K4"]);
+    await saveAnswer(jk, TODAY, "K2", OTHER, "Two pretend words", false); // autosave while typing
+    await saveAnswer(jk, TODAY, "K4", OTHER, null, true); // one Skip
+    renderApp("/", TODAY);
+    await vi.waitFor(async () => expect(await rowTick("Daily check-in")).toBe("false"));
+    expect(await journalTick()).toBe("false");
+    await vi.waitFor(async () => expect(await db.goals.get("suggested-journal-daily")).toBeTruthy());
+    expect(await rowTick("Morning pages")).toBe("false");
+  });
+
+  it("a finished check-in ticks it, as it ticks the Daily check-in row", async () => {
+    await confirmedDevice(db, jk);
+    await addSuggestedGoal("suggested-journal-daily", TODAY);
+    await ensureCheckinSet(jk, TODAY, ["K2"]);
+    await saveAnswer(jk, TODAY, "K2", OTHER, "A pretend answer", true);
+    renderApp("/", TODAY);
+    await vi.waitFor(async () => expect(await journalTick()).toBe("true"));
+    expect(await rowTick("Daily check-in")).toBe("true");
+  });
+
+  it("today's exercise card done ticks it too (the Journal rows' third row)", async () => {
+    await confirmedDevice(db, jk);
+    await importExerciseCards(jk, checkCardFile(FAKE_CARD_FILE)!, "2026-10-01");
+    await addSuggestedGoal("suggested-journal-daily", TODAY);
+    await saveExerciseMark(jk, TODAY, OTHER, "day-1", true);
+    renderApp("/today", TODAY);
+    await vi.waitFor(async () => expect(await journalTick()).toBe("true"));
+  });
+
+  it("while the journal is locked here it falls back to the rows' clear dates", async () => {
+    await addSuggestedGoal("suggested-journal-daily", TODAY);
+    // A row as another device sent it; no key on this device, so nothing is opened.
+    await db.journal.put({ id: `page:${TODAY}:p1`, kind: "page", date: TODAY, fp: "0123456789abcdef", iv: "AAAAAAAAAAAAAAAA", ct: "AAAA" });
+    renderApp("/today", TODAY);
+    await vi.waitFor(async () => expect(await journalTick()).toBe("true"));
   });
 });
 
@@ -118,7 +166,7 @@ describe("the Goals page counts from the journal", () => {
     renderApp("/goals", TODAY);
     const tile = (await screen.findByRole("link", { name: "Journal daily" })).closest("li")!;
     expect(await within(tile).findByText("2 / 30")).toBeInTheDocument();
-    expect(within(tile).getByText("Counts itself: morning pages or check-in")).toBeInTheDocument();
+    expect(within(tile).getByText("Counts itself: exercise, morning pages or check-in")).toBeInTheDocument();
     expect(within(tile).getByTitle("3 days in a row")).toBeInTheDocument();
     expect(tile).toHaveClass("is-daily");
   });
