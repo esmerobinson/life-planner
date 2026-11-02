@@ -377,6 +377,12 @@ input[type="file"].page-file {
   flex-wrap: wrap;
 }
 
+/* "Show on Home" (2026-11-02): the existing filter pill (button[aria-pressed]), 8px under
+   the chips. Placement is the implementer's call, not yet seen by Esme. */
+.goal-peek-home {
+  margin-top: 8px;
+}
+
 .goal-peek-bars {
   display: flex;
   flex-direction: column;

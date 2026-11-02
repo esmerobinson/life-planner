@@ -85,6 +85,7 @@ export function validGoal(r: unknown): r is Goal {
     optText(r.why) && optText(r.cadence) &&
     (r.notes === undefined || (isStr(r.notes) && r.notes.length <= MAX_GOAL_NOTES)) &&
     validGoalSource(r.source) &&
+    (r.onHome === undefined || typeof r.onHome === "boolean") &&
     optStamp(r.updatedAt) &&
     (r.status === undefined || r.status === "deleted" || r.status === "purged") &&
     optDate(r.deletedAt) &&

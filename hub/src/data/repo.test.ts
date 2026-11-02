@@ -4,7 +4,7 @@ import { unstamped } from "../test/unstamped";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
   archiveItem, restoreItem, listItems, setMilestone, updateItems, updateItem, updateGoal, archiveItems,
-  itemToGoal, pinTo, saveGoalNotes,
+  itemToGoal, pinTo, saveGoalNotes, setGoalOnHome, deleteGoal,
 } from "./repo";
 import { exportBackup, restoreBackup } from "./backup";
 
@@ -470,6 +470,23 @@ describe("updateGoal", () => {
     await saveGoalNotes(g.id, "x".repeat(4000));
     expect((await db.goals.get(g.id))!.notes).toHaveLength(4000);
     await expect(saveGoalNotes(g.id, "x".repeat(4001))).rejects.toThrow();
+  });
+
+  it("setGoalOnHome picks a goal for Home and takes it off again (the field is removed)", async () => {
+    const g = await seed();
+    await setGoalOnHome(g.id, true);
+    expect((await db.goals.get(g.id))!.onHome).toBe(true);
+    await updateGoal(g.id, { title: "Renamed" }, today);
+    expect((await db.goals.get(g.id))!.onHome).toBe(true); // an edit keeps the choice
+    await setGoalOnHome(g.id, false);
+    expect(await db.goals.get(g.id)).not.toHaveProperty("onHome");
+  });
+
+  it("setGoalOnHome leaves a goal in the Bin alone", async () => {
+    const g = await seed();
+    await deleteGoal(g.id, today);
+    await setGoalOnHome(g.id, true);
+    expect(await db.goals.get(g.id)).not.toHaveProperty("onHome");
   });
 
   it("leaves fields that are not in the patch alone", async () => {

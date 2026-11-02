@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { createItem, deleteGoal, saveGoalNotes, untickItem, updateGoal, type GoalPatch } from "../data/repo";
+import { createItem, deleteGoal, saveGoalNotes, setGoalOnHome, untickItem, updateGoal, type GoalPatch } from "../data/repo";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "../data/validate";
 import { monthName, shortDate } from "../domain/display";
 import { doneThisMonth, goalTaskSplit, milestoneProgress, monthlyProgress, monthsInARow, nextGoalOrder } from "../domain/progress";
@@ -265,6 +265,15 @@ export function GoalPanel({
                 {goal.kind === "finite" && goal.deadline ? `By ${shortDate(goal.deadline, today)}` : "Practice"}
               </span>
               {cadence && <span className="chip">{cadence}</span>}
+            </div>
+            <div className="goal-peek-home">
+              <button
+                type="button"
+                aria-pressed={goal.onHome === true}
+                onClick={() => void write(() => setGoalOnHome(goal.id, goal.onHome !== true))}
+              >
+                Show on Home
+              </button>
             </div>
           </div>
         </div>
