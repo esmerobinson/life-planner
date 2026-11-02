@@ -47,8 +47,8 @@ async function ready(page: Page) {
     const today = dates.todayISO();
     await repo.importExerciseCards(jk, exercise.parseCardFile(cards), dates.addDays(today, -5));
     for (const n of [1, 2, 4]) await repo.finishMorningPage(jk, dates.addDays(today, -n), device, "Pretend page");
-    await repo.submitExerciseEntry(jk, dates.addDays(today, -3), device, { day: 1, theme: "Pretend weather" }, "Pretend: a small grey cloud drifted by.");
-    await repo.submitExerciseEntry(jk, dates.addDays(today, -2), device, { day: 2, theme: "The fictional kettle" }, "Pretend: my shoulders whistled first.\nThen I breathed.");
+    await repo.submitExerciseEntry(jk, dates.addDays(today, -3), device, { id: "day-1", day: 1, theme: "Pretend weather", legacy: true }, "Pretend: a small grey cloud drifted by.");
+    await repo.submitExerciseEntry(jk, dates.addDays(today, -2), device, { id: "day-2", day: 2, theme: "The fictional kettle", legacy: true }, "Pretend: my shoulders whistled first.\nThen I breathed.");
   }, { pass: PASS, cards: FAKE_CARD_TEXT });
   await page.goto("/journal");
 }
@@ -93,31 +93,30 @@ for (const width of [1280, 1920]) {
       await expect(page.getByRole("heading", { name: "Unlock journal" })).toBeVisible();
       const w = await widths(page);
       expect(w.padding).toEqual(["24px", "24px"]);
-      // The unlock card, then the three sections' bare strips (2026-11-02: never a blank page).
-      expect(w.cards).toHaveLength(4);
+      // The unlock card, then the tabs (Journal v2; 2026-11-02: never a blank page).
+      expect(w.cards).toHaveLength(1);
       for (const c of w.cards) expect(Math.abs(c - w.column)).toBeLessThanOrEqual(1);
+      await expect(page.getByRole("navigation", { name: "Journal parts" }).getByRole("link")).toHaveCount(4);
       await noSidewaysScroll(page);
     });
 
     test("every section fills the content column; calendar, writing view, response, Past exercises", async ({ page }) => {
       test.setTimeout(120_000);
       await ready(page);
-      await expect(section(page, "Morning pages")).toBeVisible();
-      await expect(section(page, "Daily check-in")).toBeVisible();
       await expect(exercise(page).getByText("Imaginary pebbles")).toBeVisible();
       const w = await widths(page);
       expect(w.padding).toEqual(["24px", "24px"]);
       expect(w.column).toBeGreaterThan(width - 220 - 48 - 30); // the sidebar and the padding only
-      expect(w.cards).toHaveLength(3);
+      expect(w.cards).toHaveLength(1); // the open tab
       for (const c of w.cards) expect(Math.abs(c - w.column)).toBeLessThanOrEqual(1);
 
-      // The star calendar: 7 equal columns across the card, cells a fixed ~56px tall.
-      // It renders after the morning rows are read, so wait for it before measuring.
+      // The calendar: 7 equal columns across the card, cells a fixed ~56px tall.
+      await page.goto("/journal/morning");
       await expect(page.locator(".journal-cal .journal-day:not(.blank)").first()).toBeVisible();
       const cal = await page.evaluate(() => {
         const cells = [...document.querySelectorAll(".journal-cal .journal-day:not(.blank)")].map((c) => c.getBoundingClientRect());
         const grid = document.querySelector(".journal-cal")!.getBoundingClientRect();
-        const card = document.querySelector("#morning-pages-section")!;
+        const card = document.querySelector(".journal-panel")!;
         const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight);
         return { heights: [...new Set(cells.map((r) => Math.round(r.height)))], widths: [...new Set(cells.map((r) => Math.round(r.width)))], grid: grid.width, inner };
       });
@@ -125,17 +124,32 @@ for (const width of [1280, 1920]) {
       expect(cal.widths.length).toBeLessThanOrEqual(2); // equal columns (sub-pixel rounding)
       expect(Math.abs(cal.grid - cal.inner)).toBeLessThanOrEqual(1);
 
+      // The morning pages box fills the width and at least 60% of the window height.
+      const page60 = await page.getByLabel("Today's morning page").evaluate((b) => {
+        const card = b.closest(".journal-card")!;
+        const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight);
+        return { w: b.getBoundingClientRect().width, h: b.getBoundingClientRect().height, inner, win: window.innerHeight };
+      });
+      expect(Math.abs(page60.w - page60.inner)).toBeLessThanOrEqual(1);
+      expect(page60.h).toBeGreaterThanOrEqual(page60.win * 0.6 - 1);
+      await noSidewaysScroll(page);
+
       // The check-in and exercise boxes fill their cards.
+      const fills = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll(".journal-answer")].map((b) => {
+            const card = b.closest(".journal-card")!;
+            const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight);
+            return { box: b.getBoundingClientRect().width, inner };
+          }),
+        );
+      await page.goto("/journal/check-in");
       await expect(section(page, "Daily check-in").getByRole("textbox", { name: "Your answer" })).toBeVisible();
+      for (const b of await fills()) expect(Math.abs(b.box - b.inner)).toBeLessThanOrEqual(1);
+      await page.goto("/journal/exercise");
       await expect(exercise(page).getByRole("textbox", { name: "Your response" })).toBeVisible();
-      const boxes = await page.evaluate(() =>
-        [...document.querySelectorAll(".journal-answer")].map((b) => {
-          const card = b.closest(".journal-card")!;
-          const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight);
-          return { box: b.getBoundingClientRect().width, inner, font: parseFloat(getComputedStyle(b).fontSize) };
-        }),
-      );
-      expect(boxes.length).toBeGreaterThanOrEqual(2);
+      const boxes = await fills();
+      expect(boxes.length).toBeGreaterThanOrEqual(1);
       for (const b of boxes) expect(Math.abs(b.box - b.inner)).toBeLessThanOrEqual(1);
       const response = exercise(page).getByRole("textbox", { name: "Your response" });
       expect(await response.evaluate((b) => parseFloat(getComputedStyle(b).fontSize))).toBeGreaterThanOrEqual(16);
@@ -177,16 +191,6 @@ for (const width of [1280, 1920]) {
       });
       for (const word of ["Pretend", "pebble", "shoulders"]) expect(rows).not.toContain(word);
 
-      // Write now: the writing view fills the width and at least 60% of the window height.
-      await section(page, "Morning pages").getByRole("button", { name: "Write now" }).click();
-      const page60 = await page.getByLabel("Today's morning page").evaluate((b) => {
-        const card = b.closest(".journal-card")!;
-        const inner = card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight);
-        return { w: b.getBoundingClientRect().width, h: b.getBoundingClientRect().height, inner, win: window.innerHeight };
-      });
-      expect(Math.abs(page60.w - page60.inner)).toBeLessThanOrEqual(1);
-      expect(page60.h).toBeGreaterThanOrEqual(page60.win * 0.6 - 1);
-      await noSidewaysScroll(page);
     });
   });
 }

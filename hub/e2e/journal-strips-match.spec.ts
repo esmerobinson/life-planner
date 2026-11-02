@@ -4,7 +4,7 @@ import { pageDate } from "./helpers";
 /* The Journal rows look exactly like task strips (Esme, 2026-11-02: "green journal pages
    should look exactly like the other items appear elsewhere"): same height for the same
    content, padding, radius, tick box size and place, title and small-line type, and the gap
-   between strips. Only the mint, the read-only ✓ and the ★ N differ. Fictional data only. */
+   between strips. Only the mint, the read-only ✓ and the streak differ. Fictional data only. */
 
 async function seedTasks(page: Page) {
   await page.goto("/");
@@ -72,21 +72,23 @@ test("Home's Journal rows match a task strip with the same content; 8px between 
   await page.goto("/");
   const rows = page.getByRole("region", { name: "Journal" }).locator("li.strip");
   await expect(rows).toHaveCount(3);
-  // Morning pages and Daily check-in have no small line on Home (locked here: no ★ either).
-  same(await look(rows.nth(0)), plain);
-  same(await look(rows.nth(1)), plain);
+  // Locked here: no small line (the exercise's "Day N · Theme" needs the cards) and no streak.
+  for (const i of [0, 1, 2]) same(await look(rows.nth(i)), plain);
   const gap = await rows.nth(0).evaluate((el) => el.nextElementSibling!.getBoundingClientRect().top - el.getBoundingClientRect().bottom);
   expect(gap).toBe(8);
 });
 
-test("the Journal page's section strips match a task strip with a small line (the 🔒 line too)", async ({ page }) => {
+test("Today's Journal rows match Home's, and Mind's Habits rows match a task strip with a small line", async ({ page }) => {
   await seedTasks(page);
   await page.goto("/area/art");
+  const plain = await look(page.getByRole("list", { name: "To-dos" }).locator("li.strip", { hasText: "Pretend plain to-do" }));
   const dated = await look(page.getByRole("list", { name: "To-dos" }).locator("li.strip", { hasText: "Pretend dated to-do" }));
-  await page.goto("/journal");
-  for (const name of ["Morning pages", "Daily check-in", "Mental health exercise"]) {
-    const strip = page.getByRole("region", { name }).locator(".strip.journal-row");
-    await expect(strip).toBeVisible();
-    same(await look(strip), dated);
-  }
+  await page.goto("/today");
+  const today = page.getByRole("region", { name: "Journal" }).locator("li.strip");
+  await expect(today).toHaveCount(3);
+  for (const i of [0, 1, 2]) same(await look(today.nth(i)), plain);
+  await page.goto("/area/mind");
+  const habits = page.getByRole("list", { name: "Habits" }).locator("li.journal-row");
+  await expect(habits).toHaveCount(3);
+  for (const i of [0, 1, 2]) same(await look(habits.nth(i)), dated); // "every day" under the title
 });

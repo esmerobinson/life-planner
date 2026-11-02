@@ -2,10 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { FAKE_CARD_FILE } from "../src/test/exerciseCards";
 import { pageDate } from "./helpers";
 
-/* The Journal rows (VISUAL-LANGUAGE.md "Journal rows (2026-11-02)") in a real browser: three
-   Map mint strips on Home whose ticks tick themselves, "★ N" streaks, tapping a row scrolls
-   to its Journal section, the same strips heading the sections, the space under Today, and
-   no sideways scroll on phones. All data is fictional; the sync address is a made-up one
+/* The Journal rows (VISUAL-LANGUAGE.md "Journal rows (2026-11-02)"; Journal v2) in a real
+   browser: three Map mint strips on Home (the exercise first) whose ticks tick themselves, the
+   shared streak (this week's bars and the number), tapping a row opens its Journal tab (which
+   ticks too), the space under Today, and no sideways scroll on phones. All data is fictional; the sync address is a made-up one
    that never answers. Set SHOTS_DIR to save screenshots. */
 
 const PASS = "fake-journal-e2e-passphrase";
@@ -55,7 +55,7 @@ async function pretendHistory(page: Page) {
         await repo.saveAnswer(jk, d, "K2", other, "Pretend answer", true);
       }
       await repo.importExerciseCards(jk, exercise.checkCardFile(cards), days[6]);
-      await repo.saveExerciseMark(jk, days[0], other, 1, true);
+      await repo.saveExerciseMark(jk, days[0], other, "day-1", true);
       for (const title of ["Water the pretend fern", "Post the made-up letter"]) {
         await repo.createItem({ kind: "task", title, areaId: "body", priority: 3, due: days[0] }, days[0]);
       }
@@ -78,17 +78,25 @@ async function homeRows(page: Page, prefix: string) {
   await page.goto("/");
   const morning = row(page, "Morning pages");
   await expect(journal(page).locator("li.journal-row")).toHaveCount(3);
+  await expect(journal(page).locator("li.journal-row .strip-title")).toHaveText(["Mental health exercise", "Morning pages", "Daily check-in"]);
   for (const t of ["Morning pages", "Daily check-in", "Mental health exercise"]) {
     expect(await row(page, t).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(MINT);
   }
   await expect(morning.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
   await expect(morning.getByRole("checkbox")).toHaveText("✓"); // controller call: visible on mint
   expect(await morning.locator(".tick-auto").evaluate((el) => getComputedStyle(el).color)).toBe(TEXT);
-  await expect(morning.locator(".journal-row-streak")).toHaveText(/^\s*7\s*7 days in a row$/);
+  await expect(morning.locator(".streak .streak-n")).toHaveText("7");
+  await expect(morning.locator(".streak .streak-day")).toHaveCount(7);
+  await expect(morning.locator(".streak .streak-day.on")).toHaveCount(7);
+  // Undone bars are --panel on the mint row; done ones the bar green.
+  expect(await morning.locator(".streak-day.on").first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(152, 194, 147)");
   await expect(morning.getByText("7 days in a row")).toBeAttached();
+  await expect(morning.locator(".journal-star")).toHaveCount(0);
   const checkin = row(page, "Daily check-in");
   await expect(checkin.getByRole("checkbox")).toHaveAttribute("aria-checked", "false");
   await expect(checkin.getByText("3 days in a row")).toBeAttached();
+  await expect(checkin.locator(".streak-day.on")).toHaveCount(3);
+  expect(await checkin.locator(".streak-day:not(.on)").last().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(233, 227, 214)");
   const exercise = row(page, "Mental health exercise");
   await expect(exercise.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
   await expect(exercise.getByText("Day 1 · Pretend weather")).toBeVisible();
@@ -103,7 +111,7 @@ async function homeRows(page: Page, prefix: string) {
     return db.journal.count();
   });
   await checkin.getByRole("checkbox").click({ force: true }); // aria-disabled: a person can still tap it
-  await expect(page).toHaveURL(/\/journal#daily-check-in$/);
+  await expect(page).toHaveURL(/\/journal\/check-in$/);
   const after = await page.evaluate(async () => {
     const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
     const { db } = await at("/src/data/db.ts");
@@ -112,32 +120,19 @@ async function homeRows(page: Page, prefix: string) {
   expect(after - before).toBeLessThanOrEqual(1); // at most the check-in's own first-open question set
   expect(await page.evaluate(() => (document.activeElement as HTMLElement | null)?.getAttribute("role"))).not.toBe("checkbox");
 
-  // Tapping a row scrolls to its section.
+  // Tapping a row opens its tab, which shows the same tick and streak.
   await page.goto("/");
   await row(page, "Mental health exercise").getByRole("button", { name: "Mental health exercise" }).click();
-  await expect(page).toHaveURL(/\/journal#mental-health-exercise$/);
-  const section = page.locator("#mental-health-exercise-section");
-  await expect(section).toBeInViewport();
-  // At the top of the view, or as far as the page scrolls (it is the last section).
-  const atSection = () =>
-    section.evaluate((el) => {
-      let s = el.parentElement;
-      while (s && !(s.scrollHeight > s.clientHeight && /(auto|scroll)/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
-      const sc = s ?? document.scrollingElement!;
-      const scrolled = sc.scrollTop > 0;
-      return scrolled && (el.getBoundingClientRect().top < 40 || Math.ceil(sc.scrollTop + sc.clientHeight) >= sc.scrollHeight - 1);
-    });
-  await expect.poll(atSection).toBe(true);
-  const head = section.locator(".strip.journal-row").first();
-  await expect(head.getByRole("heading", { level: 2, name: "Mental health exercise" })).toBeVisible();
-  await expect(head.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
-  await noSidewaysScroll(page);
-
-  await page.goto("/journal");
-  const top = page.locator("#morning-pages-section .strip.journal-row");
-  await expect(top.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
-  await expect(top.getByText("7 days in a row")).toBeAttached();
-  expect(await top.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(MINT);
+  await expect(page).toHaveURL(/\/journal\/exercise$/);
+  const tabs = page.getByRole("navigation", { name: "Journal parts" });
+  const exTab = tabs.getByRole("link", { name: /Mental health exercise/ });
+  await expect(exTab).toHaveAttribute("aria-current", "page");
+  expect(await exTab.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(MINT);
+  await expect(exTab.locator(".tick-auto.is-done")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Mental health exercise" })).toBeVisible();
+  const morningTab = tabs.getByRole("link", { name: /Morning pages/ });
+  await expect(morningTab.locator(".tick-auto.is-done")).toBeVisible();
+  await expect(morningTab.getByText("7 days in a row")).toBeAttached();
   await noSidewaysScroll(page);
   await shoot(page, `${prefix}-journal-top`, false);
 }
@@ -145,7 +140,7 @@ async function homeRows(page: Page, prefix: string) {
 test.describe("at 1280px", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test("Home's three mint rows: ticks, ★ streaks, tapping scrolls to the section", async ({ page }) => {
+  test("Home's three mint rows: ticks, streaks, tapping opens the tab", async ({ page }) => {
     test.setTimeout(120_000);
     await homeRows(page, "journalrows-1280");
   });
@@ -168,16 +163,16 @@ test.describe("at 1280px", () => {
     // Unknown, not "not done": no checkboxes, three empty boxes that say why.
     await expect(journal(page).getByRole("img", { name: "Not available until the journal is unlocked" })).toHaveCount(3);
     await expect(journal(page).getByRole("checkbox")).toHaveCount(0);
-    await expect(journal(page).locator(".journal-row-streak")).toHaveCount(0);
+    await expect(journal(page).locator(".streak")).toHaveCount(0);
     await row(page, "Morning pages").getByRole("button", { name: "Morning pages" }).click();
-    await expect(page).toHaveURL(/\/journal#morning-pages$/);
+    await expect(page).toHaveURL(/\/journal\/morning$/);
     await expect(page.getByRole("heading", { name: "Unlock journal" })).toBeVisible();
   });
 });
 
 test.describe("at 390px", () => {
   test.use({ viewport: { width: 390, height: 844 } });
-  test("Home's three mint rows on the phone, and the Journal's top", async ({ page }) => {
+  test("Home's three mint rows on the phone, and the Journal's tabs", async ({ page }) => {
     test.setTimeout(120_000);
     await homeRows(page, "journalrows-390");
   });
@@ -193,7 +188,8 @@ for (const width of [360, 430]) {
       await expect(row(page, "Mental health exercise").getByText("Day 1 · Pretend weather")).toBeVisible();
       await noSidewaysScroll(page);
       await page.goto("/journal");
-      await expect(page.locator("#morning-pages-section .strip.journal-row")).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Journal parts" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Mental health exercise" })).toBeVisible();
       await noSidewaysScroll(page);
     });
   });
