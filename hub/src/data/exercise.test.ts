@@ -1,13 +1,14 @@
 import { vi } from "vitest";
 import { db } from "./db";
 import {
-  CARDS_TOO_BIG, importExerciseCards, NOT_CONFIRMED, readExerciseCards, readExerciseProgress, recordExerciseShown,
+  CARDS_CHUNK_BYTES, CARDS_TOO_BIG, importExerciseCards, NOT_CONFIRMED, readExerciseCards, readExerciseProgress, recordExerciseShown,
   saveExerciseMark, setExerciseStar,
 } from "./repo";
 import { journalId, MAX_JOURNAL_CT, validJournal } from "./validate";
 import { MAX_ROW_BYTES } from "../sync/engine";
-import { journalAad, sealJson, toBase64, type JournalKey } from "../journal/crypto";
-import { checkCardFile, MAX_CARD_FIELD, NO_TRACKS, parseCardFile, type CardSet } from "../journal/exercise";
+import { journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
+import { checkCardFile, MAX_CARD_FIELD, NO_TRACKS, parseCardFile, storedCards, type CardSet } from "../journal/exercise";
+import { bigCardFileText } from "../test/bigCardSet";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import { FAKE_CARD_FILE, FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
 
@@ -51,7 +52,7 @@ describe("row ids", () => {
     expect(validJournal(row({ id: "cards", kind: "cards" }))).toBe(true);
     expect(validJournal(row({ id: `exercise:${DAY}:${ME}`, kind: "exercise" }))).toBe(true);
     expect(validJournal(row({ id: `stars:${ME}`, kind: "stars" }))).toBe(true);
-    expect(validJournal(row({ id: "cards:x", kind: "cards" }))).toBe(false);
+    expect(validJournal(row({ id: "cards:x", kind: "cards" }))).toBe(false); // chunks are cards:<number>
     expect(validJournal(row({ id: `exercise:2026-10-29:${ME}`, kind: "exercise" }))).toBe(false);
     expect(validJournal(row({ id: "stars:", kind: "stars" }))).toBe(false);
     expect(validJournal(row({ id: "stars:a b", kind: "stars" }))).toBe(false);
@@ -84,7 +85,7 @@ describe("cards", () => {
     const two: CardSet = { source: "Another pretend file", version: 1, tracks: NO_TRACKS, cards: SET.cards.slice(0, 2) };
     await importExerciseCards(jk, two, "2026-10-31");
     expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: two });
-    expect(await db.journal.where("kind").equals("cards").count()).toBe(1);
+    expect((await db.journal.where("kind").equals("cards").toArray()).map((r) => r.id).sort()).toEqual(["cards", "cards:0"]);
   });
 
   it("only the confirmed key may seal the cards", async () => {
@@ -92,38 +93,65 @@ describe("cards", () => {
     expect(await db.journal.get("cards")).toBeUndefined();
   });
 
-  it("a set too big for one synced row is refused with a plain message and nothing is stored", async () => {
+  it("a set too big to store at all is refused with a plain message and nothing is stored", async () => {
     const big = "x".repeat(MAX_CARD_FIELD);
-    const cards = Array.from({ length: 120 }, (_, i) => ({ ...SET.cards[0]!, day: i + 1, learn: big, try: big, book: big }));
+    const cards = Array.from({ length: 1000 }, (_, i) => ({ ...SET.cards[0]!, day: i + 1, learn: big, try: big, book: big, skill: big, theme: big }));
     await expect(importExerciseCards(jk, { source: "", version: 1, tracks: NO_TRACKS, cards }, DAY)).rejects.toThrow(CARDS_TOO_BIG);
     expect(await db.journal.get("cards")).toBeUndefined();
   });
 
-  it("a full-size version 2 set (~550 KB of JSON: 154 cards with Read more, 4 sources, 12 parts, an example) fits in one synced row", async () => {
-    const words = (n: number, w: string) => Array.from({ length: n }, (_, i) => `${w}${i % 7}`).join(" ");
-    const cards = Array.from({ length: 154 }, (_, i) => ({
-      id: `pretend-card-${i + 1}`, day: i + 1, chapter: 1 + Math.floor(i / 10), chapterTitle: "A pretend chapter title",
-      optional: false, theme: `Pretend theme ${i + 1}`, learn: words(45, "learn"), try: words(30, "try"),
-      book: "Pretend workbook, page 12", skill: "Made-up skill", session: i % 3 === 0,
-      more: words(240, "m’"), // ~200+ words, with non-ASCII punctuation
-      sources: Array.from({ length: 4 }, (_, j) => ({ title: `Pretend source ${j}`, url: `https://example.org/pretend/${i}/${j}` })),
-      parts: Array.from({ length: 12 }, (_, j) =>
-        j % 4 === 1 ? { prompt: words(5, "list"), kind: "list", count: 25 } : j % 4 === 3 ? { prompt: words(5, "pick"), kind: "choice", options: ["One", "Two", "Three"] } : { prompt: words(5, "part"), kind: j % 4 === 2 ? "rating" : "text" }),
-      example: words(60, "ex"), bookExample: i % 2 === 0,
-    }));
-    const text = JSON.stringify({ app: "esmeworld", kind: "exercise-cards", version: 2, source: "A pretend workbook", cards });
+  it("a full-size two-book set (~950 KB of JSON) is stored in chunks of at most 250 KB, each well inside one synced row", async () => {
+    const text = bigCardFileText();
     const bytes = new TextEncoder().encode(text).length;
-    expect(bytes).toBeGreaterThan(540_000);
-    expect(bytes).toBeLessThan(600_000);
+    expect(bytes).toBeGreaterThan(900_000);
+    expect(bytes).toBeLessThan(1_000_000);
     const set = parseCardFile(text)!;
-    expect(set.cards).toHaveLength(154);
+    expect(set.cards).toHaveLength(245);
     await importExerciseCards(jk, set, DAY);
     expect(await readExerciseCards(jk)).toEqual({ state: "ok", set });
-    const stored = (await db.journal.get("cards"))!;
-    // What sync sends for the row, against the server's 1 MB cap.
-    const asSent = new TextEncoder().encode(JSON.stringify({ t: "journal", i: stored.id, u: stored.updatedAt, d: JSON.stringify(stored) })).length;
-    expect(asSent).toBeLessThan(MAX_ROW_BYTES);
-    expect(stored.ct.length).toBeLessThan(MAX_JOURNAL_CT);
+    const rows = await db.journal.where("kind").equals("cards").toArray();
+    const chunks = rows.filter((r) => r.id !== "cards");
+    expect(chunks.length).toBeGreaterThanOrEqual(4);
+    expect(rows.map((r) => r.id).sort()).toEqual(["cards", ...chunks.map((_, k) => `cards:${k}`)].sort());
+    for (const r of rows) {
+      // What sync sends for the row, against the server's 1 MB cap.
+      const asSent = new TextEncoder().encode(JSON.stringify({ t: "journal", i: r.id, u: r.updatedAt, d: JSON.stringify(r) })).length;
+      expect(asSent).toBeLessThan(MAX_ROW_BYTES / 2);
+      expect(validJournal(r)).toBe(true);
+      expect(JSON.stringify(r)).not.toContain("Pretend");
+    }
+    for (const r of chunks) {
+      const c = (await openJson(jk.key, r, journalAad(r.id))) as { cards: unknown[] };
+      expect(new TextEncoder().encode(JSON.stringify(c.cards)).length).toBeLessThanOrEqual(CARDS_CHUNK_BYTES + 2);
+    }
+  });
+
+  it("a chunk not here yet (or still the earlier import's): 'syncing', not unreadable; whole again once it arrives", async () => {
+    const set = parseCardFile(bigCardFileText())!;
+    await importExerciseCards(jk, set, DAY);
+    const chunk1 = (await db.journal.get("cards:1"))!;
+    await db.journal.delete("cards:1");
+    expect(await readExerciseCards(jk)).toEqual({ state: "syncing" });
+    await db.journal.put(chunk1);
+    expect((await readExerciseCards(jk)).state).toBe("ok");
+    // A re-import whose manifest has arrived but whose chunk 0 hasn't: the old chunk 0 isn't read as its.
+    const old0 = (await db.journal.get("cards:0"))!;
+    await importExerciseCards(jk, SET, "2026-10-31");
+    await db.journal.put(old0);
+    expect(await readExerciseCards(jk)).toEqual({ state: "syncing" });
+  });
+
+  it("an earlier single-row set still reads", async () => {
+    const entry = { v: 1, source: SET.source, cards: storedCards(SET), at: 1 };
+    await db.journal.put(await sealedRow(jk, "cards", DAY, undefined, entry));
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: SET });
+  });
+
+  it("chunk ids: cards:0 … cards:999 are valid journal rows; nothing else after cards:", () => {
+    expect(journalId("cards", DAY, "3")).toBe("cards:3");
+    expect(validJournal(row({ id: "cards:0", kind: "cards" }))).toBe(true);
+    expect(validJournal(row({ id: "cards:999", kind: "cards" }))).toBe(true);
+    for (const id of ["cards:01", "cards:1000", "cards:a", "cards:"]) expect(validJournal(row({ id, kind: "cards" }))).toBe(false);
   });
 
   it("a stored set of an unknown shape counts as unreadable", async () => {

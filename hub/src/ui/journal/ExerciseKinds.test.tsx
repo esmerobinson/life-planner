@@ -158,7 +158,7 @@ describe("newer part kinds", () => {
     const card = await todayCard();
     const chain = await within(card).findByRole("group", { name: "A pretend chain of events" });
     const steps = within(chain).getAllByRole("textbox");
-    expect(steps.map((s) => s.closest("label")!.querySelector("span")!.textContent)).toEqual(["What set it off", "What I felt", "What I did"]);
+    expect(steps.map((s) => s.closest("label")!.querySelector("span")!.textContent)).toEqual(["What set it off", "→ What I felt", "→ What I did"]);
     expect(chain.querySelectorAll(".exercise-chain-arrow")).toHaveLength(2);
     fireEvent.change(steps[0]!, { target: { value: "Pretend a" } });
     fireEvent.change(steps[1]!, { target: { value: "Pretend b" } });

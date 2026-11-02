@@ -178,3 +178,10 @@ describe("reviewing past work", () => {
     expect(within(list).getByText("Pretend cloud thoughts")).toBeInTheDocument();
   });
 });
+
+it("cards whose chunks haven't all arrived yet: 'Your cards are still syncing…'", async () => {
+  await db.journal.delete("cards:0");
+  renderApp("/journal/exercise", TODAY);
+  expect(await within(await section()).findByText("Your cards are still syncing…")).toBeInTheDocument();
+  expect(screen.queryByRole("article", { name: "Today's card" })).toBeNull();
+});

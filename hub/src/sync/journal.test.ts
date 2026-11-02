@@ -3,8 +3,10 @@ import { vi } from "vitest";
 import { db, HubDB } from "../data/db";
 import {
   addMorningPhoto, ensureCheckinSet, finishMorningPage, readCheckinDay, readMorningDay, readMorningPage, saveAnswer,
-  saveMorningDraft, readExerciseEntry, submitExerciseEntry, listExerciseEntries,
+  saveMorningDraft, readExerciseEntry, submitExerciseEntry, listExerciseEntries, importExerciseCards, readExerciseCards,
 } from "../data/repo";
+import { parseCardFile } from "../journal/exercise";
+import { bigCardFileText } from "../test/bigCardSet";
 import { journalId } from "../data/validate";
 import {
   exerciseCardKey, fileAad, journalAad, openBytes, promptKey, sealBytes, sealJson, toBase64, type JournalKey,
@@ -174,6 +176,24 @@ it("exercise responses on two devices: each keeps its own row, the newest non-em
   expect((await readExerciseEntry(jk, DAY, card)).entry).toMatchObject({ text: "Pretend mac response", saved: true });
   // The day after, it is one entry in Past exercises.
   expect((await listExerciseEntries(jk, "2026-10-29")).entries).toEqual([expect.objectContaining({ day: 2, text: "Pretend mac response" })]);
+});
+
+it("a full-size two-book card set (~950 KB, in chunks) syncs to another device and reads back whole there", async () => {
+  const server = new FakeSyncServer(TOKEN);
+  const set = parseCardFile(bigCardFileText())!;
+  await importExerciseCards(jk, set, DAY);
+  await syncOnce({ db, fetch: server.fetch });
+  const onServer = JSON.stringify([...server.rows.values()]);
+  expect(onServer).not.toContain("Pretend");
+  const phone = await phoneDevice();
+  await confirmedDevice(phone, jk);
+  await syncOnce({ db: phone, fetch: server.fetch });
+  const rows = await phone.journal.where("kind").equals("cards").toArray();
+  expect(rows.length).toBeGreaterThanOrEqual(5);
+  // The repo reads the app's own database: swap the phone's card rows in to read them there.
+  await db.journal.where("kind").equals("cards").delete();
+  await db.journal.bulkPut(rows);
+  expect(await readExerciseCards(jk)).toEqual({ state: "ok", set });
 });
 
 it("a journal row an older build held in quarantine applies once this build has the table", async () => {

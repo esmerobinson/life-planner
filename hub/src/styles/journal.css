@@ -546,18 +546,28 @@ input.exercise-list-line {
   box-sizing: border-box;
 }
 
-/* Tables, scales, trackers and chains (Journal v2 parts; builder's calls from existing values,
-   not yet seen by Esme). A table is a grid under its headings, its inputs filling the cells; on
-   the phone each row becomes its own --row card with the column names over the inputs (no
-   sideways scroll). A scale is the soft pills between its two muted end labels. A tracker is a
-   --row box per day, the day to fill now outlined in the Journal violet (as today is on the
-   calendar). A chain's steps are stacked with a small muted arrow between. The format chip is
-   the existing --row chip. */
+/* Tables, scales, trackers and chains (Journal v2 parts). Only the existing design system
+   (Esme, 2026-11-02: "as long as the cards still match the UI design of the rest of the app"):
+   - every input is the check-in answer box's: --row, tile radius, 16px or more;
+   - a table's header cells are --row boxes (tile radius, the strips' 13px 600 label), its cells
+     the same inputs, 8px apart like a task list; on the phone each row becomes its own --row
+     card with the column names over --panel inputs (no sideways scroll);
+   - a scale is the soft pills (controls.css) between its two muted end labels;
+   - a tracker's days are strips: --row, tile radius, the strips' 10px 12px padding, 8px apart,
+     --panel inputs (as the strips' icons are --panel); the day to fill now is outlined in the
+     Journal violet, as today is on the calendar;
+   - a chain's steps are the same boxes, each after the first led by a small → in --text;
+   - the format chip is the existing chip. */
+.exercise-parts input,
+.exercise-parts textarea {
+  font-size: max(16px, 1em);
+}
+
 .exercise-table {
   border-collapse: separate;
-  border-spacing: 6px;
-  margin: -6px;
-  width: calc(100% + 12px);
+  border-spacing: 8px;
+  margin: -8px;
+  width: calc(100% + 16px);
   table-layout: fixed;
 }
 
@@ -565,12 +575,20 @@ input.exercise-list-line {
   text-align: left;
   font-size: 13px;
   font-weight: 600;
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 10px 12px;
   overflow-wrap: anywhere;
+}
+
+.exercise-table td {
+  padding: 0;
 }
 
 .exercise-table input {
   width: 100%;
   box-sizing: border-box;
+  border-radius: var(--radius-tile);
 }
 
 .is-phone .exercise-table,
@@ -589,8 +607,11 @@ input.exercise-list-line {
 .is-phone .exercise-table tr {
   background: var(--row);
   border-radius: var(--radius-tile);
-  padding: 12px;
-  margin-bottom: 8px;
+  padding: 10px 12px;
+}
+
+.is-phone .exercise-table tr + tr {
+  margin-top: 8px;
 }
 
 .is-phone .exercise-table td + td {
@@ -601,8 +622,12 @@ input.exercise-list-line {
   content: attr(data-label);
   display: block;
   font-size: 13px;
-  opacity: 0.75;
-  margin-bottom: 4px;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.is-phone .exercise-table input {
+  background: var(--panel);
 }
 
 .exercise-scale {
@@ -625,10 +650,16 @@ input.exercise-list-line {
 .exercise-tracker-day {
   background: var(--row);
   border-radius: var(--radius-tile);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.exercise-tracker-day > b {
+  grid-column: 1 / -1;
+  font-weight: 600;
 }
 
 .exercise-tracker-day.is-now {
@@ -636,30 +667,33 @@ input.exercise-list-line {
 }
 
 .exercise-tracker-field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: contents;
+}
+
+.exercise-tracker-field > span {
+  font-size: 13px;
+  opacity: 0.8;
 }
 
 .exercise-tracker-field input {
   width: 100%;
   box-sizing: border-box;
-}
-
-.exercise-chain li {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  border-radius: var(--radius-tile);
+  background: var(--panel);
 }
 
 .exercise-chain-step {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .exercise-chain-arrow {
-  align-self: center;
+  color: var(--text);
+}
+
+.journal-answer.exercise-chain-box {
+  min-height: 0;
 }
 
 .chip.exercise-format {

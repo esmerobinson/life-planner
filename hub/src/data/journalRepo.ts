@@ -352,35 +352,92 @@ export async function savePromptSettings(jk: JournalKey, active: string[], today
 
 // ---- mental health exercise (exercise brief) ------------------------------------------------
 
-/** Shown when a card file is too big to store as one synced row. */
+/** Shown when a card file is too big to store at all. */
 export const CARDS_TOO_BIG = "That card file is too big to store. Nothing was changed.";
+/** The most card text (JSON) one chunk row holds before sealing (split on card boundaries). */
+export const CARDS_CHUNK_BYTES = 250_000;
+/** The most card text (JSON) a whole set may have. */
+export const MAX_CARDS_BYTES = 8_000_000;
 
-export type CardsState = { state: "none" } | { state: "ok"; set: CardSet } | { state: "unreadable" };
+/** "syncing": the set's manifest is here but not all its chunks yet. */
+export type CardsState = { state: "none" } | { state: "ok"; set: CardSet } | { state: "unreadable" } | { state: "syncing" };
 
-/** The imported exercise cards (the one sealed `cards` row), if any. */
+/**
+ * The imported exercise cards, if any: the chunks the `cards` manifest names, joined (or the
+ * earlier single-row set). A chunk that hasn't arrived yet, or is from another import, means
+ * the set is still syncing; a chunk this key can't open makes it unreadable.
+ */
 export async function readExerciseCards(jk: JournalKey): Promise<CardsState> {
   const row = await db.journal.get("cards");
   if (!row) return { state: "none" };
   const o = await openRow(jk, row, "cards");
   if (o.state !== "ok") return { state: "unreadable" };
-  const set = readStoredSet(o.entry.v, o.entry.source, o.entry.cards, o.entry.tracks);
+  const e = o.entry;
+  if (e.v === 4) return { state: "unreadable" };
+  if (e.v === 1 || e.v === 2) {
+    const set = readStoredSet(e.v, e.source, e.cards, e.tracks);
+    return set ? { state: "ok", set } : { state: "unreadable" };
+  }
+  if (e.v !== 3) return { state: "unreadable" };
+  const cards: Record<string, unknown>[] = [];
+  for (let k = 0; k < e.chunks; k++) {
+    const chunk = await db.journal.get(journalId("cards", row.date, String(k)));
+    if (!chunk) return { state: "syncing" };
+    const c = await openRow(jk, chunk, "cards");
+    if (c.state !== "ok") return { state: "unreadable" };
+    if (c.entry.v !== 4 || c.entry.k !== k) return { state: "unreadable" };
+    if (c.entry.setId !== e.setId) return { state: "syncing" }; // an earlier import's chunk: the new one is on its way
+    cards.push(...c.entry.cards);
+  }
+  const set = readStoredSet(e.version, e.source, cards, e.tracks);
   return set ? { state: "ok", set } : { state: "unreadable" };
 }
 
+/** The stored cards in chunks of at most CARDS_CHUNK_BYTES of JSON, on card boundaries. */
+function chunked(cards: Record<string, unknown>[]): Record<string, unknown>[][] {
+  const enc = new TextEncoder();
+  const out: Record<string, unknown>[][] = [[]];
+  let size = 0;
+  for (const c of cards) {
+    const n = enc.encode(JSON.stringify(c)).length + 1;
+    if (size + n > CARDS_CHUNK_BYTES && out[out.length - 1]!.length > 0) {
+      out.push([]);
+      size = 0;
+    }
+    out[out.length - 1]!.push(c);
+    size += n;
+  }
+  return out;
+}
+
 /**
- * Import: the whole set as one sealed row `cards` (synced like any journal row), in its file
- * version's shape. A new import replaces it whole. Refused (nothing stored) if it would not
- * fit in one synced row.
+ * Import: the cards sealed in chunks `cards:0` … `cards:<n-1>` (each its own synced row, at most
+ * CARDS_CHUNK_BYTES of card text), then the manifest `cards` naming this import and n, all in
+ * one transaction (the manifest last). A new import writes a new set of chunks and manifest; an
+ * earlier import's higher-numbered chunks are left as they are and never read (readers read only
+ * the n the manifest names). Refused (nothing stored) if the set is too big to store at all.
  */
 export async function importExerciseCards(jk: JournalKey, set: CardSet, today: ISODate): Promise<void> {
-  const id = journalId("cards", today);
+  const stored = storedCards(set);
+  if (new TextEncoder().encode(JSON.stringify(stored)).length > MAX_CARDS_BYTES) throw new Error(CARDS_TOO_BIG);
+  const setId = crypto.randomUUID();
+  const parts = chunked(stored);
+  const rows: JournalRow[] = [];
+  for (const [k, cards] of parts.entries()) {
+    const id = journalId("cards", today, String(k));
+    const sealed = await sealJson(jk.key, { v: 4, setId, k, cards }, journalAad(id));
+    if (sealed.ct.length > MAX_JOURNAL_CT) throw new Error(CARDS_TOO_BIG);
+    rows.push({ id, kind: "cards", date: today, fp: jk.fp, ...sealed });
+  }
   const tracks = storedTracks(set);
-  const entry = { v: set.version, source: set.source, ...(tracks ? { tracks } : {}), cards: storedCards(set), at: Date.now() };
-  const sealed = await sealJson(jk.key, entry, journalAad(id));
-  if (sealed.ct.length > MAX_JOURNAL_CT) throw new Error(CARDS_TOO_BIG);
-  const row: JournalRow = { id, kind: "cards", date: today, fp: jk.fp, ...sealed };
-  if (!validJournal(row)) throw new Error("That journal entry could not be saved.");
-  await write(jk, [row]);
+  const manifest = {
+    v: 3, setId, chunks: parts.length, version: set.version, source: set.source, ...(tracks ? { tracks } : {}),
+    importedAt: Date.now(), at: Date.now(),
+  };
+  const id = journalId("cards", today);
+  rows.push({ id, kind: "cards", date: today, fp: jk.fp, ...(await sealJson(jk.key, manifest, journalAad(id))) });
+  if (!rows.every(validJournal)) throw new Error("That journal entry could not be saved.");
+  await write(jk, rows);
 }
 
 export interface ExerciseProgress {

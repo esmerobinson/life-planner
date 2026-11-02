@@ -315,13 +315,15 @@ function PartInput({ part, value, onChange }: { part: CardPart; value: PartValue
         <ol className="exercise-chain">
           {part.steps!.map((step, j) => (
             <li key={j}>
-              {j > 0 && (
-                <span className="exercise-chain-arrow journal-muted" aria-hidden="true">
-                  ↓
-                </span>
-              )}
               <label className="exercise-chain-step">
-                <span>{step}</span>
+                <span>
+                  {j > 0 && (
+                    <span className="exercise-chain-arrow" aria-hidden="true">
+                      →{" "}
+                    </span>
+                  )}
+                  {step}
+                </span>
                 <textarea
                   className="journal-answer exercise-chain-box"
                   rows={2}

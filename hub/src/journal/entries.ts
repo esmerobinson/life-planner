@@ -61,6 +61,32 @@ export interface CardsEntry {
   at: number;
 }
 
+/**
+ * The card set in chunks (Journal v2: a set of two books is too big for one synced row): the
+ * `cards` row is the manifest, written last, naming the import (`setId`) and how many chunks
+ * `cards:0` … `cards:<chunks-1>` hold its cards, in order.
+ */
+export interface CardsManifest {
+  v: 3;
+  setId: string;
+  chunks: number;
+  version: 1 | 2;
+  source: string;
+  tracks?: unknown;
+  importedAt: number;
+  at: number;
+}
+
+/** One chunk of the cards (in their file version's shape), for the import `setId`. */
+export interface CardsChunk {
+  v: 4;
+  setId: string;
+  k: number;
+  cards: Record<string, unknown>[];
+}
+
+export type CardsRow = CardsEntry | CardsManifest | CardsChunk;
+
 /** One device's exercise card for a day, and whether it was done (version 1: by day). */
 export interface ExerciseEntryV1 {
   v: 1;
@@ -152,8 +178,14 @@ export const ENTRY_CHECK = {
     isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at),
   set: (v: unknown): v is SetEntry => isObj(v) && v.v === 1 && strList(v.prompts) && num(v.at),
   settings: (v: unknown): v is SettingsEntry => isObj(v) && v.v === 1 && strList(v.active),
-  cards: (v: unknown): v is CardsEntry =>
-    isObj(v) && (v.v === 1 || v.v === 2) && num(v.at) && readStoredSet(v.v, v.source, v.cards, v.tracks) !== null,
+  cards: (v: unknown): v is CardsRow =>
+    isObj(v) &&
+    (v.v === 3
+      ? isStr(v.setId) && v.setId !== "" && Number.isInteger(v.chunks) && (v.chunks as number) >= 1 && (v.chunks as number) <= 1000 &&
+        (v.version === 1 || v.version === 2) && isStr(v.source) && num(v.importedAt) && num(v.at)
+      : v.v === 4
+        ? isStr(v.setId) && Number.isInteger(v.k) && (v.k as number) >= 0 && Array.isArray(v.cards) && v.cards.every(isObj)
+        : (v.v === 1 || v.v === 2) && num(v.at) && readStoredSet(v.v, v.source, v.cards, v.tracks) !== null),
   exercise: (v: unknown): v is ExerciseEntry =>
     isObj(v) && typeof v.done === "boolean" && num(v.at) &&
     (v.v === 1

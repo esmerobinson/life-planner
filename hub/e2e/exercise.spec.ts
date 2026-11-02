@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
+import { FAKE_CARD_FILE_KINDS, FAKE_CARD_FILE_TRACKS, FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
 
 /* The Journal's "Mental health exercise" tab in a real browser (Journal v2): Import (a version 2
    card file), today's card with its chapter line and Read more, Submit, "Do the next one →", a
@@ -129,6 +129,55 @@ test.describe("at 390px", () => {
     await walkThrough(page, "exercise-390");
   });
 });
+
+/** Imports a fixture file (through the Import pill, as she would). */
+async function importFile(page: Page, text: string) {
+  await section(page).getByLabel("Exercise card file").setInputFiles({ name: "pretend.json", mimeType: "application/json", buffer: Buffer.from(text) });
+}
+
+for (const width of [1280, 390]) {
+  test.describe(`at ${width}px (newer parts and two books)`, () => {
+    test.use({ viewport: { width, height: 900 } });
+    test("a table (stacked rows on the phone), a scale, a tracker and a chain; two books taken in turn", async ({ page }) => {
+      test.setTimeout(120_000);
+      await unlocked(page);
+      await importFile(page, JSON.stringify(FAKE_CARD_FILE_KINDS));
+      const s = section(page);
+      const today = s.getByRole("article", { name: "Today's card" });
+      await expect(today.getByText("Pretend table", { exact: true })).toBeVisible();
+      await expect(today.locator(".chip.exercise-format")).toHaveText("Table");
+      const header = today.locator("thead");
+      if (width < 700) await expect(header).toBeHidden(); // stacked row cards, the column names over each input
+      else await expect(header).toBeVisible();
+      await today.getByLabel("Feeling, row 1").fill("Pretend calm");
+      await noSidewaysScroll(page);
+      await shoot(page, `exercise-${width}-table`);
+      // The others, one after another.
+      await today.getByRole("button", { name: "Do the next one →" }).click();
+      await s.getByRole("article", { name: "Next card: Day 2" }).getByRole("button", { name: "Do the next one →" }).click();
+      const tracker = s.getByRole("article", { name: "Next card: Day 3" });
+      await expect(tracker.getByText("Day 1 of 3")).toBeVisible();
+      await tracker.getByLabel("Day 1, Hours").fill("7");
+      await tracker.getByLabel("Day 1, Mood").fill("Pretend fine");
+      await tracker.getByRole("button", { name: "Save today's entry" }).click();
+      await expect(tracker.getByText("Saved")).toBeVisible();
+      await tracker.getByRole("button", { name: "Do the next one →" }).click();
+      await expect(s.getByRole("article", { name: "Next card: Day 4" }).locator(".exercise-chain-arrow")).toHaveCount(2);
+      await noSidewaysScroll(page);
+      await shoot(page, `exercise-${width}-kinds`);
+
+      // Two books: replace the cards, then the second book's card follows the first's.
+      await s.getByText("All cards", { exact: true }).click();
+      await importFile(page, JSON.stringify(FAKE_CARD_FILE_TRACKS));
+      await s.getByRole("button", { name: "Replace" }).click();
+      await expect(today.getByText("Pretend first workbook · Chapter 1 · Pretend chapter")).toBeVisible();
+      await today.getByRole("button", { name: "Do the next one →" }).click();
+      await expect(s.getByRole("article", { name: "Next card: Day 1" }).getByText("Pretend second workbook · Chapter 1 · Pretend chapter")).toBeVisible();
+      await noSidewaysScroll(page);
+      await shoot(page, `exercise-${width}-two-books`);
+    });
+  });
+}
 
 for (const width of [360, 390, 430]) {
   test.describe(`at ${width}px`, () => {

@@ -22,6 +22,8 @@ export const DONE_LINE = "Done for today · next card tomorrow";
 export const REPLACE_QUESTION = "Replace your exercise cards?";
 /** Said with the question only when progress would be lost (a done card's id isn't in the new file). */
 export const RESTARTS_LINE = "Replacing your cards restarts your exercise progress.";
+/** While the card set's chunks are still arriving from another device. */
+export const CARDS_SYNCING = "Your cards are still syncing…";
 /** Beside Submit on today's card (the approved mockup). */
 export const SUBMIT_TICKS = "Submitting ticks today's exercise.";
 export const NEXT_ONE = "Do the next one →";
@@ -148,6 +150,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
           <ImportPill busy={busy} onFile={(f) => void chosen(f)} />
         </div>
       )}
+      {cards?.state === "syncing" && <p className="journal-muted">{CARDS_SYNCING}</p>}
       {cards?.state === "unreadable" && (
         <>
           <p className="journal-muted">{CANT_OPEN}</p>
