@@ -1,42 +1,50 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  addMorningPhoto, CANT_OPEN, finishMorningPage, listMorningDone, listReadBack, morningOpensOn, openJournalPhoto,
-  readMorningDay, readMorningPage, saveMorningDraft, type MorningDay, type MorningText,
+  addMorningPhoto, CANT_OPEN, finishMorningPage, listMorningDone, openJournalPhoto, readMorningDay, saveMorningDraft,
+  type MorningDay,
 } from "../../data/repo";
-import { monthGrid, shiftMonth, streakLine } from "../../journal/calendar";
+import { monthGrid, shiftMonth } from "../../journal/calendar";
 import type { JournalKey } from "../../journal/crypto";
 import { countWords, MORNING_WORDS } from "../../journal/entries";
+import { rowStatus } from "../../journal/rows";
+import { addDays, todayISO } from "../../domain/dates";
 import type { ISODate } from "../../domain/types";
+import { CHECK_DATE_EVENT } from "../shellContext";
 import { downscalePicture, PICTURE_UNREADABLE } from "../picture";
 import { ProgressBar } from "../ProgressBar";
+import { Streak } from "../Streak";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
-import { rowStatus } from "../../journal/rows";
-import { DoneBox, LoadLine, longDate, monthLabel, Star, useLoadGuard } from "./bits";
-import { JournalStripHead, tickState } from "./JournalStrip";
+import { DoneBox, LoadLine, monthLabel, useLoadGuard } from "./bits";
 import { useDbChanges } from "./useJournalKey";
-
-const NO_DAYS: ReadonlySet<ISODate> = new Set();
 
 /** The rules in our own words (journal brief §1's line; no quotation from the book). */
 export const MORNING_RULES =
   "Three pages, longhand if you can, first thing in the morning. Don't edit, don't reread, just keep the pen moving.";
+/** Under the word count until her 1,000 (Journal v2: a target, never a lock; no guilt). */
+export const KEEP_GOING = "Keep going if you can — 1,000 is about three pages.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
+/** Over the box when yesterday's words were left unfinished (review I1: kept as yesterday's draft). */
+export const YESTERDAY_SAVED = "Yesterday's unfinished page is saved.";
+const fmt = (n: number) => n.toLocaleString("en-GB");
 
 type Props = { jk: JournalKey; today: ISODate; deviceId: string };
 
 /**
- * Morning pages (journal brief §1, VISUAL-LANGUAGE.md "Morning pages", mockup tab C): the star
- * calendar, "Write now" and "Add photo". A finished page stays hidden for 4 weeks, then opens
- * read-only in "Read back". Entries that don't open here are noted, never in the way.
+ * Morning pages (journal brief §1; Journal v2 tab): the big writing box straight away, "N of
+ * 1,000 words" with the bar, "Add photo instead" and "I'm done" (the day counts as done when
+ * she presses it, at any length), then the month calendar with today outlined and a mint day
+ * for each day she did her pages. A finished page stays hidden for 4 weeks, then opens
+ * read-only in the Read back tab. Entries that don't open here are noted, never in the way.
  */
 export function MorningPages({ jk, today, deviceId }: Props) {
   const [done, setDone] = useState<Set<ISODate> | null>(null);
   const [day, setDay] = useState<MorningDay | null>(null);
-  const [readBack, setReadBack] = useState<{ id: string; date: ISODate }[]>([]);
+  const [yesterdayDraft, setYesterdayDraft] = useState(false);
   const [month, setMonth] = useState(today.slice(0, 7));
-  const [writing, setWriting] = useState(false);
   const [problem, setProblem] = useState("");
   const [adding, setAdding] = useState(false);
+  // A finished page starts a fresh box (a later page that day is a page of its own).
+  const [page, setPage] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const latest = useRef(0);
   const guardFail = useRef<() => void>(() => undefined);
@@ -44,22 +52,24 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const [d, t, rb] = await Promise.all([listMorningDone(jk), readMorningDay(jk, today, deviceId), listReadBack()]);
+      const [d, t, y] = await Promise.all([
+        listMorningDone(jk),
+        readMorningDay(jk, today, deviceId),
+        readMorningDay(jk, addDays(today, -1), deviceId),
+      ]);
       if (id !== latest.current) return;
       setDone(d);
       setDay(t);
-      setReadBack(rb);
+      setYesterdayDraft(y.draft.trim() !== "");
     } catch {
       if (id === latest.current) guardFail.current();
     }
   }, [jk, today, deviceId]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
-  // Never blank under the strip: "Loading…", then the can't-open line and Try again.
-  const guard = useLoadGuard(done === null, load);
+  // Never blank: "Loading…", then the can't-open line and Try again.
+  const guard = useLoadGuard(done === null || day === null, load);
   guardFail.current = guard.fail;
-
-  const streak = useMemo(() => (done ? streakLine(done, today) : null), [done, today]);
 
   async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -78,59 +88,44 @@ export function MorningPages({ jk, today, deviceId }: Props) {
     }
   }
 
-  const doneToday = !!day?.done;
-  const row = rowStatus(done ?? NO_DAYS, today);
+  // The box is today's: until today's day is read (after midnight too), it waits.
+  if (done === null || day === null || day.date !== today) return <LoadLine guard={guard} />;
+  const row = rowStatus(done, today);
+  const streak = (row.streak > 0 || row.week.some(Boolean) || row.month > 0) && (
+    <>
+      <Streak n={row.streak} week={row.week} />
+      {row.month > 0 && <span>{` ${row.month} this month`}</span>}
+    </>
+  );
   return (
     <>
-      <JournalStripHead id="morning-pages" title="Morning pages" tick={tickState(done ? row.done : undefined)} streak={row.streak} meta={longDate(today)} />
-      {done === null ? (
-        <LoadLine guard={guard} />
-      ) : writing ? (
-        <WritingView
-          jk={jk}
-          date={today}
-          deviceId={deviceId}
-          initialDraft={day?.draft ?? ""}
-          onClose={() => {
-            setWriting(false);
-            void load();
-          }}
-        />
-      ) : (
-        <>
-          <p className="journal-rules">{MORNING_RULES}</p>
-          <div className="journal-month-row">
-            <button type="button" className="btn-secondary journal-month-step" aria-label="Previous month" onClick={() => setMonth((m) => shiftMonth(m, -1))}>
-              ‹
-            </button>
-            <b aria-live="polite">{monthLabel(month, today)}</b>
-            <button type="button" className="btn-secondary journal-month-step" aria-label="Next month" onClick={() => setMonth((m) => shiftMonth(m, 1))}>
-              ›
-            </button>
-          </div>
-          <StarCalendar month={month} done={done} today={today} />
-          {streak && !doneToday && (
-            <p className="journal-muted journal-streak">
-              <Star /> {streak}
-            </p>
-          )}
-          {doneToday && <DoneBox title="Done for today" line={streak} star />}
-          {day && day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
-          {day && day.photos.length > 0 && (
-            <ul className="journal-photos" aria-label="Today's photos">
-              {day.photos.map((id) => (
-                <li key={id}>
-                  <ProofPhoto jk={jk} id={id} />
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="btn-group">
-            <button type="button" onClick={() => setWriting(true)}>
-              Write now
-            </button>
+      <p className="journal-rules">{MORNING_RULES}</p>
+      {day.done && <DoneBox title="Done for today" line={streak || null} />}
+      {day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
+      {day.photos.length > 0 && (
+        <ul className="journal-photos" aria-label="Today's photos">
+          {day.photos.map((id) => (
+            <li key={id}>
+              <ProofPhoto jk={jk} id={id} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {yesterdayDraft && <p className="journal-muted">{YESTERDAY_SAVED}</p>}
+      <WritingView
+        key={`${page}|${today}`}
+        jk={jk}
+        date={today}
+        deviceId={deviceId}
+        initialDraft={page === 0 ? day.draft : ""}
+        onFinished={() => {
+          setPage((n) => n + 1);
+          void load();
+        }}
+        photoButton={
+          <>
             <button type="button" className="btn-secondary" disabled={adding} onClick={() => fileInput.current?.click()}>
-              Add photo
+              Add photo instead
             </button>
             <input
               ref={fileInput}
@@ -141,19 +136,29 @@ export function MorningPages({ jk, today, deviceId }: Props) {
               aria-label="Photo of today's pages"
               onChange={(e) => void onPhoto(e)}
             />
-          </div>
-          {problem && <p role="alert">{problem}</p>}
-          <ReadBack jk={jk} pages={readBack} today={today} />
-        </>
-      )}
+          </>
+        }
+      />
+      {problem && <p role="alert">{problem}</p>}
+      <div className="journal-month-row">
+        <button type="button" className="btn-secondary journal-month-step" aria-label="Previous month" onClick={() => setMonth((m) => shiftMonth(m, -1))}>
+          ‹
+        </button>
+        <b aria-live="polite">{monthLabel(month, today)}</b>
+        <button type="button" className="btn-secondary journal-month-step" aria-label="Next month" onClick={() => setMonth((m) => shiftMonth(m, 1))}>
+          ›
+        </button>
+      </div>
+      <MonthCalendar month={month} done={done} today={today} />
+      {streak && !day.done && <p className="journal-muted journal-streak">{streak}</p>}
     </>
   );
 }
 
 const WEEKDAY_HEADS = ["M", "T", "W", "T", "F", "S", "S"];
 
-/** The month, Monday first: a star on each day with a morning page, today outlined. */
-function StarCalendar({ month, done, today }: { month: string; done: ReadonlySet<ISODate>; today: ISODate }) {
+/** The month, Monday first: each day with a morning page is mint (the approved mockup), today outlined. */
+function MonthCalendar({ month, done, today }: { month: string; done: ReadonlySet<ISODate>; today: ISODate }) {
   return (
     <div className="journal-cal" role="group" aria-label="Morning pages calendar">
       {WEEKDAY_HEADS.map((d, i) => (
@@ -168,7 +173,7 @@ function StarCalendar({ month, done, today }: { month: string; done: ReadonlySet
         const cls = ["journal-day", on ? "on" : "", isToday ? "today" : ""].filter(Boolean).join(" ");
         return (
           <div key={c.date} className={cls} data-date={c.date} aria-label={`${c.day}${on ? ", done" : ""}${isToday ? ", today" : ""}`} role="img">
-            {on ? "" : c.day}
+            {c.day}
           </div>
         );
       })}
@@ -211,15 +216,18 @@ function ProofPhoto({ jk, id }: { jk: JournalKey; id: string }) {
 }
 
 /**
- * Write now: one big plain box, "N of 750 words" with the progress bar, "I'm done". The draft
+ * The writing box: one big plain box, "N of 1,000 words" with the progress bar and, until
+ * 1,000, a gentle line; "I'm done" works at any length (but not on an empty box). The draft
  * (this device's own row) saves itself, sealed, after a pause in typing, on blur, when the
- * view closes and when the app goes to the background. The day is fixed when the view opens,
- * so writing past midnight stays on the day it was started.
+ * box goes away and when the app goes to the background. The day is fixed when the box
+ * opens; a new day opens a new, empty box (the old one keeps its words as that day's draft),
+ * and "I'm done" after midnight, before the app noticed, never files the page under yesterday:
+ * it saves the draft and asks the app to look at the clock (review I1).
  */
 function WritingView({
-  jk, date: startDate, deviceId, initialDraft, onClose,
-}: { jk: JournalKey; date: ISODate; deviceId: string; initialDraft: string; onClose: () => void }) {
-  const [date] = useState(startDate); // pinned when the view opens (midnight stays on the same day)
+  jk, date: startDate, deviceId, initialDraft, onFinished, photoButton,
+}: { jk: JournalKey; date: ISODate; deviceId: string; initialDraft: string; onFinished: () => void; photoButton: ReactNode }) {
+  const [date] = useState(startDate); // pinned when the box opens (midnight stays on the same day)
   const [text, setText] = useState(initialDraft);
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
@@ -248,7 +256,7 @@ function WritingView({
     });
   }, [jk, date, deviceId, enqueue]);
 
-  // Leaving mid-way (Back, another page) or the app going to the background keeps the draft.
+  // Leaving (another tab or page) or the app going to the background keeps the draft.
   useEffect(() => () => saveDraft(), [saveDraft]);
   useHiddenFlush(saveDraft);
 
@@ -262,6 +270,12 @@ function WritingView({
 
   async function done() {
     if (busy) return;
+    if (todayISO() !== date) {
+      // Midnight passed: nothing is finished by itself. The words stay that day's draft.
+      saveDraft();
+      window.dispatchEvent(new Event(CHECK_DATE_EVENT));
+      return;
+    }
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     setBusy(true);
@@ -269,10 +283,7 @@ function WritingView({
     try {
       await enqueue(() => finishMorningPage(jk, date, deviceId, page));
       finished.current = true;
-      latest.current = "";
-      saved.current = "";
-      setText("");
-      onClose();
+      onFinished();
     } catch {
       setProblem(SAVE_PROBLEM);
       setBusy(false);
@@ -280,6 +291,7 @@ function WritingView({
   }
 
   const words = countWords(text);
+  const count = `${fmt(words)} of ${fmt(MORNING_WORDS)} words`;
   return (
     <div className="journal-writing">
       <textarea
@@ -289,79 +301,19 @@ function WritingView({
         value={text}
         onChange={(e) => onChange(e.target.value)}
         onBlur={saveDraft}
-        autoFocus
       />
       <div>
-        <p className="journal-muted journal-words">{`${words} of ${MORNING_WORDS} words`}</p>
-        <ProgressBar ratio={words / MORNING_WORDS} label={`${words} of ${MORNING_WORDS} words`} />
+        <p className="journal-muted journal-words">{count}</p>
+        <ProgressBar ratio={words / MORNING_WORDS} label={count} />
+        {words < MORNING_WORDS && <p className="journal-muted journal-keep-going">{KEEP_GOING}</p>}
       </div>
       {problem && <p role="alert">{problem}</p>}
-      <div className="btn-group">
+      <div className="btn-group journal-write-actions">
+        {photoButton}
         <button type="button" disabled={busy || words === 0} onClick={() => void done()}>
           I'm done
         </button>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => {
-            saveDraft();
-            onClose();
-          }}
-        >
-          Back
-        </button>
       </div>
     </div>
-  );
-}
-
-/**
- * Read back: every finished page, newest day first, each with its own 4-week lock. Locked:
- * "Opens on <date>" and nothing else (the page is not decrypted). Older: opens read-only.
- */
-function ReadBack({ jk, pages, today }: { jk: JournalKey; pages: { id: string; date: ISODate }[]; today: ISODate }) {
-  if (pages.length === 0) return null;
-  const count = new Map<ISODate, number>();
-  return (
-    <details className="journal-fold">
-      <summary>Read back</summary>
-      <ul className="journal-past">
-        {pages.map((p) => {
-          const n = (count.get(p.date) ?? 0) + 1;
-          count.set(p.date, n);
-          const label = n > 1 ? `${longDate(p.date)} · page ${n}` : longDate(p.date);
-          const opensOn = morningOpensOn(p.date);
-          return (
-            <li key={p.id}>
-              {today < opensOn ? (
-                <p className="journal-readback-locked">
-                  <b>{label}</b> <span className="journal-muted">{`Opens on ${longDate(opensOn)}`}</span>
-                </p>
-              ) : (
-                <OpenPage jk={jk} id={p.id} label={label} today={today} />
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </details>
-  );
-}
-
-/** One readable page: decrypted only when she opens it. */
-function OpenPage({ jk, id, label, today }: { jk: JournalKey; id: string; label: string; today: ISODate }) {
-  const [text, setText] = useState<MorningText | null>(null);
-  return (
-    <details
-      onToggle={(e) => {
-        if ((e.currentTarget as HTMLDetailsElement).open && !text) {
-          void readMorningPage(jk, id, today).then(setText, () => setText({ state: "unreadable" }));
-        }
-      }}
-    >
-      <summary>{label}</summary>
-      {text?.state === "ok" && <p className="journal-readback-text">{text.text}</p>}
-      {text?.state === "unreadable" && <p>{CANT_OPEN}</p>}
-    </details>
   );
 }

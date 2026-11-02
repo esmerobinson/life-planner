@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
@@ -8,20 +8,12 @@ import { PROMPTS, PROMPT_BY_ID, STARTER_IDS, workbookPage } from "../../journal/
 import { pickPrompts } from "../../journal/rotation";
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
-import { checkinDoneDays, rowStatus } from "../../journal/rows";
 import { DoneBox, LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
-import { JournalStripHead, Private, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
 export const CHECKED_IN_LINE = "Kind to yourself today? That counts.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
-/** The strip's small line. */
-export const CHECKIN_META = (
-  <>
-    Today's three questions · <Private />
-  </>
-);
 
 /**
  * Daily check-in (journal brief §2, VISUAL-LANGUAGE.md "Daily check-in", mockup tab A):
@@ -93,10 +85,8 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
   }
 
   const step = day ? currentStep(day) : -1;
-  const row = useMemo(() => rowStatus(checkinDoneDays(day ? [day, ...past] : past), today), [day, past, today]);
   return (
     <>
-      <JournalStripHead id="daily-check-in" title="Daily check-in" tick={tickState(day ? row.done : undefined)} streak={row.streak} meta={CHECKIN_META} />
       {day === null && <LoadLine guard={guard} />}
       {day && day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
       {day && day.prompts.length === 0 && <p>No questions are switched on. Choose some under Choose questions.</p>}
@@ -113,7 +103,7 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
   );
 }
 
-function QuestionText({ id }: { id: string }) {
+export function QuestionText({ id }: { id: string }) {
   const p = PROMPT_BY_ID.get(id);
   if (!p) return <p className="journal-q">This question is from a newer version of the app.</p>;
   const page = workbookPage(p.ref);

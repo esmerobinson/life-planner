@@ -9,6 +9,7 @@ import { ProgressBar } from "./ProgressBar";
 import { GOAL_AREAS } from "./areas";
 import { DoneSection } from "./DoneSection";
 import { GoalCard, MonthProgress } from "./GoalProgress";
+import { JournalHabitRows } from "./JournalCard";
 import { DATA_ERROR, useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow, useTick } from "./TaskRow";
@@ -82,13 +83,15 @@ export function AreaPage({ today }: { today: ISODate }) {
   const ideas = view === "all" || view === "ideas" ? mine.filter((i) => i.kind === "idea") : [];
   const areaGoals = view === "all" || view === "goals" ? goals.filter((g) => g.areaId === area.id) : [];
   const empty = loaded && habits.length + tasks.length + ideas.length + areaGoals.length === 0;
+  // Mind's Habits box also holds the three Journal rows, after her own habits (Journal v2).
+  const journalHabits = area.id === "mind" && (view === "all" || view === "tasks");
 
   return (
     <section className="area-page">
       <h1>{area.label}</h1>
       {/* The month box: at the top of every area page, directly under the h1 (2026-11-02). */}
       {loaded && <MonthProgress areaId={area.id} items={items} today={today} />}
-      {habits.length > 0 && (
+      {(habits.length > 0 || journalHabits) && (
         <section className="habits" aria-labelledby="habits-heading">
           <h2 className="habits-head" id="habits-heading">
             <span className="strip-glyph" aria-hidden="true">
@@ -118,6 +121,7 @@ export function AreaPage({ today }: { today: ISODate }) {
                 />
               );
             })}
+            {journalHabits && <JournalHabitRows today={today} />}
           </ul>
         </section>
       )}

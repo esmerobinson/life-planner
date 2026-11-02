@@ -74,13 +74,8 @@ export function monthLabel(month: string, today: ISODate): string {
   return month.slice(0, 4) === today.slice(0, 4) ? name : `${name} ${y}`;
 }
 
-/** The placeholder star (magenta until Esme picks star art). */
-export function Star() {
-  return <span className="journal-star" aria-hidden="true" />;
-}
-
 /** The done box: a tick, a bold line and a small line under it. */
-export function DoneBox({ title, line, star = false }: { title: string; line?: string | null; star?: boolean }) {
+export function DoneBox({ title, line }: { title: string; line?: React.ReactNode }) {
   return (
     <div className="journal-done">
       <span className="journal-tick" aria-hidden="true">
@@ -89,9 +84,7 @@ export function DoneBox({ title, line, star = false }: { title: string; line?: s
       <div>
         <b>{title}</b>
         {line && (
-          <div className="journal-muted">
-            {star && <Star />} {line}
-          </div>
+          <div className="journal-muted">{line}</div>
         )}
       </div>
     </div>

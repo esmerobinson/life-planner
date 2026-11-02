@@ -1,11 +1,14 @@
 import { vi } from "vitest";
 import { db } from "./db";
 import {
-  CANT_OPEN, listExerciseEntries, NOT_CONFIRMED, readExerciseEntry, readExerciseProgress, saveExerciseDraft,
-  submitExerciseEntry,
+  answerFilled, CANT_OPEN, cardRef, listExerciseEntries, logExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable, trackerNewInput,
+  type PartAnswer, NOT_CONFIRMED, readExerciseEntry, readExerciseProgress, recordExerciseShown,
+  saveExerciseDraft, submitExerciseEntry,
 } from "./repo";
 import { journalId, validJournal } from "./validate";
-import { exerciseCardKey, journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
+import { exerciseCardIdKey, exerciseCardKey, journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
+import { parseCardFile } from "../journal/exercise";
+import { FAKE_CARD_FILE_KINDS, FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 
 // The exercise response (journal polish brief §1–2): her written response to today's card is
@@ -16,7 +19,8 @@ import { confirmedDevice, keyFor } from "../test/journalKey";
 const DAY = "2026-10-30";
 const ME = "device-mac-0001";
 const PHONE = "device-phone-01";
-const CARD = { day: 3, theme: "Imaginary pebbles" };
+const legacy = (day: number, theme: string) => ({ id: `day-${day}`, day, theme, legacy: true });
+const CARD = legacy(3, "Imaginary pebbles");
 let jk: JournalKey;
 let other: JournalKey;
 beforeAll(async () => {
@@ -71,9 +75,9 @@ describe("submit", () => {
     });
     expect(await db.pending.get(["journal", id])).toBeTruthy();
     // The existing done mark, on this device's own progress row.
-    expect((await readExerciseProgress(jk)).marks).toEqual([{ date: DAY, device: ME, day: 3, done: true }]);
+    expect((await readExerciseProgress(jk)).marks).toEqual([{ date: DAY, device: ME, id: "day-3", done: true, primary: true }]);
     expect(await readExerciseEntry(jk, DAY, CARD)).toMatchObject({
-      entry: { date: DAY, day: 3, theme: CARD.theme, text: "Pretend response words", saved: true, submitted: true },
+      entry: { date: DAY, id: "day-3", day: 3, theme: CARD.theme, text: "Pretend response words", saved: true, submitted: true },
       unreadable: 0,
     });
   });
@@ -144,13 +148,13 @@ describe("two devices", () => {
 
 describe("Past exercises", () => {
   it("newest first, one per day and card, with the theme from the entry; empty drafts and today left out", async () => {
-    await submitExerciseEntry(jk, "2026-10-27", ME, { day: 1, theme: "Pretend weather" }, "Pretend one");
-    await submitExerciseEntry(jk, "2026-10-29", ME, { day: 2, theme: "The fictional kettle" }, "Pretend two");
+    await submitExerciseEntry(jk, "2026-10-27", ME, legacy(1, "Pretend weather"), "Pretend one");
+    await submitExerciseEntry(jk, "2026-10-29", ME, legacy(2, "The fictional kettle"), "Pretend two");
     await db.journal.put(
       await theirRow(jk, "2026-10-29", PHONE, { day: 2, theme: "The fictional kettle", text: "Pretend two, phone", submittedAt: 1, at: 1 }),
     );
-    await saveExerciseDraft(jk, "2026-10-28", ME, { day: 5, theme: "The made-up garden" }, "Pretend never submitted");
-    await saveExerciseDraft(jk, "2026-10-26", ME, { day: 4, theme: "A pretend lighthouse" }, "");
+    await saveExerciseDraft(jk, "2026-10-28", ME, legacy(5, "The made-up garden"), "Pretend never submitted");
+    await saveExerciseDraft(jk, "2026-10-26", ME, legacy(4, "A pretend lighthouse"), "");
     await submitExerciseEntry(jk, DAY, ME, CARD, "Pretend today");
     await db.journal.put(await theirRow(other, "2026-10-25", PHONE, { day: 1, theme: "Pretend weather", text: "x", submittedAt: 1, at: 1 }));
     const past = await listExerciseEntries(jk, DAY);
@@ -163,9 +167,158 @@ describe("Past exercises", () => {
   });
 
   it("two cards on one day are two entries", async () => {
-    await submitExerciseEntry(jk, "2026-10-29", ME, { day: 2, theme: "The fictional kettle" }, "Pretend kettle");
-    await submitExerciseEntry(jk, "2026-10-29", ME, { day: 3, theme: "Imaginary pebbles" }, "Pretend pebbles");
+    await submitExerciseEntry(jk, "2026-10-29", ME, legacy(2, "The fictional kettle"), "Pretend kettle");
+    await submitExerciseEntry(jk, "2026-10-29", ME, legacy(3, "Imaginary pebbles"), "Pretend pebbles");
     const past = await listExerciseEntries(jk, DAY);
     expect(past.entries.map((e) => e.day).sort()).toEqual([2, 3]);
+  });
+});
+
+describe("version 2 cards (Journal v2): by card id", () => {
+  const V2 = parseCardFile(FAKE_CARD_TEXT_V2)!.cards;
+  const weather = cardRef(V2[1]!);
+  const kettle = cardRef(V2[2]!);
+
+  it("a response is keyed by the card's id (opaque), stored with the id, and found again after its theme changes", async () => {
+    await submitExerciseEntry(jk, DAY, ME, weather, "Pretend about clouds");
+    const id = `exercise-entry:${DAY}:${await exerciseCardIdKey(jk, weather.id)}:${ME}`;
+    const stored = (await db.journal.get(id))!;
+    expect(JSON.stringify(stored)).not.toContain("pretend-ch1");
+    expect(await openJson(jk.key, stored, journalAad(id))).toMatchObject({ v: 2, id: weather.id, day: 1, theme: "Pretend weather" });
+    const renamed = { ...weather, theme: "Pretend weather, renamed" };
+    expect((await readExerciseEntry(jk, DAY, renamed)).entry).toMatchObject({ id: weather.id, text: "Pretend about clouds", saved: true });
+    expect((await readExerciseProgress(jk)).marks).toEqual([{ date: DAY, device: ME, id: weather.id, done: true, primary: true }]);
+  });
+
+  it("Do the next one: submitting another card marks it done too, today, and today's card stays today's", async () => {
+    await recordExerciseShown(jk, DAY, ME, weather.id);
+    await submitExerciseEntry(jk, DAY, ME, kettle, "Pretend kettle words", weather.id);
+    expect((await readExerciseProgress(jk)).marks).toEqual([
+      { date: DAY, device: ME, id: weather.id, done: false, primary: true },
+      { date: DAY, device: ME, id: kettle.id, done: true, primary: false },
+    ]);
+    await submitExerciseEntry(jk, DAY, ME, weather, "Pretend clouds after all", weather.id);
+    expect((await readExerciseProgress(jk)).marks).toEqual([
+      { date: DAY, device: ME, id: weather.id, done: true, primary: true },
+      { date: DAY, device: ME, id: kettle.id, done: true, primary: false },
+    ]);
+    expect(await db.journal.where("kind").equals("exercise").count()).toBe(1);
+  });
+
+  it("two submits at once (today's card and a next one) both keep their done marks (review M5)", async () => {
+    await recordExerciseShown(jk, DAY, ME, weather.id);
+    await Promise.all([
+      submitExerciseEntry(jk, DAY, ME, weather, "Pretend one", weather.id),
+      submitExerciseEntry(jk, DAY, ME, kettle, "Pretend two", weather.id),
+    ]);
+    const marks = (await readExerciseProgress(jk)).marks.filter((m) => m.done).map((m) => m.id).sort();
+    expect(marks).toEqual([kettle.id, weather.id].sort());
+  });
+
+  it("Past exercises carry the card id", async () => {
+    await submitExerciseEntry(jk, "2026-10-29", ME, weather, "Pretend yesterday");
+    expect((await listExerciseEntries(jk, DAY)).entries.map((e) => [e.id, e.day, e.theme])).toEqual([[weather.id, 1, "Pretend weather"]]);
+  });
+});
+
+describe("a tracker card, a day at a time", () => {
+  const KINDS = parseCardFile(JSON.stringify(FAKE_CARD_FILE_KINDS))!.cards;
+  const tracker = cardRef(KINDS[2]!);
+  const log = (days: string[][]): PartAnswer[] => [{ prompt: "Pretend sleep log", kind: "tracker", answer: days }];
+
+  it("saving a day logs the card for the day (it counts) without marking it done; complete, it is submitted", async () => {
+    expect(responseLoggable(log([["", ""], ["", ""], ["", ""]]))).toBe(false);
+    expect(responseLoggable(log([["7", "ok"], ["", ""], ["", ""]]))).toBe(true);
+    await logExerciseEntry(jk, "2026-10-29", ME, tracker, log([["7", "ok"], ["", ""], ["", ""]]));
+    expect((await readExerciseProgress(jk)).marks).toEqual([
+      { date: "2026-10-29", device: ME, id: tracker.id, done: false, primary: true },
+      { date: "2026-10-29", device: ME, id: tracker.id, done: false, primary: false, logged: true },
+    ]);
+    // The next day starts from what was saved.
+    expect((await readLatestExerciseEntry(jk, DAY, tracker))!.parts![0]!.answer).toEqual([["7", "ok"], ["", ""], ["", ""]]);
+    await expect(submitExerciseEntry(jk, DAY, ME, tracker, log([["7", "ok"], ["8", ""], ["", ""]]))).rejects.toThrow();
+    await submitExerciseEntry(jk, DAY, ME, tracker, log([["7", "ok"], ["8", "good"], ["6", "fine"]]));
+    expect((await readExerciseProgress(jk)).marks.filter((m) => m.date === DAY)).toEqual([
+      { date: DAY, device: ME, id: tracker.id, done: true, primary: true },
+    ]);
+  });
+
+  it("the next day, saving needs something new in the tracker: the days carried forward alone don't log (review I2)", async () => {
+    await logExerciseEntry(jk, "2026-10-29", ME, tracker, log([["7", "ok"], ["", ""], ["", ""]]));
+    const carried = (await readLatestExerciseEntry(jk, DAY, tracker))!.parts!;
+    expect(trackerNewInput(carried, carried)).toBe(false);
+    await expect(logExerciseEntry(jk, DAY, ME, tracker, carried)).rejects.toThrow();
+    expect((await readExerciseProgress(jk)).marks.some((m) => m.date === DAY)).toBe(false); // no tick today
+    const more = log([["7", "ok"], ["8", ""], ["", ""]]);
+    expect(trackerNewInput(more, carried)).toBe(true);
+    await logExerciseEntry(jk, DAY, ME, tracker, more);
+    expect((await readExerciseProgress(jk)).marks.find((m) => m.date === DAY && m.logged)).toMatchObject({ id: tracker.id });
+  });
+
+  it("a tracker done in an earlier round isn't carried into the next one (review M6)", async () => {
+    await submitExerciseEntry(jk, "2026-10-20", ME, tracker, log([["7", "ok"], ["8", "good"], ["6", "fine"]]));
+    expect(await readLatestExerciseEntry(jk, DAY, tracker)).toBeNull();
+    await logExerciseEntry(jk, "2026-10-29", ME, tracker, log([["5", "meh"], ["", ""], ["", ""]]));
+    expect((await readLatestExerciseEntry(jk, DAY, tracker))!.parts![0]!.answer).toEqual([["5", "meh"], ["", ""], ["", ""]]);
+  });
+
+  it("table, scale and chain answers are sealed in the same rows and read back", async () => {
+    const [table, scale, , chain] = KINDS.map(cardRef);
+    await submitExerciseEntry(jk, DAY, ME, table!, [{ prompt: "Pretend feelings and what set them off", kind: "table", answer: [["a", "b"], ["c", "d"]] }]);
+    await submitExerciseEntry(jk, DAY, ME, scale!, [{ prompt: "How pretend-calm are you?", kind: "scale", answer: 4 }], table!.id);
+    await submitExerciseEntry(jk, DAY, ME, chain!, [{ prompt: "A pretend chain of events", kind: "chain", answer: ["x", "y", "z"] }], table!.id);
+    expect((await readExerciseEntry(jk, DAY, table!)).entry!.parts![0]!.answer).toEqual([["a", "b"], ["c", "d"]]);
+    expect((await readExerciseEntry(jk, DAY, scale!)).entry!.parts![0]!.answer).toBe(4);
+    expect((await readExerciseEntry(jk, DAY, chain!)).entry!.parts![0]!.answer).toEqual(["x", "y", "z"]);
+    await expect(
+      submitExerciseEntry(jk, DAY, ME, chain!, [{ prompt: "A pretend chain of events", kind: "chain", answer: ["x", "", "z"] }]),
+    ).rejects.toThrow();
+  });
+});
+
+describe("a card with parts: one answer per part, in the same sealed per-device row", () => {
+  const V2 = parseCardFile(FAKE_CARD_TEXT_V2)!.cards;
+  const kettle = cardRef(V2[2]!);
+  const answers = (list: string[], rating: number | null, choice: string | null): PartAnswer[] => [
+    { prompt: "What does your pretend whistle sound like?", kind: "text", answer: "Pretend high whistle" },
+    { prompt: "Three pretend places you feel it", kind: "list", answer: list },
+    { prompt: "How loud is it right now?", kind: "rating", answer: rating },
+    { prompt: "Which pretend kettle is it?", kind: "choice", answer: choice },
+  ];
+
+  it("a draft keeps the parts (partly filled) and never marks done; it reads back", async () => {
+    await saveExerciseDraft(jk, DAY, ME, kettle, answers(["Pretend chest", "", ""], null, null));
+    const id = `exercise-entry:${DAY}:${await exerciseCardIdKey(jk, kettle.id)}:${ME}`;
+    const stored = (await db.journal.get(id))!;
+    expect(JSON.stringify(stored)).not.toContain("Pretend chest");
+    expect(await openJson(jk.key, stored, journalAad(id))).toMatchObject({ v: 2, text: "", parts: answers(["Pretend chest", "", ""], null, null) });
+    expect((await readExerciseEntry(jk, DAY, kettle)).entry).toMatchObject({ parts: answers(["Pretend chest", "", ""], null, null), saved: false });
+    expect((await readExerciseProgress(jk)).marks).toEqual([]);
+  });
+
+  it("Submit needs every part filled (every line of a list); then it marks the card done", async () => {
+    await expect(submitExerciseEntry(jk, DAY, ME, kettle, answers(["a", "b", ""], 4, "Tin"))).rejects.toThrow();
+    await expect(submitExerciseEntry(jk, DAY, ME, kettle, answers(["a", "b", "c"], null, "Tin"))).rejects.toThrow();
+    await expect(submitExerciseEntry(jk, DAY, ME, kettle, answers(["a", "b", "c"], 4, null))).rejects.toThrow();
+    expect(await db.journal.where("kind").anyOf("exercise-entry", "exercise").count()).toBe(0);
+    await submitExerciseEntry(jk, DAY, ME, kettle, answers(["a", "b", "c"], 0, "Tin"));
+    expect((await readExerciseEntry(jk, DAY, kettle)).entry).toMatchObject({ saved: true, submitted: true });
+    expect((await readExerciseProgress(jk)).marks).toEqual([{ date: DAY, device: ME, id: kettle.id, done: true, primary: true }]);
+  });
+
+  it("responseComplete and answerFilled", () => {
+    expect(responseComplete("  ")).toBe(false);
+    expect(responseComplete("Pretend")).toBe(true);
+    expect(responseComplete([])).toBe(false);
+    expect(responseComplete(answers(["a", "b", "c"], 10, "Glass"))).toBe(true);
+    expect(answerFilled({ prompt: "p", kind: "list", answer: ["a", " "] })).toBe(false);
+  });
+
+  it("listed for reading back (a partly filled draft too); an untouched one is left out", async () => {
+    await saveExerciseDraft(jk, "2026-10-28", ME, kettle, answers(["", "", ""], null, null).map((a) => (a.kind === "text" ? { ...a, answer: "" } : a)));
+    await saveExerciseDraft(jk, "2026-10-29", ME, kettle, answers(["Pretend", "", ""], null, null));
+    const past = await listExerciseEntries(jk, DAY);
+    expect(past.entries.map((e) => e.date)).toEqual(["2026-10-29"]);
+    expect(past.entries[0]!.parts![1]).toEqual({ prompt: "Three pretend places you feel it", kind: "list", answer: ["Pretend", "", ""] });
   });
 });

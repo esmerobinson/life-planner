@@ -3,7 +3,7 @@
 // as "can't open" and is skipped on its own.
 
 import { isObj, isStr } from "../data/validate";
-import { MAX_CARD_DAY, validCardSet, type CardSet, type StarMark } from "./exercise";
+import { MAX_CARD_DAY, MAX_CARD_ID, MAX_PARTS, PART_KINDS, readStoredSet, type PartKind, type PartValue } from "./exercise";
 
 /** One finished morning page ("I'm done"). Hidden for MORNING_LOCK_DAYS from its date. */
 export interface PageEntry {
@@ -48,38 +48,97 @@ export interface SettingsEntry {
   active: string[];
 }
 
-/** The imported exercise cards, the whole set (exercise brief). */
-export interface CardsEntry extends CardSet {
-  v: 1;
+/**
+ * The imported exercise cards, the whole set (exercise brief): `v` is the card file's version
+ * and `cards` its cards in that version's file shape (exercise.ts storedCards).
+ */
+export interface CardsEntry {
+  v: 1 | 2;
+  source: string;
+  /** The file's books (tracks), when it lists them. */
+  tracks?: unknown;
+  cards: Record<string, unknown>[];
   at: number;
 }
 
-/** One device's exercise card for a day, and whether it was ticked. */
-export interface ExerciseEntry {
+/**
+ * The card set in chunks (Journal v2: a set of two books is too big for one synced row): the
+ * `cards` row is the manifest, written last, naming the import (`setId`) and how many chunks
+ * `cards:0` … `cards:<chunks-1>` hold its cards, in order.
+ */
+export interface CardsManifest {
+  v: 3;
+  setId: string;
+  chunks: number;
+  version: 1 | 2;
+  source: string;
+  tracks?: unknown;
+  importedAt: number;
+  at: number;
+}
+
+/** One chunk of the cards (in their file version's shape), for the import `setId`. */
+export interface CardsChunk {
+  v: 4;
+  setId: string;
+  k: number;
+  cards: Record<string, unknown>[];
+}
+
+export type CardsRow = CardsEntry | CardsManifest | CardsChunk;
+
+/** One device's exercise card for a day, and whether it was done (version 1: by day). */
+export interface ExerciseEntryV1 {
   v: 1;
   day: number;
   done: boolean;
   at: number;
 }
 
-/** One device's star marks (per card, the newest mark from any device wins). */
-export interface StarsEntry {
-  v: 1;
-  marks: StarMark[];
+/**
+ * One device's exercise marks for a day (Journal v2, by card id): its card for the day
+ * (`id`, shown then perhaps `done`) and any further cards done that day (`also`).
+ */
+export interface ExerciseEntryV2 {
+  v: 2;
+  id: string;
+  done: boolean;
+  also: string[];
+  /** Tracker cards with a day filled in that day, not finished yet (they count for the day). */
+  logged?: string[];
+  at: number;
 }
+
+export type ExerciseEntry = ExerciseEntryV1 | ExerciseEntryV2;
+
+/** One device's star marks (per card, the newest mark from any device wins). v1: by day. */
+export type StarsEntry = { v: 1; marks: { day: number; on: boolean; at: number }[] } | { v: 2; marks: { id: string; on: boolean; at: number }[] };
 
 /**
  * One device's written response to a day's exercise card (journal polish brief). The card's
  * day and theme are kept so it reads back even after the card set is replaced. `submittedAt`
  * is null until Submit; `at` is the last save (an autosave after Submit leaves `submittedAt`).
+ * Version 1 is a version 1 card's (by day and theme); version 2 also keeps the card's id.
  */
-export interface ExerciseResponseEntry {
-  v: 1;
-  day: number;
-  theme: string;
-  text: string;
-  submittedAt: number | null;
-  at: number;
+export type ExerciseResponseEntry =
+  | { v: 1; day: number; theme: string; text: string; submittedAt: number | null; at: number }
+  | {
+      v: 2;
+      id: string;
+      day: number | null;
+      theme: string;
+      text: string;
+      /** A card with parts: each part's answer, with its prompt and kind (so it reads back on its own). */
+      parts?: PartAnswer[];
+      submittedAt: number | null;
+      at: number;
+    };
+
+/** One part's answer as stored. */
+export interface PartAnswer {
+  prompt: string;
+  kind: PartKind;
+  answer: PartValue;
 }
 
 /** The earlier one-row-per-day morning shape (read and split; never written). */
@@ -103,6 +162,13 @@ export interface LegacyCheckinEntry {
 const strList = (v: unknown) => Array.isArray(v) && v.every(isStr);
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
 const cardDay = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_CARD_DAY;
+const cardId = (v: unknown): v is string => isStr(v) && v !== "" && v.length <= MAX_CARD_ID;
+const partValue = (v: unknown): v is PartValue =>
+  v === null || isStr(v) || (Array.isArray(v) && (v.every(isStr) || v.every((r) => Array.isArray(r) && r.every(isStr)))) ||
+  (Number.isInteger(v) && Math.abs(v as number) <= 1000);
+const partAnswers = (v: unknown): v is PartAnswer[] =>
+  Array.isArray(v) && v.length <= MAX_PARTS &&
+  v.every((p) => isObj(p) && isStr(p.prompt) && PART_KINDS.includes(p.kind as PartKind) && partValue(p.answer));
 
 export const ENTRY_CHECK = {
   page: (v: unknown): v is PageEntry => isObj(v) && v.v === 1 && isStr(v.text) && num(v.at),
@@ -112,16 +178,28 @@ export const ENTRY_CHECK = {
     isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at),
   set: (v: unknown): v is SetEntry => isObj(v) && v.v === 1 && strList(v.prompts) && num(v.at),
   settings: (v: unknown): v is SettingsEntry => isObj(v) && v.v === 1 && strList(v.active),
-  cards: (v: unknown): v is CardsEntry =>
-    isObj(v) && v.v === 1 && num(v.at) && validCardSet({ source: v.source, cards: v.cards }),
+  cards: (v: unknown): v is CardsRow =>
+    isObj(v) &&
+    (v.v === 3
+      ? isStr(v.setId) && v.setId !== "" && Number.isInteger(v.chunks) && (v.chunks as number) >= 1 && (v.chunks as number) <= 1000 &&
+        (v.version === 1 || v.version === 2) && isStr(v.source) && num(v.importedAt) && num(v.at)
+      : v.v === 4
+        ? isStr(v.setId) && Number.isInteger(v.k) && (v.k as number) >= 0 && Array.isArray(v.cards) && v.cards.every(isObj)
+        : (v.v === 1 || v.v === 2) && num(v.at) && readStoredSet(v.v, v.source, v.cards, v.tracks) !== null),
   exercise: (v: unknown): v is ExerciseEntry =>
-    isObj(v) && v.v === 1 && cardDay(v.day) && typeof v.done === "boolean" && num(v.at),
+    isObj(v) && typeof v.done === "boolean" && num(v.at) &&
+    (v.v === 1
+      ? cardDay(v.day)
+      : v.v === 2 && cardId(v.id) && Array.isArray(v.also) && v.also.every(cardId) &&
+        (v.logged === undefined || (Array.isArray(v.logged) && v.logged.every(cardId)))),
   stars: (v: unknown): v is StarsEntry =>
-    isObj(v) && v.v === 1 && Array.isArray(v.marks) &&
-    v.marks.every((m) => isObj(m) && cardDay(m.day) && typeof m.on === "boolean" && num(m.at)),
+    isObj(v) && (v.v === 1 || v.v === 2) && Array.isArray(v.marks) &&
+    v.marks.every((m) => isObj(m) && (v.v === 1 ? cardDay(m.day) : cardId(m.id)) && typeof m.on === "boolean" && num(m.at)),
   "exercise-entry": (v: unknown): v is ExerciseResponseEntry =>
-    isObj(v) && v.v === 1 && cardDay(v.day) && isStr(v.theme) && isStr(v.text) &&
-    (v.submittedAt === null || num(v.submittedAt)) && num(v.at),
+    isObj(v) && isStr(v.theme) && isStr(v.text) && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) &&
+    (v.v === 1
+      ? cardDay(v.day)
+      : v.v === 2 && cardId(v.id) && (v.day === null || cardDay(v.day)) && (v.parts === undefined || partAnswers(v.parts))),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&
     (v.draft === undefined || isStr(v.draft)) && strList(v.photos),
@@ -131,7 +209,7 @@ export const ENTRY_CHECK = {
     Number.isInteger(v.step) && typeof v.finished === "boolean",
 } as const;
 
-/** Words in a text (for "N of 750 words"). */
+/** Words in a text (for "N of 1,000 words"). */
 export function countWords(text: string): number {
   const t = text.trim();
   return t ? t.split(/\s+/).length : 0;
@@ -143,5 +221,5 @@ export function countWords(text: string): number {
  */
 export const MORNING_LOCK_DAYS = 28;
 
-/** Three pages (the Artist's Way's rough count), shown as "N of 750 words". */
-export const MORNING_WORDS = 750;
+/** Her minimum (Journal v2: "1,000 words", about three pages), shown as "N of 1,000 words". A target, not a lock. */
+export const MORNING_WORDS = 1000;

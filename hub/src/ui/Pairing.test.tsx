@@ -459,7 +459,7 @@ describe("scan a pairing code (Journal, Unlock journal)", () => {
     await db.journal.put(await verifierRow(other)); // another passphrase's journal is here
     const { stop } = fakeCamera();
     vi.mocked(readFrame).mockResolvedValue(pairingText(PASSPHRASE));
-    renderApp("/journal", "2026-10-28");
+    renderApp("/journal/morning", "2026-10-28");
     await userEvent.click(await screen.findByRole("button", { name: "Scan pairing code" }));
     // Not the journal's passphrase: refused just like a typed one.
     expect(await screen.findByText("That isn't the journal's passphrase. Try again.", {}, { timeout: 5000 })).toBeInTheDocument();
@@ -471,7 +471,7 @@ describe("scan a pairing code (Journal, Unlock journal)", () => {
     await db.journal.put(await verifierRow(jk)); // now this passphrase's journal
     await userEvent.type(await screen.findByLabelText("Paste pairing code"), pairingText(PASSPHRASE));
     await userEvent.click(screen.getByRole("button", { name: "Use pairing code" }));
-    expect(await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 })).toBeInTheDocument(); // open
+    expect(await screen.findByLabelText("Today's morning page", {}, { timeout: 5000 })).toBeInTheDocument(); // open
     expect((await loadJournalKey(db))!.fp).toBe(jk.fp);
     expect(await everythingStored()).not.toContain(PASSPHRASE);
   });

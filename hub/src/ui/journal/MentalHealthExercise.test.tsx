@@ -6,10 +6,11 @@ import { importExerciseCards, readExerciseCards, readExerciseProgress, saveExerc
 import { journalAad, sealJson, type JournalKey } from "../../journal/crypto";
 import { checkCardFile, INVALID_CARD_FILE } from "../../journal/exercise";
 import { getDeviceId } from "../../sync/engine";
-import { FAKE_CARD_FILE, FAKE_CARD_TEXT } from "../../test/exerciseCards";
+import { FAKE_CARD_FILE, FAKE_CARD_TEXT, FAKE_CARD_TEXT_V2 } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
 import { NOT_AVAILABLE } from "./JournalStrip";
+import { RESTARTS_LINE } from "./MentalHealthExercise";
 
 // The Journal's "Mental health exercise" section (exercise brief). Fictional cards only.
 
@@ -34,13 +35,14 @@ const section = () => screen.findByRole("region", { name: "Mental health exercis
 const cardFile = (text: string) => new File([text], "pretend-cards.json", { type: "application/json" });
 const imported = () => importExerciseCards(jk, SET, "2026-10-01");
 
-it("locked: only the section's strip (no card, no import) under the unlock state", async () => {
+it("locked: only the tabs (no card, no import) under the unlock state", async () => {
   await db.journal.put(await verifierRow(jk));
   await imported().catch(() => undefined); // not confirmed: nothing is written
   renderApp("/journal", TODAY);
   expect(await screen.findByRole("heading", { name: "Unlock journal" })).toBeInTheDocument();
-  const s = screen.getByRole("region", { name: "Mental health exercise" });
-  expect(within(s).getByRole("img", { name: NOT_AVAILABLE })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Mental health exercise" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("link", { name: "Mental health exercise" }).querySelector(".tick-auto")).toHaveAttribute("title", NOT_AVAILABLE);
+  expect(screen.queryByRole("region", { name: "Mental health exercise" })).toBeNull();
   expect(screen.queryByText("Add your exercise cards")).toBeNull();
   expect(screen.queryByRole("article", { name: "Today's card" })).toBeNull();
 });
@@ -65,7 +67,7 @@ it("no cards yet: one line and an Import pill; importing shows card 1 and stores
   expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: SET });
   expect(JSON.stringify(await db.journal.toArray())).not.toContain("Pretend");
   const device = await getDeviceId(db);
-  await waitFor(async () => expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, day: 1, done: false }]));
+  await waitFor(async () => expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, id: "day-1", done: false, primary: true }]));
 });
 
 it("a file that isn't a card file is refused with a plain message; nothing is stored", async () => {
@@ -79,11 +81,11 @@ it("a file that isn't a card file is refused with a plain message; nothing is st
   expect(within(s).getByText("Add your exercise cards")).toBeInTheDocument();
 });
 
-it("Done: stays today's card, ticked, 'Done for today · next card tomorrow'; the next one shows without marking anything", async () => {
+it("Done: stays today's card, ticked, 'Done for today · next card tomorrow'; unticking brings it back", async () => {
   await confirmedDevice(db, jk);
   await imported();
   const device = await getDeviceId(db);
-  await saveExerciseMark(jk, "2026-10-29", device, 1, true);
+  await saveExerciseMark(jk, "2026-10-29", device, "day-1", true);
   renderApp("/journal", TODAY);
   const s = await section();
   expect(await within(s).findByText("The fictional kettle")).toBeInTheDocument();
@@ -92,18 +94,41 @@ it("Done: stays today's card, ticked, 'Done for today · next card tomorrow'; th
   await userEvent.click(within(s).getByRole("checkbox", { name: "Done" }));
   expect(await within(s).findByText("Done for today · next card tomorrow")).toBeInTheDocument();
   expect(within(s).getByRole("checkbox", { name: "Done" })).toBeChecked();
-  expect(within(s).getByText("The fictional kettle")).toBeInTheDocument();
-  const rows = await db.journal.count();
-  await userEvent.click(within(s).getByRole("button", { name: "Show the next one anyway" }));
-  const next = within(s).getByRole("article", { name: "Next card" });
-  expect(within(next).getByText("Imaginary pebbles")).toBeInTheDocument();
-  expect(within(next).queryByRole("checkbox")).toBeNull();
-  expect(await db.journal.count()).toBe(rows);
-  expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY)).toEqual({ date: TODAY, device, day: 2, done: true });
-  // Unticking the same day brings it back unticked.
+  expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY)).toEqual({ date: TODAY, device, id: "day-2", done: true, primary: true });
   await userEvent.click(within(s).getByRole("checkbox", { name: "Done" }));
   await waitFor(() => expect(within(s).queryByText("Done for today · next card tomorrow")).toBeNull());
   expect(within(s).getByText("The fictional kettle")).toBeInTheDocument();
+});
+
+it("Do the next one →: opens the next card not yet done with its own box; nothing is marked until its Submit, which marks it done today", async () => {
+  await confirmedDevice(db, jk);
+  await imported();
+  const device = await getDeviceId(db);
+  renderApp("/journal", TODAY);
+  const s = await section();
+  const today = await within(s).findByRole("article", { name: "Today's card" });
+  await within(today).findByRole("textbox", { name: "Your response" });
+  const rows = await db.journal.count();
+  await userEvent.click(within(today).getByRole("button", { name: "Do the next one →" }));
+  const next = within(s).getByRole("article", { name: "Next card: Day 2" });
+  expect(within(next).getByText("The fictional kettle")).toBeInTheDocument();
+  expect(within(today).queryByRole("button", { name: "Do the next one →" })).toBeNull(); // it moves to the last card
+  await new Promise((r) => setTimeout(r, 50));
+  expect(await db.journal.count()).toBe(rows);
+  await userEvent.type(await within(next).findByRole("textbox", { name: "Your response" }), "Pretend kettle words");
+  await userEvent.click(within(next).getByRole("button", { name: "Submit" }));
+  expect(await within(next).findByText("Saved")).toBeInTheDocument();
+  await waitFor(async () =>
+    expect((await readExerciseProgress(jk)).marks).toEqual([
+      { date: TODAY, device, id: "day-1", done: false, primary: true },
+      { date: TODAY, device, id: "day-2", done: true, primary: false },
+    ]),
+  );
+  // The Home row counts today as done; today's card stays card 1 (not done); another next one follows.
+  expect(within(today).getByText("Pretend weather")).toBeInTheDocument();
+  expect(within(today).getByRole("checkbox", { name: "Done" })).not.toBeChecked();
+  await userEvent.click(within(next).getByRole("button", { name: "Do the next one →" }));
+  expect(within(s).getByRole("article", { name: "Next card: Day 3" })).toBeInTheDocument();
 });
 
 it("the star toggles and is stored on this device's own row", async () => {
@@ -115,7 +140,7 @@ it("the star toggles and is stored on this device's own row", async () => {
   expect(star).toHaveAttribute("aria-pressed", "false");
   await userEvent.click(star);
   await waitFor(() => expect(within(s).getByRole("button", { name: "Star this card" })).toHaveAttribute("aria-pressed", "true"));
-  expect((await readExerciseProgress(jk)).starred).toEqual(new Set([1]));
+  expect((await readExerciseProgress(jk)).starred).toEqual(new Set(["day-1"]));
   await userEvent.click(within(s).getByRole("button", { name: "Star this card" }));
   await waitFor(async () => expect((await readExerciseProgress(jk)).starred).toEqual(new Set()));
 });
@@ -124,7 +149,7 @@ it("All cards lists every card (done / starred) and opens any one to read", asyn
   await confirmedDevice(db, jk);
   await imported();
   const device = await getDeviceId(db);
-  await saveExerciseMark(jk, "2026-10-29", device, 1, true);
+  await saveExerciseMark(jk, "2026-10-29", device, "day-1", true);
   renderApp("/journal", TODAY);
   const s = await section();
   await within(s).findByText("The fictional kettle");
@@ -154,8 +179,25 @@ it("re-importing asks first: 'Replace your exercise cards?'; Cancel keeps them, 
   await userEvent.click(within(s).getByRole("button", { name: "Cancel" }));
   expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: SET });
   await userEvent.upload(within(s).getByLabelText("Exercise card file"), cardFile(two));
+  expect(within(s).queryByText(RESTARTS_LINE)).toBeNull(); // nothing done yet: nothing to lose
   await userEvent.click(await within(s).findByRole("button", { name: "Replace" }));
   await waitFor(async () => expect((await readExerciseCards(jk) as { set: { cards: unknown[] } }).set.cards).toHaveLength(2));
+});
+
+it("replacing with cards whose ids don't match what's done says the progress restarts; matching ids say nothing", async () => {
+  await confirmedDevice(db, jk);
+  await imported();
+  await saveExerciseMark(jk, "2026-10-29", await getDeviceId(db), "day-1", true);
+  renderApp("/journal", TODAY);
+  const s = await section();
+  await within(s).findByText("The fictional kettle");
+  await userEvent.click(within(s).getByText("All cards"));
+  await userEvent.upload(within(s).getByLabelText("Exercise card file"), cardFile(FAKE_CARD_TEXT));
+  expect(await within(s).findByText("Replace your exercise cards?")).toBeInTheDocument();
+  expect(within(s).queryByText(RESTARTS_LINE)).toBeNull(); // the same file again: same ids
+  await userEvent.click(within(s).getByRole("button", { name: "Cancel" }));
+  await userEvent.upload(within(s).getByLabelText("Exercise card file"), cardFile(FAKE_CARD_TEXT_V2));
+  expect(await within(s).findByText(RESTARTS_LINE)).toBeInTheDocument();
 });
 
 it("cards sealed with another key: noted, and Import still offered", async () => {

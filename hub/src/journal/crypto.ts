@@ -55,6 +55,14 @@ export function exerciseCardKey(jk: JournalKey, day: number, theme: string): Pro
   return promptKey(jk, `exercise-card|${day}|${theme}`);
 }
 
+/**
+ * The same opaque stand-in for a card from a version 2 card file (Journal v2), of its stable
+ * id, so a re-imported file's card keeps its responses (and the id stays out of the row id).
+ */
+export function exerciseCardIdKey(jk: JournalKey, id: string): Promise<string> {
+  return promptKey(jk, `exercise-card-id|${id}`);
+}
+
 async function pbkdf2Base(passphrase: string): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase.normalize("NFC")), "PBKDF2", false, [
     "deriveKey",

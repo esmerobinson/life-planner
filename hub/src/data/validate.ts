@@ -165,6 +165,8 @@ const JOURNAL_KEYS = new Set(["id", "kind", "date", "fp", "iv", "ct", "updatedAt
 const JOURNAL_KIND_LIST: readonly string[] = JOURNAL_KINDS;
 /** The part after `<kind>:<date>:` in a part id (a uuid, file id, device id or prompt id). */
 const SUFFIX = /^[A-Za-z0-9_-]{1,64}$/;
+/** One chunk of the exercise card set: `cards:<0..999>`. */
+const CARDS_CHUNK = /^cards:(0|[1-9][0-9]{0,2})$/;
 /** A per-device answer's suffix: `<12 hex promptKey>:<deviceId>`. */
 const ANSWER_SUFFIX = /^[0-9a-f]{12}:[A-Za-z0-9_-]{8,64}$/;
 
@@ -173,8 +175,10 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
   switch (kind) {
     case "settings":
     case "verifier":
-    case "cards":
       return kind;
+    case "cards":
+      // The card set's manifest is `cards`; its chunks `cards:0`, `cards:1`, …
+      return suffix === undefined ? kind : `${kind}:${suffix}`;
     case "stars":
       return `${kind}:${suffix ?? ""}`;
     case "set":
@@ -189,6 +193,7 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
 /** The id rule for one row: the id matches its kind and day (and a part has a plain suffix). */
 function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
   if (kind === "stars") return id.startsWith("stars:") && SUFFIX.test(id.slice("stars:".length));
+  if (kind === "cards") return id === "cards" || CARDS_CHUNK.test(id);
   if (["page", "photo", "draft", "answer", "exercise", "exercise-entry"].includes(kind)) {
     const prefix = `${kind}:${date}:`;
     if (!id.startsWith(prefix)) return false;

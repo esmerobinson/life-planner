@@ -1,38 +1,110 @@
 import { useNavigate } from "react-router-dom";
+import { endOfMonth } from "../domain/dates";
+import { HABIT_WORDS } from "../domain/habits";
 import type { ISODate } from "../domain/types";
 import type { RowStatus } from "../journal/rows";
-import { CHECKIN_HASH, EXERCISE_HASH, MORNING_HASH } from "./journal/JournalPage";
 import { JournalRow, type TickState } from "./journal/JournalStrip";
-import { useJournalRows } from "./journal/useJournalRows";
+import { tabPath, type JournalTabId } from "./journal/tabs";
+import { useJournalRows, type JournalRowsView } from "./journal/useJournalRows";
+import { ProgressBar } from "./ProgressBar";
+import { Streak } from "./Streak";
+
+/** One of the three Journal rows, as every list shows them. */
+interface RowFacts {
+  tab: JournalTabId;
+  title: string;
+  tick: TickState;
+  status: RowStatus | null;
+  /** The exercise's "Day N · Theme". */
+  meta?: string;
+}
+
+/** The three rows, in her order (Journal v2): the mental health exercise first. */
+function rowFacts(view: JournalRowsView): RowFacts[] {
+  const ok = view.state === "ok" ? view : null;
+  const unknown: TickState = view.state === "loading" ? "loading" : "locked";
+  const tick = (s: RowStatus | undefined): TickState => (s ? (s.done ? "done" : "todo") : unknown);
+  const card = ok?.exercise.card;
+  return [
+    {
+      tab: "exercise", title: "Mental health exercise", tick: tick(ok?.exercise), status: ok?.exercise ?? null,
+      meta: card ? `Day ${card.day} · ${card.theme}` : undefined,
+    },
+    { tab: "morning", title: "Morning pages", tick: tick(ok?.morning), status: ok?.morning ?? null },
+    { tab: "check-in", title: "Daily check-in", tick: tick(ok?.checkin), status: ok?.checkin ?? null },
+  ];
+}
 
 /**
- * The Home Journal card (desktop and phone; VISUAL-LANGUAGE.md "Journal rows (2026-11-02)"):
- * Morning pages, Daily check-in and Mental health exercise as mint strips shaped like task
- * strips. Each tick ticks itself when that part is done today (never by hand); "★ N" is the
- * streak. Tapping a row opens that Journal section. Locked or not set up here: the rows
- * still show, with an empty box that says it isn't available and no streaks, and open the
- * Journal (to unlock). While loading: no boxes yet, so nothing pops from unticked to ticked.
+ * The Journal section on Home and on Today (VISUAL-LANGUAGE.md "Journal rows (2026-11-02)";
+ * Journal v2): the mental health exercise, Morning pages and Daily check-in as mint strips
+ * exactly like task strips. Each tick ticks itself when that part is done today (never by
+ * hand); the streak is on the right. Tapping a row opens that Journal tab. Locked or not set
+ * up here: the rows still show, with an empty box that says it isn't available and no
+ * streaks, and open the Journal (to unlock). While loading: no boxes yet, so nothing pops
+ * from unticked to ticked.
  */
 export function JournalCard({ today }: { today: ISODate }) {
   const navigate = useNavigate();
-  const view = useJournalRows(today);
-  const ok = view.state === "ok" ? view : null;
-  const unknown: TickState = view.state === "loading" ? "loading" : "locked";
-  const props = (s: RowStatus | undefined) => (s ? { tick: (s.done ? "done" : "todo") as TickState, streak: s.streak } : { tick: unknown, streak: 0 });
-  const card = ok?.exercise.card;
+  const rows = rowFacts(useJournalRows(today));
   return (
     <section className="journal-card-home" aria-label="Journal">
       <h2>Journal</h2>
       <ul className="strip-list journal-rows">
-        <JournalRow title="Morning pages" {...props(ok?.morning)} onOpen={() => navigate(`/journal${MORNING_HASH}`)} />
-        <JournalRow title="Daily check-in" {...props(ok?.checkin)} onOpen={() => navigate(`/journal${CHECKIN_HASH}`)} />
-        <JournalRow
-          title="Mental health exercise"
-          {...props(ok?.exercise)}
-          meta={card ? `Day ${card.day} · ${card.theme}` : undefined}
-          onOpen={() => navigate(`/journal${EXERCISE_HASH}`)}
-        />
+        {rows.map((r) => (
+          <JournalRow
+            key={r.tab}
+            title={r.title}
+            tick={r.tick}
+            meta={r.meta}
+            right={r.status && <Streak n={r.status.streak} week={r.status.week} />}
+            onOpen={() => navigate(tabPath(r.tab))}
+          />
+        ))}
       </ul>
     </section>
+  );
+}
+
+/** Days in today's month. */
+const daysInMonth = (today: ISODate): number => {
+  const [y, m] = today.split("-").map(Number);
+  return Number(endOfMonth(y!, m!).slice(8));
+};
+
+/**
+ * The same three rows inside Mind's Habits box (Journal v2), after her own Mind habits, in
+ * the habit rows' format: "every day" under the title, and on the right "November · session N
+ * of M" over the small bar (N = days done this month, M = days in the month). Read-only ticks;
+ * tapping a row opens that Journal tab. Locked or loading: no count.
+ */
+export function JournalHabitRows({ today }: { today: ISODate }) {
+  const navigate = useNavigate();
+  const rows = rowFacts(useJournalRows(today));
+  const planned = daysInMonth(today);
+  return (
+    <>
+      {rows.map((r) => {
+        const text = r.status ? HABIT_WORDS.session(today, r.status.month, planned) : null;
+        return (
+          <JournalRow
+            key={r.tab}
+            title={r.title}
+            tick={r.tick}
+            meta={HABIT_WORDS.schedule(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])}
+            right={
+              r.status &&
+              text && (
+                <div className="habit-session">
+                  <div className="habit-count">{text}</div>
+                  <ProgressBar ratio={r.status.month / planned} label={text} />
+                </div>
+              )
+            }
+            onOpen={() => navigate(tabPath(r.tab))}
+          />
+        );
+      })}
+    </>
   );
 }

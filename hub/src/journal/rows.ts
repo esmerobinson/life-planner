@@ -4,7 +4,8 @@
 // journal repo's existing reads.
 
 import type { ISODate } from "../domain/types";
-import { daysInARow } from "./calendar";
+import { addDays } from "../domain/dates";
+import { daysInARow, doneInMonth } from "./calendar";
 import type { ExerciseMark } from "./exercise";
 
 /** One row's state: done today, and days in a row. */
@@ -12,11 +13,25 @@ export interface RowStatus {
   done: boolean;
   /** Days in a row ending today, or ending yesterday while today isn't done yet; 0 for none. */
   streak: number;
+  /** The last seven days, oldest first, ending today: done or not (the streak's bars). */
+  week: boolean[];
+  /** Days done this month (the Mind habits' "session N of M"). */
+  month: number;
 }
 
-/** A row's tick and streak from the days it was done. */
+/** The last seven days ending today, oldest first: whether each was done. */
+export function lastSevenDays(doneDays: ReadonlySet<ISODate>, today: ISODate): boolean[] {
+  return [6, 5, 4, 3, 2, 1, 0].map((back) => doneDays.has(addDays(today, -back)));
+}
+
+/** A row's tick, streak, week and month from the days it was done. */
 export function rowStatus(doneDays: ReadonlySet<ISODate>, today: ISODate): RowStatus {
-  return { done: doneDays.has(today), streak: daysInARow(doneDays, today) };
+  return {
+    done: doneDays.has(today),
+    streak: daysInARow(doneDays, today),
+    week: lastSevenDays(doneDays, today),
+    month: doneInMonth(doneDays, today.slice(0, 7)),
+  };
 }
 
 /** The shape of a check-in day this needs (journalRepo's CheckinDay). */
@@ -39,7 +54,7 @@ export function checkinDoneDays(days: readonly CheckinDayLike[]): Set<ISODate> {
   return new Set(days.filter(checkedIn).map((d) => d.date));
 }
 
-/** The days a card was marked done (on any device). */
+/** The days a card was marked done, or a tracker day filled in (on any device). */
 export function exerciseDoneDays(marks: readonly ExerciseMark[]): Set<ISODate> {
-  return new Set(marks.filter((m) => m.done).map((m) => m.date));
+  return new Set(marks.filter((m) => m.done || m.logged).map((m) => m.date));
 }

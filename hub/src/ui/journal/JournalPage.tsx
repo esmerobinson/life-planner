@@ -1,33 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { db } from "../../data/db";
 import { isKeychainError, unlockJournal, type UnlockResult } from "../../journal/keyStore";
+import type { RowStatus } from "../../journal/rows";
 import type { ISODate } from "../../domain/types";
 import { syncController } from "../../sync";
 import type { SyncController } from "../../sync/controller";
 import { getDeviceId } from "../../sync/engine";
 import { ScanPairingCode } from "../Pairing";
-import { LOADING_LINE, longDate } from "./bits";
-import { CHECKIN_META, DailyCheckIn } from "./DailyCheckIn";
-import { JournalStripHead, type TickState } from "./JournalStrip";
+import { Streak } from "../Streak";
+import { LOADING_LINE } from "./bits";
+import { DailyCheckIn } from "./DailyCheckIn";
+import { ReadOnlyTick, type TickState } from "./JournalStrip";
 import { loadTimeout } from "./loadTimeout";
-import { EXERCISE_META, MentalHealthExercise } from "./MentalHealthExercise";
+import { MentalHealthExercise } from "./MentalHealthExercise";
 import { MorningPages } from "./MorningPages";
+import { ReadBack } from "./ReadBack";
+import { JOURNAL_TABS, TAB_FOR_HASH, tabPath, type JournalTabId } from "./tabs";
 import { useJournalKey } from "./useJournalKey";
+import { useJournalRows } from "./useJournalRows";
 
-/** The Home card's rows land on these sections. */
-export const MORNING_HASH = "#morning-pages";
-export const CHECKIN_HASH = "#daily-check-in";
-export const EXERCISE_HASH = "#mental-health-exercise";
-/** Each hash's section (the element scrolled to). */
-const SECTION_FOR_HASH: Record<string, string> = {
-  [MORNING_HASH]: "morning-pages-section",
-  [CHECKIN_HASH]: "daily-check-in-section",
-  [EXERCISE_HASH]: "mental-health-exercise-section",
-};
-/** How long a section opened from Home is kept in view while the page above it fills in. */
-const KEEP_IN_VIEW_MS = 3000;
-const HER_OWN_MOVES = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
 /** The key check or the device id failed, or didn't answer in time (2026-11-02). */
@@ -41,17 +33,23 @@ export const UNLOCK_AGAIN_LINE = "Unlock your journal once more with your passph
 export const KEYCHAIN_LINE =
   "This Mac's keychain didn't let Esmeworld open your journal key. Quit and reopen Esmeworld, enter your Mac login password and choose Always Allow.";
 
+const isTab = (t: string | undefined): t is JournalTabId => JOURNAL_TABS.some((x) => x.id === t);
+
 /**
- * The Journal (journal brief): morning pages, the daily check-in, then the mental health
- * exercise card (exercise brief). Everything here is
- * end-to-end encrypted. Only a CONFIRMED key shows or writes entries; without one the page
- * shows "Unlock journal", or "Checking your passphrase with sync…" while a typed passphrase
- * waits for sync to accept it. Synced entries still arrive and wait, sealed.
+ * The Journal (journal brief; Journal v2): big tabs, in her order: Mental health exercise ·
+ * Morning pages · Daily check-in · Read back, each at its own address (`/journal` opens the
+ * exercise). Each of the first three shows a small read-only tick when that part is done
+ * today, and its streak. Everything here is end-to-end encrypted. Only a CONFIRMED key shows
+ * or writes entries; without one the page shows "Unlock journal" (or "Checking your
+ * passphrase with sync…", or a can't-open line with Try again) above the tabs. Synced entries
+ * still arrive and wait, sealed.
  */
 export function JournalPage({ today, controller = syncController }: { today: ISODate; controller?: SyncController }) {
-  const view = useJournalKey();
+  const { tab } = useParams();
   const location = useLocation();
+  const view = useJournalKey();
   const device = useDeviceId();
+  const rows = useJournalRows(today);
   const asked = useRef(false);
 
   // A candidate key is confirmed by a successful sync: ask for one (once per visit).
@@ -61,46 +59,27 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
     void controller.syncNow().catch(() => undefined);
   }, [view.state, controller]);
 
-  const deviceId = device.state === "ok" ? device.id : null;
-  const ready = view.state === "confirmed" && deviceId !== null;
-  // From the Home card: bring the chosen section into view once it is there. The sections
-  // above it fill in after it appears and push it down, so it is brought back into view as the
-  // page grows, until she scrolls, taps or types herself (or after KEEP_IN_VIEW_MS).
-  const pageRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!ready || !location.hash) return;
-    const id = SECTION_FOR_HASH[location.hash];
-    if (!id) return;
-    const go = () => document.getElementById(id)?.scrollIntoView?.({ block: "start" });
-    const t = setTimeout(go, 0);
-    const ro = typeof ResizeObserver === "undefined" || !pageRef.current ? null : new ResizeObserver(go);
-    if (ro && pageRef.current) ro.observe(pageRef.current);
-    const stop = () => ro?.disconnect();
-    const cap = setTimeout(stop, KEEP_IN_VIEW_MS);
-    for (const e of HER_OWN_MOVES) window.addEventListener(e, stop, { passive: true });
-    return () => {
-      clearTimeout(t);
-      clearTimeout(cap);
-      stop();
-      for (const e of HER_OWN_MOVES) window.removeEventListener(e, stop);
-    };
-  }, [ready, location.hash]);
+  // `/journal` (or an earlier `/journal#morning-pages` link, or an unknown tab) opens a tab.
+  if (!isTab(tab)) return <Navigate to={tabPath(TAB_FOR_HASH[location.hash] ?? "exercise")} replace />;
 
-  // Never blank (2026-11-02): until the journal opens, the three section strips still show
-  // (no entries, no ticks) under whatever this device can say: Loading…, Unlock, Checking,
-  // or a can't-open line with Try again.
+  const deviceId = device.state === "ok" ? device.id : null;
+  // Never blank (2026-11-02): until the journal opens, the tabs still show (no ticks) under
+  // whatever this device can say: Loading…, Unlock, Checking, or a can't-open line with Try again.
   const keyProblem = view.state === "error" ? view.problem : null;
   const deviceProblem = view.state === "confirmed" && device.state === "error";
   const loading = view.state === "loading" || (view.state === "confirmed" && device.state === "loading");
-  // Until the journal opens here: the strips with no entries, no ticks, no streaks.
   const open = view.state === "confirmed" && deviceId ? { jk: view.jk, deviceId } : null;
-  const closedTick: TickState = loading ? "loading" : "locked";
   const retry = () => {
     if (keyProblem) view.retry();
     if (device.state === "error") device.retry();
   };
+  const status: Record<Exclude<JournalTabId, "read-back">, RowStatus | null> =
+    rows.state === "ok" ? { exercise: rows.exercise, morning: rows.morning, "check-in": rows.checkin } : { exercise: null, morning: null, "check-in": null };
+  const unknown: TickState = loading || rows.state === "loading" ? "loading" : "locked";
+  const current = JOURNAL_TABS.find((t) => t.id === tab)!;
+
   return (
-    <div className="journal-page" ref={pageRef}>
+    <div className="journal-page">
       <h1>Journal</h1>
       {loading ? (
         <p className="journal-muted" role="status">
@@ -128,28 +107,37 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
       ) : view.state === "unreadable" ? (
         <UnlockJournal again />
       ) : null}
-      {/* The sections stay the same elements while the journal opens (only their insides change). */}
-      <section className="journal-card" aria-labelledby="morning-pages" id="morning-pages-section">
-        {open ? (
-          <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />
-        ) : (
-          <JournalStripHead id="morning-pages" title="Morning pages" tick={closedTick} streak={0} meta={longDate(today)} />
-        )}
-      </section>
-      <section className="journal-card" aria-labelledby="daily-check-in" id="daily-check-in-section">
-        {open ? (
-          <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />
-        ) : (
-          <JournalStripHead id="daily-check-in" title="Daily check-in" tick={closedTick} streak={0} meta={CHECKIN_META} />
-        )}
-      </section>
-      <section className="journal-card" aria-labelledby="mental-health-exercise" id="mental-health-exercise-section">
-        {open ? (
-          <MentalHealthExercise jk={open.jk} today={today} deviceId={open.deviceId} />
-        ) : (
-          <JournalStripHead id="mental-health-exercise" title="Mental health exercise" tick={closedTick} streak={0} meta={EXERCISE_META} />
-        )}
-      </section>
+      <nav className="journal-tabs" aria-label="Journal parts">
+        {JOURNAL_TABS.map((t) => {
+          const selected = t.id === tab;
+          const s = t.id === "read-back" ? undefined : status[t.id];
+          return (
+            <Link
+              key={t.id}
+              to={t.path}
+              className={selected ? "journal-tab is-selected" : "journal-tab"}
+              aria-current={selected ? "page" : undefined}
+            >
+              {t.id !== "read-back" && (
+                <ReadOnlyTick state={open && s ? (s.done ? "done" : "todo") : unknown} title={t.title} inLink />
+              )}
+              <span className="journal-tab-label">{t.title}</span>
+              {open && s && <Streak n={s.streak} week={s.week} />}
+            </Link>
+          );
+        })}
+      </nav>
+      {open && (
+        <section className="journal-card journal-panel" aria-labelledby="journal-panel-heading">
+          <h2 id="journal-panel-heading" className="visually-hidden">
+            {current.title}
+          </h2>
+          {tab === "exercise" && <MentalHealthExercise jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
+        </section>
+      )}
     </div>
   );
 }

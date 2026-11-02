@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { vi } from "vitest";
 import { HomePage } from "../HomePage";
 import { db } from "../../data/db";
-import { ensureCheckinSet, finishMorningPage, importExerciseCards, saveAnswer, saveExerciseMark } from "../../data/repo";
+import { createItem, ensureCheckinSet, finishMorningPage, importExerciseCards, saveAnswer, saveExerciseMark } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
 import { checkCardFile } from "../../journal/exercise";
 import { FAKE_CARD_FILE } from "../../test/exerciseCards";
@@ -12,9 +12,10 @@ import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { currentUrl, renderApp } from "../../test/renderApp";
 import { LOADING, NOT_AVAILABLE, ReadOnlyTick, TICKS_ITSELF } from "./JournalStrip";
 
-// The Journal rows (VISUAL-LANGUAGE.md "Journal rows (2026-11-02)"): three mint strips on Home
-// whose ticks tick themselves, with "★ N" streaks, and the same strips heading the Journal's
-// sections. Fictional passphrase, words and cards only.
+// The Journal rows (VISUAL-LANGUAGE.md "Journal rows (2026-11-02)"; Journal v2): three mint
+// strips (the exercise first) on Home, on Today and in Mind's Habits, whose ticks tick
+// themselves, with the shared streak; tapping one opens its Journal tab, and the tabs tick
+// too. Fictional passphrase, words and cards only.
 
 const PASS = "fake-journal-passphrase-for-tests";
 const TODAY = "2026-11-02";
@@ -42,7 +43,7 @@ function renderHomeWithJournalSpy() {
     <MemoryRouter initialEntries={["/"]}>
       <Routes>
         <Route path="/" element={<HomePage today={TODAY} />} />
-        <Route path="/journal" element={<JournalAt />} />
+        <Route path="/journal/:tab" element={<JournalAt />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -61,7 +62,7 @@ async function someDone() {
   await ensureCheckinSet(jk, TODAY, ["K2", "K4"]);
   await saveAnswer(jk, TODAY, "K2", OTHER_DEVICE, "Pretend half way", true); // K4 not reached yet
   await importExerciseCards(jk, checkCardFile(FAKE_CARD_FILE)!, "2026-10-01");
-  await saveExerciseMark(jk, TODAY, OTHER_DEVICE, 1, true);
+  await saveExerciseMark(jk, TODAY, OTHER_DEVICE, "day-1", true);
 }
 
 describe("the read-only tick's states", () => {
@@ -103,7 +104,7 @@ describe("Home Journal rows", () => {
     const before = await db.journal.toArray();
     renderApp("/", TODAY);
     const c = await card();
-    const titles = ["Morning pages", "Daily check-in", "Mental health exercise"];
+    const titles = ["Mental health exercise", "Morning pages", "Daily check-in"];
     for (const t of titles) {
       const r = await row(t);
       expect(r).toHaveClass("strip", "journal-row");
@@ -112,8 +113,8 @@ describe("Home Journal rows", () => {
       expect(within(r).queryByRole("checkbox")).toBeNull();
     }
     expect(within(c).queryAllByRole("checkbox")).toHaveLength(0);
-    expect(within(c).getAllByRole("listitem")).toHaveLength(3);
-    expect(c.querySelector(".journal-row-streak")).toBeNull();
+    expect(within(c).getAllByRole("listitem").map((li) => within(li).getByRole("button").textContent)).toEqual(titles);
+    expect(c.querySelector(".streak")).toBeNull();
     expect(c.querySelectorAll(".strip-meta")).toHaveLength(0);
     expect(await db.journal.toArray()).toEqual(before);
   });
@@ -135,13 +136,17 @@ describe("Home Journal rows", () => {
     expect(document.activeElement).not.toBe(box);
   });
 
-  it("done today ticks itself with ★ N; not done yet keeps yesterday's run; the exercise shows today's card", async () => {
+  it("done today ticks itself with the streak; not done yet keeps yesterday's run; the exercise shows today's card", async () => {
     await someDone();
     renderApp("/", TODAY);
     const morning = await row("Morning pages");
     await waitFor(() => expect(tick(morning)).toHaveAttribute("aria-checked", "true"));
     expect(within(morning).getByText("3 days in a row")).toBeInTheDocument();
-    expect(morning.querySelector(".journal-star")).not.toBeNull();
+    // The shared streak: this week's bars (the last three days done) and the number; no star.
+    const bars = [...morning.querySelectorAll(".streak .streak-day")].map((b) => b.classList.contains("on"));
+    expect(bars).toEqual([false, false, false, false, true, true, true]);
+    expect(morning.querySelector(".streak-n")).toHaveTextContent("3");
+    expect(morning.querySelector(".journal-star")).toBeNull();
     expect(morning.querySelector(".strip-meta")).toBeNull();
 
     const checkin = await row("Daily check-in");
@@ -154,24 +159,34 @@ describe("Home Journal rows", () => {
     expect(within(exercise).getByText("Day 1 · Pretend weather")).toHaveClass("strip-meta");
   });
 
-  it("a streak of 0 shows nothing", async () => {
+  it("a streak of 0 with nothing this week shows nothing", async () => {
     await confirmedDevice(db, jk);
     await finishMorningPage(jk, "2026-10-20", OTHER_DEVICE, "Pretend old page");
     renderApp("/", TODAY);
     const morning = await row("Morning pages");
     await waitFor(() => expect(screen.getByRole("region", { name: "Journal" })).toBeInTheDocument());
-    expect(morning.querySelector(".journal-row-streak")).toBeNull();
+    expect(morning.querySelector(".streak")).toBeNull();
     expect(await within(morning).findByRole("checkbox")).toHaveAttribute("aria-checked", "false");
   });
 
+  it("a streak of 0 still shows this week's bars when a day this week was done", async () => {
+    await confirmedDevice(db, jk);
+    await finishMorningPage(jk, "2026-10-29", OTHER_DEVICE, "Pretend page");
+    renderApp("/", TODAY);
+    const morning = await row("Morning pages");
+    await waitFor(() => expect(morning.querySelector(".streak")).not.toBeNull());
+    expect(morning.querySelector(".streak-n")).toHaveTextContent("0");
+    expect(morning.querySelectorAll(".streak-day.on")).toHaveLength(1);
+  });
+
   it.each([
-    ["Morning pages", "#morning-pages"],
-    ["Daily check-in", "#daily-check-in"],
-    ["Mental health exercise", "#mental-health-exercise"],
-  ])("tapping %s opens its Journal section", async (title, hash) => {
+    ["Mental health exercise", "/journal/exercise"],
+    ["Morning pages", "/journal/morning"],
+    ["Daily check-in", "/journal/check-in"],
+  ])("tapping %s opens its Journal tab", async (title, path) => {
     renderHomeWithJournalSpy();
     await userEvent.click(await screen.findByRole("button", { name: title }));
-    expect(await screen.findByText(`At /journal${hash}`)).toBeInTheDocument();
+    expect(await screen.findByText(`At ${path}`)).toBeInTheDocument();
   });
 
   it("tapping the strip outside its title (here the tick box) opens the section too", async () => {
@@ -180,48 +195,115 @@ describe("Home Journal rows", () => {
     const r = await row("Mental health exercise");
     await waitFor(() => expect(tick(r)).toHaveAttribute("aria-checked", "true"));
     await userEvent.click(tick(r));
-    expect(await screen.findByText("At /journal#mental-health-exercise")).toBeInTheDocument();
+    expect(await screen.findByText("At /journal/exercise")).toBeInTheDocument();
   });
 
   it("locked: tapping a row goes to the Journal, which asks to unlock", async () => {
     renderApp("/", TODAY);
     await userEvent.click(await screen.findByRole("button", { name: "Daily check-in" }));
-    await waitFor(() => expect(currentUrl).toBe("/journal"));
+    await waitFor(() => expect(currentUrl).toBe("/journal/check-in"));
     expect(await screen.findByRole("heading", { name: "Unlock journal" })).toBeInTheDocument();
   });
 });
 
-describe("Journal page section strips", () => {
-  it("each section starts with its mint strip: the h2 labels the section, tick and ★ N as on Home", async () => {
+describe("Today: a Journal section under the to-dos", () => {
+  it("the same three rows, after the Today list", async () => {
     await someDone();
-    renderApp("/journal", TODAY);
-    await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 }); // open (the strips show before)
-    const morning = screen.getByRole("region", { name: "Morning pages" });
-    const head = within(morning).getByRole("heading", { level: 2, name: "Morning pages" }).closest(".strip")!;
-    expect(head).toHaveClass("journal-row");
-    expect(morning.firstElementChild).toBe(head);
-    await waitFor(() => expect(within(head as HTMLElement).getByRole("checkbox")).toHaveAttribute("aria-checked", "true"));
-    expect(within(head as HTMLElement).getByText("3 days in a row")).toBeInTheDocument();
+    renderApp("/today", TODAY);
+    const c = await card();
+    const today = screen.getByRole("heading", { level: 1, name: "Today" });
+    expect(today.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(c).getAllByRole("listitem").map((li) => within(li).getByRole("button").textContent)).toEqual([
+      "Mental health exercise", "Morning pages", "Daily check-in",
+    ]);
+    const morning = await row("Morning pages");
+    await waitFor(() => expect(tick(morning)).toHaveAttribute("aria-checked", "true"));
+    await userEvent.click(within(c).getByRole("button", { name: "Daily check-in" }));
+    await waitFor(() => expect(currentUrl).toBe("/journal/check-in"));
+  });
+});
 
-    const checkin = screen.getByRole("region", { name: "Daily check-in" });
-    const checkHead = within(checkin).getByRole("heading", { level: 2, name: "Daily check-in" }).closest(".strip") as HTMLElement;
-    await waitFor(() => expect(within(checkHead).getByText("1 day in a row")).toBeInTheDocument());
-    expect(within(checkHead).getByRole("checkbox")).toHaveAttribute("aria-checked", "false");
-
-    const exercise = screen.getByRole("region", { name: "Mental health exercise" });
-    const exHead = within(exercise).getByRole("heading", { level: 2, name: "Mental health exercise" }).closest(".strip") as HTMLElement;
-    await waitFor(() => expect(within(exHead).getByRole("checkbox")).toHaveAttribute("aria-checked", "true"));
-    expect(within(exHead).getByRole("checkbox")).toHaveAttribute("aria-disabled", "true");
+describe("Mind's Habits box holds the Journal rows", () => {
+  it("after her own Mind habits, in the habit format: 'every day', 'November · session N of 30', read-only ticks", async () => {
+    await someDone();
+    await createItem({ kind: "task", title: "Pretend habit", areaId: "mind", priority: 2, recur: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] }, TODAY);
+    renderApp("/area/mind", TODAY);
+    const box = await screen.findByRole("list", { name: "Habits" });
+    await waitFor(() => expect(within(box).getAllByRole("listitem")).toHaveLength(4));
+    const items = within(box).getAllByRole("listitem");
+    expect(items.map((li) => li.querySelector(".strip-title")!.textContent)).toEqual([
+      expect.stringContaining("Pretend habit"), "Mental health exercise", "Morning pages", "Daily check-in",
+    ]);
+    const morning = items[2]!;
+    expect(morning).toHaveClass("journal-row");
+    expect(within(morning).getByText("every day")).toHaveClass("strip-meta");
+    await waitFor(() => expect(within(morning).getByText("November · session 2 of 30")).toBeInTheDocument());
+    expect(tick(morning)).toHaveAttribute("aria-checked", "true");
+    expect(tick(morning)).toHaveAttribute("aria-disabled", "true");
+    expect(within(items[3]!).getByText("November · session 1 of 30")).toBeInTheDocument(); // checked in on the 1st
+    await userEvent.click(within(morning).getByRole("button", { name: "Morning pages" }));
+    await waitFor(() => expect(currentUrl).toBe("/journal/morning"));
   });
 
-  it("finishing today's check-in ticks its strip by itself", async () => {
+  it("with no Mind habits the box still shows, with the three rows; other areas don't get them", async () => {
+    await confirmedDevice(db, jk);
+    const first = renderApp("/area/mind", TODAY);
+    const box = await screen.findByRole("list", { name: "Habits" });
+    expect(within(box).getAllByRole("listitem")).toHaveLength(3);
+    first.unmount();
+    renderApp("/area/writing", TODAY);
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("button", { name: "Morning pages" })).toBeNull();
+  });
+});
+
+describe("Journal tabs", () => {
+  const tabs = () => screen.findByRole("navigation", { name: "Journal parts" });
+
+  it("big tabs in her order, the exercise first; /journal opens it; each part done today shows its tick and streak", async () => {
     await someDone();
     renderApp("/journal", TODAY);
-    await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 }); // open (the strips show before)
-    const checkin = screen.getByRole("region", { name: "Daily check-in" });
-    const head = within(checkin).getByRole("heading", { level: 2, name: "Daily check-in" }).closest(".strip") as HTMLElement;
-    await userEvent.click(await within(checkin).findByRole("button", { name: "Finish" }));
-    await waitFor(() => expect(within(head).getByRole("checkbox")).toHaveAttribute("aria-checked", "true"));
-    expect(within(head).getByText("2 days in a row")).toBeInTheDocument();
+    await waitFor(() => expect(currentUrl).toBe("/journal/exercise"));
+    const nav = await tabs();
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/journal/exercise", "/journal/morning", "/journal/check-in", "/journal/read-back"]);
+    expect(links[0]).toHaveAttribute("aria-current", "page");
+    expect(links[0]).toHaveClass("journal-tab", "is-selected");
+    await waitFor(() => expect(links[1]!.querySelector(".tick-auto.is-done")).not.toBeNull());
+    expect(links[1]).toHaveTextContent("(done today)");
+    expect(links[0]!.querySelector(".tick-auto.is-done")).not.toBeNull();
+    expect(links[2]!.querySelector(".tick-auto.is-done")).toBeNull(); // half way through today
+    expect(links[2]!.querySelector(".tick-auto")).not.toBeNull();
+    expect(links[3]!.querySelector(".tick-auto")).toBeNull(); // Read back has no tick
+    expect(within(links[1]!).getByText("3 days in a row")).toBeInTheDocument();
+    expect(nav.querySelector(".journal-star")).toBeNull();
+  });
+
+  it("finishing today's check-in ticks its tab by itself", async () => {
+    await someDone();
+    renderApp("/journal/check-in", TODAY);
+    const nav = await tabs();
+    const link = within(nav).getByRole("link", { name: /Daily check-in/ });
+    const panel = await screen.findByRole("region", { name: "Daily check-in" }, { timeout: 5000 });
+    await userEvent.click(await within(panel).findByRole("button", { name: "Finish" }));
+    await waitFor(() => expect(link.querySelector(".tick-auto.is-done")).not.toBeNull());
+    expect(within(link).getByText("2 days in a row")).toBeInTheDocument();
+  });
+
+  it("tapping a tab changes the address and the part shown", async () => {
+    await confirmedDevice(db, jk);
+    renderApp("/journal/exercise", TODAY);
+    await userEvent.click(within(await tabs()).getByRole("link", { name: /Morning pages/ }));
+    await waitFor(() => expect(currentUrl).toBe("/journal/morning"));
+    expect(await screen.findByLabelText("Today's morning page", {}, { timeout: 5000 })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["#morning-pages", "/journal/morning"],
+    ["#daily-check-in", "/journal/check-in"],
+    ["#mental-health-exercise", "/journal/exercise"],
+  ])("an earlier link /journal%s opens %s", async (hash, path) => {
+    renderApp(`/journal${hash}`, TODAY);
+    await waitFor(() => expect(currentUrl).toBe(path));
   });
 });

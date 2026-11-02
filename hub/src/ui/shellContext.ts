@@ -20,3 +20,6 @@ export const ShellContext = createContext<{
 export function useShellToday(): ISODate {
   return useContext(ShellContext)?.today ?? todayISO();
 }
+
+/** Asks the shell to look at the clock now (as on focus): a page that noticed midnight passing. */
+export const CHECK_DATE_EVENT = "esmeworld:check-date";

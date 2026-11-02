@@ -338,8 +338,8 @@ button.quiet-link:focus-visible {
    same as to-do boxes but green") ----
    The task strip above with Map mint #a3d5c2 (her pick) as its background, on Home and as
    each Journal section's heading. The tick box is the strips' tick box (22px, 7px radius,
-   --panel, sage border; done is --bar-fill) but read-only: it ticks itself. "★ N" is the
-   magenta placeholder star (.journal-star) and the number in the strip's own text.
+   --panel, sage border; done is --bar-fill) but read-only: it ticks itself. The streak on
+   the right is the shared <Streak> (streak.css).
    Hover / keyboard focus on a Home row: the title underlines and the cursor is a pointer,
    as on task strips; the background stays mint (a mint hover colour isn't decided). */
 :root {
@@ -352,7 +352,7 @@ button.quiet-link:focus-visible {
 
 /* Exactly a task strip's height for the same content (Esme, 2026-11-02: "should look exactly
    like the other items"): the right-hand column is as tall as the task strips' 30px icons
-   even when it holds only ★ N, or nothing. */
+   even when it holds only the streak, or nothing. */
 .strip.journal-row .strip-actions {
   min-height: 30px;
 }
@@ -396,8 +396,4 @@ span.tick-auto.is-done {
 h2.journal-row-heading {
   margin: 0;
   font: inherit;
-}
-
-.journal-row-streak {
-  white-space: nowrap;
 }

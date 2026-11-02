@@ -18,7 +18,8 @@ import { currentUrl, renderApp } from "../../test/renderApp";
 const PASS = "fake-journal-passphrase-for-tests";
 const TODAY = "2026-10-30";
 const SET = checkCardFile(FAKE_CARD_FILE)!;
-const CARD1 = { day: 1, theme: "Pretend weather" };
+const legacy = (day: number, theme: string) => ({ id: `day-${day}`, day, theme, legacy: true });
+const CARD1 = legacy(1, "Pretend weather");
 let jk: JournalKey;
 beforeAll(async () => {
   jk = await keyFor(PASS);
@@ -37,18 +38,18 @@ const section = () => screen.findByRole("region", { name: "Mental health exercis
 const todayCard = async () => within(await section()).findByRole("article", { name: "Today's card" });
 const box = async () => within(await todayCard()).findByRole("textbox", { name: "Your response" });
 
-it("a writing box under Try this, like the check-in answer box, with a Submit pill", async () => {
+it("a writing box under the card (after Try this and the book line, as in the mockup), with a Submit pill", async () => {
   renderApp("/journal", TODAY);
   const card = await todayCard();
   const b = await box();
   expect(b).toHaveAttribute("placeholder", "Write your response…");
   expect(b).toHaveClass("journal-answer", "exercise-response");
   expect(Number(b.getAttribute("rows"))).toBeGreaterThanOrEqual(6);
-  // Under Try this: the box comes after the Try this text and before the book line.
   const tryText = within(card).getByText(/Name one pretend cloud/);
   const book = within(card).getByText("In your book: Pretend workbook, page 1");
-  expect(tryText.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(b.compareDocumentPosition(book) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(tryText.compareDocumentPosition(book) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(book.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(card).getByText("Submitting ticks today's exercise.")).toBeInTheDocument();
   const submit = within(card).getByRole("button", { name: "Submit" });
   expect(submit).not.toHaveClass("btn-secondary");
   expect(submit).toBeDisabled(); // nothing written yet
@@ -63,7 +64,7 @@ it("Submit seals the response, marks today's card Done and shows 'Saved'; editin
   await waitFor(() => expect(within(card).getByRole("checkbox", { name: "Done" })).toBeChecked());
   expect(within(await section()).getByText("Done for today · next card tomorrow")).toBeInTheDocument();
   const device = await getDeviceId(db);
-  expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, day: 1, done: true }]);
+  expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, id: "day-1", done: true, primary: true }]);
   expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating", saved: true });
   expect(JSON.stringify(await db.journal.toArray())).not.toContain("floating");
   // The text stays, editable.
@@ -113,7 +114,7 @@ it("autosaves when the app is hidden, on pagehide, and when the page is left", a
   await waitFor(async () => expect((await readExerciseEntry(jk, TODAY, CARD1)).entry?.text).toBe("Pretend pagehide"), { timeout: 600 });
   fireEvent.change(b, { target: { value: "Pretend left the page" } });
   await userEvent.click(screen.getByRole("link", { name: "Bin" }));
-  await waitFor(() => expect(currentUrl).not.toBe("/journal"));
+  await waitFor(() => expect(currentUrl).not.toBe("/journal/exercise"));
   await waitFor(async () => expect((await readExerciseEntry(jk, TODAY, CARD1)).entry?.text).toBe("Pretend left the page"));
   expect((await readExerciseProgress(jk)).marks.every((m) => !m.done)).toBe(true);
 });
@@ -137,7 +138,7 @@ describe("Past exercises", () => {
   it("newest first as 'Day N · Theme · <date>'; opening one shows the card and her response", async () => {
     const device = await getDeviceId(db);
     await submitExerciseEntry(jk, "2026-10-27", device, CARD1, "Pretend first response");
-    await submitExerciseEntry(jk, "2026-10-29", device, { day: 2, theme: "The fictional kettle" }, "Pretend kettle response");
+    await submitExerciseEntry(jk, "2026-10-29", device, legacy(2, "The fictional kettle"), "Pretend kettle response");
     renderApp("/journal", TODAY);
     const s = await section();
     await userEvent.click(await within(s).findByText("Past exercises"));
@@ -156,8 +157,8 @@ describe("Past exercises", () => {
 
   it("a card no longer in the set (replaced): just the stored theme and her response", async () => {
     const device = await getDeviceId(db);
-    await submitExerciseEntry(jk, "2026-10-28", device, { day: 9, theme: "A pretend card from an old set" }, "Pretend old response");
-    await submitExerciseEntry(jk, "2026-10-29", device, { day: 2, theme: "An older pretend theme" }, "Pretend replaced response");
+    await submitExerciseEntry(jk, "2026-10-28", device, legacy(9, "A pretend card from an old set"), "Pretend old response");
+    await submitExerciseEntry(jk, "2026-10-29", device, legacy(2, "An older pretend theme"), "Pretend replaced response");
     renderApp("/journal", TODAY);
     const s = await section();
     await userEvent.click(await within(s).findByText("Past exercises"));

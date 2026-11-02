@@ -68,12 +68,12 @@ describe("HomePage", () => {
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
           <Route path="/" element={<HomePage today={TODAY} />} />
-          <Route path="/journal" element={<JournalAt />} />
+          <Route path="/journal/:tab" element={<JournalAt />} />
         </Routes>
       </MemoryRouter>,
     );
     await userEvent.click(await screen.findByRole("button", { name: "Daily check-in" }));
-    expect(await screen.findByText("At /journal#daily-check-in")).toBeInTheDocument();
+    expect(await screen.findByText("At /journal/check-in")).toBeInTheDocument();
   });
 
   it("the desktop Journal card's Morning pages button opens morning pages", async () => {
@@ -81,12 +81,12 @@ describe("HomePage", () => {
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
           <Route path="/" element={<HomePage today={TODAY} />} />
-          <Route path="/journal" element={<JournalAt />} />
+          <Route path="/journal/:tab" element={<JournalAt />} />
         </Routes>
       </MemoryRouter>,
     );
     await userEvent.click(await screen.findByRole("button", { name: "Morning pages" }));
-    expect(await screen.findByText("At /journal#morning-pages")).toBeInTheDocument();
+    expect(await screen.findByText("At /journal/morning")).toBeInTheDocument();
   });
 
   it("goals without a target are not listed as bars", async () => {

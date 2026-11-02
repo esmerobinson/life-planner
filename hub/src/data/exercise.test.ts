@@ -1,14 +1,16 @@
 import { vi } from "vitest";
 import { db } from "./db";
 import {
-  CARDS_TOO_BIG, importExerciseCards, NOT_CONFIRMED, readExerciseCards, readExerciseProgress, recordExerciseShown,
+  CARDS_CHUNK_BYTES, CARDS_TOO_BIG, importExerciseCards, NOT_CONFIRMED, readExerciseCards, readExerciseProgress, recordExerciseShown,
   saveExerciseMark, setExerciseStar,
 } from "./repo";
-import { journalId, validJournal } from "./validate";
-import { journalAad, sealJson, toBase64, type JournalKey } from "../journal/crypto";
-import { checkCardFile, MAX_CARD_FIELD, type CardSet } from "../journal/exercise";
+import { journalId, MAX_JOURNAL_CT, validJournal } from "./validate";
+import { MAX_ROW_BYTES } from "../sync/engine";
+import { journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
+import { checkCardFile, MAX_CARD_FIELD, NO_TRACKS, parseCardFile, storedCards, type CardSet } from "../journal/exercise";
+import { bigCardFileText } from "../test/bigCardSet";
 import { confirmedDevice, keyFor } from "../test/journalKey";
-import { FAKE_CARD_FILE } from "../test/exerciseCards";
+import { FAKE_CARD_FILE, FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
 
 // The exercise cards' storage (exercise brief "Storage"): the whole set is one sealed journal
 // row `cards`; progress is one sealed row per device per day; stars one sealed row per device.
@@ -50,7 +52,7 @@ describe("row ids", () => {
     expect(validJournal(row({ id: "cards", kind: "cards" }))).toBe(true);
     expect(validJournal(row({ id: `exercise:${DAY}:${ME}`, kind: "exercise" }))).toBe(true);
     expect(validJournal(row({ id: `stars:${ME}`, kind: "stars" }))).toBe(true);
-    expect(validJournal(row({ id: "cards:x", kind: "cards" }))).toBe(false);
+    expect(validJournal(row({ id: "cards:x", kind: "cards" }))).toBe(false); // chunks are cards:<number>
     expect(validJournal(row({ id: `exercise:2026-10-29:${ME}`, kind: "exercise" }))).toBe(false);
     expect(validJournal(row({ id: "stars:", kind: "stars" }))).toBe(false);
     expect(validJournal(row({ id: "stars:a b", kind: "stars" }))).toBe(false);
@@ -71,12 +73,19 @@ describe("cards", () => {
     expect(await readExerciseCards(other)).toEqual({ state: "unreadable" });
   });
 
+  it("a version 2 set is stored in its own shape and reads back the same", async () => {
+    const v2 = parseCardFile(FAKE_CARD_TEXT_V2)!;
+    await importExerciseCards(jk, v2, DAY);
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: v2 });
+    expect(JSON.stringify(await db.journal.get("cards"))).not.toContain("example.org");
+  });
+
   it("re-importing replaces the whole set", async () => {
     await importExerciseCards(jk, SET, DAY);
-    const two: CardSet = { source: "Another pretend file", cards: SET.cards.slice(0, 2) };
+    const two: CardSet = { source: "Another pretend file", version: 1, tracks: NO_TRACKS, cards: SET.cards.slice(0, 2) };
     await importExerciseCards(jk, two, "2026-10-31");
     expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: two });
-    expect(await db.journal.where("kind").equals("cards").count()).toBe(1);
+    expect((await db.journal.where("kind").equals("cards").toArray()).map((r) => r.id).sort()).toEqual(["cards", "cards:0"]);
   });
 
   it("only the confirmed key may seal the cards", async () => {
@@ -84,11 +93,87 @@ describe("cards", () => {
     expect(await db.journal.get("cards")).toBeUndefined();
   });
 
-  it("a set too big for one synced row is refused with a plain message and nothing is stored", async () => {
+  it("a set too big to store at all is refused with a plain message and nothing is stored", async () => {
     const big = "x".repeat(MAX_CARD_FIELD);
-    const cards = Array.from({ length: 120 }, (_, i) => ({ ...SET.cards[0]!, day: i + 1, learn: big, try: big, book: big }));
-    await expect(importExerciseCards(jk, { source: "", cards }, DAY)).rejects.toThrow(CARDS_TOO_BIG);
+    const cards = Array.from({ length: 1000 }, (_, i) => ({ ...SET.cards[0]!, day: i + 1, learn: big, try: big, book: big, skill: big, theme: big }));
+    await expect(importExerciseCards(jk, { source: "", version: 1, tracks: NO_TRACKS, cards }, DAY)).rejects.toThrow(CARDS_TOO_BIG);
     expect(await db.journal.get("cards")).toBeUndefined();
+  });
+
+  it("a full-size two-book set (~950 KB of JSON) is stored in chunks of at most 250 KB, each well inside one synced row", async () => {
+    const text = bigCardFileText();
+    const bytes = new TextEncoder().encode(text).length;
+    expect(bytes).toBeGreaterThan(900_000);
+    expect(bytes).toBeLessThan(1_000_000);
+    const set = parseCardFile(text)!;
+    expect(set.cards).toHaveLength(245);
+    await importExerciseCards(jk, set, DAY);
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set });
+    const rows = await db.journal.where("kind").equals("cards").toArray();
+    const chunks = rows.filter((r) => r.id !== "cards");
+    expect(chunks.length).toBeGreaterThanOrEqual(4);
+    expect(rows.map((r) => r.id).sort()).toEqual(["cards", ...chunks.map((_, k) => `cards:${k}`)].sort());
+    for (const r of rows) {
+      // What sync sends for the row, against the server's 1 MB cap.
+      const asSent = new TextEncoder().encode(JSON.stringify({ t: "journal", i: r.id, u: r.updatedAt, d: JSON.stringify(r) })).length;
+      expect(asSent).toBeLessThan(MAX_ROW_BYTES / 2);
+      expect(validJournal(r)).toBe(true);
+      expect(JSON.stringify(r)).not.toContain("Pretend");
+    }
+    for (const r of chunks) {
+      const c = (await openJson(jk.key, r, journalAad(r.id))) as { cards: unknown[] };
+      expect(new TextEncoder().encode(JSON.stringify(c.cards)).length).toBeLessThanOrEqual(CARDS_CHUNK_BYTES + 2);
+    }
+  });
+
+  it("a chunk not here yet (or still the earlier import's): 'syncing', not unreadable; whole again once it arrives", async () => {
+    const set = parseCardFile(bigCardFileText())!;
+    await importExerciseCards(jk, set, DAY);
+    const chunk1 = (await db.journal.get("cards:1"))!;
+    await db.journal.delete("cards:1");
+    expect(await readExerciseCards(jk)).toEqual({ state: "syncing" });
+    await db.journal.put(chunk1);
+    expect((await readExerciseCards(jk)).state).toBe("ok");
+    // A re-import whose manifest has arrived but whose chunk 0 hasn't: the old chunk 0 isn't read as its.
+    const old0 = (await db.journal.get("cards:0"))!;
+    await importExerciseCards(jk, SET, "2026-10-31");
+    await db.journal.put(old0);
+    expect(await readExerciseCards(jk)).toEqual({ state: "syncing" });
+  });
+
+  it("a smaller re-import empties the earlier import's higher chunks (review M3)", async () => {
+    await importExerciseCards(jk, parseCardFile(bigCardFileText())!, DAY);
+    const before = (await db.journal.where("kind").equals("cards").toArray()).filter((r) => r.id !== "cards");
+    expect(before.length).toBeGreaterThan(2);
+    await importExerciseCards(jk, SET, "2026-10-31");
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: SET });
+    for (const r of before.slice(1)) {
+      const now = (await db.journal.get(r.id))!;
+      expect(now.ct.length).toBeLessThan(1000);
+      expect(((await openJson(jk.key, now, journalAad(now.id))) as { cards: unknown[] }).cards).toEqual([]);
+    }
+  });
+
+  it("an unchanged set is opened once, and read again after a new import (review M7)", async () => {
+    await importExerciseCards(jk, SET, DAY);
+    const a = await readExerciseCards(jk);
+    expect(await readExerciseCards(jk)).toBe(a); // the same object: not decrypted again
+    const two: CardSet = { source: "Another pretend file", version: 1, tracks: NO_TRACKS, cards: SET.cards.slice(0, 2) };
+    await importExerciseCards(jk, two, DAY);
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: two });
+  });
+
+  it("an earlier single-row set still reads", async () => {
+    const entry = { v: 1, source: SET.source, cards: storedCards(SET), at: 1 };
+    await db.journal.put(await sealedRow(jk, "cards", DAY, undefined, entry));
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: SET });
+  });
+
+  it("chunk ids: cards:0 … cards:999 are valid journal rows; nothing else after cards:", () => {
+    expect(journalId("cards", DAY, "3")).toBe("cards:3");
+    expect(validJournal(row({ id: "cards:0", kind: "cards" }))).toBe(true);
+    expect(validJournal(row({ id: "cards:999", kind: "cards" }))).toBe(true);
+    for (const id of ["cards:01", "cards:1000", "cards:a", "cards:"]) expect(validJournal(row({ id, kind: "cards" }))).toBe(false);
   });
 
   it("a stored set of an unknown shape counts as unreadable", async () => {
@@ -99,47 +184,62 @@ describe("cards", () => {
 
 describe("progress (one row per device per day)", () => {
   it("shown, then ticked, on this device's own row; another device's row is its own", async () => {
-    expect(await recordExerciseShown(jk, DAY, ME, 1)).toBe(true);
-    expect(await recordExerciseShown(jk, DAY, ME, 2)).toBe(false); // already there: unchanged
-    await saveExerciseMark(jk, DAY, ME, 1, true);
-    await saveExerciseMark(jk, DAY, PHONE, 1, false);
+    expect(await recordExerciseShown(jk, DAY, ME, "day-1")).toBe(true);
+    expect(await recordExerciseShown(jk, DAY, ME, "day-2")).toBe(false); // already there: unchanged
+    await saveExerciseMark(jk, DAY, ME, "day-1", true);
+    await saveExerciseMark(jk, DAY, PHONE, "day-1", false);
     const stored = (await db.journal.get(`exercise:${DAY}:${ME}`))!;
     expect(stored).toMatchObject({ kind: "exercise", date: DAY, fp: jk.fp });
     const p = await readExerciseProgress(jk);
     expect(p.marks.sort((a, b) => a.device.localeCompare(b.device))).toEqual([
-      { date: DAY, device: ME, day: 1, done: true },
-      { date: DAY, device: PHONE, day: 1, done: false },
+      { date: DAY, device: ME, id: "day-1", done: true, primary: true },
+      { date: DAY, device: PHONE, id: "day-1", done: false, primary: true },
     ]);
     expect(p.unreadable).toBe(0);
   });
 
   it("only the confirmed key writes progress or stars", async () => {
-    await expect(saveExerciseMark(other, DAY, ME, 1, true)).rejects.toThrow(NOT_CONFIRMED);
-    await expect(recordExerciseShown(other, DAY, ME, 1)).rejects.toThrow(NOT_CONFIRMED);
-    await expect(setExerciseStar(other, DAY, ME, 1, true)).rejects.toThrow(NOT_CONFIRMED);
+    await expect(saveExerciseMark(other, DAY, ME, "day-1", true)).rejects.toThrow(NOT_CONFIRMED);
+    await expect(recordExerciseShown(other, DAY, ME, "day-1")).rejects.toThrow(NOT_CONFIRMED);
+    await expect(setExerciseStar(other, DAY, ME, "day-1", true)).rejects.toThrow(NOT_CONFIRMED);
     expect(await db.journal.where("kind").anyOf("exercise", "stars").count()).toBe(0);
   });
 
   it("a row this key can't open is counted and skipped", async () => {
     await db.journal.put(await sealedRow(other, "exercise", DAY, PHONE, { v: 1, day: 1, done: true, at: 1 }));
-    await saveExerciseMark(jk, DAY, ME, 2, true);
+    await saveExerciseMark(jk, DAY, ME, "day-2", true);
     const p = await readExerciseProgress(jk);
-    expect(p.marks).toEqual([{ date: DAY, device: ME, day: 2, done: true }]);
+    expect(p.marks).toEqual([{ date: DAY, device: ME, id: "day-2", done: true, primary: true }]);
     expect(p.unreadable).toBe(1);
+  });
+
+  it("an earlier (version 1, by day) row reads as card day-N, and marking keeps working on it", async () => {
+    await db.journal.put(await sealedRow(jk, "exercise", DAY, ME, { v: 1, day: 3, done: false, at: 1 }));
+    expect((await readExerciseProgress(jk)).marks).toEqual([{ date: DAY, device: ME, id: "day-3", done: false, primary: true }]);
+    await saveExerciseMark(jk, DAY, ME, "day-3", true);
+    expect((await readExerciseProgress(jk)).marks).toEqual([{ date: DAY, device: ME, id: "day-3", done: true, primary: true }]);
+  });
+
+  it("this device's progress row sealed with another key is never written over", async () => {
+    const theirs = await sealedRow(other, "exercise", DAY, ME, { v: 1, day: 1, done: true, at: 1 });
+    await db.journal.put(theirs);
+    await expect(saveExerciseMark(jk, DAY, ME, "day-2", true)).rejects.toThrow();
+    expect(await db.journal.get(`exercise:${DAY}:${ME}`)).toMatchObject(theirs);
   });
 });
 
 describe("stars (one row per device; newest mark per card wins)", () => {
   it("star and un-star on this device; another device's newer mark wins", async () => {
-    await setExerciseStar(jk, DAY, ME, 2, true);
-    await setExerciseStar(jk, DAY, ME, 4, true);
-    expect((await readExerciseProgress(jk)).starred).toEqual(new Set([2, 4]));
-    await setExerciseStar(jk, DAY, ME, 4, false);
-    expect((await readExerciseProgress(jk)).starred).toEqual(new Set([2]));
+    await setExerciseStar(jk, DAY, ME, "day-2", true);
+    await setExerciseStar(jk, DAY, ME, "day-4", true);
+    expect((await readExerciseProgress(jk)).starred).toEqual(new Set(["day-2", "day-4"]));
+    await setExerciseStar(jk, DAY, ME, "day-4", false);
+    expect((await readExerciseProgress(jk)).starred).toEqual(new Set(["day-2"]));
     expect(await db.journal.where("kind").equals("stars").count()).toBe(1);
     const later = Date.now() + 1000;
     await db.journal.put(await sealedRow(jk, "stars", DAY, PHONE, { v: 1, marks: [{ day: 2, on: false, at: later }, { day: 5, on: true, at: 1 }] }));
-    expect((await readExerciseProgress(jk)).starred).toEqual(new Set([5]));
+    // (that phone row is the earlier shape, by day: read as day-N)
+    expect((await readExerciseProgress(jk)).starred).toEqual(new Set(["day-5"]));
     expect(JSON.stringify(await db.journal.get(`stars:${ME}`))).not.toContain('"day"');
   });
 
@@ -147,7 +247,7 @@ describe("stars (one row per device; newest mark per card wins)", () => {
     const theirs = await sealedRow(other, "stars", DAY, ME, { v: 1, marks: [{ day: 1, on: true, at: 1 }] });
     await db.journal.put(theirs);
     const before = await db.journal.get(`stars:${ME}`);
-    await expect(setExerciseStar(jk, DAY, ME, 2, true)).rejects.toThrow();
+    await expect(setExerciseStar(jk, DAY, ME, "day-2", true)).rejects.toThrow();
     expect(await db.journal.get(`stars:${ME}`)).toEqual(before);
     expect(before).toMatchObject(theirs);
     expect((await readExerciseProgress(jk)).unreadable).toBe(1);

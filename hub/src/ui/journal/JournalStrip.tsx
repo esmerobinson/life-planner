@@ -1,5 +1,4 @@
 import type { MouseEvent, ReactNode } from "react";
-import { Star } from "./bits";
 
 /** The tick box's tooltip: it is never ticked by hand. */
 export const TICKS_ITSELF = "Ticks itself when you've done it";
@@ -22,11 +21,29 @@ export const tickState = (done: boolean | undefined): TickState => (done === und
  * (controller call, 2026-11-02: the plain green fill vanished on mint), as the Journal's own
  * "Done for today" box does. Locked: the empty box, but not a checkbox (it isn't "not done",
  * it's unknown). Loading: only the box's space, so nothing pops from unticked to ticked.
+ * `inLink`: inside a Journal tab (a link) the box is only a picture; the tab says "done today".
  */
-export function ReadOnlyTick({ state, title }: { state: TickState; title: string }) {
-  if (state === "loading") return <span className="tick-auto-space" role="img" aria-label={LOADING} />;
-  if (state === "locked") return <span className="tick-auto" role="img" aria-label={NOT_AVAILABLE} title={NOT_AVAILABLE} />;
+export function ReadOnlyTick({ state, title, inLink = false }: { state: TickState; title: string; inLink?: boolean }) {
+  if (state === "loading") {
+    return <span className="tick-auto-space" {...(inLink ? { "aria-hidden": true } : { role: "img", "aria-label": LOADING })} />;
+  }
+  if (state === "locked") {
+    return (
+      <span className="tick-auto" title={NOT_AVAILABLE} {...(inLink ? { "aria-hidden": true } : { role: "img", "aria-label": NOT_AVAILABLE })} />
+    );
+  }
   const done = state === "done";
+  const glyph = done && <span aria-hidden="true">✓</span>;
+  if (inLink) {
+    return (
+      <>
+        <span className={done ? "tick-auto is-done" : "tick-auto"} aria-hidden="true" title={TICKS_ITSELF}>
+          {glyph}
+        </span>
+        {done && <span className="visually-hidden">(done today)</span>}
+      </>
+    );
+  }
   return (
     <span
       className={done ? "tick-auto is-done" : "tick-auto"}
@@ -36,7 +53,7 @@ export function ReadOnlyTick({ state, title }: { state: TickState; title: string
       aria-label={`${title} done today`}
       title={TICKS_ITSELF}
     >
-      {done && <span aria-hidden="true">✓</span>}
+      {glyph}
     </span>
   );
 }
@@ -54,30 +71,14 @@ export function Private() {
   );
 }
 
-/** "★ N" on the right: days in a row (star is the magenta placeholder); nothing at 0. */
-export function StreakBadge({ n }: { n: number }) {
-  if (n <= 0) return null;
-  const words = `${n} ${n === 1 ? "day" : "days"} in a row`;
-  return (
-    <span className="journal-row-streak" title={words}>
-      <Star /> <span aria-hidden="true">{n}</span>
-      <span className="visually-hidden">{words}</span>
-    </span>
-  );
-}
-
-interface StripProps {
-  title: string;
-  tick: TickState;
-  streak: number;
-  meta?: ReactNode;
-}
-
 /**
- * One Journal row on Home: the mint strip (tick, title, small line, ★ N). The title is a
- * button and the whole strip opens that Journal section.
+ * One Journal row (Home, Today, Mind's Habits): a mint strip exactly like a task strip, with
+ * the read-only tick, the title (a button) and its small line, and `right` on the right (the
+ * streak; on Mind, the habit's session count). The whole strip opens that Journal tab.
  */
-export function JournalRow({ title, tick, streak, meta, onOpen }: StripProps & { onOpen: () => void }) {
+export function JournalRow({
+  title, tick, meta, right, onOpen,
+}: { title: string; tick: TickState; meta?: ReactNode; right?: ReactNode; onOpen: () => void }) {
   const onStrip = (e: MouseEvent<HTMLElement>) => {
     if ((e.target as Element).closest("button")) return; // the title's own click
     onOpen();
@@ -91,30 +92,7 @@ export function JournalRow({ title, tick, streak, meta, onOpen }: StripProps & {
         </button>
         {meta && <div className="strip-meta">{meta}</div>}
       </div>
-      <div className="strip-actions">
-        <StreakBadge n={streak} />
-      </div>
+      <div className="strip-actions">{right}</div>
     </li>
-  );
-}
-
-/**
- * The same strip as a Journal section's heading: the title is the section's h2 (`id` labels
- * the section), with the section's detail below it.
- */
-export function JournalStripHead({ id, title, tick, streak, meta }: StripProps & { id: string }) {
-  return (
-    <div className="strip journal-row">
-      <ReadOnlyTick state={tick} title={title} />
-      <div className="strip-body">
-        <h2 id={id} className="strip-title journal-row-heading">
-          {title}
-        </h2>
-        {meta && <div className="strip-meta">{meta}</div>}
-      </div>
-      <div className="strip-actions">
-        <StreakBadge n={streak} />
-      </div>
-    </div>
   );
 }

@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles/tokens.css";
 import "./styles/controls.css";
 import "./styles/strips.css";
+import "./styles/streak.css";
 import "./styles/sort.css";
 import "./styles/vision.css";
 import "./styles/journal.css";
