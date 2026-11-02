@@ -61,6 +61,33 @@ describe("AppShell", () => {
     expect(list).toHaveTextContent("Pay the gas bill");
   });
 
+  it("the Add form closes after an item is added and the item shows in the list", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 27, 12, 0));
+    renderShell(<TodayRoute />);
+    await screen.findByText("Nothing planned for today.");
+    const addBtn = screen.getByRole("button", { name: "Add" });
+    await userEvent.click(addBtn);
+    await userEvent.type(screen.getByLabelText("Title"), "Water the ferns");
+    await userEvent.selectOptions(screen.getByLabelText("Area"), "mind");
+    await userEvent.type(screen.getByLabelText("Due"), "2026-10-27");
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(await screen.findByRole("list", { name: "Today" })).toHaveTextContent("Water the ferns");
+    expect(screen.queryByLabelText("Title")).toBeNull();
+    expect(addBtn).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("a failed validation keeps the Add form open with what was typed", async () => {
+    renderShell(<p>page</p>);
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.selectOptions(screen.getByLabelText("Type"), "goal");
+    await userEvent.type(screen.getByLabelText("Title"), "A goal with no deadline");
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(await screen.findByText("A finite goal needs a deadline.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toHaveValue("A goal with no deadline");
+    expect(await db.goals.count()).toBe(0);
+  });
+
   it("today follows the clock: after midnight, a focus event updates children", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 27, 23, 50));

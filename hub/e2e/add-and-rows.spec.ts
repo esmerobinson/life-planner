@@ -128,6 +128,8 @@ for (const width of [1280, 390]) {
       await form.getByRole("button", { name: "Add item" }).click();
       const todos = page.getByRole("list", { name: "To-dos" });
       await expect(todos.getByText("Storyboard the pretend trailer")).toBeVisible();
+      await expect(form).toHaveCount(0); // the Add form closes once the item is saved
+      await shoot(page, `add-closed-after-add-${width}`);
       await expect(todos.getByRole("button", { name: "See more: Storyboard the pretend trailer" })).toBeVisible();
     });
 

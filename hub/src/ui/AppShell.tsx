@@ -118,7 +118,10 @@ export function AppShell() {
               key={addOpened}
               today={today}
               defaults={addDefaults ?? BASE_ADD_DEFAULTS}
-              onAdded={() => void changed()}
+              onAdded={() => {
+                setAdding(false); // saved: the form goes away (a failed save never reaches here)
+                void changed();
+              }}
             />
           )}
           <Outlet />
