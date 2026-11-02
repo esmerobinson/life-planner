@@ -19,9 +19,12 @@ let kAppName = "Esmeworld"
 
 let env = ProcessInfo.processInfo.environment
 let isSelfTest = env["ESMEWORLD_SELFTEST"] == "1"
-/// Self-test only: delete the throwaway `esmeworld-selftest` database first so a
-/// fresh pair of runs always reads 1 then 2. Never touches the app's own data.
+/// Self-test only: delete the self-test data store first so a fresh pair of runs
+/// always reads 1 then 2. Never touches the app's own data.
 let isSelfTestReset = env["ESMEWORLD_SELFTEST_RESET"] == "1"
+/// The self-test's own persistent data store (WKWebsiteDataStore(forIdentifier:)).
+/// Fixed so launch 2 sees what launch 1 wrote. Normal launches never use it.
+let kSelfTestStoreID = UUID(uuidString: "5E1F7E57-0000-4000-8000-00000000E5E1")!
 /// Web Inspector: `ESMEWORLD_DEBUG=1` or `defaults write world.esme.esmeworld EsmeworldDebug -bool YES`.
 let isDebug = env["ESMEWORLD_DEBUG"] == "1" || UserDefaults.standard.bool(forKey: "EsmeworldDebug")
 
@@ -182,11 +185,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         NSWindow.allowsAutomaticWindowTabbing = false
         NSApp.mainMenu = buildMainMenu()
 
+        if isSelfTest {
+            // Headless-ish: no Dock icon, window never shown, no saved frame touched.
+            NSApp.setActivationPolicy(.accessory)
+            Task { @MainActor in
+                // Watchdog: never hang the build.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
+                    say("FAIL watchdog timeout")
+                    exit(1)
+                }
+                guard let store = await self.selfTestDataStore() else {
+                    say("FAILED")
+                    exit(1)
+                }
+                self.setUpWindow(dataStore: store)
+                await self.runSelfTest()
+            }
+            return
+        }
+
+        // The default, persistent store: this is where her tasks live. Never use
+        // .nonPersistent() here, and never change it.
+        setUpWindow(dataStore: WKWebsiteDataStore.default())
+
+        // Restores the saved size and position if there is one.
+        window.setFrameAutosaveName("EsmeworldMainWindow")
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        webView.load(URLRequest(url: kStartURL))
+    }
+
+    /// Self-test only: a separate persistent store, so the self-test never shares
+    /// IndexedDB, Web Locks or anything else with her real store (which a running
+    /// Esmeworld holds open). With ESMEWORLD_SELFTEST_RESET=1 that store, and only
+    /// that store, is deleted first.
+    @MainActor
+    private func selfTestDataStore() async -> WKWebsiteDataStore? {
+        guard #available(macOS 14.0, *) else {
+            say("FAIL self-test needs macOS 14 or later (WKWebsiteDataStore(forIdentifier:))")
+            return nil
+        }
+        say("store=selftest \(kSelfTestStoreID.uuidString)")
+        if isSelfTestReset {
+            // WebKit crashes (null RunLoop in removeDataStoreWithIdentifierImpl) when
+            // this is the process's first WebKit call; creating any WebKit object first
+            // avoids it.
+            _ = WKWebViewConfiguration()
+            do {
+                try await WKWebsiteDataStore.remove(forIdentifier: kSelfTestStoreID)
+                say("store.reset=ok")
+            } catch {
+                // Normal on the very first run, when the store does not exist yet.
+                say("store.reset=\(error.localizedDescription)")
+            }
+        }
+        return WKWebsiteDataStore(forIdentifier: kSelfTestStoreID)
+    }
+
+    private func setUpWindow(dataStore: WKWebsiteDataStore) {
         let webRoot = Bundle.main.resourceURL!.appendingPathComponent("web", isDirectory: true)
         let config = WKWebViewConfiguration()
-        // The default, persistent store: this is where her tasks live. Never use
-        // .nonPersistent() here.
-        config.websiteDataStore = WKWebsiteDataStore.default()
+        config.websiteDataStore = dataStore
         config.setURLSchemeHandler(WebAppSchemeHandler(root: webRoot), forURLScheme: kScheme)
         if isSelfTest || isDebug {
             config.userContentController.add(console, name: ConsoleBridge.name)
@@ -215,19 +274,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         window.delegate = self
         window.isReleasedWhenClosed = false
         window.center()
-
-        if isSelfTest {
-            // Headless-ish: no Dock icon, window never shown, no saved frame touched.
-            NSApp.setActivationPolicy(.accessory)
-            Task { @MainActor in await self.runSelfTest() }
-            return
-        }
-
-        // Restores the saved size and position if there is one.
-        window.setFrameAutosaveName("EsmeworldMainWindow")
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        webView.load(URLRequest(url: kStartURL))
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -562,11 +608,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     @MainActor
     private func runSelfTest() async {
-        // Watchdog: never hang the build.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
-            say("FAIL watchdog timeout")
-            exit(1)
-        }
         var ok = true
         func check(_ cond: Bool, _ what: String) {
             if !cond { ok = false; say("FAIL \(what)") }
@@ -638,11 +679,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             say("h1=\(h1)")
             check(h1 == "Writing", "h1")
 
-            // (d) IndexedDB persists across launches (a throwaway database, not the app's).
+            // (d) IndexedDB persists across launches (in the self-test store, which the
+            // reset run deleted first).
             let idb = try await js("""
-            if (\(isSelfTestReset ? "true" : "false")) {
-              await new Promise((res, rej) => { const d = indexedDB.deleteDatabase("esmeworld-selftest"); d.onsuccess = res; d.onerror = () => rej(d.error); d.onblocked = res; });
-            }
             const db = await new Promise((res, rej) => {
               const r = indexedDB.open("esmeworld-selftest", 1);
               r.onupgradeneeded = () => r.result.createObjectStore("kv");
@@ -736,6 +775,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
 // MARK: - Entry point
 
+if isSelfTest {
+    // Never restore (or offer to restore) windows in a self-test run: after a crash,
+    // AppKit would otherwise show a modal "reopen windows?" alert at launch, which
+    // nobody can answer in a headless run. Volatile, so nothing is saved.
+    UserDefaults.standard.setVolatileDomain(["ApplePersistenceIgnoreState": true],
+                                            forName: UserDefaults.argumentDomain)
+}
 MainActor.assumeIsolated {
     let app = NSApplication.shared
     let delegate = AppDelegate()
