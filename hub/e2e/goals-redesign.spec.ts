@@ -145,15 +145,15 @@ test.describe("desktop (1280px)", () => {
     const bpd = page.locator(".goal-tile-a", { has: page.getByRole("link", { name: "BPD practice every day" }) });
     await expect(bpd).toHaveClass(/is-daily/);
     await expect(bpd.getByText("Daily", { exact: true })).toBeVisible();
-    // Automatic counts: BPD from the linked to-do ticked today (the exercise cards are locked
-    // here); Mind things done from both Mind to-dos; Journal daily from yesterday's page and
-    // today's answer (yesterday only counts while it is this month).
+    // Automatic counts. The journal is locked in this browser, so the goals that count exercise
+    // cards show their count as unknown (review M1); Journal daily falls back to the rows'
+    // clear dates: yesterday's page and today's answer (yesterday only while it is this month).
     const both = yesterday.slice(0, 7) === month ? 2 : 1;
-    await expect(bpd.getByText(`1 / ${daysIn(month)}`)).toBeVisible();
-    await expect(bpd.getByText("Counts itself: today's exercise card, or a linked to-do")).toBeVisible();
+    await expect(bpd.getByText(`— / ${daysIn(month)}`)).toBeVisible();
+    await expect(bpd.getByText("Counts itself: today's exercise card, or a linked to-do · Not available until the journal is unlocked")).toBeVisible();
     const health = page.locator(".goal-tile-a", { has: page.getByRole("link", { name: "Improve my mental health" }) });
-    await expect(health.getByText(`${both} / 30`)).toBeVisible();
-    await expect(health.getByText("Counts itself: exercises, Mind to-dos, Mind habits")).toBeVisible();
+    await expect(health.getByText("— / 30")).toBeVisible();
+    await expect(health.getByText(/^Counts itself: exercises, Mind to-dos, Mind habits/)).toBeVisible();
     const journal = page.locator(".goal-tile-a", { has: page.getByRole("link", { name: "Journal daily" }) });
     await expect(journal.getByText(`${both} / ${daysIn(month)}`)).toBeVisible();
     await expect(journal.getByTitle("2 days in a row")).toBeVisible();

@@ -159,6 +159,14 @@ describe("a daily goal without automatic sources", () => {
 });
 
 describe("the Goals page counts from the journal", () => {
+  it("with the journal locked here, an exercise-counted goal shows its count as unknown, never as a low number (review M1)", async () => {
+    await addSuggestedGoal("suggested-bpd-practice", TODAY);
+    renderApp("/goals", TODAY);
+    const tile = (await screen.findByRole("link", { name: "BPD practice every day" })).closest("li")!;
+    expect(await within(tile).findByText("— / 30")).toBeInTheDocument();
+    expect(within(tile).getByText(/Not available until the journal is unlocked/)).toBeInTheDocument();
+  });
+
   it("Journal daily's tile counts the days with a page this month, and its streak", async () => {
     await confirmedDevice(db, jk);
     await addSuggestedGoal("suggested-journal-daily", TODAY);

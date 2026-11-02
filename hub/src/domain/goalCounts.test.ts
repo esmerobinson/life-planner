@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  canPlanMonth, countedDays, dailyStatus, daysInMonth, goalEvents, isActive, monthCount, monthDots, monthHit,
+  canPlanMonth, countedDays, countUnknown, dailyStatus, daysInMonth, goalEvents, isActive, monthCount, monthDots, monthHit,
   monthsInARowHit, monthSummary, pastMonths, plannedFromLastMonth, type GoalSources,
 } from "./goalCounts";
 import type { Goal, Item, MonthGoal } from "./types";
@@ -260,6 +260,23 @@ describe("older goals with only a monthlyTarget (fix round 1, I2)", () => {
     expect(monthSummary(both, "2026-11", src({ items }))).toEqual({ n: 1, of: 5 });
     expect(monthSummary(goal({ areaId: "writing" }), "2026-11", src({ items }))).toBeNull();
     expect(monthHit(goal({ areaId: "writing" }), "2026-11", src({ items }))).toBeNull();
+  });
+});
+
+describe("exercise counts while the journal is locked (review M1)", () => {
+  const g = goal({ countsFrom: ["exercise", "linked"], monthGoals: [count("2026-10", { target: 2 }), count("2026-11", { id: "n", target: 2 })] });
+  it("are unknown: no number, no hit or miss (an empty dot)", () => {
+    const locked = src({ exercise: null });
+    expect(countUnknown(g, g.monthGoals![1]!, locked)).toBe(true);
+    expect(monthSummary(g, "2026-11", locked)).toEqual({ n: 0, of: 2, unknown: true });
+    expect(monthHit(g, "2026-10", locked)).toBeNull();
+    expect(pastMonths(g, "2026-11-02", locked)[0]!.hit).toBeNull();
+  });
+  it("are known once readable, and a goal without exercise is never unknown", () => {
+    expect(countUnknown(g, g.monthGoals![1]!, src())).toBe(false);
+    expect(monthHit(g, "2026-10", src())).toBe(false);
+    const linkedOnly = goal({ countsFrom: ["linked"], monthGoals: [count("2026-11")] });
+    expect(countUnknown(linkedOnly, linkedOnly.monthGoals![0]!, src({ exercise: null }))).toBe(false);
   });
 });
 

@@ -113,6 +113,13 @@ export function legacyMonthCount(goal: Goal, month: string, src: GoalSources): n
   return legacyTickOffs(goal, src).filter((d) => monthOf(d) === month).length;
 }
 
+/**
+ * An automatic count that includes exercise cards can't be known while the journal is locked
+ * on this device (review M1): it is shown as unknown, never as a low number or a miss.
+ */
+export const countUnknown = (goal: Goal, m: MonthGoal, src: GoalSources): boolean =>
+  src.exercise === null && isAutoCount(goal, m) && (goal.countsFrom ?? []).includes("exercise");
+
 /** The goal's monthly goals for "YYYY-MM", in the order they were added. */
 export const goalsIn = (goal: Goal, month: string): MonthGoal[] => (goal.monthGoals ?? []).filter((m) => m.month === month);
 
@@ -124,16 +131,23 @@ export function monthHit(goal: Goal, month: string, src: GoalSources): boolean |
   const mine = goalsIn(goal, month);
   if (mine.length === 0) return hasLegacyTarget(goal) ? legacyMonthCount(goal, month, src) >= goal.monthlyTarget! : null;
   const count = mine.find((m) => m.kind === "count");
-  if (count) return monthGoalDone(goal, count, src);
+  if (count) return countUnknown(goal, count, src) ? null : monthGoalDone(goal, count, src);
   return mine.every((m) => m.done === true);
 }
 
 /** The month's headline number: its first count (n of target), else its steps (done of all). */
-export function monthSummary(goal: Goal, month: string, src: GoalSources): { n: number; of: number } | null {
+export function monthSummary(
+  goal: Goal,
+  month: string,
+  src: GoalSources,
+): { n: number; of: number; unknown?: true } | null {
   const mine = goalsIn(goal, month);
   if (mine.length === 0) return hasLegacyTarget(goal) ? { n: legacyMonthCount(goal, month, src), of: goal.monthlyTarget! } : null;
   const count = mine.find((m) => m.kind === "count");
-  if (count) return { n: monthCount(goal, count, src), of: count.target ?? 0 };
+  if (count) {
+    const sum = { n: monthCount(goal, count, src), of: count.target ?? 0 };
+    return countUnknown(goal, count, src) ? { ...sum, unknown: true } : sum;
+  }
   return { n: mine.filter((m) => m.done === true).length, of: mine.length };
 }
 
@@ -172,13 +186,13 @@ export function pastMonths(
   goal: Goal,
   today: ISODate,
   src: GoalSources,
-): { month: string; hit: boolean; summary: { n: number; of: number } }[] {
+): { month: string; hit: boolean | null; summary: { n: number; of: number; unknown?: true } }[] {
   const now = monthOf(today);
   const legacy = hasLegacyTarget(goal) ? legacyTickOffs(goal, src).map(monthOf) : [];
   const months = [...new Set([...(goal.monthGoals ?? []).map((m) => m.month), ...legacy])].filter((m) => m < now).sort().reverse();
   return months.map((month) => ({
     month,
-    hit: monthHit(goal, month, src) === true,
+    hit: monthHit(goal, month, src), // null: not known on this device (the journal is locked)
     summary: monthSummary(goal, month, src)!,
   }));
 }

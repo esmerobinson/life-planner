@@ -363,7 +363,11 @@ export function GoalPanel({
             {past.map((p) => (
               <li key={p.month}>
                 <span>{`${monthName(`${p.month}-01`)} ${p.month.slice(0, 4)}`}</span>
-                <span>{`${p.hit ? "Hit" : "Missed"} · ${p.summary.n} / ${p.summary.of}`}</span>
+                <span>
+                  {p.hit === null
+                    ? `— · — / ${p.summary.of}` // not known here: the journal is locked (review M1)
+                    : `${p.hit ? "Hit" : "Missed"} · ${p.summary.n} / ${p.summary.of}`}
+                </span>
               </li>
             ))}
           </ul>

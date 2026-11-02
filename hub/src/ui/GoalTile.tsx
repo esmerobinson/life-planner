@@ -6,7 +6,7 @@ import {
 import { monthName, shortDate } from "../domain/display";
 import { monthOf } from "../domain/dates";
 import {
-  canPlanMonth, dailyStatus, goalsIn, isAutoCount, isDaily, monthCount, monthDots, monthGoalDone, monthsInARowHit,
+  canPlanMonth, countUnknown, dailyStatus, goalsIn, isAutoCount, isDaily, monthCount, monthDots, monthGoalDone, monthsInARowHit,
   monthSummary, type GoalSources,
 } from "../domain/goalCounts";
 import { milestoneProgress } from "../domain/progress";
@@ -17,6 +17,7 @@ import { useSaveError } from "./messages";
 import { usePanel } from "./panelContext";
 import { ProgressBar } from "./ProgressBar";
 import { Streak } from "./Streak";
+import { NOT_AVAILABLE } from "./journal/JournalStrip";
 
 /** "a November goal", "an October goal". */
 const article = (month: string) => (/^[AEIOU]/.test(month) ? "an" : "a");
@@ -94,7 +95,8 @@ function CountItem({
 }: { goal: Goal; m: MonthGoal; sources: GoalSources; today: ISODate; write: (fn: () => Promise<unknown>) => Promise<boolean> }) {
   const auto = isAutoCount(goal, m);
   const n = monthCount(goal, m, sources);
-  const done = monthGoalDone(goal, m, sources);
+  const unknown = countUnknown(goal, m, sources);
+  const done = !unknown && monthGoalDone(goal, m, sources);
   const current = m.month === monthOf(today);
   // A daily goal counts days: +1 once a day, and −1 takes today back off (review M4).
   const daily = isDaily(goal);
@@ -105,7 +107,7 @@ function CountItem({
         {done && "✓"}
       </span>
       <span className="goal-mitem-title">
-        {m.title} <b>{`${n} / ${m.target ?? 0}`}</b>
+        {m.title} <b>{`${unknown ? "—" : n} / ${m.target ?? 0}`}</b>
         {done && <span className="visually-hidden"> (reached)</span>}
       </span>
       <span className="goal-mitem-act">
@@ -120,7 +122,9 @@ function CountItem({
           </button>
         )}
       </span>
-      {auto && <span className="goal-auto">{countsItselfText(goal)}</span>}
+      {auto && (
+        <span className="goal-auto">{unknown ? `${countsItselfText(goal)} · ${NOT_AVAILABLE}` : countsItselfText(goal)}</span>
+      )}
     </li>
   );
 }
@@ -372,11 +376,11 @@ export function GoalMiniCard({ goal, today, sources }: { goal: Goal; today: ISOD
       <div className="goal-mini-body">
         {(sum || st) && (
           <div className="goal-mini-line">
-            <span>{sum ? `${sum.n} / ${sum.of} this month` : ""}</span>
+            <span>{sum ? `${sum.unknown ? "—" : sum.n} / ${sum.of} this month` : ""}</span>
             {st && <Streak n={st.streak} week={st.week} />}
           </div>
         )}
-        {sum && <ProgressBar ratio={sum.of > 0 ? sum.n / sum.of : 0} label={`${goal.title} this month ${sum.n}/${sum.of}`} />}
+        {sum && !sum.unknown && <ProgressBar ratio={sum.of > 0 ? sum.n / sum.of : 0} label={`${goal.title} this month ${sum.n}/${sum.of}`} />}
         <MonthDots goal={goal} today={today} sources={sources} />
       </div>
     </li>
