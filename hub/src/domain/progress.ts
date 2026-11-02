@@ -8,10 +8,10 @@ export type OverallProgress =
   | { kind: "evidence"; thisYear: number; monthsInARow: number; streakDays: number };
 
 /** A to-do that has been sorted: Inbox items have no type until they are filed. */
-const isSortedTask = (it: Item) => it.kind === "task" && it.areaId !== "inbox";
+export const isSortedTask = (it: Item) => it.kind === "task" && it.areaId !== "inbox";
 
 /** Every tick-off of one task: its completion, or each session of a habit (round 3). */
-function tickOffDates(it: Item): ISODate[] {
+export function tickOffDates(it: Item): ISODate[] {
   if (isHabit(it) && it.status === "open") return [...new Set(it.doneDates ?? [])];
   return it.status === "done" && it.completedAt ? [it.completedAt] : [];
 }

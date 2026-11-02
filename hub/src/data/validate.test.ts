@@ -49,3 +49,43 @@ describe("goal onHome (Show on Home)", () => {
     expect(validGoal(goal({ onHome: 1 }))).toBe(false);
   });
 });
+
+describe("goals redesign fields (all optional)", () => {
+  const goal = (o: Record<string, unknown> = {}) => ({
+    id: "g1", title: "Pretend goal", areaId: "art", kind: "practice", milestones: [], createdAt: "2026-10-01", ...o,
+  });
+  const mg = (o: Record<string, unknown> = {}) => ({ id: "m1", month: "2026-11", kind: "count", title: "Sessions", target: 20, ...o });
+
+  it("active is a boolean; rhythm is only daily", () => {
+    expect(validGoal(goal({ active: false }))).toBe(true);
+    expect(validGoal(goal({ active: "no" }))).toBe(false);
+    expect(validGoal(goal({ rhythm: "daily" }))).toBe(true);
+    expect(validGoal(goal({ rhythm: "weekly" }))).toBe(false);
+  });
+
+  it("countsFrom: the three kinds and areas (not the inbox), each once", () => {
+    expect(validGoal(goal({ countsFrom: ["journal", "exercise", "linked", { area: "mind" }] }))).toBe(true);
+    expect(validGoal(goal({ countsFrom: [] }))).toBe(true);
+    expect(validGoal(goal({ countsFrom: ["journal", "journal"] }))).toBe(false);
+    expect(validGoal(goal({ countsFrom: [{ area: "inbox" }] }))).toBe(false);
+    expect(validGoal(goal({ countsFrom: [{ area: "nowhere" }] }))).toBe(false);
+    expect(validGoal(goal({ countsFrom: [{ area: "mind", x: 1 }] }))).toBe(false);
+    expect(validGoal(goal({ countsFrom: ["habits"] }))).toBe(false);
+  });
+
+  it("monthGoals: counts and steps with a real month, whole targets and real log dates", () => {
+    expect(validGoal(goal({ monthGoals: [mg(), mg({ id: "s", kind: "step", target: undefined, done: true })] }))).toBe(true);
+    expect(validGoal(goal({ monthGoals: [mg({ log: ["2026-11-02"], auto: false })] }))).toBe(true);
+    expect(validGoal(goal({ monthGoals: [mg({ month: "2026-13" })] }))).toBe(false);
+    expect(validGoal(goal({ monthGoals: [mg({ target: 2.5 })] }))).toBe(false);
+    expect(validGoal(goal({ monthGoals: [mg({ target: 0 })] }))).toBe(false);
+    expect(validGoal(goal({ monthGoals: [mg({ kind: "habit" })] }))).toBe(false);
+    expect(validGoal(goal({ monthGoals: [mg({ log: ["2026-11-31"] })] }))).toBe(false);
+    expect(validGoal(goal({ monthGoals: [mg(), mg()] }))).toBe(false); // the same id twice
+  });
+
+  it("a purged goal carries no monthly goals", () => {
+    expect(validGoal(goal({ title: "", status: "purged", monthGoals: [mg()] }))).toBe(false);
+    expect(validGoal(goal({ title: "", status: "purged" }))).toBe(true);
+  });
+});
