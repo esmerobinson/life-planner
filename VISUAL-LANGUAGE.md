@@ -31,6 +31,9 @@ The source for art direction, per `CLAUDE.md`. Status of each line: **said** = E
 - **Daily check-in (journal round): option A, one question at a time** (big calm question, answer box, dots for progress, Skip / Next, "Checked in for today" at the end). She wants more DBT in the questions: the rotating bank is drafted from her own DBT workbook and the "Mindful Mornings" DBT article, then chosen together with her.
 - **Deadlines (2026-10-29)**: "I need a way to add deadlines to to-dos." **Chosen: the calendar icon does both.** Its menu has two labelled parts: **"Do it on"** (Today · Tomorrow · Next week · date + Set; sets the day it shows on Today, as before) and, under a divider, **"Deadline"** (Today · Tomorrow · Friday · Next week · date + Set · Clear; sets the due date shown as "Due …" on the strip). Same menu styling as now.
 - **No mental-health hotlines or crisis panel in the journal** (2026-10-30: "you don't need to have mental health hotlines"). The check-in is just her questions.
+- **Compact strips (2026-11-02)**: "the info below an item should not all show on the list, it should just be clickable into, and have a small 'see more' if there is more info"; strips show the title and the due/late/"On" line only, plus a small muted "See more" when there's more. **Hover/focus: the strip goes to `--track` (#d4d1c3) and the title underlines** (she chose "Darker row"; icons stay `--panel` so they remain visible).
+- **Add form (2026-11-02)**: Notes field; area and type default to where Add was pressed.
+- **Home goals (2026-11-02)**: she chooses which goals appear in Home's goals column ("Show on Home" toggle; "Choose goals" checklist).
 - **No multi-select in the Inbox**: "I hate the multi select thing, I will go one at a time."
 - **Delete goes to a Bin you can empty** (like the Mac's Trash): restore or empty from a Bin page.
 - Round-2 mockup file (for reference, not in repo): option IDs 1A–1C, 2A–2D, 3A–3C, 4A–4B.
