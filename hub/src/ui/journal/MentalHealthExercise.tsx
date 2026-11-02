@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseProgress,
   recordExerciseShown, saveExerciseMark, setExerciseStar, type CardsState, type ExerciseProgress, type ExerciseResponse,
@@ -6,7 +6,7 @@ import {
 import { addDays } from "../../domain/dates";
 import type { JournalKey } from "../../journal/crypto";
 import {
-  chapterLine, INVALID_CARD_FILE, moreParagraphs, parseCardFile, planExercise, replacingRestarts, upNext,
+  chapterLine, INVALID_CARD_FILE, moreParagraphs, parseCardFile, planExercise, replacingRestarts, sequence, upNext,
   type CardSet, type ExerciseCard,
 } from "../../journal/exercise";
 import type { ISODate } from "../../domain/types";
@@ -29,6 +29,9 @@ const SAVE_PROBLEM = "That didn't save. Try again.";
 /** In All cards, over a card's own responses. */
 export const YOUR_RESPONSES = "Your responses";
 const READ_PROBLEM = "The exercise cards couldn't be read. Try again.";
+/** Each book's title by track id (a set with one untitled book: none shown). */
+const TrackTitles = createContext<ReadonlyMap<string, string>>(new Map());
+
 /** A card file bigger than this isn't read at all (the real set is about 90 KB). */
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
 
@@ -134,9 +137,10 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   );
   const done = plan?.today.done ?? false;
   const restarts = asking && progress ? replacingRestarts(progress.marks, asking) : false;
+  const titles = useMemo(() => new Map((set?.tracks ?? []).filter((t) => t.title).map((t) => [t.id, t.title])), [set]);
 
   return (
-    <>
+    <TrackTitles.Provider value={titles}>
       {cards === null && <LoadLine guard={guard} />}
       {cards?.state === "none" && (
         <div className="exercise-empty">
@@ -210,7 +214,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       <PastExercises past={responses.filter((e) => e.date < today)} cards={set?.cards ?? []} />
       {plan && set && (
         <AllCards
-          cards={set.cards}
+          set={set}
           responses={responses}
           done={plan.doneThisRound}
           starred={starred}
@@ -247,7 +251,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
         </div>
       )}
       {problem && <p role="alert">{problem}</p>}
-    </>
+    </TrackTitles.Provider>
   );
 }
 
@@ -286,24 +290,24 @@ function ImportPill({ busy, onFile }: { busy: boolean; onFile: (f: File) => void
 }
 
 /**
- * A card's top: the "Day N" chip (Journal violet) and the theme, with the streak on the right
- * (today's card), then the small chapter line ("Chapter 1 · BPD 101"). An optional card has no
- * day chip.
+ * A card's top: the "Day N" chip (Journal violet), the theme and its format chip ("Table",
+ * "Tracker", …), with the streak on the right (today's card), then the small line with its book
+ * and chapter ("DBT skills workbook · Chapter 1 · …"). An optional card has no day chip.
  */
 function CardHead({ card, streak, round = 1 }: { card: ExerciseCard; streak?: RowStatus; round?: number }) {
-  const chapter = chapterLine(card);
+  const book = useContext(TrackTitles).get(card.track) ?? "";
+  const line = [book, chapterLine(card), round > 1 ? `Round ${round}` : ""].filter(Boolean).join(" · ");
   return (
     <div>
       <div className="exercise-head">
         <p className="exercise-day-line">
           {card.day !== null && !card.optional && <span className="chip exercise-day">{`Day ${card.day}`}</span>}{" "}
           <span className="exercise-theme">{card.theme}</span>
+          {card.format && <span className="chip exercise-format">{card.format}</span>}
         </p>
         {streak && <Streak n={streak.streak} week={streak.week} />}
       </div>
-      {(chapter || round > 1) && (
-        <p className="journal-muted exercise-chapter">{[chapter, round > 1 ? `Round ${round}` : ""].filter(Boolean).join(" · ")}</p>
-      )}
+      {line && <p className="journal-muted exercise-chapter">{line}</p>}
     </div>
   );
 }
@@ -442,13 +446,14 @@ function StarToggle({ on, disabled, onToggle }: { on: boolean; disabled: boolean
 
 /**
  * Every card, each opening to read: optional cards first ("Introduction (optional reading)"),
- * then the daily cards ("Day N · Theme", done this round, starred). A card she has answered
- * lists her responses under it (date and answers, read-only, newest first). Import lives here too.
+ * then the daily cards grouped by book, then chapter ("Day N · Theme", done this round,
+ * starred). A card she has answered lists her responses under it (date and answers, read-only,
+ * newest first). Import lives here too.
  */
 function AllCards({
-  cards, responses, done, starred, busy, onStar, onFile,
+  set, responses, done, starred, busy, onStar, onFile,
 }: {
-  cards: ExerciseCard[];
+  set: CardSet;
   responses: ExerciseResponse[];
   done: ReadonlySet<string>;
   starred: ReadonlySet<string>;
@@ -463,18 +468,24 @@ function AllCards({
       {open && (
         <>
           <ul className="journal-past" aria-label="All cards">
-            {cards.map((c) => (
-              <li key={c.id}>
-                <OneCard
-                  card={c}
-                  responses={responses.filter((e) => isFor(c, e))}
-                  done={done.has(c.id)}
-                  starred={starred.has(c.id)}
-                  busy={busy}
-                  onStar={onStar}
-                />
-              </li>
-            ))}
+            {grouped(set).map((g) =>
+              g.kind === "head" ? (
+                <li key={g.key} role="presentation" className={g.book ? "exercise-group-book" : "exercise-group-chapter journal-muted"}>
+                  {g.book ? <h3 className="exercise-label">{g.text}</h3> : g.text}
+                </li>
+              ) : (
+                <li key={g.card.id}>
+                  <OneCard
+                    card={g.card}
+                    responses={responses.filter((e) => isFor(g.card, e))}
+                    done={done.has(g.card.id)}
+                    starred={starred.has(g.card.id)}
+                    busy={busy}
+                    onStar={onStar}
+                  />
+                </li>
+              ),
+            )}
           </ul>
           <div className="exercise-reimport">
             <ImportPill busy={busy} onFile={onFile} />
@@ -483,6 +494,27 @@ function AllCards({
       )}
     </details>
   );
+}
+
+type Group = { kind: "head"; key: string; text: string; book: boolean } | { kind: "card"; card: ExerciseCard };
+
+/** All cards in order with their group headings: optional ones, then each book (titled) and its chapters. */
+function grouped(set: CardSet): Group[] {
+  const out: Group[] = set.cards.filter((c) => c.optional).map((card) => ({ kind: "card", card }));
+  const seq = sequence(set.cards);
+  for (const t of set.tracks) {
+    const mine = seq.filter((c) => c.track === t.id);
+    if (mine.length === 0) continue;
+    if (t.title) out.push({ kind: "head", key: `book|${t.id}`, text: t.title, book: true });
+    let chapter: string | null = null;
+    for (const card of mine) {
+      const line = chapterLine(card);
+      if (line && line !== chapter) out.push({ kind: "head", key: `ch|${t.id}|${card.id}`, text: line, book: false });
+      chapter = line;
+      out.push({ kind: "card", card });
+    }
+  }
+  return out;
 }
 
 function OneCard({

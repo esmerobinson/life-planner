@@ -54,7 +54,7 @@ export function checkinDoneDays(days: readonly CheckinDayLike[]): Set<ISODate> {
   return new Set(days.filter(checkedIn).map((d) => d.date));
 }
 
-/** The days a card was marked done (on any device). */
+/** The days a card was marked done, or a tracker day filled in (on any device). */
 export function exerciseDoneDays(marks: readonly ExerciseMark[]): Set<ISODate> {
-  return new Set(marks.filter((m) => m.done).map((m) => m.date));
+  return new Set(marks.filter((m) => m.done || m.logged).map((m) => m.date));
 }

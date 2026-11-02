@@ -29,12 +29,13 @@ export interface CardSource {
 }
 
 /** The kinds of answer a card can ask for (Journal v2 "parts"). */
-export const PART_KINDS = ["text", "list", "rating", "choice"] as const;
+export const PART_KINDS = ["text", "list", "rating", "choice", "table", "scale", "tracker", "chain"] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /**
  * One thing a card asks her to fill in: a text box, a numbered list of `count` lines, a 0–10
- * rating, or one of `options`.
+ * rating, one of `options`, a table (`columns` × `rows`), a scale (`min`..`max` with end
+ * labels), a tracker (`days` days, each with its `fields`), or a chain of `steps`.
  */
 export interface CardPart {
   prompt: string;
@@ -43,10 +44,26 @@ export interface CardPart {
   count?: number;
   /** A choice's options. */
   options?: string[];
+  /** A table's column headings and its rows. */
+  columns?: string[];
+  rows?: number;
+  /** A scale's ends and their labels. */
+  min?: number;
+  max?: number;
+  minLabel?: string;
+  maxLabel?: string;
+  /** A tracker's days and each day's fields. */
+  days?: number;
+  fields?: string[];
+  /** A chain's steps, in order. */
+  steps?: string[];
 }
 
-/** One part's answer: text → string; list → its lines; rating → 0..10 or null; choice → the option or null. */
-export type PartValue = string | string[] | number | null;
+/**
+ * One part's answer: text → string; list and chain → their lines; rating and scale → a number
+ * or null; choice → the option or null; table → rows of cells; tracker → days of fields.
+ */
+export type PartValue = string | string[] | string[][] | number | null;
 
 export interface ExerciseCard {
   /** Stable across re-imports ("day-N" for a version 1 file's card). */
@@ -72,6 +89,10 @@ export interface ExerciseCard {
   example: string;
   /** Her book has its own worked example (in `book`). */
   bookExample: boolean;
+  /** The exercise's format, shown as a small chip ("Table", "Scale", …); "" when none. */
+  format: string;
+  /** Its book (track) id; "" for a file without tracks. */
+  track: string;
   /** From a version 1 file: its responses keep the earlier (day and theme) row key. */
   legacy: boolean;
 }
@@ -79,12 +100,23 @@ export interface ExerciseCard {
 /** A sequence card always has a day. */
 export type SequenceCard = ExerciseCard & { day: number };
 
+/** One book of cards (a "track"); its days are numbered on their own from 1. */
+export interface CardTrack {
+  id: string;
+  title: string;
+}
+
 export interface CardSet {
   source: string;
   version: 1 | 2;
-  /** Optional cards first (in file order), then the sequence by day; ids and sequence days unique. */
+  /** The books, in order (the first is the default); one untitled track for a file without them. */
+  tracks: CardTrack[];
+  /** Optional cards first (in file order), then the sequence by track and day; ids, and days within a track, unique. */
   cards: ExerciseCard[];
 }
+
+/** A file without tracks has this one. */
+export const NO_TRACKS: CardTrack[] = [{ id: "", title: "" }];
 
 /** The most characters any one text in the file may have ("Read more" has its own limit). */
 export const MAX_CARD_FIELD = 2000;
@@ -100,6 +132,18 @@ export const MAX_LIST_COUNT = 30;
 export const MAX_OPTIONS = 12;
 export const MAX_OPTION = 200;
 export const MAX_EXAMPLE = 1500;
+export const MAX_COLUMNS = 6;
+export const MAX_COLUMN = 40;
+export const MAX_TABLE_ROWS = 20;
+export const MAX_SCALE_SPAN = 10;
+export const MAX_TRACKER_DAYS = 14;
+export const MAX_TRACKER_FIELDS = 4;
+export const MAX_CHAIN_STEPS = 10;
+export const MAX_FORMAT = 40;
+/** The most tracks (books) in one file, the longest track id and title. */
+export const MAX_TRACKS = 10;
+export const MAX_TRACK_ID = 50;
+export const MAX_TRACK_TITLE = 200;
 /** The longest card id. */
 export const MAX_CARD_ID = 100;
 /** Days run 1..MAX_CARD_DAY. */
@@ -153,6 +197,25 @@ function checkParts(v: unknown): CardPart[] | null {
       if (!Array.isArray(o) || o.length === 0 || o.length > MAX_OPTIONS || !o.every((x) => text(x, true, MAX_OPTION))) return null;
       if (new Set(o).size !== o.length) return null;
       out.push({ prompt: p.prompt, kind, options: o as string[] });
+    } else if (kind === "table") {
+      const c = p.columns;
+      if (!Array.isArray(c) || c.length === 0 || c.length > MAX_COLUMNS || !c.every((x) => text(x, true, MAX_COLUMN))) return null;
+      if (!intIn(p.rows, 1, MAX_TABLE_ROWS)) return null;
+      out.push({ prompt: p.prompt, kind, columns: c as string[], rows: p.rows as number });
+    } else if (kind === "scale") {
+      const { min, max } = p;
+      if (!intIn(min, -1000, 1000) || !intIn(max, -1000, 1000) || max <= min || max - min > MAX_SCALE_SPAN) return null;
+      if ((p.minLabel !== undefined && !text(p.minLabel, false, MAX_OPTION)) || (p.maxLabel !== undefined && !text(p.maxLabel, false, MAX_OPTION))) return null;
+      out.push({ prompt: p.prompt, kind, min, max, minLabel: (p.minLabel as string | undefined) ?? "", maxLabel: (p.maxLabel as string | undefined) ?? "" });
+    } else if (kind === "tracker") {
+      const f = p.fields;
+      if (!intIn(p.days, 1, MAX_TRACKER_DAYS)) return null;
+      if (!Array.isArray(f) || f.length === 0 || f.length > MAX_TRACKER_FIELDS || !f.every((x) => text(x, true, MAX_OPTION))) return null;
+      out.push({ prompt: p.prompt, kind, days: p.days as number, fields: f as string[] });
+    } else if (kind === "chain") {
+      const st = p.steps;
+      if (!Array.isArray(st) || st.length === 0 || st.length > MAX_CHAIN_STEPS || !st.every((x) => text(x, true, MAX_OPTION))) return null;
+      out.push({ prompt: p.prompt, kind, steps: st as string[] });
     } else {
       out.push({ prompt: p.prompt, kind });
     }
@@ -160,13 +223,39 @@ function checkParts(v: unknown): CardPart[] | null {
   return out;
 }
 
-/** Whether one part's answer is there in full (a list: every line). */
+const intIn = (v: unknown, lo: number, hi: number): v is number => Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi;
+const filledLine = (x: unknown) => typeof x === "string" && x.trim() !== "";
+const filledRow = (r: unknown, n: number) => Array.isArray(r) && r.length === n && r.every(filledLine);
+
+/** A table asks for every row, unless its prompt says "up to" (then the first row will do). */
+export const tableUpTo = (prompt: string): boolean => /\bup to\b/i.test(prompt);
+
+/** A tracker's days filled so far (every field of the day). */
+export function trackerDaysFilled(part: CardPart, value: PartValue | undefined): number {
+  if (!Array.isArray(value)) return 0;
+  return (value as unknown[]).filter((d) => filledRow(d, part.fields?.length ?? 0)).length;
+}
+
+/** Whether one part's answer is there in full (a list: every line; a tracker: every day). */
 export function partFilled(part: CardPart, value: PartValue | undefined): boolean {
   switch (part.kind) {
+    case "table": {
+      if (!Array.isArray(value) || value.length !== part.rows) return false;
+      const cols = part.columns?.length ?? 0;
+      const rows = value as unknown[];
+      if (tableUpTo(part.prompt)) return filledRow(rows[0], cols) && rows.every((r) => Array.isArray(r) && (filledRow(r, cols) || r.every((x) => !filledLine(x))));
+      return rows.every((r) => filledRow(r, cols));
+    }
+    case "scale":
+      return typeof value === "number" && Number.isInteger(value) && value >= part.min! && value <= part.max!;
+    case "tracker":
+      return Array.isArray(value) && value.length === part.days && trackerDaysFilled(part, value) === part.days;
+    case "chain":
+      return Array.isArray(value) && value.length === part.steps?.length && value.every(filledLine);
     case "text":
       return typeof value === "string" && value.trim() !== "";
     case "list":
-      return Array.isArray(value) && value.length === part.count && value.every((x) => x.trim() !== "");
+      return Array.isArray(value) && value.length === part.count && (value as unknown[]).every(filledLine);
     case "rating":
       return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 10;
     case "choice":
@@ -175,7 +264,26 @@ export function partFilled(part: CardPart, value: PartValue | undefined): boolea
 }
 
 /** The empty answer for a part. */
-export const emptyPart = (part: CardPart): PartValue => (part.kind === "text" ? "" : part.kind === "list" ? Array(part.count).fill("") : null);
+export function emptyPart(part: CardPart): PartValue {
+  const grid = (n: number, m: number) => Array.from({ length: n }, () => Array<string>(m).fill(""));
+  switch (part.kind) {
+    case "text":
+      return "";
+    case "list":
+      return Array<string>(part.count!).fill("");
+    case "chain":
+      return Array<string>(part.steps!.length).fill("");
+    case "table":
+      return grid(part.rows!, part.columns!.length);
+    case "tracker":
+      return grid(part.days!, part.fields!.length);
+    default:
+      return null;
+  }
+}
+
+/** A card with a tracker is done only once every day is filled; until then it is "in progress". */
+export const hasTracker = (card: { parts: CardPart[] }): boolean => card.parts.some((p) => p.kind === "tracker");
 
 /** The fields every version shares; null if any is wrong. */
 function checkBody(v: Record<string, unknown>) {
@@ -193,7 +301,7 @@ function checkV1Card(v: unknown): ExerciseCard | null {
   if (!body) return null;
   return {
     id: legacyCardId(v.day), day: v.day, chapter: null, chapterTitle: "", optional: false, ...body,
-    more: "", sources: [], parts: [], example: "", bookExample: false, legacy: true,
+    more: "", sources: [], parts: [], example: "", bookExample: false, format: "", track: "", legacy: true,
   };
 }
 
@@ -208,41 +316,76 @@ function checkV2Card(v: unknown): ExerciseCard | null {
   const parts = checkParts(v.parts);
   if (v.example !== undefined && !text(v.example, false, MAX_EXAMPLE)) return null;
   if (v.bookExample !== undefined && typeof v.bookExample !== "boolean") return null;
+  if (v.format !== undefined && !text(v.format, false, MAX_FORMAT)) return null;
+  if (v.track !== undefined && !validTrackId(v.track)) return null;
   const body = checkBody(v);
   if (!sources || !parts || !body) return null;
   return {
     id: v.id, day: day as number | null, chapter: v.chapter, chapterTitle: v.chapterTitle, optional: v.optional, ...body,
     more: (v.more as string | undefined) ?? "", sources, parts, example: (v.example as string | undefined) ?? "",
-    bookExample: v.bookExample === true, legacy: false,
+    bookExample: v.bookExample === true, format: (v.format as string | undefined) ?? "", track: (v.track as string | undefined) ?? "",
+    legacy: false,
   };
 }
 
-function checkCards(v: unknown, version: 1 | 2): ExerciseCard[] | null {
+const validTrackId = (v: unknown): v is string => isStr(v) && v.trim() !== "" && v.length <= MAX_TRACK_ID;
+
+/** The file's `tracks` (optional): ids unique; null if wrong. */
+function checkTracks(v: unknown): CardTrack[] | null | undefined {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v) || v.length === 0 || v.length > MAX_TRACKS) return null;
+  const out: CardTrack[] = [];
+  for (const t of v) {
+    if (!isObj(t) || !validTrackId(t.id) || !text(t.title, false, MAX_TRACK_TITLE) || out.some((o) => o.id === t.id)) return null;
+    out.push({ id: t.id, title: t.title });
+  }
+  return out;
+}
+
+/**
+ * The cards, checked, each on its track (a card without one is on the first), optional ones
+ * first, then by track and day. Without a `tracks` list the tracks are the ones the cards
+ * name, in order of first appearance (untitled).
+ */
+function checkCards(v: unknown, version: 1 | 2, declared: CardTrack[] | undefined): { cards: ExerciseCard[]; tracks: CardTrack[] } | null {
   if (!Array.isArray(v) || v.length === 0 || v.length > MAX_CARD_DAY) return null;
   const out: ExerciseCard[] = [];
   const ids = new Set<string>();
-  const days = new Set<number>();
   for (const c of v) {
     const card = version === 1 ? checkV1Card(c) : checkV2Card(c);
     if (!card || ids.has(card.id)) return null;
     ids.add(card.id);
-    if (!card.optional) {
-      if (days.has(card.day!)) return null;
-      days.add(card.day!);
-    }
     out.push(card);
   }
+  let tracks = declared;
+  if (!tracks) {
+    const named = [...new Set(out.map((c) => c.track).filter((t) => t !== ""))];
+    tracks = named.length ? named.map((id) => ({ id, title: "" })) : NO_TRACKS;
+  }
+  const order = new Map(tracks.map((t, i) => [t.id, i]));
+  const days = new Set<string>();
+  for (const card of out) {
+    if (card.track === "") card.track = tracks[0]!.id; // missing = the first track
+    if (!order.has(card.track)) return null;
+    if (card.optional) continue;
+    const key = `${card.track}|${card.day}`;
+    if (days.has(key)) return null;
+    days.add(key);
+  }
   if (days.size === 0) return null; // nothing to do day by day
-  return [...out.filter((c) => c.optional), ...out.filter((c) => !c.optional).sort((a, b) => a.day! - b.day!)];
+  const seq = out.filter((c) => !c.optional).sort((a, b) => order.get(a.track)! - order.get(b.track)! || a.day! - b.day!);
+  return { cards: [...out.filter((c) => c.optional), ...seq], tracks };
 }
 
-/** The import file (`{ app, kind, version: 1 | 2, source, cards }`), checked strictly; null if not. */
+/** The import file (`{ app, kind, version: 1 | 2, source, tracks?, cards }`), checked strictly; null if not. */
 export function checkCardFile(v: unknown): CardSet | null {
   if (!isObj(v) || v.app !== "esmeworld" || v.kind !== "exercise-cards") return null;
   if (v.version !== 1 && v.version !== 2) return null;
   if (!text(v.source, false)) return null;
-  const cards = checkCards(v.cards, v.version);
-  return cards ? { source: v.source, version: v.version, cards } : null;
+  const declared = v.version === 2 ? checkTracks(v.tracks) : undefined;
+  if (declared === null) return null;
+  const checked = checkCards(v.cards, v.version, declared);
+  return checked ? { source: v.source, version: v.version, tracks: checked.tracks, cards: checked.cards } : null;
 }
 
 /** A chosen file's text as a card set, or null. */
@@ -266,24 +409,33 @@ export function storedCards(set: CardSet): Record<string, unknown>[] {
       learn: c.learn, try: c.try, book: c.book, skill: c.skill, session: c.session,
       ...(c.more ? { more: c.more } : {}), ...(c.sources.length ? { sources: c.sources } : {}),
       ...(c.parts.length ? { parts: c.parts } : {}), ...(c.example ? { example: c.example } : {}),
-      ...(c.bookExample ? { bookExample: true } : {}),
+      ...(c.bookExample ? { bookExample: true } : {}), ...(c.format ? { format: c.format } : {}),
+      ...(c.track ? { track: c.track } : {}),
     };
   });
 }
+
+/** The tracks as stored: only a file's own list (none for one untitled track). */
+export const storedTracks = (set: CardSet): CardTrack[] | undefined =>
+  set.tracks.length === 1 && set.tracks[0]!.id === "" ? undefined : set.tracks;
 
 /**
  * A stored card set (after opening the sealed row), back as a set; null unless it is exactly
  * the shape this version writes (no field it doesn't know).
  */
-export function readStoredSet(version: unknown, source: unknown, cards: unknown): CardSet | null {
+export function readStoredSet(version: unknown, source: unknown, cards: unknown, tracks?: unknown): CardSet | null {
   if ((version !== 1 && version !== 2) || !Array.isArray(cards)) return null;
-  const known = version === 1 ? V1_KEYS : [...V2_KEYS, "more", "sources", "parts", "example", "bookExample"];
+  if (version === 1 && tracks !== undefined) return null;
+  const known = version === 1 ? V1_KEYS : [...V2_KEYS, "more", "sources", "parts", "example", "bookExample", "format", "track"];
   const exact = cards.every(
     (c) => isObj(c) && Object.keys(c).every((k) => known.includes(k)) && (version === 1 ? V1_KEYS : V2_KEYS).every((k) => k in c),
   );
   if (!exact) return null;
-  return checkCardFile({ app: "esmeworld", kind: "exercise-cards", version, source, cards });
+  return checkCardFile({ app: "esmeworld", kind: "exercise-cards", version, source, cards, ...(tracks === undefined ? {} : { tracks }) });
 }
+
+/** A card's book title, when the set has titled books ("" otherwise). */
+export const trackTitle = (set: CardSet, card: ExerciseCard): string => set.tracks.find((t) => t.id === card.track)?.title ?? "";
 
 /** "Chapter 1 · BPD 101" (or what there is of it); "" with no chapter. */
 export function chapterLine(card: ExerciseCard): string {
@@ -305,7 +457,8 @@ export function moreParagraphs(more: string): string[] {
 
 /**
  * One card's mark on one device for one day. `primary`: the device's card for the day (shown,
- * then perhaps done); otherwise a further card done that day ("Do the next one").
+ * then perhaps done); otherwise a further card done that day ("Do the next one"). `logged`: a
+ * tracker card's day was filled in (it counts for the day, but the card isn't done yet).
  */
 export interface ExerciseMark {
   date: ISODate;
@@ -313,6 +466,7 @@ export interface ExerciseMark {
   id: string;
   done: boolean;
   primary: boolean;
+  logged?: boolean;
 }
 
 export interface ExercisePlan {
@@ -330,11 +484,16 @@ export interface ExercisePlan {
   doneThisRound: ReadonlySet<string>;
   /** Every card done today (today's card and any further ones). */
   doneToday: ReadonlySet<string>;
+  /** Tracker cards started but not finished (they come back as today's card). */
+  inProgress: ReadonlySet<string>;
 }
 
-/** The daily sequence: the cards that aren't optional, by day. */
-export const sequence = (cards: ExerciseCard[]): SequenceCard[] =>
-  cards.filter((c): c is SequenceCard => !c.optional && c.day !== null).sort((a, b) => a.day - b.day);
+/** The daily sequence: the cards that aren't optional, by track, then day (as the set keeps them). */
+export const sequence = (cards: ExerciseCard[]): SequenceCard[] => {
+  const seq = cards.filter((c): c is SequenceCard => !c.optional && c.day !== null);
+  const tracks = [...new Set(seq.map((c) => c.track))];
+  return seq.sort((a, b) => tracks.indexOf(a.track) - tracks.indexOf(b.track) || a.day - b.day);
+};
 
 /** A round's order: round 1 by day; later rounds starred cards first, then the rest. */
 function order(cards: SequenceCard[], round: number, starred: ReadonlySet<string>): SequenceCard[] {
@@ -352,6 +511,29 @@ function advance(state: { round: number; done: Set<string> }, id: string, total:
   }
 }
 
+/**
+ * The next card, taking the books in turn (Journal v2, two books): after a card from one book,
+ * the lowest card not yet done of the next book that still has one (round-robin; a finished
+ * book is skipped). `last` is the book of the last card done (null: start with the first).
+ */
+function pick(
+  seq: SequenceCard[],
+  round: number,
+  starred: ReadonlySet<string>,
+  done: ReadonlySet<string>,
+  last: string | null,
+  exclude: ReadonlySet<string> = new Set(),
+): SequenceCard | null {
+  const tracks = [...new Set(seq.map((c) => c.track))];
+  const start = last === null ? 0 : (tracks.indexOf(last) + 1) % tracks.length;
+  for (let k = 0; k < tracks.length; k++) {
+    const t = tracks[(start + k) % tracks.length];
+    const c = order(seq.filter((x) => x.track === t), round, starred).find((x) => !done.has(x.id) && !exclude.has(x.id));
+    if (c) return c;
+  }
+  return null;
+}
+
 /** Today's card, the round, and what comes next, from every device's marks. */
 export function planExercise(
   cards: ExerciseCard[],
@@ -366,26 +548,47 @@ export function planExercise(
   const known = marks.filter((m) => byId.has(m.id));
   const bySeq = (a: { id: string }, b: { id: string }) => rank.get(a.id)! - rank.get(b.id)!;
 
-  // Every earlier day's done cards, oldest first, walked into rounds.
+  // Every earlier day's done cards, oldest first (in the order they were marked within a day),
+  // walked into rounds; the book of the last one sets whose turn it is.
   const earlier = new Map<string, { date: ISODate; id: string }>();
   for (const m of known) if (m.done && m.date < today) earlier.set(`${m.date}|${m.id}`, m);
   const state = { round: 1, done: new Set<string>() };
-  for (const m of [...earlier.values()].sort((a, b) => a.date.localeCompare(b.date) || bySeq(a, b))) {
+  let last: string | null = null;
+  for (const m of [...earlier.values()].sort((a, b) => a.date.localeCompare(b.date))) {
     advance(state, m.id, seq.length);
+    last = byId.get(m.id)!.track;
   }
-  const firstUndone = () => order(seq, state.round, starred).find((c) => !state.done.has(c.id)) ?? seq[0]!;
 
   const todays = known.filter((m) => m.date === today);
+  const doneToday = new Set(todays.filter((m) => m.done).map((m) => m.id));
+  // A tracker card logged since it was last done (and not done today) comes back as today's card.
+  const lastDone = new Map<string, ISODate>();
+  for (const m of known) if (m.done && (lastDone.get(m.id) ?? "") < m.date) lastDone.set(m.id, m.date);
+  const inProgress = new Set(
+    known.filter((m) => m.logged && m.date <= today && !doneToday.has(m.id) && m.date > (lastDone.get(m.id) ?? "")).map((m) => m.id),
+  );
   const primaries = todays.filter((m) => m.primary).sort(bySeq);
   const ticked = primaries.find((m) => m.done);
   const shown = ticked ?? primaries.find((m) => m.device === deviceId) ?? primaries[0];
-  const card = shown ? byId.get(shown.id)! : firstUndone();
-  const doneToday = new Set(todays.filter((m) => m.done).map((m) => m.id));
+  const resumed = [...inProgress].sort((a, b) => rank.get(a)! - rank.get(b)!)[0];
+  const card = shown ? byId.get(shown.id)! : resumed ? byId.get(resumed)! : (pick(seq, state.round, starred, state.done, last) ?? seq[0]!);
 
+  // What follows today's card: the turn passes on from the last card done today.
   const after = { round: state.round, done: new Set(state.done) };
   advance(after, card.id, seq.length);
-  for (const c of seq) if (doneToday.has(c.id) && c.id !== card.id) advance(after, c.id, seq.length);
-  const queue = order(seq, after.round, starred).filter((c) => !after.done.has(c.id) && c.id !== card.id);
+  let turn = card.track;
+  for (const m of todays) {
+    if (!m.done || m.id === card.id) continue;
+    advance(after, m.id, seq.length);
+    turn = byId.get(m.id)!.track;
+  }
+  const queue: SequenceCard[] = [];
+  const taken = new Set([card.id]);
+  for (let c = pick(seq, after.round, starred, after.done, turn, taken); c; c = pick(seq, after.round, starred, after.done, turn, taken)) {
+    queue.push(c);
+    taken.add(c.id);
+    turn = c.track;
+  }
   return {
     round: state.round,
     today: { card, done: doneToday.has(card.id) },
@@ -394,6 +597,7 @@ export function planExercise(
     queue,
     doneThisRound: new Set([...state.done, ...doneToday]),
     doneToday,
+    inProgress,
   };
 }
 

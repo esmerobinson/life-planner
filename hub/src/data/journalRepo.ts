@@ -26,7 +26,7 @@ import {
 } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import {
-  legacyCardId, mergeStars, readStoredSet, storedCards, type CardSet, type ExerciseCard, type ExerciseMark, type StarMark,
+  legacyCardId, mergeStars, readStoredSet, storedCards, storedTracks, tableUpTo, type CardSet, type ExerciseCard, type ExerciseMark, type StarMark,
 } from "../journal/exercise";
 import type { FileRow, ISODate, JournalKind, JournalRow } from "../domain/types";
 
@@ -363,7 +363,7 @@ export async function readExerciseCards(jk: JournalKey): Promise<CardsState> {
   if (!row) return { state: "none" };
   const o = await openRow(jk, row, "cards");
   if (o.state !== "ok") return { state: "unreadable" };
-  const set = readStoredSet(o.entry.v, o.entry.source, o.entry.cards);
+  const set = readStoredSet(o.entry.v, o.entry.source, o.entry.cards, o.entry.tracks);
   return set ? { state: "ok", set } : { state: "unreadable" };
 }
 
@@ -374,7 +374,8 @@ export async function readExerciseCards(jk: JournalKey): Promise<CardsState> {
  */
 export async function importExerciseCards(jk: JournalKey, set: CardSet, today: ISODate): Promise<void> {
   const id = journalId("cards", today);
-  const entry = { v: set.version, source: set.source, cards: storedCards(set), at: Date.now() };
+  const tracks = storedTracks(set);
+  const entry = { v: set.version, source: set.source, ...(tracks ? { tracks } : {}), cards: storedCards(set), at: Date.now() };
   const sealed = await sealJson(jk.key, entry, journalAad(id));
   if (sealed.ct.length > MAX_JOURNAL_CT) throw new Error(CARDS_TOO_BIG);
   const row: JournalRow = { id, kind: "cards", date: today, fp: jk.fp, ...sealed };
@@ -407,6 +408,7 @@ export async function readExerciseProgress(jk: JournalKey): Promise<ExerciseProg
       const device = suffixOf(row);
       marks.push({ date: row.date, device, id: e.v === 1 ? legacyCardId(e.day) : e.id, done: e.done, primary: true });
       if (e.v === 2) for (const id of e.also) marks.push({ date: row.date, device, id, done: true, primary: false });
+      if (e.v === 2) for (const id of e.logged ?? []) marks.push({ date: row.date, device, id, done: false, primary: false, logged: true });
     } else {
       const o = await openRow(jk, row, "stars");
       if (o.state !== "ok") unreadable++;
@@ -431,10 +433,12 @@ async function ownMarks(jk: JournalKey, date: ISODate, deviceId: string): Promis
  * This device's row for the day with one card marked: today's card (`todayId`) is the row's
  * own card; any other card done that day goes in `also`.
  */
-function marked(prev: ExerciseEntryV2 | null, todayId: string, cardId: string, done: boolean): ExerciseEntryV2 {
+function marked(prev: ExerciseEntryV2 | null, todayId: string, cardId: string, done: boolean, log = false): ExerciseEntryV2 {
   let id = prev?.id ?? todayId;
   let ownDone = prev?.done ?? false;
   let also = (prev?.also ?? []).filter((x) => x !== cardId);
+  const logged = (prev?.logged ?? []).filter((x) => x !== cardId);
+  if (log) return { v: 2, id, done: ownDone, also, logged: [...logged, cardId], at: Date.now() };
   if (cardId === todayId) {
     if (id !== todayId && ownDone) also = [...also.filter((x) => x !== id), id]; // the earlier card stays done
     id = todayId;
@@ -442,7 +446,7 @@ function marked(prev: ExerciseEntryV2 | null, todayId: string, cardId: string, d
   } else if (done) {
     also = [...also, cardId];
   }
-  return { v: 2, id, done: ownDone, also, at: Date.now() };
+  return { v: 2, id, done: ownDone, also, ...(logged.length ? { logged } : {}), at: Date.now() };
 }
 
 /** Marks today's card done or not on this device's own row for the day (further cards stay). */
@@ -507,18 +511,44 @@ export type { PartAnswer };
 /** What she wrote for a card: one text, or (a card with parts) each part's answer. */
 export type ResponseValue = string | PartAnswer[];
 
-/** One part's answer is there in full (a list: every line). */
+const line = (x: unknown) => typeof x === "string" && x.trim() !== "";
+const fullRow = (r: unknown) => Array.isArray(r) && r.length > 0 && r.every(line);
+const emptyRow = (r: unknown) => Array.isArray(r) && !r.some(line);
+
+/** One part's answer is there in full (a list or chain: every line; a table: every row, or the first for "up to"; a tracker: every day). */
 export function answerFilled(a: PartAnswer): boolean {
   const v = a.answer;
-  if (a.kind === "text") return typeof v === "string" && v.trim() !== "";
-  if (a.kind === "list") return Array.isArray(v) && v.length > 0 && v.every((x) => x.trim() !== "");
-  if (a.kind === "rating") return typeof v === "number";
-  return typeof v === "string" && v !== "";
+  switch (a.kind) {
+    case "text":
+      return line(v);
+    case "list":
+    case "chain":
+      return Array.isArray(v) && v.length > 0 && (v as unknown[]).every(line);
+    case "table":
+      if (!Array.isArray(v) || v.length === 0) return false;
+      return tableUpTo(a.prompt) ? fullRow(v[0]) && (v as unknown[]).every((r) => fullRow(r) || emptyRow(r)) : (v as unknown[]).every(fullRow);
+    case "tracker":
+      return Array.isArray(v) && v.length > 0 && (v as unknown[]).every(fullRow);
+    case "rating":
+    case "scale":
+      return typeof v === "number";
+    default:
+      return typeof v === "string" && v !== "";
+  }
 }
 
 /** Anything at all written or chosen (a draft worth keeping and showing). */
-const partStarted = (a: PartAnswer) =>
-  Array.isArray(a.answer) ? a.answer.some((x) => x.trim() !== "") : typeof a.answer === "string" ? a.answer.trim() !== "" : a.answer !== null;
+const started = (v: unknown): boolean => (Array.isArray(v) ? v.some(started) : typeof v === "string" ? v.trim() !== "" : v !== null);
+const partStarted = (a: PartAnswer) => started(a.answer);
+
+/**
+ * A card with a tracker, not finished: every other part filled and at least one tracker day
+ * filled in. It can be saved for the day ("logged") without the card being done.
+ */
+export const responseLoggable = (value: ResponseValue): boolean =>
+  typeof value !== "string" &&
+  value.some((a) => a.kind === "tracker") &&
+  value.every((a) => (a.kind === "tracker" ? Array.isArray(a.answer) && (a.answer as unknown[]).some(fullRow) : answerFilled(a)));
 const hasContent = (e: { text: string; parts?: PartAnswer[] | null }) => e.text.trim() !== "" || (e.parts ?? []).some(partStarted);
 
 /** Complete enough to submit: some text, or every part filled in. */
@@ -625,6 +655,41 @@ export async function submitExerciseEntry(
   const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
   const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
   await write(jk, [response, mark]);
+}
+
+/**
+ * A tracker card's day saved (Journal v2): this device's response row (submitted, so it shows
+ * "Saved") and, on its progress row, the card logged for the day (not done: it comes back
+ * tomorrow until every day is filled). The day counts on the Home row.
+ */
+export async function logExerciseEntry(
+  jk: JournalKey,
+  date: ISODate,
+  deviceId: string,
+  card: ExerciseCardRef,
+  value: ResponseValue,
+  todayId: string = card.id,
+): Promise<void> {
+  if (!responseLoggable(value)) throw new Error("There is nothing to save yet.");
+  const id = await entryRowId(jk, date, card, deviceId);
+  await ownResponse(jk, id);
+  const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, false, true);
+  const at = Date.now();
+  const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
+  const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
+  await write(jk, [response, mark]);
+}
+
+/**
+ * The newest response to a card on any day up to `date` (a tracker card carries its earlier
+ * days forward), or null.
+ */
+export async function readLatestExerciseEntry(jk: JournalKey, date: ISODate, card: ExerciseCardRef): Promise<ExerciseResponse | null> {
+  const key = `:${await cardKey(jk, card)}:`;
+  const rows = (await db.journal.where("kind").equals("exercise-entry").toArray()).filter((r) => r.date <= date && r.id.includes(key));
+  const { groups } = await openResponses(jk, rows);
+  const all = groups.map((g) => mergeResponses(g.date, g.entries)!).sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at);
+  return all[0] ?? null;
 }
 
 /**

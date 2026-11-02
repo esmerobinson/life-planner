@@ -7,7 +7,7 @@ import {
 import { journalId, MAX_JOURNAL_CT, validJournal } from "./validate";
 import { MAX_ROW_BYTES } from "../sync/engine";
 import { journalAad, sealJson, toBase64, type JournalKey } from "../journal/crypto";
-import { checkCardFile, MAX_CARD_FIELD, parseCardFile, type CardSet } from "../journal/exercise";
+import { checkCardFile, MAX_CARD_FIELD, NO_TRACKS, parseCardFile, type CardSet } from "../journal/exercise";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import { FAKE_CARD_FILE, FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
 
@@ -81,7 +81,7 @@ describe("cards", () => {
 
   it("re-importing replaces the whole set", async () => {
     await importExerciseCards(jk, SET, DAY);
-    const two: CardSet = { source: "Another pretend file", version: 1, cards: SET.cards.slice(0, 2) };
+    const two: CardSet = { source: "Another pretend file", version: 1, tracks: NO_TRACKS, cards: SET.cards.slice(0, 2) };
     await importExerciseCards(jk, two, "2026-10-31");
     expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: two });
     expect(await db.journal.where("kind").equals("cards").count()).toBe(1);
@@ -95,7 +95,7 @@ describe("cards", () => {
   it("a set too big for one synced row is refused with a plain message and nothing is stored", async () => {
     const big = "x".repeat(MAX_CARD_FIELD);
     const cards = Array.from({ length: 120 }, (_, i) => ({ ...SET.cards[0]!, day: i + 1, learn: big, try: big, book: big }));
-    await expect(importExerciseCards(jk, { source: "", version: 1, cards }, DAY)).rejects.toThrow(CARDS_TOO_BIG);
+    await expect(importExerciseCards(jk, { source: "", version: 1, tracks: NO_TRACKS, cards }, DAY)).rejects.toThrow(CARDS_TOO_BIG);
     expect(await db.journal.get("cards")).toBeUndefined();
   });
 

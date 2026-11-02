@@ -153,3 +153,60 @@ export const FAKE_CARD_FILE_V2 = {
 
 /** The version 2 fixture as the text of a file. */
 export const FAKE_CARD_TEXT_V2 = JSON.stringify(FAKE_CARD_FILE_V2);
+
+const pretendCard = (id: string, day: number, theme: string, extra: Record<string, unknown> = {}) => ({
+  id, day, chapter: 1, chapterTitle: "Pretend chapter", optional: false, theme,
+  learn: `A made-up note for ${theme}.`, try: `A made-up thing to try for ${theme}.`, book: "Pretend book, page 1", skill: "", session: false,
+  ...extra,
+});
+
+/**
+ * A FICTIONAL two-book card file (Journal v2 tracks): a pretend first book and a pretend second
+ * book, each numbered from Day 1, taken in turn. One card names no track (so it is the first's).
+ */
+export const FAKE_CARD_FILE_TRACKS = {
+  app: "esmeworld",
+  kind: "exercise-cards",
+  version: 2,
+  source: "Two pretend workbooks (test fixture)",
+  tracks: [
+    { id: "first", title: "Pretend first workbook" },
+    { id: "second", title: "Pretend second workbook" },
+  ],
+  cards: [
+    pretendCard("first-001", 1, "Pretend first one", { track: "first" }),
+    pretendCard("first-002", 2, "Pretend first two"), // no track: the first book
+    pretendCard("first-003", 3, "Pretend first three", { track: "first", chapter: 2, chapterTitle: "Pretend later chapter" }),
+    pretendCard("second-001", 1, "Pretend second one", { track: "second" }),
+    pretendCard("second-002", 2, "Pretend second two", { track: "second" }),
+  ],
+};
+
+/**
+ * A FICTIONAL file with one card of each newer part kind: a table, a scale, a tracker and a
+ * chain (each card's `format` names it). Every word is made up.
+ */
+export const FAKE_CARD_FILE_KINDS = {
+  app: "esmeworld",
+  kind: "exercise-cards",
+  version: 2,
+  source: "A pretend workbook of shapes (test fixture)",
+  cards: [
+    pretendCard("kinds-table", 1, "Pretend table", {
+      format: "Table",
+      parts: [{ prompt: "Pretend feelings and what set them off", kind: "table", columns: ["Feeling", "Set off by"], rows: 2 }],
+    }),
+    pretendCard("kinds-scale", 2, "Pretend scale", {
+      format: "Scale",
+      parts: [{ prompt: "How pretend-calm are you?", kind: "scale", min: 1, max: 5, minLabel: "Not at all", maxLabel: "Very" }],
+    }),
+    pretendCard("kinds-tracker", 3, "Pretend tracker", {
+      format: "Tracker",
+      parts: [{ prompt: "Pretend sleep log", kind: "tracker", days: 3, fields: ["Hours", "Mood"] }],
+    }),
+    pretendCard("kinds-chain", 4, "Pretend chain", {
+      format: "Chain",
+      parts: [{ prompt: "A pretend chain of events", kind: "chain", steps: ["What set it off", "What I felt", "What I did"] }],
+    }),
+  ],
+};

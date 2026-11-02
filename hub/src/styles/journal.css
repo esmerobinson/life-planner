@@ -546,6 +546,126 @@ input.exercise-list-line {
   box-sizing: border-box;
 }
 
+/* Tables, scales, trackers and chains (Journal v2 parts; builder's calls from existing values,
+   not yet seen by Esme). A table is a grid under its headings, its inputs filling the cells; on
+   the phone each row becomes its own --row card with the column names over the inputs (no
+   sideways scroll). A scale is the soft pills between its two muted end labels. A tracker is a
+   --row box per day, the day to fill now outlined in the Journal violet (as today is on the
+   calendar). A chain's steps are stacked with a small muted arrow between. The format chip is
+   the existing --row chip. */
+.exercise-table {
+  border-collapse: separate;
+  border-spacing: 6px;
+  margin: -6px;
+  width: calc(100% + 12px);
+  table-layout: fixed;
+}
+
+.exercise-table th {
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.exercise-table input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.is-phone .exercise-table,
+.is-phone .exercise-table tbody,
+.is-phone .exercise-table tr,
+.is-phone .exercise-table td {
+  display: block;
+  width: auto;
+  margin: 0;
+}
+
+.is-phone .exercise-table thead {
+  display: none;
+}
+
+.is-phone .exercise-table tr {
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.is-phone .exercise-table td + td {
+  margin-top: 8px;
+}
+
+.is-phone .exercise-table td::before {
+  content: attr(data-label);
+  display: block;
+  font-size: 13px;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
+.exercise-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.exercise-tracker,
+.exercise-chain {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exercise-tracker-day {
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exercise-tracker-day.is-now {
+  outline: 2px solid var(--journal-violet);
+}
+
+.exercise-tracker-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.exercise-tracker-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.exercise-chain li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.exercise-chain-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.exercise-chain-arrow {
+  align-self: center;
+}
+
+.chip.exercise-format {
+  margin-left: 4px;
+}
+
 /* Morning pages: "Add photo instead" left, "I'm done" right (the mockup's row). */
 .journal-write-actions {
   justify-content: space-between;

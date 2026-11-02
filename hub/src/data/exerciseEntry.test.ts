@@ -1,13 +1,14 @@
 import { vi } from "vitest";
 import { db } from "./db";
 import {
-  answerFilled, CANT_OPEN, cardRef, listExerciseEntries, responseComplete, type PartAnswer, NOT_CONFIRMED, readExerciseEntry, readExerciseProgress, recordExerciseShown,
+  answerFilled, CANT_OPEN, cardRef, listExerciseEntries, logExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable,
+  type PartAnswer, NOT_CONFIRMED, readExerciseEntry, readExerciseProgress, recordExerciseShown,
   saveExerciseDraft, submitExerciseEntry,
 } from "./repo";
 import { journalId, validJournal } from "./validate";
 import { exerciseCardIdKey, exerciseCardKey, journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
 import { parseCardFile } from "../journal/exercise";
-import { FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
+import { FAKE_CARD_FILE_KINDS, FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 
 // The exercise response (journal polish brief §1–2): her written response to today's card is
@@ -207,6 +208,42 @@ describe("version 2 cards (Journal v2): by card id", () => {
   it("Past exercises carry the card id", async () => {
     await submitExerciseEntry(jk, "2026-10-29", ME, weather, "Pretend yesterday");
     expect((await listExerciseEntries(jk, DAY)).entries.map((e) => [e.id, e.day, e.theme])).toEqual([[weather.id, 1, "Pretend weather"]]);
+  });
+});
+
+describe("a tracker card, a day at a time", () => {
+  const KINDS = parseCardFile(JSON.stringify(FAKE_CARD_FILE_KINDS))!.cards;
+  const tracker = cardRef(KINDS[2]!);
+  const log = (days: string[][]): PartAnswer[] => [{ prompt: "Pretend sleep log", kind: "tracker", answer: days }];
+
+  it("saving a day logs the card for the day (it counts) without marking it done; complete, it is submitted", async () => {
+    expect(responseLoggable(log([["", ""], ["", ""], ["", ""]]))).toBe(false);
+    expect(responseLoggable(log([["7", "ok"], ["", ""], ["", ""]]))).toBe(true);
+    await logExerciseEntry(jk, "2026-10-29", ME, tracker, log([["7", "ok"], ["", ""], ["", ""]]));
+    expect((await readExerciseProgress(jk)).marks).toEqual([
+      { date: "2026-10-29", device: ME, id: tracker.id, done: false, primary: true },
+      { date: "2026-10-29", device: ME, id: tracker.id, done: false, primary: false, logged: true },
+    ]);
+    // The next day starts from what was saved.
+    expect((await readLatestExerciseEntry(jk, DAY, tracker))!.parts![0]!.answer).toEqual([["7", "ok"], ["", ""], ["", ""]]);
+    await expect(submitExerciseEntry(jk, DAY, ME, tracker, log([["7", "ok"], ["8", ""], ["", ""]]))).rejects.toThrow();
+    await submitExerciseEntry(jk, DAY, ME, tracker, log([["7", "ok"], ["8", "good"], ["6", "fine"]]));
+    expect((await readExerciseProgress(jk)).marks.filter((m) => m.date === DAY)).toEqual([
+      { date: DAY, device: ME, id: tracker.id, done: true, primary: true },
+    ]);
+  });
+
+  it("table, scale and chain answers are sealed in the same rows and read back", async () => {
+    const [table, scale, , chain] = KINDS.map(cardRef);
+    await submitExerciseEntry(jk, DAY, ME, table!, [{ prompt: "Pretend feelings and what set them off", kind: "table", answer: [["a", "b"], ["c", "d"]] }]);
+    await submitExerciseEntry(jk, DAY, ME, scale!, [{ prompt: "How pretend-calm are you?", kind: "scale", answer: 4 }], table!.id);
+    await submitExerciseEntry(jk, DAY, ME, chain!, [{ prompt: "A pretend chain of events", kind: "chain", answer: ["x", "y", "z"] }], table!.id);
+    expect((await readExerciseEntry(jk, DAY, table!)).entry!.parts![0]!.answer).toEqual([["a", "b"], ["c", "d"]]);
+    expect((await readExerciseEntry(jk, DAY, scale!)).entry!.parts![0]!.answer).toBe(4);
+    expect((await readExerciseEntry(jk, DAY, chain!)).entry!.parts![0]!.answer).toEqual(["x", "y", "z"]);
+    await expect(
+      submitExerciseEntry(jk, DAY, ME, chain!, [{ prompt: "A pretend chain of events", kind: "chain", answer: ["x", "", "z"] }]),
+    ).rejects.toThrow();
   });
 });
 

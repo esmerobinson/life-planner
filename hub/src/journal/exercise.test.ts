@@ -30,7 +30,7 @@ describe("parseCardFile, version 1 (still accepted)", () => {
     expect(set.cards.map((c) => c.day)).toEqual([1, 2, 3, 4, 5]);
     expect(set.cards.map((c) => c.id)).toEqual(["day-1", "day-2", "day-3", "day-4", "day-5"]);
     expect(set.cards[0]).toEqual({
-      ...FAKE_CARD_FILE.cards[0], id: "day-1", chapter: null, chapterTitle: "", optional: false, more: "", sources: [], parts: [], example: "", bookExample: false,
+      ...FAKE_CARD_FILE.cards[0], id: "day-1", chapter: null, chapterTitle: "", optional: false, more: "", sources: [], parts: [], example: "", bookExample: false, format: "", track: "",
       legacy: true,
     });
     expect(parseCardFile(FAKE_CARD_TEXT)).toEqual(checkCardFile(FAKE_CARD_FILE));

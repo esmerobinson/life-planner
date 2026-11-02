@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CANT_OPEN, listCheckinDays, listExerciseEntries, listReadBack, morningOpensOn, readMorningPage,
+  CANT_OPEN, listCheckinDays, listExerciseEntries, listReadBack, morningOpensOn, readExerciseCards, readMorningPage,
   type CheckinDay, type ExerciseResponse, type MorningText,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
@@ -16,7 +16,7 @@ export const READ_BACK_LINE = "Your past exercise responses, check-ins and morni
 export const NOTHING_YET = "Nothing to read back yet.";
 
 type Item =
-  | { kind: "exercise"; date: ISODate; entry: ExerciseResponse }
+  | { kind: "exercise"; date: ISODate; entry: ExerciseResponse; book: string }
   | { kind: "checkin"; date: ISODate; day: CheckinDay }
   | { kind: "page"; date: ISODate; id: string; n: number };
 
@@ -37,15 +37,22 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const [exercises, checkins, pages] = await Promise.all([
+      const [exercises, checkins, pages, cards] = await Promise.all([
         listExerciseEntries(jk, addDays(today, 1)),
         listCheckinDays(jk),
         listReadBack(),
+        readExerciseCards(jk),
       ]);
+      // Each response's book (two books of cards), by card id.
+      const books = new Map<string, string>();
+      if (cards.state === "ok") {
+        const titles = new Map(cards.set.tracks.map((t) => [t.id, t.title]));
+        for (const c of cards.set.cards) if (titles.get(c.track)) books.set(c.id, titles.get(c.track)!);
+      }
       if (id !== latest.current) return;
       const pageCount = new Map<ISODate, number>();
       const list: Item[] = [
-        ...exercises.entries.map((entry): Item => ({ kind: "exercise", date: entry.date, entry })),
+        ...exercises.entries.map((entry): Item => ({ kind: "exercise", date: entry.date, entry, book: books.get(entry.id) ?? "" })),
         ...checkins
           .filter((d) => [...d.answers.values()].some((a) => a.answer !== null || a.done))
           .map((day): Item => ({ kind: "checkin", date: day.date, day })),
@@ -90,7 +97,7 @@ function ReadBackItem({ jk, item, today }: { jk: JournalKey; item: Item; today: 
   const date = longDate(item.date);
   if (item.kind === "exercise") {
     const e = item.entry;
-    const card = e.day !== null ? `Day ${e.day} · ${e.theme}` : e.theme;
+    const card = [item.book, e.day !== null ? `Day ${e.day}` : "", e.theme].filter(Boolean).join(" · ");
     return (
       <details>
         <summary>{`${date} · Exercise · ${card}`}</summary>
