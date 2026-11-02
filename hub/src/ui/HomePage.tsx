@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { Link } from "react-router-dom";
 import { setGoalOnHome } from "../data/repo";
+import { useAddDefaults } from "./addContext";
 import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR, NAV } from "./areas";
@@ -14,6 +15,7 @@ import { TodayPanel } from "./TodayPanel";
 import { useHubData } from "./useHubData";
 
 export function HomePage({ today }: { today: ISODate }) {
+  useAddDefaults("task", "inbox"); // Home: Add opens as a to-do (in the inbox, as before)
   return usePhone() ? <PhoneHome today={today} /> : <DesktopHome today={today} />;
 }
 

@@ -5,6 +5,7 @@ import { usePhone } from "./usePhone";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
+import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addContext";
 import { QuickAdd } from "./QuickAdd";
 import { ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
@@ -25,6 +26,9 @@ export function AppShell() {
   const today = todayISO();
   const { items, goals, refresh } = useHubData(today);
   const [adding, setAdding] = useState(false);
+  // Where Add opens pre-set, as the current page says (addContext.ts); read when it opens.
+  const [addDefaults, setAddDefaults] = useState<AddDefaults | null>(null);
+  const [addOpened, setAddOpened] = useState(0);
   const [version, setVersion] = useState(0);
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
   const unsorted = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
@@ -85,6 +89,7 @@ export function AppShell() {
 
   return (
     <ShellContext.Provider value={ctx}>
+      <AddDefaultsContext.Provider value={setAddDefaults}>
       <PanelProvider>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
@@ -93,18 +98,33 @@ export function AppShell() {
           <UpdatePrompt />
           <DbClosedNotice db={db} />
           <div className="shell-actions">
-            <button type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>
+            <button
+              type="button"
+              aria-expanded={adding}
+              onClick={() => {
+                if (!adding) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
+                setAdding(!adding);
+              }}
+            >
               Add
             </button>
             {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import. */}
             {!phone && <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>}
           </div>
-          {adding && <QuickAdd today={today} onAdded={() => void changed()} />}
+          {adding && (
+            <QuickAdd
+              key={addOpened}
+              today={today}
+              defaults={addDefaults ?? BASE_ADD_DEFAULTS}
+              onAdded={() => void changed()}
+            />
+          )}
           <Outlet />
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
         </main>
       </div>
       </PanelProvider>
+      </AddDefaultsContext.Provider>
     </ShellContext.Provider>
   );
 }

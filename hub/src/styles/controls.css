@@ -179,6 +179,12 @@ legend {
   min-width: 0;
 }
 
+/* The Add form's Notes box grows with its text (2026-11-02); otherwise the textarea look above. */
+textarea.quick-add-notes {
+  resize: none;
+  overflow: hidden;
+}
+
 .btn-group {
   display: flex;
   flex-wrap: wrap;

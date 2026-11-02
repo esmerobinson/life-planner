@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createItem, deleteItem, getItem, listItems, putItemBack, restoreItem } from "../data/repo";
 import type { ISODate, Item } from "../domain/types";
+import { useAddDefaults } from "./addContext";
 import { UndoLine } from "./DeleteButton";
 import { InboxRow } from "./InboxRow";
 import { INBOX_SOURCES, inboxOrder, inboxSource, type InboxSource } from "./inboxSource";
@@ -13,6 +14,8 @@ import { useHubData } from "./useHubData";
 export function InboxPage({ today }: { today: ISODate }) {
   const { items, refresh, loaded, error } = useHubData(today);
   const shell = useContext(ShellContext);
+  // Add opens as Inbox capture works: into the inbox, no type chosen yet (stored as a to-do).
+  useAddDefaults("task", "inbox");
   // The same order as Sort one by one (oldest first).
   const inbox = inboxOrder(items.filter((i) => i.areaId === "inbox" && i.status === "open"));
 

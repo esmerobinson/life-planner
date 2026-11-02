@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useShellToday } from "./ui/shellContext";
+import { useAddDefaults } from "./ui/addContext";
 import { AppShell } from "./ui/AppShell";
 import { NAV } from "./ui/areas";
 import { AreaPage } from "./ui/AreaPage";
@@ -15,6 +16,8 @@ import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
 
 function TodayRoute() {
+  // Today's Add opens as a to-do. It never pinned to today, so it still does not.
+  useAddDefaults("task", "inbox");
   return <TodayPanel today={useShellToday()} />;
 }
 

@@ -274,7 +274,7 @@ export function ItemPanel({
 }
 
 /** A textarea that is always as tall as its text (also when the panel is resized). */
-function useGrow(value: string) {
+export function useGrow(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;

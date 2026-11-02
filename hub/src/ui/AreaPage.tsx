@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { listItems, restoreItem, untickItem } from "../data/repo";
 import { doneToday, HABIT_WORDS, isHabit, sessions } from "../domain/habits";
 import type { ISODate, Item } from "../domain/types";
+import { useAddDefaults } from "./addContext";
 import { REPEAT_GLYPH } from "./IconPopover";
 import { ProgressBar } from "./ProgressBar";
 import { GOAL_AREAS } from "./areas";
@@ -31,6 +32,8 @@ export function AreaPage({ today }: { today: ISODate }) {
   const [archived, setArchived] = useState<Item[]>([]);
   const [archiveFailed, setArchiveFailed] = useState(false);
   const shell = useContext(ShellContext);
+  // Add opens in this area, as the filter shown (All: a to-do).
+  useAddDefaults(view === "ideas" ? "idea" : view === "goals" ? "goal" : "task", area?.id);
 
   // Archived items are not in useHubData; re-read whenever the open items change.
   const id = area?.id;
