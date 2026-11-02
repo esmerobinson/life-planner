@@ -326,7 +326,7 @@ describe("the goal panel (Edit)", () => {
       await userEvent.clear(title);
       await userEvent.type(title, "Renamed sessions");
       await userEvent.tab(); // saves when left
-      const target = p.getByLabelText("Target for Renamed sessions");
+      const target = await p.findByLabelText("Target for Renamed sessions");
       await userEvent.clear(target);
       await userEvent.type(target, "9");
       await userEvent.tab();
