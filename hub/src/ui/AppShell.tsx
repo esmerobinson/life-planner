@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { PhoneTopBar, phoneTitle } from "./PhoneTopBar";
 import { usePhone } from "./usePhone";
@@ -29,6 +29,7 @@ export function AppShell() {
   // Where Add opens pre-set, as the current page says (addContext.ts); read when it opens.
   const [addDefaults, setAddDefaults] = useState<AddDefaults | null>(null);
   const [addOpened, setAddOpened] = useState(0);
+  const addButton = useRef<HTMLButtonElement>(null);
   const [version, setVersion] = useState(0);
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
   const unsorted = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
@@ -101,6 +102,7 @@ export function AppShell() {
           <DbClosedNotice db={db} />
           <div className="shell-actions">
             <button
+              ref={addButton}
               type="button"
               aria-expanded={adding}
               onClick={() => {
@@ -120,6 +122,7 @@ export function AppShell() {
               defaults={addDefaults ?? BASE_ADD_DEFAULTS}
               onAdded={() => {
                 setAdding(false); // saved: the form goes away (a failed save never reaches here)
+                addButton.current?.focus(); // the focused "Add item" button is leaving: focus goes back to Add
                 void changed();
               }}
             />

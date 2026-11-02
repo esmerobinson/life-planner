@@ -393,6 +393,7 @@ describe("the goal panel (Edit)", () => {
       await userEvent.click(form.getByRole("button", { name: "Step" }));
       await userEvent.click(form.getByRole("button", { name: "Add" }));
       await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toHaveLength(4));
+      await vi.waitFor(() => expect(p.queryByRole("form", { name: /^Add an? \w+ goal$/ })).toBeNull()); // its own Cancel is gone
       await userEvent.click(p.getByRole("button", { name: "Cancel" }));
       await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toEqual(withMonth().monthGoals));
     });

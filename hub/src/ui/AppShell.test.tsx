@@ -75,6 +75,7 @@ describe("AppShell", () => {
     expect(await screen.findByRole("list", { name: "Today" })).toHaveTextContent("Water the ferns");
     expect(screen.queryByLabelText("Title")).toBeNull();
     expect(addBtn).toHaveAttribute("aria-expanded", "false");
+    expect(addBtn).toHaveFocus(); // the focused "Add item" button went away: focus goes back to Add
   });
 
   it("a failed validation keeps the Add form open with what was typed", async () => {
