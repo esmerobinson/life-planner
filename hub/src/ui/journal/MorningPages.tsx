@@ -12,7 +12,7 @@ import { ProgressBar } from "../ProgressBar";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { rowStatus } from "../../journal/rows";
 import { DoneBox, longDate, monthLabel, Star } from "./bits";
-import { JournalStripHead } from "./JournalStrip";
+import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 const NO_DAYS: ReadonlySet<ISODate> = new Set();
@@ -78,7 +78,7 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const row = rowStatus(done ?? NO_DAYS, today);
   return (
     <section className="journal-card" aria-labelledby="morning-pages" id="morning-pages-section">
-      <JournalStripHead id="morning-pages" title="Morning pages" {...row} meta={longDate(today)} />
+      <JournalStripHead id="morning-pages" title="Morning pages" tick={tickState(done ? row.done : undefined)} streak={row.streak} meta={longDate(today)} />
       {done === null ? null : writing ? (
         <WritingView
           jk={jk}

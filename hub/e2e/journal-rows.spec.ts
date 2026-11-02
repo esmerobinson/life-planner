@@ -10,6 +10,7 @@ import { pageDate } from "./helpers";
 
 const PASS = "fake-journal-e2e-passphrase";
 const MINT = "rgb(163, 213, 194)"; // #a3d5c2
+const TEXT = "rgb(58, 65, 47)"; // --text #3a412f
 
 async function shoot(page: Page, name: string, fullPage = true) {
   const dir = process.env.SHOTS_DIR;
@@ -81,6 +82,8 @@ async function homeRows(page: Page, prefix: string) {
     expect(await row(page, t).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(MINT);
   }
   await expect(morning.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+  await expect(morning.getByRole("checkbox")).toHaveText("✓"); // controller call: visible on mint
+  expect(await morning.locator(".tick-auto").evaluate((el) => getComputedStyle(el).color)).toBe(TEXT);
   await expect(morning.locator(".journal-row-streak")).toHaveText(/^\s*7\s*7 days in a row$/);
   await expect(morning.getByText("7 days in a row")).toBeAttached();
   const checkin = row(page, "Daily check-in");
@@ -162,7 +165,9 @@ test.describe("at 1280px", () => {
   test("locked: the rows still show, unticked, and open the Journal to unlock", async ({ page }) => {
     await page.goto("/");
     await expect(journal(page).locator("li.journal-row")).toHaveCount(3);
-    await expect(journal(page).getByRole("checkbox", { checked: true })).toHaveCount(0);
+    // Unknown, not "not done": no checkboxes, three empty boxes that say why.
+    await expect(journal(page).getByRole("img", { name: "Not available until the journal is unlocked" })).toHaveCount(3);
+    await expect(journal(page).getByRole("checkbox")).toHaveCount(0);
     await expect(journal(page).locator(".journal-row-streak")).toHaveCount(0);
     await row(page, "Morning pages").getByRole("button", { name: "Morning pages" }).click();
     await expect(page).toHaveURL(/\/journal#morning-pages$/);

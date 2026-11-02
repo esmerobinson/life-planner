@@ -10,7 +10,7 @@ import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
 import { checkinDoneDays, rowStatus } from "../../journal/rows";
 import { DoneBox, longDate, PromptText } from "./bits";
-import { JournalStripHead } from "./JournalStrip";
+import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
@@ -82,7 +82,7 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
   const row = useMemo(() => rowStatus(checkinDoneDays(day ? [day, ...past] : past), today), [day, past, today]);
   return (
     <section className="journal-card" aria-labelledby="daily-check-in" id="daily-check-in-section">
-      <JournalStripHead id="daily-check-in" title="Daily check-in" {...row} meta="Today's three questions · 🔒 private" />
+      <JournalStripHead id="daily-check-in" title="Daily check-in" tick={tickState(day ? row.done : undefined)} streak={row.streak} meta="Today's three questions · 🔒 private" />
       {day && day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
       {day && day.prompts.length === 0 && <p>No questions are switched on. Choose some under Choose questions.</p>}
       {day && day.prompts.length > 0 &&

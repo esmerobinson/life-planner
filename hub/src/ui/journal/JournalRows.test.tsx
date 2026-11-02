@@ -10,7 +10,7 @@ import { checkCardFile } from "../../journal/exercise";
 import { FAKE_CARD_FILE } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { currentUrl, renderApp } from "../../test/renderApp";
-import { TICKS_ITSELF } from "./JournalStrip";
+import { LOADING, NOT_AVAILABLE, ReadOnlyTick, TICKS_ITSELF } from "./JournalStrip";
 
 // The Journal rows (VISUAL-LANGUAGE.md "Journal rows (2026-11-02)"): three mint strips on Home
 // whose ticks tick themselves, with "★ N" streaks, and the same strips heading the Journal's
@@ -64,6 +64,39 @@ async function someDone() {
   await saveExerciseMark(jk, TODAY, OTHER_DEVICE, 1, true);
 }
 
+describe("the read-only tick's states", () => {
+  it("done: a checked, disabled checkbox showing the ✓ glyph", () => {
+    render(<ReadOnlyTick state="done" title="Morning pages" />);
+    const box = screen.getByRole("checkbox", { name: "Morning pages done today" });
+    expect(box).toHaveAttribute("aria-checked", "true");
+    expect(box).toHaveClass("tick-auto", "is-done");
+    expect(box).toHaveTextContent("✓");
+  });
+
+  it("not done yet: an unchecked, disabled checkbox with no glyph", () => {
+    render(<ReadOnlyTick state="todo" title="Morning pages" />);
+    const box = screen.getByRole("checkbox", { name: "Morning pages done today" });
+    expect(box).toHaveAttribute("aria-checked", "false");
+    expect(box).toHaveTextContent("");
+  });
+
+  it("locked: no checkbox (never a false 'not done'); the empty box says why", () => {
+    render(<ReadOnlyTick state="locked" title="Morning pages" />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const box = screen.getByRole("img", { name: NOT_AVAILABLE });
+    expect(box).toHaveClass("tick-auto");
+    expect(box).toHaveAttribute("title", NOT_AVAILABLE);
+  });
+
+  it("loading: no box at all yet (so nothing pops from unticked to ticked), only its space", () => {
+    render(<ReadOnlyTick state="loading" title="Morning pages" />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const space = screen.getByRole("img", { name: LOADING });
+    expect(space).toHaveClass("tick-auto-space");
+    expect(space).not.toHaveClass("tick-auto");
+  });
+});
+
 describe("Home Journal rows", () => {
   it("locked (not set up here): three mint strips, no ticks, no streaks, nothing written", async () => {
     await db.journal.put(await verifierRow(jk));
@@ -74,8 +107,11 @@ describe("Home Journal rows", () => {
     for (const t of titles) {
       const r = await row(t);
       expect(r).toHaveClass("strip", "journal-row");
-      expect(tick(r)).toHaveAttribute("aria-checked", "false");
+      // Not "not done": unknown. No checkbox at all, just the empty box, labelled as such.
+      await waitFor(() => expect(within(r).getByRole("img", { name: NOT_AVAILABLE })).toHaveClass("tick-auto"));
+      expect(within(r).queryByRole("checkbox")).toBeNull();
     }
+    expect(within(c).queryAllByRole("checkbox")).toHaveLength(0);
     expect(within(c).getAllByRole("listitem")).toHaveLength(3);
     expect(c.querySelector(".journal-row-streak")).toBeNull();
     expect(c.querySelectorAll(".strip-meta")).toHaveLength(0);
@@ -86,7 +122,7 @@ describe("Home Journal rows", () => {
     await someDone();
     renderApp("/", TODAY);
     const r = await row("Daily check-in");
-    const box = tick(r);
+    const box = await within(r).findByRole("checkbox"); // once known (no box while loading)
     expect(box).toHaveAttribute("aria-disabled", "true");
     expect(box).toHaveAttribute("title", TICKS_ITSELF);
     expect(box).not.toHaveAttribute("tabindex");
@@ -125,7 +161,7 @@ describe("Home Journal rows", () => {
     const morning = await row("Morning pages");
     await waitFor(() => expect(screen.getByRole("region", { name: "Journal" })).toBeInTheDocument());
     expect(morning.querySelector(".journal-row-streak")).toBeNull();
-    expect(tick(morning)).toHaveAttribute("aria-checked", "false");
+    expect(await within(morning).findByRole("checkbox")).toHaveAttribute("aria-checked", "false");
   });
 
   it.each([

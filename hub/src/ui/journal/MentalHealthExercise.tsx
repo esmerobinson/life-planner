@@ -10,7 +10,7 @@ import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { exerciseDoneDays, rowStatus } from "../../journal/rows";
 import { longDate, PromptText } from "./bits";
-import { JournalStripHead } from "./JournalStrip";
+import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** Under today's card once it is ticked. */
@@ -108,7 +108,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
 
   return (
     <section className="journal-card" aria-labelledby="mental-health-exercise" id="mental-health-exercise-section">
-      <JournalStripHead id="mental-health-exercise" title="Mental health exercise" {...row} meta={sub} />
+      <JournalStripHead id="mental-health-exercise" title="Mental health exercise" tick={tickState(progress ? row.done : undefined)} streak={row.streak} meta={sub} />
       {cards?.state === "none" && (
         <div className="exercise-empty">
           <p>Add your exercise cards</p>
