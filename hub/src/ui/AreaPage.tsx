@@ -86,6 +86,8 @@ export function AreaPage({ today }: { today: ISODate }) {
   return (
     <section className="area-page">
       <h1>{area.label}</h1>
+      {/* The month box: at the top of every area page, directly under the h1 (2026-11-02). */}
+      {loaded && <MonthProgress areaId={area.id} items={items} today={today} />}
       {habits.length > 0 && (
         <section className="habits" aria-labelledby="habits-heading">
           <h2 className="habits-head" id="habits-heading">
@@ -172,7 +174,6 @@ export function AreaPage({ today }: { today: ISODate }) {
           </ul>
         </section>
       )}
-      {loaded && <MonthProgress areaId={area.id} items={items} today={today} />}
       <h2>Archive</h2>
       {archiveFailed ? (
         <p>{DATA_ERROR}</p>
