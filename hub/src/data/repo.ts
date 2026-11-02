@@ -1,11 +1,15 @@
 import { db } from "./db";
-import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "./validate";
+import { MAX_GOAL_NOTES, MAX_GOAL_TEXT, MAX_MONTH_GOALS, MAX_MONTH_LOG, MAX_MONTH_TARGET, MAX_MONTH_TITLE } from "./validate";
 import { pictureIds } from "../domain/page";
-import { addDays, isValidISODate, mondayOf } from "../domain/dates";
+import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
+import { daysInMonth, plannedFromLastMonth } from "../domain/goalCounts";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
 import { milestoneTask } from "../domain/milestones";
+import { SUGGESTED_GOALS, suggestedGoalRow } from "../domain/suggestedGoals";
 export * from "./journalRepo";
-import { AREA_IDS, type AreaId, type FileRow, type Goal, type ISODate, type Item, type Milestone } from "../domain/types";
+import {
+  AREA_IDS, type AreaId, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
+} from "../domain/types";
 
 export async function createItem(
   input: Omit<Item, "id" | "status" | "links" | "createdAt" | "touchedAt"> & { links?: string[] },
@@ -61,6 +65,10 @@ export interface GoalPatch {
   why?: string | undefined;
   cadence?: string | undefined;
   notes?: string | undefined;
+  /** "daily" makes it a daily goal (and a practice); undefined takes that off. */
+  rhythm?: "daily" | undefined;
+  /** What counts for it by itself; an empty list or undefined removes the field. */
+  countsFrom?: CountSource[] | undefined;
 }
 
 /**
@@ -88,6 +96,7 @@ export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate):
       if (patch.kind !== "finite" && patch.kind !== "practice") throw new Error("a goal is finite or practice");
       next.kind = patch.kind;
       if (patch.kind === "practice") delete next.deadline;
+      if (patch.kind === "finite" && patch.rhythm !== "daily") delete next.rhythm; // a daily goal is a practice
     }
     for (const key of ["why", "cadence", "notes"] as const) {
       if (!(key in patch)) continue;
@@ -109,6 +118,24 @@ export async function updateGoal(id: string, patch: GoalPatch, _today: ISODate):
       if (t === undefined) delete next.monthlyTarget;
       else if (!Number.isInteger(t) || t < 1) throw new Error("a monthly target is a whole number, 1 or more");
       else next.monthlyTarget = t;
+    }
+    if ("rhythm" in patch) {
+      if (patch.rhythm === "daily") {
+        next.rhythm = "daily";
+        next.kind = "practice";
+        delete next.deadline;
+      } else delete next.rhythm;
+    }
+    if ("countsFrom" in patch) {
+      const seen = new Set<string>();
+      const list = (patch.countsFrom ?? []).filter((s) => {
+        const k = typeof s === "string" ? s : `area:${s.area}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      if (list.length) next.countsFrom = list;
+      else delete next.countsFrom;
     }
     await db.goals.put(next);
   });
@@ -317,6 +344,167 @@ export async function setGoalOnHome(id: string, onHome: boolean): Promise<void> 
     if (!goal || goal.status !== undefined) return;
     const { onHome: _o, ...rest } = goal;
     await db.goals.put(onHome ? { ...rest, onHome: true } : rest);
+  });
+}
+
+/** Active / Inactive (goals redesign). Active is the default, so the field is then removed. */
+export async function setGoalActive(id: string, active: boolean): Promise<void> {
+  await db.transaction("rw", db.goals, async () => {
+    const goal = await db.goals.get(id);
+    if (!goal || goal.status !== undefined) return;
+    const { active: _a, ...rest } = goal;
+    await db.goals.put(active ? rest : { ...rest, active: false });
+  });
+}
+
+/**
+ * Changes a live goal's monthly goals in one transaction. `fn` gets a copy of the list and
+ * returns the new one (or null for no change). Concurrent edits on two devices: the goal row
+ * is last-write-wins, so one of two +1s made at the same moment may be lost.
+ */
+async function editMonthGoals(goalId: string, fn: (list: MonthGoal[], goal: Goal) => MonthGoal[] | null): Promise<void> {
+  await db.transaction("rw", db.goals, async () => {
+    const goal = await db.goals.get(goalId);
+    if (!goal || goal.status !== undefined) throw new Error("that goal does not exist");
+    const next = fn((goal.monthGoals ?? []).map((m) => ({ ...m, ...(m.log ? { log: [...m.log] } : {}) })), goal);
+    if (next === null) return;
+    if (next.length > MAX_MONTH_GOALS) throw new Error("that goal has too many monthly goals");
+    const { monthGoals: _m, ...rest } = goal;
+    await db.goals.put(next.length ? { ...rest, monthGoals: next } : rest);
+  });
+}
+
+function cleanTitle(title: string): string {
+  const t = title.trim();
+  if (!t) throw new Error("a monthly goal needs a title");
+  if (t.length > MAX_MONTH_TITLE) throw new Error(`at most ${MAX_MONTH_TITLE} characters`);
+  return t;
+}
+
+function cleanTarget(target: number | undefined): number {
+  if (target === undefined || !Number.isInteger(target) || target < 1 || target > MAX_MONTH_TARGET) {
+    throw new Error("a count's target is a whole number, 1 or more");
+  }
+  return target;
+}
+
+/** "+ Add a <Month> goal": a count (with a target) or a step, for this month. */
+export async function addMonthGoal(
+  goalId: string,
+  input: { kind: MonthGoal["kind"]; title: string; target?: number },
+  today: ISODate,
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const m: MonthGoal = { id, month: monthOf(today), kind: input.kind, title: cleanTitle(input.title) };
+  if (input.kind === "count") m.target = cleanTarget(input.target);
+  await editMonthGoals(goalId, (list) => [...list, m]);
+  return id;
+}
+
+/** Edit mode: a monthly goal's title and (counts) target. */
+export async function updateMonthGoal(goalId: string, id: string, patch: { title?: string; target?: number }): Promise<void> {
+  await editMonthGoals(goalId, (list) =>
+    list.map((m) => {
+      if (m.id !== id) return m;
+      const next = { ...m };
+      if (patch.title !== undefined) next.title = cleanTitle(patch.title);
+      if (patch.target !== undefined && m.kind === "count") next.target = cleanTarget(patch.target);
+      return next;
+    }),
+  );
+}
+
+/** Edit mode: removes a monthly goal. */
+export async function removeMonthGoal(goalId: string, id: string): Promise<void> {
+  await editMonthGoals(goalId, (list) => (list.some((m) => m.id === id) ? list.filter((m) => m.id !== id) : null));
+}
+
+/** Ticks a step goal, or unticks it. */
+export async function setMonthStep(goalId: string, id: string, done: boolean): Promise<void> {
+  await editMonthGoals(goalId, (list) =>
+    list.map((m) => {
+      if (m.id !== id || m.kind !== "step") return m;
+      const { done: _d, ...rest } = m;
+      return done ? { ...rest, done: true } : rest;
+    }),
+  );
+}
+
+/** +1 on a manual count: today goes on its log. */
+export async function plusOne(goalId: string, id: string, today: ISODate): Promise<void> {
+  await editMonthGoals(goalId, (list) =>
+    list.map((m) => {
+      if (m.id !== id || m.kind !== "count") return m;
+      const log = [...(m.log ?? []), today];
+      if (log.length > MAX_MONTH_LOG) throw new Error("that count is full");
+      return { ...m, log };
+    }),
+  );
+}
+
+/** −1: undoes the last +1 on a manual count. */
+export async function minusOne(goalId: string, id: string): Promise<void> {
+  await editMonthGoals(goalId, (list) =>
+    list.map((m) => {
+      if (m.id !== id || !m.log?.length) return m;
+      const { log, ...rest } = m;
+      const left = log.slice(0, -1);
+      return left.length ? { ...rest, log: left } : rest;
+    }),
+  );
+}
+
+/** "Plan <Month>": this month's counts copied from last month's (steps aren't copied). */
+export async function planMonth(goalId: string, today: ISODate): Promise<void> {
+  await editMonthGoals(goalId, (list, goal) => {
+    const plan = plannedFromLastMonth({ ...goal, monthGoals: list }, today, () => crypto.randomUUID());
+    return plan.length ? [...list, ...plan] : null;
+  });
+}
+
+/** The title of the count a daily goal's Home tick makes when the month has none to log on. */
+export const DAILY_COUNT_TITLE = "Days";
+
+/**
+ * A daily goal without automatic sources: its Home row's tick logs today on this month's
+ * first count (unticking takes today off). With no count this month yet, last month's are
+ * planned first; with none at all, a count of every day this month is made.
+ */
+export async function tickDailyGoal(goalId: string, today: ISODate, on: boolean): Promise<void> {
+  await editMonthGoals(goalId, (list, goal) => {
+    const month = monthOf(today);
+    let next = list;
+    if (on && !next.some((m) => m.month === month && m.kind === "count")) {
+      const plan = plannedFromLastMonth({ ...goal, monthGoals: next }, today, () => crypto.randomUUID());
+      next = plan.length
+        ? [...next, ...plan]
+        : [...next, { id: crypto.randomUUID(), month, kind: "count", title: DAILY_COUNT_TITLE, target: daysInMonth(month) }];
+    }
+    const first = next.find((m) => m.month === month && m.kind === "count");
+    if (!first) return null;
+    const has = first.log?.includes(today) ?? false;
+    if (on === has) return next === list ? null : next;
+    return next.map((m) => {
+      if (m !== first) return m;
+      if (on) return { ...m, log: [...(m.log ?? []), today] };
+      const { log, ...rest } = m;
+      const left = (log ?? []).filter((d) => d !== today);
+      return left.length ? { ...rest, log: left } : rest;
+    });
+  });
+}
+
+/**
+ * Adds one of the Suggested goals (only on her tap). Its id is fixed, so a second tap (or
+ * another device's) changes nothing; a binned or emptied one comes back fresh.
+ */
+export async function addSuggestedGoal(id: string, today: ISODate): Promise<void> {
+  const s = SUGGESTED_GOALS.find((g) => g.id === id);
+  if (!s) throw new Error("that is not a suggested goal");
+  await db.transaction("rw", db.goals, async () => {
+    const there = await db.goals.get(id);
+    if (there && there.status === undefined) return;
+    await db.goals.put(suggestedGoalRow(s, today));
   });
 }
 

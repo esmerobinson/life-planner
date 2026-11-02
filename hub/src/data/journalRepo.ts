@@ -136,6 +136,16 @@ export async function listMorningDone(jk: JournalKey): Promise<Set<ISODate>> {
   return done;
 }
 
+/**
+ * The days with a finished morning page, a morning photo or a check-in answer, from the rows'
+ * clear kind and date alone: nothing is opened, so it needs no key (goals redesign: "Journal
+ * daily" counts these). Read only.
+ */
+export async function listJournalledDays(): Promise<Set<ISODate>> {
+  const rows = await db.journal.where("kind").anyOf("page", "photo", "answer").toArray();
+  return new Set(rows.map((r) => r.date));
+}
+
 /** Autosaves this device's draft for the day (sealed). Only this device writes it. */
 export async function saveMorningDraft(jk: JournalKey, date: ISODate, deviceId: string, text: string): Promise<void> {
   await write(jk, [await seal(jk, "draft", date, deviceId, { v: 1, text })]);
