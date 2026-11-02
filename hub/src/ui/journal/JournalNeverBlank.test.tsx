@@ -10,7 +10,7 @@ import * as keyStore from "../../journal/keyStore";
 import * as engine from "../../sync/engine";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
-import { KEYCHAIN_LINE, CANT_OPEN_JOURNAL } from "./JournalPage";
+import { KEYCHAIN_LINE, CANT_OPEN_JOURNAL, UNLOCK_AGAIN_LINE } from "./JournalPage";
 import { SECTION_CANT_OPEN } from "./bits";
 import { loadTimeout } from "./loadTimeout";
 
@@ -93,14 +93,32 @@ describe("the key check", () => {
     expect(await db.syncMeta.get(keyStore.JOURNAL_KEY_META)).toEqual(before);
   });
 
-  it("a stored key that comes back unreadable (keychain denied) says what to do instead of asking to unlock", async () => {
+  it("a stored key that comes back unreadable (an older Mac build's keychain master key) asks for the passphrase once more, and that opens it", async () => {
     await db.journal.put(await verifierRow(jk));
     await db.syncMeta.put({ key: keyStore.JOURNAL_KEY_META, value: null });
     renderApp("/journal", TODAY);
-    expect(await screen.findByRole("alert")).toHaveTextContent(KEYCHAIN_LINE);
-    expect(screen.queryByLabelText("Sync passphrase")).toBeNull();
+    const unlock = await screen.findByRole("region", { name: "Unlock journal" });
+    expect(unlock).toHaveTextContent(UNLOCK_AGAIN_LINE);
+    expect(screen.queryByText(KEYCHAIN_LINE)).toBeNull();
+    expect(screen.queryByText(/keychain/i)).toBeNull();
     await expectSectionStrips();
+    // Nothing is deleted before she unlocks.
     expect((await db.syncMeta.get(keyStore.JOURNAL_KEY_META))?.key).toBe(keyStore.JOURNAL_KEY_META);
+    await userEvent.type(within(unlock).getByLabelText("Sync passphrase"), PASS);
+    await userEvent.click(within(unlock).getByRole("button", { name: "Unlock" }));
+    expect(await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 })).toBeInTheDocument();
+    expect((await keyStore.loadJournalKeyInfo(db))?.fp).toBe(jk.fp);
+  });
+
+  it("a wrong passphrase there says so and keeps asking", async () => {
+    await db.journal.put(await verifierRow(jk));
+    await db.syncMeta.put({ key: keyStore.JOURNAL_KEY_META, value: null });
+    renderApp("/journal", TODAY);
+    const unlock = await screen.findByRole("region", { name: "Unlock journal" });
+    await userEvent.type(within(unlock).getByLabelText("Sync passphrase"), "not-the-passphrase");
+    await userEvent.click(within(unlock).getByRole("button", { name: "Unlock" }));
+    expect(await within(unlock).findByRole("alert")).toHaveTextContent("That isn't the journal's passphrase. Try again.");
+    expect(unlock).toHaveTextContent(UNLOCK_AGAIN_LINE);
   });
 
   it("locked: Unlock journal above the three section strips, which show no entries", async () => {

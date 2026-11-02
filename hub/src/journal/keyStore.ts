@@ -66,10 +66,12 @@ export async function loadJournalKeyInfo(db: HubDB): Promise<StoredJournalKey | 
 }
 
 /**
- * True when this device has a confirmed key stored but it can't be read back. In the Mac app
- * (WKWebView) a stored CryptoKey is unwrapped with a master key kept in the macOS keychain; if
- * the keychain refuses, the row comes back empty although it is there. Counts the row by its
- * id only (that never unwraps anything). Never changes anything.
+ * True when this device has a confirmed key stored but it can't be read back. WebKit
+ * (WKWebView, Safari) unwraps a stored CryptoKey with a master key; if that isn't the master
+ * key it was stored with, the row comes back empty although it is there. In the Mac app that
+ * is a key stored by a build that used the macOS keychain's master key (since 2026-11-02 the
+ * app supplies its own). Unlocking again overwrites it. Counts the row by its id only (that
+ * never unwraps anything). Never changes anything.
  */
 export async function journalKeyUnreadable(db: HubDB): Promise<boolean> {
   const n = await db.syncMeta.where(":id").equals(JOURNAL_KEY_META).count();

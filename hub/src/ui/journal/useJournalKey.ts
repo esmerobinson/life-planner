@@ -8,14 +8,21 @@ import {
 import { loadTimeout } from "./loadTimeout";
 
 /**
- * Why the key check couldn't finish: the macOS keychain refused the stored key ("keychain"),
- * or it failed or took longer than loadTimeout.ms ("failed"). Nothing is deleted either way.
+ * Why the key check couldn't finish: WebCrypto threw while reading the stored key
+ * ("keychain"), or it failed or took longer than loadTimeout.ms ("failed"). Nothing is
+ * deleted either way.
  */
 export type KeyProblem = "keychain" | "failed";
 
+/**
+ * "unreadable": a confirmed key is stored but comes back empty. In the Mac app that is a key
+ * wrapped by an older build with the macOS keychain's master key, which the app no longer
+ * uses (2026-11-02); typing the passphrase once more stores it again. Nothing is deleted.
+ */
 export type KeyView =
   | { state: "loading" }
   | { state: Exclude<JournalKeyState, "confirmed"> }
+  | { state: "unreadable" }
   | { state: "confirmed"; jk: JournalKey }
   | { state: "error"; problem: KeyProblem };
 
@@ -43,7 +50,7 @@ export function useJournalKey(): KeyView & { retry: () => void } {
       const state = await confirmJournalKey(db);
       const info = state === "confirmed" ? await loadJournalKeyInfo(db) : undefined;
       if (info) next = { v: { state: "confirmed", jk: { key: info.key, mac: info.mac, fp: info.fp } }, id: info.id };
-      else if (await journalKeyUnreadable(db)) next = { v: { state: "error", problem: "keychain" }, id: null };
+      else if (await journalKeyUnreadable(db)) next = { v: { state: "unreadable" }, id: null };
       else next = { v: { state: state === "confirmed" ? "locked" : state }, id: null };
     } catch (e) {
       next = { v: { state: "error", problem: isKeychainError(e) ? "keychain" : "failed" }, id: null };
