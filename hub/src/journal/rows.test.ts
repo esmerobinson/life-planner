@@ -89,19 +89,12 @@ describe("journal rows: exercise done", () => {
 });
 
 describe("journalRowDays (goals: Journal daily, fix round 1)", () => {
-  it("a page day, a finished check-in day and an exercise day; an unfinished check-in and a shown card don't count", () => {
+  it("a page day and a finished check-in day count; an unfinished check-in doesn't (exercises never count: Esme, 2026-11-02)", () => {
     const answers = (done: boolean) => new Map([["K2", { done }]]);
-    const days = journalRowDays(
-      set("2026-11-01"),
-      [
-        { date: "2026-10-31", prompts: ["K2"], answers: answers(true) },
-        { date: "2026-11-02", prompts: ["K2", "K4"], answers: answers(true) }, // K4 not reached
-      ],
-      [
-        { date: "2026-10-30", device: "d1", id: "day-1", done: true, primary: true },
-        { date: "2026-10-29", device: "d1", id: "day-2", done: false, primary: true }, // shown, not done
-      ],
-    );
-    expect(days).toEqual(set("2026-11-01", "2026-10-31", "2026-10-30"));
+    const days = journalRowDays(set("2026-11-01"), [
+      { date: "2026-10-31", prompts: ["K2"], answers: answers(true) },
+      { date: "2026-11-02", prompts: ["K2", "K4"], answers: answers(true) }, // K4 not reached
+    ]);
+    expect(days).toEqual(set("2026-11-01", "2026-10-31"));
   });
 });

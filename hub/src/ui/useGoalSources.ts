@@ -44,7 +44,7 @@ export function useGoalSources(items: readonly Item[]): GoalSourcesView {
         // With the confirmed key: exactly the days the Journal rows tick (fix round 1, I1),
         // through the journal repo's key-gated reads, held in memory only.
         const [morning, checkins, progress] = await Promise.all([listMorningDone(jk), listCheckinDays(jk), readExerciseProgress(jk)]);
-        days = journalRowDays(morning, checkins, progress.marks);
+        days = journalRowDays(morning, checkins);
         exercise = progress.marks.filter((m) => m.done || m.logged).map((m) => ({ date: m.date, card: m.id }));
       }
     } catch {

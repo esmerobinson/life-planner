@@ -55,16 +55,12 @@ export function checkinDoneDays(days: readonly CheckinDayLike[]): Set<ISODate> {
 }
 
 /**
- * The days any of the three Journal rows ticked (goals redesign fix round 1: "Journal daily"
- * counts exactly these): a morning page or photo, a finished check-in, or an exercise card
- * done.
+ * The days "Journal daily" counts: the Morning pages row ticked (a page or photo) or the Daily
+ * check-in row ticked (finished). Exercise cards never count here (Esme, 2026-11-02: "only
+ * morning pages and check-in"; exercises count toward the BPD practice goal instead).
  */
-export function journalRowDays(
-  morning: ReadonlySet<ISODate>,
-  checkins: readonly CheckinDayLike[],
-  marks: readonly ExerciseMark[],
-): Set<ISODate> {
-  return new Set([...morning, ...checkinDoneDays(checkins), ...exerciseDoneDays(marks)]);
+export function journalRowDays(morning: ReadonlySet<ISODate>, checkins: readonly CheckinDayLike[]): Set<ISODate> {
+  return new Set([...morning, ...checkinDoneDays(checkins)]);
 }
 
 /** The days a card was marked done, or a tracker day filled in (on any device). */

@@ -123,13 +123,14 @@ describe("Journal daily counts exactly the days the Journal rows tick (fix round
     expect(await rowTick("Daily check-in")).toBe("true");
   });
 
-  it("today's exercise card done ticks it too (the Journal rows' third row)", async () => {
+  it("today's exercise card done does NOT tick it: only morning pages and the check-in count (Esme, 2026-11-02)", async () => {
     await confirmedDevice(db, jk);
     await importExerciseCards(jk, checkCardFile(FAKE_CARD_FILE)!, "2026-10-01");
     await addSuggestedGoal("suggested-journal-daily", TODAY);
     await saveExerciseMark(jk, TODAY, OTHER, "day-1", true);
     renderApp("/today", TODAY);
-    await vi.waitFor(async () => expect(await journalTick()).toBe("true"));
+    await vi.waitFor(async () => expect(await rowTick("Mental health exercise")).toBe("true"));
+    await vi.waitFor(async () => expect(await journalTick()).toBe("false"));
   });
 
   it("while the journal is locked here it falls back to the rows' clear dates", async () => {
@@ -174,7 +175,7 @@ describe("the Goals page counts from the journal", () => {
     renderApp("/goals", TODAY);
     const tile = (await screen.findByRole("link", { name: "Journal daily" })).closest("li")!;
     expect(await within(tile).findByText("2 / 30")).toBeInTheDocument();
-    expect(within(tile).getByText("Counts itself: exercise, morning pages or check-in")).toBeInTheDocument();
+    expect(within(tile).getByText("Counts itself: morning pages or check-in")).toBeInTheDocument();
     expect(within(tile).getByTitle("3 days in a row")).toBeInTheDocument();
     expect(tile).toHaveClass("is-daily");
   });
