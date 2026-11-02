@@ -58,7 +58,7 @@ async function walkThrough(page: Page, prefix: string) {
   await expect(s.getByText("In your book: Pretend workbook, page 1")).toBeVisible();
   await shoot(page, `${prefix}-today`);
 
-  await s.getByRole("checkbox", { name: "Done" }).check();
+  await s.getByRole("checkbox", { name: "Done", exact: true }).check();
   await expect(s.getByText("Done for today · next card tomorrow")).toBeVisible();
   await s.getByRole("button", { name: "Star this card" }).first().click();
   await expect(s.getByRole("button", { name: "Star this card" }).first()).toHaveAttribute("aria-pressed", "true");
@@ -85,7 +85,7 @@ async function walkThrough(page: Page, prefix: string) {
   // Reloaded: still today's card, ticked.
   await page.reload();
   await expect(section(page).getByText("Done for today · next card tomorrow")).toBeVisible();
-  await expect(section(page).getByRole("checkbox", { name: "Done" })).toBeChecked();
+  await expect(section(page).getByRole("checkbox", { name: "Done", exact: true })).toBeChecked();
 }
 
 test.describe("at 1280px", () => {
@@ -115,7 +115,7 @@ for (const width of [360, 390, 430]) {
       const s = section(page);
       await expect(s.getByText("Pretend weather")).toBeVisible();
       await noSidewaysScroll(page);
-      await s.getByRole("checkbox", { name: "Done" }).check();
+      await s.getByRole("checkbox", { name: "Done", exact: true }).check();
       await s.getByRole("button", { name: "Show the next one anyway" }).click();
       await s.getByText("All cards", { exact: true }).click();
       for (const name of ["Day 1 · Pretend weather", "Day 4 · A pretend lighthouse", "Day 5 · The made-up garden"]) {

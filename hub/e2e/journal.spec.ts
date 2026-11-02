@@ -90,7 +90,7 @@ async function walkThrough(page: Page, prefix: string) {
   await page.reload();
   const cal = page.getByRole("group", { name: "Morning pages calendar" });
   await expect(cal).toBeVisible();
-  await expect(page.getByText(/3 days in a row/)).toBeVisible();
+  await expect(page.locator(".journal-streak").getByText(/3 days in a row/)).toBeVisible();
   await shoot(page, `${prefix}-star-calendar`);
 
   await page.getByRole("button", { name: "Write now" }).click();
