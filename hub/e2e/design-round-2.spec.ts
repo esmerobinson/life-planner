@@ -83,8 +83,10 @@ test("area page: strips, icons, due line, goal card, month count and the done fo
   await page.goto("/area/art");
   await expect(page.getByText("3 ticked off in", { exact: false })).toBeVisible();
   await expect(page.getByText(/^last month 2$/)).toBeVisible();
-  // The month box sits at the bottom, directly above the Archive heading.
-  await expect(page.getByRole("region", { name: "Ticked off this month" }).locator("xpath=following-sibling::*[1]")).toHaveText("Archive");
+  // The month box sits at the top, directly under the page's h1 (2026-11-02).
+  const aboveBox = page.getByRole("region", { name: "Ticked off this month" }).locator("xpath=preceding-sibling::*[1]");
+  await expect(aboveBox).toHaveText("Art");
+  await expect(aboveBox).toHaveJSProperty("tagName", "H1");
   const late = page.getByText(/· 2 days late$/);
   await expect(late).toBeVisible();
   expect(await late.evaluate((e) => getComputedStyle(e).color)).toBe("rgb(191, 101, 100)");

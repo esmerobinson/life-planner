@@ -104,11 +104,12 @@ function DesktopHome({ today }: { today: ISODate }) {
           />
         ) : (
           <>
-            {loaded && shown.goals.length === 0 && (
+            {loaded && goals.length === 0 && (
               <p>
                 No monthly targets yet. <Link to="/goals">Go to goals</Link>
               </p>
             )}
+            {loaded && goals.length > 0 && shown.goals.length === 0 && <p>Choose which goals show here.</p>}
             {shown.goals.length > 0 && (
               <ul className="goal-list">
                 {shown.goals.map((g) => (

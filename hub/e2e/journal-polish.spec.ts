@@ -93,8 +93,9 @@ for (const width of [1280, 1920]) {
       await expect(page.getByRole("heading", { name: "Unlock journal" })).toBeVisible();
       const w = await widths(page);
       expect(w.padding).toEqual(["24px", "24px"]);
-      expect(w.cards).toHaveLength(1);
-      expect(Math.abs(w.cards[0]! - w.column)).toBeLessThanOrEqual(1);
+      // The unlock card, then the three sections' bare strips (2026-11-02: never a blank page).
+      expect(w.cards).toHaveLength(4);
+      for (const c of w.cards) expect(Math.abs(c - w.column)).toBeLessThanOrEqual(1);
       await noSidewaysScroll(page);
     });
 

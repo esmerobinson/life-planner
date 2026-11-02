@@ -41,6 +41,19 @@ export function ReadOnlyTick({ state, title }: { state: TickState; title: string
   );
 }
 
+/**
+ * "🔒 private" on a strip's small line. The emoji sits in its own span that adds no line
+ * height, so the line is exactly as tall as a task strip's due line (the emoji font's taller
+ * line made these strips 5px taller, 2026-11-02).
+ */
+export function Private() {
+  return (
+    <>
+      <span className="strip-emoji">🔒</span> private
+    </>
+  );
+}
+
 /** "★ N" on the right: days in a row (star is the magenta placeholder); nothing at 0. */
 export function StreakBadge({ n }: { n: number }) {
   if (n <= 0) return null;

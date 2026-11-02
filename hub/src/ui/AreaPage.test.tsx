@@ -198,7 +198,7 @@ describe("AreaPage", () => {
       await tickItem(it.id, day);
     }
 
-    it("says how many were ticked off this month and last month, above the archive", async () => {
+    it("says how many were ticked off this month and last month, at the top: directly under the h1", async () => {
       for (const d of ["2026-10-01", "2026-10-15", "2026-10-26"]) await doneOn(`Oct ${d}`, d);
       for (const d of ["2026-09-03", "2026-09-30"]) await doneOn(`Sep ${d}`, d);
       await doneOn("Other area", "2026-10-02", "body");
@@ -208,8 +208,20 @@ describe("AreaPage", () => {
       expect(within(box).getByText("3 ticked off in October")).toBeInTheDocument();
       expect(within(box).getByText("last month 2")).toBeInTheDocument();
       expect(within(box).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
-      // At the bottom, directly above the Archive heading.
-      expect(box.nextElementSibling).toBe(screen.getByRole("heading", { level: 2, name: "Archive" }));
+      // At the top (2026-11-02): directly under the h1, above everything else.
+      const h1 = screen.getByRole("heading", { level: 1, name: "Art" });
+      expect(h1.nextElementSibling).toBe(box);
+    });
+
+    it("sits above the Habits box and the filter pills too (the same place on every area page)", async () => {
+      await createItem({ kind: "task", title: "Pretend habit", areaId: "art", priority: 2, recur: ["mon", "wed"] }, TODAY);
+      await doneOn("One", "2026-10-03");
+      renderArea("art");
+      const box = await screen.findByRole("region", { name: "Ticked off this month" });
+      const habits = await screen.findByRole("region", { name: "Habits" });
+      expect(screen.getByRole("heading", { level: 1, name: "Art" }).nextElementSibling).toBe(box);
+      expect(box.nextElementSibling).toBe(habits);
+      expect(box.compareDocumentPosition(screen.getByRole("group", { name: "Show" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("compares with last month's total", async () => {
