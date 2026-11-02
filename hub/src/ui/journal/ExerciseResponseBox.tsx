@@ -104,14 +104,19 @@ function ResponseField({
     return next;
   }, []);
 
+  // When this box last wrote: a read that started before that write landed is older, never taken.
+  const wroteAt = useRef(0);
+  const entryAt = entry?.at ?? null;
+
   // A newer stored response (another device, or this one read back): take it while nothing typed waits.
   useEffect(() => {
-    if (keyOf(latest.current) === saved.current && storedKey !== saved.current) {
+    const newer = wroteAt.current === 0 || (entryAt !== null && entryAt >= wroteAt.current);
+    if (newer && keyOf(latest.current) === saved.current && storedKey !== saved.current) {
       latest.current = stored;
       saved.current = storedKey;
       setValue(stored);
     }
-  }, [stored, storedKey]);
+  }, [stored, storedKey, entryAt]);
 
   // The single box grows with the text (at least its six rows).
   useLayoutEffect(() => {
@@ -128,6 +133,7 @@ function ResponseField({
     const k = keyOf(v);
     if (k === saved.current) return;
     saved.current = k;
+    wroteAt.current = Date.now();
     void enqueue(() => saveExerciseDraft(jk, today, deviceId, ref, v)).catch(() => {
       if (saved.current === k) saved.current = UNSAVED; // the next save tries again
       onProblem(SAVE_PROBLEM);
@@ -159,6 +165,7 @@ function ResponseField({
     const before = saved.current;
     const k = keyOf(v);
     saved.current = k;
+    wroteAt.current = Date.now();
     try {
       await enqueue(() => submitExerciseEntry(jk, today, deviceId, ref, v, todayId));
       onProblem("");

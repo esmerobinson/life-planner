@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { pageDate } from "./helpers";
 
-/* The Journal in a real browser: unlock, star calendar, Write now, Add photo (downscaled,
-   sealed, shown blurred), the check-in, and no sideways scroll on phones. All data is
+/* The Journal in a real browser (Journal v2 tabs): unlock, the morning pages box and calendar,
+   Add photo instead (downscaled, sealed, shown blurred), the check-in, and no sideways scroll
+   on phones. All data is
    fictional; the sync address is a made-up one that never answers. Set SHOTS_DIR to save
    screenshots. */
 
@@ -84,20 +85,22 @@ async function walkThrough(page: Page, prefix: string) {
   await expect(page.getByRole("alert")).toContainText("isn't the journal's passphrase");
   await page.getByLabel("Sync passphrase").fill(PASS);
   await page.getByRole("button", { name: "Unlock" }).click();
-  await expect(page.getByRole("button", { name: "Write now" })).toBeVisible(); // open (the strips show before)
+  await expect(page.getByText("Add your exercise cards")).toBeVisible(); // open, on the exercise tab
+  await expect(page).toHaveURL(/\/journal\/exercise$/);
 
   await pastPages(page, [-1, -2, -3, -6, -7]);
-  await page.reload();
+  await page.goto("/journal/morning");
   const cal = page.getByRole("group", { name: "Morning pages calendar" });
   await expect(cal).toBeVisible();
-  await expect(page.locator(".journal-streak").getByText(/3 days in a row/)).toBeVisible();
-  await shoot(page, `${prefix}-star-calendar`);
+  await expect(page.locator(".journal-streak")).toContainText("3 days in a row");
+  await expect(cal.locator(".journal-day.on")).not.toHaveCount(0);
+  await shoot(page, `${prefix}-calendar`);
 
-  await page.getByRole("button", { name: "Write now" }).click();
   await page.getByLabel("Today's morning page").fill(
     "Pretend morning words. The made-up kettle is loud and the pretend cat wants breakfast. Keep the pen moving, no editing.",
   );
-  await expect(page.getByText("20 of 750 words")).toBeVisible();
+  await expect(page.getByText("20 of 1,000 words")).toBeVisible();
+  await expect(page.getByText("Keep going if you can — 1,000 is about three pages.")).toBeVisible();
   await shoot(page, `${prefix}-writing`);
   await page.getByRole("button", { name: "I'm done" }).click();
   await expect(page.getByText("Done for today")).toBeVisible();
@@ -121,8 +124,8 @@ async function walkThrough(page: Page, prefix: string) {
   expect(String(files[0].data).startsWith("/9j/")).toBe(false); // a JPEG's base64 would
   expect(Math.max(files[0].width, files[0].height)).toBeLessThanOrEqual(1600);
 
+  await page.getByRole("link", { name: /Daily check-in/ }).click();
   const checkin = page.getByRole("region", { name: "Daily check-in" });
-  await checkin.scrollIntoViewIfNeeded();
   await expect(checkin.getByRole("img", { name: "Question 1 of 3" })).toBeVisible();
   await checkin.getByLabel("Your answer").fill("Pretend: a bird, the cool sheet, the pretend lamp.");
   await shoot(page, `${prefix}-checkin-question`);
@@ -142,13 +145,13 @@ test.describe("at 1280px", () => {
     await walkThrough(page, "journal-1280");
   });
 
-  test("the Home card's buttons open the two parts", async ({ page }) => {
+  test("the Home rows open their tabs", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("region", { name: "Journal" }).getByRole("button", { name: "Daily check-in" }).click();
-    await expect(page).toHaveURL(/\/journal#daily-check-in$/);
+    await expect(page).toHaveURL(/\/journal\/check-in$/);
     await page.goto("/");
     await page.getByRole("region", { name: "Journal" }).getByRole("button", { name: "Morning pages" }).click();
-    await expect(page).toHaveURL(/\/journal#morning-pages$/);
+    await expect(page).toHaveURL(/\/journal\/morning$/);
   });
 });
 
@@ -172,15 +175,19 @@ for (const width of [360, 390, 430]) {
         await keys.unlockJournal(db, pass);
       }, PASS);
       await pastPages(page, [-1, -2]);
-      await page.goto("/journal");
-      await expect(page.getByRole("heading", { name: "Morning pages", exact: true })).toBeVisible();
-      await page.getByText("Choose questions", { exact: true }).click();
-      await page.getByText("Read back").click();
-      const m = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, w: window.innerWidth }));
+      const wide = () => page.evaluate(() => ({ s: document.documentElement.scrollWidth, w: window.innerWidth }));
+      await page.goto("/journal/morning");
+      await expect(page.getByLabel("Today's morning page")).toBeVisible();
+      let m = await wide();
       expect(m.s).toBeLessThanOrEqual(m.w);
-      await page.getByRole("button", { name: "Write now" }).click();
-      const m2 = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, w: window.innerWidth }));
-      expect(m2.s).toBeLessThanOrEqual(m2.w);
+      await page.goto("/journal/check-in");
+      await page.getByText("Choose questions", { exact: true }).click();
+      m = await wide();
+      expect(m.s).toBeLessThanOrEqual(m.w);
+      await page.goto("/journal/read-back");
+      await expect(page.getByRole("list", { name: "Read back" })).toBeVisible();
+      m = await wide();
+      expect(m.s).toBeLessThanOrEqual(m.w);
     });
   });
 }

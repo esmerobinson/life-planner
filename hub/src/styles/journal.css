@@ -47,6 +47,8 @@
   gap: 8px;
   overflow-x: auto;
   min-width: 0;
+  /* Its screen-reader-only text (position: absolute) stays inside the scrolling row. */
+  position: relative;
 }
 
 a.journal-tab {

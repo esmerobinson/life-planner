@@ -4,7 +4,8 @@ import {
   CARDS_TOO_BIG, importExerciseCards, NOT_CONFIRMED, readExerciseCards, readExerciseProgress, recordExerciseShown,
   saveExerciseMark, setExerciseStar,
 } from "./repo";
-import { journalId, validJournal } from "./validate";
+import { journalId, MAX_JOURNAL_CT, validJournal } from "./validate";
+import { MAX_ROW_BYTES } from "../sync/engine";
 import { journalAad, sealJson, toBase64, type JournalKey } from "../journal/crypto";
 import { checkCardFile, MAX_CARD_FIELD, parseCardFile, type CardSet } from "../journal/exercise";
 import { confirmedDevice, keyFor } from "../test/journalKey";
@@ -96,6 +97,33 @@ describe("cards", () => {
     const cards = Array.from({ length: 120 }, (_, i) => ({ ...SET.cards[0]!, day: i + 1, learn: big, try: big, book: big }));
     await expect(importExerciseCards(jk, { source: "", version: 1, cards }, DAY)).rejects.toThrow(CARDS_TOO_BIG);
     expect(await db.journal.get("cards")).toBeUndefined();
+  });
+
+  it("a full-size version 2 set (~550 KB of JSON: 154 cards with Read more, 4 sources, 12 parts, an example) fits in one synced row", async () => {
+    const words = (n: number, w: string) => Array.from({ length: n }, (_, i) => `${w}${i % 7}`).join(" ");
+    const cards = Array.from({ length: 154 }, (_, i) => ({
+      id: `pretend-card-${i + 1}`, day: i + 1, chapter: 1 + Math.floor(i / 10), chapterTitle: "A pretend chapter title",
+      optional: false, theme: `Pretend theme ${i + 1}`, learn: words(45, "learn"), try: words(30, "try"),
+      book: "Pretend workbook, page 12", skill: "Made-up skill", session: i % 3 === 0,
+      more: words(240, "m’"), // ~200+ words, with non-ASCII punctuation
+      sources: Array.from({ length: 4 }, (_, j) => ({ title: `Pretend source ${j}`, url: `https://example.org/pretend/${i}/${j}` })),
+      parts: Array.from({ length: 12 }, (_, j) =>
+        j % 4 === 1 ? { prompt: words(5, "list"), kind: "list", count: 25 } : j % 4 === 3 ? { prompt: words(5, "pick"), kind: "choice", options: ["One", "Two", "Three"] } : { prompt: words(5, "part"), kind: j % 4 === 2 ? "rating" : "text" }),
+      example: words(60, "ex"), bookExample: i % 2 === 0,
+    }));
+    const text = JSON.stringify({ app: "esmeworld", kind: "exercise-cards", version: 2, source: "A pretend workbook", cards });
+    const bytes = new TextEncoder().encode(text).length;
+    expect(bytes).toBeGreaterThan(540_000);
+    expect(bytes).toBeLessThan(600_000);
+    const set = parseCardFile(text)!;
+    expect(set.cards).toHaveLength(154);
+    await importExerciseCards(jk, set, DAY);
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set });
+    const stored = (await db.journal.get("cards"))!;
+    // What sync sends for the row, against the server's 1 MB cap.
+    const asSent = new TextEncoder().encode(JSON.stringify({ t: "journal", i: stored.id, u: stored.updatedAt, d: JSON.stringify(stored) })).length;
+    expect(asSent).toBeLessThan(MAX_ROW_BYTES);
+    expect(stored.ct.length).toBeLessThan(MAX_JOURNAL_CT);
   });
 
   it("a stored set of an unknown shape counts as unreadable", async () => {
