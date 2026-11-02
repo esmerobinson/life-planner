@@ -419,6 +419,28 @@ export async function removeMonthGoal(goalId: string, id: string): Promise<void>
   await editMonthGoals(goalId, (list) => (list.some((m) => m.id === id) ? list.filter((m) => m.id !== id) : null));
 }
 
+/**
+ * Edit mode's Cancel: puts the monthly goals back as they were when Edit opened. Goals
+ * removed since come back in their place; a renamed or re-targeted one gets its title and
+ * target back; anything else on a goal (ticks, logs) and any goal that arrived since is
+ * left as it is.
+ */
+export async function restoreMonthGoals(goalId: string, before: readonly MonthGoal[]): Promise<void> {
+  await editMonthGoals(goalId, (list) => {
+    const now = new Map(list.map((m) => [m.id, m]));
+    const ids = new Set(before.map((m) => m.id));
+    const back = before.map((b) => {
+      const m = now.get(b.id);
+      if (!m) return { ...b, ...(b.log ? { log: [...b.log] } : {}) };
+      const next: MonthGoal = { ...m, title: b.title };
+      if (b.target !== undefined) next.target = b.target;
+      return next;
+    });
+    const next = [...back, ...list.filter((m) => !ids.has(m.id))];
+    return JSON.stringify(next) === JSON.stringify(list) ? null : next;
+  });
+}
+
 /** Ticks a step goal, or unticks it. */
 export async function setMonthStep(goalId: string, id: string, done: boolean): Promise<void> {
   await editMonthGoals(goalId, (list) =>

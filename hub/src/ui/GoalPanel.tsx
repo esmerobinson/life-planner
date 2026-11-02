@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  createItem, deleteGoal, saveGoalNotes, setGoalActive, setGoalOnHome, untickItem, updateGoal, type GoalPatch,
+  createItem, deleteGoal, restoreMonthGoals, saveGoalNotes, setGoalActive, setGoalOnHome, untickItem, updateGoal,
+  type GoalPatch,
 } from "../data/repo";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "../data/validate";
 import { monthName } from "../domain/display";
 import { isActive, isDaily, pastMonths } from "../domain/goalCounts";
 import { goalTaskSplit, nextGoalOrder } from "../domain/progress";
-import type { AreaId, CountSource, Goal, ISODate, Item } from "../domain/types";
+import type { AreaId, CountSource, Goal, ISODate, Item, MonthGoal } from "../domain/types";
 import { GOAL_AREAS, NAV } from "./areas";
 import { tickedOffToday } from "../domain/triage";
 import { DoneStrip } from "./DoneSection";
@@ -106,6 +107,9 @@ export function GoalPanel({
   const [asking, setAsking] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const addRef = useRef<HTMLInputElement>(null);
+  // The month goals as Edit opened. They save as they are edited, so Cancel puts them back.
+  const monthBefore = useRef<MonthGoal[]>([]);
+  const cancelEdit = useRef<() => void>(() => undefined);
 
   async function write(fn: () => Promise<unknown>): Promise<boolean> {
     const ok = await attempt(fn);
@@ -124,8 +128,7 @@ export function GoalPanel({
   useEffect(() => {
     escape.current = editing
       ? () => {
-          setEditing(false);
-          setFormMessage("");
+          cancelEdit.current();
           return true;
         }
       : adding
@@ -150,9 +153,17 @@ export function GoalPanel({
     const now = fieldsOf(goal);
     setFields(now);
     setSnapshot(now);
+    monthBefore.current = (goal.monthGoals ?? []).map((m) => ({ ...m, ...(m.log ? { log: [...m.log] } : {}) }));
     setFormMessage("");
     setEditing(true);
   }
+
+  // Cancel (button or Escape): the fields were never saved; the month goals were, so put them back.
+  cancelEdit.current = () => {
+    setEditing(false);
+    setFormMessage("");
+    void write(() => restoreMonthGoals(goal.id, monthBefore.current));
+  };
 
   async function done() {
     if (busy) return;
@@ -226,10 +237,7 @@ export function GoalPanel({
         busy={busy}
         onEdit={startEdit}
         onDone={() => void done()}
-        onCancel={() => {
-          setEditing(false);
-          setFormMessage("");
-        }}
+        onCancel={() => cancelEdit.current()}
       />
       <div className="peek-content">
       {editing ? (

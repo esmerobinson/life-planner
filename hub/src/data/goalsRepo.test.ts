@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./db";
 import {
   addMonthGoal, addSuggestedGoal, createGoal, deleteGoal, listJournalledDays, minusOne, planMonth, plusOne,
-  removeMonthGoal, saveGoalNotes, setGoalActive, setMonthStep, tickDailyGoal, updateGoal, updateMonthGoal, DAILY_COUNT_TITLE,
+  removeMonthGoal, restoreMonthGoals, saveGoalNotes, setGoalActive, setMonthStep, tickDailyGoal, updateGoal, updateMonthGoal, DAILY_COUNT_TITLE,
 } from "./repo";
 import { validGoal } from "./validate";
 import { SUGGESTED_GOALS } from "../domain/suggestedGoals";
@@ -78,6 +78,31 @@ describe("monthly goals", () => {
     expect((await stored(g.id)).monthGoals![0]).toMatchObject({ title: "Long sessions", target: 8 });
     await removeMonthGoal(g.id, c);
     expect("monthGoals" in (await stored(g.id))).toBe(false);
+  });
+
+  it("restoreMonthGoals puts back removed goals in place and old titles and targets; keeps ticks and later arrivals", async () => {
+    const g = await practice();
+    const a = await addMonthGoal(g.id, { kind: "count", title: "Sessions", target: 3 }, TODAY);
+    const b = await addMonthGoal(g.id, { kind: "step", title: "Book a pretend class" }, TODAY);
+    const before = (await stored(g.id)).monthGoals!;
+    await updateMonthGoal(g.id, a, { title: "Renamed", target: 9 });
+    await removeMonthGoal(g.id, b);
+    await plusOne(g.id, a, TODAY); // a tick made since Edit opened
+    const later = await addMonthGoal(g.id, { kind: "step", title: "Arrived later" }, TODAY);
+    await restoreMonthGoals(g.id, before);
+    const now = (await stored(g.id)).monthGoals!;
+    expect(now.map((m) => m.id)).toEqual([a, b, later]);
+    expect(now[0]).toMatchObject({ title: "Sessions", target: 3, log: [TODAY] });
+    expect(now[1]).toEqual(before[1]);
+    expect(validGoal(await stored(g.id))).toBe(true);
+  });
+
+  it("restoreMonthGoals with nothing changed writes nothing", async () => {
+    const g = await practice();
+    await addMonthGoal(g.id, { kind: "step", title: "Same" }, TODAY);
+    const row = await stored(g.id);
+    await restoreMonthGoals(g.id, row.monthGoals!);
+    expect(await stored(g.id)).toEqual(row);
   });
 
   it("a binned goal can't be changed", async () => {

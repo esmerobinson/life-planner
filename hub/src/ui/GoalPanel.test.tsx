@@ -306,6 +306,58 @@ describe("the goal panel (Edit)", () => {
     expect((await db.goals.get("ef"))!.title).toBe("Edit me");
   });
 
+  describe("month goals follow Cancel", () => {
+    const withMonth = () => ({
+      ...finite,
+      monthGoals: [
+        { id: "a", month: "2026-10", kind: "count" as const, title: "Sessions", target: 5, log: ["2026-10-02"] },
+        { id: "b", month: "2026-10", kind: "step" as const, title: "Book a pretend class" },
+        { id: "c", month: "2026-09", kind: "count" as const, title: "Old count", target: 3 },
+      ],
+    });
+
+    it("Cancel puts back a removed month goal, a rename and a new target", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      await userEvent.click(p.getByRole("button", { name: "Remove Book a pretend class" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toHaveLength(2));
+      const title = p.getByLabelText("Title of Sessions");
+      await userEvent.clear(title);
+      await userEvent.type(title, "Renamed sessions");
+      await userEvent.tab(); // saves when left
+      const target = p.getByLabelText("Target for Renamed sessions");
+      await userEvent.clear(target);
+      await userEvent.type(target, "9");
+      await userEvent.tab();
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals![0]).toMatchObject({ title: "Renamed sessions", target: 9 }));
+      await userEvent.click(p.getByRole("button", { name: "Cancel" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toEqual(withMonth().monthGoals));
+      expect(await p.findByText("Book a pretend class")).toBeInTheDocument();
+      expect(p.getByText("Sessions")).toBeInTheDocument();
+    });
+
+    it("Escape does the same", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      await userEvent.click(p.getByRole("button", { name: "Remove Sessions" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toHaveLength(2));
+      await userEvent.keyboard("{Escape}");
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toEqual(withMonth().monthGoals));
+    });
+
+    it("Done keeps a removal", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      await userEvent.click(p.getByRole("button", { name: "Remove Book a pretend class" }));
+      await userEvent.click(p.getByRole("button", { name: "Done" }));
+      await vi.waitFor(() => expect(p.getByRole("button", { name: "Edit" })).toBeInTheDocument());
+      expect((await db.goals.get("ef"))!.monthGoals!.map((m) => m.id)).toEqual(["a", "c"]);
+    });
+  });
+
   it("switching to Practice drops the deadline; the messages guard title, deadline and target", async () => {
     await db.goals.add(finite);
     const p = await openGoal("ef");
