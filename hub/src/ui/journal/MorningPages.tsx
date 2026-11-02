@@ -39,7 +39,9 @@ type Props = { jk: JournalKey; today: ISODate; deviceId: string };
 export function MorningPages({ jk, today, deviceId }: Props) {
   const [done, setDone] = useState<Set<ISODate> | null>(null);
   const [day, setDay] = useState<MorningDay | null>(null);
-  const [yesterdayDraft, setYesterdayDraft] = useState(false);
+  const [yesterdayDraft, setYesterdayDraft] = useState("");
+  // Yesterday's page opened for finishing: its date and the words it opened with.
+  const [finishing, setFinishing] = useState<{ date: ISODate; text: string } | null>(null);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [problem, setProblem] = useState("");
   const [adding, setAdding] = useState(false);
@@ -60,12 +62,14 @@ export function MorningPages({ jk, today, deviceId }: Props) {
       if (id !== latest.current) return;
       setDone(d);
       setDay(t);
-      setYesterdayDraft(y.draft.trim() !== "");
+      setYesterdayDraft(y.draft);
     } catch {
       if (id === latest.current) guardFail.current();
     }
   }, [jk, today, deviceId]);
   useEffect(() => void load(), [load]);
+  // A new day: the page being finished was yesterday's, no longer.
+  useEffect(() => setFinishing(null), [today]);
   useDbChanges(() => void load());
   // Never blank: "Loading…", then the can't-open line and Try again.
   const guard = useLoadGuard(done === null || day === null, load);
@@ -111,34 +115,66 @@ export function MorningPages({ jk, today, deviceId }: Props) {
           ))}
         </ul>
       )}
-      {yesterdayDraft && <p className="journal-muted">{YESTERDAY_SAVED}</p>}
-      <WritingView
-        key={`${page}|${today}`}
-        jk={jk}
-        date={today}
-        deviceId={deviceId}
-        initialDraft={page === 0 ? day.draft : ""}
-        onFinished={() => {
-          setPage((n) => n + 1);
-          void load();
-        }}
-        photoButton={
-          <>
-            <button type="button" className="btn-secondary" disabled={adding} onClick={() => fileInput.current?.click()}>
-              Add photo instead
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              hidden
-              aria-label="Photo of today's pages"
-              onChange={(e) => void onPhoto(e)}
-            />
-          </>
-        }
-      />
+      {yesterdayDraft.trim() !== "" && !finishing && (
+        <div className="btn-group">
+          <p className="journal-muted">{YESTERDAY_SAVED}</p>
+          <button type="button" className="btn-secondary" onClick={() => setFinishing({ date: addDays(today, -1), text: yesterdayDraft })}>
+            Open yesterday's page
+          </button>
+        </div>
+      )}
+      {finishing && (
+        <>
+          <p className="journal-muted">Finishing yesterday's page</p>
+          <WritingView
+            key={`late|${finishing.date}`}
+            jk={jk}
+            date={finishing.date}
+            late
+            deviceId={deviceId}
+            initialDraft={finishing.text}
+            onFinished={() => {
+              setFinishing(null); // back to today's own, untouched box
+              void load();
+            }}
+            photoButton={
+              <button type="button" className="btn-secondary" onClick={() => setFinishing(null)}>
+                Back to today
+              </button>
+            }
+          />
+        </>
+      )}
+      {/* Kept mounted (just hidden) while yesterday's page is open, so nothing typed today is lost. */}
+      <div hidden={finishing !== null}>
+        <WritingView
+          key={`${page}|${today}`}
+          jk={jk}
+          date={today}
+          deviceId={deviceId}
+          initialDraft={page === 0 ? day.draft : ""}
+          onFinished={() => {
+            setPage((n) => n + 1);
+            void load();
+          }}
+          photoButton={
+            <>
+              <button type="button" className="btn-secondary" disabled={adding} onClick={() => fileInput.current?.click()}>
+                Add photo instead
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                aria-label="Photo of today's pages"
+                onChange={(e) => void onPhoto(e)}
+              />
+            </>
+          }
+        />
+      </div>
       {problem && <p role="alert">{problem}</p>}
       <div className="journal-month-row">
         <button type="button" className="btn-secondary journal-month-step" aria-label="Previous month" onClick={() => setMonth((m) => shiftMonth(m, -1))}>
@@ -225,8 +261,17 @@ function ProofPhoto({ jk, id }: { jk: JournalKey; id: string }) {
  * it saves the draft and asks the app to look at the clock (review I1).
  */
 function WritingView({
-  jk, date: startDate, deviceId, initialDraft, onFinished, photoButton,
-}: { jk: JournalKey; date: ISODate; deviceId: string; initialDraft: string; onFinished: () => void; photoButton: ReactNode }) {
+  jk, date: startDate, late = false, deviceId, initialDraft, onFinished, photoButton,
+}: {
+  jk: JournalKey;
+  date: ISODate;
+  /** Yesterday's unfinished page: it is filed under its own date, as if finished then. */
+  late?: boolean;
+  deviceId: string;
+  initialDraft: string;
+  onFinished: () => void;
+  photoButton: ReactNode;
+}) {
   const [date] = useState(startDate); // pinned when the box opens (midnight stays on the same day)
   const [text, setText] = useState(initialDraft);
   const [problem, setProblem] = useState("");
@@ -270,7 +315,7 @@ function WritingView({
 
   async function done() {
     if (busy) return;
-    if (todayISO() !== date) {
+    if ((late ? addDays(todayISO(), -1) : todayISO()) !== date) {
       // Midnight passed: nothing is finished by itself. The words stay that day's draft.
       saveDraft();
       window.dispatchEvent(new Event(CHECK_DATE_EVENT));
@@ -296,7 +341,7 @@ function WritingView({
     <div className="journal-writing">
       <textarea
         className="journal-page-box"
-        aria-label="Today's morning page"
+        aria-label={late ? "Yesterday's morning page" : "Today's morning page"}
         placeholder="Just write. No topic, no editing."
         value={text}
         onChange={(e) => onChange(e.target.value)}
