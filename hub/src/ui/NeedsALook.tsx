@@ -1,38 +1,29 @@
 import { useState } from "react";
 import { updateItem } from "../data/repo";
 import { needsALook } from "../domain/attention";
-import { daysBetween } from "../domain/dates";
 import type { ISODate, Item } from "../domain/types";
-import { AREA_CHOICES } from "./areas";
 import { useSaveError } from "./messages";
 import { TaskRow, useTick } from "./TaskRow";
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
 type Kind = "overdue" | "dueSoon" | "stale";
 
-/** Why a row is here, beyond its due line: overdue and due-soon rows say it in the due line (2D). */
-function reason(kind: Kind, it: Item, today: ISODate): string | null {
-  if (kind !== "stale") return null;
-  return `Not looked at for ${plural(daysBetween(it.touchedAt, today), "day")}. What do you want to do with this?`;
-}
-
+/**
+ * One row (compact strips, 2026-11-02): the title and due line only; its area is in the
+ * side panel, and why it is here is the group heading. The tray keeps the date controls.
+ */
 function Row({
   item,
-  kind,
   today,
   onTick,
   onChanged,
 }: {
   item: Item;
-  kind: Kind;
   today: ISODate;
   onTick: (id: string) => Promise<boolean>;
   onChanged: () => Promise<void>;
 }) {
   const [due, setDue] = useState(item.due ?? "");
   const { attempt, saveError } = useSaveError();
-  const area = AREA_CHOICES.find((a) => a.id === item.areaId)?.label ?? item.areaId;
 
   async function saveDate() {
     // An empty date clears the due date (undefined removes the field).
@@ -40,24 +31,12 @@ function Row({
     if (ok) await onChanged();
   }
 
-  const why = reason(kind, item, today);
   return (
     <TaskRow
       item={item}
       today={today}
       onTick={onTick}
       onMoved={onChanged}
-      meta={
-        <div className="strip-meta">
-          <span>{area}</span>
-          {why && (
-            <>
-              {" · "}
-              <span>{why}</span>
-            </>
-          )}
-        </div>
-      }
       tray={
         <>
           <label className="form-field">
@@ -113,7 +92,7 @@ export function NeedsALook({
             <h3>{heading}</h3>
             <ul aria-label={heading} className="strip-list">
               {found[kind].map((it) => (
-                <Row key={it.id} item={it} kind={kind} today={today} onTick={tick} onChanged={onChanged} />
+                <Row key={it.id} item={it} today={today} onTick={tick} onChanged={onChanged} />
               ))}
             </ul>
           </section>

@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { saveItemNotes, updateItem } from "../data/repo";
+import { needsALook } from "../domain/attention";
+import { daysBetween } from "../domain/dates";
 import { dayLabel } from "../domain/display";
 import type { AreaId, Goal, ISODate, Item, Priority } from "../domain/types";
 import { GOAL_AREAS } from "./areas";
@@ -127,6 +129,8 @@ export function ItemPanel({
   }
 
   const goal = goals.find((g) => g.id === item.goalId);
+  // Days untouched, when it is in Needs a look's "Not looked at in a while" group.
+  const stale = needsALook([item], today).stale.length > 0 ? daysBetween(item.touchedAt, today) : null;
   const isTask = inbox || item.kind === "task";
   const showGoal = editing ? inbox || fields.kind === "task" : isTask;
 
@@ -180,6 +184,24 @@ export function ItemPanel({
           <span>
             <span className="chip">{inbox ? "Inbox" : areaLabel(item.areaId)}</span>
           </span>
+        )}
+        {/* The stale reason left the Needs-a-look strip (compact strips); read-only here. */}
+        {stale !== null && (
+          <>
+            <span className="peek-key">Needs a look</span>
+            <span>{`Not looked at for ${stale} ${stale === 1 ? "day" : "days"}. What do you want to do with this?`}</span>
+          </>
+        )}
+        {/* Tags no longer show on the strip (compact strips); read-only here, as chips. */}
+        {item.tags && item.tags.length > 0 && (
+          <>
+            <span className="peek-key">Tags</span>
+            <span className="peek-tags">
+              {item.tags.map((t) => (
+                <span key={t} className="chip">{`#${t}`}</span>
+              ))}
+            </span>
+          </>
         )}
         {showGoal && (
           <>
@@ -263,7 +285,7 @@ export function ItemPanel({
 }
 
 /** A textarea that is always as tall as its text (also when the panel is resized). */
-function useGrow(value: string) {
+export function useGrow(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;

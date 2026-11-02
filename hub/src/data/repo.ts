@@ -310,6 +310,16 @@ export async function setMilestone(id: string, milestone: boolean, today: ISODat
   });
 }
 
+/** "Show on Home": picks a goal for the Home goals column, or takes it off (the field is then removed). */
+export async function setGoalOnHome(id: string, onHome: boolean): Promise<void> {
+  await db.transaction("rw", db.goals, async () => {
+    const goal = await db.goals.get(id);
+    if (!goal || goal.status !== undefined) return;
+    const { onHome: _o, ...rest } = goal;
+    await db.goals.put(onHome ? { ...rest, onHome: true } : rest);
+  });
+}
+
 /** Saves a goal's notes (the panel's page); blank text removes them. */
 export async function saveGoalNotes(id: string, notes: string): Promise<void> {
   if (notes.length > MAX_GOAL_NOTES) throw new Error(`at most ${MAX_GOAL_NOTES} characters`);

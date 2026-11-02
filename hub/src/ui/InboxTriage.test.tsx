@@ -197,33 +197,16 @@ describe("From filter", () => {
   });
 });
 
-describe("check reasons", () => {
-  it("shows the reason line under the title when the item has the check tag", async () => {
+describe("check reasons (compact strips, 2026-11-02)", () => {
+  it("the Check: line stays off the list; it is the first line of the item's page in the panel", async () => {
     await createItem(
       { kind: "task", title: "Maybe done", areaId: "inbox", priority: 2, tags: ["check"], notes: "Check: not sure if this is still open\nmore detail" },
       TODAY,
     );
-    await createItem(
-      { kind: "task", title: "Plain", areaId: "inbox", priority: 2, notes: "Check: this should not show" },
-      TODAY,
-    );
     render(<InboxPage today={TODAY} />);
     await screen.findByText("Maybe done", { selector: ".strip-title" });
-    expect(within(rowOf("Maybe done")).getByText("Check: not sure if this is still open")).toBeInTheDocument();
+    expect(within(rowOf("Maybe done")).queryByText(/Check:/)).toBeNull();
     expect(screen.queryByText("more detail")).toBeNull();
-    expect(screen.queryByText("Check: this should not show")).toBeNull();
-  });
-
-  it("shows nothing extra when the check tag has no reason line, and renders the reason as text", async () => {
-    await createItem({ kind: "task", title: "Tagged", areaId: "inbox", priority: 2, tags: ["check"] }, TODAY);
-    await createItem(
-      { kind: "task", title: "Html", areaId: "inbox", priority: 2, tags: ["check"], notes: "Check: <b>idea</b> or to-do?" },
-      TODAY,
-    );
-    render(<InboxPage today={TODAY} />);
-    await screen.findByText("Tagged", { selector: ".strip-title" });
-    expect(document.querySelectorAll(".inbox-check")).toHaveLength(1);
-    expect(screen.getByText("Check: <b>idea</b> or to-do?")).toBeInTheDocument();
-    expect(document.querySelector("b")).toBeNull();
+    expect(document.querySelectorAll(".inbox-check")).toHaveLength(0);
   });
 });

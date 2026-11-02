@@ -1,5 +1,6 @@
 import { useContext } from "react";
 import type { ISODate } from "../domain/types";
+import { useAddDefaults } from "./addContext";
 import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
 import { areaLabel, GoalCard } from "./GoalProgress";
 import { GoalForm } from "./GoalForm";
@@ -9,6 +10,9 @@ import { useHubData } from "./useHubData";
 export function GoalsPage({ today }: { today: ISODate }) {
   const { items, goals, refresh, loaded, error } = useHubData(today);
   const shell = useContext(ShellContext);
+  // Add opens as a goal in the first area section shown (the first sidebar area when none).
+  const firstShown = GOAL_AREAS_BY_SIDEBAR.find((a) => goals.some((g) => g.areaId === a.id));
+  useAddDefaults("goal", (firstShown ?? GOAL_AREAS_BY_SIDEBAR[0]).id);
 
   /** Re-read here, then tell the shell so other readers (e.g. an open quick-add) see the new goal. */
   async function saved() {

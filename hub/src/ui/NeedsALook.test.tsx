@@ -27,7 +27,7 @@ async function seed(title: string, extra: { due?: string; touchedAt?: string; ar
 }
 
 describe("Inbox: To sort and Needs a look", () => {
-  it("shows both sections, the three groups and calm reasons with correct singular and plural", async () => {
+  it("shows both sections and the three groups; rows are compact (title and due line only)", async () => {
     await seed("Late two", { due: "2026-10-25" });
     await seed("Late one", { due: "2026-10-26" });
     await seed("Today job", { due: "2026-10-27" });
@@ -49,10 +49,9 @@ describe("Inbox: To sort and Needs a look", () => {
     expect(within(row("Tomorrow job")).getByText("Due tomorrow")).toBeInTheDocument();
     expect(within(row("Soon job")).getByText("Due Fri 30 Oct")).toBeInTheDocument();
     expect(screen.queryByText(/Overdue by/)).toBeNull();
-    expect(
-      within(row("Old job")).getByText("Not looked at for 26 days. What do you want to do with this?"),
-    ).toBeInTheDocument();
-    expect(within(row("Late two")).getByText("Art")).toBeInTheDocument();
+    // Compact strips: the stale reason is the group heading, the area is in the panel.
+    expect(screen.queryByText(/Not looked at for/)).toBeNull();
+    expect(within(row("Late two")).queryByText("Art")).toBeNull();
     expect(screen.queryByText("Nothing needs a look.")).toBeNull();
   });
 

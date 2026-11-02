@@ -164,6 +164,18 @@ describe("the goal panel (view)", () => {
     await vi.waitFor(async () => expect((await db.goals.get(g.id))!.notes).toBe("# Plan\n- [ ] a pretend step"), { timeout: 3000 });
   });
 
+  it("Show on Home is one tap in view mode, and tapping again takes it off", async () => {
+    const g = await createGoal({ title: "Pretend homeward", areaId: "art", kind: "practice" }, TODAY);
+    const p = await openGoal(g.id);
+    const toggle = p.getByRole("button", { name: "Show on Home" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(toggle);
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.onHome).toBe(true));
+    await vi.waitFor(() => expect(p.getByRole("button", { name: "Show on Home" })).toHaveAttribute("aria-pressed", "true"));
+    await userEvent.click(p.getByRole("button", { name: "Show on Home" }));
+    await vi.waitFor(async () => expect(await db.goals.get(g.id)).not.toHaveProperty("onHome"));
+  });
+
   it("a goal's page stops at 4,000 characters this release, saying so", async () => {
     const g = await createGoal({ title: "Long", areaId: "art", kind: "practice", notes: "y".repeat(3999) }, TODAY);
     const p = await openGoal(g.id);

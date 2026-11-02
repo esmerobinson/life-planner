@@ -1,9 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { db } from "../data/db";
-import { createGoal, createItem, tickItem } from "../data/repo";
+import { createGoal, createItem, deleteGoal, setGoalOnHome, tickItem } from "../data/repo";
 import { AppShell } from "./AppShell";
 import { HomePage } from "./HomePage";
 import { Route, Routes, useLocation } from "react-router-dom";
@@ -94,6 +94,59 @@ describe("HomePage", () => {
     expect(await screen.findByText("No monthly targets yet.")).toBeInTheDocument();
     expect(screen.queryByText("Targetless")).toBeNull();
     expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("with goals chosen for Home, the column shows only those, in sidebar area order", async () => {
+    await createGoal({ title: "Pretend target goal", areaId: "art", kind: "practice", monthlyTarget: 4 }, TODAY);
+    const body = await createGoal({ title: "Pretend long run", areaId: "body", kind: "practice" }, TODAY);
+    const admin = await createGoal({ title: "Pretend tidy papers", areaId: "admin", kind: "practice", monthlyTarget: 2 }, TODAY);
+    await setGoalOnHome(body.id, true);
+    await setGoalOnHome(admin.id, true);
+    renderHome();
+    const column = await screen.findByRole("complementary", { name: "Goals this month" });
+    await vi.waitFor(() => expect(within(column).getAllByRole("listitem")).toHaveLength(2));
+    // Admin comes before Body in the sidebar.
+    expect(within(column).getAllByRole("listitem").map((li) => li.querySelector(".goal-title")!.textContent)).toEqual([
+      "Pretend tidy papers",
+      "Pretend long run",
+    ]);
+    expect(within(column).queryByText("Pretend target goal")).toBeNull();
+    expect(within(column).queryByText("No monthly targets yet.")).toBeNull();
+  });
+
+  it("Choose goals lists every live goal by area; ticking one shows it on Home, unticking falls back", async () => {
+    await createGoal({ title: "Pretend target goal", areaId: "art", kind: "practice", monthlyTarget: 4 }, TODAY);
+    const mind = await createGoal({ title: "Pretend calm", areaId: "mind", kind: "practice" }, TODAY);
+    const binned = await createGoal({ title: "Pretend binned", areaId: "mind", kind: "practice" }, TODAY);
+    await deleteGoal(binned.id, TODAY);
+    renderHome();
+    const column = await screen.findByRole("complementary", { name: "Goals this month" });
+    // Nothing chosen yet: the goals with a monthly target show, as before.
+    expect(await within(column).findByText("Pretend target goal")).toBeInTheDocument();
+    expect(within(column).queryByText("Pretend calm")).toBeNull();
+
+    await userEvent.click(within(column).getByRole("button", { name: "Choose goals" }));
+    expect(within(column).getByRole("group", { name: "Art" })).toBeInTheDocument();
+    const mindGroup = within(column).getByRole("group", { name: "Mind" });
+    expect(within(mindGroup).queryByText("Pretend binned")).toBeNull();
+    await userEvent.click(within(mindGroup).getByRole("checkbox", { name: "Pretend calm" }));
+    await vi.waitFor(async () => expect((await db.goals.get(mind.id))!.onHome).toBe(true));
+    await vi.waitFor(() => expect(within(mindGroup).getByRole("checkbox", { name: "Pretend calm" })).toBeChecked());
+    await userEvent.click(within(column).getByRole("button", { name: "Done" }));
+    expect(await within(column).findByRole("link", { name: "Pretend calm" })).toBeInTheDocument();
+    expect(within(column).queryByText("Pretend target goal")).toBeNull();
+
+    await userEvent.click(within(column).getByRole("button", { name: "Choose goals" }));
+    await userEvent.click(within(column).getByRole("checkbox", { name: "Pretend calm" }));
+    await vi.waitFor(async () => expect(await db.goals.get(mind.id)).not.toHaveProperty("onHome"));
+    await userEvent.click(within(column).getByRole("button", { name: "Done" }));
+    expect(await within(column).findByRole("link", { name: "Pretend target goal" })).toBeInTheDocument();
+  });
+
+  it("no Choose goals link before there are any goals", async () => {
+    renderHome();
+    expect(await screen.findByText("No monthly targets yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Choose goals" })).toBeNull();
   });
 
   it("ticking a goal pick on Home updates the goal bar without navigation", async () => {

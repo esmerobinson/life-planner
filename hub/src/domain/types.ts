@@ -74,6 +74,8 @@ export interface Goal {
   /** How often it is worked on, e.g. "Weekly: 3 sessions". Plain text. */
   cadence?: string;
   notes?: string;
+  /** Chosen to show in the Home goals column ("Show on Home"). Absent means not chosen. */
+  onHome?: boolean;
   source?: { kind: "obsidian"; key: string };
   createdAt: ISODate;
   /**

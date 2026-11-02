@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validItem } from "./validate";
+import { validGoal, validItem } from "./validate";
 
 const row = (o: Record<string, unknown> = {}) => ({
   id: "i1", kind: "task", title: "Pretend", links: [], areaId: "art", priority: 2,
@@ -30,5 +30,22 @@ describe("round 3 item fields", () => {
     expect(validItem(row({ doneDates: ["2026-02-30"] }))).toBe(false);
     expect(validItem(row({ doneDates: "2026-10-28" }))).toBe(false);
     expect(validItem(row({ doneDates: Array.from({ length: 401 }, () => "2026-10-28") }))).toBe(false);
+  });
+});
+
+describe("goal onHome (Show on Home)", () => {
+  const goal = (o: Record<string, unknown> = {}) => ({
+    id: "g1", title: "Pretend goal", areaId: "art", kind: "practice", milestones: [], createdAt: "2026-10-01", ...o,
+  });
+
+  it("is optional, so goals without it stay valid", () => {
+    expect(validGoal(goal())).toBe(true);
+  });
+
+  it("is a boolean when present", () => {
+    expect(validGoal(goal({ onHome: true }))).toBe(true);
+    expect(validGoal(goal({ onHome: false }))).toBe(true);
+    expect(validGoal(goal({ onHome: "yes" }))).toBe(false);
+    expect(validGoal(goal({ onHome: 1 }))).toBe(false);
   });
 });

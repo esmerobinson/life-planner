@@ -218,6 +218,9 @@ describe("Goals and the shell", () => {
     );
     await userEvent.click(await screen.findByRole("button", { name: "Add" }));
     const quick = within(document.querySelector("form.quick-add") as HTMLElement);
+    // On the Goals page Add opens as a goal; a to-do offers the goal picker.
+    expect(quick.getByLabelText("Type")).toHaveValue("goal");
+    await userEvent.selectOptions(quick.getByLabelText("Type"), "task");
     await userEvent.selectOptions(quick.getByLabelText("Area"), "writing");
     expect(quick.queryByRole("option", { name: "Fresh goal" })).toBeNull();
     await userEvent.type(screen.getByLabelText("Goal title"), "Fresh goal");

@@ -39,7 +39,11 @@ test("Google Tasks JSON import: add, repeat, list tag, cross-source title check"
   const inbox = page.getByLabel("Inbox items");
   await expect(inbox.getByText("Prune the pretend roses")).toBeVisible();
   await expect(inbox.getByText("Order invented seeds")).toBeVisible();
-  await expect(inbox.getByText("#garden jobs").first()).toBeVisible();
+  // Compact strips: the list tag is off the strip, in the panel behind "See more".
+  await expect(inbox.getByText("#garden jobs")).toHaveCount(0);
+  await inbox.getByRole("button", { name: "See more: Prune the pretend roses" }).click();
+  await expect(page.getByRole("complementary", { name: "Prune the pretend roses" }).getByText("#garden jobs")).toBeVisible();
+  await page.goBack();
   await expect(inbox.getByText("Already done chore")).toHaveCount(0);
   await expect(inbox.getByText(/sketch the pretend hedgehog/i)).toHaveCount(1);
 });
