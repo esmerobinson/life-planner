@@ -197,7 +197,15 @@ describe("planning a new month", () => {
     expect(plan).toEqual([{ id: expect.any(String), month: "2026-11", kind: "count", title: "Writing sessions", target: 20 }]);
   });
 
-  it("not offered once this month has goals, nor when last month had only steps or nothing", () => {
+  it("a skipped month is passed over: January copies November when December had nothing (review M6)", () => {
+    const g = goal({ rhythm: "daily", monthGoals: [count("2026-11", { target: 30, title: "Days" }), count("2026-09", { id: "old", target: 5 })] });
+    expect(canPlanMonth(g, "2027-01-03")).toBe(true);
+    expect(plannedFromLastMonth(g, "2027-01-03", id)).toEqual([
+      { id: expect.any(String), month: "2027-01", kind: "count", title: "Days", target: 31 },
+    ]);
+  });
+
+  it("not offered once this month has goals, nor when earlier months had only steps or nothing", () => {
     expect(canPlanMonth(goal({ monthGoals: [count("2026-10"), count("2026-11", { id: "x" })] }), "2026-11-02")).toBe(false);
     expect(canPlanMonth(goal({ monthGoals: [{ id: "s", month: "2026-10", kind: "step", title: "x" }] }), "2026-11-02")).toBe(false);
     expect(canPlanMonth(goal(), "2026-11-02")).toBe(false);

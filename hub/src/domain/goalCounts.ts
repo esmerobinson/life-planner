@@ -183,20 +183,27 @@ export function pastMonths(
   }));
 }
 
-/** "Plan <month>" is offered: last month had counts, this month has no monthly goals yet. */
-export function canPlanMonth(goal: Goal, today: ISODate): boolean {
+/** The latest month before this one that had counts (what "Plan <month>" copies; review M6). */
+function planSource(goal: Goal, today: ISODate): string | null {
   const now = monthOf(today);
-  return goalsIn(goal, now).length === 0 && goalsIn(goal, shiftMonth(now, -1)).some((m) => m.kind === "count");
+  const months = (goal.monthGoals ?? []).filter((m) => m.kind === "count" && m.month < now).map((m) => m.month);
+  return months.length ? months.sort()[months.length - 1]! : null;
+}
+
+/** "Plan <month>" is offered: an earlier month had counts, this month has no monthly goals yet. */
+export function canPlanMonth(goal: Goal, today: ISODate): boolean {
+  return goalsIn(goal, monthOf(today)).length === 0 && planSource(goal, today) !== null;
 }
 
 /**
- * This month's counts copied from last month's (same titles and targets; steps aren't
- * copied). A daily goal whose target was every day of last month gets every day of this one.
+ * This month's counts copied from the latest earlier month that had any (usually last month;
+ * a skipped month is passed over): same titles and targets; steps aren't copied. A daily goal
+ * whose target was every day of that month gets every day of this one.
  */
 export function plannedFromLastMonth(goal: Goal, today: ISODate, newId: () => string): MonthGoal[] {
   if (!canPlanMonth(goal, today)) return [];
   const now = monthOf(today);
-  const last = shiftMonth(now, -1);
+  const last = planSource(goal, today)!;
   return goalsIn(goal, last)
     .filter((m) => m.kind === "count")
     .map((m) => {
