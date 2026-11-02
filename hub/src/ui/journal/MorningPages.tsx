@@ -8,6 +8,7 @@ import type { JournalKey } from "../../journal/crypto";
 import { countWords, MORNING_WORDS } from "../../journal/entries";
 import { rowStatus } from "../../journal/rows";
 import { addDays, todayISO } from "../../domain/dates";
+import { dayLabel } from "../../domain/display";
 import type { ISODate } from "../../domain/types";
 import { CHECK_DATE_EVENT } from "../shellContext";
 import { downscalePicture, PICTURE_UNREADABLE } from "../picture";
@@ -40,8 +41,11 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const [done, setDone] = useState<Set<ISODate> | null>(null);
   const [day, setDay] = useState<MorningDay | null>(null);
   const [yesterdayDraft, setYesterdayDraft] = useState("");
-  // Yesterday's page opened for finishing: its date and the words it opened with.
-  const [finishing, setFinishing] = useState<{ date: ISODate; text: string } | null>(null);
+  // Yesterday's page opened for finishing: the day it was started (fixed, even if midnight
+  // passes) and, in lateText, its words as they are typed (the box is re-made when the day
+  // is re-read, and must come back with them).
+  const [finishing, setFinishing] = useState<{ date: ISODate } | null>(null);
+  const lateText = useRef("");
   const [month, setMonth] = useState(today.slice(0, 7));
   const [problem, setProblem] = useState("");
   const [adding, setAdding] = useState(false);
@@ -68,8 +72,6 @@ export function MorningPages({ jk, today, deviceId }: Props) {
     }
   }, [jk, today, deviceId]);
   useEffect(() => void load(), [load]);
-  // A new day: the page being finished was yesterday's, no longer.
-  useEffect(() => setFinishing(null), [today]);
   useDbChanges(() => void load());
   // Never blank: "Loading…", then the can't-open line and Try again.
   const guard = useLoadGuard(done === null || day === null, load);
@@ -118,21 +120,31 @@ export function MorningPages({ jk, today, deviceId }: Props) {
       {yesterdayDraft.trim() !== "" && !finishing && (
         <div className="btn-group">
           <p className="journal-muted">{YESTERDAY_SAVED}</p>
-          <button type="button" className="btn-secondary" onClick={() => setFinishing({ date: addDays(today, -1), text: yesterdayDraft })}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              lateText.current = yesterdayDraft;
+              setFinishing({ date: addDays(today, -1) });
+            }}
+          >
             Open yesterday's page
           </button>
         </div>
       )}
       {finishing && (
         <>
-          <p className="journal-muted">Finishing yesterday's page</p>
+          <p className="journal-muted">
+            {finishing.date === addDays(today, -1) ? "Finishing yesterday's page" : `Finishing the page from ${dayLabel(finishing.date, today)}`}
+          </p>
           <WritingView
             key={`late|${finishing.date}`}
             jk={jk}
             date={finishing.date}
             late
             deviceId={deviceId}
-            initialDraft={finishing.text}
+            initialDraft={lateText.current}
+            onText={(t) => (lateText.current = t)}
             onFinished={() => {
               setFinishing(null); // back to today's own, untouched box
               void load();
@@ -261,7 +273,7 @@ function ProofPhoto({ jk, id }: { jk: JournalKey; id: string }) {
  * it saves the draft and asks the app to look at the clock (review I1).
  */
 function WritingView({
-  jk, date: startDate, late = false, deviceId, initialDraft, onFinished, photoButton,
+  jk, date: startDate, late = false, deviceId, initialDraft, onText, onFinished, photoButton,
 }: {
   jk: JournalKey;
   date: ISODate;
@@ -269,6 +281,8 @@ function WritingView({
   late?: boolean;
   deviceId: string;
   initialDraft: string;
+  /** Told the words as they change (so a box that is re-made can come back with them). */
+  onText?: (text: string) => void;
   onFinished: () => void;
   photoButton: ReactNode;
 }) {
@@ -307,6 +321,7 @@ function WritingView({
 
   function onChange(value: string) {
     latest.current = value;
+    onText?.(value);
     setText(value);
     setProblem("");
     if (timer.current) clearTimeout(timer.current);
@@ -315,7 +330,9 @@ function WritingView({
 
   async function done() {
     if (busy) return;
-    if ((late ? addDays(todayISO(), -1) : todayISO()) !== date) {
+    // A late page (yesterday's, opened on purpose) is pinned to the day it was started: filing it
+    // under that day is right whatever the clock says. Today's box is not (see the note above).
+    if (!late && todayISO() !== date) {
       // Midnight passed: nothing is finished by itself. The words stay that day's draft.
       saveDraft();
       window.dispatchEvent(new Event(CHECK_DATE_EVENT));
