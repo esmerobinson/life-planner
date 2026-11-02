@@ -208,3 +208,38 @@ it("cards sealed with another key: noted, and Import still offered", async () =>
   expect(await within(s).findByText("Can't open this entry on this device")).toBeInTheDocument();
   expect(within(s).getByRole("button", { name: "Import" })).toBeEnabled();
 });
+
+it("Update cards sits at the top of the tab (above the card) and opens the same import flow", async () => {
+  await confirmedDevice(db, jk);
+  await imported();
+  renderApp("/journal", TODAY);
+  const s = await section();
+  const card = await within(s).findByRole("article", { name: "Today's card" });
+  const update = within(s).getByRole("button", { name: "Update cards" });
+  expect(update).toHaveClass("btn-secondary");
+  expect(update.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const input = within(s).getByLabelText("Exercise card file (update)");
+  const clicked = vi.spyOn(input, "click");
+  await userEvent.click(update);
+  expect(clicked).toHaveBeenCalledTimes(1); // the file picker
+  const two = JSON.stringify({ ...FAKE_CARD_FILE, cards: FAKE_CARD_FILE.cards.slice(1, 3) });
+  await userEvent.upload(input, cardFile(two));
+  expect(await within(s).findByText("Replace your exercise cards?")).toBeInTheDocument(); // the same rules
+  await userEvent.click(within(s).getByRole("button", { name: "Replace" }));
+  await waitFor(async () => expect((await readExerciseCards(jk) as { set: { cards: unknown[] } }).set.cards).toHaveLength(2));
+});
+
+it("Update cards is not offered while the journal is locked", async () => {
+  await db.journal.put(await verifierRow(jk));
+  renderApp("/journal", TODAY);
+  await screen.findByRole("heading", { name: "Unlock journal" });
+  expect(screen.queryByRole("button", { name: "Update cards" })).toBeNull();
+});
+
+it("no cards yet: only the Import pill, no Update cards", async () => {
+  await confirmedDevice(db, jk);
+  renderApp("/journal", TODAY);
+  const s = await section();
+  await within(s).findByText("Add your exercise cards");
+  expect(within(s).queryByRole("button", { name: "Update cards" })).toBeNull();
+});

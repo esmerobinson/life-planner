@@ -166,6 +166,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       {progress && progress.unreadable > 0 && set && <p className="journal-muted">{CANT_OPEN}</p>}
       {plan && (
         <>
+          <ImportPill label="Update cards" fileLabel="Exercise card file (update)" busy={busy} onFile={(f) => void chosen(f)} />
           <article className="exercise-card" aria-label="Today's card">
             <CardHead card={plan.today.card} streak={row} round={plan.round} />
             <CardBody card={plan.today.card} />
@@ -274,20 +275,25 @@ async function readCardFile(file: File): Promise<CardSet | null> {
   }
 }
 
-/** The "Import" soft pill and its file picker (JSON only). */
-function ImportPill({ busy, onFile }: { busy: boolean; onFile: (f: File) => void }) {
+/**
+ * The "Import" soft pill and its file picker (JSON only). "Update cards" at the top of the
+ * tab is the same pill and flow under another name (its picker is labelled apart).
+ */
+function ImportPill({
+  busy, onFile, label = "Import", fileLabel = "Exercise card file",
+}: { busy: boolean; onFile: (f: File) => void; label?: string; fileLabel?: string }) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <div className="btn-group">
       <button type="button" className="btn-secondary" disabled={busy} onClick={() => input.current?.click()}>
-        Import
+        {label}
       </button>
       <input
         ref={input}
         type="file"
         accept="application/json"
         hidden
-        aria-label="Exercise card file"
+        aria-label={fileLabel}
         onChange={(e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
