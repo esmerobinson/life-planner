@@ -148,6 +148,7 @@ test("delete from an area strip and delete a goal: both in the Bin, both restora
   await page.getByLabel("Title").fill("Pretend chore to delete");
   await page.getByRole("combobox", { name: "Area", exact: true }).selectOption({ label: "Art" });
   await page.getByRole("button", { name: "Add item" }).click();
+  await expect(page.getByRole("button", { name: "Add item" })).toHaveCount(0); // saved: the form closes
   await page.goto("/area/art");
   await page.getByRole("button", { name: "Move to: Pretend chore to delete" }).click();
   await page.getByRole("group", { name: "Move Pretend chore to delete to" }).getByRole("button", { name: "Delete" }).click();
