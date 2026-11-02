@@ -53,8 +53,10 @@ describe("the key check", () => {
     await confirmedDevice(db, jk);
     const real = keyStore.confirmJournalKey;
     const spy = vi.spyOn(keyStore, "confirmJournalKey").mockImplementation(() => never());
-    renderApp("/journal", TODAY);
-    expect(await screen.findByRole("heading", { level: 1, name: "Journal" })).toBeInTheDocument();
+    renderApp("/journal/exercise", TODAY);
+    // Checked straight away, in the first render (review M1: a later look could already be
+    // past the short test timeout under load).
+    expect(screen.getByRole("heading", { level: 1, name: "Journal" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Loading…");
     await expectSectionStrips();
     const alert = await screen.findByRole("alert");

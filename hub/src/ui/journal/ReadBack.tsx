@@ -83,7 +83,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
       {items.length > 0 && (
         <ul className="journal-past journal-read-back" aria-label="Read back">
           {items.map((it) => (
-            <li key={it.kind === "page" ? it.id : `${it.kind}|${it.date}|${it.kind === "exercise" ? it.entry.id : ""}`}>
+            <li key={it.kind === "page" ? it.id : `${it.kind}|${it.date}|${it.kind === "exercise" ? `${it.entry.id}|${it.entry.theme}` : ""}`}>
               <ReadBackItem jk={jk} item={it} today={today} />
             </li>
           ))}

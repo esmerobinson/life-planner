@@ -205,6 +205,16 @@ describe("version 2 cards (Journal v2): by card id", () => {
     expect(await db.journal.where("kind").equals("exercise").count()).toBe(1);
   });
 
+  it("two submits at once (today's card and a next one) both keep their done marks (review M5)", async () => {
+    await recordExerciseShown(jk, DAY, ME, weather.id);
+    await Promise.all([
+      submitExerciseEntry(jk, DAY, ME, weather, "Pretend one", weather.id),
+      submitExerciseEntry(jk, DAY, ME, kettle, "Pretend two", weather.id),
+    ]);
+    const marks = (await readExerciseProgress(jk)).marks.filter((m) => m.done).map((m) => m.id).sort();
+    expect(marks).toEqual([kettle.id, weather.id].sort());
+  });
+
   it("Past exercises carry the card id", async () => {
     await submitExerciseEntry(jk, "2026-10-29", ME, weather, "Pretend yesterday");
     expect((await listExerciseEntries(jk, DAY)).entries.map((e) => [e.id, e.day, e.theme])).toEqual([[weather.id, 1, "Pretend weather"]]);

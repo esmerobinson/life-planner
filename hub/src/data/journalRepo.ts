@@ -379,9 +379,13 @@ export async function readExerciseCards(jk: JournalKey): Promise<CardsState> {
     return set ? { state: "ok", set } : { state: "unreadable" };
   }
   if (e.v !== 3) return { state: "unreadable" };
+  const chunks = await Promise.all(Array.from({ length: e.chunks }, (_, k) => db.journal.get(journalId("cards", row.date, String(k)))));
+  // The same manifest and chunks as last time: the set already opened (review M7: not every
+  // database change decrypts and checks the whole set again).
+  const key = [jk.fp, row.iv, ...chunks.map((c) => c?.iv ?? "-")].join("|");
+  if (opened?.key === key) return opened.state;
   const cards: Record<string, unknown>[] = [];
-  for (let k = 0; k < e.chunks; k++) {
-    const chunk = await db.journal.get(journalId("cards", row.date, String(k)));
+  for (const [k, chunk] of chunks.entries()) {
     if (!chunk) return { state: "syncing" };
     const c = await openRow(jk, chunk, "cards");
     if (c.state !== "ok") return { state: "unreadable" };
@@ -390,8 +394,13 @@ export async function readExerciseCards(jk: JournalKey): Promise<CardsState> {
     cards.push(...c.entry.cards);
   }
   const set = readStoredSet(e.version, e.source, cards, e.tracks);
-  return set ? { state: "ok", set } : { state: "unreadable" };
+  const state: CardsState = set ? { state: "ok", set } : { state: "unreadable" };
+  if (set) opened = { key, state };
+  return state;
 }
+
+/** The last card set opened from chunks, by its rows (one at a time; it holds no plaintext beyond memory). */
+let opened: { key: string; state: CardsState } | null = null;
 
 /** The stored cards in chunks of at most CARDS_CHUNK_BYTES of JSON, on card boundaries. */
 function chunked(cards: Record<string, unknown>[]): Record<string, unknown>[][] {
@@ -428,6 +437,13 @@ export async function importExerciseCards(jk: JournalKey, set: CardSet, today: I
     const sealed = await sealJson(jk.key, { v: 4, setId, k, cards }, journalAad(id));
     if (sealed.ct.length > MAX_JOURNAL_CT) throw new Error(CARDS_TOO_BIG);
     rows.push({ id, kind: "cards", date: today, fp: jk.fp, ...sealed });
+  }
+  // An earlier import's higher chunks are emptied, so they don't linger (review M3).
+  for (const old of await db.journal.where("kind").equals("cards").toArray()) {
+    const k = old.id.startsWith("cards:") ? Number(old.id.slice("cards:".length)) : -1;
+    if (k < parts.length) continue;
+    const id = journalId("cards", today, String(k));
+    rows.push({ id, kind: "cards", date: today, fp: jk.fp, ...(await sealJson(jk.key, { v: 4, setId, k, cards: [] }, journalAad(id))) });
   }
   const tracks = storedTracks(set);
   const manifest = {
@@ -506,10 +522,23 @@ function marked(prev: ExerciseEntryV2 | null, todayId: string, cardId: string, d
   return { v: 2, id, done: ownDone, also, ...(logged.length ? { logged } : {}), at: Date.now() };
 }
 
+/**
+ * This device's marks row is read, changed and written outside one transaction (sealing can't
+ * run inside it), so its changes go one at a time (review M5: two quick submits never lose a mark).
+ */
+let marksQueue: Promise<unknown> = Promise.resolve();
+function oneAtATime<T>(op: () => Promise<T>): Promise<T> {
+  const next = marksQueue.then(op, op);
+  marksQueue = next.catch(() => undefined);
+  return next;
+}
+
 /** Marks today's card done or not on this device's own row for the day (further cards stay). */
-export async function saveExerciseMark(jk: JournalKey, date: ISODate, deviceId: string, cardId: string, done: boolean): Promise<void> {
-  const next = marked(await ownMarks(jk, date, deviceId), cardId, cardId, done);
-  await write(jk, [await seal(jk, "exercise", date, deviceId, next)]);
+export function saveExerciseMark(jk: JournalKey, date: ISODate, deviceId: string, cardId: string, done: boolean): Promise<void> {
+  return oneAtATime(async () => {
+    const next = marked(await ownMarks(jk, date, deviceId), cardId, cardId, done);
+    await write(jk, [await seal(jk, "exercise", date, deviceId, next)]);
+  });
 }
 
 /**
@@ -723,11 +752,13 @@ export async function submitExerciseEntry(
   if (!responseComplete(value)) throw new Error("There is nothing to submit yet.");
   const id = await entryRowId(jk, date, card, deviceId);
   await ownResponse(jk, id);
-  const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, true);
-  const at = Date.now();
-  const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
-  const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
-  await write(jk, [response, mark]);
+  await oneAtATime(async () => {
+    const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, true);
+    const at = Date.now();
+    const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
+    const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
+    await write(jk, [response, mark]);
+  });
 }
 
 /**
@@ -748,11 +779,13 @@ export async function logExerciseEntry(
   if (!trackerNewInput(value, carried?.parts)) throw new Error("There is nothing new to save yet.");
   const id = await entryRowId(jk, date, card, deviceId);
   await ownResponse(jk, id);
-  const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, false, true);
-  const at = Date.now();
-  const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
-  const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
-  await write(jk, [response, mark]);
+  await oneAtATime(async () => {
+    const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, false, true);
+    const at = Date.now();
+    const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
+    const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
+    await write(jk, [response, mark]);
+  });
 }
 
 /**

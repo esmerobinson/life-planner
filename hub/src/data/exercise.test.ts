@@ -141,6 +141,28 @@ describe("cards", () => {
     expect(await readExerciseCards(jk)).toEqual({ state: "syncing" });
   });
 
+  it("a smaller re-import empties the earlier import's higher chunks (review M3)", async () => {
+    await importExerciseCards(jk, parseCardFile(bigCardFileText())!, DAY);
+    const before = (await db.journal.where("kind").equals("cards").toArray()).filter((r) => r.id !== "cards");
+    expect(before.length).toBeGreaterThan(2);
+    await importExerciseCards(jk, SET, "2026-10-31");
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: SET });
+    for (const r of before.slice(1)) {
+      const now = (await db.journal.get(r.id))!;
+      expect(now.ct.length).toBeLessThan(1000);
+      expect(((await openJson(jk.key, now, journalAad(now.id))) as { cards: unknown[] }).cards).toEqual([]);
+    }
+  });
+
+  it("an unchanged set is opened once, and read again after a new import (review M7)", async () => {
+    await importExerciseCards(jk, SET, DAY);
+    const a = await readExerciseCards(jk);
+    expect(await readExerciseCards(jk)).toBe(a); // the same object: not decrypted again
+    const two: CardSet = { source: "Another pretend file", version: 1, tracks: NO_TRACKS, cards: SET.cards.slice(0, 2) };
+    await importExerciseCards(jk, two, DAY);
+    expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: two });
+  });
+
   it("an earlier single-row set still reads", async () => {
     const entry = { v: 1, source: SET.source, cards: storedCards(SET), at: 1 };
     await db.journal.put(await sealedRow(jk, "cards", DAY, undefined, entry));

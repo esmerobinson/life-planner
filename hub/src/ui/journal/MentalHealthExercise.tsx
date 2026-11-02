@@ -150,7 +150,13 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
           <ImportPill busy={busy} onFile={(f) => void chosen(f)} />
         </div>
       )}
-      {cards?.state === "syncing" && <p className="journal-muted">{CARDS_SYNCING}</p>}
+      {cards?.state === "syncing" && (
+        <>
+          <p className="journal-muted">{CARDS_SYNCING}</p>
+          {/* Never a dead end (review M2): her file can be imported here too. */}
+          <ImportPill busy={busy} onFile={(f) => void chosen(f)} />
+        </>
+      )}
       {cards?.state === "unreadable" && (
         <>
           <p className="journal-muted">{CANT_OPEN}</p>

@@ -184,4 +184,6 @@ it("cards whose chunks haven't all arrived yet: 'Your cards are still syncing…
   renderApp("/journal/exercise", TODAY);
   expect(await within(await section()).findByText("Your cards are still syncing…")).toBeInTheDocument();
   expect(screen.queryByRole("article", { name: "Today's card" })).toBeNull();
+  // Never a dead end (review M2): she can import her file here too.
+  expect(within(await section()).getByRole("button", { name: "Import" })).toBeEnabled();
 });
