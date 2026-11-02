@@ -19,6 +19,7 @@ import type { HubDB } from "../data/db";
 import { validJournal } from "../data/validate";
 import type { JournalRow } from "../domain/types";
 import { deriveToken } from "../sync/token";
+import { JOURNAL_KEY_LOST_META } from "./unreadableKeys";
 import { deriveJournalKeyAndFp, fileAad, journalAad, openBytes, openJson, sealBytes, sealJson, type JournalKey } from "./crypto";
 
 /** syncMeta: the confirmed key `{key, mac, fp, id}`. */
@@ -74,8 +75,10 @@ export async function loadJournalKeyInfo(db: HubDB): Promise<StoredJournalKey | 
  * never unwraps anything). Never changes anything.
  */
 export async function journalKeyUnreadable(db: HubDB): Promise<boolean> {
+  // A key found unreadable at start-up was removed and leaves a note (unreadableKeys.ts).
+  const lost = (await meta<boolean>(db, JOURNAL_KEY_LOST_META)) === true;
   const n = await db.syncMeta.where(":id").equals(JOURNAL_KEY_META).count();
-  return n > 0 && !(await loadJournalKeyInfo(db));
+  return (lost || n > 0) && !(await loadJournalKeyInfo(db));
 }
 
 /**
@@ -137,6 +140,7 @@ async function storeCandidate(db: HubDB, jk: JournalKey, token: string | null): 
   return db.transaction("rw", db.syncMeta, async () => {
     if (token !== null && (await meta<string>(db, "token")) !== token) return false;
     await retireCandidateIn(db); // a superseded candidate is kept for repair, never used
+    await db.syncMeta.delete(JOURNAL_KEY_LOST_META); // she typed the passphrase again
     const value: StoredCandidate = { key: jk.key, mac: jk.mac, fp: jk.fp, token, id: crypto.randomUUID() };
     await db.syncMeta.put({ key: JOURNAL_CANDIDATE_META, value });
     return true;

@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import type { FileRow, Item, Goal, JournalRow } from "../domain/types";
+import { dropUnreadableKeys } from "../journal/unreadableKeys";
 import { installChangeTracking, legacyStamp, markTransactionUntracked } from "./changeTracking";
 
 /** The tables that sync (files: the pictures on pages, round 3b; journal: the encrypted journal). */
@@ -93,6 +94,9 @@ export class HubDB extends Dexie {
     // v5: the journal (end-to-end encrypted entries). New and empty, so nothing to stamp.
     this.version(5).stores({ journal: "id, kind, date" });
     installChangeTracking(this);
+    // Before anything reads the journal key: remove key rows WebKit can't read back (their
+    // `get` never answers there and would hang every journal read). See unreadableKeys.ts.
+    this.on("ready", (vip) => dropUnreadableKeys(vip as HubDB).then(() => undefined, () => undefined));
   }
 }
 
