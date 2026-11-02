@@ -7,7 +7,9 @@ import { monthGrid, shiftMonth } from "../../journal/calendar";
 import type { JournalKey } from "../../journal/crypto";
 import { countWords, MORNING_WORDS } from "../../journal/entries";
 import { rowStatus } from "../../journal/rows";
+import { addDays, todayISO } from "../../domain/dates";
 import type { ISODate } from "../../domain/types";
+import { CHECK_DATE_EVENT } from "../shellContext";
 import { downscalePicture, PICTURE_UNREADABLE } from "../picture";
 import { ProgressBar } from "../ProgressBar";
 import { Streak } from "../Streak";
@@ -21,6 +23,8 @@ export const MORNING_RULES =
 /** Under the word count until her 1,000 (Journal v2: a target, never a lock; no guilt). */
 export const KEEP_GOING = "Keep going if you can — 1,000 is about three pages.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
+/** Over the box when yesterday's words were left unfinished (review I1: kept as yesterday's draft). */
+export const YESTERDAY_SAVED = "Yesterday's unfinished page is saved.";
 const fmt = (n: number) => n.toLocaleString("en-GB");
 
 type Props = { jk: JournalKey; today: ISODate; deviceId: string };
@@ -35,6 +39,7 @@ type Props = { jk: JournalKey; today: ISODate; deviceId: string };
 export function MorningPages({ jk, today, deviceId }: Props) {
   const [done, setDone] = useState<Set<ISODate> | null>(null);
   const [day, setDay] = useState<MorningDay | null>(null);
+  const [yesterdayDraft, setYesterdayDraft] = useState(false);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [problem, setProblem] = useState("");
   const [adding, setAdding] = useState(false);
@@ -47,10 +52,15 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const [d, t] = await Promise.all([listMorningDone(jk), readMorningDay(jk, today, deviceId)]);
+      const [d, t, y] = await Promise.all([
+        listMorningDone(jk),
+        readMorningDay(jk, today, deviceId),
+        readMorningDay(jk, addDays(today, -1), deviceId),
+      ]);
       if (id !== latest.current) return;
       setDone(d);
       setDay(t);
+      setYesterdayDraft(y.draft.trim() !== "");
     } catch {
       if (id === latest.current) guardFail.current();
     }
@@ -78,7 +88,8 @@ export function MorningPages({ jk, today, deviceId }: Props) {
     }
   }
 
-  if (done === null || day === null) return <LoadLine guard={guard} />;
+  // The box is today's: until today's day is read (after midnight too), it waits.
+  if (done === null || day === null || day.date !== today) return <LoadLine guard={guard} />;
   const row = rowStatus(done, today);
   const streak = (row.streak > 0 || row.week.some(Boolean) || row.month > 0) && (
     <>
@@ -100,8 +111,9 @@ export function MorningPages({ jk, today, deviceId }: Props) {
           ))}
         </ul>
       )}
+      {yesterdayDraft && <p className="journal-muted">{YESTERDAY_SAVED}</p>}
       <WritingView
-        key={page}
+        key={`${page}|${today}`}
         jk={jk}
         date={today}
         deviceId={deviceId}
@@ -208,7 +220,9 @@ function ProofPhoto({ jk, id }: { jk: JournalKey; id: string }) {
  * 1,000, a gentle line; "I'm done" works at any length (but not on an empty box). The draft
  * (this device's own row) saves itself, sealed, after a pause in typing, on blur, when the
  * box goes away and when the app goes to the background. The day is fixed when the box
- * opens, so writing past midnight stays on the day it was started.
+ * opens; a new day opens a new, empty box (the old one keeps its words as that day's draft),
+ * and "I'm done" after midnight, before the app noticed, never files the page under yesterday:
+ * it saves the draft and asks the app to look at the clock (review I1).
  */
 function WritingView({
   jk, date: startDate, deviceId, initialDraft, onFinished, photoButton,
@@ -256,6 +270,12 @@ function WritingView({
 
   async function done() {
     if (busy) return;
+    if (todayISO() !== date) {
+      // Midnight passed: nothing is finished by itself. The words stay that day's draft.
+      saveDraft();
+      window.dispatchEvent(new Event(CHECK_DATE_EVENT));
+      return;
+    }
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     setBusy(true);

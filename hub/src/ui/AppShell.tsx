@@ -7,7 +7,7 @@ import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
 import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addContext";
 import { QuickAdd } from "./QuickAdd";
-import { ShellContext } from "./shellContext";
+import { CHECK_DATE_EVENT, ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
 import { DbClosedNotice } from "./DbClosedNotice";
@@ -54,11 +54,13 @@ export function AppShell() {
       if (document.visibilityState !== "hidden") bump();
     };
     window.addEventListener("focus", bump);
+    window.addEventListener(CHECK_DATE_EVENT, bump);
     document.addEventListener("visibilitychange", onVisible);
     // A tab left focused across midnight gets no focus event; check the date periodically.
     const timer = setInterval(bump, CLOCK_CHECK_MS);
     return () => {
       window.removeEventListener("focus", bump);
+      window.removeEventListener(CHECK_DATE_EVENT, bump);
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(timer);
     };
