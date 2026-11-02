@@ -1,0 +1,35 @@
+/* The one streak (VISUAL-LANGUAGE.md "Streak (2026-11-02)", her pick "I like the bars",
+   mockup-streaks.html option D), drawn by <Streak> everywhere a streak shows: seven bars for
+   the last seven days ending today, each 7x14px, 3px radius, 3px apart; done = --bar-fill
+   (#98c293, the palette's --green), otherwise --track, or --panel on a mint row (journal rows
+   and the selected Journal tab); then the number, 12px, weight 600. The 6px between the bars
+   and the number is the mockup's. */
+.streak {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.streak-week {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.streak-day {
+  width: 7px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--track);
+}
+
+.streak-day.on {
+  background: var(--bar-fill);
+}
+
+.journal-row .streak-day:not(.on),
+.journal-tab.is-selected .streak-day:not(.on) {
+  background: var(--panel);
+}
