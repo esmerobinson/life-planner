@@ -1,3 +1,4 @@
+import Dexie from "dexie";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { db } from "../data/db";
 import { listCheckinDays, listJournalledDays, listMorningDone, readExerciseProgress } from "../data/repo";
@@ -5,7 +6,9 @@ import type { GoalSources } from "../domain/goalCounts";
 import type { ISODate, Item } from "../domain/types";
 import { loadJournalKey } from "../journal/keyStore";
 import { journalRowDays } from "../journal/rows";
-import { useDbChanges } from "./journal/useJournalKey";
+
+/** A changed-part key (`idb://<db>/<table>/<index>`) in the journal or the key's table. */
+export const touchesJournal = (part: string): boolean => /^idb:\/\/[^/]+\/(journal|syncMeta)(\/|$)/.test(part);
 
 /** What the goals count from, and what this device can't see. */
 export interface GoalSourcesView {
@@ -66,7 +69,16 @@ export function useGoalSources(items: readonly Item[]): GoalSourcesView {
       mounted.current = false;
     };
   }, [load]);
-  useDbChanges(() => void load());
+  // Re-read only when the journal or the key could have changed (review M8): a to-do or sync
+  // bookkeeping write never decrypts the exercise rows again. A change naming no tables re-reads.
+  useEffect(() => {
+    const onMutated = (parts: Record<string, unknown> | undefined) => {
+      const keys = Object.keys(parts ?? {});
+      if (keys.length === 0 || keys.some(touchesJournal)) void load();
+    };
+    Dexie.on.storagemutated.subscribe(onMutated);
+    return () => Dexie.on.storagemutated.unsubscribe(onMutated);
+  }, [load]);
 
   return useMemo(
     () => ({

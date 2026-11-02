@@ -102,10 +102,10 @@ export function validGoal(r: unknown): r is Goal {
   );
 }
 
-/** The most monthly goals one goal keeps (every month's: decades of a few a month). */
-export const MAX_MONTH_GOALS = 500;
+/** The most monthly goals one goal keeps (years of a few a month; with MAX_MONTH_LOG it keeps a row near the sync cap of 1 MB, review M8). */
+export const MAX_MONTH_GOALS = 200;
 /** The most +1s one monthly goal keeps. */
-export const MAX_MONTH_LOG = 1000;
+export const MAX_MONTH_LOG = 400;
 /** The longest monthly goal title (characters). */
 export const MAX_MONTH_TITLE = 200;
 /** The largest monthly count target. */

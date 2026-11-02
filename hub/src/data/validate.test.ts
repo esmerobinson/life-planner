@@ -84,6 +84,14 @@ describe("goals redesign fields (all optional)", () => {
     expect(validGoal(goal({ monthGoals: [mg(), mg()] }))).toBe(false); // the same id twice
   });
 
+  it("caps: at most 200 monthly goals and 400 +1s on one (review M8)", () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => mg({ id: `m${i}` }));
+    expect(validGoal(goal({ monthGoals: many(200) }))).toBe(true);
+    expect(validGoal(goal({ monthGoals: many(201) }))).toBe(false);
+    expect(validGoal(goal({ monthGoals: [mg({ log: Array.from({ length: 400 }, () => "2026-11-02") })] }))).toBe(true);
+    expect(validGoal(goal({ monthGoals: [mg({ log: Array.from({ length: 401 }, () => "2026-11-02") })] }))).toBe(false);
+  });
+
   it("a purged goal carries no monthly goals", () => {
     expect(validGoal(goal({ title: "", status: "purged", monthGoals: [mg()] }))).toBe(false);
     expect(validGoal(goal({ title: "", status: "purged" }))).toBe(true);
