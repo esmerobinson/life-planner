@@ -82,7 +82,11 @@ for (const width of [1280, 390]) {
       const strip = todos.getByRole("listitem").filter({ hasText: "Plan the fictional newsletter" });
       expect(await strip.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(227, 221, 205)"); // --row
       await strip.getByText("Plan the fictional newsletter").hover();
-      expect(await strip.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(233, 227, 214)"); // --panel
+      expect(await strip.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(212, 209, 195)"); // --track
+      // The icon squares keep --panel, so they still stand out from the hovered strip.
+      expect(await strip.locator("button.icon").first().evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(
+        "rgb(233, 227, 214)",
+      );
       expect(await strip.evaluate((e) => getComputedStyle(e).cursor)).toBe("pointer");
       expect(
         await strip.locator(".strip-title").evaluate((e) => getComputedStyle(e).textDecorationLine),
@@ -102,7 +106,7 @@ for (const width of [1280, 390]) {
       await strip.getByRole("button", { name: "Plan the fictional newsletter", exact: true }).focus();
       await page.keyboard.press("Shift+Tab");
       await page.keyboard.press("Tab");
-      expect(await strip.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(233, 227, 214)");
+      expect(await strip.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(212, 209, 195)");
     });
 
     test("Add from Content › To-dos opens there, with Notes; it saves into Content", async ({ page }) => {

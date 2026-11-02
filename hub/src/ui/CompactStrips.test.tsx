@@ -68,6 +68,23 @@ describe("compact strips", () => {
     expect(await screen.findByRole("complementary", { name: "Pretend strip" })).toBeInTheDocument();
   });
 
+  it("a stale to-do's panel says how long it has not been looked at (it left the strip)", async () => {
+    const old = await createItem({ kind: "task", title: "Pretend old job", areaId: "art", priority: 2 }, TODAY);
+    await db.items.update(old.id, { touchedAt: "2026-10-01" });
+    renderApp(`/inbox?open=${old.id}`, TODAY);
+    const panel = await screen.findByRole("complementary", { name: "Pretend old job" });
+    expect(within(panel).getByText("Needs a look")).toBeInTheDocument();
+    expect(within(panel).getByText("Not looked at for 27 days. What do you want to do with this?")).toBeInTheDocument();
+    expect(screen.queryByText(/Not looked at for/, { selector: ".strip *, .strip" })).toBeNull();
+  });
+
+  it("a to-do looked at recently has no Needs a look line in its panel", async () => {
+    const fresh = await createItem({ kind: "task", title: "Pretend fresh job", areaId: "art", priority: 2 }, TODAY);
+    renderApp(`/area/art?open=${fresh.id}`, TODAY);
+    const panel = await screen.findByRole("complementary", { name: "Pretend fresh job" });
+    expect(within(panel).queryByText("Needs a look")).toBeNull();
+  });
+
   it("goal panel task lists are compact too", async () => {
     const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
     await createItem({ kind: "task", title: "Pretend step", areaId: "art", priority: 2, goalId: g.id, notes: "Step detail" }, TODAY);

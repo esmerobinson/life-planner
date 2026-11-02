@@ -81,10 +81,12 @@ describe("strips.css (design round 2, values from the chosen mockups)", () => {
     expect(m).toContain("min-width: 190px");
   });
 
-  it("compact strips: hover and keyboard focus use an existing token; See more is the muted small line", () => {
+  it("compact strips: hover and keyboard focus are --track (Esme, 2026-11-02); See more is the muted small line", () => {
     const hover = rule(".strip.openable:hover");
-    expect(hover).toContain("background: var(--panel)");
-    expect(rule(".strip.openable:has(.strip-open:focus-visible)")).toContain("background: var(--panel)");
+    expect(hover).toContain("background: var(--track)");
+    expect(rule(".strip.openable:has(.strip-open:focus-visible)")).toContain("background: var(--track)");
+    // Never --panel: the icon squares are --panel and would vanish on hover.
+    expect(rule("button.icon")).toContain("background: var(--panel)");
     expect(rule(".strip.openable:not(.crossed):hover .strip-title")).toContain("text-decoration: underline");
     expect(rule(".strip.openable")).toContain("cursor: pointer");
     const q = rule("button.quiet-link");

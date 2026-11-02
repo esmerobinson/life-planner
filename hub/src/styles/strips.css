@@ -285,8 +285,10 @@ button.icon svg {
    - "See more" / "Choose goals": the strips' small muted line (.strip-meta: 13px, 0.8
      opacity), underlined on hover like the clickable title;
    - hover / keyboard focus on an openable strip: its background goes from --row to
-     --panel (PROVISIONAL: an existing token picked by the implementer, not by Esme) and
-     the title underlines. The tick box and the two icons are unchanged. */
+     --track #d4d1c3 and the title underlines (Esme-approved 2026-11-02, everywhere strips
+     appear). Not --panel: the two 30px icon squares are --panel and would vanish, and the
+     goal panel's strips would blend into its --panel background. The tick box and the
+     two icons are unchanged. */
 button.quiet-link {
   background: none;
   border: 0;
@@ -320,7 +322,7 @@ button.quiet-link:focus-visible {
 
 .strip.openable:hover,
 .strip.openable:has(.strip-open:focus-visible) {
-  background: var(--panel);
+  background: var(--track);
 }
 
 .strip.openable:not(.crossed):hover .strip-title,
