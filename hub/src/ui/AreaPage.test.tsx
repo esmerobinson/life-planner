@@ -198,7 +198,7 @@ describe("AreaPage", () => {
       await tickItem(it.id, day);
     }
 
-    it("says how many were ticked off this month and last month, under the heading", async () => {
+    it("says how many were ticked off this month and last month, above the archive", async () => {
       for (const d of ["2026-10-01", "2026-10-15", "2026-10-26"]) await doneOn(`Oct ${d}`, d);
       for (const d of ["2026-09-03", "2026-09-30"]) await doneOn(`Sep ${d}`, d);
       await doneOn("Other area", "2026-10-02", "body");
@@ -208,9 +208,8 @@ describe("AreaPage", () => {
       expect(within(box).getByText("3 ticked off in October")).toBeInTheDocument();
       expect(within(box).getByText("last month 2")).toBeInTheDocument();
       expect(within(box).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
-      // Directly under the h1, above the filter pills.
-      const h1 = screen.getByRole("heading", { level: 1, name: "Art" });
-      expect(h1.nextElementSibling).toBe(box);
+      // At the bottom, directly above the Archive heading.
+      expect(box.nextElementSibling).toBe(screen.getByRole("heading", { level: 2, name: "Archive" }));
     });
 
     it("compares with last month's total", async () => {

@@ -119,7 +119,6 @@ export function AreaPage({ today }: { today: ISODate }) {
           </ul>
         </section>
       )}
-      {loaded && <MonthProgress areaId={area.id} items={items} today={today} />}
       <div role="group" aria-label="Show" className="btn-group">
         {FILTERS.map((t) => (
           <button
@@ -173,6 +172,7 @@ export function AreaPage({ today }: { today: ISODate }) {
           </ul>
         </section>
       )}
+      {loaded && <MonthProgress areaId={area.id} items={items} today={today} />}
       <h2>Archive</h2>
       {archiveFailed ? (
         <p>{DATA_ERROR}</p>
