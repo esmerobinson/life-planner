@@ -11,7 +11,7 @@ import { downscalePicture, PICTURE_UNREADABLE } from "../picture";
 import { ProgressBar } from "../ProgressBar";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { rowStatus } from "../../journal/rows";
-import { DoneBox, longDate, monthLabel, Star } from "./bits";
+import { DoneBox, LoadLine, longDate, monthLabel, Star, useLoadGuard } from "./bits";
 import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
@@ -39,6 +39,7 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const [adding, setAdding] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const latest = useRef(0);
+  const guardFail = useRef<() => void>(() => undefined);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
@@ -49,11 +50,14 @@ export function MorningPages({ jk, today, deviceId }: Props) {
       setDay(t);
       setReadBack(rb);
     } catch {
-      if (id === latest.current) setDone((prev) => prev ?? new Set());
+      if (id === latest.current) guardFail.current();
     }
   }, [jk, today, deviceId]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
+  // Never blank under the strip: "Loading…", then the can't-open line and Try again.
+  const guard = useLoadGuard(done === null, load);
+  guardFail.current = guard.fail;
 
   const streak = useMemo(() => (done ? streakLine(done, today) : null), [done, today]);
 
@@ -77,9 +81,11 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const doneToday = !!day?.done;
   const row = rowStatus(done ?? NO_DAYS, today);
   return (
-    <section className="journal-card" aria-labelledby="morning-pages" id="morning-pages-section">
+    <>
       <JournalStripHead id="morning-pages" title="Morning pages" tick={tickState(done ? row.done : undefined)} streak={row.streak} meta={longDate(today)} />
-      {done === null ? null : writing ? (
+      {done === null ? (
+        <LoadLine guard={guard} />
+      ) : writing ? (
         <WritingView
           jk={jk}
           date={today}
@@ -140,7 +146,7 @@ export function MorningPages({ jk, today, deviceId }: Props) {
           <ReadBack jk={jk} pages={readBack} today={today} />
         </>
       )}
-    </section>
+    </>
   );
 }
 
@@ -185,7 +191,7 @@ function ProofPhoto({ jk, id }: { jk: JournalKey; id: string }) {
         setUrl(made);
       }
       setState(r.state);
-    });
+    }, () => alive && setState("unreadable"));
     return () => {
       alive = false;
       if (made) URL.revokeObjectURL(made);

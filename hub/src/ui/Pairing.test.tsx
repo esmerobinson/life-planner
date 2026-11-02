@@ -471,7 +471,7 @@ describe("scan a pairing code (Journal, Unlock journal)", () => {
     await db.journal.put(await verifierRow(jk)); // now this passphrase's journal
     await userEvent.type(await screen.findByLabelText("Paste pairing code"), pairingText(PASSPHRASE));
     await userEvent.click(screen.getByRole("button", { name: "Use pairing code" }));
-    expect(await screen.findByRole("heading", { name: "Morning pages" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 })).toBeInTheDocument(); // open
     expect((await loadJournalKey(db))!.fp).toBe(jk.fp);
     expect(await everythingStored()).not.toContain(PASSPHRASE);
   });

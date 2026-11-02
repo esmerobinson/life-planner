@@ -9,6 +9,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE, FAKE_CARD_TEXT } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { NOT_AVAILABLE } from "./JournalStrip";
 
 // The Journal's "Mental health exercise" section (exercise brief). Fictional cards only.
 
@@ -33,13 +34,15 @@ const section = () => screen.findByRole("region", { name: "Mental health exercis
 const cardFile = (text: string) => new File([text], "pretend-cards.json", { type: "application/json" });
 const imported = () => importExerciseCards(jk, SET, "2026-10-01");
 
-it("locked: the section isn't there (only the unlock state)", async () => {
+it("locked: only the section's strip (no card, no import) under the unlock state", async () => {
   await db.journal.put(await verifierRow(jk));
   await imported().catch(() => undefined); // not confirmed: nothing is written
   renderApp("/journal", TODAY);
   expect(await screen.findByRole("heading", { name: "Unlock journal" })).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "Mental health exercise" })).toBeNull();
+  const s = screen.getByRole("region", { name: "Mental health exercise" });
+  expect(within(s).getByRole("img", { name: NOT_AVAILABLE })).toBeInTheDocument();
   expect(screen.queryByText("Add your exercise cards")).toBeNull();
+  expect(screen.queryByRole("article", { name: "Today's card" })).toBeNull();
 });
 
 it("no cards yet: one line and an Import pill; importing shows card 1 and stores it sealed", async () => {

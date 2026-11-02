@@ -9,13 +9,15 @@ import { pickPrompts } from "../../journal/rotation";
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
 import { checkinDoneDays, rowStatus } from "../../journal/rows";
-import { DoneBox, longDate, PromptText } from "./bits";
+import { DoneBox, LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
 export const CHECKED_IN_LINE = "Kind to yourself today? That counts.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
+/** The strip's small line. */
+export const CHECKIN_META = "Today's three questions · 🔒 private";
 
 /**
  * Daily check-in (journal brief §2, VISUAL-LANGUAGE.md "Daily check-in", mockup tab A):
@@ -34,6 +36,8 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
   const [active, setActive] = useState<string[] | null>(null);
   const [problem, setProblem] = useState("");
   const latest = useRef(0);
+  const guardFail = useRef<() => void>(() => undefined);
+  const loaded = useRef(false);
   // The first-open write of a day's questions, per day (a check-in left open past midnight
   // picks and stores the new day's questions too).
   const ensuring = useRef<{ date: ISODate; done: Promise<unknown> } | null>(null);
@@ -59,15 +63,21 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
         todayDay = await readCheckinDay(jk, today);
       }
       if (id !== latest.current) return;
+      loaded.current = true;
       setActive(ids);
       setDay(todayDay);
       setPast(all.filter((d) => d.date !== today));
     } catch {
-      if (id === latest.current) setProblem(SAVE_PROBLEM);
+      if (id !== latest.current) return;
+      if (loaded.current) setProblem(SAVE_PROBLEM);
+      else guardFail.current(); // nothing read yet: the can't-open line and Try again
     }
   }, [jk, today]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
+  // Never blank under the strip: "Loading…", then the can't-open line and Try again.
+  const guard = useLoadGuard(day === null, load);
+  guardFail.current = guard.fail;
 
   async function choose(ids: string[]) {
     setActive(ids);
@@ -81,8 +91,9 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
   const step = day ? currentStep(day) : -1;
   const row = useMemo(() => rowStatus(checkinDoneDays(day ? [day, ...past] : past), today), [day, past, today]);
   return (
-    <section className="journal-card" aria-labelledby="daily-check-in" id="daily-check-in-section">
-      <JournalStripHead id="daily-check-in" title="Daily check-in" tick={tickState(day ? row.done : undefined)} streak={row.streak} meta="Today's three questions · 🔒 private" />
+    <>
+      <JournalStripHead id="daily-check-in" title="Daily check-in" tick={tickState(day ? row.done : undefined)} streak={row.streak} meta={CHECKIN_META} />
+      {day === null && <LoadLine guard={guard} />}
       {day && day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
       {day && day.prompts.length === 0 && <p>No questions are switched on. Choose some under Choose questions.</p>}
       {day && day.prompts.length > 0 &&
@@ -94,7 +105,7 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
       {problem && <p role="alert">{problem}</p>}
       <PastCheckIns past={past} />
       {active && <ChooseQuestions active={active} onChange={(ids) => void choose(ids)} />}
-    </section>
+    </>
   );
 }
 

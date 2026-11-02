@@ -195,7 +195,8 @@ describe("Journal page section strips", () => {
   it("each section starts with its mint strip: the h2 labels the section, tick and ★ N as on Home", async () => {
     await someDone();
     renderApp("/journal", TODAY);
-    const morning = await screen.findByRole("region", { name: "Morning pages" }, { timeout: 5000 });
+    await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 }); // open (the strips show before)
+    const morning = screen.getByRole("region", { name: "Morning pages" });
     const head = within(morning).getByRole("heading", { level: 2, name: "Morning pages" }).closest(".strip")!;
     expect(head).toHaveClass("journal-row");
     expect(morning.firstElementChild).toBe(head);
@@ -216,7 +217,8 @@ describe("Journal page section strips", () => {
   it("finishing today's check-in ticks its strip by itself", async () => {
     await someDone();
     renderApp("/journal", TODAY);
-    const checkin = await screen.findByRole("region", { name: "Daily check-in" }, { timeout: 5000 });
+    await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 }); // open (the strips show before)
+    const checkin = screen.getByRole("region", { name: "Daily check-in" });
     const head = within(checkin).getByRole("heading", { level: 2, name: "Daily check-in" }).closest(".strip") as HTMLElement;
     await userEvent.click(await within(checkin).findByRole("button", { name: "Finish" }));
     await waitFor(() => expect(within(head).getByRole("checkbox")).toHaveAttribute("aria-checked", "true"));

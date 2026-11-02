@@ -9,7 +9,7 @@ import { INVALID_CARD_FILE, parseCardFile, planExercise, type CardSet, type Exer
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { exerciseDoneDays, rowStatus } from "../../journal/rows";
-import { longDate, PromptText } from "./bits";
+import { LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
@@ -17,6 +17,8 @@ import { useDbChanges } from "./useJournalKey";
 export const DONE_LINE = "Done for today · next card tomorrow";
 export const REPLACE_QUESTION = "Replace your exercise cards?";
 const SAVE_PROBLEM = "That didn't save. Try again.";
+/** The strip's small line (before round 2). */
+export const EXERCISE_META = "One card a day · 🔒 private";
 const READ_PROBLEM = "The exercise cards couldn't be read. Try again.";
 /** A card file bigger than this isn't read at all (the real set is about 90 KB). */
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -37,6 +39,8 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const [busy, setBusy] = useState(false);
   const [ticking, setTicking] = useState<boolean | null>(null);
   const latest = useRef(0);
+  const guardFail = useRef<() => void>(() => undefined);
+  const loaded = useRef(false);
   const recorded = useRef<string | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -45,15 +49,21 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
     try {
       const [c, p, earlier] = await Promise.all([readExerciseCards(jk), readExerciseProgress(jk), listExerciseEntries(jk, today)]);
       if (id !== latest.current) return;
+      loaded.current = true;
       setCards(c);
       setProgress(p);
       setPast(earlier.entries);
     } catch {
-      if (id === latest.current) setProblem(READ_PROBLEM);
+      if (id !== latest.current) return;
+      if (loaded.current) setProblem(READ_PROBLEM);
+      else guardFail.current(); // nothing read yet: the can't-open line and Try again
     }
   }, [jk, today]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
+  // Never blank under the strip: "Loading…", then the can't-open line and Try again.
+  const guard = useLoadGuard(cards === null, load);
+  guardFail.current = guard.fail;
 
   const plan = useMemo(
     () => (cards?.state === "ok" && progress ? planExercise(cards.set.cards, progress.marks, progress.starred, today, deviceId) : null),
@@ -104,11 +114,12 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const star = (day: number, on: boolean) => void attempt(() => setExerciseStar(jk, today, deviceId, day, on));
   const starred = progress?.starred ?? new Set<number>();
   const row = useMemo(() => rowStatus(exerciseDoneDays(progress?.marks ?? []), today), [progress, today]);
-  const sub = plan && plan.round > 1 ? `Round ${plan.round} · 🔒 private` : "One card a day · 🔒 private";
+  const sub = plan && plan.round > 1 ? `Round ${plan.round} · 🔒 private` : EXERCISE_META;
 
   return (
-    <section className="journal-card" aria-labelledby="mental-health-exercise" id="mental-health-exercise-section">
+    <>
       <JournalStripHead id="mental-health-exercise" title="Mental health exercise" tick={tickState(progress ? row.done : undefined)} streak={row.streak} meta={sub} />
+      {cards === null && <LoadLine guard={guard} />}
       {cards?.state === "none" && (
         <div className="exercise-empty">
           <p>Add your exercise cards</p>
@@ -202,7 +213,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
         </div>
       )}
       {problem && <p role="alert">{problem}</p>}
-    </section>
+    </>
   );
 }
 

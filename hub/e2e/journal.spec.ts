@@ -84,7 +84,7 @@ async function walkThrough(page: Page, prefix: string) {
   await expect(page.getByRole("alert")).toContainText("isn't the journal's passphrase");
   await page.getByLabel("Sync passphrase").fill(PASS);
   await page.getByRole("button", { name: "Unlock" }).click();
-  await expect(page.getByRole("heading", { name: "Morning pages" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Write now" })).toBeVisible(); // open (the strips show before)
 
   await pastPages(page, [-1, -2, -3, -6, -7]);
   await page.reload();

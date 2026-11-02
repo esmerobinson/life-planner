@@ -1,4 +1,65 @@
+import { useCallback, useEffect, useState } from "react";
 import type { ISODate } from "../../domain/types";
+import { loadTimeout } from "./loadTimeout";
+
+/** A Journal section whose own read failed or never answered (2026-11-02). */
+export const SECTION_CANT_OPEN = "Can't open this on this device right now.";
+/** While a Journal read is still pending: quiet, never blank. */
+export const LOADING_LINE = "Loading…";
+
+export interface LoadGuard {
+  /** The first read failed, or took longer than loadTimeout.ms. */
+  failed: boolean;
+  /** Call when the read throws (ignored once something has loaded). */
+  fail: () => void;
+  /** "Try again": a fresh read and a fresh timeout. */
+  retry: () => void;
+}
+
+/**
+ * Guards a section's first read: while `pending`, a failure or a read that takes longer than
+ * loadTimeout.ms turns into `failed`. A late answer still shows (`pending` goes false).
+ */
+export function useLoadGuard(pending: boolean, load: () => unknown): LoadGuard {
+  const [thrown, setThrown] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [tries, setTries] = useState(0);
+  useEffect(() => {
+    setSlow(false);
+    if (!pending) return;
+    const t = setTimeout(() => setSlow(true), loadTimeout.ms);
+    return () => clearTimeout(t);
+  }, [pending, tries]);
+  useEffect(() => {
+    if (!pending) setThrown(false);
+  }, [pending]);
+  const fail = useCallback(() => setThrown(true), []);
+  const retry = useCallback(() => {
+    setThrown(false);
+    setTries((n) => n + 1);
+    void load();
+  }, [load]);
+  return { failed: pending && (thrown || slow), fail, retry };
+}
+
+/** Under a section's strip while its read is pending: "Loading…", or the line and "Try again". */
+export function LoadLine({ guard, line = SECTION_CANT_OPEN }: { guard: LoadGuard; line?: React.ReactNode }) {
+  if (!guard.failed) {
+    return (
+      <p className="journal-muted" role="status">
+        {LOADING_LINE}
+      </p>
+    );
+  }
+  return (
+    <div role="alert">
+      <p>{line}</p>
+      <button type="button" className="btn-secondary" onClick={guard.retry}>
+        Try again
+      </button>
+    </div>
+  );
+}
 
 /** "Wednesday 28 October" for a calendar date (no timezone shift). */
 export function longDate(date: ISODate): string {

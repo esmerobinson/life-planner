@@ -42,13 +42,18 @@ const unlocked = () => confirmedDevice(db, jk);
 const me = () => getDeviceId(db);
 
 describe("locked", () => {
-  it("without a confirmed key: only Unlock journal; entries waiting here are not shown or written", async () => {
+  it("without a confirmed key: Unlock journal and the bare section strips; entries waiting here are not shown or written", async () => {
     await db.journal.put(await verifierRow(jk));
     const before = await db.journal.toArray();
     renderApp("/journal", TODAY);
     expect(await screen.findByRole("heading", { name: "Unlock journal" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Morning pages" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Daily check-in" })).toBeNull();
+    for (const name of ["Morning pages", "Daily check-in"]) {
+      const region = screen.getByRole("region", { name });
+      expect(within(region).getByRole("img", { name: "Not available until the journal is unlocked" })).toBeInTheDocument();
+      expect(within(region).queryByRole("checkbox")).toBeNull();
+    }
+    expect(screen.queryByRole("button", { name: "Write now" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Morning pages calendar" })).toBeNull();
     expect(await db.journal.toArray()).toEqual(before);
   });
 
@@ -64,7 +69,7 @@ describe("locked", () => {
     expect(field).toHaveValue("");
     await userEvent.type(field, PASS);
     await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
-    expect(await screen.findByRole("heading", { name: "Morning pages" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 })).toBeInTheDocument(); // open
   });
 
   it("without sync set up and no verifier, it says to set up sync first", async () => {
@@ -96,7 +101,7 @@ describe("locked", () => {
     await waitFor(() => expect(server.syncRequests).toHaveLength(1)); // the page asked once (offline)
     await act(() => controller.syncNow()); // joins any run still in flight
     await act(() => controller.syncNow()); // online now
-    expect(await screen.findByRole("heading", { name: "Morning pages" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 })).toBeInTheDocument(); // open
     expect(await db.journal.get("verifier")).toBeTruthy();
   });
 });

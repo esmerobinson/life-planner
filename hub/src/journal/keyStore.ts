@@ -65,6 +65,30 @@ export async function loadJournalKeyInfo(db: HubDB): Promise<StoredJournalKey | 
   return isKey(v) ? v : undefined;
 }
 
+/**
+ * True when this device has a confirmed key stored but it can't be read back. In the Mac app
+ * (WKWebView) a stored CryptoKey is unwrapped with a master key kept in the macOS keychain; if
+ * the keychain refuses, the row comes back empty although it is there. Counts the row by its
+ * id only (that never unwraps anything). Never changes anything.
+ */
+export async function journalKeyUnreadable(db: HubDB): Promise<boolean> {
+  const n = await db.syncMeta.where(":id").equals(JOURNAL_KEY_META).count();
+  return n > 0 && !(await loadJournalKeyInfo(db));
+}
+
+/**
+ * Errors that mean WebCrypto or the keychain step refused the key (storing or reading a
+ * CryptoKey, wrapping/unwrapping it), as opposed to e.g. a full disk.
+ */
+export function isKeychainError(e: unknown): boolean {
+  const name = e instanceof Error || (typeof DOMException !== "undefined" && e instanceof DOMException) ? (e as Error).name : "";
+  const message = e instanceof Error || (typeof DOMException !== "undefined" && e instanceof DOMException) ? (e as Error).message : String(e ?? "");
+  return (
+    ["DataCloneError", "OperationError", "InvalidAccessError", "NotAllowedError", "NotSupportedError"].includes(name) ||
+    /keychain|crypto ?key|webcrypto|master key|unwrap|could not be cloned|can ?not be cloned/i.test(message)
+  );
+}
+
 /** The confirmed key, or undefined. */
 export async function loadJournalKey(db: HubDB): Promise<JournalKey | undefined> {
   const v = await loadJournalKeyInfo(db);

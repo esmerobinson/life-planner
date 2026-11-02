@@ -5,12 +5,15 @@ import type { ISODate } from "../../domain/types";
 import { planExercise } from "../../journal/exercise";
 import { loadJournalKey } from "../../journal/keyStore";
 import { checkinDoneDays, exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows";
+import { loadTimeout } from "./loadTimeout";
 import { useDbChanges } from "./useJournalKey";
 
 export type JournalRowsView =
   | { state: "loading" }
   /** Not set up or not unlocked on this device (or unreadable): rows show with no ticks. */
   | { state: "locked" }
+  /** A read failed or didn't answer within loadTimeout.ms: rows show with no ticks. */
+  | { state: "error" }
   | {
       state: "ok";
       morning: RowStatus;
@@ -54,7 +57,7 @@ export function useJournalRows(today: ISODate): JournalRowsView {
         };
       }
     } catch {
-      next = { state: "locked" };
+      next = { state: "error" };
     }
     if (mounted.current && id === latest.current) setView(next);
   }, [today]);
@@ -62,8 +65,12 @@ export function useJournalRows(today: ISODate): JournalRowsView {
   useEffect(() => {
     mounted.current = true;
     void load();
+    // Never stuck on loading (2026-11-02): no answer in time shows the rows without ticks; a
+    // late answer still ticks them.
+    const timer = setTimeout(() => mounted.current && setView((v) => (v.state === "loading" ? { state: "error" } : v)), loadTimeout.ms);
     return () => {
       mounted.current = false;
+      clearTimeout(timer);
     };
   }, [load]);
   useDbChanges(() => void load());
