@@ -10,6 +10,7 @@ import "./styles/vision.css";
 import "./styles/journal.css";
 import "./styles/phone.css";
 import "./styles/panel.css";
+import "./styles/goals.css";
 import "./styles/pairing.css";
 
 createRoot(document.getElementById("root")!).render(

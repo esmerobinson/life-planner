@@ -1,4 +1,5 @@
 import { useContext, useEffect, useState } from "react";
+import { isActive } from "../domain/goalCounts";
 import { useParams } from "react-router-dom";
 import { listItems, restoreItem, untickItem } from "../data/repo";
 import { doneToday, HABIT_WORDS, isHabit, sessions } from "../domain/habits";
@@ -81,7 +82,7 @@ export function AreaPage({ today }: { today: ISODate }) {
   const habits = view === "all" || view === "tasks" ? mine.filter(isHabit) : [];
   const tasks = view === "all" || view === "tasks" ? mine.filter((i) => i.kind === "task" && !isHabit(i)) : [];
   const ideas = view === "all" || view === "ideas" ? mine.filter((i) => i.kind === "idea") : [];
-  const areaGoals = view === "all" || view === "goals" ? goals.filter((g) => g.areaId === area.id) : [];
+  const areaGoals = view === "all" || view === "goals" ? goals.filter((g) => g.areaId === area.id && isActive(g)) : [];
   const empty = loaded && habits.length + tasks.length + ideas.length + areaGoals.length === 0;
   // Mind's Habits box also holds the three Journal rows, after her own habits (Journal v2).
   const journalHabits = area.id === "mind" && (view === "all" || view === "tasks");

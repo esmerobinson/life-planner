@@ -9,7 +9,7 @@
    (b) Provisional layout dimensions, NOT in VISUAL-LANGUAGE.md (taken from or fitted to
        the mockup by the implementers): sidebar width 220px, sidebar tile 32px, icon 24px
        (Sidebar.tsx), gaps and padding (24px content, 16px/12px sidebar, 20px/6px/10px gaps,
-       6px/8px item padding), Home right column 190px, bar height 10px, bar radius 6px,
+       6px/8px item padding), Home right column 280px (goals redesign mockup), bar height 10px, bar radius 6px,
        radii 18px (panel) and 9px (tile).
 
    (b2) Form controls live in controls.css and use the approved mockup A (soft pills)
@@ -147,17 +147,16 @@ body {
   /* minmax(0, …): long Today strips wrap inside their column instead of pushing the goals
      column over. 32px clear between Today and the goals column (Esme, 2026-11-02: "it sits
      too closely to Today"). */
-  grid-template-columns: minmax(0, 1fr) 190px;
+  /* 280px: the goals column of the approved mockup-goals-choices.html section 2 (tab C, the
+     mini colour-band cards, 2026-11-02). */
+  grid-template-columns: minmax(0, 1fr) 280px;
   column-gap: 32px;
   row-gap: 32px;
 }
 /* Under 1000px wide the goals column goes below Today instead of squashing against it
-   (2026-11-02). It keeps its 190px width; how it should look there is not decided yet. */
+   (2026-11-02), full width as in that mockup's narrow layout. */
 @media (max-width: 999.98px) {
   .home-page {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .home-page .home-goals {
-    width: 190px;
   }
 }

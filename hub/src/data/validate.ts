@@ -5,7 +5,7 @@
 
 import { isValidISODate } from "../domain/dates";
 import { MAX_DONE_DATES } from "../domain/habits";
-import { AREA_IDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
+import { AREA_IDS, COUNT_SOURCE_KINDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 
 /** The longest goal why / cadence text (characters). */
 export const MAX_GOAL_TEXT = 4000;
@@ -86,16 +86,69 @@ export function validGoal(r: unknown): r is Goal {
     (r.notes === undefined || (isStr(r.notes) && r.notes.length <= MAX_GOAL_NOTES)) &&
     validGoalSource(r.source) &&
     (r.onHome === undefined || typeof r.onHome === "boolean") &&
+    (r.active === undefined || typeof r.active === "boolean") &&
+    (r.rhythm === undefined || r.rhythm === "daily") &&
+    validCountsFrom(r.countsFrom) &&
+    validMonthGoals(r.monthGoals) &&
     optStamp(r.updatedAt) &&
     (r.status === undefined || r.status === "deleted" || r.status === "purged") &&
     optDate(r.deletedAt) &&
     // An emptied-from-the-Bin tombstone carries no content.
     (r.status !== "purged" ||
       (r.title === "" && r.why === undefined && r.cadence === undefined && r.notes === undefined &&
-        (r.milestones as unknown[]).length === 0)) &&
+        r.monthGoals === undefined && (r.milestones as unknown[]).length === 0)) &&
     (r.monthlyTarget === undefined ||
       (typeof r.monthlyTarget === "number" && Number.isFinite(r.monthlyTarget) && r.monthlyTarget > 0))
   );
+}
+
+/** The most monthly goals one goal keeps (years of a few a month; with MAX_MONTH_LOG it keeps a row near the sync cap of 1 MB, review M8). */
+export const MAX_MONTH_GOALS = 200;
+/** The most +1s one monthly goal keeps. */
+export const MAX_MONTH_LOG = 400;
+/** The longest monthly goal title (characters). */
+export const MAX_MONTH_TITLE = 200;
+/** The largest monthly count target. */
+export const MAX_MONTH_TARGET = 100_000;
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const COUNT_KINDS: readonly string[] = COUNT_SOURCE_KINDS;
+
+/** Absent, or a list of sources: "journal", "exercise", "linked" or { area } (each once). */
+function validCountsFrom(v: unknown): boolean {
+  if (v === undefined) return true;
+  if (!Array.isArray(v) || v.length > COUNT_KINDS.length + AREAS.length) return false;
+  const keys = v.map((s) =>
+    isStr(s) && COUNT_KINDS.includes(s)
+      ? s
+      : isObj(s) && Object.keys(s).length === 1 && AREAS.includes(s.area as string) && s.area !== "inbox"
+        ? `area:${s.area as string}`
+        : null,
+  );
+  return keys.every((k) => k !== null) && new Set(keys).size === keys.length;
+}
+
+/** One monthly goal: a count (with a whole-number target) or a step. */
+function validMonthGoal(m: unknown): boolean {
+  return (
+    isObj(m) &&
+    isStr(m.id) && m.id !== "" && m.id.length <= 128 &&
+    isStr(m.month) && MONTH.test(m.month) &&
+    (m.kind === "count" || m.kind === "step") &&
+    isStr(m.title) && m.title.length <= MAX_MONTH_TITLE &&
+    (m.target === undefined ||
+      (typeof m.target === "number" && Number.isInteger(m.target) && m.target >= 1 && m.target <= MAX_MONTH_TARGET)) &&
+    (m.done === undefined || typeof m.done === "boolean") &&
+    (m.auto === undefined || typeof m.auto === "boolean") &&
+    (m.log === undefined ||
+      (Array.isArray(m.log) && m.log.length <= MAX_MONTH_LOG && m.log.every((d) => isStr(d) && isValidISODate(d))))
+  );
+}
+
+/** Absent, or at most MAX_MONTH_GOALS valid monthly goals with distinct ids. */
+function validMonthGoals(v: unknown): boolean {
+  if (v === undefined) return true;
+  if (!Array.isArray(v) || v.length > MAX_MONTH_GOALS || !v.every(validMonthGoal)) return false;
+  return new Set(v.map((m) => (m as { id: string }).id)).size === v.length;
 }
 
 const WEEKDAY_LIST: readonly string[] = WEEKDAYS;

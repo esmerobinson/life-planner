@@ -54,6 +54,19 @@ export function checkinDoneDays(days: readonly CheckinDayLike[]): Set<ISODate> {
   return new Set(days.filter(checkedIn).map((d) => d.date));
 }
 
+/**
+ * The days any of the three Journal rows ticked (goals redesign fix round 1: "Journal daily"
+ * counts exactly these): a morning page or photo, a finished check-in, or an exercise card
+ * done.
+ */
+export function journalRowDays(
+  morning: ReadonlySet<ISODate>,
+  checkins: readonly CheckinDayLike[],
+  marks: readonly ExerciseMark[],
+): Set<ISODate> {
+  return new Set([...morning, ...checkinDoneDays(checkins), ...exerciseDoneDays(marks)]);
+}
+
 /** The days a card was marked done, or a tracker day filled in (on any device). */
 export function exerciseDoneDays(marks: readonly ExerciseMark[]): Set<ISODate> {
   return new Set(marks.filter((m) => m.done || m.logged).map((m) => m.date));

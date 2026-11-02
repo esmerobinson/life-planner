@@ -72,7 +72,20 @@ async function seedPretendWorld(page: Page) {
     task("h2", "Pretend scales practice", { recur: ["mon", "wed", "fri"] }),
   ];
   const goals: Row[] = [
-    { id: "g1", title: "Draw every week, even the pretend weeks with long names", areaId: "art", kind: "practice", monthlyTarget: 4, milestones: [], createdAt: today },
+    {
+      id: "g1", title: "Draw every week, even the pretend weeks with long names", areaId: "art", kind: "practice", monthlyTarget: 4,
+      milestones: [], createdAt: today, onHome: true,
+      // Goals redesign: a month's count with +1s and a long step, so the tile's box wraps at 360px.
+      monthGoals: [
+        { id: "mg1", month: today.slice(0, 7), kind: "count", title: "Pretend sketchbook pages with a long name", target: 20, log: [today] },
+        { id: "mg2", month: today.slice(0, 7), kind: "step", title: "Supercalifragilisticexpialidociouspretendstepwithnobreaks" },
+      ],
+    },
+    {
+      id: "g3", title: "A pretend daily practice with a very long title that has to wrap", areaId: "mind", kind: "practice",
+      rhythm: "daily", onHome: true, countsFrom: ["linked", { area: "art" }], milestones: [], createdAt: today,
+      monthGoals: [{ id: "mg3", month: today.slice(0, 7), kind: "count", title: "Days practised", target: 30 }],
+    },
     {
       id: "g2", title: "Finish the pretend essay collection", areaId: "writing", kind: "finite", deadline: `${today.slice(0, 4)}-12-31`,
       monthlyTarget: 6, createdAt: today,
@@ -142,6 +155,15 @@ for (const width of [360, 390, 430]) {
         if (width === 390) await shoot(page, `phone-390-${name}`);
       });
     }
+
+    test("the Choose goals pop-up (a full-screen sheet) does not scroll sideways", async ({ page }) => {
+      await seedPretendWorld(page);
+      await page.goto("/goals");
+      await page.getByRole("button", { name: "Choose goals" }).click();
+      await expect(page.getByRole("dialog", { name: "Goals on Home" })).toBeVisible();
+      const m = await sideways(page);
+      expect(m.scrollWidth).toBeLessThanOrEqual(m.innerWidth);
+    });
 
     test("open menus and the Add form do not scroll sideways", async ({ page }) => {
       await seedPretendWorld(page);

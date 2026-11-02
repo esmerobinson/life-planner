@@ -61,6 +61,37 @@ export interface Milestone {
   done: boolean;
 }
 
+/**
+ * Where a goal's automatic count comes from (goals redesign):
+ * - "journal": a day with a morning page or photo, or a check-in answer;
+ * - "exercise": a mental health exercise card marked done (or a tracker day logged);
+ * - "linked": a to-do linked to the goal ticked done, or a linked habit's session;
+ * - { area }: any to-do in that area ticked done, or that area's habit sessions.
+ */
+export const COUNT_SOURCE_KINDS = ["journal", "exercise", "linked"] as const;
+export type CountSource = (typeof COUNT_SOURCE_KINDS)[number] | { area: AreaId };
+
+/**
+ * One of a goal's monthly goals (goals redesign): a count ("Writing sessions 12 / 20") or a
+ * step (ticked). A count is automatic when its goal counts itself (`countsFrom`); otherwise
+ * each +1 adds that day to `log`.
+ */
+export interface MonthGoal {
+  id: string;
+  /** "YYYY-MM". */
+  month: string;
+  kind: "count" | "step";
+  title: string;
+  /** Counts: the number to reach. */
+  target?: number;
+  /** Steps: ticked. */
+  done?: boolean;
+  /** Manual counts: one date per +1. */
+  log?: ISODate[];
+  /** Counts: false keeps it manual even when the goal counts itself. */
+  auto?: boolean;
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -76,6 +107,17 @@ export interface Goal {
   notes?: string;
   /** Chosen to show in the Home goals column ("Show on Home"). Absent means not chosen. */
   onHome?: boolean;
+  /**
+   * Goals redesign: false = inactive (hidden from Home, area pages, pickers and counting;
+   * shown on the Goals page under Inactive). Absent means active.
+   */
+  active?: boolean;
+  /** "daily": a goal done every day (its count is days, it has a streak). Absent: not daily. */
+  rhythm?: "daily";
+  /** Sources that count for the goal by themselves (goals redesign). */
+  countsFrom?: CountSource[];
+  /** The goal's monthly goals ("November goals"), every month's, oldest first. */
+  monthGoals?: MonthGoal[];
   source?: { kind: "obsidian"; key: string };
   createdAt: ISODate;
   /**

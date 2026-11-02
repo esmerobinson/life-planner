@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
+import { isActive } from "../domain/goalCounts";
 import { createGoal, createItem, listGoals } from "../data/repo";
 import { MAX_GOAL_NOTES, MAX_NOTES_TEXT } from "../data/validate";
 import type { AreaId, Goal, ISODate, Priority, Weekday } from "../domain/types";
@@ -60,7 +61,7 @@ export function QuickAdd({
   }, [version]);
 
   const isGoal = type === "goal";
-  const areaGoals = goals.filter((g) => g.areaId === areaId);
+  const areaGoals = goals.filter((g) => g.areaId === areaId && isActive(g));
   const notesCap = isGoal ? MAX_GOAL_NOTES : MAX_NOTES_TEXT;
 
   function toggleDay(d: Weekday) {

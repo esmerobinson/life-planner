@@ -1,47 +1,73 @@
 import { useEffect, useRef, useState } from "react";
-import { createItem, deleteGoal, saveGoalNotes, setGoalOnHome, untickItem, updateGoal, type GoalPatch } from "../data/repo";
+import {
+  createItem, deleteGoal, saveGoalNotes, setGoalActive, setGoalOnHome, untickItem, updateGoal, type GoalPatch,
+} from "../data/repo";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "../data/validate";
-import { monthName, shortDate } from "../domain/display";
-import { doneThisMonth, goalTaskSplit, milestoneProgress, monthlyProgress, monthsInARow, nextGoalOrder } from "../domain/progress";
-import type { AreaId, Goal, ISODate, Item } from "../domain/types";
+import { monthName } from "../domain/display";
+import { isActive, isDaily, pastMonths } from "../domain/goalCounts";
+import { goalTaskSplit, nextGoalOrder } from "../domain/progress";
+import type { AreaId, CountSource, Goal, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS, NAV } from "./areas";
 import { tickedOffToday } from "../domain/triage";
 import { DoneStrip } from "./DoneSection";
 import { areaLabel } from "./GoalProgress";
+import { GoalOverall, goalKindLabel, MonthDots, MonthGoalsBox } from "./GoalTile";
 import { PageEditor } from "./PageEditor";
 import { useSaveError } from "./messages";
 import { usePanel } from "./panelContext";
 import { PanelTop } from "./PanelTop";
-import { ProgressBar } from "./ProgressBar";
 import type { EscapeHandler } from "./SidePanel";
 import { TaskRow, useTick } from "./TaskRow";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
+import { useGoalSources } from "./useGoalSources";
 
 /** How many completed tasks show before "Show all" (round-3 brief). */
 export const COMPLETED_CAP = 10;
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-const pct = (r: number) => `${Math.round(Math.min(1, Math.max(0, r)) * 100)}%`;
+/** The Type select: a daily goal is a practice with rhythm "daily". */
+type TypeChoice = Goal["kind"] | "daily";
 
 interface Fields {
   title: string;
   areaId: AreaId;
-  kind: Goal["kind"];
+  kind: TypeChoice;
   deadline: string;
   target: string;
   cadence: string;
   why: string;
+  /** "Counts from": the three kinds, and an area ("" for none). */
+  journal: boolean;
+  exercise: boolean;
+  linked: boolean;
+  countArea: AreaId | "";
 }
+
+const has = (g: Goal, s: string) => (g.countsFrom ?? []).some((c) => c === s);
 
 const fieldsOf = (g: Goal): Fields => ({
   title: g.title,
   areaId: g.areaId,
-  kind: g.kind,
+  kind: isDaily(g) ? "daily" : g.kind,
   deadline: g.deadline ?? "",
   target: g.monthlyTarget === undefined ? "" : String(g.monthlyTarget),
   cadence: g.cadence ?? "",
   why: g.why ?? "",
+  journal: has(g, "journal"),
+  exercise: has(g, "exercise"),
+  linked: has(g, "linked"),
+  countArea: (g.countsFrom ?? []).flatMap((c) => (typeof c === "string" ? [] : [c.area]))[0] ?? "",
 });
+
+/** The "Counts from" fields as the goal's list, keeping any further areas it already had. */
+function sourcesOf(f: Fields, g: Goal): CountSource[] {
+  const out: CountSource[] = [];
+  if (f.journal) out.push("journal");
+  if (f.exercise) out.push("exercise");
+  if (f.linked) out.push("linked");
+  const areas = (g.countsFrom ?? []).filter((c): c is { area: AreaId } => typeof c !== "string");
+  if (f.countArea) out.push({ area: f.countArea }, ...areas.slice(1).filter((a) => a.area !== f.countArea));
+  return out;
+}
 
 /**
  * A goal in the side panel (VISUAL-LANGUAGE.md "Goal view"; goal.html, top of tab B):
@@ -66,6 +92,7 @@ export function GoalPanel({
   escape: EscapeHandler;
 }) {
   const panel = usePanel();
+  const { sources } = useGoalSources(items);
   const { attempt, saveError } = useSaveError();
   const { tick, celebration, message } = useTick(today, onChanged);
   const [editing, setEditing] = useState(false);
@@ -144,11 +171,21 @@ export function GoalPanel({
     const patch: GoalPatch = {};
     if (f.title.trim() !== was.title) patch.title = f.title.trim();
     if (f.areaId !== was.areaId) patch.areaId = f.areaId;
-    if (f.kind !== was.kind) patch.kind = f.kind; // practice drops the deadline in the repo
+    if (f.kind !== was.kind) {
+      // Practice drops the deadline in the repo; Daily is a practice that counts days.
+      patch.kind = f.kind === "daily" ? "practice" : f.kind;
+      patch.rhythm = f.kind === "daily" ? "daily" : undefined;
+    }
     if (f.kind === "finite" && (f.kind !== was.kind || f.deadline !== was.deadline)) patch.deadline = f.deadline;
     if (f.target.trim() !== was.target) patch.monthlyTarget = monthlyTarget;
     if (f.cadence !== was.cadence) patch.cadence = f.cadence;
     if (f.why !== was.why) patch.why = f.why;
+    const sourcesNow = sourcesOf(f, goal);
+    if (
+      f.journal !== was.journal || f.exercise !== was.exercise || f.linked !== was.linked || f.countArea !== was.countArea
+    ) {
+      patch.countsFrom = sourcesNow;
+    }
     setFormMessage("");
     if (Object.keys(patch).length === 0) {
       setEditing(false);
@@ -175,9 +212,7 @@ export function GoalPanel({
   }
 
   const nav = NAV.find((n) => n.id === goal.areaId);
-  const overall = milestoneProgress(goal, items);
-  const month = monthlyProgress(goal, items, today);
-  const inARow = monthsInARow(goal, items, today);
+  const past = pastMonths(goal, today, sources);
   const { toCome, completed } = goalTaskSplit(goal, items);
   const shownDone = allDone ? completed : completed.slice(0, COMPLETED_CAP);
   const cadence = goal.cadence?.split(/\n+/).find((l) => l.trim());
@@ -222,9 +257,10 @@ export function GoalPanel({
           </label>
           <label className="form-field">
             <span className="form-label">Type</span>
-            <select value={fields.kind} onChange={(e) => setFields({ ...fields, kind: e.target.value as Goal["kind"] })}>
+            <select value={fields.kind} onChange={(e) => setFields({ ...fields, kind: e.target.value as TypeChoice })}>
               <option value="finite">Finish by a date</option>
               <option value="practice">Practice</option>
+              <option value="daily">Daily</option>
             </select>
           </label>
           {fields.kind === "finite" && (
@@ -250,6 +286,33 @@ export function GoalPanel({
             <span className="form-label">Why it matters</span>
             <textarea maxLength={MAX_GOAL_TEXT} value={fields.why} onChange={(e) => setFields({ ...fields, why: e.target.value })} />
           </label>
+          <fieldset className="form-field form-full goal-sources">
+            <legend className="form-label">Counts from</legend>
+            <label className="form-check">
+              <input type="checkbox" checked={fields.journal} onChange={(e) => setFields({ ...fields, journal: e.target.checked })} />
+              Journal
+            </label>
+            <label className="form-check">
+              <input type="checkbox" checked={fields.exercise} onChange={(e) => setFields({ ...fields, exercise: e.target.checked })} />
+              Exercise
+            </label>
+            <label className="form-check">
+              <input type="checkbox" checked={fields.linked} onChange={(e) => setFields({ ...fields, linked: e.target.checked })} />
+              Linked to-dos
+            </label>
+            <select
+              aria-label="Counts an area"
+              value={fields.countArea}
+              onChange={(e) => setFields({ ...fields, countArea: e.target.value as AreaId | "" })}
+            >
+              <option value="">No area</option>
+              {GOAL_AREAS.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </fieldset>
           {formMessage && <p className="form-message form-full">{formMessage}</p>}
         </form>
       ) : (
@@ -261,12 +324,17 @@ export function GoalPanel({
             <h2 className="goal-peek-title">{goal.title}</h2>
             <div className="goal-peek-chips">
               <span className="chip">{areaLabel(goal.areaId)}</span>
-              <span className="chip">
-                {goal.kind === "finite" && goal.deadline ? `By ${shortDate(goal.deadline, today)}` : "Practice"}
-              </span>
+              <span className="chip">{goalKindLabel(goal, today)}</span>
               {cadence && <span className="chip">{cadence}</span>}
             </div>
-            <div className="goal-peek-home">
+            <div className="goal-peek-home goal-peek-switches">
+              <button
+                type="button"
+                aria-pressed={isActive(goal)}
+                onClick={() => void write(() => setGoalActive(goal.id, !isActive(goal)))}
+              >
+                Active
+              </button>
               <button
                 type="button"
                 aria-pressed={goal.onHome === true}
@@ -281,44 +349,30 @@ export function GoalPanel({
       {saveError && <p className="form-message">{saveError}</p>}
       {celebration}
       {message}
-      {(overall || month) && (
-        <div className="goal-peek-bars">
-          {overall && (
-            <div>
-              <div className="bar-label">
-                <span>{overall.flagged ? "Overall · milestones" : "Overall · tasks"}</span>
-                <span>{pct(overall.ratio)}</span>
-              </div>
-              <ProgressBar ratio={overall.ratio} label={`Overall ${overall.done}/${overall.total}`} />
-            </div>
-          )}
-          {month && (
-            <div>
-              <div className="bar-label">
-                <span>{`${monthName(today)}: ${month.done} of ${month.target} sessions`}</span>
-                <span>{`${plural(inARow, "month")} in a row`}</span>
-              </div>
-              <ProgressBar ratio={month.ratio} label={`This month ${month.done}/${month.target}`} />
-            </div>
-          )}
-        </div>
-      )}
-      <div className="goal-peek-stats">
-        {overall && (
-          <div className="goal-peek-stat">
-            <b>{pct(overall.ratio)}</b>
-            <span>overall</span>
-          </div>
-        )}
-        <div className="goal-peek-stat">
-          <b>{month ? `${month.done}/${month.target}` : doneThisMonth(goal, items, today)}</b>
-          <span>this month</span>
-        </div>
-        <div className="goal-peek-stat">
-          <b>{inARow}</b>
-          <span>{`${inARow === 1 ? "month" : "months"} in a row`}</span>
-        </div>
+      <div className="goal-peek-bars">
+        <GoalOverall goal={goal} items={items} today={today} sources={sources} />
+        <MonthDots goal={goal} today={today} sources={sources} />
       </div>
+      <MonthGoalsBox goal={goal} today={today} sources={sources} onChanged={onChanged} editing={editing} />
+      {past.length > 0 && (
+        <section aria-labelledby="goal-past-heading">
+          <h3 className="peek-sec" id="goal-past-heading">
+            Past months
+          </h3>
+          <ul className="goal-past">
+            {past.map((p) => (
+              <li key={p.month}>
+                <span>{`${monthName(`${p.month}-01`)} ${p.month.slice(0, 4)}`}</span>
+                <span>
+                  {p.hit === null
+                    ? `— · — / ${p.summary.of}` // not known here: the journal is locked (review M1)
+                    : `${p.hit ? "Hit" : "Missed"} · ${p.summary.n} / ${p.summary.of}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {!editing && goal.why && (
         <section>
           <h3 className="peek-sec">Why it matters</h3>

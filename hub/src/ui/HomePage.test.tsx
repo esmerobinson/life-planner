@@ -46,8 +46,8 @@ describe("HomePage", () => {
     expect(screen.queryByText("Coming in a later update")).toBeNull();
     expect(await screen.findByRole("progressbar", { name: /3\/10/ })).toBeInTheDocument();
     const card = screen.getByRole("link", { name: "Write more" }).closest("li")!;
-    expect(card).toHaveClass("goal-card");
-    expect(card).toHaveTextContent("October: 3 of 10");
+    expect(card).toHaveClass("goal-mini");
+    expect(card).toHaveTextContent("3 / 10 this month");
   });
 
   it("home with no data renders three calm empty states and no console errors", async () => {
@@ -97,28 +97,33 @@ describe("HomePage", () => {
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
-  it("with goals chosen for Home, the column shows only those, in sidebar area order", async () => {
+  it("with goals chosen for Home, the column shows only those (active ones), Mind first, then sidebar order", async () => {
     await createGoal({ title: "Pretend target goal", areaId: "art", kind: "practice", monthlyTarget: 4 }, TODAY);
     const body = await createGoal({ title: "Pretend long run", areaId: "body", kind: "practice" }, TODAY);
     const admin = await createGoal({ title: "Pretend tidy papers", areaId: "admin", kind: "practice", monthlyTarget: 2 }, TODAY);
+    const mind = await createGoal({ title: "Pretend calm", areaId: "mind", kind: "practice", onHome: true }, TODAY);
+    await createGoal({ title: "Pretend resting", areaId: "mind", kind: "practice", onHome: true, active: false }, TODAY);
     await setGoalOnHome(body.id, true);
     await setGoalOnHome(admin.id, true);
     renderHome();
     const column = await screen.findByRole("complementary", { name: "Goals this month" });
-    await vi.waitFor(() => expect(within(column).getAllByRole("listitem")).toHaveLength(2));
-    // Admin comes before Body in the sidebar.
-    expect(within(column).getAllByRole("listitem").map((li) => li.querySelector(".goal-title")!.textContent)).toEqual([
+    await vi.waitFor(() => expect(within(column).getAllByRole("listitem")).toHaveLength(3));
+    // Mind first; then Admin comes before Body in the sidebar. The inactive goal never shows.
+    expect(within(column).getAllByRole("listitem").map((li) => li.querySelector(".goal-mini-link")!.textContent)).toEqual([
+      "Pretend calm",
       "Pretend tidy papers",
       "Pretend long run",
     ]);
+    expect(mind.onHome).toBe(true);
     expect(within(column).queryByText("Pretend target goal")).toBeNull();
     expect(within(column).queryByText("No monthly targets yet.")).toBeNull();
   });
 
-  it("Choose goals lists every live goal by area; ticking one shows it on Home, unticking falls back", async () => {
+  it("Choose goals is a pop-up: active goals by area as cards; a tap puts one on Home at once; Done closes", async () => {
     await createGoal({ title: "Pretend target goal", areaId: "art", kind: "practice", monthlyTarget: 4 }, TODAY);
     const mind = await createGoal({ title: "Pretend calm", areaId: "mind", kind: "practice" }, TODAY);
     const binned = await createGoal({ title: "Pretend binned", areaId: "mind", kind: "practice" }, TODAY);
+    await createGoal({ title: "Pretend resting", areaId: "mind", kind: "practice", active: false }, TODAY);
     await deleteGoal(binned.id, TODAY);
     renderHome();
     const column = await screen.findByRole("complementary", { name: "Goals this month" });
@@ -127,21 +132,44 @@ describe("HomePage", () => {
     expect(within(column).queryByText("Pretend calm")).toBeNull();
 
     await userEvent.click(within(column).getByRole("button", { name: "Choose goals" }));
-    expect(within(column).getByRole("group", { name: "Art" })).toBeInTheDocument();
-    const mindGroup = within(column).getByRole("group", { name: "Mind" });
-    expect(within(mindGroup).queryByText("Pretend binned")).toBeNull();
-    await userEvent.click(within(mindGroup).getByRole("checkbox", { name: "Pretend calm" }));
+    const sheet = screen.getByRole("dialog", { name: "Goals on Home" });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(within(sheet).getByText("0 chosen")).toBeInTheDocument();
+    const groups = within(sheet).getAllByRole("region").map((r) => r.getAttribute("aria-label"));
+    expect(groups).toEqual(["Mind", "Art"]);
+    expect(within(sheet).queryByText("Pretend binned")).toBeNull();
+    expect(within(sheet).queryByText("Pretend resting")).toBeNull();
+    expect(sheet).not.toHaveTextContent(/On Home|Not on Home/);
+    await userEvent.click(within(sheet).getByRole("button", { name: "Pretend calm" }));
     await vi.waitFor(async () => expect((await db.goals.get(mind.id))!.onHome).toBe(true));
-    await vi.waitFor(() => expect(within(mindGroup).getByRole("checkbox", { name: "Pretend calm" })).toBeChecked());
-    await userEvent.click(within(column).getByRole("button", { name: "Done" }));
+    expect(within(sheet).getByRole("button", { name: "Pretend calm" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(sheet).getByText("1 chosen")).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(await within(column).findByRole("link", { name: "Pretend calm" })).toBeInTheDocument();
     expect(within(column).queryByText("Pretend target goal")).toBeNull();
 
+    // Escape closes too; focus goes back to Choose goals.
     await userEvent.click(within(column).getByRole("button", { name: "Choose goals" }));
-    await userEvent.click(within(column).getByRole("checkbox", { name: "Pretend calm" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Pretend calm" }));
     await vi.waitFor(async () => expect(await db.goals.get(mind.id)).not.toHaveProperty("onHome"));
-    await userEvent.click(within(column).getByRole("button", { name: "Done" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(column).getByRole("button", { name: "Choose goals" })).toHaveFocus();
     expect(await within(column).findByRole("link", { name: "Pretend target goal" })).toBeInTheDocument();
+  });
+
+  it("the pop-up keeps focus inside (Tab from the last card goes to the first control)", async () => {
+    await createGoal({ title: "Pretend calm", areaId: "mind", kind: "practice" }, TODAY);
+    renderHome();
+    const column = await screen.findByRole("complementary", { name: "Goals this month" });
+    await userEvent.click(await within(column).findByRole("button", { name: "Choose goals" }));
+    const sheet = screen.getByRole("dialog");
+    within(sheet).getByRole("button", { name: "Pretend calm" }).focus();
+    await userEvent.tab();
+    expect(within(sheet).getByRole("button", { name: "Done" })).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(within(sheet).getByRole("button", { name: "Pretend calm" })).toHaveFocus();
   });
 
   it("goals all set not to show (onHome false) fall back to the goals with a monthly target", async () => {

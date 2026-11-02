@@ -127,7 +127,7 @@ test.describe("at 1280px", () => {
     const peek = page.locator(".peek");
     await expect(peek.getByRole("heading", { level: 2, name: "Finish the pretend relationship book" })).toBeVisible();
     // The legacy milestones became flagged tasks: 1 done of 3 flagged (2 migrated + t3).
-    await expect(peek.getByText("Overall · milestones")).toBeVisible();
+    await expect(peek.getByText("Overall", { exact: true })).toBeVisible();
     await expect(peek.getByRole("progressbar", { name: "Overall 1/3" })).toBeVisible();
     await expect(peek.getByRole("list", { name: "To come" }).getByText("Draft pretend Part 2")).toBeVisible();
     await expect(peek.getByRole("list", { name: "Completed" }).getByText("Outline all pretend parts")).toBeVisible();
