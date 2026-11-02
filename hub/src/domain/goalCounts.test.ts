@@ -217,6 +217,44 @@ describe("planning a new month", () => {
   });
 });
 
+describe("older goals with only a monthlyTarget (fix round 1, I2)", () => {
+  const done = (id: string, d: string, extra: Partial<Item> = {}) =>
+    task({ id, goalId: "g1", areaId: "writing", status: "done", completedAt: d, ...extra });
+  const items = [
+    done("a", "2026-09-03"), done("b", "2026-09-10"), // September: 2 of 2
+    done("c", "2026-10-05"), // October: 1 of 2
+    done("d", "2026-11-01"), done("e", "2026-11-02"), // November: 2 of 2
+    task({ id: "h", goalId: "g1", areaId: "writing", recur: ["mon"], doneDates: ["2026-08-03"] }), // a habit session in August
+    done("x", "2026-11-02", { goalId: "other" }),
+  ];
+  const old = goal({ areaId: "writing", monthlyTarget: 2 });
+
+  it("a month without monthly goals counts the linked to-dos ticked (and linked habit sessions), as the old bar did", () => {
+    expect(monthSummary(old, "2026-11", src({ items }))).toEqual({ n: 2, of: 2 });
+    expect(monthSummary(old, "2026-10", src({ items }))).toEqual({ n: 1, of: 2 });
+    expect(monthSummary(old, "2026-08", src({ items }))).toEqual({ n: 1, of: 2 });
+    expect(monthHit(old, "2026-09", src({ items }))).toBe(true);
+    expect(monthHit(old, "2026-10", src({ items }))).toBe(false);
+  });
+
+  it("dots, months in a row and Past months come from that history", () => {
+    expect(monthDots(old, "2026-11-02", src({ items })).map((d) => d.hit)).toEqual([false, false, false, true, false, true]);
+    expect(monthsInARowHit(old, "2026-11-02", src({ items }))).toBe(1);
+    expect(pastMonths(old, "2026-11-02", src({ items })).map((p) => [p.month, p.hit, p.summary])).toEqual([
+      ["2026-10", false, { n: 1, of: 2 }],
+      ["2026-09", true, { n: 2, of: 2 }],
+      ["2026-08", false, { n: 1, of: 2 }],
+    ]);
+  });
+
+  it("a month with monthly goals uses them; no monthlyTarget means no fallback", () => {
+    const both = { ...old, monthGoals: [count("2026-11", { target: 5, log: ["2026-11-01"] })] };
+    expect(monthSummary(both, "2026-11", src({ items }))).toEqual({ n: 1, of: 5 });
+    expect(monthSummary(goal({ areaId: "writing" }), "2026-11", src({ items }))).toBeNull();
+    expect(monthHit(goal({ areaId: "writing" }), "2026-11", src({ items }))).toBeNull();
+  });
+});
+
 it("isActive: missing means active", () => {
   expect(isActive(goal())).toBe(true);
   expect(isActive(goal({ active: false }))).toBe(false);

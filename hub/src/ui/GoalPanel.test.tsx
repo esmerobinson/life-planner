@@ -119,6 +119,19 @@ describe("the goal panel (view)", () => {
     expect(await box.findByText("0 / 4")).toBeInTheDocument();
   });
 
+  it("an older goal with only a monthly target: the month's count and Past months from its ticked to-dos (fix round 1, I2)", async () => {
+    const g = await createGoal({ title: "Pretend imported sessions", areaId: "writing", kind: "practice", monthlyTarget: 2 }, TODAY);
+    for (const d of ["2026-09-03", "2026-09-12", "2026-10-02"]) {
+      const t = await createItem({ kind: "task", title: `Pretend session ${d}`, areaId: "writing", priority: 3, goalId: g.id }, d);
+      await tickItem(t.id, d);
+    }
+    const p = await openGoal(g.id);
+    expect(within(p.getByRole("list", { name: "October goals" })).getByText("October: 1 of 2")).toBeInTheDocument();
+    const past = p.getByRole("region", { name: "Past months" });
+    expect(within(past).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["September 2026Hit · 2 / 2"]);
+    expect(p.getAllByText("1 month in a row").length).toBeGreaterThan(0);
+  });
+
   it("Past months: each earlier month with goals, hit or missed, with its count", async () => {
     const g = await createGoal({
       title: "Write", areaId: "writing", kind: "practice",

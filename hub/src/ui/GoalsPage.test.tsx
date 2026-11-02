@@ -177,6 +177,19 @@ describe("GoalsPage (goals redesign: colour-band tiles)", () => {
     expect(within(tile).queryByRole("button", { name: "Plan October" })).toBeNull();
   });
 
+  it("an older goal with only a monthly target keeps its month count and history on the tile, as on Home (fix round 1, I2)", async () => {
+    const g = await createGoal({ title: "Pretend imported sessions", areaId: "writing", kind: "practice", monthlyTarget: 2 }, TODAY);
+    for (const d of ["2026-09-03", "2026-09-12", "2026-10-02"]) {
+      const it = await createItem({ kind: "task", title: `Pretend session ${d}`, areaId: "writing", priority: 3, goalId: g.id }, d);
+      await tickItem(it.id, d);
+    }
+    renderGoals();
+    const tile = (await screen.findByRole("link", { name: "Pretend imported sessions" })).closest("li")!;
+    expect(await within(tile).findByText("October: 1 of 2")).toBeInTheDocument();
+    expect(tile.querySelectorAll(".goal-dot.on")).toHaveLength(1); // September hit
+    expect(within(tile).getByText("1 month in a row")).toBeInTheDocument(); // ends last month (September)
+  });
+
   it("Active / Inactive: inactive goals only under Inactive", async () => {
     await createGoal({ title: "Live one", areaId: "art", kind: "practice" }, TODAY);
     await createGoal({ title: "Resting one", areaId: "art", kind: "practice", active: false }, TODAY);

@@ -9,7 +9,7 @@ import {
   canPlanMonth, dailyStatus, goalsIn, isAutoCount, isDaily, monthCount, monthDots, monthGoalDone, monthsInARowHit,
   monthSummary, type GoalSources,
 } from "../domain/goalCounts";
-import { milestoneProgress, monthlyProgress } from "../domain/progress";
+import { milestoneProgress } from "../domain/progress";
 import type { CountSource, Goal, ISODate, Item, MonthGoal } from "../domain/types";
 import { areaLabel } from "./GoalProgress";
 import { NAV } from "./areas";
@@ -275,6 +275,8 @@ export function MonthGoalsBox({
   const month = monthName(today);
   const mine = goalsIn(goal, monthOf(today));
   const done = mine.filter((m) => monthGoalDone(goal, m, sources)).length;
+  // An older goal with only a monthly target (before monthly goals): its count, as the goal cards showed it.
+  const legacy = mine.length === 0 ? monthSummary(goal, monthOf(today), sources) : null;
   async function write(fn: () => Promise<unknown>): Promise<boolean> {
     const ok = await attempt(fn);
     if (ok) await onChanged();
@@ -297,6 +299,17 @@ export function MonthGoalsBox({
               <StepItem key={m.id} goal={goal} m={m} write={write} />
             ),
           )}
+        </ul>
+      )}
+      {legacy && (
+        <ul className="goal-mitems" aria-label={`${month} goals`}>
+          <li className="goal-mitem">
+            <span className={legacy.n >= legacy.of ? "tick-auto tick-sm is-done" : "tick-auto tick-sm"} aria-hidden="true">
+              {legacy.n >= legacy.of && "✓"}
+            </span>
+            <span className="goal-mitem-title">{`${month}: ${legacy.n} of ${legacy.of}`}</span>
+            <span />
+          </li>
         </ul>
       )}
       {canPlanMonth(goal, today) && (
@@ -344,9 +357,8 @@ export function GoalOverall({ goal, items, today, sources }: { goal: Goal; items
  */
 export function GoalMiniCard({ goal, today, sources }: { goal: Goal; today: ISODate; sources: GoalSources }) {
   const nav = NAV.find((n) => n.id === goal.areaId);
-  // Before any monthly goals: the older monthly target (to-dos ticked for it), as the cards showed it.
-  const legacy = monthlyProgress(goal, [...sources.items], today);
-  const sum = monthSummary(goal, monthOf(today), sources) ?? (legacy && { n: legacy.done, of: legacy.target });
+  // Before any monthly goals, monthSummary falls back to the older monthly target (fix round 1, I2).
+  const sum = monthSummary(goal, monthOf(today), sources);
   const st = isDaily(goal) ? dailyStatus(goal, today, sources) : null;
   return (
     <li className="goal-mini">

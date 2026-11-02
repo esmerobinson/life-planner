@@ -100,6 +100,19 @@ export function monthGoalDone(goal: Goal, m: MonthGoal, src: GoalSources): boole
   return m.target !== undefined && monthCount(goal, m, src) >= m.target;
 }
 
+/** An older goal's monthly target (before monthly goals): what a month without monthly goals is measured by. */
+const hasLegacyTarget = (goal: Goal): boolean => (goal.monthlyTarget ?? 0) > 0;
+
+/** The tick-offs the older monthly target counted: linked to-dos ticked done and linked habit sessions. */
+function legacyTickOffs(goal: Goal, src: GoalSources): ISODate[] {
+  return src.items.filter((it) => it.goalId === goal.id && isSortedTask(it)).flatMap(tickOffDates);
+}
+
+/** The older monthly target's count for "YYYY-MM" (the number the goal cards' month bar showed). */
+export function legacyMonthCount(goal: Goal, month: string, src: GoalSources): number {
+  return legacyTickOffs(goal, src).filter((d) => monthOf(d) === month).length;
+}
+
 /** The goal's monthly goals for "YYYY-MM", in the order they were added. */
 export const goalsIn = (goal: Goal, month: string): MonthGoal[] => (goal.monthGoals ?? []).filter((m) => m.month === month);
 
@@ -109,7 +122,7 @@ export const goalsIn = (goal: Goal, month: string): MonthGoal[] => (goal.monthGo
  */
 export function monthHit(goal: Goal, month: string, src: GoalSources): boolean | null {
   const mine = goalsIn(goal, month);
-  if (mine.length === 0) return null;
+  if (mine.length === 0) return hasLegacyTarget(goal) ? legacyMonthCount(goal, month, src) >= goal.monthlyTarget! : null;
   const count = mine.find((m) => m.kind === "count");
   if (count) return monthGoalDone(goal, count, src);
   return mine.every((m) => m.done === true);
@@ -118,7 +131,7 @@ export function monthHit(goal: Goal, month: string, src: GoalSources): boolean |
 /** The month's headline number: its first count (n of target), else its steps (done of all). */
 export function monthSummary(goal: Goal, month: string, src: GoalSources): { n: number; of: number } | null {
   const mine = goalsIn(goal, month);
-  if (mine.length === 0) return null;
+  if (mine.length === 0) return hasLegacyTarget(goal) ? { n: legacyMonthCount(goal, month, src), of: goal.monthlyTarget! } : null;
   const count = mine.find((m) => m.kind === "count");
   if (count) return { n: monthCount(goal, count, src), of: count.target ?? 0 };
   return { n: mine.filter((m) => m.done === true).length, of: mine.length };
@@ -161,7 +174,8 @@ export function pastMonths(
   src: GoalSources,
 ): { month: string; hit: boolean; summary: { n: number; of: number } }[] {
   const now = monthOf(today);
-  const months = [...new Set((goal.monthGoals ?? []).map((m) => m.month))].filter((m) => m < now).sort().reverse();
+  const legacy = hasLegacyTarget(goal) ? legacyTickOffs(goal, src).map(monthOf) : [];
+  const months = [...new Set([...(goal.monthGoals ?? []).map((m) => m.month), ...legacy])].filter((m) => m < now).sort().reverse();
   return months.map((month) => ({
     month,
     hit: monthHit(goal, month, src) === true,
