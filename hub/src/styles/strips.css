@@ -347,18 +347,31 @@ button.quiet-link:focus-visible {
 }
 
 .tick-auto {
-  display: inline-block;
+  display: inline-grid;
+  place-items: center;
   box-sizing: border-box;
   width: 22px;
   height: 22px;
   border-radius: 7px;
   background: var(--panel);
   border: 2px solid var(--sage);
+  font-weight: 700;
+  line-height: 1;
 }
 
+/* Done: the ✓ in --text on --bar-fill (controller call, 2026-11-02: the plain green fill
+   vanished on mint), as the Journal's "Done for today" box (.journal-tick) shows it. */
 .tick-auto.is-done {
   background: var(--bar-fill);
   border-color: var(--bar-fill);
+  color: var(--text);
+}
+
+/* While loading: only the box's space, so nothing pops from unticked to ticked. */
+.tick-auto-space {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
 }
 
 .strip.journal-row-open {
