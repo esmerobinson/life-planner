@@ -42,7 +42,7 @@ describe("the goal panel (view)", () => {
     expect(currentUrl).toBe(`/goals?open=${g.id}`);
   });
 
-  it("shows the header, both bars, the three stats, why, To come and Completed", async () => {
+  it("shows the header, Overall, the month dots, the month's goals, why, To come and Completed", async () => {
     const g = await createGoal(
       {
         title: "Finish the pretend book", areaId: "writing", kind: "finite", deadline: "2026-12-31", monthlyTarget: 6,
@@ -60,13 +60,14 @@ describe("the goal panel (view)", () => {
     expect(p.getByText("By 31 Dec")).toBeInTheDocument();
     expect(p.getByText("Weekly: 3 sessions")).toBeInTheDocument();
     // Overall from the milestone-flagged tasks: 1 of 2.
-    expect(p.getByText("Overall · milestones")).toBeInTheDocument();
+    expect(p.getByText("Overall")).toBeInTheDocument();
     expect(p.getByRole("progressbar", { name: "Overall 1/2" })).toHaveAttribute("aria-valuenow", "50");
-    expect(p.getByText("October: 1 of 6 sessions")).toBeInTheDocument();
-    expect(p.getAllByText("1 month in a row").length).toBeGreaterThan(0);
-    expect(p.getByText("1/6")).toBeInTheDocument();
+    expect(document.querySelectorAll(".peek .goal-dot")).toHaveLength(6);
+    expect(p.getByText("October goals")).toBeInTheDocument();
+    expect(p.getByRole("button", { name: "Active" })).toHaveAttribute("aria-pressed", "true");
+    expect(p.getByRole("button", { name: "Show on Home" })).toHaveAttribute("aria-pressed", "false");
     expect(p.getByText("A pretend reason <b>x</b>")).toBeInTheDocument();
-    expect(document.querySelector(".peek b:not(.goal-peek-stat b)")).toBeNull();
+    expect(document.querySelector(".peek b")).toBeNull();
     const toCome = p.getByRole("list", { name: "To come" });
     expect(within(toCome).getAllByRole("listitem").map((li) => li.querySelector(".strip-title")!.textContent)).toEqual([
       "Book a writing day",
@@ -78,10 +79,10 @@ describe("the goal panel (view)", () => {
     expect(p.getByRole("button", { name: "Delete goal" })).toBeInTheDocument();
   });
 
-  it("a goal with no linked tasks has no overall bar", async () => {
+  it("a finite goal with no linked tasks shows Overall at 0%; a practice says ongoing", async () => {
     const g = await createGoal({ title: "Empty", areaId: "art", kind: "finite", deadline: "2026-12-31" }, TODAY);
     const p = await openGoal(g.id);
-    expect(p.queryByText(/Overall/)).toBeNull();
+    expect(p.getByRole("progressbar", { name: "Overall 0/0" })).toHaveAttribute("aria-valuenow", "0");
     expect(p.getByText("No open tasks attached to this goal.")).toBeInTheDocument();
   });
 
@@ -101,16 +102,74 @@ describe("the goal panel (view)", () => {
     expect(titles()).toHaveLength(12);
   });
 
-  it("ticking a task in the panel raises the month bar; unticking a completed one lowers it", async () => {
-    const g = await createGoal({ title: "Write", areaId: "writing", kind: "practice", monthlyTarget: 4 }, TODAY);
+  it("a goal counting linked to-dos: ticking one in the panel raises the count; unticking lowers it", async () => {
+    const g = await createGoal({
+      title: "Write", areaId: "writing", kind: "practice", countsFrom: ["linked"],
+      monthGoals: [{ id: "m", month: "2026-10", kind: "count", title: "Sessions", target: 4 }],
+    }, TODAY);
     await createItem({ kind: "task", title: "Draft", areaId: "writing", priority: 3, goalId: g.id }, TODAY);
     const p = await openGoal(g.id);
-    expect(p.getByRole("progressbar", { name: "This month 0/4" })).toBeInTheDocument();
+    const box = within(p.getByRole("list", { name: "October goals" }));
+    expect(box.getByText("0 / 4")).toBeInTheDocument();
+    expect(box.getByText("Counts itself: linked to-dos")).toBeInTheDocument();
     await userEvent.click(p.getByRole("checkbox", { name: "Mark done: Draft" }));
-    expect(await p.findByRole("progressbar", { name: "This month 1/4" })).toBeInTheDocument();
+    expect(await box.findByText("1 / 4")).toBeInTheDocument();
     expect(within(p.getByRole("list", { name: "Completed" })).getByText("Draft")).toBeInTheDocument();
     await userEvent.click(p.getByRole("checkbox", { name: "Done: Draft" }));
-    expect(await p.findByRole("progressbar", { name: "This month 0/4" })).toBeInTheDocument();
+    expect(await box.findByText("0 / 4")).toBeInTheDocument();
+  });
+
+  it("Past months: each earlier month with goals, hit or missed, with its count", async () => {
+    const g = await createGoal({
+      title: "Write", areaId: "writing", kind: "practice",
+      monthGoals: [
+        { id: "a", month: "2026-08", kind: "count", title: "Sessions", target: 2, log: ["2026-08-01", "2026-08-02"] },
+        { id: "b", month: "2026-09", kind: "count", title: "Sessions", target: 2, log: ["2026-09-01"] },
+      ],
+    }, TODAY);
+    const p = await openGoal(g.id);
+    const past = p.getByRole("region", { name: "Past months" });
+    expect(within(past).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "September 2026Missed · 1 / 2",
+      "August 2026Hit · 2 / 2",
+    ]);
+  });
+
+  it("the Active switch makes a goal inactive (and active again)", async () => {
+    const g = await createGoal({ title: "Pretend rest", areaId: "art", kind: "practice" }, TODAY);
+    const p = await openGoal(g.id);
+    await userEvent.click(p.getByRole("button", { name: "Active" }));
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.active).toBe(false));
+    await vi.waitFor(() => expect(p.getByRole("button", { name: "Active" })).toHaveAttribute("aria-pressed", "false"));
+    await userEvent.click(p.getByRole("button", { name: "Active" }));
+    await vi.waitFor(async () => expect(await db.goals.get(g.id)).not.toHaveProperty("active"));
+  });
+
+  it("Edit: Counts from (Journal, Exercise, Linked to-dos, an area), Daily, and the month's goals renamed or removed", async () => {
+    const g = await createGoal({
+      title: "Pretend calm", areaId: "mind", kind: "practice",
+      monthGoals: [
+        { id: "a", month: "2026-10", kind: "count", title: "Sessions", target: 5 },
+        { id: "b", month: "2026-10", kind: "step", title: "Book a pretend class" },
+      ],
+    }, TODAY);
+    const p = await openGoal(g.id);
+    await userEvent.click(p.getByRole("button", { name: "Edit" }));
+    await userEvent.click(p.getByRole("checkbox", { name: "Journal" }));
+    await userEvent.click(p.getByRole("checkbox", { name: "Exercise" }));
+    await userEvent.selectOptions(p.getByLabelText("Counts an area"), "mind");
+    await userEvent.selectOptions(p.getByLabelText("Type"), "daily");
+    const target = p.getByLabelText("Target for Sessions");
+    await userEvent.clear(target);
+    await userEvent.type(target, "31");
+    await userEvent.click(p.getByRole("button", { name: "Remove Book a pretend class" }));
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.monthGoals).toHaveLength(1));
+    expect((await db.goals.get(g.id))!.monthGoals![0]!.target).toBe(31);
+    await userEvent.click(p.getByRole("button", { name: "Done" }));
+    await vi.waitFor(async () =>
+      expect(await db.goals.get(g.id)).toMatchObject({ rhythm: "daily", countsFrom: ["journal", "exercise", { area: "mind" }] }),
+    );
+    expect(await p.findByText("Daily", { selector: ".chip" })).toBeInTheDocument();
   });
 
   it("+ Add a task makes a to-do in the goal's area with the goal linked (it shows in that area's To-dos)", async () => {
@@ -252,7 +311,7 @@ describe("the goal panel (Edit)", () => {
     expect(await p.findByText("A monthly target is a whole number, 1 or more.")).toBeInTheDocument();
     fireEvent.change(p.getByLabelText("Monthly target"), { target: { value: "3" } });
     await userEvent.click(p.getByRole("button", { name: "Done" }));
-    expect(await p.findByText("Practice", { selector: ".chip" })).toBeInTheDocument();
+    expect(await p.findByText("Ongoing", { selector: ".chip" })).toBeInTheDocument();
     const got = (await db.goals.get("ef"))!;
     expect(got).toMatchObject({ kind: "practice", title: "ok", monthlyTarget: 3 });
     expect(got.deadline).toBeUndefined();

@@ -76,10 +76,10 @@ describe("the Add form opens pre-set from where Add was pressed", () => {
     expect(preset(await openAdd())).toEqual({ type: "goal", area: "art" });
   });
 
-  it("the Goals page with no goals yet: a goal in the first sidebar area", async () => {
+  it("the Goals page with no goals yet: a goal in the first area shown there (Mind, goals redesign)", async () => {
     renderApp("/goals", TODAY);
     await screen.findByText("No goals yet.");
-    expect(preset(await openAdd())).toEqual({ type: "goal", area: "admin" });
+    expect(preset(await openAdd())).toEqual({ type: "goal", area: "mind" });
   });
 
   it("Today: a to-do (not pinned, as Today's Add never pinned)", async () => {

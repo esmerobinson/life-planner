@@ -3,7 +3,10 @@ import { tickItem, untickItem } from "../data/repo";
 import { pickToday, tickedOffToday, withTickedOff } from "../domain/triage";
 import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
+import { isActive } from "../domain/goalCounts";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
+import { DailyGoalRows } from "./DailyGoalRows";
+import { useGoalSources } from "./useGoalSources";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow } from "./TaskRow";
@@ -37,10 +40,12 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
   }, [celebrating]);
 
   // What was ticked off today stays, crossed out, at the bottom of its list (round 3).
-  const { rhythm, picks, alsoDue } = useMemo(
-    () => withTickedOff(pickToday(items, goals, today, thisMonthDoneFor(goals, items, today)), items, today),
-    [items, goals, today],
-  );
+  // Inactive goals don't count (goals redesign).
+  const { rhythm, picks, alsoDue } = useMemo(() => {
+    const active = goals.filter(isActive);
+    return withTickedOff(pickToday(items, active, today, thisMonthDoneFor(active, items, today)), items, today);
+  }, [items, goals, today]);
+  const sources = useGoalSources(items);
 
   async function tick(id: string): Promise<boolean> {
     if (!(await attempt(() => tickItem(id, today)))) return false;
@@ -84,6 +89,7 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
       <Heading>Today</Heading>
       {celebrating && <CelebrationPlaceholder />}
       {saveError && <p className="form-message">{saveError}</p>}
+      <DailyGoalRows goals={goals} today={today} view={sources} onChanged={changed} />
       {empty && <p>Nothing planned for today.</p>}
       {rhythm.length > 0 && (
         <ul aria-label="Rhythm" className="strip-list">{rhythm.map(row)}</ul>

@@ -49,3 +49,9 @@ export const GOAL_AREAS = AREA_CHOICES.filter((a) => a.id !== "inbox");
 
 /** GOAL_AREAS in sidebar order (Admin first), for lists a person scans like the sidebar. */
 export const GOAL_AREAS_BY_SIDEBAR = NAV.flatMap((n) => GOAL_AREAS.filter((a) => a.id === n.id));
+
+/** Goal areas with Mind first, then sidebar order (goals redesign: "Areas grouped as before (Mind first)"). */
+export const GOAL_AREAS_MIND_FIRST = [
+  ...GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id === "mind"),
+  ...GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id !== "mind"),
+];

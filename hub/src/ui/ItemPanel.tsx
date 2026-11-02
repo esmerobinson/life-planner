@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { isActive } from "../domain/goalCounts";
 import { saveItemNotes, updateItem } from "../data/repo";
 import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
@@ -215,7 +216,7 @@ export function ItemPanel({
             {editing ? (
               <select aria-label="Goal" value={fields.goalId} onChange={(e) => setFields({ ...fields, goalId: e.target.value })}>
                 <option value="">None</option>
-                {goals.map((g) => (
+                {goals.filter((g) => isActive(g) || g.id === item.goalId).map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.title}
                   </option>
