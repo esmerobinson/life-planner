@@ -12,13 +12,21 @@ import { BinPage } from "./ui/BinPage";
 import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
 import { TodayPanel } from "./ui/TodayPanel";
+import { JournalCard } from "./ui/JournalCard";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
 
 function TodayRoute() {
   // Today's Add opens as a to-do. It never pinned to today, so it still does not.
   useAddDefaults("task", "inbox");
-  return <TodayPanel today={useShellToday()} />;
+  const today = useShellToday();
+  // Journal v2: the Journal rows get their own section, under the to-dos.
+  return (
+    <div className="today-page">
+      <TodayPanel today={today} />
+      <JournalCard today={today} />
+    </div>
+  );
 }
 
 function HomeRoute() {
@@ -85,6 +93,7 @@ export function AppRoutes() {
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
             ),
           )}
+          <Route path="/journal/:tab" element={<JournalRoute />} />
           <Route path="/goals" element={<GoalsRoute />} />
           <Route path="/goals/:id" element={<GoalDetailRoute />} />
           <Route path="/area/:areaId" element={<AreaRoute />} />

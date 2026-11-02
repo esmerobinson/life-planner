@@ -48,7 +48,7 @@ function renderAt(entries: string[], index = entries.length - 1) {
           <Route path="/goals" element={<h1>Goals</h1>} />
           <Route path="/area/art" element={<h1>Art</h1>} />
           <Route path="/goals/:id" element={<h1>A goal opened</h1>} />
-          <Route path="/journal" element={<JournalSpy />} />
+          <Route path="/journal/:tab" element={<JournalSpy />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -130,11 +130,11 @@ describe("phone layout (below 700px)", () => {
     setPhone(true);
     const first = renderAt(["/"]);
     await userEvent.click(await screen.findByRole("button", { name: "Morning pages" }));
-    expect(await screen.findByRole("heading", { name: "Journal at /journal#morning-pages" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Journal at /journal/morning" })).toBeInTheDocument();
     first.unmount();
     renderAt(["/"]);
     await userEvent.click(await screen.findByRole("button", { name: "Daily check-in" }));
-    expect(await screen.findByRole("heading", { name: "Journal at /journal#daily-check-in" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Journal at /journal/check-in" })).toBeInTheDocument();
   });
 
   it("an opened goal keeps its own heading visible and the bar title empty", async () => {

@@ -1,8 +1,7 @@
 /* The Journal (journal round). Every value is from the journal mockup (journal.html: part 1
    tab C "Star calendar", part 2 tab A "One question at a time") and the existing tokens:
    the Journal tile violet is the sidebar's Journal tile (Island Life 101 violet, in
-   VISUAL-LANGUAGE.md's palette); stars stay the magenta placeholder until Esme picks star
-   art. Not in the mockup (builder's call, not yet seen by Esme): the writing box's height
+   VISUAL-LANGUAGE.md's palette); the magenta placeholder stars are retired (2026-11-02). Not in the mockup (builder's call, not yet seen by Esme): the writing box's height
    and 16px text (the brief asks for 16px+), the month arrows as small secondary pills, the
    Read back / Past check-ins / Choose questions fold-outs, and the Show/Hide pill under a
    proof photo. */
@@ -39,8 +38,54 @@
   margin: 0;
 }
 
-/* Each section's heading is its Journal row (strips.css "Journal rows", 2026-11-02); the
-   mockup's violet tile head is gone. */
+/* ---- Journal v2 tabs (the approved mockup-journal-v2.html): big pills in a row, 16px text,
+   12px x 18px padding, 14px radius, --row; the selected tab is Map mint and bold. Each holds
+   the rows' read-only tick at the mockup's 18px (6px radius) and the streak. On a narrow
+   screen the row scrolls sideways instead of overflowing the page. ---- */
+.journal-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+a.journal-tab {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border-radius: 14px;
+  padding: 12px 18px;
+  background: var(--row);
+  color: var(--text);
+  font-size: 16px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.journal-tab:hover .journal-tab-label,
+a.journal-tab:focus-visible .journal-tab-label {
+  text-decoration: underline;
+}
+
+a.journal-tab.is-selected {
+  background: var(--mint);
+  font-weight: 700;
+}
+
+.journal-tab .tick-auto,
+.journal-tab .tick-auto-space {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  font-size: 11px;
+  flex: none;
+}
+
+/* Desktop Today: the Journal section under the to-dos, with the same clear space as on Home. */
+.today-page .journal-card-home {
+  padding-top: 20px;
+}
 
 .journal-big {
   margin: 0;
@@ -51,15 +96,6 @@
 .journal-muted {
   font-size: 13px;
   opacity: 0.75;
-}
-
-.journal-star {
-  width: 18px;
-  height: 18px;
-  background: var(--placeholder);
-  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-  display: inline-block;
-  vertical-align: -3px;
 }
 
 .journal-month-row {
@@ -93,12 +129,10 @@
   position: relative;
 }
 
-.journal-day.on::after {
-  content: "";
-  position: absolute;
-  inset: 22%;
-  background: var(--placeholder);
-  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+/* A day with morning pages is mint (the approved Journal v2 mockup), with its number; the
+   magenta placeholder stars are retired (VISUAL-LANGUAGE.md "Streak (2026-11-02)"). */
+.journal-day.on {
+  background: var(--mint);
 }
 
 .journal-day.today {
@@ -317,6 +351,61 @@
   margin-top: 8px;
 }
 
+/* Journal v2 card head (the approved mockup): the Day chip and the theme (20px, bold), the
+   streak on the right; the chapter line under it in the muted small line. */
+.exercise-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.exercise-theme {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.exercise-chapter {
+  margin-top: 4px;
+}
+
+/* "Read more" (the approved mockup): a bold summary, then a --row box (tile radius, 12px x
+   14px, line height 1.55) with the paragraphs and the sources' links in --text. */
+.exercise-more summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.exercise-more-box {
+  margin-top: 8px;
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 12px 14px;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exercise-more-box a {
+  color: var(--text);
+}
+
+.exercise-boxed .exercise-more-box {
+  background: var(--panel);
+}
+
+/* Under the response box: the muted "Submitting ticks today's exercise." left, Submit and
+   "Do the next one →" right (the mockup's row). */
+.exercise-response-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .exercise-day-line {
   display: flex;
   flex-wrap: wrap;
@@ -406,4 +495,56 @@ button.exercise-next-link {
 .exercise-response-actions {
   justify-content: flex-end;
   align-items: center;
+  margin-left: auto;
+}
+
+/* A card with parts (Journal v2, not in the mockup; builder's calls from existing values, not
+   yet seen by Esme): the parts stacked 14px apart like the check-in answers, each prompt as
+   the bold Learn / Try this label; list lines numbered, 6px apart; the 0–10 rating and the
+   choices as the existing soft pills (controls.css button[aria-pressed]). Read back the same
+   way, read-only. */
+.exercise-parts,
+.exercise-part-answers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+fieldset.exercise-part,
+label.exercise-part {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exercise-part legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+.exercise-list,
+.exercise-list-answer {
+  margin: 0;
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+input.exercise-list-line {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Morning pages: "Add photo instead" left, "I'm done" right (the mockup's row). */
+.journal-write-actions {
+  justify-content: space-between;
 }

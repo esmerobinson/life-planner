@@ -19,8 +19,10 @@ describe("journal.css", () => {
     for (const bad of ["transition", "animation", "font-family", "!important"]) expect(code).not.toContain(bad);
   });
 
-  it("keeps stars as the magenta placeholder and today outlined in the violet", () => {
-    expect(code).toMatch(/\.journal-day\.on::after \{[^}]*background: var\(--placeholder\)/);
+  it("a done day is mint (the magenta stars are retired); today outlined in the violet", () => {
+    expect(code).not.toContain(".journal-star");
+    expect(code).not.toMatch(/\.journal-day\.on::after/);
+    expect(code).toMatch(/\.journal-day\.on \{[^}]*background: var\(--mint\)/);
     expect(code).toMatch(/\.journal-day\.today \{[^}]*outline: 2px solid var\(--journal-violet\)/);
     expect(code).toMatch(/\.journal-photo\.blurred \{[^}]*filter: blur\(10px\)/);
   });
@@ -35,6 +37,25 @@ describe("journal.css", () => {
 
   it("the exercise response box is the check-in answer box at 16px or more", () => {
     expect(code).toMatch(/\.journal-answer\.exercise-response \{[^}]*font-size: max\(16px, 1em\)/);
+  });
+
+  it("Journal v2 tabs: the mockup's big pills (16px, 12px 18px, --row; selected mint and bold), scrolling sideways when narrow", () => {
+    expect(code).toMatch(/\.journal-tabs \{[^}]*overflow-x: auto/);
+    expect(code).toMatch(/a\.journal-tab \{[^}]*border-radius: 14px;[^}]*padding: 12px 18px;[^}]*background: var\(--row\);[^}]*font-size: 16px/);
+    expect(code).toMatch(/a\.journal-tab\.is-selected \{[^}]*background: var\(--mint\);[^}]*font-weight: 700/);
+    expect(code).toMatch(/\.journal-tab \.tick-auto,[^{]*\{[^}]*width: 18px;[^}]*height: 18px;[^}]*border-radius: 6px/);
+    expect(code).toMatch(/\.exercise-more-box \{[^}]*background: var\(--row\);[^}]*border-radius: var\(--radius-tile\);[^}]*padding: 12px 14px;[^}]*line-height: 1\.55/);
+  });
+
+  it("the streak is drawn in one place: streak.css (7x14 bars, 3px radius and gap; the number 12px, 600)", () => {
+    const streak = read("src/styles/streak.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(read("src/main.tsx")).toContain('import "./styles/streak.css"');
+    expect(streak).toMatch(/\.streak \{[^}]*font-size: 12px;[^}]*font-weight: 600/);
+    expect(streak).toMatch(/\.streak-week \{[^}]*gap: 3px/);
+    expect(streak).toMatch(/\.streak-day \{[^}]*width: 7px;[^}]*height: 14px;[^}]*border-radius: 3px;[^}]*background: var\(--track\)/);
+    expect(streak).toMatch(/\.streak-day\.on \{[^}]*background: var\(--bar-fill\)/);
+    expect(streak).toMatch(/\.journal-row \.streak-day:not\(\.on\)[^{]*\{[^}]*background: var\(--panel\)/);
+    expect(streak).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
   it("exercise cards: the Day chip is the Journal violet; the star is drawn in --text on no background", () => {

@@ -156,11 +156,11 @@ it("the phone answers, the Mac (not yet synced) skips the same question: the pho
 it("exercise responses on two devices: each keeps its own row, the newest non-empty one shows, sealed all the way", async () => {
   const server = new FakeSyncServer(TOKEN);
   const phone = await phoneDevice();
-  const card = { day: 2, theme: "The fictional kettle" };
+  const card = { id: "day-2", day: 2, theme: "The fictional kettle", legacy: true };
   // The phone responds first (offline), as the repo writes it: its own row.
   const pk = await exerciseCardKey(jk, card.day, card.theme);
   await phone.journal.add(
-    await sealed("exercise-entry", DAY, `${pk}:${PHONE}`, { v: 1, ...card, text: "Pretend phone response", submittedAt: clock, at: clock }),
+    await sealed("exercise-entry", DAY, `${pk}:${PHONE}`, { v: 1, day: card.day, theme: card.theme, text: "Pretend phone response", submittedAt: clock, at: clock }),
   );
   // Later the Mac (not synced) submits its own response to the same card.
   await submitExerciseEntry(jk, DAY, MAC, card, "Pretend mac response");

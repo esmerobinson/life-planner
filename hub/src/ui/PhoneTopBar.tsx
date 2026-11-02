@@ -17,7 +17,8 @@ const TITLES: Record<string, string> = {
  */
 export function phoneTitle(pathname: string): string | null {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return TITLES[path] ?? null;
+  // The Journal's tabs (/journal/exercise, …) are still the Journal.
+  return TITLES[path] ?? (path.startsWith("/journal/") ? (TITLES["/journal"] ?? null) : null);
 }
 
 /**

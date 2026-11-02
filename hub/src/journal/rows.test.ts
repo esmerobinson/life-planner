@@ -78,11 +78,12 @@ describe("journal rows: check-in done", () => {
 describe("journal rows: exercise done", () => {
   it("a day counts when any device marked its card done", () => {
     const marks = [
-      { date: "2026-11-02", device: "d1", day: 4, done: false },
-      { date: "2026-11-01", device: "d1", day: 3, done: false },
-      { date: "2026-11-01", device: "d2", day: 3, done: true },
-      { date: "2026-10-31", device: "d1", day: 2, done: true },
+      { date: "2026-11-02", device: "d1", id: "day-4", done: false, primary: true },
+      { date: "2026-11-01", device: "d1", id: "day-3", done: false, primary: true },
+      { date: "2026-11-01", device: "d2", id: "day-3", done: true, primary: true },
+      { date: "2026-10-31", device: "d1", id: "day-2", done: true, primary: true },
+      { date: "2026-10-30", device: "d1", id: "day-9", done: true, primary: false }, // a further card that day
     ];
-    expect(exerciseDoneDays(marks)).toEqual(set("2026-11-01", "2026-10-31"));
+    expect(exerciseDoneDays(marks)).toEqual(set("2026-11-01", "2026-10-31", "2026-10-30"));
   });
 });
