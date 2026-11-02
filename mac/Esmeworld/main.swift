@@ -35,6 +35,93 @@ func say(_ s: String) {
     fflush(stdout)
 }
 
+// MARK: - WebCrypto master key (never the login keychain)
+
+/// WebKit wraps every CryptoKey a page stores in IndexedDB (the journal key) with a
+/// "master key". By default it keeps that key in the login keychain as
+/// "Esmeworld WebCrypto Master Key", and macOS asks for the keychain password whenever
+/// the app's signature changes (every ad-hoc build). Instead the navigation delegate
+/// hands WebKit this key (private SPI `_webCryptoMasterKeyForWebView:`), so the
+/// keychain is never used.
+///
+/// The key is 32 random bytes made once and kept in
+/// ~/Library/Application Support/Esmeworld/webcrypto-master.key (folder 0700, file
+/// 0600). The self-test uses its own file and never reads or writes hers. The bytes
+/// are never logged. If this file is lost, stored CryptoKeys can no longer be read
+/// (the journal then asks for the passphrase once); nothing else depends on it.
+enum WebCryptoMasterKey {
+    static let length = 32
+
+    static var directory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(kAppName, isDirectory: true)
+    }
+
+    static var fileURL: URL {
+        directory.appendingPathComponent(isSelfTest ? "webcrypto-master-selftest.key" : "webcrypto-master.key")
+    }
+
+    enum Origin: String { case created, loaded }
+
+    /// Self-test reset only: deletes the self-test key file (never hers).
+    static func deleteSelfTestKey() {
+        precondition(isSelfTest)
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+
+    /// The key from the file, or a new one written to it. Never overwrites an
+    /// existing file (a bad one is an error, so no stored key is ever orphaned).
+    static func loadOrCreate() throws -> (Data, Origin) {
+        let url = fileURL
+        if let existing = try read(url) { return (existing, .loaded) }
+
+        let fm = FileManager.default
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true,
+                               attributes: [.posixPermissions: 0o700])
+        try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+
+        var bytes = [UInt8](repeating: 0, count: length)
+        guard SecRandomCopyBytes(kSecRandomDefault, length, &bytes) == errSecSuccess else {
+            throw error("SecRandomCopyBytes failed")
+        }
+        defer { bytes.withUnsafeMutableBytes { _ = memset_s($0.baseAddress, $0.count, 0, $0.count) } }
+
+        // Atomic and no-clobber: write a 0600 temp file, fsync, then link() it into
+        // place (fails if the file appeared meanwhile, and then that one is used).
+        let temp = directory.appendingPathComponent(".webcrypto-master-\(UUID().uuidString).tmp")
+        let fd = open(temp.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard fd >= 0 else { throw error("can't create \(temp.lastPathComponent): \(String(cString: strerror(errno)))") }
+        defer { unlink(temp.path) }
+        let written = bytes.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+        let synced = fsync(fd)
+        close(fd)
+        guard written == length, synced == 0 else { throw error("can't write the master key file") }
+        if link(temp.path, url.path) != 0 {
+            let e = errno
+            if e == EEXIST, let existing = try read(url) { return (existing, .loaded) }
+            throw error("can't place the master key file: \(String(cString: strerror(e)))")
+        }
+        // The folder entry itself is durable too.
+        let dfd = open(directory.path, O_RDONLY)
+        if dfd >= 0 { fsync(dfd); close(dfd) }
+        return (Data(bytes), .created)
+    }
+
+    /// nil if there is no file; an error if it is there but not a 32-byte key.
+    private static func read(_ url: URL) throws -> Data? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let data = try Data(contentsOf: url)
+        guard data.count == length else {
+            throw error("\(url.path) is \(data.count) bytes, not \(length); left as it is")
+        }
+        return data
+    }
+
+    private static func error(_ text: String) -> NSError {
+        NSError(domain: "Esmeworld.WebCryptoMasterKey", code: 1, userInfo: [NSLocalizedDescriptionKey: text])
+    }
+}
+
 // MARK: - Serving the bundled web app
 
 /// Maps esmeworld://app/<path> to files under Contents/Resources/web/.
@@ -175,6 +262,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     var webView: WKWebView!
     let console = ConsoleBridge()
 
+    /// The WebCrypto master key handed to WebKit (see WebCryptoMasterKey). nil only
+    /// if the key file could not be read or made.
+    private var masterKey: Data?
+    /// How often WebKit asked for it, per SPI variant (the self-test checks this).
+    private var masterKeyCallsSync = 0
+    private var masterKeyCallsAsync = 0
+
     // Self-test plumbing.
     private var loadWaiter: CheckedContinuation<Void, Error>?
     private var downloadWaiter: CheckedContinuation<URL, Error>?
@@ -198,6 +292,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                     say("FAILED")
                     exit(1)
                 }
+                if isSelfTestReset { WebCryptoMasterKey.deleteSelfTestKey() }
+                self.loadMasterKey()
+                guard self.masterKey != nil else {
+                    say("FAILED")
+                    exit(1)
+                }
                 self.setUpWindow(dataStore: store)
                 await self.runSelfTest()
             }
@@ -206,6 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
         // The default, persistent store: this is where her tasks live. Never use
         // .nonPersistent() here, and never change it.
+        loadMasterKey()
         setUpWindow(dataStore: WKWebsiteDataStore.default())
 
         // Restores the saved size and position if there is one.
@@ -240,6 +341,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             }
         }
         return WKWebsiteDataStore(forIdentifier: kSelfTestStoreID)
+    }
+
+    /// Must run before the web view exists, so WebKit's first request finds the key.
+    private func loadMasterKey() {
+        do {
+            let (key, origin) = try WebCryptoMasterKey.loadOrCreate()
+            masterKey = key
+            if isSelfTest { say("masterKey=\(origin.rawValue) file=\(WebCryptoMasterKey.fileURL.lastPathComponent)") }
+        } catch {
+            // Never the bytes; only what went wrong.
+            if isSelfTest {
+                say("FAIL masterKey \(error.localizedDescription)")
+            } else {
+                FileHandle.standardError.write(Data("Esmeworld: WebCrypto master key: \(error.localizedDescription)\n".utf8))
+            }
+        }
     }
 
     private func setUpWindow(dataStore: WKWebsiteDataStore) {
@@ -422,6 +539,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         } else if !isSelfTest {
             FileHandle.standardError.write(Data("Esmeworld: load failed: \(error.localizedDescription)\n".utf8))
         }
+    }
+
+    // MARK: WebCrypto master key (private WKNavigationDelegatePrivate SPI)
+
+    // WebKit asks the navigation delegate for the key that wraps CryptoKeys stored in
+    // IndexedDB; when the delegate answers, it never creates or reads the
+    // "Esmeworld WebCrypto Master Key" keychain item. Both variants are implemented
+    // so whichever this WebKit calls is answered (the completion-handler one is
+    // preferred by newer WebKit). nil (no key file) lets WebKit fall back to its default.
+
+    @objc(_webCryptoMasterKeyForWebView:)
+    func _webCryptoMasterKey(forWebView webView: WKWebView) -> NSData? {
+        masterKeyCallsSync += 1
+        return masterKey.map { $0 as NSData }
+    }
+
+    @objc(_webCryptoMasterKeyForWebView:completionHandler:)
+    func _webCryptoMasterKey(forWebView webView: WKWebView, completionHandler: @escaping (NSData?) -> Void) {
+        masterKeyCallsAsync += 1
+        completionHandler(masterKey.map { $0 as NSData })
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -706,6 +843,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             say("launchCount=\(n)")
             say("storage.persisted=\(idb["persisted"] ?? "nil")")
             check(n >= 1, "IndexedDB write")
+
+            // (d2) A stored CryptoKey survives a relaunch, wrapped with OUR master key.
+            // Launch 1 makes a non-extractable AES-GCM key, seals a value with it and
+            // stores both in IndexedDB (WebKit wraps the key on write); every launch
+            // then reads them back through a fresh connection (WebKit unwraps) and
+            // opens the sealed value. Launch 2 must find launch 1's key. The delegate
+            // count proves WebKit asked us, not the keychain, for the master key.
+            let wc = try await js("""
+            const PLAIN = "esmeworld-selftest-sealed-v1";
+            const open = () => new Promise((res, rej) => {
+              const r = indexedDB.open("esmeworld-selftest", 1);
+              r.onupgradeneeded = () => r.result.createObjectStore("kv");
+              r.onsuccess = () => res(r.result);
+              r.onerror = () => rej(r.error);
+            });
+            const req = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+            const done = (tx) => new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+            let stored = "existing", storedOnLaunch = null;
+            let db = await open();
+            const before = await req(db.transaction("kv").objectStore("kv").get("sealed"));
+            if (!before) {
+              const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+              const iv = crypto.getRandomValues(new Uint8Array(12));
+              const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(PLAIN));
+              const tx = db.transaction("kv", "readwrite");
+              tx.objectStore("kv").put({ key, iv, ct, launch: \(n) }, "sealed");
+              await done(tx);
+              stored = "new";
+            }
+            db.close();
+            db = await open();
+            const rec = await req(db.transaction("kv").objectStore("kv").get("sealed"));
+            db.close();
+            if (!rec) return JSON.stringify({ stored, error: "record unreadable after reopen" });
+            storedOnLaunch = rec.launch;
+            const isKey = rec.key instanceof CryptoKey;
+            let plain = "", error = "";
+            try {
+              plain = new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: rec.iv }, rec.key, rec.ct));
+            } catch (e) { error = String(e && e.name) + ": " + String(e && e.message); }
+            return JSON.stringify({
+              stored, storedOnLaunch, isKey: String(isKey), extractable: isKey ? String(rec.key.extractable) : "n/a",
+              decrypt: plain === PLAIN ? "ok" : "mismatch", error,
+            });
+            """)
+            let storedOn = wc["storedOnLaunch"] as? Int ?? -1
+            say("webcrypto.stored=\(wc["stored"] ?? "nil") storedOnLaunch=\(storedOn) thisLaunch=\(n)")
+            say("webcrypto.cryptoKey=\(wc["isKey"] ?? "nil") extractable=\(wc["extractable"] ?? "nil")")
+            let wcError = wc["error"] as? String ?? ""
+            say("webcrypto.decrypt=\(wc["decrypt"] ?? "nil")\(wcError.isEmpty ? "" : " " + wcError)")
+            check(wc["isKey"] as? String == "true", "stored CryptoKey read back")
+            check(wc["extractable"] as? String == "false", "stored CryptoKey stays non-extractable")
+            check(wc["decrypt"] as? String == "ok", "stored CryptoKey decrypts the sealed value")
+            if n >= 2 { check(storedOn >= 1 && storedOn < n, "CryptoKey stored on an earlier launch survived the relaunch") }
+            say("webcryptoDelegateCalled=\(masterKeyCallsSync + masterKeyCallsAsync) sync=\(masterKeyCallsSync) completionHandler=\(masterKeyCallsAsync)")
+            check(masterKeyCallsSync + masterKeyCallsAsync > 0, "WebKit asked the app for the WebCrypto master key")
 
             // (e) service worker (informational only).
             let sw = try await js("""

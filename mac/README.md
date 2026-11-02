@@ -24,10 +24,8 @@ The result is `mac/build/Esmeworld.app` (ignored by git). The script:
 5. writes `Info.plist` (bundle id `world.esme.esmeworld`) and copies `hub/dist`
    into `Contents/Resources/web/`
 6. signs it: with `$ESMEWORLD_SIGN_IDENTITY` if that is set, otherwise with
-   the "Esmeworld Local Signing" certificate if it is in your login keychain
-   (see "Stable signing" below), otherwise ad hoc (`codesign --sign -`), which
-   runs fine on this Mac but makes macOS ask for your keychain password after
-   every update. The build prints a warning when it falls back to ad hoc.
+   the "Esmeworld Local Signing" certificate if it is in your login keychain,
+   otherwise ad hoc (`codesign --sign -`). Ad hoc is fine: see "Signing" below.
 7. runs the self-test twice (see below)
 
 ## Install
@@ -43,114 +41,44 @@ version until you quit and reopen Esmeworld.
 Because the app is built on this Mac, macOS normally opens it without a
 warning. If it does refuse, right-click the app in Finder and choose Open.
 
-## Stable signing
+## No keychain password box
 
-The encryption keys Esmeworld saves (used by sync) are protected by an item in
-your login keychain called "Esmeworld WebCrypto Master Key". macOS only lets the app that made that
-item read it, and it recognises the app by its signature. With ad hoc signing
-every build has a different signature, so after each update macOS shows a box
-saying Esmeworld wants to use "Esmeworld WebCrypto Master Key" and asks for the
-login keychain password.
+Esmeworld never uses your login keychain. Earlier versions did: WebKit kept the
+key that protects the journal key in a keychain item called "Esmeworld
+WebCrypto Master Key", and because every build has a new ad hoc signature,
+macOS asked for your login keychain password after each update.
 
-The fix is to sign every build with the same certificate. You make it once, on
-this Mac, and it never leaves the Mac. It costs nothing and needs no Apple
-account.
+Now the app gives WebKit its own key instead. It is made once, the first time
+you open this version, and kept in
 
-### 1. Open Keychain Access
+    ~/Library/Application Support/Esmeworld/webcrypto-master.key
 
-Press Cmd+Space, type `Keychain Access`, and press Return. (If Spotlight offers
-the Passwords app instead, keep typing the full name; Keychain Access is still
-there.)
+(readable only by you; the folder too). Updates keep using the same file, so
+there is no box after an update, whatever the signature. The old keychain item
+is left where it is, unused. You can leave it.
 
-### 2. Create the certificate
+**Once, after the first update to this version:** your journal key was stored
+with the old keychain key, so the Journal can't read it and asks you to
+**Unlock your journal once more with your passphrase.** Type your sync
+passphrase (or scan a pairing code) and it opens. Nothing is lost: your entries
+are untouched and sync keeps working throughout (the sync token is stored as
+an ordinary string, not as a WebCrypto key, so it never depended on the
+keychain).
 
-1. In the menu bar at the top of the screen, click **Keychain Access**, then
-   **Certificate Assistant**, then **Create a Certificate…**.
-2. In the window that opens, fill in:
-   - **Name:** `Esmeworld Local Signing` (exactly this, with the capitals and
-     spaces; the build looks for this name)
-   - **Identity Type:** Self-Signed Root
-   - **Certificate Type:** Code Signing
-   - Tick **Let me override defaults**.
-3. Click **Create**. A warning says you are about to create a self-signed
-   certificate. Click **Continue**.
-4. The next screen has **Validity Period (days)**, set to 365. Change it to
-   `3650` (ten years) so it doesn't run out next year. Click **Continue**.
-5. Keep clicking **Continue** on every following screen without changing
-   anything, until you reach one titled **Specify a Location For The
-   Certificate**.
-6. Check that **Keychain** says **login**. If it says something else, click it
-   and choose **login**. Click **Create**.
-7. Click **Done**.
+Don't delete `webcrypto-master.key`. If it is ever lost, the same thing
+happens once more: unlock the journal again with your passphrase. It is not in
+backups, and doesn't need to be.
 
-### 3. Trust it for code signing
+## Signing
 
-1. In Keychain Access, click **login** in the left sidebar, then the
-   **My Certificates** tab (or **Certificates**) at the top.
-2. Double-click **Esmeworld Local Signing**.
-3. Click the small triangle next to **Trust** to open that section.
-4. Next to **Code Signing**, choose **Always Trust**.
-5. Close the window. macOS asks for your password: type your Mac login password
-   and click **Update Settings**.
+Ad hoc signing (the default) is fine. To sign every build with a certificate
+of your own instead, set its name when you build:
 
-To check it worked, run this in Terminal:
+    ESMEWORLD_SIGN_IDENTITY="Some Name" mac/build.sh --install
 
-    security find-identity -v -p codesigning
-
-One of the lines should end with `"Esmeworld Local Signing"`.
-
-### 4. The next build
-
-Run `mac/build.sh --install` as usual. The build now prints
-`signed with Esmeworld Local Signing …` instead of the ad hoc warning.
-
-The first time it signs, a box may say **codesign wants to sign using key
-"Esmeworld Local Signing" in your keychain**. Type your login keychain password
-(normally your Mac login password) and click **Always Allow**, so later builds
-don't ask.
-
-### 5. The keychain box, one last time
-
-The first time you open Esmeworld after that build, macOS asks once more,
-because the app's signature changed from ad hoc to the new certificate. The box
-says Esmeworld wants to use "Esmeworld WebCrypto Master Key":
-
-1. In the password field, type your **login keychain password**. That is
-   normally the password you type to log in to your Mac.
-2. Click **Always Allow** (not just Allow, which would ask again next time).
-
-After this, updates signed with the same certificate should open without the
-box.
-
-If you clicked **Deny** by mistake: quit Esmeworld and open it again, and the
-box comes back.
-
-### If your Mac password doesn't work in the box
-
-The login keychain password starts out the same as your Mac password, but they
-can drift apart, usually after the Mac password was reset (for example with
-your Apple Account or by an administrator) instead of changed in System
-Settings.
-
-- First, try your **previous** Mac password in the box. That usually works.
-- If it does, make them match again: in Keychain Access, choose
-  **Edit > Change Password for Keychain "login"**, type the old password, then
-  your current Mac password twice.
-- If you don't know the old password at all, stop and ask for help before
-  doing anything else. Keychain Access has a "Reset My Default Keychain" option,
-  but it throws away every password saved in the login keychain, including
-  "Esmeworld WebCrypto Master Key", and Esmeworld's sync keys with it. Download
-  a backup from the Backup page first if you ever go that way.
-
-### Using a different certificate
-
-To sign with any other code-signing identity in your keychain, set its name
-when you build:
-
-    ESMEWORLD_SIGN_IDENTITY="Some Other Name" mac/build.sh --install
-
-Changing certificates counts as a new signature, so the keychain box appears
-once more (step 5).
+or make a code-signing certificate named exactly `Esmeworld Local Signing` in
+your login keychain, which the build picks up by itself. Neither is needed for
+anything today.
 
 ## Your data: read this
 
@@ -169,6 +97,10 @@ page's address, which is `esmeworld://app`.
   missing, never changes what is there). This is also the escape hatch if the
   app ever opens empty.
 - Download backups regularly and keep them outside the app.
+- The key that protects the stored journal key is in
+  `~/Library/Application Support/Esmeworld/webcrypto-master.key` (see "No
+  keychain password box"). Keep it; losing it only means unlocking the journal
+  once more with your passphrase.
 
 ## What works
 
@@ -220,6 +152,18 @@ save window positions either.
 It counts launches in a database in that store. The first run deletes the
 self-test store (only that one) and must print `launchCount=1`; the second must
 print `launchCount=2`, which proves IndexedDB survives quitting and relaunching.
+
+It also checks the WebCrypto master key (see "No keychain password box"), with
+its own key file, `webcrypto-master-selftest.key` next to yours, which it never
+reads or writes. The first run deletes that self-test file and must print
+`masterKey=created`, the second `masterKey=loaded`. The first run stores a
+non-extractable AES-GCM key and a value sealed with it in IndexedDB; each run
+reads them back and opens the value, and the second run must open the key the
+first one stored (`webcrypto.stored=existing storedOnLaunch=1 thisLaunch=2`,
+`webcrypto.decrypt=ok`). `webcryptoDelegateCalled=` counts how often WebKit
+asked the app for the master key; 0 is a failure, because then WebKit would
+be using the keychain.
+
 Needs macOS 14 or later (the app itself still runs on macOS 13).
 
 Run it by hand:

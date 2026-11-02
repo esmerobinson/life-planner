@@ -6,7 +6,8 @@
 #   mac/build.sh --install    also copy the app to ~/Applications/Esmeworld.app
 #
 # Signing: $ESMEWORLD_SIGN_IDENTITY if set, else a login-keychain code-signing
-# identity named exactly "Esmeworld Local Signing", else ad hoc (see README).
+# identity named exactly "Esmeworld Local Signing", else ad hoc. Ad hoc is fine:
+# the app never uses the login keychain (see README "Signing").
 #
 # Requires: node/npm (unless --skip-web), swiftc, sips, iconutil, codesign, plutil,
 # security; --install also uses ditto and /usr/bin/python3 (for an atomic swap).
@@ -20,7 +21,7 @@ for arg in "$@"; do
     case "$arg" in
         --skip-web) SKIP_WEB=1 ;;
         --install) INSTALL=1 ;;
-        -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
         *) echo "error: unknown option $arg" >&2; exit 2 ;;
     esac
 done
@@ -117,9 +118,9 @@ cp -R "$HUB_DIR/dist" "$CONTENTS/Resources/web"
 echo "$CONTENTS/Resources/web ($(find "$CONTENTS/Resources/web" -type f | wc -l | tr -d ' ') files)"
 
 # --- 6. sign -------------------------------------------------------------------
-# A stable identity keeps the app's signature the same from build to build, so
-# the keychain item WebKit uses for WebCrypto keys ("Esmeworld WebCrypto Master
-# Key") stays trusted after an update. Ad hoc gives every build a new identity.
+# Optional stable identity. Not needed for the keychain any more: the app hands
+# WebKit its own WebCrypto master key (Application Support), so no build, ad hoc
+# or not, makes macOS ask for the keychain password.
 step "6/7: code signature"
 SIGN_IDENTITY="${ESMEWORLD_SIGN_IDENTITY:-}"
 SIGN_LABEL="$SIGN_IDENTITY (from ESMEWORLD_SIGN_IDENTITY)"
@@ -132,7 +133,7 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
     SIGN_LABEL="$AUTO_SIGN_IDENTITY (login keychain, $SIGN_IDENTITY)"
     if [[ -z "$SIGN_IDENTITY" ]] && security find-identity -p codesigning ${LOGIN_KEYCHAIN:+"$LOGIN_KEYCHAIN"} 2>/dev/null \
         | grep -qF "\"$AUTO_SIGN_IDENTITY\""; then
-        echo "note: \"$AUTO_SIGN_IDENTITY\" is in the keychain but not valid (not trusted, or expired); see mac/README.md 'Stable signing', step 3"
+        echo "note: \"$AUTO_SIGN_IDENTITY\" is in the keychain but not valid (not trusted, or expired); signing ad hoc instead (that is fine)"
     fi
 fi
 if [[ -n "$SIGN_IDENTITY" ]]; then
@@ -143,7 +144,6 @@ else
     codesign --force --deep --sign - "$APP"
     codesign --verify --deep --strict "$APP"
     echo "signed (ad-hoc) and verified"
-    echo "warning: Ad-hoc signed: macOS will ask for the keychain password after each update. See mac/README.md 'Stable signing'."
 fi
 
 # --- 7. self-test ----------------------------------------------------------------
@@ -151,6 +151,9 @@ fi
 # (WKWebsiteDataStore(forIdentifier:)), never her real one, so this works while
 # her Esmeworld is open. The first launch deletes that store, so run 1 must print
 # launchCount=1 and run 2 launchCount=2: IndexedDB survived a quit and relaunch.
+# It also deletes the self-test's own WebCrypto master key file (never hers), so
+# run 1 must create it and run 2 load it, and run 2 must open the CryptoKey run 1
+# stored: the master key, and keys wrapped with it, survive a relaunch.
 step "7/7: self-test (two launches)"
 run_selftest() {
     local n="$1" reset="$2" log="$BUILD_DIR/selftest-$1.log" status=0
@@ -164,17 +167,27 @@ run_selftest() {
         exit 1
     fi
     LAST_COUNT="$(grep -o 'SELFTEST launchCount=[0-9]*' "$log" | tail -1 | cut -d= -f2)"
+    LAST_MASTER="$(grep -o 'SELFTEST masterKey=[a-z]*' "$log" | tail -1 | cut -d= -f2)"
 }
 LAST_COUNT=""
+LAST_MASTER=""
 run_selftest 1 1
-first="$LAST_COUNT"
+first="$LAST_COUNT"; first_master="$LAST_MASTER"
 run_selftest 2 0
-second="$LAST_COUNT"
+second="$LAST_COUNT"; second_master="$LAST_MASTER"
 if [[ "$first" != 1 || "$second" != 2 ]]; then
     echo "error: expected launchCount 1 then 2, got '$first' then '$second' (IndexedDB did not persist)" >&2
     exit 1
 fi
-echo "self-test passed: both launches exited 0; launchCount $first -> $second"
+if [[ "$first_master" != created || "$second_master" != loaded ]]; then
+    echo "error: expected the self-test master key created then loaded, got '$first_master' then '$second_master'" >&2
+    exit 1
+fi
+if ! grep -q '^SELFTEST webcrypto.stored=existing storedOnLaunch=1 thisLaunch=2$' "$BUILD_DIR/selftest-2.log"; then
+    echo "error: launch 2 did not open the CryptoKey launch 1 stored" >&2
+    exit 1
+fi
+echo "self-test passed: both launches exited 0; launchCount $first -> $second; master key $first_master -> $second_master; stored CryptoKey reopened"
 
 # --- install (only with --install) -----------------------------------------------
 if [[ "$INSTALL" == 1 ]]; then

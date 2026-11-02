@@ -32,7 +32,12 @@ const HER_OWN_MOVES = ["wheel", "touchstart", "pointerdown", "keydown"] as const
 export const CHECKING_LINE = "Checking your passphrase with sync…";
 /** The key check or the device id failed, or didn't answer in time (2026-11-02). */
 export const CANT_OPEN_JOURNAL = "Can't open your journal on this device right now.";
-/** The macOS keychain refused the stored journal key (Mac app). Nothing is deleted. */
+/**
+ * The stored journal key can't be read any more (in the Mac app: it was stored by a build
+ * that used the macOS keychain, 2026-11-02). Shown above the passphrase field. Nothing is deleted.
+ */
+export const UNLOCK_AGAIN_LINE = "Unlock your journal once more with your passphrase.";
+/** WebCrypto threw while reading or storing the journal key (Mac app). Nothing is deleted. */
 export const KEYCHAIN_LINE =
   "This Mac's keychain didn't let Esmeworld open your journal key. Quit and reopen Esmeworld, enter your Mac login password and choose Always Allow.";
 
@@ -120,6 +125,8 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
         </section>
       ) : view.state === "locked" ? (
         <UnlockJournal />
+      ) : view.state === "unreadable" ? (
+        <UnlockJournal again />
       ) : null}
       {/* The sections stay the same elements while the journal opens (only their insides change). */}
       <section className="journal-card" aria-labelledby="morning-pages" id="morning-pages-section">
@@ -189,8 +196,11 @@ const PROBLEMS: Record<Exclude<UnlockResult, "ok" | "checking"> | "failed" | "ke
   keychain: KEYCHAIN_LINE,
 };
 
-/** The passphrase is held only in this field until Unlock; never stored, never logged. */
-function UnlockJournal() {
+/**
+ * The passphrase is held only in this field until Unlock; never stored, never logged.
+ * `again`: a key is stored here but can't be read any more, so it asks for the passphrase once more.
+ */
+function UnlockJournal({ again = false }: { again?: boolean }) {
   const [passphrase, setPassphrase] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<keyof typeof PROBLEMS | null>(null);
@@ -222,7 +232,11 @@ function UnlockJournal() {
       <h2 id="unlock-journal" className="journal-big">
         Unlock journal
       </h2>
-      <p>Your journal is private to you. Type your sync passphrase, or scan a pairing code, to open it on this device.</p>
+      <p>
+        {again
+          ? UNLOCK_AGAIN_LINE
+          : "Your journal is private to you. Type your sync passphrase, or scan a pairing code, to open it on this device."}
+      </p>
       <form onSubmit={(e) => void submit(e)}>
         <label className="form-field">
           <span className="form-label">Sync passphrase</span>
