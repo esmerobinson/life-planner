@@ -76,10 +76,10 @@ describe("phone layout (below 700px)", () => {
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
     const apps = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link");
     expect(apps.map((a) => a.textContent)).toEqual([
-      "Today", "Goals", "Admin", "Writing", "Art", "Content", "Mind", "Body",
+      "Today", "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
       "Tech projects", "Production", "Journal", "Vision board",
     ]);
-    expect(apps[4]).toHaveAttribute("href", "/area/art");
+    expect(apps[5]).toHaveAttribute("href", "/area/art");
     expect(screen.getByRole("heading", { level: 2, name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inbox (1)" })).toHaveAttribute("href", "/inbox");
     const footer = screen.getByRole("navigation", { name: "More" });

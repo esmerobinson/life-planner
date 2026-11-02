@@ -73,7 +73,7 @@ describe("Sort one by one: the card", () => {
     expect(within(card()).getByText("Which area?")).toBeInTheDocument();
     const grid = within(card()).getByRole("group", { name: "Which area?" });
     expect(within(grid).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Admin", "Writing", "Art", "Content", "Mind", "Body", "Tech projects", "Production",
+      "Admin", "Mind", "Writing", "Art", "Content", "Body", "Tech projects", "Production",
     ]);
     await userEvent.click(within(card()).getByRole("button", { name: "← Idea · change" }));
     expect(within(card()).getByText("What is it?")).toBeInTheDocument();

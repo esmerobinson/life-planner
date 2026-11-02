@@ -242,7 +242,7 @@ describe("TodayPanel", () => {
     ]);
     expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual([
       "Idea", "Goal",
-      "Admin", "Art", "Content", "Mind", "Body", "Tech projects", "Production",
+      "Admin", "Mind", "Art", "Content", "Body", "Tech projects", "Production",
       "This week", "Remove from today", "Archive", "Delete",
     ]);
     expect(screen.queryByRole("menu")).toBeNull();

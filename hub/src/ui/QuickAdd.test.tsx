@@ -197,7 +197,7 @@ describe("QuickAdd", () => {
     render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
     const names = Array.from(screen.getByLabelText("Area").querySelectorAll("option")).map((o) => o.textContent);
     expect(names).toEqual([
-      "Inbox", "Writing", "Art", "Content", "Mind", "Body", "Tech projects", "Production", "Admin",
+      "Inbox", "Mind", "Writing", "Art", "Content", "Body", "Tech projects", "Production", "Admin",
     ]);
   });
 });

@@ -4,15 +4,15 @@ import { AREA_CHOICES, GOAL_AREAS, NAV } from "./areas";
 describe("areas", () => {
   it("AREA_IDS is the one list of ids", () => {
     expect([...AREA_IDS]).toEqual([
-      "inbox", "writing", "art", "content", "mind", "body", "tech", "production", "admin",
+      "inbox", "mind", "writing", "art", "content", "body", "tech", "production", "admin",
     ]);
   });
 
   it("NAV has thirteen entries in order with exact labels and paths", () => {
     expect(NAV.map((n) => [n.label, n.path])).toEqual([
       ["Home", "/"], ["Today", "/today"], ["Goals", "/goals"], ["Admin", "/area/admin"],
-      ["Writing", "/area/writing"], ["Art", "/area/art"], ["Content", "/area/content"],
-      ["Mind", "/area/mind"], ["Body", "/area/body"],
+      ["Mind", "/area/mind"], ["Writing", "/area/writing"], ["Art", "/area/art"],
+      ["Content", "/area/content"], ["Body", "/area/body"],
       ["Tech projects", "/area/tech"], ["Production", "/area/production"],
       ["Journal", "/journal"], ["Vision board", "/vision"],
     ]);
@@ -29,7 +29,7 @@ describe("areas", () => {
 
   it("goal areas are every area but the inbox; choices add the inbox first", () => {
     expect(GOAL_AREAS.map((a) => a.id)).toEqual(
-      ["writing", "art", "content", "mind", "body", "tech", "production", "admin"],
+      ["mind", "writing", "art", "content", "body", "tech", "production", "admin"],
     );
     expect(AREA_CHOICES[0].id).toBe("inbox");
     expect(AREA_CHOICES).toHaveLength(9);
