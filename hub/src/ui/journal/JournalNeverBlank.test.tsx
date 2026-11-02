@@ -110,7 +110,9 @@ describe("the key check", () => {
     expect((await db.syncMeta.get(keyStore.JOURNAL_KEY_META))?.key).toBe(keyStore.JOURNAL_KEY_META);
     await userEvent.type(within(unlock).getByLabelText("Sync passphrase"), PASS);
     await userEvent.click(within(unlock).getByRole("button", { name: "Unlock" }));
-    expect(await screen.findByRole("button", { name: "Write now" }, { timeout: 5000 })).toBeInTheDocument();
+    // Journal v2 opens on the Exercise tab: unlocking removes the Unlock card and shows the tabs.
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Unlock journal" })).toBeNull(), { timeout: 5000 });
+    expect(screen.getByRole("navigation", { name: "Journal parts" })).toBeInTheDocument();
     expect((await keyStore.loadJournalKeyInfo(db))?.fp).toBe(jk.fp);
   });
 
