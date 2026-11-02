@@ -12,9 +12,19 @@ import { MentalHealthExercise } from "./MentalHealthExercise";
 import { MorningPages } from "./MorningPages";
 import { useJournalKey } from "./useJournalKey";
 
-/** The Home card's buttons land on these sections. */
+/** The Home card's rows land on these sections. */
 export const MORNING_HASH = "#morning-pages";
 export const CHECKIN_HASH = "#daily-check-in";
+export const EXERCISE_HASH = "#mental-health-exercise";
+/** Each hash's section (the element scrolled to). */
+const SECTION_FOR_HASH: Record<string, string> = {
+  [MORNING_HASH]: "morning-pages-section",
+  [CHECKIN_HASH]: "daily-check-in-section",
+  [EXERCISE_HASH]: "mental-health-exercise-section",
+};
+/** How long a section opened from Home is kept in view while the page above it fills in. */
+const KEEP_IN_VIEW_MS = 3000;
+const HER_OWN_MOVES = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
 
@@ -43,17 +53,31 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
   }, [view.state, controller]);
 
   const ready = view.state === "confirmed" && deviceId !== null;
-  // From the Home card: bring the chosen section into view once it is there.
+  // From the Home card: bring the chosen section into view once it is there. The sections
+  // above it fill in after it appears and push it down, so it is brought back into view as the
+  // page grows, until she scrolls, taps or types herself (or after KEEP_IN_VIEW_MS).
+  const pageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ready || !location.hash) return;
-    const id = location.hash === CHECKIN_HASH ? "daily-check-in-section" : location.hash === MORNING_HASH ? "morning-pages-section" : null;
+    const id = SECTION_FOR_HASH[location.hash];
     if (!id) return;
-    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView?.({ block: "start" }), 0);
-    return () => clearTimeout(t);
+    const go = () => document.getElementById(id)?.scrollIntoView?.({ block: "start" });
+    const t = setTimeout(go, 0);
+    const ro = typeof ResizeObserver === "undefined" || !pageRef.current ? null : new ResizeObserver(go);
+    if (ro && pageRef.current) ro.observe(pageRef.current);
+    const stop = () => ro?.disconnect();
+    const cap = setTimeout(stop, KEEP_IN_VIEW_MS);
+    for (const e of HER_OWN_MOVES) window.addEventListener(e, stop, { passive: true });
+    return () => {
+      clearTimeout(t);
+      clearTimeout(cap);
+      stop();
+      for (const e of HER_OWN_MOVES) window.removeEventListener(e, stop);
+    };
   }, [ready, location.hash]);
 
   return (
-    <div className="journal-page">
+    <div className="journal-page" ref={pageRef}>
       <h1>Journal</h1>
       {view.state === "loading" ? null : view.state === "confirmed" ? (
         deviceId && (

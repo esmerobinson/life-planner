@@ -39,25 +39,8 @@
   margin: 0;
 }
 
-.journal-head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.journal-tile {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--journal-violet);
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-
-.journal-tile img {
-  width: 26px;
-}
+/* Each section's heading is its Journal row (strips.css "Journal rows", 2026-11-02); the
+   mockup's violet tile head is gone. */
 
 .journal-big {
   margin: 0;
@@ -292,6 +275,14 @@
 
 .journal-card-home h2 {
   margin-top: 0;
+}
+
+/* Desktop Home: clear space between the last Today strip and the Journal heading (Esme,
+   2026-11-02: "due is too close to journal header"). The Today list keeps its own 16px under
+   it, and the card adds the 20px the phone Home already puts before its next section
+   (.phone-footer). Padding, so the two add up instead of collapsing into one margin. */
+.home-centre .journal-card-home {
+  padding-top: 20px;
 }
 
 /* Mental health exercise (exercise brief): the section is a journal card; the "Day N" chip is

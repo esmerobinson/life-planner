@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-import journalIcon from "../../assets/icons/journal.svg";
 import type { ISODate } from "../../domain/types";
 
 /** "Wednesday 28 October" for a calendar date (no timezone shift). */
@@ -13,23 +11,6 @@ export function monthLabel(month: string, today: ISODate): string {
   const [y, m] = month.split("-").map(Number);
   const name = new Date(y!, m! - 1, 1).toLocaleDateString("en-GB", { month: "long" });
   return month.slice(0, 4) === today.slice(0, 4) ? name : `${name} ${y}`;
-}
-
-/** The section head from the mockup: Journal tile (violet, journal icon), title, a small line. */
-export function JournalHead({ id, title, sub }: { id: string; title: string; sub: ReactNode }) {
-  return (
-    <div className="journal-head">
-      <span className="journal-tile">
-        <img src={journalIcon} alt="" />
-      </span>
-      <div>
-        <h2 id={id} className="journal-big">
-          {title}
-        </h2>
-        <div className="journal-muted">{sub}</div>
-      </div>
-    </div>
-  );
 }
 
 /** The placeholder star (magenta until Esme picks star art). */

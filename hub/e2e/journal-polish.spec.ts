@@ -79,7 +79,7 @@ async function submitResponse(page: Page) {
   await box.fill("Pretend: I put down one imaginary pebble.\nIt was a kind word to myself.\nThat counts.");
   await s.getByRole("button", { name: "Submit" }).click();
   await expect(s.getByText("Saved", { exact: true })).toBeVisible();
-  await expect(s.getByRole("checkbox", { name: "Done" })).toBeChecked();
+  await expect(s.getByRole("checkbox", { name: "Done", exact: true })).toBeChecked();
   await expect(s.getByText("Done for today · next card tomorrow")).toBeVisible();
 }
 

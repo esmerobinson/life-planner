@@ -8,7 +8,9 @@ import type { JournalKey } from "../../journal/crypto";
 import { INVALID_CARD_FILE, parseCardFile, planExercise, type CardSet, type ExerciseCard } from "../../journal/exercise";
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
-import { JournalHead, longDate, PromptText } from "./bits";
+import { exerciseDoneDays, rowStatus } from "../../journal/rows";
+import { longDate, PromptText } from "./bits";
+import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** Under today's card once it is ticked. */
@@ -101,11 +103,12 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
 
   const star = (day: number, on: boolean) => void attempt(() => setExerciseStar(jk, today, deviceId, day, on));
   const starred = progress?.starred ?? new Set<number>();
+  const row = useMemo(() => rowStatus(exerciseDoneDays(progress?.marks ?? []), today), [progress, today]);
   const sub = plan && plan.round > 1 ? `Round ${plan.round} · 🔒 private` : "One card a day · 🔒 private";
 
   return (
     <section className="journal-card" aria-labelledby="mental-health-exercise" id="mental-health-exercise-section">
-      <JournalHead id="mental-health-exercise" title="Mental health exercise" sub={sub} />
+      <JournalStripHead id="mental-health-exercise" title="Mental health exercise" tick={tickState(progress ? row.done : undefined)} streak={row.streak} meta={sub} />
       {cards?.state === "none" && (
         <div className="exercise-empty">
           <p>Add your exercise cards</p>

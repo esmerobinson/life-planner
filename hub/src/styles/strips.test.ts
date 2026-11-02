@@ -111,4 +111,29 @@ describe("strips.css (design round 2, values from the chosen mockups)", () => {
     expect(done).toContain("text-decoration: line-through");
     expect(done).toContain("opacity: 0.6");
   });
+
+  it("Journal rows (2026-11-02): Map mint strips, the strips' tick box read-only, hover only underlines", () => {
+    expect(code).toContain("--mint: #a3d5c2");
+    expect(rule(".strip.journal-row")).toContain("background: var(--mint)");
+    const box = rule(".tick-auto");
+    const real = rule('input[type="checkbox"].tick');
+    for (const d of ["width: 22px", "height: 22px", "border-radius: 7px", "background: var(--panel)", "border: 2px solid var(--sage)"]) {
+      expect(real).toContain(d);
+      expect(box).toContain(d);
+    }
+    const done = rule(".tick-auto.is-done");
+    expect(done).toContain("background: var(--bar-fill)");
+    // The ✓ (controller call): --text, centred and bold like the Journal's "Done for today" box.
+    expect(done).toContain("color: var(--text)");
+    expect(rule(".tick-auto")).toContain("place-items: center");
+    expect(rule(".tick-auto")).toContain("font-weight: 700");
+    // While loading: the box's space only (nothing drawn).
+    const space = rule(".tick-auto-space");
+    expect(space).toContain("width: 22px");
+    expect(space).not.toContain("background");
+    expect(space).not.toContain("border:");
+    expect(rule(".strip.journal-row-open:hover .strip-title")).toContain("text-decoration: underline");
+    // A mint hover colour isn't decided: nothing changes the rows' background on hover or focus.
+    expect(code).not.toMatch(/journal-row[^{]*:(hover|has)[^{]*\{[^}]*background/);
+  });
 });

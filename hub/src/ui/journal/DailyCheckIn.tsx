@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
@@ -8,7 +8,9 @@ import { PROMPTS, PROMPT_BY_ID, STARTER_IDS, workbookPage } from "../../journal/
 import { pickPrompts } from "../../journal/rotation";
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
-import { DoneBox, JournalHead, longDate, PromptText } from "./bits";
+import { checkinDoneDays, rowStatus } from "../../journal/rows";
+import { DoneBox, longDate, PromptText } from "./bits";
+import { JournalStripHead, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
@@ -77,9 +79,10 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
   }
 
   const step = day ? currentStep(day) : -1;
+  const row = useMemo(() => rowStatus(checkinDoneDays(day ? [day, ...past] : past), today), [day, past, today]);
   return (
     <section className="journal-card" aria-labelledby="daily-check-in" id="daily-check-in-section">
-      <JournalHead id="daily-check-in" title="Daily check-in" sub="Today's three questions · 🔒 private" />
+      <JournalStripHead id="daily-check-in" title="Daily check-in" tick={tickState(day ? row.done : undefined)} streak={row.streak} meta="Today's three questions · 🔒 private" />
       {day && day.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
       {day && day.prompts.length === 0 && <p>No questions are switched on. Choose some under Choose questions.</p>}
       {day && day.prompts.length > 0 &&

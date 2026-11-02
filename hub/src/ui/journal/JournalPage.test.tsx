@@ -317,7 +317,8 @@ describe("daily check-in", () => {
     await unlocked();
     renderApp("/journal", TODAY);
     await userEvent.click(await screen.findByText("Choose questions"));
-    const boxes = screen.getAllByRole("checkbox");
+    // Only the fold's boxes (not the sections' read-only Journal row ticks).
+    const boxes = within(screen.getByText("Choose questions").closest("details")!).getAllByRole("checkbox");
     expect(boxes).toHaveLength(61);
     expect(boxes.filter((b) => (b as HTMLInputElement).checked)).toHaveLength(21);
     await userEvent.click(boxes[2]!); // M3, off by default
