@@ -155,13 +155,7 @@ export function AreaPage({ today }: { today: ISODate }) {
           {view === "all" && <h2>Ideas</h2>}
           <ul aria-label="Ideas" className="strip-list">
             {ideas.map((it) => (
-              <TaskRow
-                key={it.id}
-                item={it}
-                today={today}
-                onMoved={changed}
-                meta={it.notes ? <div className="strip-meta">{it.notes}</div> : undefined}
-              />
+              <TaskRow key={it.id} item={it} today={today} onMoved={changed} />
             ))}
           </ul>
         </section>

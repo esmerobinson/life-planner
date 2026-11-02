@@ -278,3 +278,52 @@ button.icon svg {
   border-radius: var(--radius-tile);
   padding: 8px 10px;
 }
+
+/* ---- Compact strips (2026-11-02, Esme: "the info below an item should not all show on
+   the list, it should just be clickable into, and have a small 'see more'") ----
+   A strip shows its title and due line only. Every value here is an existing one:
+   - "See more" / "Choose goals": the strips' small muted line (.strip-meta: 13px, 0.8
+     opacity), underlined on hover like the clickable title;
+   - hover / keyboard focus on an openable strip: its background goes from --row to
+     --panel (PROVISIONAL: an existing token picked by the implementer, not by Esme) and
+     the title underlines. The tick box and the two icons are unchanged. */
+button.quiet-link {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  opacity: 0.8;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+button.quiet-link:hover,
+button.quiet-link:focus-visible {
+  text-decoration: underline;
+}
+
+.strip-more {
+  margin-top: 2px;
+}
+
+.strip.openable {
+  cursor: pointer;
+}
+
+.strip.openable .strip-actions,
+.strip.openable .strip-tray {
+  cursor: default;
+}
+
+.strip.openable:hover,
+.strip.openable:has(.strip-open:focus-visible) {
+  background: var(--panel);
+}
+
+.strip.openable:not(.crossed):hover .strip-title,
+.strip.openable:not(.crossed):has(.strip-open:focus-visible) .strip-title {
+  text-decoration: underline;
+}

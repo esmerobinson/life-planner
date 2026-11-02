@@ -172,11 +172,11 @@ describe("InboxPage", () => {
     expect(sort.compareDocumentPosition(screen.getByRole("textbox", { name: "Add to inbox" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("lists imported items with their tags", async () => {
+  it("lists imported items; their tags stay off the list (compact strips: they are in the panel)", async () => {
     await importBacklog(BACKLOG, TODAY);
     render(<InboxPage today={TODAY} />);
     expect(await screen.findByText("Water the ferns")).toBeInTheDocument();
-    expect(screen.getByText("#home")).toBeInTheDocument();
+    expect(screen.queryByText("#home")).toBeNull();
     expect(screen.getByText("Email Sam")).toBeInTheDocument();
   });
 

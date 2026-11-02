@@ -181,6 +181,17 @@ export function ItemPanel({
             <span className="chip">{inbox ? "Inbox" : areaLabel(item.areaId)}</span>
           </span>
         )}
+        {/* Tags no longer show on the strip (compact strips); read-only here, as chips. */}
+        {item.tags && item.tags.length > 0 && (
+          <>
+            <span className="peek-key">Tags</span>
+            <span className="peek-tags">
+              {item.tags.map((t) => (
+                <span key={t} className="chip">{`#${t}`}</span>
+              ))}
+            </span>
+          </>
+        )}
         {showGoal && (
           <>
             <span className="peek-key">Due</span>

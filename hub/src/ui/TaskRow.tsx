@@ -82,23 +82,47 @@ export function StripTitle({ item, untyped = false }: { item: Item; untyped?: bo
   );
 }
 
-/** Clicking anywhere in a strip's body (not its own controls) opens the panel too. */
+/** Clicking anywhere in a strip (not its own controls, the icons or the tray) opens the panel too. */
 export function useOpenOnBodyClick(id: string) {
   const panel = usePanel();
   return panel
-    ? (e: MouseEvent<HTMLDivElement>) => {
-        if ((e.target as Element).closest(OWN_CLICK)) return;
+    ? (e: MouseEvent<HTMLElement>) => {
+        const t = e.target as Element;
+        if (t.closest(OWN_CLICK) || t.closest(".strip-actions, .strip-tray")) return;
         panel.open(id);
       }
     : undefined;
 }
 
 /**
+ * Whether an item has more than its strip shows (compact strips, 2026-11-02): a page of
+ * notes or tags. The strip then offers a small "See more" that opens the side panel.
+ */
+export function hasMoreInfo(item: Item): boolean {
+  return Boolean(item.notes?.trim()) || (item.tags?.length ?? 0) > 0;
+}
+
+/** The small muted "See more" under a strip's title; opens the item in the side panel. */
+export function SeeMore({ item }: { item: Item }) {
+  const panel = usePanel();
+  if (!panel || !hasMoreInfo(item)) return null;
+  return (
+    <div className="strip-more">
+      <button type="button" className="quiet-link" aria-label={`See more: ${item.title}`} onClick={() => panel.open(item.id)}>
+        See more
+      </button>
+    </div>
+  );
+}
+
+/**
  * One task (or idea) as a strip: tick box on the left (Done; tasks only), title with the
  * due line under it, and the Schedule for (tasks only) and Move to icons on the right.
- * Clicking the title (or anywhere in the body) opens it in the side panel.
- * `meta` adds lines under the title, `extra` sits before the icons, `tray` is a second
- * line under the title for a page's own controls, `trail` sits after the icons.
+ * Compact (2026-11-02): only the title and its due line show; anything more (notes, tags)
+ * is behind a small "See more". Clicking the title (or anywhere in the strip but its
+ * controls) opens it in the side panel.
+ * `extra` sits before the icons, `tray` is a second line under the title for a page's own
+ * controls, `trail` sits after the icons.
  * `untyped` is for Inbox items, which have no type until they are sorted: no tick box,
  * and nothing that depends on the stored kind (the calendar shows, Move to has no
  * "Change to").
@@ -113,7 +137,6 @@ export function TaskRow({
   onUntick,
   crossed = false,
   onMoved,
-  meta,
   extra,
   tray,
   trail,
@@ -129,7 +152,6 @@ export function TaskRow({
   onUntick?: (id: string) => void | Promise<unknown>;
   crossed?: boolean;
   onMoved: () => void | Promise<void>;
-  meta?: ReactNode;
   extra?: ReactNode;
   tray?: ReactNode;
   trail?: ReactNode;
@@ -149,7 +171,12 @@ export function TaskRow({
   const tick = !untyped && isTask && onTick !== undefined;
   const checked = crossed || ticked;
   return (
-    <li className={["strip", tick ? "" : "no-tick", crossed ? "crossed" : "", className ?? ""].filter(Boolean).join(" ")}>
+    <li
+      className={["strip", tick ? "" : "no-tick", crossed ? "crossed" : "", openOnClick ? "openable" : "", className ?? ""]
+        .filter(Boolean)
+        .join(" ")}
+      onClick={openOnClick}
+    >
       {tick && (
         <input
           type="checkbox"
@@ -167,11 +194,11 @@ export function TaskRow({
           }}
         />
       )}
-      <div className={openOnClick ? "strip-body openable" : "strip-body"} onClick={openOnClick}>
+      <div className="strip-body">
         <StripTitle item={item} untyped={untyped} />
         {isTask && !crossed && <DueLine item={item} today={today} />}
         {habit && <div className="strip-meta">{crossed ? HABIT_WORDS.doneForToday : HABIT_WORDS.schedule(item.recur)}</div>}
-        {meta}
+        <SeeMore item={item} />
       </div>
       <div className="strip-actions">
         {extra}

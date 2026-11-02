@@ -81,6 +81,18 @@ describe("strips.css (design round 2, values from the chosen mockups)", () => {
     expect(m).toContain("min-width: 190px");
   });
 
+  it("compact strips: hover and keyboard focus use an existing token; See more is the muted small line", () => {
+    const hover = rule(".strip.openable:hover");
+    expect(hover).toContain("background: var(--panel)");
+    expect(rule(".strip.openable:has(.strip-open:focus-visible)")).toContain("background: var(--panel)");
+    expect(rule(".strip.openable:not(.crossed):hover .strip-title")).toContain("text-decoration: underline");
+    expect(rule(".strip.openable")).toContain("cursor: pointer");
+    const q = rule("button.quiet-link");
+    expect(q).toContain("font-size: 13px");
+    expect(q).toContain("opacity: 0.8");
+    expect(rule("button.quiet-link:hover")).toContain("text-decoration: underline");
+  });
+
   it("goal cards (3A), month count and done fold-out (4A)", () => {
     const c = rule(".goal-card");
     expect(c).toContain("background: var(--panel)");
