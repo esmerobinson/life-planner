@@ -147,7 +147,7 @@ for (const width of [1280, 390]) {
 test.describe("Home goals at 1280px", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test("Choose goals: tick which show on Home; they show in sidebar area order", async ({ page }) => {
+  test("Choose goals (the pop-up): tap which show on Home; they show by area, Mind first, then sidebar order", async ({ page }) => {
     await seedWorld(page);
     await page.goto("/");
     const column = page.getByRole("complementary", { name: "Goals this month" });
@@ -155,13 +155,14 @@ test.describe("Home goals at 1280px", () => {
     await expect(column.getByRole("link", { name: "Post twice a week (pretend)" })).toBeVisible();
     await expect(column.getByRole("link", { name: "Run a pretend 10k" })).toHaveCount(0);
     await column.getByRole("button", { name: "Choose goals" }).click();
-    await column.getByRole("checkbox", { name: "Run a pretend 10k" }).check();
-    await column.getByRole("checkbox", { name: "Tidy the fictional files" }).check();
-    await column.getByRole("checkbox", { name: "Post twice a week (pretend)" }).check();
-    await expect(column.getByRole("checkbox", { name: "Post twice a week (pretend)" })).toBeChecked();
+    const sheet = page.getByRole("dialog", { name: "Goals on Home" });
+    await sheet.getByRole("button", { name: "Run a pretend 10k" }).click();
+    await sheet.getByRole("button", { name: "Tidy the fictional files" }).click();
+    await sheet.getByRole("button", { name: "Post twice a week (pretend)" }).click();
+    await expect(sheet.getByRole("button", { name: "Post twice a week (pretend)" })).toHaveAttribute("aria-pressed", "true");
     await shoot(page, "home-choose-goals-1280");
-    await column.getByRole("button", { name: "Done" }).click();
-    await expect(column.locator(".goal-title")).toHaveText([
+    await sheet.getByRole("button", { name: "Done" }).click();
+    await expect(column.locator(".goal-mini-link")).toHaveText([
       "Tidy the fictional files",
       "Post twice a week (pretend)",
       "Run a pretend 10k",
