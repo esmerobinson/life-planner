@@ -277,6 +277,14 @@
   margin-top: 0;
 }
 
+/* Desktop Home: clear space between the last Today strip and the Journal heading (Esme,
+   2026-11-02: "due is too close to journal header"). The Today list keeps its own 16px under
+   it, and the card adds the 20px the phone Home already puts before its next section
+   (.phone-footer). Padding, so the two add up instead of collapsing into one margin. */
+.home-centre .journal-card-home {
+  padding-top: 20px;
+}
+
 /* Mental health exercise (exercise brief): the section is a journal card; the "Day N" chip is
    the Journal violet; the Done box is the task strips' tick; the star toggle is line-drawn in
    --text (filled with --text while starred). Builder's calls, not yet seen by Esme: the
