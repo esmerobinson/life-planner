@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./db";
 import {
   addMonthGoal, addSuggestedGoal, createGoal, deleteGoal, listJournalledDays, minusOne, planMonth, plusOne,
-  removeMonthGoal, setGoalActive, setMonthStep, tickDailyGoal, updateGoal, updateMonthGoal, DAILY_COUNT_TITLE,
+  removeMonthGoal, saveGoalNotes, setGoalActive, setMonthStep, tickDailyGoal, updateGoal, updateMonthGoal, DAILY_COUNT_TITLE,
 } from "./repo";
 import { validGoal } from "./validate";
 import { SUGGESTED_GOALS } from "../domain/suggestedGoals";
@@ -61,6 +61,14 @@ describe("monthly goals", () => {
     expect((await stored(g.id)).monthGoals![1]!.done).toBe(true);
     await setMonthStep(g.id, s, false);
     expect("done" in (await stored(g.id)).monthGoals![1]!).toBe(false);
+  });
+
+  it("a daily goal's +1 counts today once (review M4)", async () => {
+    const g = await createGoal({ title: "Pretend daily", areaId: "body", kind: "practice", rhythm: "daily" }, TODAY);
+    const c = await addMonthGoal(g.id, { kind: "count", title: "Days", target: 30 }, TODAY);
+    await plusOne(g.id, c, TODAY);
+    await plusOne(g.id, c, TODAY);
+    expect((await stored(g.id)).monthGoals![0]!.log).toEqual([TODAY]);
   });
 
   it("edits and removes; removing the last drops the field", async () => {
@@ -154,13 +162,26 @@ describe("Suggested goals", () => {
     expect(SUGGESTED_GOALS).toHaveLength(3);
   });
 
-  it("a second tap changes nothing; a binned one comes back fresh", async () => {
+  it("a second tap changes nothing; one in the Bin is restored with its history and notes (review M2)", async () => {
     await addSuggestedGoal("suggested-journal-daily", TODAY);
     await setGoalActive("suggested-journal-daily", false);
     await addSuggestedGoal("suggested-journal-daily", TODAY);
     expect((await stored("suggested-journal-daily")).active).toBe(false);
+    await plusOne("suggested-journal-daily", "suggested-journal-daily-2026-11", TODAY);
+    await saveGoalNotes("suggested-journal-daily", "Pretend notes");
     await deleteGoal("suggested-journal-daily", TODAY);
     await addSuggestedGoal("suggested-journal-daily", TODAY);
+    const back = await stored("suggested-journal-daily");
+    expect(back.status).toBeUndefined();
+    expect(back.deletedAt).toBeUndefined();
+    expect(back.notes).toBe("Pretend notes");
+    expect(back.monthGoals![0]!.log).toEqual([TODAY]);
+  });
+
+  it("an emptied (purged) one comes back fresh", async () => {
+    await db.goals.put({ id: "suggested-journal-daily", title: "", areaId: "mind", kind: "practice", milestones: [], createdAt: "2026-01-01", status: "purged" });
+    await addSuggestedGoal("suggested-journal-daily", TODAY);
+    expect(await stored("suggested-journal-daily")).toMatchObject({ title: "Journal daily", monthGoals: [{ title: "Days journalled" }] });
     expect((await stored("suggested-journal-daily")).status).toBeUndefined();
   });
 });

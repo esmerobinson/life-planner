@@ -96,6 +96,9 @@ function CountItem({
   const n = monthCount(goal, m, sources);
   const done = monthGoalDone(goal, m, sources);
   const current = m.month === monthOf(today);
+  // A daily goal counts days: +1 once a day, and −1 takes today back off (review M4).
+  const daily = isDaily(goal);
+  const loggedToday = m.log?.includes(today) ?? false;
   return (
     <li className="goal-mitem">
       <span className={done ? "tick-auto tick-sm is-done" : "tick-auto tick-sm"} aria-hidden="true">
@@ -106,12 +109,12 @@ function CountItem({
         {done && <span className="visually-hidden"> (reached)</span>}
       </span>
       <span className="goal-mitem-act">
-        {!auto && current && (m.log?.length ?? 0) > 0 && (
+        {!auto && current && (daily ? loggedToday : (m.log?.length ?? 0) > 0) && (
           <button type="button" className="goal-minus" aria-label={`Undo the last +1 on ${m.title}`} onClick={() => void write(() => minusOne(goal.id, m.id))}>
             −1
           </button>
         )}
-        {!auto && current && (
+        {!auto && current && !(daily && loggedToday) && (
           <button type="button" className="goal-plus" aria-label={`+1 ${m.title}`} onClick={() => void write(() => plusOne(goal.id, m.id, today))}>
             +1
           </button>

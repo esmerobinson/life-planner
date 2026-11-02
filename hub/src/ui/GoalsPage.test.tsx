@@ -190,6 +190,22 @@ describe("GoalsPage (goals redesign: colour-band tiles)", () => {
     expect(within(tile).getByText("1 month in a row")).toBeInTheDocument(); // ends last month (September)
   });
 
+  it("a daily goal's +1 is there once a day; −1 takes today back off (review M4)", async () => {
+    await createGoal({
+      title: "Pretend daily stretch", areaId: "body", kind: "practice", rhythm: "daily",
+      monthGoals: [{ id: "m", month: "2026-10", kind: "count", title: "Days stretched", target: 31 }],
+    }, TODAY);
+    renderGoals();
+    const tile = (await screen.findByRole("link", { name: "Pretend daily stretch" })).closest("li")!;
+    expect(within(tile).queryByRole("button", { name: /^Undo/ })).toBeNull();
+    await userEvent.click(within(tile).getByRole("button", { name: "+1 Days stretched" }));
+    expect(await within(tile).findByText("1 / 31")).toBeInTheDocument();
+    expect(within(tile).queryByRole("button", { name: "+1 Days stretched" })).toBeNull();
+    await userEvent.click(within(tile).getByRole("button", { name: "Undo the last +1 on Days stretched" }));
+    expect(await within(tile).findByText("0 / 31")).toBeInTheDocument();
+    expect(within(tile).getByRole("button", { name: "+1 Days stretched" })).toBeInTheDocument();
+  });
+
   it("Active / Inactive: inactive goals only under Inactive", async () => {
     await createGoal({ title: "Live one", areaId: "art", kind: "practice" }, TODAY);
     await createGoal({ title: "Resting one", areaId: "art", kind: "practice", active: false }, TODAY);

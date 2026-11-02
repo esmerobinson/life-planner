@@ -430,11 +430,12 @@ export async function setMonthStep(goalId: string, id: string, done: boolean): P
   );
 }
 
-/** +1 on a manual count: today goes on its log. */
+/** +1 on a manual count: today goes on its log (a daily goal counts days, so once a day: review M4). */
 export async function plusOne(goalId: string, id: string, today: ISODate): Promise<void> {
-  await editMonthGoals(goalId, (list) =>
+  await editMonthGoals(goalId, (list, goal) =>
     list.map((m) => {
       if (m.id !== id || m.kind !== "count") return m;
+      if (goal.rhythm === "daily" && m.log?.includes(today)) return m;
       const log = [...(m.log ?? []), today];
       if (log.length > MAX_MONTH_LOG) throw new Error("that count is full");
       return { ...m, log };
@@ -496,7 +497,8 @@ export async function tickDailyGoal(goalId: string, today: ISODate, on: boolean)
 
 /**
  * Adds one of the Suggested goals (only on her tap). Its id is fixed, so a second tap (or
- * another device's) changes nothing; a binned or emptied one comes back fresh.
+ * another device's) changes nothing. One in the Bin is restored as it was (its monthly goals and
+ * notes kept, review M2); only an emptied (purged) one is made fresh.
  */
 export async function addSuggestedGoal(id: string, today: ISODate): Promise<void> {
   const s = SUGGESTED_GOALS.find((g) => g.id === id);
@@ -504,6 +506,11 @@ export async function addSuggestedGoal(id: string, today: ISODate): Promise<void
   await db.transaction("rw", db.goals, async () => {
     const there = await db.goals.get(id);
     if (there && there.status === undefined) return;
+    if (there?.status === "deleted") {
+      const { status: _s, deletedAt: _d, ...rest } = there;
+      await db.goals.put(rest);
+      return;
+    }
     await db.goals.put(suggestedGoalRow(s, today));
   });
 }
