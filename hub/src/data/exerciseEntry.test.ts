@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import { db } from "./db";
 import {
-  answerFilled, CANT_OPEN, cardRef, listExerciseEntries, logExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable,
+  answerFilled, CANT_OPEN, cardRef, listExerciseEntries, logExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable, trackerNewInput,
   type PartAnswer, NOT_CONFIRMED, readExerciseEntry, readExerciseProgress, recordExerciseShown,
   saveExerciseDraft, submitExerciseEntry,
 } from "./repo";
@@ -231,6 +231,25 @@ describe("a tracker card, a day at a time", () => {
     expect((await readExerciseProgress(jk)).marks.filter((m) => m.date === DAY)).toEqual([
       { date: DAY, device: ME, id: tracker.id, done: true, primary: true },
     ]);
+  });
+
+  it("the next day, saving needs something new in the tracker: the days carried forward alone don't log (review I2)", async () => {
+    await logExerciseEntry(jk, "2026-10-29", ME, tracker, log([["7", "ok"], ["", ""], ["", ""]]));
+    const carried = (await readLatestExerciseEntry(jk, DAY, tracker))!.parts!;
+    expect(trackerNewInput(carried, carried)).toBe(false);
+    await expect(logExerciseEntry(jk, DAY, ME, tracker, carried)).rejects.toThrow();
+    expect((await readExerciseProgress(jk)).marks.some((m) => m.date === DAY)).toBe(false); // no tick today
+    const more = log([["7", "ok"], ["8", ""], ["", ""]]);
+    expect(trackerNewInput(more, carried)).toBe(true);
+    await logExerciseEntry(jk, DAY, ME, tracker, more);
+    expect((await readExerciseProgress(jk)).marks.find((m) => m.date === DAY && m.logged)).toMatchObject({ id: tracker.id });
+  });
+
+  it("a tracker done in an earlier round isn't carried into the next one (review M6)", async () => {
+    await submitExerciseEntry(jk, "2026-10-20", ME, tracker, log([["7", "ok"], ["8", "good"], ["6", "fine"]]));
+    expect(await readLatestExerciseEntry(jk, DAY, tracker)).toBeNull();
+    await logExerciseEntry(jk, "2026-10-29", ME, tracker, log([["5", "meh"], ["", ""], ["", ""]]));
+    expect((await readLatestExerciseEntry(jk, DAY, tracker))!.parts![0]!.answer).toEqual([["5", "meh"], ["", ""], ["", ""]]);
   });
 
   it("table, scale and chain answers are sealed in the same rows and read back", async () => {

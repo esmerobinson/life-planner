@@ -599,6 +599,22 @@ const started = (v: unknown): boolean => (Array.isArray(v) ? v.some(started) : t
 const partStarted = (a: PartAnswer) => started(a.answer);
 
 /**
+ * Something new in a tracker since `baseline` (the days carried forward from an earlier day):
+ * a field filled now that was empty then (review I2: only new input logs a day).
+ */
+export function trackerNewInput(value: ResponseValue, baseline: ResponseValue | null | undefined): boolean {
+  if (typeof value === "string") return false;
+  return value.some((a, i) => {
+    if (a.kind !== "tracker" || !Array.isArray(a.answer)) return false;
+    const before = typeof baseline === "string" || !baseline ? undefined : (baseline.find((b) => b.prompt === a.prompt && b.kind === a.kind) ?? baseline[i]);
+    const was = Array.isArray(before?.answer) ? (before!.answer as unknown[]) : [];
+    return (a.answer as unknown[]).some((day, d) =>
+      Array.isArray(day) && day.some((cell, f) => line(cell) && !line(Array.isArray(was[d]) ? (was[d] as unknown[])[f] : undefined)),
+    );
+  });
+}
+
+/**
  * A card with a tracker, not finished: every other part filled and at least one tracker day
  * filled in. It can be saved for the day ("logged") without the card being done.
  */
@@ -728,6 +744,8 @@ export async function logExerciseEntry(
   todayId: string = card.id,
 ): Promise<void> {
   if (!responseLoggable(value)) throw new Error("There is nothing to save yet.");
+  const carried = await readLatestExerciseEntry(jk, date, card);
+  if (!trackerNewInput(value, carried?.parts)) throw new Error("There is nothing new to save yet.");
   const id = await entryRowId(jk, date, card, deviceId);
   await ownResponse(jk, id);
   const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, false, true);
@@ -738,12 +756,17 @@ export async function logExerciseEntry(
 }
 
 /**
- * The newest response to a card on any day up to `date` (a tracker card carries its earlier
- * days forward), or null.
+ * The newest response to a card before `date` and since it was last done (a tracker card
+ * carries its earlier days forward; a new round starts empty, review M6), or null.
  */
 export async function readLatestExerciseEntry(jk: JournalKey, date: ISODate, card: ExerciseCardRef): Promise<ExerciseResponse | null> {
   const key = `:${await cardKey(jk, card)}:`;
-  const rows = (await db.journal.where("kind").equals("exercise-entry").toArray()).filter((r) => r.date <= date && r.id.includes(key));
+  const lastDone = (await readExerciseProgress(jk)).marks
+    .filter((m) => m.id === card.id && m.done && m.date < date)
+    .reduce<ISODate>((a, m) => (m.date > a ? m.date : a), "");
+  const rows = (await db.journal.where("kind").equals("exercise-entry").toArray()).filter(
+    (r) => r.date < date && r.date > lastDone && r.id.includes(key),
+  );
   const { groups } = await openResponses(jk, rows);
   const all = groups.map((g) => mergeResponses(g.date, g.entries)!).sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at);
   return all[0] ?? null;

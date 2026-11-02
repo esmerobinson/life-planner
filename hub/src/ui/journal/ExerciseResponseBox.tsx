@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   cardRef, logExerciseEntry, readExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable, saveExerciseDraft,
-  submitExerciseEntry, type ExerciseResponse, type PartAnswer, type ResponseValue,
+  submitExerciseEntry, trackerNewInput, type ExerciseResponse, type PartAnswer, type ResponseValue,
 } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
 import { emptyPart, hasTracker, trackerDaysFilled, type CardPart, type ExerciseCard, type PartValue } from "../../journal/exercise";
@@ -46,7 +46,7 @@ export function ExerciseResponseBox({
 }) {
   // The same card keeps the same reference across renders.
   const ref = useMemo(() => cardRef(card), [card.id, card.day, card.theme, card.legacy]);
-  const [read, setRead] = useState<{ entry: ExerciseResponse | null; at: number } | undefined>(undefined);
+  const [read, setRead] = useState<{ entry: ExerciseResponse | null; carried: PartAnswer[] | null; at: number } | undefined>(undefined);
   const latestRead = useRef(0);
   const tracker = hasTracker(card);
   const load = useCallback(async () => {
@@ -55,12 +55,11 @@ export function ExerciseResponseBox({
     try {
       const r = await readExerciseEntry(jk, today, ref);
       let e = r.entry;
-      // A tracker card: today's box starts from the last day she saved.
-      if (!e && tracker) {
-        const prev = await readLatestExerciseEntry(jk, today, ref);
-        if (prev) e = { ...prev, date: today, saved: false, submitted: false };
-      }
-      if (id === latestRead.current) setRead({ entry: e, at });
+      // A tracker card: today's box starts from the last day she saved, and only what is new
+      // since then can be saved for today (review I2).
+      const prev = tracker ? await readLatestExerciseEntry(jk, today, ref) : null;
+      if (!e && prev) e = { ...prev, date: today, saved: false, submitted: false };
+      if (id === latestRead.current) setRead({ entry: e, carried: prev?.parts ?? null, at });
     } catch {
       if (id === latestRead.current) onProblem(SAVE_PROBLEM);
     }
@@ -76,6 +75,7 @@ export function ExerciseResponseBox({
       card={card}
       todayId={todayId}
       entry={read.entry}
+      carried={read.carried}
       readAt={read.at}
       reload={load}
       onProblem={onProblem}
@@ -113,7 +113,7 @@ const UNSAVED = "\u0000unsaved";
 const keyOf = (v: ResponseValue) => (typeof v === "string" ? v : JSON.stringify(v));
 
 function ResponseField({
-  jk, today, deviceId, card, todayId, entry, readAt, reload, onProblem, note, after,
+  jk, today, deviceId, card, todayId, entry, carried, readAt, reload, onProblem, note, after,
 }: {
   jk: JournalKey;
   today: ISODate;
@@ -121,6 +121,8 @@ function ResponseField({
   card: ExerciseCard;
   todayId: string;
   entry: ExerciseResponse | null;
+  /** A tracker card's days carried forward from an earlier day (null: none). */
+  carried: PartAnswer[] | null;
   /** When the read behind `entry` started (tick). */
   readAt: number;
   reload: () => Promise<void>;
@@ -211,7 +213,7 @@ function ResponseField({
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     const v = latest.current;
-    if (log ? !responseLoggable(v) : !responseComplete(v)) return;
+    if (log ? !(responseLoggable(v) && trackerNewInput(v, carried)) : !responseComplete(v)) return;
     setBusy(true);
     const before = saved.current;
     const k = keyOf(v);
@@ -257,7 +259,7 @@ function ResponseField({
               Saved
             </p>
           ) : !responseComplete(value) && hasTracker(card) ? (
-            <button type="button" disabled={busy || !responseLoggable(value)} onClick={() => void submit(true)}>
+            <button type="button" disabled={busy || !responseLoggable(value) || !trackerNewInput(value, carried)} onClick={() => void submit(true)}>
               {SAVE_TODAY}
             </button>
           ) : (

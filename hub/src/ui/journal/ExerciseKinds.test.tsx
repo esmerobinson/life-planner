@@ -140,6 +140,11 @@ describe("newer part kinds", () => {
     expect(await within(again).findByText("Day 2 of 3")).toBeInTheDocument();
     expect(within(again).getByRole("textbox", { name: "Day 1, Hours" })).toHaveValue("7");
     expect(again.querySelectorAll(".exercise-tracker-day")[1]).toHaveClass("is-now");
+    // Carried forward, nothing new: it can't be saved for today (review I2) …
+    expect(within(again).getByRole("button", { name: SAVE_TODAY })).toBeDisabled();
+    // … until today's day has something in it.
+    await userEvent.type(within(again).getByRole("textbox", { name: "Day 2, Hours" }), "8");
+    expect(within(again).getByRole("button", { name: SAVE_TODAY })).toBeEnabled();
   });
 
   it("a tracker logged on an earlier day is today's card again", async () => {
