@@ -130,6 +130,12 @@ test.describe("at 390px", () => {
   });
 });
 
+/** One card on its own (SHOTS_DIR). */
+async function shootCard(card: ReturnType<Page["locator"]>, name: string) {
+  const dir = process.env.SHOTS_DIR;
+  if (dir) await card.screenshot({ path: `${dir}/${name}.png` });
+}
+
 /** Imports a fixture file (through the Import pill, as she would). */
 async function importFile(page: Page, text: string) {
   await section(page).getByLabel("Exercise card file").setInputFiles({ name: "pretend.json", mimeType: "application/json", buffer: Buffer.from(text) });
@@ -151,18 +157,25 @@ for (const width of [1280, 390]) {
       else await expect(header).toBeVisible();
       await today.getByLabel("Feeling, row 1").fill("Pretend calm");
       await noSidewaysScroll(page);
-      await shoot(page, `exercise-${width}-table`);
+      await shootCard(today, `card-${width}-table`);
       // The others, one after another.
       await today.getByRole("button", { name: "Do the next one →" }).click();
-      await s.getByRole("article", { name: "Next card: Day 2" }).getByRole("button", { name: "Do the next one →" }).click();
+      const scale = s.getByRole("article", { name: "Next card: Day 2" });
+      await scale.getByRole("group", { name: "How pretend-calm are you?" }).getByRole("button", { name: "4" }).click();
+      await shootCard(scale, `card-${width}-scale`);
+      await scale.getByRole("button", { name: "Do the next one →" }).click();
       const tracker = s.getByRole("article", { name: "Next card: Day 3" });
       await expect(tracker.getByText("Day 1 of 3")).toBeVisible();
       await tracker.getByLabel("Day 1, Hours").fill("7");
       await tracker.getByLabel("Day 1, Mood").fill("Pretend fine");
       await tracker.getByRole("button", { name: "Save today's entry" }).click();
       await expect(tracker.getByText("Saved")).toBeVisible();
+      await shootCard(tracker, `card-${width}-tracker`);
       await tracker.getByRole("button", { name: "Do the next one →" }).click();
-      await expect(s.getByRole("article", { name: "Next card: Day 4" }).locator(".exercise-chain-arrow")).toHaveCount(2);
+      const chain = s.getByRole("article", { name: "Next card: Day 4" });
+      await expect(chain.locator(".exercise-chain-arrow")).toHaveCount(2);
+      await chain.getByRole("textbox").first().fill("Pretend: the kettle was loud");
+      await shootCard(chain, `card-${width}-chain`);
       await noSidewaysScroll(page);
       await shoot(page, `exercise-${width}-kinds`);
 

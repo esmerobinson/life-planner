@@ -700,6 +700,25 @@ input.exercise-list-line {
   margin-left: 4px;
 }
 
+/* In a --row box (a next card, a card under All cards) the --row boxes swap to --panel and
+   what sits on them to --row, so nothing vanishes into its background (as Read more does). */
+.exercise-boxed .journal-answer,
+.exercise-boxed .exercise-parts input,
+.exercise-boxed .exercise-table th,
+.exercise-boxed .exercise-tracker-day,
+.exercise-boxed .chip.exercise-format {
+  background: var(--panel);
+}
+
+.exercise-boxed .exercise-tracker-field input,
+.is-phone .exercise-boxed .exercise-table input {
+  background: var(--row);
+}
+
+.is-phone .exercise-boxed .exercise-table tr {
+  background: var(--panel);
+}
+
 /* Morning pages: "Add photo instead" left, "I'm done" right (the mockup's row). */
 .journal-write-actions {
   justify-content: space-between;
