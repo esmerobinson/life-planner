@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import {
-  addMonthGoal, minusOne, planMonth, plusOne, removeMonthGoal, setMonthStep, updateMonthGoal,
+  addMonthGoal, minusOne, planMonth, plusOne, removeMonthGoal, setMonthStep, updateMonthGoal, type MonthEdit,
 } from "../data/repo";
 import { monthName, shortDate } from "../domain/display";
 import { monthOf } from "../domain/dates";
@@ -150,6 +150,9 @@ export function TickBox({
   );
 }
 
+/** Reports a month-goal change made in Edit: its save, and (once saved) what to record for Cancel. */
+export type TrackEdit = (saved: Promise<boolean>, edit: () => MonthEdit) => void;
+
 function StepItem({ goal, m, write }: { goal: Goal; m: MonthGoal; write: (fn: () => Promise<unknown>) => Promise<boolean> }) {
   const done = m.done === true;
   return (
@@ -162,7 +165,9 @@ function StepItem({ goal, m, write }: { goal: Goal; m: MonthGoal; write: (fn: ()
 }
 
 /** Edit mode (goal panel): the title (and a count's target) as fields that save when left, and Remove. */
-function EditItem({ goal, m, write }: { goal: Goal; m: MonthGoal; write: (fn: () => Promise<unknown>) => Promise<boolean> }) {
+function EditItem({
+  goal, m, write, track,
+}: { goal: Goal; m: MonthGoal; write: (fn: () => Promise<unknown>) => Promise<boolean>; track?: TrackEdit }) {
   const [title, setTitle] = useState(m.title);
   const [target, setTarget] = useState(String(m.target ?? ""));
   useEffect(() => setTitle(m.title), [m.title]);
@@ -175,8 +180,10 @@ function EditItem({ goal, m, write }: { goal: Goal; m: MonthGoal; write: (fn: ()
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onBlur={() => {
-          if (title.trim() && title.trim() !== m.title) void write(() => updateMonthGoal(goal.id, m.id, { title }));
-          else setTitle(m.title);
+          if (title.trim() && title.trim() !== m.title) {
+            const saved = write(() => updateMonthGoal(goal.id, m.id, { title }));
+            track?.(saved, () => ({ kind: "retitle", id: m.id, from: m.title, to: title.trim() }));
+          } else setTitle(m.title);
         }}
       />
       {m.kind === "count" ? (
@@ -189,14 +196,25 @@ function EditItem({ goal, m, write }: { goal: Goal; m: MonthGoal; write: (fn: ()
           onChange={(e) => setTarget(e.target.value)}
           onBlur={() => {
             const t = Number(target);
-            if (Number.isInteger(t) && t >= 1 && t !== m.target) void write(() => updateMonthGoal(goal.id, m.id, { target: t }));
-            else setTarget(String(m.target ?? ""));
+            if (Number.isInteger(t) && t >= 1 && t !== m.target) {
+              const saved = write(() => updateMonthGoal(goal.id, m.id, { target: t }));
+              if (m.target !== undefined) track?.(saved, () => ({ kind: "retarget", id: m.id, from: m.target!, to: t }));
+            } else setTarget(String(m.target ?? ""));
           }}
         />
       ) : (
         <span />
       )}
-      <button type="button" className="btn-secondary" aria-label={`Remove ${m.title}`} onClick={() => void write(() => removeMonthGoal(goal.id, m.id))}>
+      <button
+        type="button"
+        className="btn-secondary"
+        aria-label={`Remove ${m.title}`}
+        onClick={() => {
+          const saved = write(() => removeMonthGoal(goal.id, m.id));
+          const index = Math.max(0, (goal.monthGoals ?? []).findIndex((x) => x.id === m.id));
+          track?.(saved, () => ({ kind: "remove", entry: m, index }));
+        }}
+      >
         Remove
       </button>
     </li>
@@ -204,7 +222,9 @@ function EditItem({ goal, m, write }: { goal: Goal; m: MonthGoal; write: (fn: ()
 }
 
 /** "+ Add a <Month> goal": Count or Step, a title, and a target for a count. */
-function AddMonthGoal({ goal, today, write }: { goal: Goal; today: ISODate; write: (fn: () => Promise<unknown>) => Promise<boolean> }) {
+function AddMonthGoal({
+  goal, today, write, track,
+}: { goal: Goal; today: ISODate; write: (fn: () => Promise<unknown>) => Promise<boolean>; track?: TrackEdit }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<MonthGoal["kind"]>("count");
   const [title, setTitle] = useState("");
@@ -230,7 +250,12 @@ function AddMonthGoal({ goal, today, write }: { goal: Goal; today: ISODate; writ
       onSubmit={(e) => {
         e.preventDefault();
         if (!ready) return;
-        void write(() => addMonthGoal(goal.id, { kind, title, ...(kind === "count" ? { target: t } : {}) }, today)).then((ok) => {
+        let id = "";
+        const saved = write(async () => {
+          id = await addMonthGoal(goal.id, { kind, title, ...(kind === "count" ? { target: t } : {}) }, today);
+        });
+        track?.(saved, () => ({ kind: "add", id }));
+        void saved.then((ok) => {
           if (!ok) return;
           setTitle("");
           setTarget("");
@@ -276,8 +301,12 @@ function AddMonthGoal({ goal, today, write }: { goal: Goal; today: ISODate; writ
  * or removed.
  */
 export function MonthGoalsBox({
-  goal, today, sources, onChanged, editing = false,
-}: { goal: Goal; today: ISODate; sources: GoalSources; onChanged: () => Promise<void>; editing?: boolean }) {
+  goal, today, sources, onChanged, editing = false, track,
+}: {
+  goal: Goal; today: ISODate; sources: GoalSources; onChanged: () => Promise<void>; editing?: boolean;
+  /** Edit mode only: told about each change made, so Cancel can undo just those. */
+  track?: TrackEdit;
+}) {
   const { attempt, saveError } = useSaveError();
   const month = monthName(today);
   const mine = goalsIn(goal, monthOf(today));
@@ -299,7 +328,7 @@ export function MonthGoalsBox({
         <ul className="goal-mitems" aria-label={`${month} goals`}>
           {mine.map((m) =>
             editing ? (
-              <EditItem key={m.id} goal={goal} m={m} write={write} />
+              <EditItem key={m.id} goal={goal} m={m} write={write} track={track} />
             ) : m.kind === "count" ? (
               <CountItem key={m.id} goal={goal} m={m} sources={sources} today={today} write={write} />
             ) : (
@@ -325,7 +354,7 @@ export function MonthGoalsBox({
         </button>
       )}
       {saveError && <p className="form-message">{saveError}</p>}
-      <AddMonthGoal goal={goal} today={today} write={write} />
+      <AddMonthGoal goal={goal} today={today} write={write} track={editing ? track : undefined} />
     </div>
   );
 }

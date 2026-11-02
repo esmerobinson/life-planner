@@ -419,24 +419,35 @@ export async function removeMonthGoal(goalId: string, id: string): Promise<void>
   await editMonthGoals(goalId, (list) => (list.some((m) => m.id === id) ? list.filter((m) => m.id !== id) : null));
 }
 
+/** One change made to a monthly goal during an Edit session (what Cancel may undo). */
+export type MonthEdit =
+  | { kind: "retitle"; id: string; from: string; to: string }
+  | { kind: "retarget"; id: string; from: number; to: number }
+  | { kind: "remove"; entry: MonthGoal; index: number }
+  | { kind: "add"; id: string };
+
 /**
- * Edit mode's Cancel: puts the monthly goals back as they were when Edit opened. Goals
- * removed since come back in their place; a renamed or re-targeted one gets its title and
- * target back; anything else on a goal (ticks, logs) and any goal that arrived since is
- * left as it is.
+ * Edit mode's Cancel: undoes this session's own changes, newest first, and only where the
+ * goal still holds what the session set. A title or target that has changed since (say by
+ * sync) stays; a removed goal comes back only if its id is still missing; an added one is
+ * taken out again. Ticks and logs are never touched. Writes nothing when nothing applies.
  */
-export async function restoreMonthGoals(goalId: string, before: readonly MonthGoal[]): Promise<void> {
+export async function undoMonthEdits(goalId: string, edits: readonly MonthEdit[]): Promise<void> {
+  if (edits.length === 0) return;
   await editMonthGoals(goalId, (list) => {
-    const now = new Map(list.map((m) => [m.id, m]));
-    const ids = new Set(before.map((m) => m.id));
-    const back = before.map((b) => {
-      const m = now.get(b.id);
-      if (!m) return { ...b, ...(b.log ? { log: [...b.log] } : {}) };
-      const next: MonthGoal = { ...m, title: b.title };
-      if (b.target !== undefined) next.target = b.target;
-      return next;
-    });
-    const next = [...back, ...list.filter((m) => !ids.has(m.id))];
+    let next = list;
+    for (const e of [...edits].reverse()) {
+      if (e.kind === "add") next = next.filter((m) => m.id !== e.id);
+      else if (e.kind === "remove") {
+        if (next.some((m) => m.id === e.entry.id)) continue;
+        const back = { ...e.entry, ...(e.entry.log ? { log: [...e.entry.log] } : {}) };
+        next = [...next.slice(0, e.index), back, ...next.slice(e.index)];
+      } else if (e.kind === "retitle") {
+        next = next.map((m) => (m.id === e.id && m.title === e.to ? { ...m, title: e.from } : m));
+      } else {
+        next = next.map((m) => (m.id === e.id && m.target === e.to ? { ...m, target: e.from } : m));
+      }
+    }
     return JSON.stringify(next) === JSON.stringify(list) ? null : next;
   });
 }

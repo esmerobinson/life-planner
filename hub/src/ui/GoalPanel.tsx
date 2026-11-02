@@ -1,18 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  createItem, deleteGoal, restoreMonthGoals, saveGoalNotes, setGoalActive, setGoalOnHome, untickItem, updateGoal,
-  type GoalPatch,
+  createItem, deleteGoal, saveGoalNotes, setGoalActive, setGoalOnHome, undoMonthEdits, untickItem, updateGoal,
+  type GoalPatch, type MonthEdit,
 } from "../data/repo";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "../data/validate";
 import { monthName } from "../domain/display";
 import { isActive, isDaily, pastMonths } from "../domain/goalCounts";
 import { goalTaskSplit, nextGoalOrder } from "../domain/progress";
-import type { AreaId, CountSource, Goal, ISODate, Item, MonthGoal } from "../domain/types";
+import type { AreaId, CountSource, Goal, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS, NAV } from "./areas";
 import { tickedOffToday } from "../domain/triage";
 import { DoneStrip } from "./DoneSection";
 import { areaLabel } from "./GoalProgress";
-import { GoalOverall, goalKindLabel, MonthDots, MonthGoalsBox } from "./GoalTile";
+import { GoalOverall, goalKindLabel, MonthDots, MonthGoalsBox, type TrackEdit } from "./GoalTile";
 import { PageEditor } from "./PageEditor";
 import { useSaveError } from "./messages";
 import { usePanel } from "./panelContext";
@@ -107,9 +107,9 @@ export function GoalPanel({
   const [asking, setAsking] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const addRef = useRef<HTMLInputElement>(null);
-  // The month goals as Edit opened. They save as they are edited, so Cancel puts them back.
-  const monthBefore = useRef<MonthGoal[]>([]);
+  const session = useRef<{ edits: MonthEdit[]; saves: Promise<unknown>[] }>({ edits: [], saves: [] });
   const cancelEdit = useRef<() => void>(() => undefined);
+  const unmountUndo = useRef<() => void>(() => undefined);
 
   async function write(fn: () => Promise<unknown>): Promise<boolean> {
     const ok = await attempt(fn);
@@ -153,17 +153,44 @@ export function GoalPanel({
     const now = fieldsOf(goal);
     setFields(now);
     setSnapshot(now);
-    monthBefore.current = (goal.monthGoals ?? []).map((m) => ({ ...m, ...(m.log ? { log: [...m.log] } : {}) }));
+    session.current = { edits: [], saves: [] };
     setFormMessage("");
     setEditing(true);
   }
 
-  // Cancel (button or Escape): the fields were never saved; the month goals were, so put them back.
+  // Month goals save as they are edited; this Edit's own changes are noted so Cancel can undo them.
+  const track = useCallback<TrackEdit>((saved, edit) => {
+    const mine = session.current; // the session this save belongs to, even if Cancel starts a new one
+    mine.saves.push(
+      saved.then((ok) => {
+        if (ok) mine.edits.push(edit());
+      }),
+    );
+  }, []);
+
+  /** Takes this Edit's changes (after any save still in flight) and undoes them; nothing of hers, nothing written. */
+  async function undoSession(): Promise<void> {
+    const { edits, saves } = session.current;    session.current = { edits: [], saves: [] };
+    if (saves.length === 0) return;
+    await Promise.all(saves);
+    await undoMonthEdits(goal.id, edits);
+    await onChanged();
+  }
+
+  // Cancel (button or Escape): the fields were never saved; the month goals were, so undo those.
+  // The form stays until they are back, so a removed goal never flashes away.
   cancelEdit.current = () => {
-    setEditing(false);
     setFormMessage("");
-    void write(() => restoreMonthGoals(goal.id, monthBefore.current));
+    if (session.current.saves.length === 0) return setEditing(false);
+    void undoSession()
+      .catch(() => undefined) // e.g. the goal was binned meanwhile: nothing left to undo
+      .finally(() => setEditing(false));
   };
+  // Closing the panel while editing (Close, another card) means Cancel too.
+  unmountUndo.current = () => {
+    if (editing) void undoSession().catch(() => undefined);
+  };
+  useEffect(() => () => unmountUndo.current(), []);
 
   async function done() {
     if (busy) return;
@@ -361,7 +388,7 @@ export function GoalPanel({
         <GoalOverall goal={goal} items={items} today={today} sources={sources} />
         <MonthDots goal={goal} today={today} sources={sources} />
       </div>
-      <MonthGoalsBox goal={goal} today={today} sources={sources} onChanged={onChanged} editing={editing} />
+      <MonthGoalsBox goal={goal} today={today} sources={sources} onChanged={onChanged} editing={editing} track={track} />
       {past.length > 0 && (
         <section aria-labelledby="goal-past-heading">
           <h3 className="peek-sec" id="goal-past-heading">

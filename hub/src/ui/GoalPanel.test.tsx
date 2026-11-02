@@ -347,6 +347,78 @@ describe("the goal panel (Edit)", () => {
       await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toEqual(withMonth().monthGoals));
     });
 
+    it("a change that arrived by sync during Edit stays after Cancel (nothing of hers to undo)", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      const row = (await db.goals.get("ef"))!;
+      const synced = row.monthGoals!.filter((m) => m.id !== "b").map((m) => (m.id === "a" ? { ...m, title: "Theirs", target: 8 } : m));
+      await db.goals.put({ ...row, monthGoals: synced });
+      await userEvent.click(p.getByRole("button", { name: "Cancel" }));
+      await p.findByRole("button", { name: "Edit" });
+      expect((await db.goals.get("ef"))!.monthGoals).toEqual(synced);
+    });
+
+    it("Cancel undoes only her own change: a synced rename of another goal stays", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      await userEvent.click(p.getByRole("button", { name: "Remove Book a pretend class" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toHaveLength(2));
+      const row = (await db.goals.get("ef"))!;
+      const synced = row.monthGoals!.map((m) => (m.id === "a" ? { ...m, title: "Theirs" } : m));
+      await db.goals.put({ ...row, monthGoals: synced });
+      await userEvent.click(p.getByRole("button", { name: "Cancel" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals!.map((m) => m.id)).toEqual(["a", "b", "c"]));
+      expect((await db.goals.get("ef"))!.monthGoals![0]!.title).toBe("Theirs");
+    });
+
+    it("Cancel with no month-goal edits writes nothing", async () => {
+      await db.goals.add(withMonth());
+      const before = (await db.goals.get("ef"))!;
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      await userEvent.click(p.getByRole("button", { name: "Cancel" }));
+      await p.findByRole("button", { name: "Edit" });
+      expect(await db.goals.get("ef")).toEqual(before);
+    });
+
+    it("a month goal added during Edit is taken out again by Cancel", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      await userEvent.click(p.getByRole("button", { name: /^\+ Add an? \w+ goal$/ }));
+      const form = within(p.getByRole("form", { name: /^Add an? \w+ goal$/ }));
+      await userEvent.type(form.getByLabelText("Title"), "Added in this Edit");
+      await userEvent.click(form.getByRole("button", { name: "Step" }));
+      await userEvent.click(form.getByRole("button", { name: "Add" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toHaveLength(4));
+      await userEvent.click(p.getByRole("button", { name: "Cancel" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toEqual(withMonth().monthGoals));
+    });
+
+    it("a rename typed into a title field when Cancel is pressed is undone too", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      const title = p.getByLabelText("Title of Sessions");
+      await userEvent.clear(title);
+      await userEvent.type(title, "Half typed"); // still focused; Cancel's press blurs (and so saves) it first
+      await userEvent.click(p.getByRole("button", { name: "Cancel" }));
+      await p.findByRole("button", { name: "Edit" });
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toEqual(withMonth().monthGoals));
+    });
+
+    it("closing the panel while editing (Close) behaves like Cancel", async () => {
+      await db.goals.add(withMonth());
+      const p = await openGoal("ef");
+      await userEvent.click(p.getByRole("button", { name: "Edit" }));
+      await userEvent.click(p.getByRole("button", { name: "Remove Sessions" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toHaveLength(2));
+      await userEvent.click(p.getByRole("button", { name: "Close" }));
+      await vi.waitFor(async () => expect((await db.goals.get("ef"))!.monthGoals).toEqual(withMonth().monthGoals));
+    });
+
     it("Done keeps a removal", async () => {
       await db.goals.add(withMonth());
       const p = await openGoal("ef");

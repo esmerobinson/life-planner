@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./db";
 import {
   addMonthGoal, addSuggestedGoal, createGoal, deleteGoal, listJournalledDays, minusOne, planMonth, plusOne,
-  removeMonthGoal, restoreMonthGoals, saveGoalNotes, setGoalActive, setMonthStep, tickDailyGoal, updateGoal, updateMonthGoal, DAILY_COUNT_TITLE,
+  removeMonthGoal, saveGoalNotes, setGoalActive, setMonthStep, tickDailyGoal, updateGoal, undoMonthEdits, updateMonthGoal, DAILY_COUNT_TITLE,
 } from "./repo";
 import { validGoal } from "./validate";
 import { SUGGESTED_GOALS } from "../domain/suggestedGoals";
@@ -80,29 +80,77 @@ describe("monthly goals", () => {
     expect("monthGoals" in (await stored(g.id))).toBe(false);
   });
 
-  it("restoreMonthGoals puts back removed goals in place and old titles and targets; keeps ticks and later arrivals", async () => {
-    const g = await practice();
-    const a = await addMonthGoal(g.id, { kind: "count", title: "Sessions", target: 3 }, TODAY);
-    const b = await addMonthGoal(g.id, { kind: "step", title: "Book a pretend class" }, TODAY);
-    const before = (await stored(g.id)).monthGoals!;
-    await updateMonthGoal(g.id, a, { title: "Renamed", target: 9 });
-    await removeMonthGoal(g.id, b);
-    await plusOne(g.id, a, TODAY); // a tick made since Edit opened
-    const later = await addMonthGoal(g.id, { kind: "step", title: "Arrived later" }, TODAY);
-    await restoreMonthGoals(g.id, before);
-    const now = (await stored(g.id)).monthGoals!;
-    expect(now.map((m) => m.id)).toEqual([a, b, later]);
-    expect(now[0]).toMatchObject({ title: "Sessions", target: 3, log: [TODAY] });
-    expect(now[1]).toEqual(before[1]);
-    expect(validGoal(await stored(g.id))).toBe(true);
-  });
+  describe("undoMonthEdits (Edit's Cancel: only this session's own changes)", () => {
+    it("undoes a rename, a new target, a removal (in place) and an add; keeps a tick made since", async () => {
+      const g = await practice();
+      const a = await addMonthGoal(g.id, { kind: "count", title: "Sessions", target: 3 }, TODAY);
+      const b = await addMonthGoal(g.id, { kind: "step", title: "Book a pretend class" }, TODAY);
+      const c = await addMonthGoal(g.id, { kind: "step", title: "Third" }, TODAY);
+      const before = (await stored(g.id)).monthGoals!;
+      await updateMonthGoal(g.id, a, { title: "Renamed", target: 9 });
+      await removeMonthGoal(g.id, b);
+      const added = await addMonthGoal(g.id, { kind: "step", title: "Added in Edit" }, TODAY);
+      await plusOne(g.id, a, TODAY);
+      await undoMonthEdits(g.id, [
+        { kind: "retitle", id: a, from: "Sessions", to: "Renamed" },
+        { kind: "retarget", id: a, from: 3, to: 9 },
+        { kind: "remove", entry: before[1]!, index: 1 },
+        { kind: "add", id: added },
+      ]);
+      const now = (await stored(g.id)).monthGoals!;
+      expect(now.map((m) => m.id)).toEqual([a, b, c]);
+      expect(now[0]).toMatchObject({ title: "Sessions", target: 3, log: [TODAY] });
+      expect(now[1]).toEqual(before[1]);
+      expect(validGoal(await stored(g.id))).toBe(true);
+    });
 
-  it("restoreMonthGoals with nothing changed writes nothing", async () => {
-    const g = await practice();
-    await addMonthGoal(g.id, { kind: "step", title: "Same" }, TODAY);
-    const row = await stored(g.id);
-    await restoreMonthGoals(g.id, row.monthGoals!);
-    expect(await stored(g.id)).toEqual(row);
+    it("a chain of renames goes back to the first title", async () => {
+      const g = await practice();
+      const a = await addMonthGoal(g.id, { kind: "step", title: "One" }, TODAY);
+      await updateMonthGoal(g.id, a, { title: "Two" });
+      await updateMonthGoal(g.id, a, { title: "Three" });
+      await undoMonthEdits(g.id, [
+        { kind: "retitle", id: a, from: "One", to: "Two" },
+        { kind: "retitle", id: a, from: "Two", to: "Three" },
+      ]);
+      expect((await stored(g.id)).monthGoals![0]!.title).toBe("One");
+    });
+
+    it("leaves what arrived by sync: a remote rename, target and removal survive a Cancel", async () => {
+      const g = await practice();
+      const a = await addMonthGoal(g.id, { kind: "count", title: "Sessions", target: 3 }, TODAY);
+      const b = await addMonthGoal(g.id, { kind: "step", title: "Book" }, TODAY);
+      const c = await addMonthGoal(g.id, { kind: "step", title: "Third" }, TODAY);
+      // This session renamed a, retargeted a, removed b and c.
+      await updateMonthGoal(g.id, a, { title: "Mine", target: 4 });
+      const mid = (await stored(g.id)).monthGoals!;
+      await removeMonthGoal(g.id, b);
+      // Meanwhile the other device changed a's title and target, and re-added b.
+      const row = await stored(g.id);
+      await db.goals.put({
+        ...row,
+        monthGoals: [{ ...mid[0]!, title: "Theirs", target: 7 }, mid[1]!, ...row.monthGoals!.filter((m) => m.id === c)],
+      });
+      const synced = await stored(g.id);
+      await undoMonthEdits(g.id, [
+        { kind: "retitle", id: a, from: "Sessions", to: "Mine" },
+        { kind: "retarget", id: a, from: 3, to: 4 },
+        { kind: "remove", entry: mid[1]!, index: 1 },
+      ]);
+      const now = (await stored(g.id)).monthGoals!;
+      expect(now[0]).toMatchObject({ title: "Theirs", target: 7 }); // not put back
+      expect(now.filter((m) => m.id === b)).toHaveLength(1); // present again already: not duplicated
+      expect(now).toEqual(synced.monthGoals);
+    });
+
+    it("no edits, or nothing to undo, writes nothing", async () => {
+      const g = await practice();
+      const a = await addMonthGoal(g.id, { kind: "step", title: "Same" }, TODAY);
+      const row = await stored(g.id);
+      await undoMonthEdits(g.id, []);
+      await undoMonthEdits(g.id, [{ kind: "retitle", id: a, from: "Other", to: "Gone" }]);
+      expect(await stored(g.id)).toEqual(row);
+    });
   });
 
   it("a binned goal can't be changed", async () => {
