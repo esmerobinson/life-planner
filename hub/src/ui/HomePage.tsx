@@ -42,7 +42,7 @@ function PhoneHome({ today }: { today: ISODate }) {
           ))}
         </ul>
       </nav>
-      <JournalCard />
+      <JournalCard today={today} />
       <TodayPanel today={today} headingLevel={2} />
       <nav aria-label="More" className="phone-footer">
         <FooterLinks />
@@ -89,7 +89,7 @@ function DesktopHome({ today }: { today: ISODate }) {
     <div className="home-page">
       <div className="home-centre">
         <TodayPanel today={today} />
-        <JournalCard />
+        <JournalCard today={today} />
       </div>
       <aside className="home-goals" aria-label="Goals this month">
         <h2>Goals this month</h2>

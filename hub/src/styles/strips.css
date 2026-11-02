@@ -329,3 +329,53 @@ button.quiet-link:focus-visible {
 .strip.openable:not(.crossed):has(.strip-open:focus-visible) .strip-title {
   text-decoration: underline;
 }
+
+/* ---- Journal rows (2026-11-02, VISUAL-LANGUAGE.md "Journal rows"; Esme: "should look the
+   same as to-do boxes but green") ----
+   The task strip above with Map mint #a3d5c2 (her pick) as its background, on Home and as
+   each Journal section's heading. The tick box is the strips' tick box (22px, 7px radius,
+   --panel, sage border; done is --bar-fill) but read-only: it ticks itself. "★ N" is the
+   magenta placeholder star (.journal-star) and the number in the strip's own text.
+   Hover / keyboard focus on a Home row: the title underlines and the cursor is a pointer,
+   as on task strips; the background stays mint (a mint hover colour isn't decided). */
+:root {
+  --mint: #a3d5c2; /* Map mint, Esme's pick for the Journal rows */
+}
+
+.strip.journal-row {
+  background: var(--mint);
+}
+
+.tick-auto {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--panel);
+  border: 2px solid var(--sage);
+}
+
+.tick-auto.is-done {
+  background: var(--bar-fill);
+  border-color: var(--bar-fill);
+}
+
+.strip.journal-row-open {
+  cursor: pointer;
+}
+
+.strip.journal-row-open:hover .strip-title,
+.strip.journal-row-open:has(.strip-open:focus-visible) .strip-title {
+  text-decoration: underline;
+}
+
+/* On the Journal page the strip's title is the section's h2, at the strip title's size. */
+h2.journal-row-heading {
+  margin: 0;
+  font: inherit;
+}
+
+.journal-row-streak {
+  white-space: nowrap;
+}

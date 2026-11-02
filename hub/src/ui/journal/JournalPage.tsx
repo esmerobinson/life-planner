@@ -12,9 +12,16 @@ import { MentalHealthExercise } from "./MentalHealthExercise";
 import { MorningPages } from "./MorningPages";
 import { useJournalKey } from "./useJournalKey";
 
-/** The Home card's buttons land on these sections. */
+/** The Home card's rows land on these sections. */
 export const MORNING_HASH = "#morning-pages";
 export const CHECKIN_HASH = "#daily-check-in";
+export const EXERCISE_HASH = "#mental-health-exercise";
+/** Each hash's section (the element scrolled to). */
+const SECTION_FOR_HASH: Record<string, string> = {
+  [MORNING_HASH]: "morning-pages-section",
+  [CHECKIN_HASH]: "daily-check-in-section",
+  [EXERCISE_HASH]: "mental-health-exercise-section",
+};
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
 
@@ -46,7 +53,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
   // From the Home card: bring the chosen section into view once it is there.
   useEffect(() => {
     if (!ready || !location.hash) return;
-    const id = location.hash === CHECKIN_HASH ? "daily-check-in-section" : location.hash === MORNING_HASH ? "morning-pages-section" : null;
+    const id = SECTION_FOR_HASH[location.hash];
     if (!id) return;
     const t = setTimeout(() => document.getElementById(id)?.scrollIntoView?.({ block: "start" }), 0);
     return () => clearTimeout(t);

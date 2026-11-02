@@ -232,10 +232,11 @@ describe("controls.css (approved mockup A, soft pills)", () => {
 
     const journal = render(
       <MemoryRouter>
-        <JournalCard />
+        <JournalCard today="2026-10-27" />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("button", { name: "Morning pages" }).parentElement?.classList.contains("btn-group")).toBe(true);
+    // The Journal card's rows are strips now (Journal rows, 2026-11-02), not a pill group.
+    expect(screen.getByRole("button", { name: "Morning pages" }).closest("ul")?.classList.contains("strip-list")).toBe(true);
     journal.unmount();
 
     // Move to is now a popover in the 1A menu look (strips.css), not a row of pills.

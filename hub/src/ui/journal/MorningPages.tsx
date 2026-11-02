@@ -10,8 +10,12 @@ import type { ISODate } from "../../domain/types";
 import { downscalePicture, PICTURE_UNREADABLE } from "../picture";
 import { ProgressBar } from "../ProgressBar";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
-import { DoneBox, JournalHead, longDate, monthLabel, Star } from "./bits";
+import { rowStatus } from "../../journal/rows";
+import { DoneBox, longDate, monthLabel, Star } from "./bits";
+import { JournalStripHead } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
+
+const NO_DAYS: ReadonlySet<ISODate> = new Set();
 
 /** The rules in our own words (journal brief §1's line; no quotation from the book). */
 export const MORNING_RULES =
@@ -71,9 +75,10 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   }
 
   const doneToday = !!day?.done;
+  const row = rowStatus(done ?? NO_DAYS, today);
   return (
     <section className="journal-card" aria-labelledby="morning-pages" id="morning-pages-section">
-      <JournalHead id="morning-pages" title="Morning pages" sub={longDate(today)} />
+      <JournalStripHead id="morning-pages" title="Morning pages" {...row} meta={longDate(today)} />
       {done === null ? null : writing ? (
         <WritingView
           jk={jk}

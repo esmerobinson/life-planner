@@ -39,25 +39,8 @@
   margin: 0;
 }
 
-.journal-head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.journal-tile {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--journal-violet);
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-
-.journal-tile img {
-  width: 26px;
-}
+/* Each section's heading is its Journal row (strips.css "Journal rows", 2026-11-02); the
+   mockup's violet tile head is gone. */
 
 .journal-big {
   margin: 0;
