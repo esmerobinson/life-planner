@@ -121,12 +121,17 @@ describe("strips.css (design round 2, values from the chosen mockups)", () => {
       expect(real).toContain(d);
       expect(box).toContain(d);
     }
-    const done = rule(".tick-auto.is-done");
-    expect(done).toContain("background: var(--bar-fill)");
+    // One shared rule for the box and one for its done state (2026-11-02: "exactly like" the task strips).
+    expect(box).toBe(real);
+    expect(rule(".tick-auto.is-done")).toBe(rule('input[type="checkbox"].tick:checked'));
+    expect(rule(".tick-auto.is-done")).toContain("background: var(--bar-fill)");
     // The ✓ (controller call): --text, centred and bold like the Journal's "Done for today" box.
-    expect(done).toContain("color: var(--text)");
-    expect(rule(".tick-auto")).toContain("place-items: center");
-    expect(rule(".tick-auto")).toContain("font-weight: 700");
+    expect(rule("span.tick-auto.is-done")).toContain("color: var(--text)");
+    expect(rule("span.tick-auto")).toContain("place-items: center");
+    expect(rule("span.tick-auto")).toContain("font-weight: 700");
+    // The same height as a task strip for the same content: the right column is as tall as its icons.
+    expect(rule(".strip.journal-row .strip-actions")).toContain("min-height: 30px");
+    expect(rule(".strip-emoji")).toContain("line-height: 0");
     // While loading: the box's space only (nothing drawn).
     const space = rule(".tick-auto-space");
     expect(space).toContain("width: 22px");

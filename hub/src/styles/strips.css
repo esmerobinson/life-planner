@@ -88,7 +88,10 @@
 }
 
 /* The tick box (a real checkbox): 22px, 7px radius, --panel with a sage border; ticked is green. */
-input[type="checkbox"].tick {
+/* Shared with the Journal rows' read-only tick (.tick-auto, below): one rule, so they can't drift apart. */
+input[type="checkbox"].tick,
+.tick-auto {
+  box-sizing: border-box;
   width: 22px;
   height: 22px;
   border-radius: 7px;
@@ -97,7 +100,8 @@ input[type="checkbox"].tick {
   padding: 0;
 }
 
-input[type="checkbox"].tick:checked {
+input[type="checkbox"].tick:checked,
+.tick-auto.is-done {
   background: var(--bar-fill);
   border-color: var(--bar-fill);
 }
@@ -346,24 +350,29 @@ button.quiet-link:focus-visible {
   background: var(--mint);
 }
 
-.tick-auto {
+/* Exactly a task strip's height for the same content (Esme, 2026-11-02: "should look exactly
+   like the other items"): the right-hand column is as tall as the task strips' 30px icons
+   even when it holds only ★ N, or nothing. */
+.strip.journal-row .strip-actions {
+  min-height: 30px;
+}
+
+/* The 🔒 on a small line adds no line height, so the line is a task due line's height. */
+.strip-emoji {
+  line-height: 0;
+}
+
+/* The box itself is the task strips' tick box (the shared rule up with input.tick). */
+span.tick-auto {
   display: inline-grid;
   place-items: center;
-  box-sizing: border-box;
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: var(--panel);
-  border: 2px solid var(--sage);
   font-weight: 700;
   line-height: 1;
 }
 
 /* Done: the ✓ in --text on --bar-fill (controller call, 2026-11-02: the plain green fill
    vanished on mint), as the Journal's "Done for today" box (.journal-tick) shows it. */
-.tick-auto.is-done {
-  background: var(--bar-fill);
-  border-color: var(--bar-fill);
+span.tick-auto.is-done {
   color: var(--text);
 }
 

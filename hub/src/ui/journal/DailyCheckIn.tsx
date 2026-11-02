@@ -10,14 +10,18 @@ import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
 import { checkinDoneDays, rowStatus } from "../../journal/rows";
 import { DoneBox, LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
-import { JournalStripHead, tickState } from "./JournalStrip";
+import { JournalStripHead, Private, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
 export const CHECKED_IN_LINE = "Kind to yourself today? That counts.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
 /** The strip's small line. */
-export const CHECKIN_META = "Today's three questions · 🔒 private";
+export const CHECKIN_META = (
+  <>
+    Today's three questions · <Private />
+  </>
+);
 
 /**
  * Daily check-in (journal brief §2, VISUAL-LANGUAGE.md "Daily check-in", mockup tab A):

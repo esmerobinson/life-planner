@@ -10,7 +10,7 @@ import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { exerciseDoneDays, rowStatus } from "../../journal/rows";
 import { LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
-import { JournalStripHead, tickState } from "./JournalStrip";
+import { JournalStripHead, Private, tickState } from "./JournalStrip";
 import { useDbChanges } from "./useJournalKey";
 
 /** Under today's card once it is ticked. */
@@ -18,7 +18,11 @@ export const DONE_LINE = "Done for today · next card tomorrow";
 export const REPLACE_QUESTION = "Replace your exercise cards?";
 const SAVE_PROBLEM = "That didn't save. Try again.";
 /** The strip's small line (before round 2). */
-export const EXERCISE_META = "One card a day · 🔒 private";
+export const EXERCISE_META = (
+  <>
+    One card a day · <Private />
+  </>
+);
 const READ_PROBLEM = "The exercise cards couldn't be read. Try again.";
 /** A card file bigger than this isn't read at all (the real set is about 90 KB). */
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -114,7 +118,11 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const star = (day: number, on: boolean) => void attempt(() => setExerciseStar(jk, today, deviceId, day, on));
   const starred = progress?.starred ?? new Set<number>();
   const row = useMemo(() => rowStatus(exerciseDoneDays(progress?.marks ?? []), today), [progress, today]);
-  const sub = plan && plan.round > 1 ? `Round ${plan.round} · 🔒 private` : EXERCISE_META;
+  const sub = plan && plan.round > 1 ? (
+      <>
+        Round {plan.round} · <Private />
+      </>
+    ) : EXERCISE_META;
 
   return (
     <>
