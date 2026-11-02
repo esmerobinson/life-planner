@@ -144,10 +144,18 @@ function ChooseGoals({
   onDone: () => void;
 }) {
   const { attempt, saveError } = useSaveError();
+  // The box shows the tick at once; a failed save puts it back.
+  const [ticks, setTicks] = useState<Record<string, boolean>>({});
   const sorted = bySidebar(goals);
   const areas = [...new Set(sorted.map((g) => g.areaId))];
   async function toggle(g: Goal, on: boolean) {
+    setTicks((t) => ({ ...t, [g.id]: on }));
     if (await attempt(() => setGoalOnHome(g.id, on))) await onChanged();
+    else
+      setTicks((t) => {
+        const { [g.id]: _drop, ...rest } = t;
+        return rest;
+      });
   }
   return (
     <div className="choose-goals">
@@ -155,14 +163,22 @@ function ChooseGoals({
       {areas.map((areaId) => (
         <fieldset key={areaId}>
           <legend>{areaLabel(areaId)}</legend>
-          {sorted
-            .filter((g) => g.areaId === areaId)
-            .map((g) => (
-              <label key={g.id} className="form-check">
-                <input type="checkbox" checked={g.onHome === true} onChange={(e) => void toggle(g, e.target.checked)} />
-                {g.title}
-              </label>
-            ))}
+          <ul className="plain-list">
+            {sorted
+              .filter((g) => g.areaId === areaId)
+              .map((g) => (
+                <li key={g.id}>
+                  <label className="form-check">
+                    <input
+                      type="checkbox"
+                      checked={ticks[g.id] ?? g.onHome === true}
+                      onChange={(e) => void toggle(g, e.target.checked)}
+                    />
+                    {g.title}
+                  </label>
+                </li>
+              ))}
+          </ul>
         </fieldset>
       ))}
       {saveError && <p className="form-message">{saveError}</p>}
