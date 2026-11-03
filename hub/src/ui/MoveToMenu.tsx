@@ -42,7 +42,10 @@ export function MoveToMenu({
   untyped = false,
   milestone,
   project = false,
+  isOpen = true,
 }: {
+  /** Not done (only an open item can become a project, M-8). */
+  isOpen?: boolean;
   /** A project to-do (it has sessions): "Change to" offers To-do instead of Project. */
   project?: boolean;
   /**
@@ -116,7 +119,7 @@ export function MoveToMenu({
                 <div className="pop-menu-label" aria-hidden="true">
                   Change to
                 </div>
-                {TYPES.filter((t) => t.to !== (project ? "project" : kind)).map((t) => (
+                {TYPES.filter((t) => t.to !== (project ? "project" : kind) && (t.to !== "project" || isOpen)).map((t) => (
                   <button key={t.to} type="button" onClick={() => void pick({ kind: "become", to: t.to }, close)}>
                     {t.label}
                   </button>

@@ -244,6 +244,16 @@ describe("QuickAdd: Project (3A)", () => {
     expect(await db.items.count()).toBe(0);
   });
 
+  it("a half-typed date stops the save with a plain message (M-1)", async () => {
+    render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText("Title"), "Pretend half date");
+    // jsdom has no partial date entry: the browser's state is put on the field by hand.
+    Object.defineProperty(screen.getByLabelText("Due"), "validity", { value: { badInput: true } });
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(await screen.findByText("A date is not finished. Finish it or clear it.")).toBeInTheDocument();
+    expect(await db.items.count()).toBe(0);
+  });
+
   it("Cancel shows only when the form can be closed", async () => {
     const onCancel = vi.fn();
     const { rerender } = render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);

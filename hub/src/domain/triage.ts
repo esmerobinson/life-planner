@@ -8,7 +8,8 @@ import { doneTodayIndex, isProject, plannedToday } from "./projects";
  * project with a session ticked today (it stays crossed out for the rest of the day).
  */
 export function tickedOffToday(it: Item, today: ISODate): boolean {
-  if (isProject(it) && it.status === "open") return doneTodayIndex(it, today) >= 0;
+  // Not while another session is still planned for today: the main box then logs that one (M-2).
+  if (isProject(it) && it.status === "open") return doneTodayIndex(it, today) >= 0 && !plannedToday(it, today);
   return isHabit(it) && it.status === "open" ? doneToday(it, today) : it.status === "done" && it.completedAt === today;
 }
 

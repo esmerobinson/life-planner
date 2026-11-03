@@ -63,6 +63,15 @@ describe("Edit → Type away from Project (I-2)", () => {
   });
 });
 
+describe("the round Add button and the side panel (M-6)", () => {
+  it("is not there while the panel is open (it would sit hidden under it), and is back when it closes", async () => {
+    const { panel } = await openProject(FOUR);
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+    await userEvent.click(within(panel).getByRole("button", { name: "Close" }));
+    expect(await screen.findByRole("button", { name: "Add" })).toBeInTheDocument();
+  });
+});
+
 describe("a project's side panel", () => {
   it("says Project, shows the deadline, the session count and the summary box", async () => {
     const { panel } = await openProject(FOUR);

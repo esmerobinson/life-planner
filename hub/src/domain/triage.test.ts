@@ -210,4 +210,10 @@ describe("project to-dos on Today", () => {
     expect(tickedOffToday(p, MON)).toBe(true);
     expect(tickedOffToday(p, "2026-11-03")).toBe(false);
   });
+
+  it("not crossed out while another session is still planned for today (its box logs that one)", () => {
+    const p = item({ id: "p", sessions: [{ id: "a", doneOn: MON }, { id: "b", plannedFor: MON }, { id: "c" }] });
+    expect(tickedOffToday(p, MON)).toBe(false);
+    expect(ids(pick([p]).picks)).toEqual(["p"]);
+  });
 });

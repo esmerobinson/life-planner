@@ -126,9 +126,12 @@ for (const width of [1280, 390]) {
       // Scrolled to the bottom, the last thing on the page sits clear of the round button.
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       const fab = (await page.getByRole("button", { name: "Add", exact: true }).boundingBox())!;
+      // Everything drawn in the page (the Done fold-out and Archive included), not the floating controls.
       const lastBottom = await page.evaluate(() => {
         const main = document.querySelector("main.app-content")!;
-        const kids = [...main.querySelectorAll(".strip, h2, p")].filter((e) => e.getBoundingClientRect().height > 0);
+        const kids = [...main.querySelectorAll("*")].filter(
+          (e) => !e.closest(".add-fab, .add-pop, .add-shade, .shell-undo, .peek") && e.getBoundingClientRect().height > 0,
+        );
         return Math.max(...kids.map((e) => e.getBoundingClientRect().bottom));
       });
       expect(lastBottom).toBeLessThanOrEqual(fab.y);

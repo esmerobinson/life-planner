@@ -124,6 +124,9 @@ export function QuickAdd({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (inFlight.current) return;
+    // A half-typed date (12/11/yyyy) reads as "", so without this it would save with no date (M-1).
+    const dates = Array.from((e.currentTarget as HTMLFormElement).querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    if (dates.some((d) => d.validity.badInput)) return setMessage("A date is not finished. Finish it or clear it.");
     const trimmed = title.trim();
     if (!trimmed) {
       setMessage("A title is needed.");

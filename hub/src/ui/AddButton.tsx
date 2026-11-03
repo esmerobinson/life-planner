@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { usePanel } from "./panelContext";
 
 /**
  * Add as a round "+" button fixed bottom right on every page (mockup add-and-projects.html
@@ -24,6 +25,13 @@ export function AddButton({
   children: (close: () => void) => ReactNode;
 }) {
   const card = useRef<HTMLDivElement>(null);
+  // The button sits under the side panel: while the panel is open it is left out, so it is
+  // neither hidden-but-tabbable nor opening a card under the panel (review M-6).
+  const panelOpen = Boolean(usePanel()?.openId);
+  // A panel opened by keyboard while Add is open: Add closes (what was typed is kept, as for a click outside).
+  useEffect(() => {
+    if (panelOpen && open) onToggle(false);
+  }, [panelOpen, open, onToggle]);
 
   function close() {
     onToggle(false);
@@ -69,7 +77,7 @@ export function AddButton({
       {open &&
         (phone ? (
           <div className="add-shade">
-            <div ref={card} className="add-sheet" role="dialog" aria-label="Add">
+            <div ref={card} className="add-sheet" role="dialog" aria-modal="true" aria-label="Add">
               {head}
               {children(close)}
             </div>
@@ -80,6 +88,7 @@ export function AddButton({
             {children(close)}
           </div>
         ))}
+      {!panelOpen && (
       <button
         ref={buttonRef}
         type="button"
@@ -90,6 +99,7 @@ export function AddButton({
       >
         <span aria-hidden="true">{open && !phone ? "×" : "+"}</span>
       </button>
+      )}
     </>
   );
 }

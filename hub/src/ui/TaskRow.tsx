@@ -234,6 +234,7 @@ export function TaskRow({
           areaId={item.areaId}
           kind={untyped ? undefined : item.kind}
           project={project}
+          isOpen={item.status === "open"}
           untyped={untyped}
           today={today}
           onMoved={onMoved}
