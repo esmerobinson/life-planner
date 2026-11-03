@@ -97,3 +97,49 @@ describe("goals redesign fields (all optional)", () => {
     expect(validGoal(goal({ title: "", status: "purged" }))).toBe(true);
   });
 });
+
+describe("project to-dos (sessions)", () => {
+  const s = (o: Record<string, unknown> = {}) => ({ id: "s1", ...o });
+  const many = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i}` }));
+
+  it("a to-do may carry 1 to 20 sessions", () => {
+    expect(validItem(row({ sessions: many(1) }))).toBe(true);
+    expect(validItem(row({ sessions: many(20) }))).toBe(true);
+    expect(validItem(row({ sessions: [] }))).toBe(false);
+    expect(validItem(row({ sessions: many(21) }))).toBe(false);
+    expect(validItem(row({ sessions: "4" }))).toBe(false);
+  });
+
+  it("a session has an id and optional title (<= 120), details (<= 1000), doneOn and plannedFor dates", () => {
+    expect(
+      validItem(row({ sessions: [s({ title: "Block out the street", details: "Rough shapes only", doneOn: "2026-10-30", plannedFor: "2026-11-05" })] })),
+    ).toBe(true);
+    expect(validItem(row({ sessions: [s({ title: "x".repeat(120) })] }))).toBe(true);
+    expect(validItem(row({ sessions: [s({ title: "x".repeat(121) })] }))).toBe(false);
+    expect(validItem(row({ sessions: [s({ title: "" })] }))).toBe(false);
+    expect(validItem(row({ sessions: [s({ details: "x".repeat(1000) })] }))).toBe(true);
+    expect(validItem(row({ sessions: [s({ details: "x".repeat(1001) })] }))).toBe(false);
+    expect(validItem(row({ sessions: [s({ details: "" })] }))).toBe(false);
+    expect(validItem(row({ sessions: [s({ doneOn: "2026-02-30" })] }))).toBe(false);
+    expect(validItem(row({ sessions: [s({ plannedFor: "soon" })] }))).toBe(false);
+    expect(validItem(row({ sessions: [{ title: "No id" }] }))).toBe(false);
+    expect(validItem(row({ sessions: [s({ id: "" })] }))).toBe(false);
+    expect(validItem(row({ sessions: [s({ id: "x".repeat(65) })] }))).toBe(false);
+  });
+
+  it("a session holds nothing else, and ids are distinct", () => {
+    expect(validItem(row({ sessions: [s({ colour: "red" })] }))).toBe(false);
+    expect(validItem(row({ sessions: [s(), s()] }))).toBe(false);
+  });
+
+  it("only a to-do can be a project, and a project does not repeat", () => {
+    expect(validItem(row({ kind: "idea", sessions: many(2) }))).toBe(false);
+    expect(validItem(row({ recur: ["mon"], sessions: many(2) }))).toBe(false);
+  });
+
+  it("an emptied-from-the-Bin tombstone carries no sessions", () => {
+    const tomb = row({ status: "purged", title: "" });
+    expect(validItem(tomb)).toBe(true);
+    expect(validItem({ ...tomb, sessions: many(1) })).toBe(false);
+  });
+});

@@ -40,6 +40,11 @@ export interface Item {
   order?: number;
   /** Habits: the days it was ticked (sorted, the most recent 400 kept). Never changes `status`. */
   doneDates?: ISODate[];
+  /**
+   * A project to-do (projects round): 1–20 sessions, done when every session is (domain/
+   * projects.ts). Only on `kind: "task"`, never with `recur`. Its deadline is `due`.
+   */
+  sessions?: Session[];
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
@@ -48,6 +53,19 @@ export interface Item {
    * (data/changeTracking.ts). Optional only so older backups still load.
    */
   updatedAt?: number;
+}
+
+/** One session of a project to-do. Unnamed sessions are called "Session 3" by their place. */
+export interface Session {
+  id: string;
+  /** At most 120 characters; absent when unnamed. */
+  title?: string;
+  /** What the session is, in her words. At most 1000 characters. */
+  details?: string;
+  /** The day it was ticked. */
+  doneOn?: ISODate;
+  /** The day it is planned for (it then shows on Today that day). */
+  plannedFor?: ISODate;
 }
 
 /**

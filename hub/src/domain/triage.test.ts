@@ -182,3 +182,32 @@ describe("Today keeps what was ticked off today (withTickedOff)", () => {
     expect(ids(today([item({ id: "h0", recur: ["mon"] })]).rhythm)).toEqual([]);
   });
 });
+
+describe("project to-dos on Today", () => {
+  const MON = "2026-11-02";
+  const ids = (l: Item[]) => l.map((i) => i.id);
+  const pick = (items: Item[]) => withTickedOff(pickToday(items, [], MON, {}), items, MON);
+
+  it("shows when a session is planned for today", () => {
+    const p = item({ id: "p", priority: 3, sessions: [{ id: "a", plannedFor: MON }, { id: "b" }] });
+    expect(ids(pick([p]).picks)).toEqual(["p"]);
+  });
+
+  it("shows when the deadline is within the due horizon", () => {
+    const p = item({ id: "p", priority: 3, due: "2026-11-05", sessions: [{ id: "a" }] });
+    expect(ids(pick([p]).picks)).toEqual(["p"]);
+  });
+
+  it("does not fill Today by priority alone", () => {
+    const p1 = item({ id: "p1", priority: 1, due: "2026-11-20", sessions: [{ id: "a" }] });
+    const p2 = item({ id: "p2", priority: 2, sessions: [{ id: "a", plannedFor: "2026-11-04" }] });
+    expect(ids(pick([p1, p2]).picks)).toEqual([]);
+  });
+
+  it("a session ticked today keeps it on Today, crossed out", () => {
+    const p = item({ id: "p", priority: 3, due: "2026-11-20", sessions: [{ id: "a", doneOn: MON }, { id: "b" }] });
+    expect(ids(pick([p]).picks)).toEqual(["p"]);
+    expect(tickedOffToday(p, MON)).toBe(true);
+    expect(tickedOffToday(p, "2026-11-03")).toBe(false);
+  });
+});
