@@ -219,7 +219,15 @@ export async function untickItem(id: string, today: ISODate): Promise<void> {
     const item = await db.items.get(id);
     if (!item) return;
     if (isProject(item)) {
-      // Today's session comes off; a done project reopens with its last-ticked session unticked.
+      // A done project with open sessions left (an older app ticked it as a plain to-do, or
+      // a done to-do became a project) just reopens; its sessions stay as they are.
+      if (item.status === "done" && item.sessions!.some((s) => s.doneOn === undefined)) {
+        const { completedAt: _c, ...rest } = item;
+        await db.items.put({ ...rest, status: "open", touchedAt: today });
+        return;
+      }
+      // Otherwise today's session comes off; a done project (its last session ticked)
+      // reopens with that last-ticked session unticked.
       let i = doneTodayIndex(item, today);
       if (i < 0 && item.status === "done") i = lastTicked(item.sessions!);
       if (i < 0) return;

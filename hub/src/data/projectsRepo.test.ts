@@ -70,6 +70,23 @@ describe("project to-dos in the repo", () => {
     expect(got.sessions!.map((s) => s.doneOn)).toEqual(["2026-10-30", undefined]);
   });
 
+  it("unticking a done project that still has open sessions (an older app's tick) just reopens it", async () => {
+    const p = await project(4, {
+      sessions: [{ id: "a", doneOn: "2026-10-30" }, { id: "b", doneOn: "2026-10-31" }, { id: "c" }, { id: "d" }],
+    });
+    await db.items.update(p.id, { status: "done", completedAt: "2026-11-01" });
+    await untickItem(p.id, TODAY);
+    const got = await get(p.id);
+    expect(got.status).toBe("open");
+    expect(got.completedAt).toBeUndefined();
+    expect(got.sessions!.map((s) => s.doneOn)).toEqual(["2026-10-30", "2026-10-31", undefined, undefined]);
+    // None ticked at all: it reopens too (it used to stay stuck in Done).
+    const q = await project(2);
+    await db.items.update(q.id, { status: "done", completedAt: "2026-11-01" });
+    await untickItem(q.id, TODAY);
+    expect((await get(q.id)).status).toBe("open");
+  });
+
   it("a session box ticks and unticks that session (today's date); the status follows", async () => {
     const p = await project(2);
     await setSessionDone(p.id, "s2", true, TODAY);

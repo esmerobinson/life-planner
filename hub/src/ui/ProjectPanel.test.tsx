@@ -33,6 +33,22 @@ const FOUR: Session[] = [
 ];
 const sessionRows = (panel: HTMLElement) => within(within(panel).getByRole("list", { name: "Sessions" })).getAllByRole("listitem");
 
+describe("Edit → Type in the panel", () => {
+  it("a done to-do made a Project is open again, with 4 sessions (never a done project with open sessions)", async () => {
+    const t = await createItem({ kind: "task", title: "Pretend done mural", areaId: "art", priority: 2 }, "2026-10-29");
+    await db.items.update(t.id, { status: "done", completedAt: "2026-11-01" });
+    renderApp(`/area/art?open=${t.id}`, TODAY);
+    const panel = await screen.findByRole("complementary", { name: "Pretend done mural" });
+    await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+    await userEvent.selectOptions(within(panel).getByLabelText("Type"), "project");
+    await userEvent.click(within(panel).getByRole("button", { name: "Done" }));
+    await vi.waitFor(async () => expect((await db.items.get(t.id))!.sessions).toHaveLength(4));
+    const got = (await db.items.get(t.id))!;
+    expect(got.status).toBe("open");
+    expect(got.completedAt).toBeUndefined();
+  });
+});
+
 describe("a project's side panel", () => {
   it("says Project, shows the deadline, the session count and the summary box", async () => {
     const { panel } = await openProject(FOUR);

@@ -110,8 +110,11 @@ export function ItemPanel({
     if (f.priority !== was.priority) patch.priority = f.priority;
     if (!inbox && f.kind !== was.kind) {
       // Project <-> to-do: the sessions come or go (a project does not repeat); an idea has none.
-      if (f.kind === "project") Object.assign(patch, { kind: "task", sessions: newSessions(DEFAULT_SESSIONS), recur: undefined });
-      else patch.kind = f.kind;
+      // A done to-do made a project is open again: a project is done only when its sessions are (I-1).
+      if (f.kind === "project") {
+        Object.assign(patch, { kind: "task", sessions: item.sessions ?? newSessions(DEFAULT_SESSIONS), recur: undefined });
+        if (item.status === "done") Object.assign(patch, { status: "open", completedAt: undefined });
+      } else patch.kind = f.kind;
       if (was.kind === "project" && f.kind !== "project") patch.sessions = undefined;
     }
     if (!inbox && f.areaId !== was.areaId) patch.areaId = f.areaId;
