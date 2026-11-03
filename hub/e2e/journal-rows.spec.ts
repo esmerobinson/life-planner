@@ -153,8 +153,9 @@ test.describe("at 1280px", () => {
     const lastStrip = page.locator(".today-panel .strip").last();
     const lastBottom = await lastStrip.evaluate((el) => el.getBoundingClientRect().bottom);
     const headTop = await journal(page).getByRole("heading", { name: "Journal" }).evaluate((el) => el.getBoundingClientRect().top);
-    // Was 16px (the list's own margin); now that plus the 20px Home puts before a section.
-    expect(Math.round(headTop - lastBottom)).toBe(36);
+    // Was 16px (the list's own margin), then 36px; since the spacing pass (2026-11-03) it is the
+    // page section gap, --gap-section (32px), the same before every section heading.
+    expect(Math.round(headTop - lastBottom)).toBe(32);
   });
 
   test("locked: the rows still show, unticked, and open the Journal to unlock", async ({ page }) => {

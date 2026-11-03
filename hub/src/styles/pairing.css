@@ -6,9 +6,26 @@
    - Not in VISUAL-LANGUAGE.md (placeholders, obviously wrong on purpose): the camera view's
      size and frame (magenta --placeholder outline) and the code's placement. Pills are the
      existing secondary soft pill; nothing new. */
+/* Spacing pass (Esme, Unlock journal: "watch the spacing"; the stacked buttons sat at uneven
+   gaps). Each part (Scan pairing code, the paste field with its button, a problem line; the
+   code, its words, Hide) is one block, --gap-stack (16px) from the next, the same as between
+   blocks in the card around it; inside the paste form the label is 4px over its field and
+   the button 12px under it, as in every form. :where() so a card's own "no margins on my
+   blocks" rule (the Journal card) wins over the 16px above, which is for plain pages (Sync). */
 .pairing-code,
 .pairing-scan {
-  margin: 8px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+}
+
+:where(.pairing-code, .pairing-scan) {
+  margin: var(--gap-stack) 0 0;
+}
+
+.pairing-code > *,
+.pairing-scan > * {
+  margin: 0;
 }
 
 .pairing-qr {
