@@ -52,9 +52,13 @@ button:disabled {
   cursor: default;
 }
 
+/* Password and address fields take the same soft field (spacing pass: they were the browser's
+   own small boxes on Sync and Unlock journal, the only fields that didn't match). */
 input[type="text"],
 input[type="number"],
 input[type="date"],
+input[type="password"],
+input[type="url"],
 input:not([type]),
 select,
 textarea {
@@ -110,16 +114,29 @@ a.btn-secondary {
 
 .shell-actions {
   display: flex;
-  gap: 8px;
+  gap: 8px; /* = --gap-buttons */
   flex-wrap: wrap;
   align-items: center;
 }
 
-/* Form layout from approved mockup A. */
+/* Form layout from approved mockup A (its values are pinned by controls.test.tsx: the grid's
+   8px x 12px, a field's 8px above / 4px below, the buttons 12px under the fields and 8px
+   apart). Spacing pass additions, none of which changes those: the label sits --gap-label
+   (4px) over its field instead of touching it; a field or button row that starts its block
+   takes no space above it (the block's own spacing decides); in a row of controls the
+   field's margins are off so its box lines up with the button beside it. */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px 12px;
+}
+
+/* A grid has no collapsing margins: a message line's own 16px above and below would double
+   the grid's gap, and a form's heading (New goal) gets the grid's 8px + the first field's
+   8px = the 16px under every heading. */
+.form-grid > p,
+.form-grid > h2 {
+  margin: 0;
 }
 
 .form-full {
@@ -131,9 +148,19 @@ a.btn-secondary {
   margin: 8px 0 4px;
 }
 
+.form-field:first-child {
+  margin-top: 0;
+}
+
+.form-row > .form-field,
+.strip-tray > .form-field {
+  margin: 0;
+}
+
 .form-label {
   display: block;
   font-size: 11px;
+  margin-bottom: var(--gap-label);
 }
 
 .form-grid .form-field input[type="text"],
@@ -160,7 +187,7 @@ legend {
 .form-checks {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: var(--space-2) var(--space-3);
 }
 
 .form-check {
@@ -169,10 +196,32 @@ legend {
   gap: 6px;
 }
 
+/* The browser's own radio margin pushed Backup's "How to restore" choices in from the left
+   edge every other field shares; the 6px gap above is the space beside it. */
+.form-check > input[type="radio"] {
+  margin: 0;
+}
+
+/* Backup: "Import from a file" is a page section of its own (it sat on the Merge button). */
+.backup-page > details {
+  margin-top: var(--gap-section);
+}
+
+.import-panel > h2 {
+  margin-top: var(--gap-stack);
+}
+
 .form-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  flex-wrap: wrap;
+  gap: 8px; /* = --gap-buttons */
+  margin-top: 12px; /* = --gap-field */
+}
+
+/* Buttons that start a block (Scan pairing code, Download backup) take no space above them;
+   the block's own spacing decides. */
+.form-actions:first-child {
+  margin-top: 0;
 }
 
 .form-grid > * {
@@ -188,7 +237,7 @@ textarea.quick-add-notes {
 .btn-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px; /* = --gap-buttons */
   align-items: center;
 }
 
@@ -196,6 +245,6 @@ textarea.quick-add-notes {
 .form-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: var(--space-2) var(--space-3);
   align-items: flex-end;
 }
