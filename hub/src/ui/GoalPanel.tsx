@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  createItem, deleteGoal, saveGoalNotes, setGoalActive, setGoalOnHome, undoMonthEdits, untickItem, updateGoal,
-  type GoalPatch, type MonthEdit,
+  createItem, deleteGoal, deleteItem, goalToProject, restoreGoalFromBin, saveGoalNotes, setGoalActive, setGoalOnHome,
+  undoMonthEdits, untickItem, updateGoal, type GoalPatch, type MonthEdit,
 } from "../data/repo";
+import { useShellUndo } from "./undoContext";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT } from "../data/validate";
 import { monthName } from "../domain/display";
 import { isActive, isDaily, pastMonths } from "../domain/goalCounts";
@@ -25,8 +26,11 @@ import { useGoalSources } from "./useGoalSources";
 /** How many completed tasks show before "Show all" (round-3 brief). */
 export const COMPLETED_CAP = 10;
 
-/** The Type select: a daily goal is a practice with rhythm "daily". */
-type TypeChoice = Goal["kind"] | "daily";
+/**
+ * The Type select: a daily goal is a practice with rhythm "daily"; "project" changes the goal
+ * into a project to-do (fix round 1: Change to → Project; the goal goes to the Bin).
+ */
+type TypeChoice = Goal["kind"] | "daily" | "project";
 
 interface Fields {
   title: string;
@@ -95,6 +99,7 @@ export function GoalPanel({
   const panel = usePanel();
   const { sources } = useGoalSources(items);
   const { attempt, saveError } = useSaveError();
+  const undoNote = useShellUndo();
   const { tick, celebration, message } = useTick(today, onChanged);
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<Fields>(() => fieldsOf(goal));
@@ -204,6 +209,7 @@ export function GoalPanel({
         return setFormMessage("A monthly target is a whole number, 1 or more.");
       }
     }
+    if (f.kind === "project") return void toProject(f, monthlyTarget);
     // Only what was changed in Edit is written, so a change synced in meanwhile is kept (review M-3).
     const was = snapshot;
     const patch: GoalPatch = {};
@@ -232,6 +238,45 @@ export function GoalPanel({
     setBusy(true);
     try {
       if (await write(() => updateGoal(goal.id, patch, today))) setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Change to → Project: a project to-do with the title, area and deadline shown here, the
+   * goal's notes, and the monthly target as its sessions (else 4). The goal goes to the Bin;
+   * the panel shows the project, with an Undo line (the goal back, the project to the Bin).
+   */
+  async function toProject(f: Fields, target: number | undefined) {
+    setBusy(true);
+    let id: string | undefined;
+    try {
+      const ok = await attempt(async () => {
+        id = await goalToProject(goal.id, today, {
+          title: f.title.trim(), areaId: f.areaId, deadline: f.deadline || undefined, sessions: target,
+        });
+      });
+      if (!ok || !id) return;
+      const projectId = id;
+      // Month goals saved during this Edit went to the Bin with the goal: nothing to undo on close.
+      session.current = { edits: [], saves: [] };
+      setEditing(false);
+      panel?.open(projectId);
+      await onChanged();
+      undoNote({
+        message: "Changed to a project; the goal is in the Bin",
+        undo: async () => {
+          try {
+            await restoreGoalFromBin(goal.id, today);
+            await deleteItem(projectId, today);
+            panel?.open(goal.id);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+      });
     } finally {
       setBusy(false);
     }
@@ -296,9 +341,10 @@ export function GoalPanel({
               <option value="finite">Finish by a date</option>
               <option value="practice">Practice</option>
               <option value="daily">Daily</option>
+              <option value="project">Project</option>
             </select>
           </label>
-          {fields.kind === "finite" && (
+          {(fields.kind === "finite" || fields.kind === "project") && (
             <label className="form-field">
               <span className="form-label">Deadline</span>
               <input type="date" value={fields.deadline} onChange={(e) => setFields({ ...fields, deadline: e.target.value })} />

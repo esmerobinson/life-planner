@@ -9,8 +9,11 @@ export interface Panel {
   openId: string | null;
   /** Opens (or swaps to) an item or goal. */
   open: (id: string) => void;
-  /** Closes the panel: Back when this app opened it, else the same page without it. */
-  close: () => void;
+  /**
+   * Closes the panel: Back when this app opened it, else the same page without it. With
+   * `onlyIf`, only while that id is still the one open (nothing else opened since).
+   */
+  close: (onlyIf?: string) => void;
   /** A link target that opens `id` on the current page. */
   href: (id: string) => To;
 }
@@ -44,9 +47,17 @@ export function PanelProvider({ children }: { children: ReactNode }) {
     [location.search],
   );
 
+  // The id most recently opened (set at once, before the URL catches up).
+  const lastOpened = useRef<string | null>(openId);
+  useEffect(() => {
+    lastOpened.current = openId;
+  }, [openId]);
   const open = useCallback(
     (id: string) => {
-      if (id === openId) return;
+      // Against the latest opened, not this render's: a caller holding an older copy (e.g. an
+      // Undo after the panel moved on) may reopen what was open then.
+      if (id === lastOpened.current) return;
+      lastOpened.current = id;
       const to = { pathname: location.pathname, search: searchWith(id) };
       if (openId) navigate(to, { replace: true, state: location.state });
       else navigate(to, { state: { panel: true } });
@@ -60,8 +71,10 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     backedFrom.current = null; // the URL moved on (also when Forward returns to this entry later)
   }, [location.key]);
-  const close = useCallback(() => {
+  const close = useCallback((onlyIf?: string) => {
     if (!openId) return;
+    // A late "that is gone" check must not close what was opened since (the URL may not have caught up).
+    if (onlyIf !== undefined && lastOpened.current !== onlyIf) return;
     if (pushed) {
       if (backedFrom.current === location.key) return;
       backedFrom.current = location.key;

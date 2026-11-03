@@ -106,7 +106,7 @@ export function SidePanel({
     Promise.all([getItem(openId), listGoals()]).then(
       ([it, gs]) => {
         const there = (it && (it.status === "open" || it.status === "done")) || gs.some((g) => g.id === openId);
-        if (live && !there) close();
+        if (live && !there) close(openId);
       },
       () => {},
     );

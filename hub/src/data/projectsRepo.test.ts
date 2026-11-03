@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./db";
 import {
-  addSession, changeToProject, createItem, emptyBin, deleteItem, fileItem, removeSession, setSessionDone, tickItem, untickItem,
+  addSession, changeToProject, createGoal, createItem, emptyBin, deleteItem, fileItem, goalToProject, removeSession, setSessionDone, tickItem, untickItem,
   updateItem, updateSession,
 } from "./repo";
 import type { Item } from "../domain/types";
@@ -19,6 +19,7 @@ const get = async (id: string) => (await db.items.get(id))!;
 
 beforeEach(async () => {
   await db.items.clear();
+  await db.goals.clear();
 });
 
 describe("project to-dos in the repo", () => {
@@ -163,6 +164,26 @@ describe("project to-dos in the repo", () => {
     await fileItem(b.id, "idea", "art", TODAY);
     expect(await get(b.id)).toMatchObject({ kind: "idea", areaId: "art" });
     expect((await get(b.id)).sessions).toBeUndefined();
+  });
+
+  it("a goal becomes a project: title, area, notes, deadline kept; target → sessions; the goal goes to the Bin", async () => {
+    const g = await createGoal(
+      { title: "Pretend blender scene", areaId: "art", kind: "finite", deadline: "2026-11-30", monthlyTarget: 6, notes: "Pretend notes" },
+      "2026-10-01",
+    );
+    const id = await goalToProject(g.id, TODAY);
+    const p = await get(id);
+    expect(p).toMatchObject({
+      kind: "task", title: "Pretend blender scene", areaId: "art", notes: "Pretend notes", due: "2026-11-30", status: "open",
+    });
+    expect(p.sessions).toHaveLength(6);
+    expect(await db.goals.get(g.id)).toMatchObject({ status: "deleted", deletedAt: TODAY });
+    // Without a target: 4; a target over 20 is capped at 20; no deadline stays without one.
+    const g2 = await createGoal({ title: "Pretend practice", areaId: "art", kind: "practice" }, "2026-10-01");
+    expect((await get(await goalToProject(g2.id, TODAY))).sessions).toHaveLength(4);
+    const g3 = await createGoal({ title: "Pretend big", areaId: "art", kind: "practice", monthlyTarget: 40 }, "2026-10-01");
+    expect((await get(await goalToProject(g3.id, TODAY))).sessions).toHaveLength(20);
+    await expect(goalToProject(g.id, TODAY)).rejects.toThrow(); // already in the Bin
   });
 
   it("emptying the Bin leaves a tombstone without sessions", async () => {

@@ -359,6 +359,37 @@ export async function changeToProject(itemId: string, today: ISODate, count = DE
   });
 }
 
+/**
+ * "Change to → Project" for a goal (fix round 1): a project to-do in its area with its title,
+ * notes and deadline (`with` overrides the title, area and deadline from the panel's Edit),
+ * as many sessions as its monthly target (1–20) or 4; the goal goes to the Bin (restorable),
+ * never destroyed. Its linked tasks keep their goalId, as a binned goal's do. Returns the
+ * project's id. One transaction.
+ */
+export async function goalToProject(
+  goalId: string,
+  today: ISODate,
+  with_: { title?: string; areaId?: AreaId; deadline?: ISODate; sessions?: number } = {},
+): Promise<string> {
+  return db.transaction("rw", db.goals, db.items, async () => {
+    const goal = await db.goals.get(goalId);
+    if (!goal || goal.status !== undefined) throw new Error("that goal does not exist");
+    const title = (with_.title ?? goal.title).trim();
+    if (!title) throw new Error("a project needs a title");
+    const areaId = with_.areaId ?? goal.areaId;
+    const due = "deadline" in with_ ? with_.deadline : goal.deadline;
+    if (due !== undefined && !isValidISODate(due)) throw new Error("that deadline is not a real date");
+    const count = Math.min(MAX_SESSIONS, Math.max(MIN_SESSIONS, with_.sessions ?? goal.monthlyTarget ?? DEFAULT_SESSIONS));
+    const item = await createItem(
+      { kind: "task", title, areaId, priority: 2, ...(goal.notes ? { notes: goal.notes } : {}), ...(due ? { due } : {}) },
+      today,
+    );
+    await changeToProject(item.id, today, count);
+    await db.goals.put({ ...goal, status: "deleted", deletedAt: today });
+    return item.id;
+  });
+}
+
 export async function moveTo(
   id: string,
   list: "today" | "tomorrow" | "week",
