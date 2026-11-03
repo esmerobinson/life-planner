@@ -275,7 +275,7 @@ describe("AreaPage", () => {
       const it = await createItem({ kind: "idea", title: "Snail comic", areaId: "art", priority: 3 }, TODAY);
       renderArea("art");
       const menu = await changeTo("Snail comic");
-      expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["To-do", "Goal"]);
+      expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["To-do", "Project", "Goal"]);
       await userEvent.click(menu.getByRole("button", { name: "To-do" }));
       const todos = await screen.findByRole("list", { name: "To-dos" });
       expect(within(todos).getByRole("checkbox", { name: "Mark done: Snail comic" })).toBeInTheDocument();
@@ -289,7 +289,7 @@ describe("AreaPage", () => {
       );
       renderArea("art");
       const menu = await changeTo("Maybe later");
-      expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["Idea", "Goal"]);
+      expect(menu.getAllByRole("button").map((b) => b.textContent)).toEqual(["Project", "Idea", "Goal"]);
       await userEvent.click(menu.getByRole("button", { name: "Idea" }));
       const ideas = await screen.findByRole("list", { name: "Ideas" });
       expect(within(ideas).getByText("Maybe later")).toBeInTheDocument();

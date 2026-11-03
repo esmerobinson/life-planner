@@ -1,9 +1,15 @@
 import type { Goal, ISODate, Item } from "./types";
 import { daysBetween, weekdayOf } from "./dates";
 import { doneToday, isHabit } from "./habits";
+import { doneTodayIndex, isProject, plannedToday } from "./projects";
 
-/** Ticked off today: a habit with today in its done log, or a to-do completed today. */
+/**
+ * Ticked off today: a habit with today in its done log, a to-do completed today, or a
+ * project with a session ticked today (it stays crossed out for the rest of the day).
+ */
 export function tickedOffToday(it: Item, today: ISODate): boolean {
+  // Not while another session is still planned for today: the main box then logs that one (M-2).
+  if (isProject(it) && it.status === "open") return doneTodayIndex(it, today) >= 0 && !plannedToday(it, today);
   return isHabit(it) && it.status === "open" ? doneToday(it, today) : it.status === "done" && it.completedAt === today;
 }
 
@@ -22,7 +28,14 @@ export function withTickedOff(
   const extraHabits = items.filter(
     (i) => sorted(i) && isHabit(i) && i.status === "open" && doneToday(i, today) && !inRhythm.has(i.id),
   );
-  const doneTasks = items.filter((i) => sorted(i) && i.status === "done" && i.completedAt === today);
+  const inPicks = new Set(pick.picks.map((i) => i.id));
+  const doneTasks = items.filter(
+    (i) =>
+      sorted(i) &&
+      !inPicks.has(i.id) &&
+      ((i.status === "done" && i.completedAt === today) ||
+        (isProject(i) && i.status === "open" && doneTodayIndex(i, today) >= 0)),
+  );
   const lastIfTicked = (list: Item[]) => [
     ...list.filter((i) => !tickedOffToday(i, today)),
     ...list.filter((i) => tickedOffToday(i, today)),
@@ -77,9 +90,13 @@ export function pickToday(
   const isRecurring = (i: Item) => (i.recur?.length ?? 0) > 0;
   const pool = live.filter((i) => !isRecurring(i));
 
-  const pinned = pool.filter((i) => i.pinnedDate === today);
+  // A project shows when a session is planned for today (like a pin), or by its deadline;
+  // it never fills Today by priority alone (projects round).
+  const pinned = pool.filter((i) => i.pinnedDate === today || (isProject(i) && plannedToday(i, today)));
   // Items pinned to a later day were moved off today on purpose: never re-pick them early.
-  const rest = pool.filter((i) => i.pinnedDate === undefined || i.pinnedDate < today);
+  const rest = pool.filter(
+    (i) => (i.pinnedDate === undefined || i.pinnedDate < today) && !(isProject(i) && plannedToday(i, today)),
+  );
 
   const due = rest
     .filter((i) => i.due !== undefined && daysBetween(today, i.due) <= DUE_HORIZON)
@@ -103,12 +120,12 @@ export function pickToday(
 
   const dueIds = new Set(due.map((i) => i.id));
   const p1 = rest
-    .filter((i) => i.priority === 1 && !dueIds.has(i.id))
+    .filter((i) => i.priority === 1 && !dueIds.has(i.id) && !isProject(i))
     .sort((a, b) => behind(a) - behind(b));
   picks.push(...p1.slice(0, Math.max(0, CAPACITY - picks.length)));
 
   if (picks.length < CAPACITY) {
-    const p2 = rest.filter((i) => i.priority === 2 && !dueIds.has(i.id));
+    const p2 = rest.filter((i) => i.priority === 2 && !dueIds.has(i.id) && !isProject(i));
     if (p2.length > 0) {
       const start = daysBetween("1970-01-01", today) % p2.length;
       const count = Math.min(CAPACITY - picks.length, p2.length);

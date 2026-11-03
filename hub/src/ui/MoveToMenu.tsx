@@ -1,12 +1,15 @@
 import { useNavigate } from "react-router-dom";
-import { archiveItem, deleteItem, itemToGoal, moveTo, removeFromToday, setMilestone, updateItem } from "../data/repo";
+import { useSessionsUndo } from "./undoSessions";
+import { archiveItem, changeToProject, deleteItem, getItem, itemToGoal, moveTo, removeFromToday, setMilestone, updateItem } from "../data/repo";
 import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
 import { ARROW_GLYPH, IconPopover } from "./IconPopover";
 import { useSaveError } from "./messages";
 
+type Become = "task" | "project" | "idea" | "goal";
+
 type Choice =
-  | { kind: "become"; to: "task" | "idea" | "goal" }
+  | { kind: "become"; to: Become }
   | { kind: "area"; areaId: AreaId }
   | { kind: "milestone"; on: boolean }
   | { kind: "week" }
@@ -14,15 +17,16 @@ type Choice =
   | { kind: "archive" }
   | { kind: "delete" };
 
-const TYPES: { to: "task" | "idea" | "goal"; label: string }[] = [
+const TYPES: { to: Become; label: string }[] = [
   { to: "task", label: "To-do" },
+  { to: "project", label: "Project" },
   { to: "idea", label: "Idea" },
   { to: "goal", label: "Goal" },
 ];
 
 /**
  * The arrow icon (Move to). When the item's kind is known: "Change to" first (the types
- * it is not: To-do, Idea, Goal), then the other areas, then This week (not for ideas)
+ * it is not: To-do, Project, Idea, Goal), then the other areas, then This week (not for ideas)
  * and Remove from today (only on the Today list), then Archive and Delete (to the Bin).
  * An unsorted Inbox item (`untyped`) has no type to change and no area to move between:
  * its menu is "Sort this…" (Sort one by one, opened on it), then Archive and Delete.
@@ -37,7 +41,13 @@ export function MoveToMenu({
   onTodayList = false,
   untyped = false,
   milestone,
+  project = false,
+  isOpen = true,
 }: {
+  /** Not done (only an open item can become a project, M-8). */
+  isOpen?: boolean;
+  /** A project to-do (it has sessions): "Change to" offers To-do instead of Project. */
+  project?: boolean;
   /**
    * For a to-do with a goal: whether it is flagged as a milestone (offers "Mark as
    * milestone", or "Unmark as milestone" when it is). Undefined: no row.
@@ -55,19 +65,26 @@ export function MoveToMenu({
   untyped?: boolean;
 }) {
   const { attempt, saveError } = useSaveError();
+  const offerUndo = useSessionsUndo(today);
 
   async function pick(c: Choice, close: (refocus?: boolean) => void) {
+    // A project made a to-do or an idea loses its sessions: keep the whole row for Undo (I-2).
+    const dropsSessions = project && c.kind === "become" && (c.to === "task" || c.to === "idea");
+    const before: { row?: Item } = {};
     const ok = await attempt(async () => {
+      if (dropsSessions) before.row = await getItem(itemId);
       if (c.kind === "become") {
+        // A project's archived copy keeps its sessions when it becomes a goal.
         if (c.to === "goal") await itemToGoal(itemId, areaId ?? "admin", today);
-        // An idea has no due date, repeat or day on Today; remove them explicitly (as the Inbox does).
+        else if (c.to === "project") await changeToProject(itemId, today);
+        // An idea has no due date, repeat, day on Today or sessions; remove them explicitly (as the Inbox does).
         else if (c.to === "idea") {
           await updateItem(
             itemId,
-            { kind: "idea", due: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined },
+            { kind: "idea", due: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, sessions: undefined },
             today,
           );
-        } else await updateItem(itemId, { kind: "task" }, today);
+        } else await updateItem(itemId, { kind: "task", sessions: undefined }, today);
       } else if (c.kind === "area") await updateItem(itemId, { areaId: c.areaId }, today);
       else if (c.kind === "milestone") await setMilestone(itemId, c.on, today);
       else if (c.kind === "week") await moveTo(itemId, "week", today);
@@ -76,6 +93,7 @@ export function MoveToMenu({
       else await deleteItem(itemId, today);
     });
     close(!ok); // the clicked choice is gone; on failure keep focus somewhere sensible
+    if (ok && dropsSessions && before.row) offerUndo(c.kind === "become" && c.to === "idea" ? "idea" : "task", before.row);
     if (ok) await onMoved();
   }
 
@@ -101,7 +119,7 @@ export function MoveToMenu({
                 <div className="pop-menu-label" aria-hidden="true">
                   Change to
                 </div>
-                {TYPES.filter((t) => t.to !== kind).map((t) => (
+                {TYPES.filter((t) => t.to !== (project ? "project" : kind) && (t.to !== "project" || isOpen)).map((t) => (
                   <button key={t.to} type="button" onClick={() => void pick({ kind: "become", to: t.to }, close)}>
                     {t.label}
                   </button>

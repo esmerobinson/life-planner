@@ -6,7 +6,10 @@ import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
 import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addContext";
-import { QuickAdd } from "./QuickAdd";
+import { AddButton } from "./AddButton";
+import { UndoLine } from "./DeleteButton";
+import { ShellUndoContext, type UndoNote } from "./undoContext";
+import { draftHasContent, QuickAdd, type AddDraft } from "./QuickAdd";
 import { CHECK_DATE_EVENT, ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
@@ -30,6 +33,7 @@ export function AppShell() {
   const [addDefaults, setAddDefaults] = useState<AddDefaults | null>(null);
   const [addOpened, setAddOpened] = useState(0);
   const addButton = useRef<HTMLButtonElement>(null);
+  const addDraft = useRef<AddDraft | null>(null);
   const [version, setVersion] = useState(0);
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
   const unsorted = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
@@ -88,11 +92,28 @@ export function AppShell() {
   // page). Rows that arrive refresh every view the same way a local write does.
   useEffect(() => syncController.start({ onSynced: () => void changed() }), [changed]);
 
+  // The shell's Undo line (fix round 1, I-2): e.g. after a project lost its sessions.
+  const [undoNote, setUndoNote] = useState<UndoNote | null>(null);
+  useEffect(() => setUndoNote(null), [location.pathname]); // a new page: the line goes
+  const undoNow = useCallback(async () => {
+    const note = undoNote;
+    if (!note) return;
+    if (!(await note.undo())) return;
+    setUndoNote(null);
+    await changed();
+  }, [undoNote, changed]);
+
+  const toggleAdd = useCallback((open: boolean) => {
+    if (open) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
+    setAdding(open);
+  }, []);
+
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
 
   return (
     <ShellContext.Provider value={ctx}>
       <AddDefaultsContext.Provider value={setAddDefaults}>
+      <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
@@ -100,38 +121,51 @@ export function AppShell() {
           {phone && <PhoneTopBar inboxLabel={inboxLabel} />}
           <UpdatePrompt />
           <DbClosedNotice db={db} />
-          <div className="shell-actions">
-            <button
-              ref={addButton}
-              type="button"
-              aria-expanded={adding}
-              onClick={() => {
-                if (!adding) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
-                setAdding(!adding);
-              }}
-            >
-              Add
-            </button>
-            {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import. */}
-            {!phone && <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>}
-          </div>
-          {adding && (
-            <QuickAdd
-              key={addOpened}
-              today={today}
-              defaults={addDefaults ?? BASE_ADD_DEFAULTS}
-              onAdded={() => {
-                setAdding(false); // saved: the form goes away (a failed save never reaches here)
-                addButton.current?.focus(); // the focused "Add item" button is leaving: focus goes back to Add
-                void changed();
-              }}
-            />
+          {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import.
+              It floats right, so the page's h1 is the first thing on the page (1C: Add left this row). */}
+          {!phone && (
+            <div className="shell-actions">
+              <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>
+            </div>
           )}
           <Outlet />
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
+          {/* Only while there is something to undo: an always-there status region would be a
+              second "status" on pages that have their own. */}
+          {undoNote && (
+            <div className="shell-undo has-note">
+              <UndoLine message={undoNote.message} onUndo={() => void undoNow()} takeFocus />
+            </div>
+          )}
+          <AddButton open={adding} onToggle={toggleAdd} phone={phone} buttonRef={addButton}>
+            {(close) => (
+              <QuickAdd
+                key={addOpened}
+                today={today}
+                autoFocus
+                defaults={addDefaults ?? BASE_ADD_DEFAULTS}
+                // A click outside, Escape or the button keep what was typed for the next open (I-5);
+                // Cancel and a successful add start afresh.
+                initial={addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
+                onDraft={(d) => {
+                  addDraft.current = d;
+                }}
+                onCancel={() => {
+                  addDraft.current = null;
+                  close();
+                }}
+                onAdded={() => {
+                  addDraft.current = null;
+                  close(); // saved: the form goes away and focus goes back to "+" (a failed save never reaches here)
+                  void changed();
+                }}
+              />
+            )}
+          </AddButton>
         </main>
       </div>
       </PanelProvider>
+      </ShellUndoContext.Provider>
       </AddDefaultsContext.Provider>
     </ShellContext.Provider>
   );

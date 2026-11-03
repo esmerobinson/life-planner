@@ -5,10 +5,16 @@ import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
 import { daysInMonth, plannedFromLastMonth } from "../domain/goalCounts";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
 import { milestoneTask } from "../domain/milestones";
+import { noteSessionTicks } from "./sessionTicks";
+import {
+  DEFAULT_SESSIONS, MAX_SESSION_DETAILS, MAX_SESSION_TITLE, MAX_SESSIONS, MIN_SESSIONS, doneTodayIndex, isProject, newSessions,
+  nextSessionIndex, withSessions,
+} from "../domain/projects";
 import { SUGGESTED_GOALS, suggestedGoalRow } from "../domain/suggestedGoals";
 export * from "./journalRepo";
 import {
   AREA_IDS, type AreaId, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
+  type Session,
 } from "../domain/types";
 
 export async function createItem(
@@ -189,9 +195,16 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
  * to-do) instead logs today in its doneDates and stays open: it never goes to Done.
  */
 export async function tickItem(id: string, today: ISODate): Promise<void> {
-  await db.transaction("rw", db.items, async () => {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item || item.status === "done") return;
+    if (isProject(item)) {
+      // A project logs its next session today; with every session done already, it is just done.
+      const i = nextSessionIndex(item, today);
+      const sessions = item.sessions!.map((s, k) => (k === i ? { ...s, doneOn: today } : s));
+      await putProject(item, { ...withSessions(item, sessions, today), touchedAt: today });
+      return;
+    }
     if (isHabit(item) && item.status === "open") {
       if (item.doneDates?.includes(today)) return;
       await db.items.update(id, { doneDates: withDoneDate(item.doneDates, today), touchedAt: today });
@@ -203,9 +216,26 @@ export async function tickItem(id: string, today: ISODate): Promise<void> {
 
 /** Unticks: a done item is open again; a habit loses today from its doneDates. */
 export async function untickItem(id: string, today: ISODate): Promise<void> {
-  await db.transaction("rw", db.items, async () => {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item) return;
+    if (isProject(item)) {
+      // A done project with open sessions left (an older app ticked it as a plain to-do, or
+      // a done to-do became a project) just reopens; its sessions stay as they are.
+      if (item.status === "done" && item.sessions!.some((s) => s.doneOn === undefined)) {
+        const { completedAt: _c, ...rest } = item;
+        await db.items.put({ ...rest, status: "open", touchedAt: today });
+        return;
+      }
+      // Otherwise today's session comes off; a done project (its last session ticked)
+      // reopens with that last-ticked session unticked.
+      let i = doneTodayIndex(item, today);
+      if (i < 0 && item.status === "done") i = lastTicked(item.sessions!);
+      if (i < 0) return;
+      const sessions = item.sessions!.map((s, k) => (k === i ? withoutDone(s) : s));
+      await putProject(item, { ...withSessions(item, sessions, today), touchedAt: today });
+      return;
+    }
     if (isHabit(item) && item.status === "open") {
       if (!item.doneDates?.includes(today)) return;
       const { doneDates, ...rest } = item;
@@ -215,6 +245,159 @@ export async function untickItem(id: string, today: ISODate): Promise<void> {
     }
     const { completedAt: _drop, ...rest } = item;
     await db.items.put({ ...rest, status: "open", touchedAt: today });
+  });
+}
+
+/**
+ * Writes a project and notes any session it ticked or unticked, so a newer row from another
+ * device cannot wipe the tick out (data/sessionTicks.ts). Inside a transaction over items and syncMeta.
+ */
+async function putProject(before: Item, next: Item): Promise<void> {
+  await db.items.put(next);
+  const stamp = (await db.items.get(next.id))?.updatedAt ?? 0;
+  await noteSessionTicks(db, next.id, before.sessions, next.sessions ?? [], stamp);
+}
+
+/** A session without its tick. */
+function withoutDone(s: Session): Session {
+  const { doneOn: _d, ...rest } = s;
+  return rest;
+}
+
+/** The session ticked last (latest doneOn; on a tie the later one in the list), or -1. */
+function lastTicked(list: Session[]): number {
+  let best = -1;
+  list.forEach((s, k) => {
+    if (s.doneOn !== undefined && (best < 0 || s.doneOn >= list[best].doneOn!)) best = k;
+  });
+  return best;
+}
+
+/**
+ * Changes a live project's sessions in one transaction: `fn` gets a copy and returns the new
+ * list. The status follows (done when every session is). Throws for anything not a project.
+ */
+async function editSessions(itemId: string, today: ISODate, fn: (list: Session[]) => Session[]): Promise<void> {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
+    const item = await db.items.get(itemId);
+    if (!item || !isProject(item) || (item.status !== "open" && item.status !== "done")) {
+      throw new Error("that project does not exist");
+    }
+    const next = fn(item.sessions!.map((s) => ({ ...s })));
+    if (next.length < MIN_SESSIONS || next.length > MAX_SESSIONS) throw new Error(`a project has ${MIN_SESSIONS} to ${MAX_SESSIONS} sessions`);
+    await putProject(item, { ...withSessions(item, next, today), touchedAt: today });
+  });
+}
+
+/** A session box: ticks that session (today's date) or unticks it. Ticking the last makes the project done. */
+export async function setSessionDone(itemId: string, sessionId: string, done: boolean, today: ISODate): Promise<void> {
+  await editSessions(itemId, today, (list) =>
+    list.map((s) => (s.id !== sessionId ? s : done ? { ...s, doneOn: s.doneOn ?? today } : withoutDone(s))),
+  );
+}
+
+/**
+ * A session's title, details or planned day. A key present with blank text (or undefined)
+ * removes that field. Title at most 120 characters, details 1000.
+ */
+export async function updateSession(
+  itemId: string,
+  sessionId: string,
+  patch: { title?: string; details?: string; plannedFor?: ISODate | undefined },
+  today: ISODate,
+): Promise<void> {
+  if (patch.title !== undefined && patch.title.trim().length > MAX_SESSION_TITLE) {
+    throw new Error(`a session title is at most ${MAX_SESSION_TITLE} characters`);
+  }
+  if (patch.details !== undefined && patch.details.length > MAX_SESSION_DETAILS) {
+    throw new Error(`session details are at most ${MAX_SESSION_DETAILS} characters`);
+  }
+  if (patch.plannedFor !== undefined && !isValidISODate(patch.plannedFor)) throw new Error("that is not a real date");
+  await editSessions(itemId, today, (list) =>
+    list.map((s) => {
+      if (s.id !== sessionId) return s;
+      const next: Session = { ...s };
+      if ("title" in patch) {
+        const t = patch.title?.trim() ?? "";
+        if (t) next.title = t;
+        else delete next.title;
+      }
+      if ("details" in patch) {
+        if (patch.details?.trim()) next.details = patch.details;
+        else delete next.details;
+      }
+      if ("plannedFor" in patch) {
+        if (patch.plannedFor !== undefined) next.plannedFor = patch.plannedFor;
+        else delete next.plannedFor;
+      }
+      return next;
+    }),
+  );
+}
+
+/** "+ Add a session": an unnamed one at the end (a done project is open again). Returns its id. */
+export async function addSession(itemId: string, today: ISODate): Promise<string> {
+  const [s] = newSessions(1);
+  await editSessions(itemId, today, (list) => [...list, s]);
+  return s.id;
+}
+
+/** Removes a session that is not done (a project keeps at least one). */
+export async function removeSession(itemId: string, sessionId: string, today: ISODate): Promise<void> {
+  await editSessions(itemId, today, (list) => {
+    const s = list.find((x) => x.id === sessionId);
+    if (!s) return list;
+    if (s.doneOn !== undefined) throw new Error("a done session cannot be removed");
+    if (list.length <= MIN_SESSIONS) throw new Error("a project keeps at least one session");
+    return list.filter((x) => x.id !== sessionId);
+  });
+}
+
+/**
+ * "Change to → Project": an open to-do or idea becomes a project to-do, keeping its title,
+ * area, notes and deadline, with DEFAULT_SESSIONS unnamed sessions (`count` to choose). A
+ * project does not repeat, so a habit's repeat days are dropped.
+ */
+export async function changeToProject(itemId: string, today: ISODate, count = DEFAULT_SESSIONS): Promise<void> {
+  if (!Number.isInteger(count) || count < MIN_SESSIONS || count > MAX_SESSIONS) throw new Error("that is not a session count");
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(itemId);
+    if (!item || item.status !== "open") throw new Error("only an open item can become a project");
+    if (isProject(item)) return;
+    // Sessions an older app left on an idea or habit (dormant) come back as they were.
+    const { recur: _r, ...rest } = item;
+    await db.items.put({ ...rest, kind: "task", sessions: item.sessions ?? newSessions(count), touchedAt: today });
+  });
+}
+
+/**
+ * "Change to → Project" for a goal (fix round 1): a project to-do in its area with its title,
+ * notes and deadline (`with` overrides the title, area and deadline from the panel's Edit),
+ * as many sessions as its monthly target (1–20) or 4; the goal goes to the Bin (restorable),
+ * never destroyed. Its linked tasks keep their goalId, as a binned goal's do. Returns the
+ * project's id. One transaction.
+ */
+export async function goalToProject(
+  goalId: string,
+  today: ISODate,
+  with_: { title?: string; areaId?: AreaId; deadline?: ISODate; sessions?: number } = {},
+): Promise<string> {
+  return db.transaction("rw", db.goals, db.items, async () => {
+    const goal = await db.goals.get(goalId);
+    if (!goal || goal.status !== undefined) throw new Error("that goal does not exist");
+    const title = (with_.title ?? goal.title).trim();
+    if (!title) throw new Error("a project needs a title");
+    const areaId = with_.areaId ?? goal.areaId;
+    const due = "deadline" in with_ ? with_.deadline : goal.deadline;
+    if (due !== undefined && !isValidISODate(due)) throw new Error("that deadline is not a real date");
+    const count = Math.min(MAX_SESSIONS, Math.max(MIN_SESSIONS, with_.sessions ?? goal.monthlyTarget ?? DEFAULT_SESSIONS));
+    const item = await createItem(
+      { kind: "task", title, areaId, priority: 2, ...(goal.notes ? { notes: goal.notes } : {}), ...(due ? { due } : {}) },
+      today,
+    );
+    await changeToProject(item.id, today, count);
+    await db.goals.put({ ...goal, status: "deleted", deletedAt: today });
+    return item.id;
   });
 }
 
@@ -693,7 +876,8 @@ export async function fileItem(id: string, type: SortType, areaId: AreaId, today
     if (!item || item.status !== "open" || item.areaId !== "inbox") throw new Error("that item is no longer in the inbox");
     if (type === "goal") return itemToGoal(id, areaId, today);
     if (type === "idea") {
-      const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, ...rest } = item;
+      // An idea has no sessions either (a project added to the inbox, filed as an idea).
+      const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, sessions: _s, ...rest } = item;
       await db.items.put({ ...rest, kind: "idea", areaId, touchedAt: today });
     } else {
       await db.items.put({ ...item, kind: "task", areaId, touchedAt: today });

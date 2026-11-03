@@ -397,3 +397,56 @@ h2.journal-row-heading {
   margin: 0;
   font: inherit;
 }
+
+/* ---- Project to-dos (projects round; mockup add-and-projects.html option 2C, Esme: "2c is
+   great!") ----
+   The task strip with, on the right, one small tick box per session (the goal-step boxes,
+   goals.css .tick-sm: 18px, 4px apart; ticked ones filled) 10px before the two icons, and
+   a thin countdown bar along the strip's bottom edge (4px, --track with a --bar-fill part
+   that empties towards the deadline); the strip is 14px deep at the bottom to make room.
+   Calls made by the implementer (Esme may veto):
+   - many sessions wrap onto more rows of boxes, at most 10 to a row (5 on a phone), so a
+     20-session project never pushes the strip wider than the page;
+   - the bar keeps the strip's rounded corners (clipped to them); on hover the strip goes to
+     --track like every strip, so the bar's empty part blends in. */
+.strip.project-row {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.session-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  max-width: 216px; /* 10 boxes: 10 x 18px + 9 x 4px */
+  margin-right: 6px; /* + the icons' 4px = the mockup's 10px */
+}
+
+.is-phone .session-boxes {
+  max-width: 106px; /* 5 boxes */
+}
+
+.project-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.project-edge-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--track);
+}
+
+.project-edge-fill {
+  display: block;
+  height: 100%;
+  background: var(--bar-fill);
+}

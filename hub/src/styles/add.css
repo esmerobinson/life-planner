@@ -1,0 +1,125 @@
+/* Add as a round "+" button, bottom right (projects round; mockup add-and-projects.html
+   option 1C, Esme: "1c is good but make the button a little smaller"). Values copied from
+   the mockup and the app: the button is every button's green (--bar-fill) with the menus'
+   shadow (0 4px 14px forest green #3a412f at 25%, strips.css .pop-menu), 24px from the
+   window's corner (16px and 28px on a phone); the desktop card is --panel, --radius-panel,
+   padding 16px 18px 18px, 440px wide, the same shadow, 16px above the button; the phone
+   sheet is --panel with --radius-panel top corners, padding 18px 16px 24px, the Choose
+   goals sheet's shadow, over the Choose goals shade (forest green at 35%); "Add" heading
+   20px. Nothing animates (motion is undecided): it just appears.
+
+   Calls made by the implementer (Esme may veto):
+   - 48px instead of the mockup's 56px ("a little smaller"); the "+" scaled with it,
+     30px -> 26px;
+   - the button sits under the side panel (it is for pages, and the panel is not a page);
+   - pages get bottom room for the button: its height plus its offset plus 24px (desktop)
+     or 16px (phone, the gutter), so the last row always scrolls clear of it. */
+
+button.add-fab {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 15;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 26px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+}
+
+.is-phone button.add-fab {
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(28px, env(safe-area-inset-bottom));
+}
+
+/* Room under the last row: 24 + 48 + 24 (desktop), 28 + 48 + 16 (phone). */
+.app-content {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.is-phone .app-content {
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+}
+
+/* Desktop: the card just above the button. */
+.add-pop {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 64px);
+  z-index: 15;
+  width: min(440px, calc(100vw - 48px));
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: 16px 18px 18px;
+  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+}
+
+.add-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.add-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+/* The shell's Undo line (fix round 1, I-2: a project made a to-do or an idea, without its
+   sessions). The existing Undo line (.undo-line: 14px text, "· Undo" link) in a --panel pill
+   with the menus' shadow, beside the round button, centred on it. Where it sits is NOT
+   decided, so it carries the 2px magenta placeholder outline. Undo takes the focus when it
+   shows (the control that was used has just closed or moved). */
+.shell-undo {
+  position: fixed;
+  right: calc(max(24px, env(safe-area-inset-right)) + 60px);
+  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 6px);
+  z-index: 21; /* over the side panel (20): an Undo made in the panel must stay reachable */
+  max-width: calc(100vw - 320px);
+  pointer-events: none;
+}
+
+.is-phone .shell-undo {
+  right: calc(max(16px, env(safe-area-inset-right)) + 60px);
+  bottom: calc(max(28px, env(safe-area-inset-bottom)) + 6px);
+  max-width: calc(100vw - 92px);
+}
+
+.shell-undo.has-note {
+  pointer-events: auto;
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+  outline: 2px solid var(--placeholder);
+}
+
+/* Phone: a sheet from the bottom over a shade. */
+.add-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 16;
+  background: rgba(58, 65, 47, 0.35);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.add-sheet {
+  background: var(--panel);
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  padding: 18px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  max-height: calc(100% - max(34px, env(safe-area-inset-top)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-shadow: 0 10px 40px rgba(58, 65, 47, 0.3);
+}

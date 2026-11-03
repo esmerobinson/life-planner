@@ -168,9 +168,15 @@ for (const width of [360, 390, 430]) {
     test("open menus and the Add form do not scroll sideways", async ({ page }) => {
       await seedPretendWorld(page);
       await page.goto("/today");
-      await page.getByRole("button", { name: "Add" }).click();
-      await page.getByRole("button", { name: /^Schedule for: Sort the imaginary/ }).click();
+      // The Add sheet (1C) covers the page, so it is checked on its own and closed first.
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      await expect(page.getByRole("dialog", { name: "Add" })).toBeVisible();
       let m = await sideways(page);
+      expect(m.scrollWidth).toBeLessThanOrEqual(m.innerWidth);
+      if (width === 390) await shoot(page, "phone-390-today-add");
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: /^Schedule for: Sort the imaginary/ }).click();
+      m = await sideways(page);
       expect(m.scrollWidth).toBeLessThanOrEqual(m.innerWidth);
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: /^Move to: Sort the imaginary/ }).click();

@@ -597,6 +597,98 @@ button.strip-open {
   white-space: normal;
 }
 
+/* ---- A project's panel (projects round; mockup add-and-projects.html option 2C panel) ----
+   The summary is the goal panel's --row box (.goal-peek-box) holding the session boxes with
+   "2 of 4 sessions" (bold) on one line and, 8px under it, "Due Mon 9 Nov" / "7 days left"
+   3px over a 6px bar; the Sessions list is task strips (the goal's "to come / completed").
+   Calls made by the implementer (Esme may veto):
+   - a session's title is typed straight into the strip (no box, like the panel title), its
+     placeholder "Session 3" at the page placeholder's 60%;
+   - details sit under the title in the strip's small-line size (13px, 80%), typed straight
+     in too; over 140 characters they are cut to two lines with the strips' "See more";
+     "+ Add details" is the small muted link when there are none;
+   - "Remove session" is the last choice in the session's calendar menu, under a divider
+     (the strips' Delete sits last in the arrow menu the same way). */
+.project-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-summary-row .session-boxes {
+  margin-right: 0;
+}
+
+.project-summary-due {
+  margin-bottom: 3px;
+}
+
+.project-summary .progress-bar {
+  height: 6px;
+}
+
+input[type="text"].session-title {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+input[type="text"].session-title::placeholder {
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.session-details {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+textarea.session-details-field {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  resize: none;
+  overflow: hidden;
+}
+
+/* iOS zooms into a field under 16px (technical, as for the page's lines). */
+.is-phone textarea.session-details-field {
+  font-size: 16px;
+}
+
+textarea.session-details-field::placeholder {
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.session-details-short {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
 /* For screen readers only. */
 .visually-hidden {
   position: absolute;

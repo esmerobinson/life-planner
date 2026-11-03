@@ -9,6 +9,7 @@ import "./styles/sort.css";
 import "./styles/vision.css";
 import "./styles/journal.css";
 import "./styles/phone.css";
+import "./styles/add.css";
 import "./styles/panel.css";
 import "./styles/goals.css";
 import "./styles/pairing.css";

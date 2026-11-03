@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { isActive } from "../domain/goalCounts";
 import { createGoal, createItem, listGoals } from "../data/repo";
 import { MAX_GOAL_NOTES, MAX_NOTES_TEXT } from "../data/validate";
+import { DEFAULT_SESSIONS, MAX_SESSIONS, MIN_SESSIONS, newSessions } from "../domain/projects";
 import type { AreaId, Goal, ISODate, Priority, Weekday } from "../domain/types";
 import { BASE_ADD_DEFAULTS, type AddDefaults, type AddType } from "./addContext";
 import { AREA_CHOICES, GOAL_AREAS, GOAL_AREAS_BY_SIDEBAR } from "./areas";
@@ -14,31 +15,75 @@ const WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 /** A goal is never in the inbox: the first area in the sidebar stands in. */
 const goalArea = (a: AreaId): AreaId => (a === "inbox" ? GOAL_AREAS_BY_SIDEBAR[0].id : a);
 
+/** What the form can make: the page defaults' types, plus a project to-do (3A). */
+type FormType = AddType | "project";
+
+/** Everything typed or chosen in the form. */
+export interface AddDraft {
+  title: string;
+  type: FormType;
+  areaId: AreaId;
+  goalId: string;
+  priority: Priority;
+  due: string;
+  recur: Weekday[];
+  notes: string;
+  goalKind: Goal["kind"];
+  deadline: string;
+  target: string;
+  sessionCount: string;
+}
+
+/** Something was typed (a draft worth keeping); only choosing type or area is not. */
+export function draftHasContent(d: AddDraft): boolean {
+  return Boolean(d.title.trim() || d.notes.trim() || d.due || d.deadline || d.target.trim() || d.recur.length);
+}
+
 /**
  * The Add form. It opens pre-set from the page Add was pressed on (`defaults`, see
  * addContext.ts); type and area can still be changed. Notes are saved with the item (or
- * the goal) as its page.
+ * the goal) as its page. Type "Project" (3A) makes a to-do with unnamed sessions and a
+ * deadline. With `onCancel` it offers Cancel (the pop-up and the phone sheet).
  */
 export function QuickAdd({
   today,
   onAdded,
+  onCancel,
   defaults = BASE_ADD_DEFAULTS,
+  autoFocus = false,
+  initial,
+  onDraft,
 }: {
   today: ISODate;
   onAdded: () => void;
+  onCancel?: () => void;
   defaults?: AddDefaults;
+  /** Focus the title when the form appears. */
+  autoFocus?: boolean;
+  /** What was typed when the form last closed without Cancel (fix round 1, I-5). */
+  initial?: AddDraft;
+  /** Hears every change, so the shell can keep it when the form closes. */
+  onDraft?: (draft: AddDraft) => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<AddType>(defaults.type);
-  const [areaId, setAreaId] = useState<AreaId>(defaults.type === "goal" ? goalArea(defaults.areaId) : defaults.areaId);
-  const [goalId, setGoalId] = useState("");
-  const [priority, setPriority] = useState<Priority>(2);
-  const [due, setDue] = useState("");
-  const [recur, setRecur] = useState<Weekday[]>([]);
-  const [notes, setNotes] = useState("");
-  const [goalKind, setGoalKind] = useState<Goal["kind"]>("finite");
-  const [deadline, setDeadline] = useState("");
-  const [target, setTarget] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [type, setType] = useState<FormType>(initial?.type ?? defaults.type);
+  const [areaId, setAreaId] = useState<AreaId>(
+    initial?.areaId ?? (defaults.type === "goal" ? goalArea(defaults.areaId) : defaults.areaId),
+  );
+  const [goalId, setGoalId] = useState(initial?.goalId ?? "");
+  const [priority, setPriority] = useState<Priority>(initial?.priority ?? 2);
+  const [due, setDue] = useState(initial?.due ?? "");
+  const [recur, setRecur] = useState<Weekday[]>(initial?.recur ?? []);
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [goalKind, setGoalKind] = useState<Goal["kind"]>(initial?.goalKind ?? "finite");
+  const [deadline, setDeadline] = useState(initial?.deadline ?? "");
+  const [target, setTarget] = useState(initial?.target ?? "");
+  const [sessionCount, setSessionCount] = useState(initial?.sessionCount ?? String(DEFAULT_SESSIONS));
+  const draftRef = useRef(onDraft);
+  draftRef.current = onDraft;
+  useEffect(() => {
+    draftRef.current?.({ title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount });
+  }, [title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount]);
   const [message, setMessage] = useState("");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [saving, setSaving] = useState(false);
@@ -68,7 +113,7 @@ export function QuickAdd({
     setRecur((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
   }
 
-  function changeType(next: AddType) {
+  function changeType(next: FormType) {
     setType(next);
     if (next === "goal") {
       setAreaId((a) => goalArea(a));
@@ -79,6 +124,9 @@ export function QuickAdd({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (inFlight.current) return;
+    // A half-typed date (12/11/yyyy) reads as "", so without this it would save with no date (M-1).
+    const dates = Array.from((e.currentTarget as HTMLFormElement).querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    if (dates.some((d) => d.validity.badInput)) return setMessage("A date is not finished. Finish it or clear it.");
     const trimmed = title.trim();
     if (!trimmed) {
       setMessage("A title is needed.");
@@ -94,6 +142,14 @@ export function QuickAdd({
         }
       }
     }
+    let count = 0;
+    if (type === "project") {
+      count = Number(sessionCount);
+      if (sessionCount.trim() === "" || !Number.isInteger(count) || count < MIN_SESSIONS || count > MAX_SESSIONS) {
+        return setMessage(`Sessions is a whole number from ${MIN_SESSIONS} to ${MAX_SESSIONS}.`);
+      }
+      if (!deadline) return setMessage("A project needs a deadline.");
+    }
     if (notes.length > notesCap) {
       return setMessage(`Notes are at most ${notesCap.toLocaleString("en-GB")} characters here.`);
     }
@@ -101,7 +157,7 @@ export function QuickAdd({
     inFlight.current = true;
     setSaving(true);
     try {
-      await save(trimmed, monthlyTarget);
+      await save(trimmed, monthlyTarget, count);
     } catch {
       setMessage(SAVE_ERROR);
     } finally {
@@ -110,7 +166,7 @@ export function QuickAdd({
     }
   }
 
-  async function save(trimmed: string, monthlyTarget: number | undefined) {
+  async function save(trimmed: string, monthlyTarget: number | undefined, count: number) {
     const page = notes.trim() ? { notes } : {};
     if (isGoal) {
       await createGoal(
@@ -121,6 +177,21 @@ export function QuickAdd({
           ...(goalKind === "finite" ? { deadline } : {}),
           ...(monthlyTarget !== undefined ? { monthlyTarget } : {}),
           ...page,
+        },
+        today,
+      );
+    } else if (type === "project") {
+      await createItem(
+        {
+          kind: "task",
+          title: trimmed,
+          areaId,
+          priority,
+          links: [],
+          ...page,
+          ...(goalId ? { goalId } : {}),
+          due: deadline,
+          sessions: newSessions(count),
         },
         today,
       );
@@ -152,19 +223,22 @@ export function QuickAdd({
     setGoalKind("finite");
     setDeadline("");
     setTarget("");
+    setSessionCount(String(DEFAULT_SESSIONS));
     onAdded();
   }
 
   return (
-    <form className="quick-add form-grid" onSubmit={(e) => void submit(e)}>
+    // noValidate: the form's own plain messages, not the browser's bubbles (min/max still set the spinners).
+    <form className="quick-add form-grid" noValidate onSubmit={(e) => void submit(e)}>
       <label className="form-field form-full">
         <span className="form-label">Title</span>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input type="text" value={title} autoFocus={autoFocus} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <label className="form-field">
         <span className="form-label">Type</span>
-        <select value={type} onChange={(e) => changeType(e.target.value as AddType)}>
+        <select value={type} onChange={(e) => changeType(e.target.value as FormType)}>
           <option value="task">To-do</option>
+          <option value="project">Project</option>
           <option value="idea">Idea</option>
           <option value="goal">Goal</option>
         </select>
@@ -207,6 +281,25 @@ export function QuickAdd({
         </>
       ) : (
         <>
+          {type === "project" && (
+            <>
+              <label className="form-field">
+                <span className="form-label">Sessions</span>
+                <input
+                  type="number"
+                  min={MIN_SESSIONS}
+                  max={MAX_SESSIONS}
+                  step={1}
+                  value={sessionCount}
+                  onChange={(e) => setSessionCount(e.target.value)}
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">Deadline</span>
+                <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+              </label>
+            </>
+          )}
           <label className="form-field">
             <span className="form-label">Goal</span>
             <select value={goalId} onChange={(e) => setGoalId(e.target.value)}>
@@ -263,6 +356,11 @@ export function QuickAdd({
         <button type="submit" disabled={saving}>
           Add item
         </button>
+        {onCancel && (
+          <button type="button" className="btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
       </div>
     </form>
   );

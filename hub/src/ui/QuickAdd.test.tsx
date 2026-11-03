@@ -201,3 +201,65 @@ describe("QuickAdd", () => {
     ]);
   });
 });
+
+describe("QuickAdd: Project (3A)", () => {
+  it("Type has a fourth choice, Project, after To-do", () => {
+    render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    const names = Array.from(screen.getByLabelText("Type").querySelectorAll("option")).map((o) => o.textContent);
+    expect(names).toEqual(["To-do", "Project", "Idea", "Goal"]);
+  });
+
+  it("Project swaps Due and Repeats for Sessions (4) and Deadline, and saves a project to-do", async () => {
+    const onAdded = vi.fn();
+    render(<QuickAdd today={TODAY} onAdded={onAdded} defaults={{ type: "task", areaId: "art" }} />);
+    await userEvent.selectOptions(screen.getByLabelText("Type"), "project");
+    expect(screen.queryByLabelText("Due")).toBeNull();
+    expect(screen.queryByLabelText("mon")).toBeNull();
+    expect(screen.getByLabelText("Sessions")).toHaveValue(4);
+    expect(screen.getByLabelText("Goal")).toBeInTheDocument();
+    expect(screen.getByLabelText("Priority")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Title"), "Pretend street scene");
+    await userEvent.type(screen.getByLabelText("Deadline"), "2026-11-09");
+    await userEvent.type(screen.getByLabelText("Notes"), "Low-poly");
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    await vi.waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1));
+    const [it] = await db.items.toArray();
+    expect(it).toMatchObject({ kind: "task", title: "Pretend street scene", areaId: "art", due: "2026-11-09", notes: "Low-poly" });
+    expect(it.sessions).toHaveLength(4);
+    expect(it.sessions!.every((s) => s.title === undefined)).toBe(true);
+    expect(it.recur).toBeUndefined();
+  });
+
+  it("sessions are a whole number from 1 to 20, and a project needs a deadline", async () => {
+    render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    await userEvent.selectOptions(screen.getByLabelText("Type"), "project");
+    await userEvent.type(screen.getByLabelText("Title"), "Pretend project");
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(await screen.findByText("A project needs a deadline.")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Deadline"), "2026-11-09");
+    await userEvent.clear(screen.getByLabelText("Sessions"));
+    await userEvent.type(screen.getByLabelText("Sessions"), "21");
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(await screen.findByText("Sessions is a whole number from 1 to 20.")).toBeInTheDocument();
+    expect(await db.items.count()).toBe(0);
+  });
+
+  it("a half-typed date stops the save with a plain message (M-1)", async () => {
+    render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText("Title"), "Pretend half date");
+    // jsdom has no partial date entry: the browser's state is put on the field by hand.
+    Object.defineProperty(screen.getByLabelText("Due"), "validity", { value: { badInput: true } });
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(await screen.findByText("A date is not finished. Finish it or clear it.")).toBeInTheDocument();
+    expect(await db.items.count()).toBe(0);
+  });
+
+  it("Cancel shows only when the form can be closed", async () => {
+    const onCancel = vi.fn();
+    const { rerender } = render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    rerender(<QuickAdd today={TODAY} onAdded={vi.fn()} onCancel={onCancel} />);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalled();
+  });
+});

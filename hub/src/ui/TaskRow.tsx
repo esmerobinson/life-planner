@@ -7,6 +7,8 @@ import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { FLAG_GLYPH, REPEAT_GLYPH } from "./IconPopover";
 import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
+import { ProjectEdge, ProjectLine, SessionBoxes } from "./ProjectBits";
+import { isProject } from "../domain/projects";
 import { usePanel } from "./panelContext";
 import { ScheduleMenu } from "./ScheduleMenu";
 
@@ -99,7 +101,12 @@ export function useOpenOnBodyClick(id: string) {
  * notes or tags. The strip then offers a small "See more" that opens the side panel.
  */
 export function hasMoreInfo(item: Item): boolean {
-  return Boolean(item.notes?.trim()) || (item.tags?.length ?? 0) > 0;
+  return (
+    Boolean(item.notes?.trim()) ||
+    (item.tags?.length ?? 0) > 0 ||
+    // A project's session details show in its panel (projects round).
+    (item.sessions ?? []).some((s) => s.details !== undefined)
+  );
 }
 
 /** The small muted "See more" under a strip's title; opens the item in the side panel. */
@@ -168,11 +175,16 @@ export function TaskRow({
   const openOnClick = useOpenOnBodyClick(item.id);
   const isTask = untyped || item.kind === "task";
   const habit = !untyped && isHabit(item);
+  // A project (2C) stays on its list after a tick (it logs a session), so its box shows only `crossed`.
+  const project = !untyped && isProject(item);
   const tick = !untyped && isTask && onTick !== undefined;
-  const checked = crossed || ticked;
+  const checked = crossed || (ticked && !project);
   return (
     <li
-      className={["strip", tick ? "" : "no-tick", crossed ? "crossed" : "", openOnClick ? "openable" : "", className ?? ""]
+      className={[
+        "strip", tick ? "" : "no-tick", crossed ? "crossed" : "", openOnClick ? "openable" : "", project ? "project-row" : "",
+        className ?? "",
+      ]
         .filter(Boolean)
         .join(" ")}
       onClick={openOnClick}
@@ -181,7 +193,7 @@ export function TaskRow({
         <input
           type="checkbox"
           className="tick"
-          aria-label={crossed ? `Done: ${item.title}` : `Mark done: ${item.title}`}
+          aria-label={crossed ? `Done: ${item.title}` : project ? `Log a session: ${item.title}` : `Mark done: ${item.title}`}
           checked={checked}
           onChange={async () => {
             if (crossed) {
@@ -190,17 +202,22 @@ export function TaskRow({
             }
             if (ticked) return;
             setTicked(true);
-            if ((await onTick(item.id)) === false) setTicked(false);
+            if ((await onTick(item.id)) === false || project) setTicked(false);
           }}
         />
       )}
       <div className="strip-body">
         <StripTitle item={item} untyped={untyped} />
-        {isTask && !crossed && <DueLine item={item} today={today} />}
+        {project ? (
+          <ProjectLine item={item} today={today} onToday={onTodayList ?? false} />
+        ) : (
+          isTask && !crossed && <DueLine item={item} today={today} />
+        )}
         {habit && <div className="strip-meta">{crossed ? HABIT_WORDS.doneForToday : HABIT_WORDS.schedule(item.recur)}</div>}
         <SeeMore item={item} />
       </div>
       <div className="strip-actions">
+        {project && <SessionBoxes item={item} today={today} onChanged={onMoved} />}
         {extra}
         {isTask && !habit && !crossed && (
           <ScheduleMenu
@@ -216,6 +233,8 @@ export function TaskRow({
           itemId={item.id}
           areaId={item.areaId}
           kind={untyped ? undefined : item.kind}
+          project={project}
+          isOpen={item.status === "open"}
           untyped={untyped}
           today={today}
           onMoved={onMoved}
@@ -226,6 +245,7 @@ export function TaskRow({
         {trail}
       </div>
       {tray && <div className="strip-tray">{tray}</div>}
+      {project && <ProjectEdge item={item} today={today} />}
     </li>
   );
 }

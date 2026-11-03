@@ -5,6 +5,7 @@
 
 import { isValidISODate } from "../domain/dates";
 import { MAX_DONE_DATES } from "../domain/habits";
+import { MAX_SESSION_DETAILS, MAX_SESSION_TITLE, MAX_SESSIONS, MIN_SESSIONS } from "../domain/projects";
 import { AREA_IDS, COUNT_SOURCE_KINDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 
 /** The longest goal why / cadence text (characters). */
@@ -62,10 +63,36 @@ export function validItem(r: unknown): r is Item {
         r.doneDates.every((d) => isStr(d) && isValidISODate(d)))) &&
     optStamp(r.updatedAt) &&
     validSource(r.source) &&
+    // Sessions are checked for their shape only. What makes a project (a to-do that does not
+    // repeat) is domain/projects.ts isProject: an older app version may turn a project into an
+    // idea and keep its sessions, and that row must still apply here (fix round 1, I-3).
+    (r.sessions === undefined || validSessions(r.sessions)) &&
     // An emptied-from-the-Bin tombstone carries no content.
     (r.status !== "purged" ||
-      (r.title === "" && r.notes === undefined && r.tags === undefined && (r.links as unknown[]).length === 0))
+      (r.title === "" && r.notes === undefined && r.tags === undefined && r.sessions === undefined &&
+        (r.links as unknown[]).length === 0))
   );
+}
+
+const SESSION_KEYS = new Set(["id", "title", "details", "doneOn", "plannedFor"]);
+
+/** One session: an id, and optional non-empty title / details within their caps, and real dates. Nothing else. */
+function validSession(s: unknown): boolean {
+  return (
+    isObj(s) &&
+    Object.keys(s).every((k) => SESSION_KEYS.has(k)) &&
+    isStr(s.id) && s.id !== "" && s.id.length <= 64 &&
+    (s.title === undefined || (isStr(s.title) && s.title !== "" && s.title.length <= MAX_SESSION_TITLE)) &&
+    (s.details === undefined || (isStr(s.details) && s.details !== "" && s.details.length <= MAX_SESSION_DETAILS)) &&
+    optDate(s.doneOn) &&
+    optDate(s.plannedFor)
+  );
+}
+
+/** 1–20 valid sessions with distinct ids. */
+function validSessions(v: unknown): boolean {
+  if (!Array.isArray(v) || v.length < MIN_SESSIONS || v.length > MAX_SESSIONS || !v.every(validSession)) return false;
+  return new Set(v.map((s) => (s as { id: string }).id)).size === v.length;
 }
 
 /** One goal row is valid (backup, sync, local writes). */
