@@ -9,7 +9,7 @@ import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addCo
 import { AddButton } from "./AddButton";
 import { UndoLine } from "./DeleteButton";
 import { ShellUndoContext, type UndoNote } from "./undoContext";
-import { QuickAdd } from "./QuickAdd";
+import { draftHasContent, QuickAdd, type AddDraft } from "./QuickAdd";
 import { CHECK_DATE_EVENT, ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
@@ -33,6 +33,7 @@ export function AppShell() {
   const [addDefaults, setAddDefaults] = useState<AddDefaults | null>(null);
   const [addOpened, setAddOpened] = useState(0);
   const addButton = useRef<HTMLButtonElement>(null);
+  const addDraft = useRef<AddDraft | null>(null);
   const [version, setVersion] = useState(0);
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
   const unsorted = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
@@ -143,8 +144,18 @@ export function AppShell() {
                 today={today}
                 autoFocus
                 defaults={addDefaults ?? BASE_ADD_DEFAULTS}
-                onCancel={close}
+                // A click outside, Escape or the button keep what was typed for the next open (I-5);
+                // Cancel and a successful add start afresh.
+                initial={addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
+                onDraft={(d) => {
+                  addDraft.current = d;
+                }}
+                onCancel={() => {
+                  addDraft.current = null;
+                  close();
+                }}
                 onAdded={() => {
+                  addDraft.current = null;
                   close(); // saved: the form goes away and focus goes back to "+" (a failed save never reaches here)
                   void changed();
                 }}

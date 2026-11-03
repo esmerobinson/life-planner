@@ -172,6 +172,34 @@ describe("the round Add button (1C)", () => {
     expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
   });
 
+  it("a click outside keeps what was typed for the next open; Cancel and a successful add clear it (I-5)", async () => {
+    renderShell(<p>page</p>);
+    const add = screen.getByRole("button", { name: "Add" });
+    await userEvent.click(add);
+    await userEvent.type(screen.getByLabelText("Title"), "Pretend half-typed thought");
+    await userEvent.selectOptions(screen.getByLabelText("Type"), "project");
+    await userEvent.type(screen.getByLabelText("Notes"), "Pretend notes");
+    await userEvent.click(screen.getByText("page"));
+    expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+    await userEvent.click(add);
+    expect(screen.getByLabelText("Title")).toHaveValue("Pretend half-typed thought");
+    expect(screen.getByLabelText("Type")).toHaveValue("project");
+    expect(screen.getByLabelText("Notes")).toHaveValue("Pretend notes");
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(add);
+    expect(screen.getByLabelText("Title")).toHaveValue("Pretend half-typed thought"); // Escape keeps it too
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(add);
+    expect(screen.getByLabelText("Title")).toHaveValue("");
+    expect(screen.getByLabelText("Type")).toHaveValue("task");
+
+    await userEvent.type(screen.getByLabelText("Title"), "Pretend saved thought");
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull());
+    await userEvent.click(add);
+    expect(screen.getByLabelText("Title")).toHaveValue("");
+  });
+
   it("on a phone it is a sheet from the bottom with Close; the shade closes it too", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {},

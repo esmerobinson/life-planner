@@ -18,6 +18,27 @@ const goalArea = (a: AreaId): AreaId => (a === "inbox" ? GOAL_AREAS_BY_SIDEBAR[0
 /** What the form can make: the page defaults' types, plus a project to-do (3A). */
 type FormType = AddType | "project";
 
+/** Everything typed or chosen in the form. */
+export interface AddDraft {
+  title: string;
+  type: FormType;
+  areaId: AreaId;
+  goalId: string;
+  priority: Priority;
+  due: string;
+  recur: Weekday[];
+  notes: string;
+  goalKind: Goal["kind"];
+  deadline: string;
+  target: string;
+  sessionCount: string;
+}
+
+/** Something was typed (a draft worth keeping); only choosing type or area is not. */
+export function draftHasContent(d: AddDraft): boolean {
+  return Boolean(d.title.trim() || d.notes.trim() || d.due || d.deadline || d.target.trim() || d.recur.length);
+}
+
 /**
  * The Add form. It opens pre-set from the page Add was pressed on (`defaults`, see
  * addContext.ts); type and area can still be changed. Notes are saved with the item (or
@@ -30,6 +51,8 @@ export function QuickAdd({
   onCancel,
   defaults = BASE_ADD_DEFAULTS,
   autoFocus = false,
+  initial,
+  onDraft,
 }: {
   today: ISODate;
   onAdded: () => void;
@@ -37,19 +60,30 @@ export function QuickAdd({
   defaults?: AddDefaults;
   /** Focus the title when the form appears. */
   autoFocus?: boolean;
+  /** What was typed when the form last closed without Cancel (fix round 1, I-5). */
+  initial?: AddDraft;
+  /** Hears every change, so the shell can keep it when the form closes. */
+  onDraft?: (draft: AddDraft) => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState<FormType>(defaults.type);
-  const [areaId, setAreaId] = useState<AreaId>(defaults.type === "goal" ? goalArea(defaults.areaId) : defaults.areaId);
-  const [goalId, setGoalId] = useState("");
-  const [priority, setPriority] = useState<Priority>(2);
-  const [due, setDue] = useState("");
-  const [recur, setRecur] = useState<Weekday[]>([]);
-  const [notes, setNotes] = useState("");
-  const [goalKind, setGoalKind] = useState<Goal["kind"]>("finite");
-  const [deadline, setDeadline] = useState("");
-  const [target, setTarget] = useState("");
-  const [sessionCount, setSessionCount] = useState(String(DEFAULT_SESSIONS));
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [type, setType] = useState<FormType>(initial?.type ?? defaults.type);
+  const [areaId, setAreaId] = useState<AreaId>(
+    initial?.areaId ?? (defaults.type === "goal" ? goalArea(defaults.areaId) : defaults.areaId),
+  );
+  const [goalId, setGoalId] = useState(initial?.goalId ?? "");
+  const [priority, setPriority] = useState<Priority>(initial?.priority ?? 2);
+  const [due, setDue] = useState(initial?.due ?? "");
+  const [recur, setRecur] = useState<Weekday[]>(initial?.recur ?? []);
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [goalKind, setGoalKind] = useState<Goal["kind"]>(initial?.goalKind ?? "finite");
+  const [deadline, setDeadline] = useState(initial?.deadline ?? "");
+  const [target, setTarget] = useState(initial?.target ?? "");
+  const [sessionCount, setSessionCount] = useState(initial?.sessionCount ?? String(DEFAULT_SESSIONS));
+  const draftRef = useRef(onDraft);
+  draftRef.current = onDraft;
+  useEffect(() => {
+    draftRef.current?.({ title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount });
+  }, [title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount]);
   const [message, setMessage] = useState("");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [saving, setSaving] = useState(false);
