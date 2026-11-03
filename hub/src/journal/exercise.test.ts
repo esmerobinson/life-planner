@@ -167,6 +167,66 @@ describe("parseCardFile, version 2 (Journal v2)", () => {
     expect(emptyPart(rating!)).toBeNull();
   });
 
+  describe("checklist parts", () => {
+    const good = { prompt: "Pretend: go through each one", kind: "checklist", items: ["One", "Two"], options: ["Yes", "Partly", "No"], note: "Example (optional)" };
+    const part = (p: Record<string, unknown>) => withCard2({ parts: [p] });
+    const parts = (p: Record<string, unknown>) => checkCardFile(part(p))?.cards[1]!.parts;
+
+    it("is accepted and kept as written", () => {
+      expect(parts(good)).toEqual([good]);
+      expect(parts({ ...good, note: "" })).toEqual([{ ...good, note: "" }]);
+      expect(parts({ ...good, extra: 1 })).toEqual([good]); // only its own fields
+    });
+
+    it("caps: prompt 500; 1..30 items of 80; 2..4 options of 20; note 80", () => {
+      const ok = (p: Record<string, unknown>) => checkCardFile(part({ ...good, ...p })) !== null;
+      expect(ok({ prompt: "x".repeat(500) })).toBe(true);
+      expect(ok({ prompt: "x".repeat(501) })).toBe(false);
+      expect(ok({ prompt: "" })).toBe(false);
+      expect(ok({ items: Array.from({ length: 30 }, (_, i) => `Item ${i}`) })).toBe(true);
+      expect(ok({ items: Array.from({ length: 31 }, (_, i) => `Item ${i}`) })).toBe(false);
+      expect(ok({ items: [] })).toBe(false);
+      expect(ok({ items: undefined })).toBe(false);
+      expect(ok({ items: ["x".repeat(80)] })).toBe(true);
+      expect(ok({ items: ["x".repeat(81)] })).toBe(false);
+      expect(ok({ items: ["One", " "] })).toBe(false);
+      expect(ok({ items: ["One", 2] })).toBe(false);
+      expect(ok({ options: ["Yes", "No"] })).toBe(true);
+      expect(ok({ options: ["A", "B", "C", "D"] })).toBe(true);
+      expect(ok({ options: ["A", "B", "C", "D", "E"] })).toBe(false);
+      expect(ok({ options: ["Yes"] })).toBe(false);
+      expect(ok({ options: [] })).toBe(false);
+      expect(ok({ options: undefined })).toBe(false);
+      expect(ok({ options: ["Yes", "Yes"] })).toBe(false);
+      expect(ok({ options: ["Yes", ""] })).toBe(false);
+      expect(ok({ options: ["x".repeat(20), "No"] })).toBe(true);
+      expect(ok({ options: ["x".repeat(21), "No"] })).toBe(false);
+      expect(ok({ note: "x".repeat(80) })).toBe(true);
+      expect(ok({ note: "x".repeat(81) })).toBe(false);
+      expect(ok({ note: 5 })).toBe(false);
+    });
+
+    it("an older card (a note-less checklist is read as no note box)", () => {
+      const { note: _n, ...bare } = good;
+      expect(parts(bare)).toEqual([{ ...good, note: "" }]);
+    });
+
+    it("emptyPart is an [item, choice, note] row per item (so it reads back on its own); partFilled needs every item's choice, one of the options", () => {
+      const p = parts(good)![0]!;
+      expect(emptyPart(p)).toEqual([["One", "", ""], ["Two", "", ""]]);
+      expect(partFilled(p, [["One", "Yes", ""], ["Two", "No", "x"]])).toBe(true);
+      expect(partFilled(p, [["One", "Yes", ""], ["Two", "", "only a note"]])).toBe(false);
+      expect(partFilled(p, [["One", "Yes", ""]])).toBe(false);
+      expect(partFilled(p, [["One", "Yes", ""], ["Two", "Maybe", ""]])).toBe(false);
+      expect(partFilled(p, null)).toBe(false);
+    });
+
+    it("stored and read back exactly", () => {
+      const set = checkCardFile(part(good))!;
+      expect(readStoredSet(2, set.source, storedCards(set))).toEqual(set);
+    });
+  });
+
   it("a file with only optional cards has nothing to do day by day, so it isn't read", () => {
     const f = clone2();
     f.cards = [f.cards[0]!];

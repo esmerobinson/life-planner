@@ -682,6 +682,40 @@ input.exercise-list-line {
   background: var(--panel);
 }
 
+/* A checklist: each item is its words, with the choice pills under them (the label above the
+   pills at every width) and, when the card gives one, a one-line note box. Only existing
+   values: 6px from label to control (as in every part), 14px from item to item (as between
+   parts), the choice part's pills, the list part's input and its muted count line. */
+.exercise-checklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.exercise-check-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.exercise-check-label {
+  overflow-wrap: anywhere;
+}
+
+input.exercise-check-note {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.exercise-check-answers {
+  list-style: none;
+  padding-left: 0;
+}
+
 .exercise-chain-step {
   display: flex;
   flex-direction: column;

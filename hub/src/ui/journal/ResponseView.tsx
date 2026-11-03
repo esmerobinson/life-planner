@@ -27,6 +27,21 @@ const cell = (x: string) => (x.trim() ? x : <span className="journal-muted">{NOT
 
 function Answer({ a }: { a: PartAnswer }) {
   const none = <p className="journal-muted">{NOT_ANSWERED}</p>;
+  if (a.kind === "checklist" && Array.isArray(a.answer)) {
+    // [item, choice, note] rows: each item with its choice and note.
+    const rows = (a.answer as unknown[]).filter((r): r is string[] => Array.isArray(r));
+    if (!rows.some((r) => has(r.slice(1)))) return none;
+    return (
+      <ul className="exercise-list-answer exercise-check-answers">
+        {rows.map((r, i) => (
+          <li key={i} className="exercise-check-answer">
+            {r[0]}: {r[1]?.trim() ? r[1] : <span className="journal-muted">{NOT_ANSWERED}</span>}
+            {r[2]?.trim() ? ` — ${r[2]}` : ""}
+          </li>
+        ))}
+      </ul>
+    );
+  }
   if (Array.isArray(a.answer)) {
     if (!has(a.answer)) return none;
     const rows = a.answer as unknown[];

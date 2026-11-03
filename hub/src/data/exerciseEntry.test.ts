@@ -8,7 +8,7 @@ import {
 import { journalId, validJournal } from "./validate";
 import { exerciseCardIdKey, exerciseCardKey, journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
 import { parseCardFile } from "../journal/exercise";
-import { FAKE_CARD_FILE_KINDS, FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
+import { FAKE_CARD_FILE_CHECKLIST, FAKE_CARD_FILE_KINDS, FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 
 // The exercise response (journal polish brief §1–2): her written response to today's card is
@@ -273,6 +273,30 @@ describe("a tracker card, a day at a time", () => {
     await expect(
       submitExerciseEntry(jk, DAY, ME, chain!, [{ prompt: "A pretend chain of events", kind: "chain", answer: ["x", "", "z"] }]),
     ).rejects.toThrow();
+  });
+});
+
+describe("a checklist part: an [item, choice, note] row per item, sealed like the others", () => {
+  const card = cardRef(parseCardFile(JSON.stringify(FAKE_CARD_FILE_CHECKLIST))!.cards[0]!);
+  const prompt = parseCardFile(JSON.stringify(FAKE_CARD_FILE_CHECKLIST))!.cards[0]!.parts[0]!.prompt;
+  const answer = (rows: string[][]): PartAnswer[] => [{ prompt, kind: "checklist", answer: rows }];
+  const rows = (...choices: string[]) => choices.map((c, i) => [`Pretend feature ${i + 1}`, c, i === 0 ? "Pretend note" : ""]);
+
+  it("a draft keeps a partly answered list; Submit needs every item's choice (a note alone is not an answer)", async () => {
+    await saveExerciseDraft(jk, DAY, ME, card, answer(rows("Yes", "", "", "")));
+    expect((await readExerciseEntry(jk, DAY, card)).entry!.parts).toEqual(answer(rows("Yes", "", "", "")));
+    expect((await readExerciseProgress(jk)).marks).toEqual([]);
+    expect(answerFilled(answer(rows("Yes", "Partly", "No", ""))[0]!)).toBe(false);
+    expect(answerFilled(answer([["One", "", "note only"], ["Two", "Yes", ""]])[0]!)).toBe(false);
+    expect(answerFilled(answer([])[0]!)).toBe(false);
+    await expect(submitExerciseEntry(jk, DAY, ME, card, answer(rows("Yes", "Partly", "No", "")))).rejects.toThrow();
+    await submitExerciseEntry(jk, DAY, ME, card, answer(rows("Yes", "Partly", "No", "Yes")));
+    expect((await readExerciseEntry(jk, DAY, card)).entry).toMatchObject({ saved: true, submitted: true, parts: answer(rows("Yes", "Partly", "No", "Yes")) });
+  });
+
+  it("sealed: no word of it in clear", async () => {
+    await saveExerciseDraft(jk, DAY, ME, card, answer(rows("Yes", "", "", "")));
+    expect(JSON.stringify(await db.journal.toArray())).not.toContain("Pretend note");
   });
 });
 

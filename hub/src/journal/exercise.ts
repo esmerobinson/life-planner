@@ -29,13 +29,14 @@ export interface CardSource {
 }
 
 /** The kinds of answer a card can ask for (Journal v2 "parts"). */
-export const PART_KINDS = ["text", "list", "rating", "choice", "table", "scale", "tracker", "chain"] as const;
+export const PART_KINDS = ["text", "list", "rating", "choice", "table", "scale", "tracker", "chain", "checklist"] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /**
  * One thing a card asks her to fill in: a text box, a numbered list of `count` lines, a 0–10
  * rating, one of `options`, a table (`columns` × `rows`), a scale (`min`..`max` with end
- * labels), a tracker (`days` days, each with its `fields`), or a chain of `steps`.
+ * labels), a tracker (`days` days, each with its `fields`), a chain of `steps`, or a checklist
+ * (each of `items` answered with one of `options`, and perhaps a short `note`).
  */
 export interface CardPart {
   prompt: string;
@@ -57,11 +58,16 @@ export interface CardPart {
   fields?: string[];
   /** A chain's steps, in order. */
   steps?: string[];
+  /** A checklist's items (each answered with one of `options`) and the placeholder of its optional per-item note box ("" = no note box). */
+  items?: string[];
+  note?: string;
 }
 
 /**
  * One part's answer: text → string; list and chain → their lines; rating and scale → a number
- * or null; choice → the option or null; table → rows of cells; tracker → days of fields.
+ * or null; choice → the option or null; table → rows of cells; tracker → days of fields;
+ * checklist → one [item, choice, note] row per item ("" for nothing yet; the item's own words
+ * are kept so the answer reads back on its own).
  */
 export type PartValue = string | string[] | string[][] | number | null;
 
@@ -139,6 +145,12 @@ export const MAX_SCALE_SPAN = 10;
 export const MAX_TRACKER_DAYS = 14;
 export const MAX_TRACKER_FIELDS = 4;
 export const MAX_CHAIN_STEPS = 10;
+export const MAX_CHECKLIST_ITEMS = 30;
+export const MAX_CHECKLIST_ITEM = 80;
+export const MIN_CHECKLIST_OPTIONS = 2;
+export const MAX_CHECKLIST_OPTIONS = 4;
+export const MAX_CHECKLIST_OPTION = 20;
+export const MAX_CHECKLIST_NOTE = 80;
 export const MAX_FORMAT = 40;
 /** The most tracks (books) in one file, the longest track id and title. */
 export const MAX_TRACKS = 10;
@@ -216,6 +228,13 @@ function checkParts(v: unknown): CardPart[] | null {
       const st = p.steps;
       if (!Array.isArray(st) || st.length === 0 || st.length > MAX_CHAIN_STEPS || !st.every((x) => text(x, true, MAX_OPTION))) return null;
       out.push({ prompt: p.prompt, kind, steps: st as string[] });
+    } else if (kind === "checklist") {
+      const { items, options } = p;
+      if (!Array.isArray(items) || items.length === 0 || items.length > MAX_CHECKLIST_ITEMS || !items.every((x) => text(x, true, MAX_CHECKLIST_ITEM))) return null;
+      if (!Array.isArray(options) || options.length < MIN_CHECKLIST_OPTIONS || options.length > MAX_CHECKLIST_OPTIONS) return null;
+      if (!options.every((x) => text(x, true, MAX_CHECKLIST_OPTION)) || new Set(options).size !== options.length) return null;
+      if (p.note !== undefined && !text(p.note, false, MAX_CHECKLIST_NOTE)) return null;
+      out.push({ prompt: p.prompt, kind, items: items as string[], options: options as string[], note: (p.note as string | undefined) ?? "" });
     } else {
       out.push({ prompt: p.prompt, kind });
     }
@@ -252,6 +271,10 @@ export function partFilled(part: CardPart, value: PartValue | undefined): boolea
       return Array.isArray(value) && value.length === part.days && trackerDaysFilled(part, value) === part.days;
     case "chain":
       return Array.isArray(value) && value.length === part.steps?.length && value.every(filledLine);
+    case "checklist": {
+      const n = part.items?.length ?? 0;
+      return Array.isArray(value) && value.length === n && (value as unknown[]).every((r) => Array.isArray(r) && (part.options ?? []).includes(r[1] as string));
+    }
     case "text":
       return typeof value === "string" && value.trim() !== "";
     case "list":
@@ -277,6 +300,8 @@ export function emptyPart(part: CardPart): PartValue {
       return grid(part.rows!, part.columns!.length);
     case "tracker":
       return grid(part.days!, part.fields!.length);
+    case "checklist":
+      return part.items!.map((item) => [item, "", ""]);
     default:
       return null;
   }

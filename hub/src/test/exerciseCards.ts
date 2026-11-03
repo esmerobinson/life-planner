@@ -210,3 +210,35 @@ export const FAKE_CARD_FILE_KINDS = {
     }),
   ],
 };
+
+/**
+ * A FICTIONAL file with checklist cards (a list of pretend things, each answered Yes / Partly /
+ * No, with an optional note box) and a scale card with no end labels. Every word is made up.
+ */
+export const PRETEND_FEATURES = ["Pretend feature one", "Pretend feature two", "Pretend feature three", "Pretend feature four"];
+export const FAKE_CARD_FILE_CHECKLIST = {
+  app: "esmeworld",
+  kind: "exercise-cards",
+  version: 2,
+  source: "A pretend workbook of checklists (test fixture)",
+  cards: [
+    pretendCard("check-notes", 1, "Pretend checklist", {
+      format: "Checklist",
+      parts: [
+        {
+          prompt: "Go through the pretend features in your made-up book. Does each one fit you?",
+          kind: "checklist",
+          items: PRETEND_FEATURES,
+          options: ["Yes", "Partly", "No"],
+          note: "An example (optional)",
+        },
+      ],
+    }),
+    pretendCard("check-plain", 2, "Pretend plain checklist", {
+      parts: [{ prompt: "Which pretend things did you do today?", kind: "checklist", items: ["Pretend walk", "Pretend tea"], options: ["Done", "Not yet"], note: "" }],
+    }),
+    pretendCard("check-bare-scale", 3, "Pretend bare scale", {
+      parts: [{ prompt: "How pretend-calm are you?", kind: "scale", min: 1, max: 5 }],
+    }),
+  ],
+};

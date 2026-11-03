@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   cardRef, logExerciseEntry, readExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable, saveExerciseDraft,
   submitExerciseEntry, trackerNewInput, type ExerciseResponse, type PartAnswer, type ResponseValue,
@@ -23,7 +23,8 @@ export const SAVE_TODAY = "Save today's entry";
  * (text: a box; list: `count` numbered lines with "N of M filled"; rating: 0–10; choice: pill
  * options; table: a grid under its column headings, stacked row cards on the phone; scale: the
  * points between its end labels; tracker: Day 1 … Day N, each with its fields, the day to fill
- * now outlined; chain: its steps in order, linked), and Submit only once every part is filled
+ * now outlined; chain: its steps in order, linked; checklist: each item with the choice pills and perhaps a note box, "N of M
+ * answered · Yes 3 · …"), and Submit only once every part is filled
  * ("if I have to complete 10, I complete 10"). A tracker card can be saved a day at a time
  * ("Save today's entry"): it counts for the day, and comes back as today's card until every day
  * is filled; its earlier days come forward from the last day she saved. Under it, "See an example" and her book's own example when the card has them.
@@ -99,12 +100,26 @@ function fit(empty: PartValue, prev: PartValue): PartValue {
   return typeof prev === "number" || typeof prev === "string" ? prev : null;
 }
 
+/**
+ * A stored checklist answer fitted to the card's items now: each item keeps the choice (still
+ * one of the options) and note stored under the same item words.
+ */
+function fitChecklist(part: CardPart, prev: PartValue): PartValue {
+  const rows = Array.isArray(prev) ? (prev as unknown[]).filter((r): r is string[] => Array.isArray(r)) : [];
+  return part.items!.map((item, i) => {
+    const was = rows[i]?.[0] === item ? rows[i] : rows.find((r) => r[0] === item);
+    const choice = typeof was?.[1] === "string" && (part.options ?? []).includes(was[1]) ? was[1] : "";
+    return [item, choice, typeof was?.[2] === "string" ? was[2] : ""];
+  });
+}
+
 /** The stored response as this card's value: its text, or an answer for each of its parts. */
 function valueFrom(parts: CardPart[], entry: ExerciseResponse | null): ResponseValue {
   if (parts.length === 0) return entry?.text ?? "";
   return parts.map((p, i): PartAnswer => {
     const prev = entry?.parts?.find((a) => a.prompt === p.prompt && a.kind === p.kind) ?? entry?.parts?.[i];
-    const answer = prev && prev.kind === p.kind ? fit(emptyPart(p), prev.answer) : emptyPart(p);
+    const answer =
+      prev && prev.kind === p.kind ? (p.kind === "checklist" ? fitChecklist(p, prev.answer) : fit(emptyPart(p), prev.answer)) : emptyPart(p);
     return { prompt: p.prompt, kind: p.kind, answer };
   });
 }
@@ -307,6 +322,7 @@ function PartInput({ part, value, onChange }: { part: CardPart; value: PartValue
       </fieldset>
     );
   }
+  if (part.kind === "checklist") return <ChecklistInput part={part} value={value} onChange={onChange} />;
   if (part.kind === "table") return <TableInput part={part} value={value} onChange={onChange} />;
   if (part.kind === "tracker") return <TrackerInput part={part} value={value} onChange={onChange} />;
   if (part.kind === "chain") {
@@ -369,6 +385,53 @@ function PartInput({ part, value, onChange }: { part: CardPart; value: PartValue
           </button>
         ))}
       </div>
+    </fieldset>
+  );
+}
+
+/**
+ * A checklist: the prompt, then a row per item (its words, the options as the choice part's
+ * pills, one at a time, tap again to clear, and a one-line note box when the card gives it a
+ * placeholder), and a quiet count line ("4 of 9 answered · Yes 3 · Partly 1"). An answer is an
+ * [item, choice, note] row per item.
+ */
+function ChecklistInput({ part, value, onChange }: { part: CardPart; value: PartValue; onChange: (v: PartValue) => void }) {
+  const id = useId();
+  const options = part.options ?? [];
+  const rows = Array.isArray(value) ? (value as string[][]) : [];
+  const set = (i: number, at: 1 | 2, v: string) => onChange(rows.map((r, j) => (j === i ? r.map((x, k) => (k === at ? v : x)) : r)));
+  const counts = options.map((o) => ({ o, n: rows.filter((r) => r[1] === o).length })).filter((c) => c.n > 0);
+  const answered = counts.reduce((n, c) => n + c.n, 0);
+  return (
+    <fieldset className="exercise-part">
+      <legend className="exercise-label">{part.prompt}</legend>
+      <ul className="exercise-checklist">
+        {rows.map((r, i) => (
+          <li key={i} className="exercise-check-item">
+            <span id={`${id}-${i}`} className="exercise-check-label">
+              {part.items![i]}
+            </span>
+            <div role="group" aria-labelledby={`${id}-${i}`} className="btn-group exercise-choice">
+              {options.map((o) => (
+                <button key={o} type="button" aria-pressed={r[1] === o} onClick={() => set(i, 1, r[1] === o ? "" : o)}>
+                  {o}
+                </button>
+              ))}
+            </div>
+            {part.note && (
+              <input
+                type="text"
+                className="exercise-check-note"
+                aria-label={`${part.items![i]}, note`}
+                placeholder={part.note}
+                value={r[2] ?? ""}
+                onChange={(e) => set(i, 2, e.target.value)}
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="journal-muted">{[`${answered} of ${rows.length} answered`, ...counts.map((c) => `${c.o} ${c.n}`)].join(" · ")}</p>
     </fieldset>
   );
 }

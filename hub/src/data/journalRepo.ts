@@ -625,6 +625,9 @@ export function answerFilled(a: PartAnswer): boolean {
       return tableUpTo(a.prompt) ? fullRow(v[0]) && (v as unknown[]).every((r) => fullRow(r) || emptyRow(r)) : (v as unknown[]).every(fullRow);
     case "tracker":
       return Array.isArray(v) && v.length > 0 && (v as unknown[]).every(fullRow);
+    case "checklist":
+      // Every item has its choice (the second of its [item, choice, note] row); the note is optional.
+      return Array.isArray(v) && v.length > 0 && (v as unknown[]).every((r) => Array.isArray(r) && line(r[1]));
     case "rating":
     case "scale":
       return typeof v === "number";
