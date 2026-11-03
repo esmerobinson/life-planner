@@ -21,9 +21,15 @@
 /* ---- Goals page ---- */
 .goals-toggle {
   display: flex;
-  gap: 8px;
+  gap: var(--gap-buttons);
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--gap-stack);
+}
+
+/* "New goal" is a page section like the area groups above it (spacing pass: it sat right on
+   the last goal tile, a grid has no margin of its own). */
+.goal-form {
+  margin-top: var(--gap-section);
 }
 
 .goal-grid {

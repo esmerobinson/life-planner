@@ -206,7 +206,7 @@ button.icon svg {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: var(--gap-stack); /* spacing pass: 16px between page blocks (was 12px) */
 }
 
 .bar-label {
