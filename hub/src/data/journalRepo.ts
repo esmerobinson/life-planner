@@ -638,7 +638,9 @@ export function answerFilled(a: PartAnswer): boolean {
 
 /** Anything at all written or chosen (a draft worth keeping and showing). */
 const started = (v: unknown): boolean => (Array.isArray(v) ? v.some(started) : typeof v === "string" ? v.trim() !== "" : v !== null);
-const partStarted = (a: PartAnswer) => started(a.answer);
+/** A checklist's rows start with the item's own words, which are not hers: only the choice and note count. */
+const partStarted = (a: PartAnswer) =>
+  a.kind === "checklist" && Array.isArray(a.answer) ? started((a.answer as unknown[]).map((r) => (Array.isArray(r) ? r.slice(1) : r))) : started(a.answer);
 
 /**
  * Something new in a tracker since `baseline` (the days carried forward from an earlier day):

@@ -294,6 +294,25 @@ describe("a checklist part: an [item, choice, note] row per item, sealed like th
     expect((await readExerciseEntry(jk, DAY, card)).entry).toMatchObject({ saved: true, submitted: true, parts: answer(rows("Yes", "Partly", "No", "Yes")) });
   });
 
+  it("a draft of only item words (pills tapped, then cleared) is not content: it is left out of the lists and never hides another device's answer", async () => {
+    const empty = answer(rows("", "", "", "").map((r) => [r[0]!, "", ""]));
+    // On its own: left out of the lists.
+    await saveExerciseDraft(jk, "2026-10-28", PHONE, card, empty);
+    expect((await listExerciseEntries(jk, DAY)).entries).toEqual([]);
+    // Next to a submitted answer from another device, even a newer one: the answer is what is read.
+    await submitExerciseEntry(jk, DAY, ME, card, answer(rows("Yes", "Partly", "No", "Yes")));
+    await saveExerciseDraft(jk, DAY, PHONE, card, empty);
+    const read = (await readExerciseEntry(jk, DAY, card)).entry!;
+    expect(read.parts).toEqual(answer(rows("Yes", "Partly", "No", "Yes")));
+    expect(read.submitted).toBe(true);
+    const listed = (await listExerciseEntries(jk, "2026-10-31")).entries; // `before` is exclusive
+    expect(listed.map((e) => e.date)).toEqual([DAY]); // and not the empty 2026-10-28 draft
+    expect(listed[0]!.parts).toEqual(answer(rows("Yes", "Partly", "No", "Yes")));
+    // A note alone is something she wrote: it counts.
+    await saveExerciseDraft(jk, "2026-10-27", PHONE, card, answer([["Pretend feature one", "", "Pretend only a note"], ["Pretend feature two", "", ""]]));
+    expect((await listExerciseEntries(jk, "2026-10-31")).entries.map((e) => e.date)).toEqual([DAY, "2026-10-27"]);
+  });
+
   it("sealed: no word of it in clear", async () => {
     await saveExerciseDraft(jk, DAY, ME, card, answer(rows("Yes", "", "", "")));
     expect(JSON.stringify(await db.journal.toArray())).not.toContain("Pretend note");
