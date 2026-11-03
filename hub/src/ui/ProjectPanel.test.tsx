@@ -49,6 +49,20 @@ describe("Edit → Type in the panel", () => {
   });
 });
 
+describe("Edit → Type away from Project (I-2)", () => {
+  it("drops the sessions with an Undo that brings them back, titles and details included", async () => {
+    const { p, panel } = await openProject(FOUR);
+    await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+    await userEvent.selectOptions(within(panel).getByLabelText("Type"), "idea");
+    await userEvent.click(within(panel).getByRole("button", { name: "Done" }));
+    await vi.waitFor(async () => expect((await db.items.get(p.id))!.kind).toBe("idea"));
+    expect((await db.items.get(p.id))!.sessions).toBeUndefined();
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions).toEqual(FOUR));
+    expect(await db.items.get(p.id)).toMatchObject({ kind: "task", due: "2026-11-09" });
+  });
+});
+
 describe("a project's side panel", () => {
   it("says Project, shows the deadline, the session count and the summary box", async () => {
     const { panel } = await openProject(FOUR);

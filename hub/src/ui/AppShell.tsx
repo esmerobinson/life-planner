@@ -7,6 +7,8 @@ import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
 import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addContext";
 import { AddButton } from "./AddButton";
+import { UndoLine } from "./DeleteButton";
+import { ShellUndoContext, type UndoNote } from "./undoContext";
 import { QuickAdd } from "./QuickAdd";
 import { CHECK_DATE_EVENT, ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
@@ -89,6 +91,17 @@ export function AppShell() {
   // page). Rows that arrive refresh every view the same way a local write does.
   useEffect(() => syncController.start({ onSynced: () => void changed() }), [changed]);
 
+  // The shell's Undo line (fix round 1, I-2): e.g. after a project lost its sessions.
+  const [undoNote, setUndoNote] = useState<UndoNote | null>(null);
+  useEffect(() => setUndoNote(null), [location.pathname]); // a new page: the line goes
+  const undoNow = useCallback(async () => {
+    const note = undoNote;
+    if (!note) return;
+    if (!(await note.undo())) return;
+    setUndoNote(null);
+    await changed();
+  }, [undoNote, changed]);
+
   const toggleAdd = useCallback((open: boolean) => {
     if (open) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
     setAdding(open);
@@ -99,6 +112,7 @@ export function AppShell() {
   return (
     <ShellContext.Provider value={ctx}>
       <AddDefaultsContext.Provider value={setAddDefaults}>
+      <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
@@ -115,6 +129,13 @@ export function AppShell() {
           )}
           <Outlet />
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
+          {/* Only while there is something to undo: an always-there status region would be a
+              second "status" on pages that have their own. */}
+          {undoNote && (
+            <div className="shell-undo has-note">
+              <UndoLine message={undoNote.message} onUndo={() => void undoNow()} takeFocus />
+            </div>
+          )}
           <AddButton open={adding} onToggle={toggleAdd} phone={phone} buttonRef={addButton}>
             {(close) => (
               <QuickAdd
@@ -133,6 +154,7 @@ export function AppShell() {
         </main>
       </div>
       </PanelProvider>
+      </ShellUndoContext.Provider>
       </AddDefaultsContext.Provider>
     </ShellContext.Provider>
   );

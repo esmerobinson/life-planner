@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { archiveItem, changeToProject, deleteItem, itemToGoal, moveTo, removeFromToday, setMilestone, updateItem } from "../data/repo";
+import { useSessionsUndo } from "./undoSessions";
+import { archiveItem, changeToProject, deleteItem, getItem, itemToGoal, moveTo, removeFromToday, setMilestone, updateItem } from "../data/repo";
 import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
 import { ARROW_GLYPH, IconPopover } from "./IconPopover";
@@ -61,9 +62,14 @@ export function MoveToMenu({
   untyped?: boolean;
 }) {
   const { attempt, saveError } = useSaveError();
+  const offerUndo = useSessionsUndo(today);
 
   async function pick(c: Choice, close: (refocus?: boolean) => void) {
+    // A project made a to-do or an idea loses its sessions: keep the whole row for Undo (I-2).
+    const dropsSessions = project && c.kind === "become" && (c.to === "task" || c.to === "idea");
+    const before: { row?: Item } = {};
     const ok = await attempt(async () => {
+      if (dropsSessions) before.row = await getItem(itemId);
       if (c.kind === "become") {
         // A project's archived copy keeps its sessions when it becomes a goal.
         if (c.to === "goal") await itemToGoal(itemId, areaId ?? "admin", today);
@@ -84,6 +90,7 @@ export function MoveToMenu({
       else await deleteItem(itemId, today);
     });
     close(!ok); // the clicked choice is gone; on failure keep focus somewhere sensible
+    if (ok && dropsSessions && before.row) offerUndo(c.kind === "become" && c.to === "idea" ? "idea" : "task", before.row);
     if (ok) await onMoved();
   }
 

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isActive } from "../domain/goalCounts";
-import { saveItemNotes, updateItem } from "../data/repo";
+import { getItem, saveItemNotes, updateItem } from "../data/repo";
+import { useSessionsUndo } from "./undoSessions";
 import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
 import { dayLabel } from "../domain/display";
@@ -63,6 +64,7 @@ export function ItemPanel({
 }) {
   const panel = usePanel();
   const { attempt, saveError } = useSaveError();
+  const offerUndo = useSessionsUndo(today);
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<Fields>(() => fieldsOf(item));
   const [snapshot, setSnapshot] = useState<Fields>(() => fieldsOf(item));
@@ -132,8 +134,15 @@ export function ItemPanel({
       return;
     }
     setBusy(true);
+    // A project made a to-do or an idea loses its sessions: keep the whole row for Undo (I-2).
+    const dropsSessions = "sessions" in patch && patch.sessions === undefined;
+    const before: { row?: Item } = {};
     try {
-      await write(() => updateItem(item.id, patch, today));
+      await write(async () => {
+        if (dropsSessions) before.row = await getItem(item.id);
+        await updateItem(item.id, patch, today);
+      });
+      if (dropsSessions && before.row) offerUndo(f.kind === "idea" ? "idea" : "task", before.row);
       setEditing(false);
     } catch {
       // The save message shows; stay in Edit mode with the changes.

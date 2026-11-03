@@ -73,6 +73,35 @@ button.add-fab {
   font-size: 20px;
 }
 
+/* The shell's Undo line (fix round 1, I-2: a project made a to-do or an idea, without its
+   sessions). The existing Undo line (.undo-line: 14px text, "· Undo" link) in a --panel pill
+   with the menus' shadow, beside the round button, centred on it. Where it sits is NOT
+   decided, so it carries the 2px magenta placeholder outline. Undo takes the focus when it
+   shows (the control that was used has just closed or moved). */
+.shell-undo {
+  position: fixed;
+  right: calc(max(24px, env(safe-area-inset-right)) + 60px);
+  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 6px);
+  z-index: 15;
+  max-width: calc(100vw - 320px);
+  pointer-events: none;
+}
+
+.is-phone .shell-undo {
+  right: calc(max(16px, env(safe-area-inset-right)) + 60px);
+  bottom: calc(max(28px, env(safe-area-inset-bottom)) + 6px);
+  max-width: calc(100vw - 92px);
+}
+
+.shell-undo.has-note {
+  pointer-events: auto;
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+  outline: 2px solid var(--placeholder);
+}
+
 /* Phone: a sheet from the bottom over a shade. */
 .add-shade {
   position: fixed;

@@ -131,6 +131,28 @@ describe("Change to → Project (the arrow menu)", () => {
     await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions).toBeUndefined());
   });
 
+  it("To-do or Idea drops the sessions with an Undo that brings every session back as it was (I-2)", async () => {
+    const p = await project(FOUR);
+    const before = (await db.items.get(p.id))!;
+    renderApp("/area/art", TODAY);
+    for (const to of ["To-do", "Idea"]) {
+      const row = await rowOf();
+      await userEvent.click(within(row).getByRole("button", { name: "Move to: Pretend street scene" }));
+      await userEvent.click(within(within(row).getByRole("group", { name: "Change to" })).getByRole("button", { name: to }));
+      await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions).toBeUndefined());
+      expect(
+        await screen.findByText(new RegExp(`^Changed to ${to === "To-do" ? "a to-do" : "an idea"}, without its sessions`), {
+          selector: ".shell-undo p",
+        }),
+      ).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+      await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions).toEqual(FOUR));
+      const back = (await db.items.get(p.id))!;
+      expect({ ...back, updatedAt: 0, touchedAt: "" }).toEqual({ ...before, updatedAt: 0, touchedAt: "" });
+      await vi.waitFor(() => expect(screen.queryByRole("button", { name: "Undo" })).toBeNull());
+    }
+  });
+
   it("an idea offers To-do and Project", async () => {
     await createItem({ kind: "idea", title: "Pretend idea", areaId: "art", priority: 2 }, MADE);
     renderApp("/area/art", TODAY);
