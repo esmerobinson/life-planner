@@ -6,6 +6,7 @@ import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
 import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addContext";
+import { AddButton } from "./AddButton";
 import { QuickAdd } from "./QuickAdd";
 import { CHECK_DATE_EVENT, ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
@@ -88,6 +89,11 @@ export function AppShell() {
   // page). Rows that arrive refresh every view the same way a local write does.
   useEffect(() => syncController.start({ onSynced: () => void changed() }), [changed]);
 
+  const toggleAdd = useCallback((open: boolean) => {
+    if (open) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
+    setAdding(open);
+  }, []);
+
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
 
   return (
@@ -100,35 +106,30 @@ export function AppShell() {
           {phone && <PhoneTopBar inboxLabel={inboxLabel} />}
           <UpdatePrompt />
           <DbClosedNotice db={db} />
-          <div className="shell-actions">
-            <button
-              ref={addButton}
-              type="button"
-              aria-expanded={adding}
-              onClick={() => {
-                if (!adding) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
-                setAdding(!adding);
-              }}
-            >
-              Add
-            </button>
-            {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import. */}
-            {!phone && <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>}
-          </div>
-          {adding && (
-            <QuickAdd
-              key={addOpened}
-              today={today}
-              defaults={addDefaults ?? BASE_ADD_DEFAULTS}
-              onAdded={() => {
-                setAdding(false); // saved: the form goes away (a failed save never reaches here)
-                addButton.current?.focus(); // the focused "Add item" button is leaving: focus goes back to Add
-                void changed();
-              }}
-            />
+          {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import.
+              It floats right, so the page's h1 is the first thing on the page (1C: Add left this row). */}
+          {!phone && (
+            <div className="shell-actions">
+              <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>
+            </div>
           )}
           <Outlet />
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
+          <AddButton open={adding} onToggle={toggleAdd} phone={phone} buttonRef={addButton}>
+            {(close) => (
+              <QuickAdd
+                key={addOpened}
+                today={today}
+                autoFocus
+                defaults={addDefaults ?? BASE_ADD_DEFAULTS}
+                onCancel={close}
+                onAdded={() => {
+                  close(); // saved: the form goes away and focus goes back to "+" (a failed save never reaches here)
+                  void changed();
+                }}
+              />
+            )}
+          </AddButton>
         </main>
       </div>
       </PanelProvider>

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { db } from "../data/db";
@@ -284,9 +284,11 @@ describe("Goals and the shell", () => {
     await userEvent.selectOptions(quick.getByLabelText("Type"), "task");
     await userEvent.selectOptions(quick.getByLabelText("Area"), "writing");
     expect(quick.queryByRole("option", { name: "Fresh goal" })).toBeNull();
-    await userEvent.type(screen.getByLabelText("Goal title"), "Fresh goal");
-    await userEvent.selectOptions(screen.getByLabelText("Kind", { selector: "form.goal-form select" }), "practice");
-    await userEvent.click(screen.getByRole("button", { name: "Add goal" }));
+    // A click on the page closes the Add pop-up (1C), so the goal is made without one (as a
+    // sync or another tab would): the open form still picks it up.
+    fireEvent.change(screen.getByLabelText("Goal title"), { target: { value: "Fresh goal" } });
+    fireEvent.change(screen.getByLabelText("Kind", { selector: "form.goal-form select" }), { target: { value: "practice" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add goal" }));
     expect(await quick.findByRole("option", { name: "Fresh goal" })).toBeInTheDocument();
   });
 });

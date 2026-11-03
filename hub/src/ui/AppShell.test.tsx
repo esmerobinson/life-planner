@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -125,13 +125,72 @@ describe("AppShell", () => {
     expect(await screen.findByText("date:2026-10-28")).toBeInTheDocument();
   });
 
-  it("top row has Add on the left and the Inbox pill last; Backup is not in it", async () => {
+  it("the top row holds only the Inbox pill (Add is the round button); Backup is not in it", async () => {
     renderShell(<p>x</p>);
     const row = document.querySelector(".shell-actions") as HTMLElement;
     const kids = Array.from(row.children).map((c) => c.textContent);
-    expect(kids).toEqual(["Add", "Inbox"]);
+    expect(kids).toEqual(["Inbox"]);
     expect(row.lastElementChild).toHaveAttribute("href", "/inbox");
     expect(row.querySelector('a[href="/backup"]')).toBeNull();
     expect(document.querySelector('.sidebar-footer a[href="/backup"]')).not.toBeNull();
+  });
+});
+
+describe("the round Add button (1C)", () => {
+  it("is a round '+' named Add, after the page, and opens the form as a pop-up card", async () => {
+    renderShell(<p>page</p>);
+    const add = screen.getByRole("button", { name: "Add" });
+    expect(add).toHaveClass("add-fab");
+    expect(add).toHaveTextContent("+");
+    expect(add.closest(".shell-actions")).toBeNull();
+    await userEvent.click(add);
+    const card = screen.getByRole("dialog", { name: "Add" });
+    expect(card).toHaveClass("add-pop");
+    expect(add).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Title")).toHaveFocus();
+  });
+
+  it("the button again, Escape, Cancel or a click outside closes it; focus returns to the button", async () => {
+    renderShell(<p>page</p>);
+    const add = screen.getByRole("button", { name: "Add" });
+    await userEvent.click(add);
+    await userEvent.click(add);
+    expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+
+    await userEvent.click(add);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+    expect(add).toHaveFocus();
+
+    await userEvent.click(add);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+    expect(add).toHaveFocus();
+
+    await userEvent.click(add);
+    await userEvent.click(screen.getByText("page"));
+    expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+  });
+
+  it("on a phone it is a sheet from the bottom with Close; the shade closes it too", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {},
+    }));
+    try {
+      renderShell(<p>page</p>);
+      expect(document.querySelector(".shell-actions")).toBeNull(); // Inbox is in the phone top bar
+      const add = screen.getByRole("button", { name: "Add" });
+      await userEvent.click(add);
+      const sheet = screen.getByRole("dialog", { name: "Add" });
+      expect(sheet).toHaveClass("add-sheet");
+      await userEvent.click(within(sheet).getByRole("button", { name: "Close" }));
+      expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+      expect(add).toHaveFocus();
+      await userEvent.click(add);
+      await userEvent.click(document.querySelector(".add-shade") as HTMLElement);
+      expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
