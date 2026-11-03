@@ -181,6 +181,24 @@ button.sort-back {
   margin: 0;
 }
 
+/* Inbox page (spacing pass). The add-to-inbox row had no space above it (it sat on the
+   "3 to sort" row): page blocks are --gap-stack (16px) apart. The empty Undo line kept a
+   blank line between "To sort" and the list, so heading to list was 16 + 20 + 16px; empty,
+   it now takes no room (it appears in the same moment a row leaves the list). */
+.inbox-capture {
+  margin: var(--gap-stack) 0;
+}
+
+.inbox-page .undo-line:empty {
+  min-height: 0;
+}
+
+/* "Needs a look" is followed straight by its first small heading: the section heading's
+   16px is the space (the small heading's own 24px is for the groups after it). */
+.needs-a-look > section:first-of-type > h3 {
+  margin-top: 0;
+}
+
 /* Present for screen readers, not drawn (the mockup has no heading). */
 .sort-heading {
   position: absolute;

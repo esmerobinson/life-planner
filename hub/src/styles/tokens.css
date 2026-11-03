@@ -42,6 +42,27 @@
 
   --placeholder: #ff00ff; /* undecided: obviously wrong on purpose */
 
+  /* Spacing scale (spacing pass, 2026-11-03; Esme: "make sure throughout app alignment and
+     spacing is clean"). Not new values: these are the gaps, margins and paddings the app
+     already used most (8px strips and button rows, 12px form columns, 16px panels and grids,
+     24px page padding, 32px Home columns), named so every page uses the same ones. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  /* What each step is for, everywhere. */
+  --gap-label: var(--space-1); /* a field's label to its field */
+  --gap-field: var(--space-3); /* the last field to its buttons (controls.css .form-actions);
+                                  field to field is mockup A's 8px (--space-2) */
+  --gap-buttons: var(--space-2); /* buttons side by side (and their wrapped rows) */
+  --gap-rows: var(--space-2); /* rows in a list: strips, cards in a column */
+  --gap-stack: var(--space-4); /* blocks in a card or panel; a heading to its content */
+  --gap-section: var(--space-6); /* a page section to the next */
+  --pad-card: var(--space-4); /* a card on the page */
+  --pad-sheet: var(--space-5); /* the page, the side panel, sheets and pop-ups over the page */
+
   font-family: system-ui;
   color: var(--text);
 }
@@ -54,6 +75,26 @@
 body {
   margin: 0;
   background: var(--page);
+}
+
+/* Headings on a page (spacing pass). The browser's own heading margins (21px, 20px, 19px)
+   gave every page a slightly different title position and section rhythm. Now: the page
+   title sits at the top of the page column with --gap-stack (16px) under it; a section
+   heading starts --gap-section (32px) under what came before and has 16px under it; a
+   sub-heading 24px and 16px. Paragraphs and lists keep the browser's 16px, which is
+   --gap-stack, so heading to content, paragraph to paragraph and list to next are all 16px
+   (touching margins share, the larger wins). :where() keeps these at plain element weight,
+   so any heading styled by its own class (cards, panels, the Journal) keeps its own. */
+:where(.app-content) h1 {
+  margin: 0 0 var(--gap-stack);
+}
+
+:where(.app-content) h2 {
+  margin: var(--gap-section) 0 var(--gap-stack);
+}
+
+:where(.app-content) h3 {
+  margin: var(--space-5) 0 var(--gap-stack);
 }
 
 .app-shell {
@@ -92,6 +133,10 @@ body {
 /* Backup: a quiet text link at the bottom of the sidebar's scroll area. */
 .sidebar-footer {
   margin-top: auto;
+  /* The same row as the phone's footer links (phone.css .phone-footer: 8px 16px). */
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
 }
 
 .sidebar-footer a {
@@ -150,8 +195,13 @@ body {
   /* 280px: the goals column of the approved mockup-goals-choices.html section 2 (tab C, the
      mini colour-band cards, 2026-11-02). */
   grid-template-columns: minmax(0, 1fr) 280px;
-  column-gap: 32px;
-  row-gap: 32px;
+  column-gap: var(--space-6);
+  row-gap: var(--space-6);
+}
+
+/* The goals column's heading lines up with Today's title at the top of the page. */
+.home-goals > h2 {
+  margin-top: 0;
 }
 /* Under 1000px wide the goals column goes below Today instead of squashing against it
    (2026-11-02), full width as in that mockup's narrow layout. */

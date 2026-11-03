@@ -69,7 +69,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: var(--gap-stack); /* spacing pass: was 14px, now the panel's block gap */
 }
 
 /* The goal mockup's small "Goal" word (.muted). */
@@ -95,15 +95,18 @@ button.peek-pill.is-done {
   background: var(--bar-fill);
 }
 
+/* Spacing pass: one block gap for every panel, --gap-stack (16px; the goal panel already
+   used it, the task panel had 14px). Paragraphs are blocks here too: the gap is their space,
+   so their own 16px browser margins (which doubled it, e.g. above "Delete goal") are off. */
 .peek-content {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
   min-width: 0;
 }
 
-.goal-peek .peek-content {
-  gap: 16px;
+.peek-content p {
+  margin: 0;
 }
 
 /* The task title (.dtitle): typed straight into, saved on blur. A one-line textarea that
@@ -434,7 +437,7 @@ input[type="file"].page-file {
 .peek-sec {
   font-weight: 700;
   font-size: 15px;
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -449,16 +452,18 @@ button.peek-add {
   border-radius: 0;
 }
 
+/* "To come" / "Completed": spacing pass, 12px above and 8px below (were 10px and 6px), so
+   the small heading sits on the scale like the section heading above it. */
 .peek-sub {
   font-size: 13px;
   font-weight: 600;
-  margin: 10px 0 6px;
+  margin: var(--space-3) 0 var(--space-2);
 }
 
 .peek-add-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--gap-buttons);
+  margin-bottom: var(--space-2);
 }
 
 .peek-add-row input {
@@ -488,7 +493,7 @@ button.peek-add {
 .peek.is-full .peek-content {
   background: var(--panel);
   border-radius: var(--radius-panel);
-  padding: 14px;
+  padding: var(--pad-card); /* spacing pass: a card's 16px (was 14px) */
 }
 
 /* ---- Strips: opening, flags, crossed off ---- */
@@ -556,7 +561,7 @@ button.strip-open {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: var(--gap-stack); /* spacing pass: 16px between page blocks (was 12px) */
 }
 
 .habits-head {

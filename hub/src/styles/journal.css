@@ -14,7 +14,7 @@
 .journal-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--gap-stack);
   min-width: 0;
 }
 
@@ -22,20 +22,26 @@
   margin: 0;
 }
 
-/* .card in the mockup */
+/* .card in the mockup. Spacing pass: the page cards' padding (--pad-card, 16px, as the goal
+   and suggested-goals cards) and blocks --gap-stack (16px) apart; were 20px and 14px. */
 .journal-card {
   background: var(--panel);
   border-radius: var(--radius-panel);
-  padding: 20px;
+  padding: var(--pad-card);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
   scroll-margin-top: 16px;
 }
 
 .journal-card > *,
 .journal-card p {
   margin: 0;
+}
+
+/* A lone button in a card (Try again) keeps its pill width instead of stretching across. */
+.journal-card > button {
+  align-self: flex-start;
 }
 
 /* ---- Journal v2 tabs (the approved mockup-journal-v2.html): big pills in a row, 16px text,
@@ -82,11 +88,6 @@ a.journal-tab.is-selected {
   border-radius: 6px;
   font-size: 11px;
   flex: none;
-}
-
-/* Desktop Today: the Journal section under the to-dos, with the same clear space as on Home. */
-.today-page .journal-card-home {
-  padding-top: 20px;
 }
 
 .journal-big {
@@ -213,7 +214,7 @@ a.journal-tab.is-selected {
 .journal-writing {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
 }
 
 .journal-page-box {
@@ -235,6 +236,17 @@ a.journal-tab.is-selected {
   margin-bottom: 6px;
 }
 
+/* Spacing pass: the card's "no margins on paragraphs" rule had set both lines flat on the
+   bar (the 6px above never applied); the word count and the "keep going" line now sit
+   --space-1 (4px) above and below it, as a label sits over its field. */
+.journal-writing .journal-words {
+  margin-bottom: var(--space-1);
+}
+
+.journal-writing .journal-keep-going {
+  margin-top: var(--space-1);
+}
+
 .journal-dots {
   display: flex;
   gap: 6px;
@@ -254,7 +266,7 @@ a.journal-tab.is-selected {
 .journal-question {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
 }
 
 .journal-q {
@@ -265,7 +277,14 @@ a.journal-tab.is-selected {
 }
 
 .journal-skill {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
+}
+
+/* In the one-question view the question and its skill line are both blocks of the stack:
+   the skill line still sits 4px under its question (as in the answers list and as a card's
+   chapter line under its title), not a full block gap away. */
+.journal-question > .journal-skill {
+  margin-top: calc(var(--space-1) - var(--gap-stack));
 }
 
 .journal-answer {
@@ -286,7 +305,7 @@ a.journal-tab.is-selected {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
 }
 
 .journal-answers .journal-answer {
@@ -309,17 +328,10 @@ a.journal-tab.is-selected {
   overflow-wrap: anywhere;
 }
 
-.journal-card-home h2 {
-  margin-top: 0;
-}
-
-/* Desktop Home: clear space between the last Today strip and the Journal heading (Esme,
-   2026-11-02: "due is too close to journal header"). The Today list keeps its own 16px under
-   it, and the card adds the 20px the phone Home already puts before its next section
-   (.phone-footer). Padding, so the two add up instead of collapsing into one margin. */
-.home-centre .journal-card-home {
-  padding-top: 20px;
-}
+/* Home and Today: clear space between the last Today strip and the Journal heading (Esme,
+   2026-11-02: "due is too close to journal header"). Spacing pass: the heading is a page
+   section heading like any other (tokens.css h2: --gap-section, 32px, above it), so the
+   space is the same on Home and Today; it was 16px + 20px of padding. */
 
 /* Mental health exercise (exercise brief): the section is a journal card; the "Day N" chip is
    the Journal violet; the Done box is the task strips' tick; the star toggle is line-drawn in
@@ -338,7 +350,7 @@ a.journal-tab.is-selected {
 .exercise-card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
   min-width: 0;
 }
 
@@ -421,7 +433,7 @@ a.journal-tab.is-selected {
 }
 
 .exercise-label {
-  margin: 0 0 4px;
+  margin: 0 0 var(--gap-label);
   font-size: inherit;
   font-weight: 700;
 }
@@ -480,11 +492,12 @@ button.exercise-next-link {
 /* The response box under Try this (journal polish brief §1): the check-in answer box
    (.journal-answer) at 16px+, six rows tall and growing with the text (the height is set as
    she types). Builder's calls, not yet seen by Esme: Submit / "Saved" under the box on the
-   right, the 8px gap, and "Your response" in Past exercises as a bold label like Learn. */
+   right, the gap, and "Your response" in Past exercises as a bold label like Learn.
+   Spacing pass: the box (or the parts) to Submit is the forms' field-to-buttons gap. */
 .exercise-response-wrap {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--gap-field);
   min-width: 0;
 }
 
@@ -501,10 +514,11 @@ button.exercise-next-link {
 }
 
 /* A card with parts (Journal v2, not in the mockup; builder's calls from existing values, not
-   yet seen by Esme): the parts stacked 14px apart like the check-in answers, each prompt as
-   the bold Learn / Try this label; list lines numbered, 6px apart; the 0–10 rating and the
-   choices as the existing soft pills (controls.css button[aria-pressed]). Read back the same
-   way, read-only. */
+   yet seen by Esme): the parts stacked like the check-in answers, each prompt as the bold
+   Learn / Try this label; list lines numbered; the 0–10 rating and the choices as the
+   existing soft pills (controls.css button[aria-pressed]). Read back the same way, read-only.
+   Spacing pass (were 14px / 6px / 6px): parts --gap-stack apart, a prompt --gap-label over
+   its control (as every form label), list lines --gap-rows apart (as every list). */
 .exercise-parts,
 .exercise-part-answers {
   margin: 0;
@@ -512,7 +526,7 @@ button.exercise-next-link {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
   min-width: 0;
 }
 
@@ -524,12 +538,17 @@ label.exercise-part {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--gap-label);
 }
 
 .exercise-part legend {
   padding: 0;
-  margin-bottom: 6px;
+  margin-bottom: var(--gap-label);
+}
+
+/* In a text part the label is a flex item: the gap is its space, not its margin as well. */
+label.exercise-part > .exercise-label {
+  margin: 0;
 }
 
 .exercise-list,
@@ -538,7 +557,7 @@ label.exercise-part {
   padding-left: 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--gap-rows);
 }
 
 input.exercise-list-line {
@@ -684,7 +703,8 @@ input.exercise-list-line {
 
 /* A checklist: each item is its words, with the choice pills under them (the label above the
    pills at every width) and, when the card gives one, a one-line note box. Only existing
-   values: 6px from label to control (as in every part), 14px from item to item (as between
+   values: the label --gap-label over its pills (as every label over its control), the note
+   box 8px under them (as field to field in a form), items --gap-stack apart (as between
    parts), the choice part's pills, the list part's input and its muted count line. */
 .exercise-checklist {
   margin: 0;
@@ -692,13 +712,13 @@ input.exercise-list-line {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-stack);
 }
 
 .exercise-check-item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--gap-label);
   min-width: 0;
 }
 
@@ -709,6 +729,7 @@ input.exercise-list-line {
 input.exercise-check-note {
   width: 100%;
   box-sizing: border-box;
+  margin-top: var(--gap-label); /* + the item's 4px gap = 8px, a form's field-to-field */
 }
 
 .exercise-check-answers {
@@ -719,7 +740,7 @@ input.exercise-check-note {
 .exercise-chain-step {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--gap-label);
 }
 
 .exercise-chain-arrow {
