@@ -153,14 +153,13 @@ describe("Change to → Project (the arrow menu)", () => {
     }
   });
 
-  it("a to-do done today (still on Today) is not offered Project (M-8)", async () => {
+  it("a to-do done today sits in 'Done today' as a plain done strip, with no Move to menu (M-8)", async () => {
     const t = await createItem({ kind: "task", title: "Pretend done today", areaId: "art", priority: 2 }, MADE);
     await db.items.update(t.id, { status: "done", completedAt: TODAY });
     renderApp("/today", TODAY);
-    const row = await rowOf("Pretend done today", "Today");
-    await userEvent.click(within(row).getByRole("button", { name: "Move to: Pretend done today" }));
-    const change = within(row).getByRole("group", { name: "Change to" });
-    expect(within(change).getAllByRole("button").map((b) => b.textContent)).toEqual(["Idea", "Goal"]);
+    const fold = (await screen.findByText("Done today (1)")).closest("details")!;
+    expect(within(fold).getByText("Pretend done today")).toBeInTheDocument();
+    expect(within(fold).queryByRole("button", { name: "Move to: Pretend done today" })).toBeNull();
   });
 
   it("an idea offers To-do and Project", async () => {

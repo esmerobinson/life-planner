@@ -6,6 +6,7 @@ import type { Goal, ISODate, Item } from "../domain/types";
 import { isActive } from "../domain/goalCounts";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { DailyGoalRows } from "./DailyGoalRows";
+import { DoneSection } from "./DoneSection";
 import { useGoalSources } from "./useGoalSources";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
@@ -39,9 +40,10 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
     return () => clearTimeout(t);
   }, [celebrating]);
 
-  // What was ticked off today stays, crossed out, at the bottom of its list (round 3).
+  // Habits and started projects ticked today stay, crossed out, at the bottom of their list;
+  // a to-do done today moves to the "Done today" dropdown.
   // Inactive goals don't count (goals redesign).
-  const { rhythm, picks, alsoDue } = useMemo(() => {
+  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => {
     const active = goals.filter(isActive);
     return withTickedOff(pickToday(items, active, today, thisMonthDoneFor(active, items, today)), items, today);
   }, [items, goals, today]);
@@ -95,6 +97,7 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
         <ul aria-label="Rhythm" className="strip-list">{rhythm.map(row)}</ul>
       )}
       {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
+      {doneToday.length > 0 && <DoneSection title="Done today" items={doneToday} today={today} onUndo={untick} />}
       {alsoDue.length > 0 && (
         <details>
           <summary>Also due</summary>

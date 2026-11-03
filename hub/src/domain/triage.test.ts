@@ -157,14 +157,37 @@ describe("pickToday", () => {
 describe("Today keeps what was ticked off today (withTickedOff)", () => {
   const today = (items: Item[], day = TUE) => withTickedOff(pickToday(items, [], day, {}), items, day);
 
-  it("a to-do completed today stays on the Today list, at the bottom; tomorrow it is gone", () => {
+  it("a to-do completed today leaves the Today list and goes to doneToday; tomorrow it is gone", () => {
     const a = item({ id: "a", pinnedDate: TUE });
     const b = item({ id: "b", pinnedDate: TUE, status: "done", completedAt: TUE });
     const c = item({ id: "c", pinnedDate: TUE });
     const old = item({ id: "old", status: "done", completedAt: "2026-10-26" });
     const inbox = item({ id: "inbox", areaId: "inbox", status: "done", completedAt: TUE });
-    expect(ids(today([a, b, c, old, inbox]).picks)).toEqual(["a", "c", "b"]);
-    expect(ids(today([a, b, c], WED).picks)).not.toContain("b");
+    const out = today([a, b, c, old, inbox]);
+    expect(ids(out.picks)).toEqual(["a", "c"]);
+    expect(ids(out.doneToday)).toEqual(["b"]);
+    expect(today([a, b, c], WED).doneToday).toEqual([]);
+  });
+
+  it("a project finished today (status done) goes to doneToday too", () => {
+    const p = item({ id: "p", status: "done", completedAt: TUE, sessions: [{ id: "s1", doneOn: TUE }] });
+    const out = today([p]);
+    expect(ids(out.picks)).toEqual([]);
+    expect(ids(out.doneToday)).toEqual(["p"]);
+  });
+
+  it("a project with a session ticked today (not finished) stays in the picks, crossed off", () => {
+    const p = item({ id: "p", sessions: [{ id: "s1", doneOn: TUE }, { id: "s2" }] });
+    const out = today([p]);
+    expect(ids(out.picks)).toEqual(["p"]);
+    expect(out.doneToday).toEqual([]);
+  });
+
+  it("a habit done today never goes to doneToday", () => {
+    const h = item({ id: "h", recur: ["tue"], doneDates: [TUE] });
+    const out = today([h]);
+    expect(ids(out.rhythm)).toEqual(["h"]);
+    expect(out.doneToday).toEqual([]);
   });
 
   it("a habit done today stays in the rhythm, ticked ones last; tomorrow it is fresh", () => {

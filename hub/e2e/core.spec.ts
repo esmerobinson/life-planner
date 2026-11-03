@@ -87,8 +87,12 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(row.getByText(/· 3 days late$/)).toBeVisible();
     await expect(row.getByText("OVERDUE", { exact: true })).toHaveCount(0);
     await row.getByRole("checkbox", { name: "Mark done: Overdue pretend errand" }).click();
-    // Round 3: it stays on Today for the rest of the day, ticked and crossed out.
-    const crossed = page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
+    // It leaves the Today list at once and waits, ticked and crossed out, in a closed "Done today (1)" dropdown.
+    await expect(page.getByRole("list", { name: "Today" }).getByText("Overdue pretend errand")).toHaveCount(0);
+    const fold = page.locator("details.done-fold").filter({ hasText: "Done today (1)" });
+    await expect(fold).not.toHaveAttribute("open", "");
+    await fold.getByText("Done today (1)").click();
+    const crossed = fold.getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
     await expect(crossed.getByRole("checkbox", { name: "Done: Overdue pretend errand" })).toBeChecked();
     await expect(crossed).toHaveClass(/crossed/);
 

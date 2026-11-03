@@ -148,11 +148,15 @@ test.describe("at 1280px", () => {
     await page.goto("/today");
     const list = page.getByRole("list", { name: "Today" });
     await list.getByRole("checkbox", { name: "Mark done: Book a pretend writing day" }).click();
-    await expect(list.getByRole("checkbox", { name: "Done: Book a pretend writing day" })).toBeChecked();
-    await expect
-      .poll(async () => (await list.locator(".strip-title").allTextContents()).slice(-2).sort())
-      .toEqual(["Book a pretend writing day", "Send pretend chapter 3 to a made-up friend"]);
-    await shoot(page, "desktop-1280-today-crossed-off");
+    // The ticked to-do moves to the closed "Done today" dropdown; the one done earlier is already there.
+    const fold = page.locator("details.done-fold").filter({ hasText: "Done today (2)" });
+    await expect(fold).not.toHaveAttribute("open", "");
+    await expect(list.getByText("Book a pretend writing day")).toHaveCount(0);
+    await shoot(page, "desktop-1280-today-done-collapsed");
+    await fold.getByText("Done today (2)").click();
+    await expect(fold.getByRole("checkbox", { name: "Done: Book a pretend writing day" })).toBeChecked();
+    await expect(fold.getByRole("checkbox", { name: "Done: Send pretend chapter 3 to a made-up friend" })).toBeChecked();
+    await shoot(page, "desktop-1280-today-done-open");
   });
 });
 
@@ -196,8 +200,11 @@ test.describe("at 390px", () => {
     await shoot(page, "phone-390-goal-panel-edit");
 
     await page.goto("/today");
+    await fits(page);
+    await shoot(page, "phone-390-today-done-collapsed");
+    await page.getByText(/^Done today \(\d+\)$/).click();
     await expect(page.getByRole("checkbox", { name: "Done: Send pretend chapter 3 to a made-up friend" })).toBeChecked();
     await fits(page);
-    await shoot(page, "phone-390-today-crossed-off");
+    await shoot(page, "phone-390-today-done-open");
   });
 });

@@ -28,10 +28,13 @@ export function DoneSection({
   items,
   today,
   onUndo,
+  title = "Done",
 }: {
   items: Item[];
   today: ISODate;
   onUndo: (id: string) => void;
+  /** The fold-out's heading before the count; "Done today" on the Today list. */
+  title?: string;
 }) {
   const [all, setAll] = useState(false);
   const done = items
@@ -40,12 +43,12 @@ export function DoneSection({
   const shown = all ? done : done.slice(0, DONE_CAP);
   return (
     <details className="done-fold">
-      <summary>{`Done (${done.length})`}</summary>
+      <summary>{`${title} (${done.length})`}</summary>
       {done.length === 0 ? (
         <p>Nothing done yet.</p>
       ) : (
         <>
-          <ul aria-label="Done" className="strip-list">
+          <ul aria-label={title} className="strip-list">
             {shown.map((it) => (
               <DoneStrip key={it.id} item={it} today={today} onUndo={onUndo} />
             ))}

@@ -14,36 +14,36 @@ export function tickedOffToday(it: Item, today: ISODate): boolean {
 }
 
 /**
- * Today keeps what was ticked off today (round 3): habits done today stay in the rhythm
- * list (also one ticked on a day it is not planned for), to-dos completed today join the
- * Today list. Ticked ones move to the bottom of their list, so what is left stays on top.
+ * Today keeps what was ticked off today. Habits done today stay in the rhythm list (also
+ * one ticked on a day it is not planned for), and a project with a session ticked today
+ * (not finished) stays in the Today list; both cross off in place, at the bottom of their
+ * list. A plain to-do (or finished project) completed today leaves the list at once and
+ * is returned in `doneToday`, for the "Done today" dropdown.
  */
 export function withTickedOff(
   pick: { rhythm: Item[]; picks: Item[]; alsoDue: Item[] },
   items: Item[],
   today: ISODate,
-): { rhythm: Item[]; picks: Item[]; alsoDue: Item[] } {
+): { rhythm: Item[]; picks: Item[]; alsoDue: Item[]; doneToday: Item[] } {
   const sorted = (i: Item) => i.kind === "task" && i.areaId !== "inbox";
   const inRhythm = new Set(pick.rhythm.map((i) => i.id));
   const extraHabits = items.filter(
     (i) => sorted(i) && isHabit(i) && i.status === "open" && doneToday(i, today) && !inRhythm.has(i.id),
   );
   const inPicks = new Set(pick.picks.map((i) => i.id));
-  const doneTasks = items.filter(
-    (i) =>
-      sorted(i) &&
-      !inPicks.has(i.id) &&
-      ((i.status === "done" && i.completedAt === today) ||
-        (isProject(i) && i.status === "open" && doneTodayIndex(i, today) >= 0)),
+  const startedProjects = items.filter(
+    (i) => sorted(i) && !inPicks.has(i.id) && isProject(i) && i.status === "open" && doneTodayIndex(i, today) >= 0,
   );
+  const finishedToday = items.filter((i) => sorted(i) && !isHabit(i) && i.status === "done" && i.completedAt === today);
   const lastIfTicked = (list: Item[]) => [
     ...list.filter((i) => !tickedOffToday(i, today)),
     ...list.filter((i) => tickedOffToday(i, today)),
   ];
   return {
     rhythm: lastIfTicked([...pick.rhythm, ...extraHabits]),
-    picks: lastIfTicked([...pick.picks, ...doneTasks]),
+    picks: lastIfTicked([...pick.picks, ...startedProjects]),
     alsoDue: pick.alsoDue,
+    doneToday: finishedToday,
   };
 }
 
