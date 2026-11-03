@@ -17,6 +17,8 @@
 // (including no network) leaves every local change pending.
 
 import { applyUntracked } from "../data/changeTracking";
+import { carrySessionTicks, forgetAcceptedTicks } from "../data/sessionTicks";
+import type { Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
 import { retireCandidateForToken } from "../journal/keyStore";
@@ -404,6 +406,11 @@ async function applyReply(
       }
       if (await applyRow(db, c, reply.cursor)) written++;
     }
+    // A sent item that came back with no other version won: the session ticks it carried are settled.
+    const returned = new Set(reply.changes.filter((c) => c.table === "items").map((c) => c.id));
+    for (const c of sentChanges) {
+      if (c.table === "items" && !returned.has(c.id)) await forgetAcceptedTicks(db, c.id, c.updatedAt);
+    }
     await db.syncMeta.put({ key: "cursor", value: reply.cursor });
     // Everything the server had has now been seen once: Merge and imports may run.
     if (!reply.hasMore) await db.syncMeta.put({ key: "firstPullDone", value: true });
@@ -437,6 +444,19 @@ async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boole
       });
     }
     return false;
+  }
+  // A project this device ticked sessions on, replaced by a newer row from another device:
+  // its ticks go back on and the result is a new local change, sent next (I-4, sessionTicks.ts).
+  if (c.table === "items") {
+    const merged = await carrySessionTicks(db, row as unknown as Item);
+    // This write skips the change tracker, so it is checked here as every local write is.
+    if (merged && validItem({ ...merged, updatedAt: c.updatedAt + 1 })) {
+      const stamp = Math.max(Date.now(), c.updatedAt + 1);
+      await db.items.put({ ...merged, updatedAt: stamp });
+      await db.pending.put({ table: "items", id: c.id, updatedAt: stamp });
+      if (held && held.updatedAt <= c.updatedAt) await db.quarantine.delete([c.table, c.id]);
+      return true;
+    }
   }
   await db.table(c.table).put(row);
   if (waiting) await db.pending.delete([c.table, c.id]);

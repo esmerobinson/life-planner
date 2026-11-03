@@ -5,6 +5,7 @@ import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
 import { daysInMonth, plannedFromLastMonth } from "../domain/goalCounts";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
 import { milestoneTask } from "../domain/milestones";
+import { noteSessionTicks } from "./sessionTicks";
 import {
   DEFAULT_SESSIONS, MAX_SESSION_DETAILS, MAX_SESSION_TITLE, MAX_SESSIONS, MIN_SESSIONS, doneTodayIndex, isProject, newSessions,
   nextSessionIndex, withSessions,
@@ -194,14 +195,14 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
  * to-do) instead logs today in its doneDates and stays open: it never goes to Done.
  */
 export async function tickItem(id: string, today: ISODate): Promise<void> {
-  await db.transaction("rw", db.items, async () => {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item || item.status === "done") return;
     if (isProject(item)) {
       // A project logs its next session today; with every session done already, it is just done.
       const i = nextSessionIndex(item, today);
       const sessions = item.sessions!.map((s, k) => (k === i ? { ...s, doneOn: today } : s));
-      await db.items.put({ ...withSessions(item, sessions, today), touchedAt: today });
+      await putProject(item, { ...withSessions(item, sessions, today), touchedAt: today });
       return;
     }
     if (isHabit(item) && item.status === "open") {
@@ -215,7 +216,7 @@ export async function tickItem(id: string, today: ISODate): Promise<void> {
 
 /** Unticks: a done item is open again; a habit loses today from its doneDates. */
 export async function untickItem(id: string, today: ISODate): Promise<void> {
-  await db.transaction("rw", db.items, async () => {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item) return;
     if (isProject(item)) {
@@ -232,7 +233,7 @@ export async function untickItem(id: string, today: ISODate): Promise<void> {
       if (i < 0 && item.status === "done") i = lastTicked(item.sessions!);
       if (i < 0) return;
       const sessions = item.sessions!.map((s, k) => (k === i ? withoutDone(s) : s));
-      await db.items.put({ ...withSessions(item, sessions, today), touchedAt: today });
+      await putProject(item, { ...withSessions(item, sessions, today), touchedAt: today });
       return;
     }
     if (isHabit(item) && item.status === "open") {
@@ -245,6 +246,16 @@ export async function untickItem(id: string, today: ISODate): Promise<void> {
     const { completedAt: _drop, ...rest } = item;
     await db.items.put({ ...rest, status: "open", touchedAt: today });
   });
+}
+
+/**
+ * Writes a project and notes any session it ticked or unticked, so a newer row from another
+ * device cannot wipe the tick out (data/sessionTicks.ts). Inside a transaction over items and syncMeta.
+ */
+async function putProject(before: Item, next: Item): Promise<void> {
+  await db.items.put(next);
+  const stamp = (await db.items.get(next.id))?.updatedAt ?? 0;
+  await noteSessionTicks(db, next.id, before.sessions, next.sessions ?? [], stamp);
 }
 
 /** A session without its tick. */
@@ -267,14 +278,14 @@ function lastTicked(list: Session[]): number {
  * list. The status follows (done when every session is). Throws for anything not a project.
  */
 async function editSessions(itemId: string, today: ISODate, fn: (list: Session[]) => Session[]): Promise<void> {
-  await db.transaction("rw", db.items, async () => {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(itemId);
     if (!item || !isProject(item) || (item.status !== "open" && item.status !== "done")) {
       throw new Error("that project does not exist");
     }
     const next = fn(item.sessions!.map((s) => ({ ...s })));
     if (next.length < MIN_SESSIONS || next.length > MAX_SESSIONS) throw new Error(`a project has ${MIN_SESSIONS} to ${MAX_SESSIONS} sessions`);
-    await db.items.put({ ...withSessions(item, next, today), touchedAt: today });
+    await putProject(item, { ...withSessions(item, next, today), touchedAt: today });
   });
 }
 
