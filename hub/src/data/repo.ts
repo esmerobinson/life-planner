@@ -345,8 +345,9 @@ export async function changeToProject(itemId: string, today: ISODate, count = DE
     const item = await db.items.get(itemId);
     if (!item || item.status !== "open") throw new Error("only an open item can become a project");
     if (isProject(item)) return;
+    // Sessions an older app left on an idea or habit (dormant) come back as they were.
     const { recur: _r, ...rest } = item;
-    await db.items.put({ ...rest, kind: "task", sessions: newSessions(count), touchedAt: today });
+    await db.items.put({ ...rest, kind: "task", sessions: item.sessions ?? newSessions(count), touchedAt: today });
   });
 }
 

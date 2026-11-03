@@ -14,9 +14,12 @@ export const DEFAULT_SESSIONS = 4;
 export const MAX_SESSION_TITLE = 120;
 export const MAX_SESSION_DETAILS = 1000;
 
-/** A to-do with sessions. */
+/**
+ * A to-do with sessions that does not repeat. Sessions on anything else (an idea or a habit
+ * an older app version made from a project) lie dormant: the row is not a project.
+ */
 export function isProject(it: Item): boolean {
-  return it.kind === "task" && (it.sessions?.length ?? 0) > 0;
+  return it.kind === "task" && (it.recur?.length ?? 0) === 0 && (it.sessions?.length ?? 0) > 0;
 }
 
 /** `n` unnamed sessions ("Session 1"…), each with its own id. */

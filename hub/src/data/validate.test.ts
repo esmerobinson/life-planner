@@ -132,9 +132,11 @@ describe("project to-dos (sessions)", () => {
     expect(validItem(row({ sessions: [s(), s()] }))).toBe(false);
   });
 
-  it("only a to-do can be a project, and a project does not repeat", () => {
-    expect(validItem(row({ kind: "idea", sessions: many(2) }))).toBe(false);
-    expect(validItem(row({ recur: ["mon"], sessions: many(2) }))).toBe(false);
+  it("sessions are checked for shape only: an idea or a repeating to-do from an older app may carry them", () => {
+    // An older app version keeps unknown fields, so Change to → Idea there leaves the sessions on.
+    expect(validItem(row({ kind: "idea", sessions: many(2) }))).toBe(true);
+    expect(validItem(row({ recur: ["mon"], sessions: many(2) }))).toBe(true);
+    expect(validItem(row({ kind: "idea", sessions: [{ title: "No id" }] }))).toBe(false);
   });
 
   it("an emptied-from-the-Bin tombstone carries no sessions", () => {

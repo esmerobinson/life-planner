@@ -63,8 +63,10 @@ export function validItem(r: unknown): r is Item {
         r.doneDates.every((d) => isStr(d) && isValidISODate(d)))) &&
     optStamp(r.updatedAt) &&
     validSource(r.source) &&
-    // A project is a to-do that does not repeat.
-    (r.sessions === undefined || (r.kind === "task" && r.recur === undefined && validSessions(r.sessions))) &&
+    // Sessions are checked for their shape only. What makes a project (a to-do that does not
+    // repeat) is domain/projects.ts isProject: an older app version may turn a project into an
+    // idea and keep its sessions, and that row must still apply here (fix round 1, I-3).
+    (r.sessions === undefined || validSessions(r.sessions)) &&
     // An emptied-from-the-Bin tombstone carries no content.
     (r.status !== "purged" ||
       (r.title === "" && r.notes === undefined && r.tags === undefined && r.sessions === undefined &&

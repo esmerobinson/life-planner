@@ -15,6 +15,9 @@ describe("projects", () => {
     expect(isProject(proj([{ id: "a" }]))).toBe(true);
     expect(isProject(proj([]))).toBe(false);
     expect(isProject(proj(undefined))).toBe(false);
+    // Stray sessions on an idea or a habit (an older app's Change to) are dormant.
+    expect(isProject(proj([{ id: "a" }], { kind: "idea" }))).toBe(false);
+    expect(isProject(proj([{ id: "a" }], { recur: ["mon"] }))).toBe(false);
   });
 
   it("newSessions makes unnamed sessions with distinct ids", () => {

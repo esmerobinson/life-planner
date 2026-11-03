@@ -159,7 +159,16 @@ describe("project to-dos in the repo", () => {
 
   it("an invalid project is never written (the change tracker validates every write)", async () => {
     const p = await project();
-    await expect(updateItem(p.id, { recur: ["mon"] }, TODAY)).rejects.toThrow();
-    expect((await get(p.id)).recur).toBeUndefined();
+    await expect(updateItem(p.id, { sessions: [] }, TODAY)).rejects.toThrow();
+    expect((await get(p.id)).sessions).toHaveLength(4);
+  });
+
+  it("Change to → Project on an idea carrying dormant sessions (an older app's) brings them back", async () => {
+    const idea = await createItem(
+      { ...base, kind: "idea", sessions: [{ id: "x", title: "Market stalls", doneOn: "2026-10-30" }, { id: "y" }] },
+      "2026-10-29",
+    );
+    await changeToProject(idea.id, TODAY);
+    expect((await get(idea.id)).sessions).toEqual([{ id: "x", title: "Market stalls", doneOn: "2026-10-30" }, { id: "y" }]);
   });
 });
