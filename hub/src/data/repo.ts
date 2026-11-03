@@ -825,7 +825,8 @@ export async function fileItem(id: string, type: SortType, areaId: AreaId, today
     if (!item || item.status !== "open" || item.areaId !== "inbox") throw new Error("that item is no longer in the inbox");
     if (type === "goal") return itemToGoal(id, areaId, today);
     if (type === "idea") {
-      const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, ...rest } = item;
+      // An idea has no sessions either (a project added to the inbox, filed as an idea).
+      const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, sessions: _s, ...rest } = item;
       await db.items.put({ ...rest, kind: "idea", areaId, touchedAt: today });
     } else {
       await db.items.put({ ...item, kind: "task", areaId, touchedAt: today });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./db";
 import {
-  addSession, changeToProject, createItem, emptyBin, deleteItem, removeSession, setSessionDone, tickItem, untickItem,
+  addSession, changeToProject, createItem, emptyBin, deleteItem, fileItem, removeSession, setSessionDone, tickItem, untickItem,
   updateItem, updateSession,
 } from "./repo";
 import type { Item } from "../domain/types";
@@ -136,6 +136,16 @@ describe("project to-dos in the repo", () => {
     const p = await project();
     await updateItem(p.id, { sessions: undefined }, TODAY);
     expect((await get(p.id)).sessions).toBeUndefined();
+  });
+
+  it("a project added to the inbox keeps its sessions filed as a to-do, and loses them filed as an idea", async () => {
+    const a = await project(3, { areaId: "inbox" });
+    await fileItem(a.id, "task", "art", TODAY);
+    expect((await get(a.id)).sessions).toHaveLength(3);
+    const b = await project(3, { areaId: "inbox" });
+    await fileItem(b.id, "idea", "art", TODAY);
+    expect(await get(b.id)).toMatchObject({ kind: "idea", areaId: "art" });
+    expect((await get(b.id)).sessions).toBeUndefined();
   });
 
   it("emptying the Bin leaves a tombstone without sessions", async () => {
