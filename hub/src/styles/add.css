@@ -57,7 +57,8 @@ button.add-fab {
   overscroll-behavior: contain;
   background: var(--panel);
   border-radius: var(--radius-panel);
-  padding: 16px 18px 18px;
+  /* Spacing pass: a card's padding (--pad-card, 16px all round; was 16px 18px 18px). */
+  padding: var(--pad-card);
   box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
 }
 
@@ -65,7 +66,10 @@ button.add-fab {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
+  /* Spacing pass: the "Add" heading had nothing under it (the old field margins gave 8px);
+     now the 16px under every heading. */
+  margin-bottom: var(--gap-stack);
 }
 
 .add-head h2 {
@@ -116,7 +120,8 @@ button.add-fab {
 .add-sheet {
   background: var(--panel);
   border-radius: var(--radius-panel) var(--radius-panel) 0 0;
-  padding: 18px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+  /* Spacing pass: 16px at the top like the sides (the phone gutter; was 18px). */
+  padding: var(--space-4) max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
     max(16px, env(safe-area-inset-left));
   max-height: calc(100% - max(34px, env(safe-area-inset-top)));
   overflow-y: auto;
