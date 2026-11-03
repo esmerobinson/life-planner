@@ -13,12 +13,17 @@ import { usePanel } from "./panelContext";
 import { PanelTop } from "./PanelTop";
 import type { EscapeHandler } from "./SidePanel";
 import { PageEditor } from "./PageEditor";
+import { ProjectSummary, SessionList } from "./ProjectPanel";
+import { DEFAULT_SESSIONS, isProject, newSessions } from "../domain/projects";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
 
-const TYPE_LABEL: Record<Item["kind"], string> = { task: "To-do", idea: "Idea" };
+/** The Type property: a project is a to-do with sessions, shown as its own type. */
+type PanelKind = Item["kind"] | "project";
+const TYPE_LABEL: Record<PanelKind, string> = { task: "To-do", project: "Project", idea: "Idea" };
+const kindOf = (it: Item): PanelKind => (isProject(it) ? "project" : it.kind);
 
 interface Fields {
-  kind: Item["kind"];
+  kind: PanelKind;
   areaId: AreaId;
   due: string;
   goalId: string;
@@ -27,7 +32,7 @@ interface Fields {
 }
 
 const fieldsOf = (it: Item): Fields => ({
-  kind: it.kind,
+  kind: kindOf(it),
   areaId: it.areaId,
   due: it.due ?? "",
   goalId: it.goalId ?? "",
@@ -103,9 +108,14 @@ export function ItemPanel({
     const was = snapshot;
     const patch: Partial<Item> = {};
     if (f.priority !== was.priority) patch.priority = f.priority;
-    if (!inbox && f.kind !== was.kind) patch.kind = f.kind;
+    if (!inbox && f.kind !== was.kind) {
+      // Project <-> to-do: the sessions come or go (a project does not repeat); an idea has none.
+      if (f.kind === "project") Object.assign(patch, { kind: "task", sessions: newSessions(DEFAULT_SESSIONS), recur: undefined });
+      else patch.kind = f.kind;
+      if (was.kind === "project" && f.kind !== "project") patch.sessions = undefined;
+    }
     if (!inbox && f.areaId !== was.areaId) patch.areaId = f.areaId;
-    if (inbox || f.kind === "task") {
+    if (inbox || f.kind !== "idea") {
       if (f.due !== was.due) patch.due = f.due || undefined;
       if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
       const flag = Boolean(f.goalId && f.milestone);
@@ -133,12 +143,16 @@ export function ItemPanel({
   // Days untouched, when it is in Needs a look's "Not looked at in a while" group.
   const stale = needsALook([item], today).stale.length > 0 ? daysBetween(item.touchedAt, today) : null;
   const isTask = inbox || item.kind === "task";
-  const showGoal = editing ? inbox || fields.kind === "task" : isTask;
+  const showGoal = editing ? inbox || fields.kind !== "idea" : isTask;
+  const project = isProject(item);
+  // A project's due date is its deadline (2C).
+  const dueKey = (editing ? fields.kind === "project" : project) ? "Deadline" : "Due";
 
   return (
     <div className="peek-body">
       <PanelTop
         phone={phone}
+        kicker={project ? "Project" : undefined}
         editing={editing}
         busy={busy}
         onEdit={startEdit}
@@ -156,14 +170,15 @@ export function ItemPanel({
               <select
                 aria-label="Type"
                 value={fields.kind}
-                onChange={(e) => setFields({ ...fields, kind: e.target.value as Item["kind"] })}
+                onChange={(e) => setFields({ ...fields, kind: e.target.value as PanelKind })}
               >
                 <option value="task">To-do</option>
+                <option value="project">Project</option>
                 <option value="idea">Idea</option>
               </select>
             ) : (
               <span>
-                <span className="chip">{TYPE_LABEL[item.kind]}</span>
+                <span className="chip">{TYPE_LABEL[kindOf(item)]}</span>
               </span>
             )}
           </>
@@ -206,11 +221,17 @@ export function ItemPanel({
         )}
         {showGoal && (
           <>
-            <span className="peek-key">Due</span>
+            <span className="peek-key">{dueKey}</span>
             {editing ? (
-              <input type="date" aria-label="Due" value={fields.due} onChange={(e) => setFields({ ...fields, due: e.target.value })} />
+              <input type="date" aria-label={dueKey} value={fields.due} onChange={(e) => setFields({ ...fields, due: e.target.value })} />
             ) : (
               <span>{item.due ? dayLabel(item.due, today) : "None"}</span>
+            )}
+            {project && (
+              <>
+                <span className="peek-key">Sessions</span>
+                <span>{item.sessions!.length}</span>
+              </>
             )}
             <span className="peek-key">Goal</span>
             {editing ? (
@@ -279,6 +300,12 @@ export function ItemPanel({
           </>
         )}
       </div>
+      {project && (
+        <>
+          <ProjectSummary item={item} today={today} onChanged={onChanged} />
+          <SessionList item={item} today={today} write={write} />
+        </>
+      )}
       <PageEditor value={notes.value} onChange={notes.set} onBlur={notes.flush} today={today} />
       </div>
     </div>

@@ -6,7 +6,7 @@ import type { ISODate } from "../domain/types";
 import { CALENDAR_GLYPH, IconPopover } from "./IconPopover";
 import { useSaveError } from "./messages";
 
-type Close = (refocus?: boolean) => void;
+export type Close = (refocus?: boolean) => void;
 
 /**
  * One labelled part of the menu: quick choices, then a day field with Set, then (when
@@ -16,7 +16,7 @@ type Close = (refocus?: boolean) => void;
  * move the row away mid-edit. Only a real day, today or later, that differs from the
  * current value is saved.
  */
-function DayPart({
+export function DayPart({
   heading,
   quick,
   current,
