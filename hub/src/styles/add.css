@@ -82,7 +82,7 @@ button.add-fab {
   position: fixed;
   right: calc(max(24px, env(safe-area-inset-right)) + 60px);
   bottom: calc(max(24px, env(safe-area-inset-bottom)) + 6px);
-  z-index: 15;
+  z-index: 21; /* over the side panel (20): an Undo made in the panel must stay reachable */
   max-width: calc(100vw - 320px);
   pointer-events: none;
 }

@@ -150,6 +150,35 @@ for (const width of [1280, 390]) {
       await shoot(page, `today-project-ticked-${width}`);
     });
 
+    test("a goal changes to a project from its Edit, and Undo brings the goal back", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.getByText("Nothing planned for today.").first()).toBeVisible();
+      const deadline = await pageDate(page, 20);
+      const id = await page.evaluate(async (deadline) => {
+        const repo = await import(/* @vite-ignore */ "/src/data/repo.ts" as string);
+        const today = (await import(/* @vite-ignore */ "/src/domain/dates.ts" as string)).todayISO();
+        const g = await repo.createGoal(
+          { title: "Pretend blender goal", areaId: "art", kind: "finite", deadline, monthlyTarget: 5, notes: "Pretend notes" },
+          today,
+        );
+        return g.id as string;
+      }, deadline);
+      await page.goto(`/goals?open=${id}`);
+      const goalPanel = page.getByRole("complementary", { name: "Pretend blender goal" });
+      await goalPanel.getByRole("button", { name: "Edit" }).click();
+      await goalPanel.getByLabel("Type").selectOption("project");
+      await goalPanel.getByRole("button", { name: "Done" }).click();
+      const projectPanel = page.getByRole("complementary", { name: "Pretend blender goal" });
+      await expect(projectPanel.locator(".peek-kicker")).toHaveText("Project");
+      await expect(projectPanel.getByRole("list", { name: "Sessions" }).getByRole("listitem")).toHaveCount(5);
+      const undo = page.locator(".shell-undo");
+      await expect(undo).toContainText("Changed to a project; the goal is in the Bin");
+      await noSideways(page);
+      await shoot(page, `goal-to-project-${width}`);
+      await undo.getByRole("button", { name: "Undo" }).click();
+      await expect(page.getByRole("complementary", { name: "Pretend blender goal" }).locator(".peek-kicker")).toHaveText("Goal");
+    });
+
     test("the panel: summary, sessions with titles, details and days; add and name a session", async ({ page }) => {
       const id = await seed(page);
       await page.goto(`/area/art?open=${id}`);
