@@ -206,6 +206,24 @@ describe("parseCardFile, version 2 (Journal v2)", () => {
       expect(ok({ note: 5 })).toBe(false);
     });
 
+    it("malformed checklists make the whole file unreadable, like any other bad part", () => {
+      const bad: Record<string, unknown>[] = [
+        { ...good, items: ["One", "One"] }, // a repeated item
+        { ...good, items: "One" },
+        { ...good, items: { 0: "One" } },
+        { ...good, options: "Yes" },
+        { ...good, options: ["Yes", null] },
+        { ...good, options: ["Yes", "Yes"] },
+        { ...good, items: [] },
+        { ...good, options: ["Only"] },
+        { kind: "checklist", prompt: "Pretend" }, // no items, no options
+      ];
+      for (const p of bad) expect(checkCardFile(part(p)), JSON.stringify(p)).toBeNull();
+      // Another good part beside a bad one does not save the file.
+      expect(checkCardFile(withCard2({ parts: [{ prompt: "Pretend", kind: "text" }, { ...good, items: [] }] }))).toBeNull();
+      expect(parseCardFile(JSON.stringify(part({ ...good, items: ["One", "One"] })))).toBeNull();
+    });
+
     it("an older card (a note-less checklist is read as no note box)", () => {
       const { note: _n, ...bare } = good;
       expect(parts(bare)).toEqual([{ ...good, note: "" }]);

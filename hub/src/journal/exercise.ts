@@ -230,7 +230,7 @@ function checkParts(v: unknown): CardPart[] | null {
       out.push({ prompt: p.prompt, kind, steps: st as string[] });
     } else if (kind === "checklist") {
       const { items, options } = p;
-      if (!Array.isArray(items) || items.length === 0 || items.length > MAX_CHECKLIST_ITEMS || !items.every((x) => text(x, true, MAX_CHECKLIST_ITEM))) return null;
+      if (!Array.isArray(items) || items.length === 0 || items.length > MAX_CHECKLIST_ITEMS || !items.every((x) => text(x, true, MAX_CHECKLIST_ITEM)) || new Set(items).size !== items.length) return null;
       if (!Array.isArray(options) || options.length < MIN_CHECKLIST_OPTIONS || options.length > MAX_CHECKLIST_OPTIONS) return null;
       if (!options.every((x) => text(x, true, MAX_CHECKLIST_OPTION)) || new Set(options).size !== options.length) return null;
       if (p.note !== undefined && !text(p.note, false, MAX_CHECKLIST_NOTE)) return null;

@@ -4,7 +4,8 @@ import { vi } from "vitest";
 import { db } from "../../data/db";
 import { cardRef, importExerciseCards, readExerciseEntry, readExerciseProgress, saveExerciseMark, submitExerciseEntry } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
-import { checkCardFile } from "../../journal/exercise";
+import { checkCardFile, type PartValue } from "../../journal/exercise";
+import { fitChecklist } from "./ExerciseResponseBox";
 import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_CHECKLIST, PRETEND_FEATURES } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
@@ -172,6 +173,54 @@ describe("a checklist card", () => {
     await userEvent.click(within(list).getByText(/Exercise · Day 2/));
     expect(within(list).getByText("Pretend walk: Done")).toBeInTheDocument();
     expect(within(list).getByText((_, el) => el?.tagName === "LI" && el.textContent === "Pretend tea: Not answered")).toBeInTheDocument();
+  });
+});
+
+it("the typed note is capped at 500 characters", async () => {
+  renderApp("/journal/exercise", TODAY);
+  const card = await todayCard();
+  expect(await within(card).findByRole("textbox", { name: "Pretend feature one, note" })).toHaveAttribute("maxlength", "500");
+});
+
+describe("re-importing the cards keeps the answers of items that are unchanged", () => {
+  const part = NOTES.parts[0]!;
+  const was: PartValue = [
+    ["Pretend feature one", "Yes", "Pretend note one"], ["Pretend feature two", "Partly", "Pretend note two"],
+    ["Pretend feature three", "No", ""], ["Pretend feature four", "Yes", "Pretend note four"],
+  ];
+  const withItems = (items: string[], options = part.options) => ({ ...part, items, options });
+
+  it("the same items: all of it comes back", () => {
+    expect(fitChecklist(part, was)).toEqual(was);
+  });
+
+  it("reordered items keep their own answers (matched by their words); a new item is empty", () => {
+    const next = withItems(["Pretend feature four", "Pretend brand new", "Pretend feature one"]);
+    expect(fitChecklist(next, was)).toEqual([
+      ["Pretend feature four", "Yes", "Pretend note four"], ["Pretend brand new", "", ""], ["Pretend feature one", "Yes", "Pretend note one"],
+    ]);
+  });
+
+  it("a renamed item starts empty (the others keep theirs)", () => {
+    const next = withItems(["Pretend feature one", "Pretend feature 2", "Pretend feature three", "Pretend feature four"]);
+    expect(fitChecklist(next, was)).toEqual([
+      ["Pretend feature one", "Yes", "Pretend note one"], ["Pretend feature 2", "", ""], ["Pretend feature three", "No", ""],
+      ["Pretend feature four", "Yes", "Pretend note four"],
+    ]);
+  });
+
+  it("a choice that is no longer one of the options is dropped, its note kept", () => {
+    expect(fitChecklist(withItems(PRETEND_FEATURES, ["Yes", "No"]), was)).toEqual([
+      ["Pretend feature one", "Yes", "Pretend note one"], ["Pretend feature two", "", "Pretend note two"], ["Pretend feature three", "No", ""],
+      ["Pretend feature four", "Yes", "Pretend note four"],
+    ]);
+  });
+
+  it("nothing stored, or something that is not rows: all empty", () => {
+    const empty = PRETEND_FEATURES.map((i) => [i, "", ""]);
+    expect(fitChecklist(part, null)).toEqual(empty);
+    expect(fitChecklist(part, "text")).toEqual(empty);
+    expect(fitChecklist(part, [1, "x", null] as unknown as PartValue)).toEqual(empty);
   });
 });
 

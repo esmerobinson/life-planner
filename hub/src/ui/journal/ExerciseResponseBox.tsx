@@ -13,7 +13,9 @@ const SAVE_PROBLEM = "That didn't save. Try again.";
 /** A running count, to tell whether a read started after a write had landed. */
 let clock = 0;
 const tick = () => ++clock;
-const RATINGS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+/** The most she can type in one checklist item's note. */
+const MAX_CHECKLIST_NOTE_TEXT = 500;
+const RATINGS =[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 /** Saving a tracker card's day without finishing it. */
 export const SAVE_TODAY = "Save today's entry";
 
@@ -104,7 +106,7 @@ function fit(empty: PartValue, prev: PartValue): PartValue {
  * A stored checklist answer fitted to the card's items now: each item keeps the choice (still
  * one of the options) and note stored under the same item words.
  */
-function fitChecklist(part: CardPart, prev: PartValue): PartValue {
+export function fitChecklist(part: CardPart, prev: PartValue): PartValue {
   const rows = Array.isArray(prev) ? (prev as unknown[]).filter((r): r is string[] => Array.isArray(r)) : [];
   return part.items!.map((item, i) => {
     const was = rows[i]?.[0] === item ? rows[i] : rows.find((r) => r[0] === item);
@@ -424,6 +426,7 @@ function ChecklistInput({ part, value, onChange }: { part: CardPart; value: Part
                 className="exercise-check-note"
                 aria-label={`${part.items![i]}, note`}
                 placeholder={part.note}
+                maxLength={MAX_CHECKLIST_NOTE_TEXT}
                 value={r[2] ?? ""}
                 onChange={(e) => set(i, 2, e.target.value)}
               />
