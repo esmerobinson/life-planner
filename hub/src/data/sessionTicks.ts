@@ -53,7 +53,9 @@ export async function carrySessionTicks(db: HubDB, incoming: Item): Promise<Item
   const row = await db.syncMeta.get(ticksKey(incoming.id));
   if (!row) return null;
   const ticks = row.value as Ticks;
-  if (!isProject(incoming)) {
+  // Binned, archived (Change to → Goal archives it) or no longer a project on the other
+  // device: that wins as it is, and the ticks are dropped (re-review R-1).
+  if (!isProject(incoming) || (incoming.status !== "open" && incoming.status !== "done")) {
     await db.syncMeta.delete(ticksKey(incoming.id));
     return null;
   }
@@ -71,6 +73,20 @@ export async function carrySessionTicks(db: HubDB, incoming: Item): Promise<Item
     return null;
   }
   return withSessions(incoming, sessions, todayISO());
+}
+
+/**
+ * The engine re-stamped the item's pending change down to `stamp` (a clock that ran far
+ * ahead): notes stamped later are brought down with it, so accepting that version still
+ * forgets them (re-review R-2). Inside the engine's apply transaction.
+ */
+export async function restampTicks(db: HubDB, itemId: string, stamp: number): Promise<void> {
+  const row = await db.syncMeta.get(ticksKey(itemId));
+  if (!row) return;
+  const ticks = Object.fromEntries(
+    Object.entries(row.value as Ticks).map(([id, t]) => [id, { ...t, at: Math.min(t.at, stamp) }]),
+  );
+  await db.syncMeta.put({ key: ticksKey(itemId), value: ticks });
 }
 
 /** The server accepted this device's version (stamp `upTo`) of the item: notes it carried are done. */

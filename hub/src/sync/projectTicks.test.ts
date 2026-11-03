@@ -126,6 +126,56 @@ describe("session ticks from two devices", () => {
     expect(done(await db.items.get(id))).toEqual([]);
   });
 
+  // R-1: a delete, archive or change of type on the other device wins over a carried tick.
+  for (const [what, change] of [
+    ["binned", (r: Item): Item => ({ ...r, status: "deleted", deletedAt: TODAY })],
+    ["archived", (r: Item): Item => ({ ...r, status: "archived" })],
+    // Change to → Goal archives the to-do (with its sessions) and makes a goal.
+    ["changed into a goal", (r: Item): Item => ({ ...r, status: "archived", notes: "Became a goal: Pretend street scene" })],
+    ["changed into an idea", (r: Item): Item => ({ ...r, kind: "idea" })],
+  ] as const) {
+    it(`a project ${what} on the other device stays that way; the phone's tick note is dropped`, async () => {
+      const { server, m, id } = await setUp();
+      clock += 60_000;
+      await setSessionDone(id, "s1", true, TODAY); // the phone, offline: a note
+      clock += 60_000;
+      const row = (await m.items.get(id))!;
+      await m.items.put(change(row));
+      if (what === "changed into a goal") {
+        await m.goals.put({ id: "g", title: "Pretend street scene", areaId: "art", kind: "practice", milestones: [], createdAt: TODAY });
+      }
+      await syncOnce({ db: m, fetch: server.fetch });
+      await syncOnce({ db, fetch: server.fetch });
+      await syncOnce({ db, fetch: server.fetch });
+      await syncOnce({ db: m, fetch: server.fetch });
+      const want = change(row);
+      for (const r of [await db.items.get(id), await m.items.get(id), server.data("items", id) as unknown as Item]) {
+        expect(r).toMatchObject({ status: want.status, kind: want.kind });
+        expect(done(r)).toEqual([]); // the Mac's row as it was: no tick carried onto it
+      }
+      expect(await db.syncMeta.get(`sessionTicks:${id}`)).toBeUndefined();
+      expect(await db.pending.count()).toBe(0);
+    });
+  }
+
+  it("a far-future clock re-stamp keeps the notes forgettable (R-2)", async () => {
+    const { server, m, id } = await setUp();
+    clock += 60_000;
+    const realNow = clock;
+    clock += 48 * 3_600_000; // the phone's clock runs two days fast
+    await setSessionDone(id, "s1", true, TODAY);
+    clock = realNow; // back to the right time: the server refuses the far-future stamp, the engine re-stamps it
+    await syncOnce({ db, fetch: server.fetch });
+    expect(done(server.data("items", id) as unknown as Item)).toEqual(["s1"]);
+    expect(await db.syncMeta.get(`sessionTicks:${id}`)).toBeUndefined(); // accepted after the re-stamp: forgotten
+    clock += 60_000;
+    await syncOnce({ db: m, fetch: server.fetch });
+    await macSets(m, id, "s1", undefined); // a deliberate untick on the Mac
+    await syncOnce({ db: m, fetch: server.fetch });
+    await syncOnce({ db, fetch: server.fetch });
+    expect(done(await db.items.get(id))).toEqual([]);
+  });
+
   it("the merged ticks finish the project: done everywhere once its last session is ticked", async () => {
     const { server, m, id } = await setUp();
     for (const s of ["s1", "s2"]) await setSessionDone(id, s, true, TODAY);

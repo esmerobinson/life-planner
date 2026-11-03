@@ -17,7 +17,7 @@
 // (including no network) leaves every local change pending.
 
 import { applyUntracked } from "../data/changeTracking";
-import { carrySessionTicks, forgetAcceptedTicks } from "../data/sessionTicks";
+import { carrySessionTicks, forgetAcceptedTicks, restampTicks } from "../data/sessionTicks";
 import type { Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
@@ -507,6 +507,7 @@ async function restampFarFuture(db: HubDB): Promise<void> {
       const row = (await db.table(p.table).get(p.id)) as object | undefined;
       if (row) await db.table(p.table).put({ ...row, updatedAt: now });
       await db.pending.put({ ...p, updatedAt: now });
+      if (p.table === "items") await restampTicks(db, p.id, now); // its session-tick notes too (R-2)
     }
   });
 }
