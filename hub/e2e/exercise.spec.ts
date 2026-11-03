@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { FAKE_CARD_FILE_KINDS, FAKE_CARD_FILE_TRACKS, FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
+import { FAKE_CARD_FILE_CHECKLIST, FAKE_CARD_FILE_KINDS, FAKE_CARD_FILE_TRACKS, FAKE_CARD_TEXT_V2, PRETEND_FEATURES } from "../src/test/exerciseCards";
 
 /* The Journal's "Mental health exercise" tab in a real browser (Journal v2): Import (a version 2
    card file), today's card with its chapter line and Read more, Submit, "Do the next one →", a
@@ -138,7 +138,7 @@ async function shootCard(card: ReturnType<Page["locator"]>, name: string) {
 
 /** Imports a fixture file (through the Import pill, as she would). */
 async function importFile(page: Page, text: string) {
-  await section(page).getByLabel("Exercise card file").setInputFiles({ name: "pretend.json", mimeType: "application/json", buffer: Buffer.from(text) });
+  await section(page).getByLabel("Exercise card file", { exact: true }).setInputFiles({ name: "pretend.json", mimeType: "application/json", buffer: Buffer.from(text) });
 }
 
 for (const width of [1280, 390]) {
@@ -213,6 +213,110 @@ for (const width of [360, 390, 430]) {
       }
       await expect(s.getByText(/doesn't chase the boats/)).toBeVisible();
       await noSidewaysScroll(page);
+    });
+  });
+}
+
+for (const width of [1280, 390]) {
+  test.describe(`at ${width}px (scale without end labels)`, () => {
+    test.use({ viewport: { width, height: 900 } });
+    test("a scale with no end labels still shows its numbers", async ({ page }) => {
+      test.setTimeout(120_000);
+      await unlocked(page);
+      await importFile(page, JSON.stringify({ ...FAKE_CARD_FILE_CHECKLIST, cards: [{ ...FAKE_CARD_FILE_CHECKLIST.cards[2]!, day: 1 }] }));
+      const today = section(page).getByRole("article", { name: "Today's card" });
+      const group = today.getByRole("group", { name: "How pretend-calm are you?" });
+      for (const n of ["1", "2", "3", "4", "5"]) await expect(group.getByRole("button", { name: n, exact: true })).toBeVisible();
+      await group.getByRole("button", { name: "4", exact: true }).click();
+      await noSidewaysScroll(page);
+      await shootCard(today, `scale-bare-${width}`);
+    });
+  });
+}
+
+/* A checklist card: each item answered from the card's own options, with a note box; the label
+   sits above the pills, nothing overflows at 390px (long labels and the widest options too). */
+const WIDE_CHECKLIST = {
+  ...FAKE_CARD_FILE_CHECKLIST,
+  cards: [
+    FAKE_CARD_FILE_CHECKLIST.cards[0]!,
+    {
+      ...FAKE_CARD_FILE_CHECKLIST.cards[1]!,
+      id: "check-wide",
+      day: 2,
+      theme: "Pretend wide checklist",
+      parts: [
+        {
+          prompt: "A pretend checklist with the longest words allowed",
+          kind: "checklist",
+          items: ["Pretend very long feature label ".repeat(3).slice(0, 80), "Pretendunbrokenfeaturelabel".repeat(3).slice(0, 80)],
+          options: ["Pretend option one 1", "Pretend option two 2", "Pretend option 3 3", "Pretend option 4 44"],
+          note: "A pretend note placeholder that is quite long, up to eighty characters in all..".slice(0, 80),
+        },
+      ],
+    },
+  ],
+};
+
+for (const width of [1280, 390]) {
+  test.describe(`at ${width}px (checklist)`, () => {
+    test.use({ viewport: { width, height: 900 } });
+    test("answers a checklist: pills, notes, the count line, Submit, read back", async ({ page }) => {
+      test.setTimeout(120_000);
+      await unlocked(page);
+      await importFile(page, JSON.stringify(WIDE_CHECKLIST));
+      const s = section(page);
+      const today = s.getByRole("article", { name: "Today's card" });
+      const prompt = "Go through the pretend features in your made-up book. Does each one fit you?";
+      await expect(today.getByRole("group", { name: prompt })).toBeVisible();
+      for (const f of PRETEND_FEATURES) await expect(today.getByText(f, { exact: true })).toBeVisible();
+      await expect(today.getByText("0 of 4 answered")).toBeVisible();
+      await expect(today.getByRole("button", { name: "Submit" })).toBeDisabled();
+
+      // The label above its pills (and its note box under them), at every width.
+      const label = await today.getByText("Pretend feature one", { exact: true }).boundingBox();
+      const pillBox = await today.getByRole("group", { name: "Pretend feature one" }).boundingBox();
+      const noteBox = await today.getByLabel("Pretend feature one, note").boundingBox();
+      expect(label!.y + label!.height).toBeLessThanOrEqual(pillBox!.y + 1);
+      expect(pillBox!.y + pillBox!.height).toBeLessThanOrEqual(noteBox!.y + 1);
+      await noSidewaysScroll(page);
+      await shootCard(today, `checklist-${width}-empty`);
+
+      const pick = (item: string, option: string) => today.getByRole("group", { name: item }).getByRole("button", { name: option, exact: true }).click();
+      await pick("Pretend feature one", "Yes");
+      await pick("Pretend feature two", "Partly");
+      await pick("Pretend feature three", "Yes");
+      await today.getByLabel("Pretend feature two, note").fill("Pretend: only on weekdays");
+      await expect(today.getByText("3 of 4 answered · Yes 2 · Partly 1")).toBeVisible();
+      await expect(today.getByRole("button", { name: "Submit" })).toBeDisabled();
+      await pick("Pretend feature three", "Yes"); // tap again: cleared
+      await expect(today.getByText("2 of 4 answered · Yes 1 · Partly 1")).toBeVisible();
+      await pick("Pretend feature three", "No");
+      await pick("Pretend feature four", "Yes");
+      await expect(today.getByText("4 of 4 answered · Yes 2 · Partly 1 · No 1")).toBeVisible();
+      await shootCard(today, `checklist-${width}-answered`);
+      await today.getByRole("button", { name: "Submit" }).click();
+      await expect(today.getByText("Saved")).toBeVisible();
+
+      // Reloaded: the answers come back; All cards shows each item with its choice and note.
+      await page.reload();
+      const again = section(page).getByRole("article", { name: "Today's card" });
+      await expect(again.getByLabel("Pretend feature two, note")).toHaveValue("Pretend: only on weekdays");
+      await expect(again.getByText("4 of 4 answered · Yes 2 · Partly 1 · No 1")).toBeVisible();
+      await s.getByText("All cards", { exact: true }).click();
+      await s.getByText("Day 1 · Pretend checklist").click();
+      const mine = s.getByRole("list", { name: "Your responses" });
+      await expect(mine.getByText("Pretend feature two: Partly — Pretend: only on weekdays")).toBeVisible();
+      await expect(mine.getByText("Pretend feature three: No", { exact: true })).toBeVisible();
+      await noSidewaysScroll(page);
+      await shoot(page, `checklist-${width}-review`);
+
+      // The widest card: long labels, four 20-character options, a long note placeholder.
+      await again.getByRole("button", { name: "Do the next one →" }).click();
+      const wide = s.getByRole("article", { name: "Next card: Day 2" });
+      await expect(wide.getByText("Pretend option one 1").first()).toBeVisible();
+      await noSidewaysScroll(page);
+      await shootCard(wide, `checklist-${width}-widest`);
     });
   });
 }
