@@ -111,7 +111,8 @@ describe("C1: a typo never seals anything", () => {
     expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("needs-passphrase");
     expect(await confirmJournalKey(d)).toBe("locked");
     expect(await loadCandidate(d)).toBeUndefined();
-    expect((await d.syncMeta.get(JOURNAL_RETIRED_META))!.value).toHaveLength(1);
+    // A candidate never sealed anything, so it is dropped, not kept for repair (re-key review M1).
+    expect(await d.syncMeta.get(JOURNAL_RETIRED_META)).toBeUndefined();
   });
 
   it("a refusal landing between token save and key store (the Save race): the late candidate can never confirm", async () => {

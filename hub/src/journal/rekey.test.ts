@@ -287,3 +287,137 @@ describe("a stale acceptance never confirms a key (bug #4)", () => {
     expect(await saveJournalKeyFromSync(d, A)).toBe("confirmed");
   });
 });
+
+// Fix round 1 (review I1): only positive evidence that ANOTHER key won (the verifier's
+// fingerprint differs) retires a confirmed key. A verifier with this key's fingerprint that
+// won't open is damaged: it is sealed afresh, and her real passphrase keeps working.
+describe("a damaged verifier (review I1)", () => {
+  /** The verifier with one ciphertext character changed (same fingerprint). */
+  async function damageVerifier(d: HubDB) {
+    const v = (await d.journal.get(VERIFIER_ID))!;
+    const ct = v.ct.startsWith("A") ? `B${v.ct.slice(1)}` : `A${v.ct.slice(1)}`;
+    await d.journal.put({ ...v, ct });
+    return { ...v, ct };
+  }
+
+  it("keeps the device confirmed, re-seals the verifier, and the journal stays readable", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac, page } = await macWithPage(server);
+    const fp = (await loadJournalKey(mac))!.fp;
+    await damageVerifier(mac);
+    expect(await confirmJournalKey(mac)).toBe("confirmed");
+    expect((await loadJournalKey(mac))!.fp).toBe(fp);
+    expect(await readPage(mac, page)).toBe("A pretend old page.");
+    const v = (await mac.journal.get(VERIFIER_ID))!;
+    expect(v.fp).toBe(fp);
+    expect(await openJson((await loadJournalKey(mac))!.key, v, journalAad(VERIFIER_ID))).toMatchObject({ v: 1 });
+    expect(await mac.syncMeta.get("journalRetired")).toBeUndefined();
+  });
+
+  it("Unlock with her real passphrase works on a device whose only verifier copy is damaged (and the new passphrase's wrap too)", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac, page } = await macWithPage(server);
+    changeServer(server, await deriveToken(B));
+    expect(await savePassphrase(mac, server, B)).toBe("ok");
+    for (const passphrase of [A, B]) {
+      const d = device();
+      await saveSyncSettings(d, { serverUrl: SERVER, token: await deriveToken(B) });
+      expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("ok");
+      await damageVerifier(d);
+      expect(await unlockJournal(d, TYPO)).toBe("wrong");
+      expect(await unlockJournal(d, passphrase)).toBe("ok");
+      expect(await readPage(d, page)).toBe("A pretend old page.");
+      expect(await openJson((await loadJournalKey(d))!.key, (await d.journal.get(VERIFIER_ID))!, journalAad(VERIFIER_ID))).toMatchObject({ v: 1 });
+    }
+  });
+
+  it("Sync page Save of the real passphrase confirms on a new device despite a damaged verifier", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { page } = await macWithPage(server);
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: SERVER, token: await deriveToken(A) });
+    expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("ok");
+    await damageVerifier(d);
+    expect(await saveJournalKeyFromSync(d, A)).toBe("confirmed");
+    expect(await readPage(d, page)).toBe("A pretend old page.");
+  });
+
+  it("a confirmed key that can't decrypt right now (a WebCrypto/keychain refusal) retires nothing and changes no row", async () => {
+    const d = device();
+    const good = await keyFor(A);
+    await d.journal.put(await verifierRow(good));
+    const before = await d.journal.get(VERIFIER_ID);
+    // The same key bits, but WebCrypto refuses to decrypt with it.
+    const s = await deriveJournalSecret(A);
+    const encryptOnly = await crypto.subtle.importKey("raw", s as BufferSource, { name: "AES-GCM" }, false, ["encrypt"]);
+    await d.syncMeta.put({ key: "journalKey", value: { key: encryptOnly, mac: good.mac, fp: good.fp, id: "refusing" } });
+    expect(await confirmJournalKey(d)).toBe("confirmed");
+    expect((await d.syncMeta.get("journalKey"))!.value).toMatchObject({ id: "refusing" });
+    expect(await d.syncMeta.get("journalRetired")).toBeUndefined();
+    expect(await d.journal.get(VERIFIER_ID)).toEqual(before);
+  });
+
+  it("a key row WebKit can't read (dropped at start-up) retires nothing; the passphrase opens it again", async () => {
+    const { dropUnreadableKeys } = await import("./unreadableKeys");
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac, page } = await macWithPage(server);
+    const before = await mac.journal.get(VERIFIER_ID);
+    expect(await dropUnreadableKeys(mac, async (k) => (k === "journalKey" ? "unreadable" : "absent"))).toEqual(["journalKey"]);
+    expect(await confirmJournalKey(mac)).toBe("locked");
+    expect(await mac.syncMeta.get("journalRetired")).toBeUndefined();
+    expect(await mac.journal.get(VERIFIER_ID)).toEqual(before);
+    expect(await unlockJournal(mac, A)).toBe("ok");
+    expect(await readPage(mac, page)).toBe("A pretend old page.");
+  });
+});
+
+describe("fix round 1: minor items", () => {
+  it("M1: candidates never sealed anything, so a passphrase change or a typo adds nothing to the retired keys", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac } = await macWithPage(server);
+    changeServer(server, await deriveToken(B));
+    expect(await savePassphrase(mac, server, TYPO)).toBe("needs-passphrase");
+    expect(await savePassphrase(mac, server, B)).toBe("ok");
+    changeServer(server, await deriveToken(C));
+    expect(await savePassphrase(mac, server, C)).toBe("ok");
+    expect(await mac.syncMeta.get("journalRetired")).toBeUndefined();
+  });
+
+  it("M2: a wrap holding another journal's secret doesn't hide the old-passphrase prompt; the prompt then writes the right wrap", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const mac = device();
+    await saveSyncSettings(mac, { serverUrl: SERVER, token: await deriveToken(A) });
+    await confirmedDevice(mac, await keyFor(A)); // from before the update: no copy of S
+    const kek = await deriveKeyWrapKey(B);
+    const id = keyWrapId(kek.fp);
+    const stranger = await deriveJournalSecret("pretend-some-other-journal");
+    await mac.journal.put({
+      id, kind: "keywrap", date: DAY, fp: kek.fp,
+      ...(await sealJson(kek.key, { v: 1, s: toBase64(stranger), fp: (await keyFor("pretend-some-other-journal")).fp }, journalAad(id))),
+    });
+    expect((await syncOnce({ db: mac, fetch: server.fetch })).kind).toBe("ok");
+    changeServer(server, await deriveToken(B));
+    expect(await savePassphrase(mac, server, B)).toBe("ok");
+    expect(await journalNeedsOldPassphrase(mac)).toBe(true);
+    expect(await giveOldPassphrase(mac, A)).toBe("ok");
+    expect(await openJson(kek.key, (await mac.journal.get(id))!, journalAad(id))).toMatchObject({ fp: (await keyFor(A)).fp });
+    expect(await journalNeedsOldPassphrase(mac)).toBe(false);
+  });
+
+  it("M3: when the follow-up run that sends a new wrap fails, the sync still reports the first run's success; the next sync sends it", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac } = await macWithPage(server);
+    changeServer(server, await deriveToken(B));
+    await saveSyncSettings(mac, { serverUrl: SERVER, token: await deriveToken(B) });
+    await saveJournalKeyFromSync(mac, B);
+    const flaky: typeof fetch = async (input, init) => {
+      if (typeof init?.body === "string" && init.body.includes("keywrap:")) throw new TypeError("pretend network blip");
+      return server.fetch(input, init);
+    };
+    expect((await syncOnce({ db: mac, fetch: flaky })).kind).toBe("ok");
+    expect(serverWraps(server)).toEqual([]);
+    expect((await mac.pending.toArray()).filter((p) => p.table === "journal" && p.id.startsWith("keywrap:"))).toHaveLength(1);
+    expect((await syncOnce({ db: mac, fetch: server.fetch })).kind).toBe("ok");
+    expect(serverWraps(server)).toHaveLength(1);
+  });
+});

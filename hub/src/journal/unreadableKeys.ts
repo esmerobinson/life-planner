@@ -57,23 +57,27 @@ export function checkRowRaw(idb: IDBDatabase, key: string): Promise<RowCheck> {
 
 /**
  * Removes the key rows `check` says can't be read; returns their names. A check that doesn't
- * answer within `ms` counts as "unknown" (left alone), so start-up is never held up.
+ * answer within `ms` counts as "unknown" (left alone), so start-up is never held up. All rows
+ * are checked at once (each on its own read-only cursor).
  */
 export async function dropUnreadableKeys(
   db: HubDB,
   check: (key: string) => Promise<RowCheck> = (key) => checkRowRaw(db.backendDB(), key),
   ms = 3000,
 ): Promise<string[]> {
-  const found: string[] = [];
-  for (const key of KEY_ROWS) {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const result = await Promise.race([
-      check(key).catch((): RowCheck => "unknown"),
-      new Promise<RowCheck>((r) => (timer = setTimeout(() => r("unknown"), ms))),
-    ]);
-    clearTimeout(timer);
-    if (result === "unreadable") found.push(key);
-  }
+  // Side by side, so rows that never answer cost one timeout in all, not one each (re-key review M7).
+  const results = await Promise.all(
+    KEY_ROWS.map(async (key) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const result = await Promise.race([
+        check(key).catch((): RowCheck => "unknown"),
+        new Promise<RowCheck>((r) => (timer = setTimeout(() => r("unknown"), ms))),
+      ]);
+      clearTimeout(timer);
+      return result;
+    }),
+  );
+  const found: string[] = KEY_ROWS.filter((_, i) => results[i] === "unreadable");
   if (found.length === 0) return found;
   await db.transaction("rw", db.syncMeta, async () => {
     await db.syncMeta.bulkDelete(found);

@@ -4,13 +4,15 @@
 // - A key made from a typed passphrase (Sync page Save, or "Unlock journal") is only a
 //   CANDIDATE. A candidate never seals anything.
 // - It becomes the CONFIRMED key when either
-//   (a) it opens the synced verifier row (a known value sealed with the first confirmed key), or
+//   (a) it opens the synced verifier row (a known value sealed with the first confirmed key),
+//       or the verifier carries its fingerprint but is damaged (then it is sealed afresh), or
 //   (b) no verifier exists yet AND the sync server has accepted the sync token made from the
 //       same passphrase in a successful sync on this device. This device then writes the verifier.
 // - A confirmed key is never replaced by a candidate unless the candidate also opens the
 //   verifier, and never removed by a refused passphrase (only a candidate is).
-// - Refused or superseded candidates are RETIRED (kept, never used to seal), so the repair
-//   pass can re-seal any row they once sealed with the confirmed key.
+// - Refused or superseded candidates are DROPPED: they never sealed anything. Only a key that
+//   was once confirmed is RETIRED (kept, never used to seal), so the repair pass can re-seal
+//   the rows it sealed with the confirmed key.
 //
 // Keys are non-extractable CryptoKeys stored as objects in syncMeta (IndexedDB holds them;
 // syncMeta is never synced and never in a backup). The passphrase is never stored or logged.
@@ -28,8 +30,12 @@
 // - Rule (b) needs an acceptance that is FRESH: from a sync that finished after the candidate
 //   was made (for a Save: after its token was saved). A remembered older acceptance can't
 //   confirm a key the server has since stopped accepting (bug #4).
-// - A confirmed key that can't open the synced verifier (another key won) stops sealing: it is
-//   retired and the device goes back to "locked", so the repair pass re-seals its rows later.
+// - A confirmed key stops sealing only on positive evidence that ANOTHER key won: the synced
+//   verifier carries a different fingerprint. It is retired and the device goes back to
+//   "locked", so the repair pass re-seals its rows later. A verifier with this key's own
+//   fingerprint that won't open is DAMAGED (the same key sealed it): it is sealed afresh with
+//   the confirmed key and nothing locks (re-key review I1). A key that can't decrypt at all
+//   right now (a WebCrypto or keychain refusal) changes nothing.
 
 import type { HubDB } from "../data/db";
 import { validJournal } from "../data/validate";
@@ -191,24 +197,23 @@ async function retireKeyIn(db: HubDB, k: JournalKey): Promise<void> {
   await db.syncMeta.put({ key: JOURNAL_RETIRED_META, value: retired.slice(0, MAX_RETIRED) });
 }
 
-/** Moves the candidate (if any) to the retired list, inside the caller's transaction. */
-async function retireCandidateIn(db: HubDB): Promise<void> {
-  const c = await loadCandidate(db);
+/**
+ * Drops the candidate (if any), inside the caller's transaction. A candidate never sealed
+ * anything (C1), so there is nothing for the repair pass to re-seal with it; keeping it would
+ * only push keys that once sealed rows out of the retired list (re-key review M1).
+ */
+async function dropCandidateIn(db: HubDB): Promise<void> {
   await db.syncMeta.delete(JOURNAL_CANDIDATE_META);
-  if (!c) return;
-  const confirmed = await loadJournalKeyInfo(db);
-  if (confirmed?.fp === c.fp) return; // the same key as the confirmed one: nothing to keep
-  await retireKeyIn(db, c);
 }
 
 /**
  * The sync engine, on a refused passphrase (401) for `token`: the candidate made with that
- * passphrase is retired, and its pending wrap dropped (a refused passphrase never gets a
+ * passphrase is dropped, and so is its pending wrap (a refused passphrase never gets a
  * wrap). A confirmed key is never touched. Runs inside the engine's syncMeta transaction.
  */
 export async function retireCandidateForToken(db: HubDB, token: string): Promise<void> {
   const c = await loadCandidate(db);
-  if (c && c.token === token) await retireCandidateIn(db);
+  if (c && c.token === token) await dropCandidateIn(db);
   if ((await loadPendingWrap(db))?.token === token) await db.syncMeta.delete(JOURNAL_PENDING_WRAP_META);
 }
 
@@ -295,7 +300,7 @@ async function storeCandidate(
   const sealed = m.s ? await sealForDevice(db, m.s, m.jk.fp) : undefined;
   return db.transaction("rw", db.syncMeta, async () => {
     if (token !== null && (await meta<string>(db, "token")) !== token) return false;
-    await retireCandidateIn(db); // a superseded candidate is kept for repair, never used
+    await dropCandidateIn(db); // a superseded candidate never sealed anything
     await db.syncMeta.delete(JOURNAL_KEY_LOST_META); // she typed the passphrase again
     const accepted = (await meta<number>(db, ACCEPTED_SEQ_META)) ?? 0;
     const tokenSeq = await meta<number>(db, TOKEN_SEQ_META);
@@ -324,6 +329,67 @@ async function opensVerifier(jk: JournalKey, row: JournalRow): Promise<boolean> 
     return v?.check === VERIFIER_TEXT;
   } catch {
     return false;
+  }
+}
+
+/**
+ * How a key stands against the synced verifier:
+ * - "opens": it opens it.
+ * - "other-key": it carries another fingerprint (another key sealed it).
+ * - "damaged": it carries THIS key's fingerprint (so this key sealed it) and this key works,
+ *   but the row won't open: the row itself is damaged.
+ * - "key-fails": this key's fingerprint, but this key can't encrypt and decrypt right now
+ *   (WebCrypto or the keychain refused): nothing can be concluded about the row.
+ */
+type VerifierCheck = "opens" | "other-key" | "damaged" | "key-fails";
+
+async function checkVerifier(jk: JournalKey, row: JournalRow): Promise<VerifierCheck> {
+  if (await opensVerifier(jk, row)) return "opens";
+  if (row.fp !== jk.fp) return "other-key";
+  return (await keyWorks(jk)) ? "damaged" : "key-fails";
+}
+
+/** The verifier says this is the journal's key: it opens it, or it is that key's own damaged copy. */
+async function verifierAccepts(jk: JournalKey, row: JournalRow): Promise<boolean> {
+  const check = await checkVerifier(jk, row);
+  return check === "opens" || check === "damaged";
+}
+
+/** This key seals and opens a throwaway value (nothing stored). */
+async function keyWorks(jk: JournalKey): Promise<boolean> {
+  try {
+    const probe = await sealJson(jk.key, { probe: 1 }, "probe");
+    return (await openJson<{ probe?: unknown }>(jk.key, probe, "probe"))?.probe === 1;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The confirmed key against the synced verifier: retired when another key's verifier won
+ * (bug #4); the verifier sealed afresh when it is this key's own damaged copy (review I1).
+ */
+async function settleVerifier(db: HubDB): Promise<void> {
+  const confirmed = await loadJournalKeyInfo(db);
+  const verifier = await db.journal.get(VERIFIER_ID);
+  if (!confirmed || !verifier) return;
+  const check = await checkVerifier(confirmed, verifier);
+  if (check === "other-key") {
+    // Another key's verifier won: this key stops sealing. Its rows stay as they are; kept as
+    // retired, the repair pass re-seals them once the right key is confirmed here.
+    await db.transaction("rw", db.journal, db.syncMeta, async () => {
+      if ((await loadJournalKeyInfo(db))?.id !== confirmed.id || (await db.journal.get(VERIFIER_ID))?.updatedAt !== verifier.updatedAt) return;
+      await retireKeyIn(db, confirmed);
+      await db.syncMeta.delete(JOURNAL_KEY_META);
+    });
+  } else if (check === "damaged") {
+    // The only row ever written over without being opened: its fingerprint says this very key
+    // sealed it, and this key works, so the row is damaged and a fresh copy is the same check.
+    const row = await sealedVerifier(confirmed, todayStamp());
+    await db.transaction("rw", db.journal, db.syncMeta, async () => {
+      if ((await loadJournalKeyInfo(db))?.fp !== confirmed.fp || (await db.journal.get(VERIFIER_ID))?.updatedAt !== verifier.updatedAt) return;
+      await db.journal.put(row);
+    });
   }
 }
 
@@ -360,20 +426,9 @@ export type JournalKeyState = "confirmed" | "checking" | "locked";
  * after a sync). Returns where this device now stands.
  */
 export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
+  await settleVerifier(db);
   let confirmed = await loadJournalKeyInfo(db);
   let verifier = await db.journal.get(VERIFIER_ID);
-  // Another key's verifier won (bug #4): this key stops sealing. Its rows stay as they are;
-  // kept as retired, the repair pass re-seals them once the right key is confirmed here.
-  if (confirmed && verifier && !(await opensVerifier(confirmed, verifier))) {
-    const was = confirmed;
-    const seen = verifier;
-    await db.transaction("rw", db.journal, db.syncMeta, async () => {
-      if ((await loadJournalKeyInfo(db))?.id !== was.id || (await db.journal.get(VERIFIER_ID))?.updatedAt !== seen.updatedAt) return;
-      await retireKeyIn(db, was);
-      await db.syncMeta.delete(JOURNAL_KEY_META);
-    });
-    confirmed = await loadJournalKeyInfo(db);
-  }
   // A confirmed key with no verifier anywhere here (e.g. after a Replace restore): put it back.
   if (confirmed && !verifier) {
     const row = await sealedVerifier(confirmed, todayStamp());
@@ -386,7 +441,7 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
   if (c) {
     if (verifier) {
       let found: StoredJournalKey | undefined;
-      if (await opensVerifier(c, verifier)) found = asStored(c);
+      if (await verifierAccepts(c, verifier)) found = asStored(c);
       else if (c.kek && c.kekFp) found = await keyFromWrap(db, c.kek, c.kekFp, verifier);
       await db.transaction("rw", db.syncMeta, async () => {
         if ((await loadCandidate(db))?.id !== c.id) return;
@@ -395,7 +450,7 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
           await db.syncMeta.delete(JOURNAL_CANDIDATE_META);
           // The candidate's own key (when it came through a wrap) never sealed anything: dropped.
         } else {
-          await retireCandidateIn(db); // a typo, or a passphrase with no wrap (yet)
+          await dropCandidateIn(db); // a typo, or a passphrase with no wrap (yet)
         }
       });
     } else if (!confirmed) {
@@ -403,7 +458,7 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
       if (!token || c.token === null || token !== c.token) {
         // Its passphrase's token is gone (refused) or replaced: it can never be confirmed.
         await db.transaction("rw", db.syncMeta, async () => {
-          if ((await loadCandidate(db))?.id === c.id) await retireCandidateIn(db);
+          if ((await loadCandidate(db))?.id === c.id) await dropCandidateIn(db);
         });
       } else if (await freshlyAccepted(db, c.token, c.seq)) {
         // The server accepted this passphrase (in a sync after it was typed) and no device has
@@ -431,6 +486,7 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
       });
     }
   }
+  await settleVerifier(db); // a key just confirmed against a damaged verifier seals it afresh
   confirmed = await loadJournalKeyInfo(db);
   if (confirmed) {
     await writeAcceptedKeyWrap(db);
@@ -445,7 +501,7 @@ async function keyFromWrap(db: HubDB, kek: CryptoKey, kekFp: string, verifier: J
   const w = await openWrap(db, kek, kekFp);
   if (!w) return undefined;
   try {
-    if (!(await opensVerifier(w.jk, verifier))) return undefined; // another journal's secret: ignored
+    if (!(await verifierAccepts(w.jk, verifier))) return undefined; // another journal's secret: ignored
     return { ...w.jk, id: crypto.randomUUID(), s: await sealForDevice(db, w.s, w.jk.fp) };
   } finally {
     w.s.fill(0);
@@ -472,7 +528,7 @@ export async function writeAcceptedKeyWrap(db: HubDB): Promise<boolean> {
   }
   if (!(await freshlyAccepted(db, p.token, p.seq))) return false;
   const verifier = await db.journal.get(VERIFIER_ID);
-  if (!verifier || !(await opensVerifier(confirmed, verifier))) return false;
+  if (!verifier || !(await verifierAccepts(confirmed, verifier))) return false;
   const id = keyWrapId(p.kekFp);
   const existing = await db.journal.get(id);
   if (existing) {
@@ -513,7 +569,14 @@ export async function journalNeedsOldPassphrase(db: HubDB): Promise<boolean> {
   const confirmed = await loadJournalKeyInfo(db);
   if (!p || !confirmed || p.fp === confirmed.fp) return false;
   if (!(await freshlyAccepted(db, p.token, p.seq))) return false;
-  if (await db.journal.get(keyWrapId(p.kekFp))) return false;
+  // Only a wrap that opens to THIS journal counts (one holding another journal's secret is
+  // replaced once S is here, re-key review M2).
+  // A row there that this KEK can't open is never written over, so asking would achieve nothing.
+  if (await db.journal.get(keyWrapId(p.kekFp))) {
+    const w = await openWrap(db, p.kek, p.kekFp);
+    w?.s.fill(0);
+    if (!w || w.jk.fp === confirmed.fp) return false;
+  }
   const s = await deviceSecret(db, confirmed);
   s?.fill(0);
   return !s;
@@ -586,11 +649,11 @@ export async function unlockJournal(db: HubDB, passphrase: string): Promise<Unlo
   const verifier = await db.journal.get(VERIFIER_ID);
   if (verifier) {
     let m: { jk: JournalKey; s: Uint8Array } | undefined = await fromPassphrase(passphrase);
-    if (!(await opensVerifier(m.jk, verifier))) {
+    if (!(await verifierAccepts(m.jk, verifier))) {
       m.s.fill(0);
       const kek = await deriveKeyWrapKey(passphrase);
       m = await openWrap(db, kek.key, kek.fp);
-      if (m && !(await opensVerifier(m.jk, verifier))) m = (m.s.fill(0), undefined);
+      if (m && !(await verifierAccepts(m.jk, verifier))) m = (m.s.fill(0), undefined);
     }
     if (!m) return "wrong";
     try {

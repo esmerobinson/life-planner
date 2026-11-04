@@ -65,6 +65,27 @@ describe("unreadable journal keys (WebKit: a CryptoKey stored under another mast
     expect(await db.syncMeta.get(JOURNAL_KEY_META)).toBeDefined();
   });
 
+  it("the rows are checked side by side: never-answering checks cost one timeout, not one per row (re-key review M7)", async () => {
+    const db = await fresh();
+    const asked: string[] = [];
+    const started = Date.now();
+    const found = await dropUnreadableKeys(db, (k) => {
+      asked.push(k);
+      return new Promise<RowCheck>(() => undefined);
+    }, 300);
+    expect(found).toEqual([]);
+    expect(asked.sort()).toEqual([...KEY_ROWS].sort());
+    expect(Date.now() - started).toBeLessThan(300 * 2.5); // one row after another would be 1500 ms
+  });
+
+  it("several unreadable rows are all removed, in the key store's order", async () => {
+    const db = await fresh();
+    const unreadable = new Set<string>([JOURNAL_PENDING_WRAP_META, JOURNAL_KEY_META, JOURNAL_DEVICE_WRAP_META]);
+    expect(await dropUnreadableKeys(db, async (k) => (unreadable.has(k) ? "unreadable" : "absent"))).toEqual(
+      KEY_ROWS.filter((k) => unreadable.has(k)),
+    );
+  });
+
   it("checkRowRaw reads a normal row as readable and a missing one as absent", async () => {
     const db = await fresh();
     await db.syncMeta.put({ key: JOURNAL_RETIRED_META, value: [] });

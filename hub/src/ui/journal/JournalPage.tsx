@@ -33,7 +33,6 @@ export const CANT_OPEN_JOURNAL = "Can't open your journal on this device right n
  * that used the macOS keychain, 2026-11-02). Shown above the passphrase field. Nothing is deleted.
  */
 export const UNLOCK_AGAIN_LINE = "Unlock your journal once more with your passphrase.";
-/** WebCrypto threw while reading or storing the journal key (Mac app). Nothing is deleted. */
 /**
  * Placeholder wording (Esme may reword; journal-rekey report): accurate for both passphrases
  * after a sync passphrase change (the old one always opens the journal; the new one once a
@@ -44,6 +43,7 @@ export const UNLOCK_LINE =
 /** Placeholder wording (Esme may reword): a passphrase that opens neither the journal nor a wrap. */
 export const WRONG_PASSPHRASE_LINE =
   "That passphrase doesn't open your journal. If you've just changed it, type the new one first on a device where the journal is open, or use your old one. Try again.";
+/** WebCrypto threw while reading or storing the journal key (Mac app). Nothing is deleted. */
 export const KEYCHAIN_LINE =
   "This Mac's keychain didn't let Esmeworld open your journal key. Quit and reopen Esmeworld, enter your Mac login password and choose Always Allow.";
 

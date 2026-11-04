@@ -200,10 +200,11 @@ export async function syncOnce(env: SyncEnv): Promise<SyncOutcome> {
   return withSyncLock(env.db, async () => {
     const outcome = await run(env);
     // The server has just accepted this token: a new passphrase saved here may now get its
-    // journal keywrap row (journal/keyStore.ts). One more run sends it straight away.
+    // journal keywrap row (journal/keyStore.ts). One more run sends it straight away. If that
+    // run fails, this sync still succeeded: the wrap waits as a pending change for the next one.
     if (outcome.kind !== "ok" || !(await writeAcceptedKeyWrap(env.db).catch(() => false))) return outcome;
     const more = await run(env);
-    if (more.kind !== "ok") return more;
+    if (more.kind !== "ok") return outcome;
     return { kind: "ok", sent: outcome.sent + more.sent, received: outcome.received + more.received, held: more.held };
   });
 }
