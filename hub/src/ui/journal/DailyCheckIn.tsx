@@ -251,6 +251,9 @@ function CheckedIn({
   // clearing one to rewrite it never takes its box away (re-review m2).
   const [editingIds, setEditingIds] = useState<string[] | null>(null);
   const editing = editingIds !== null;
+  // The answers the boxes opened with: while she edits, a re-read of the day never puts other
+  // words into a box (bug #32); she sees them again after Save.
+  const [editStart, setEditStart] = useState<Record<string, { text: string; at: number }>>({});
   // This Edit's own rows (a new version each time she edits; bug #24).
   const [session, setSession] = useState("");
   // What she just saved here, shown at once until the day is read again; then the day's merged
@@ -268,11 +271,11 @@ function CheckedIn({
             <QuestionText id={id} />
             {editing ? (
               <EditableAnswer
-                stored={answerOf(id)}
+                stored={editStart[id]?.text ?? answerOf(id)}
                 onSave={async (text) => {
                   setMine((m) => ({ ...m, [id]: text }));
                   try {
-                    await saveAnswer(jk, day.date, id, deviceId, text, true, { session }); // this Edit's own row
+                    await saveAnswer(jk, day.date, id, deviceId, text, true, { session, seenAt: editStart[id]?.at }); // this Edit's own row
                   } catch (err) {
                     onProblem(SAVE_PROBLEM);
                     throw err;
@@ -301,6 +304,7 @@ function CheckedIn({
               className="btn-secondary"
               onClick={() => {
                 setSession(Date.now().toString(36));
+                setEditStart(Object.fromEntries(answered.map((id) => [id, { text: answerOf(id), at: day.answers.get(id)?.at ?? 0 }])));
                 setEditingIds(answered);
               }}
             >

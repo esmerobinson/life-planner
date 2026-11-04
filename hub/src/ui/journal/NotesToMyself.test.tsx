@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../../data/db";
@@ -23,7 +23,9 @@ beforeAll(async () => {
 beforeEach(async () => {
   await Promise.all([db.journal.clear(), db.files.clear(), db.pending.clear(), db.syncMeta.clear(), db.items.clear(), db.goals.clear()]);
 });
-afterEach(() => {
+afterEach(async () => {
+  cleanup();
+  await new Promise((r) => setTimeout(r, 150)); // saves made as the editor goes away land first
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
