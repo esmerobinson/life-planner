@@ -28,10 +28,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** The clock moves past midnight and the app notices (as on focus, visibility or its minute check). */
+/** The clock moves past the day's end (3am) and the app notices (as on focus, visibility or its minute check). */
 async function pastMidnight() {
   await act(async () => {
-    vi.setSystemTime(new Date(2026, 10, 2, 0, 5));
+    vi.setSystemTime(new Date(2026, 10, 2, 3, 5));
     window.dispatchEvent(new Event("focus"));
   });
 }
@@ -66,7 +66,7 @@ it("written yesterday, not finished: kept as yesterday's draft; today starts emp
 it("I'm done pressed after midnight before the app noticed: not filed under yesterday; today's box opens with the line", async () => {
   renderApp("/journal/morning", "2026-11-01");
   await userEvent.type(await screen.findByLabelText("Today's morning page"), "Pretend words");
-  vi.setSystemTime(new Date(2026, 10, 2, 0, 1)); // no focus event yet
+  vi.setSystemTime(new Date(2026, 10, 2, 3, 1)); // no focus event yet (a day ends at 3am)
   await userEvent.click(screen.getByRole("button", { name: "I'm done" }));
   const device = await getDeviceId(db);
   expect(await screen.findByText(YESTERDAY_SAVED)).toBeInTheDocument();
