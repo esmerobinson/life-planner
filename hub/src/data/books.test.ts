@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { db } from "./db";
-import { createBook, createItem, makeBook, setBookStatus, unBook, updateBook } from "./repo";
+import {
+  archiveItem, createBook, createItem, deleteItem, emptyBin, makeBook, restoreItem, setBookStatus, unBook, updateBook, updateItem,
+} from "./repo";
 import { validItem } from "./validate";
 import { BOOK_LIMITS, bookLine, isBook } from "../domain/books";
 
@@ -149,6 +151,27 @@ describe("making and changing books (repo)", () => {
     await expect(updateBook(b.id, { link: "notaurl" }, TODAY)).rejects.toThrow();
     await expect(updateBook(b.id, { pages: 0 }, TODAY)).rejects.toThrow();
     await expect(updateBook(b.id, { author: "a".repeat(BOOK_LIMITS.author + 1) }, TODAY)).rejects.toThrow();
+  });
+
+  it("writes that don't know about books keep the book fields (rows are spread, as an older app version writes them)", async () => {
+    const b = await createBook({ title: "Pretend novel", author: "Pretend Author", bookStatus: "reading" }, TODAY);
+    await updateBook(b.id, { pages: 300, pageAt: 12, link: "https://example.test/pretend" }, TODAY);
+    await updateItem(b.id, { title: "Pretend novel (renamed)" }, TODAY);
+    await archiveItem(b.id, TODAY);
+    await restoreItem(b.id, TODAY);
+    expect((await db.items.get(b.id))!).toMatchObject({
+      title: "Pretend novel (renamed)", bookStatus: "reading", author: "Pretend Author", pages: 300, pageAt: 12, link: "https://example.test/pretend",
+    });
+  });
+
+  it("emptying the Bin leaves a content-free tombstone (no author, link or pages)", async () => {
+    const b = await createBook({ title: "Pretend novel", author: "Pretend Author", bookStatus: "read" }, TODAY);
+    await updateBook(b.id, { link: "https://example.test/pretend", pages: 10 }, TODAY);
+    await deleteItem(b.id, TODAY);
+    await emptyBin(TODAY);
+    const t = (await db.items.get(b.id))!;
+    expect(t.status).toBe("purged");
+    for (const k of ["bookStatus", "author", "pages", "pageAt", "finishedOn", "link"] as const) expect(t[k]).toBeUndefined();
   });
 
   it("unBook: back to a plain idea (or a to-do), every book field gone", async () => {
