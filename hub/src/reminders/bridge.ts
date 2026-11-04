@@ -57,15 +57,19 @@ export async function askNotifyPermission(): Promise<NotifyPermission> {
 
 /**
  * Hands the Mac the whole schedule; it replaces every pending Esmeworld reminder with it.
- * Only titles, counts and app paths cross. Returns how many it holds, or null without a bridge.
+ * Only titles, counts and app paths cross. `today` (the app-day) and `keepToday` (today's
+ * reminder ids that still stand) let it take done ones out of Notification Center. Returns how
+ * many it holds, or null without a bridge.
  */
 export async function sendSchedule(
   reminders: readonly ScheduledReminder[],
+  delivered?: { today: string; keepToday: readonly string[] },
 ): Promise<{ scheduled: number; status: NotifyPermission } | null> {
   if (!hasNativeReminders()) return null;
   const reply = await call({
     action: "schedule",
     reminders: reminders.map(({ id, at, title, body, path }) => ({ id, at, title, body, path })),
+    ...(delivered ? { today: delivered.today, keepToday: [...delivered.keepToday] } : {}),
   });
   const scheduled = typeof reply === "object" && reply !== null ? Number((reply as { scheduled?: unknown }).scheduled) : NaN;
   return { scheduled: Number.isFinite(scheduled) ? scheduled : 0, status: permissionOf(reply) };

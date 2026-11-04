@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { askNotifyPermission, hasNativeReminders, notifyPermission, type NotifyPermission } from "../reminders/bridge";
 import {
-  DEFAULT_REMINDER_SETTINGS, type MonthlyWhen, type ReminderKind, type ReminderSettings, type ReviewWeekday,
+  DEFAULT_REMINDER_SETTINGS, plannedUntil, type MonthlyWhen, type ReminderKind, type ReminderSettings, type ReviewWeekday,
 } from "../reminders/schedule";
-import { rescheduleReminders } from "../reminders/scheduler";
+import { currentSchedule, rescheduleReminders } from "../reminders/scheduler";
 import { loadReminderSettings, saveReminderSettings } from "../reminders/settings";
+import { todayISO } from "../domain/dates";
+import { dayLabel } from "../domain/display";
 import { usePhone } from "./usePhone";
 
 const MONTHS = [
@@ -56,7 +58,7 @@ export function RemindersPage() {
       asked.current = true;
       p = await askNotifyPermission();
       // Just allowed: the reminders that were waiting for it go to the Mac now.
-      if (p === "authorized") void rescheduleReminders();
+      if (p === "authorized") void rescheduleReminders(true);
     }
     setPermission(p);
   }, [place]);
@@ -76,6 +78,20 @@ export function RemindersPage() {
       live = false;
     };
   }, [ask, place]);
+
+  // How far ahead the Mac's reminders reach (they refresh whenever Esmeworld opens).
+  const [until, setUntil] = useState<string | null>(null);
+  useEffect(() => {
+    if (place !== "mac" || !settings) return;
+    let live = true;
+    currentSchedule().then(
+      (list) => live && setUntil(plannedUntil(list)),
+      () => live && setUntil(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [place, settings]);
 
   const change = useCallback(
     async (next: ReminderSettings, turnedOn = false) => {
@@ -191,6 +207,11 @@ export function RemindersPage() {
       ) : place === "mac" ? (
         <p className="rem-foot">The first time you turn one on, the Mac asks once whether Esmeworld may send notifications.</p>
       ) : null}
+      {place === "mac" && until && permission !== "denied" && (
+        <p className="rem-foot">
+          Reminders are planned up to {dayLabel(until, todayISO())}, and refresh whenever Esmeworld opens.
+        </p>
+      )}
     </section>
   );
 }

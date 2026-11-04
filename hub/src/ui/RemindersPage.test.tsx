@@ -104,6 +104,21 @@ describe("Reminders page (4A, a simple list)", () => {
     await waitFor(() => expect(actions(mac)).toContain("schedule"));
   });
 
+  it("in the Mac app, says how far ahead reminders are planned", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 4, 7, 0)); // Wednesday 4 Nov
+    const off = structuredClone(DEFAULT_REMINDER_SETTINGS);
+    for (const r of Object.values(off)) r.on = false;
+    off.weekly.on = true; // Sundays only: 13 of them in the 92 days looked at
+    await db.syncMeta.put({ key: REMINDER_SETTINGS_KEY, value: off });
+    fakeMac("authorized");
+    renderPage();
+    expect(
+      await screen.findByText("Reminders are planned up to Sun 31 Jan 2027, and refresh whenever Esmeworld opens."),
+    ).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it("says so when the Mac didn't ask (still no answer after asking)", async () => {
     fakeMac("not-determined", "not-determined");
     renderPage();

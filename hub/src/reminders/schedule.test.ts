@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { Item } from "../domain/types";
 import {
   DEFAULT_REMINDER_SETTINGS,
+  MAX_DAYS,
   MAX_SCHEDULED,
+  appDayOf,
   computeSchedule,
+  localNow,
+  msToDayChange,
   normalizeReminderSettings,
+  plannedUntil,
+  remindersOn,
   type ReminderSettings,
   type ScheduleInput,
 } from "./schedule";
@@ -39,6 +45,7 @@ function only(patch: Partial<ReminderSettings>): ReminderSettings {
   return { ...off, ...patch };
 }
 
+/** A week's look ahead unless a test says otherwise (the fill-to-the-cap tests do). */
 function input(o: Partial<ScheduleInput> = {}): ScheduleInput {
   return {
     settings: DEFAULT_REMINDER_SETTINGS,
@@ -46,6 +53,7 @@ function input(o: Partial<ScheduleInput> = {}): ScheduleInput {
     items: [],
     morningDone: new Set(),
     checkinDone: new Set(),
+    days: 7,
     ...o,
   };
 }
@@ -318,8 +326,136 @@ describe("the whole schedule", () => {
   });
 
   it("holds only titles and counts (no notes or page text)", () => {
-    const items = [item({ title: "Pretend title", notes: "SECRET pretend notes", pinnedDate: WED })];
+    const items = [
+      item({ title: "Pretend title", notes: "SECRET pretend notes", pinnedDate: WED }),
+      item({
+        title: "Pretend project",
+        notes: "SECRET project notes",
+        sessions: [{ id: "s1", title: "SECRET session title", details: "SECRET session details", plannedFor: WED }],
+      }),
+    ];
     const text = JSON.stringify(computeSchedule(input({ items })));
     expect(text).not.toContain("SECRET");
+  });
+});
+
+describe("app-days (a day runs 3am to 3am)", () => {
+  const checkinAt1 = only({ checkin: { on: true, time: "01:00" } });
+
+  it("a check-in done at 00:40 means no 01:00 reminder for that app-day", () => {
+    // 00:45 on Friday the 6th is still Thursday the 5th; the check-in done at 00:40 was the 5th's.
+    const now = { date: FRI, time: "00:45" };
+    const done = computeSchedule(input({ settings: checkinAt1, now, checkinDone: new Set([THU]) }));
+    expect(done[0]).toMatchObject({ id: `checkin:${FRI}`, at: "2026-11-07T01:00" });
+    const notDone = computeSchedule(input({ settings: checkinAt1, now }));
+    expect(notDone[0]).toMatchObject({ id: `checkin:${THU}`, at: "2026-11-06T01:00" });
+  });
+
+  it("a reminder at 02:30 belongs to the app-day before (it goes off after midnight)", () => {
+    const out = computeSchedule(input({ settings: only({ morning: { on: true, time: "02:30" } }), now: { date: WED, time: "12:00" } }));
+    expect(out[0]).toEqual(expect.objectContaining({ id: `morning:${WED}`, at: "2026-11-05T02:30" }));
+    expect(appDayOf("2026-11-05", "02:30")).toBe(WED);
+    expect(appDayOf("2026-11-05", "03:00")).toBe(THU);
+  });
+
+  it("between midnight and 3am, the to-dos are still the app-day's (as Today shows them)", () => {
+    const items = [item({ title: "Pretend Wednesday thing", pinnedDate: WED }), item({ title: "Pretend Thursday thing", pinnedDate: THU })];
+    const out = remindersOn(input({ settings: only({ todos: { on: true, time: "01:30", dayBefore: false } }), items }), WED);
+    expect(out).toEqual([expect.objectContaining({ id: `todos:${WED}`, at: "2026-11-05T01:30", body: "Pretend Wednesday thing" })]);
+  });
+
+  it("rolls over a month and a year", () => {
+    const out = computeSchedule(
+      input({ now: { date: "2026-12-28", time: "12:00" }, settings: only({ monthly: { on: true, when: "first", time: "10:00" } }) }),
+    );
+    expect(out).toEqual([
+      { id: "monthly:2027-01-01", at: "2027-01-01T10:00", title: "December review", body: "Your month is ready to look back on.", path: "/" },
+    ]);
+    // 01:00 on the 1st is still the 31st's app-day: the 1st's monthly reminder is still ahead.
+    const night = computeSchedule(
+      input({ now: { date: "2027-01-01", time: "01:00" }, settings: only({ monthly: { on: true, when: "first", time: "10:00" } }) }),
+    );
+    expect(night[0]).toMatchObject({ id: "monthly:2027-01-01", at: "2027-01-01T10:00" });
+  });
+
+  it("keeps wall-clock times through a clock change (UK clocks go back on 25 Oct 2026)", () => {
+    const out = computeSchedule(
+      input({ now: { date: "2026-10-24", time: "12:00" }, settings: only({ morning: { on: true, time: "08:30" }, checkin: { on: true, time: "01:30" } }) }),
+    );
+    expect(ats(out).slice(0, 4)).toEqual(["2026-10-25T01:30", "2026-10-25T08:30", "2026-10-26T01:30", "2026-10-26T08:30"]);
+  });
+});
+
+describe("filled up to the cap", () => {
+  it("keeps going day by day, soonest first, up to MAX_SCHEDULED", () => {
+    const out = computeSchedule(input({ days: undefined }));
+    expect(out).toHaveLength(MAX_SCHEDULED);
+    expect(ats(out)).toEqual([...ats(out)].sort());
+    expect(MAX_SCHEDULED).toBeLessThan(64);
+    // Defaults: about two a day, so it reaches weeks ahead, not just 7 days.
+    expect(out[out.length - 1].at > "2026-11-25").toBe(true);
+  });
+
+  it("stops at MAX_DAYS when only a few are on", () => {
+    const out = computeSchedule(input({ days: undefined, settings: only({ weekly: { on: true, day: "sun", time: "16:00" } }) }));
+    // 92 app-days from Wednesday 4 Nov hold 13 Sundays.
+    expect(MAX_DAYS).toBe(92);
+    expect(out.length).toBe(13);
+    expect(out.every((r) => r.id.startsWith("weekly:"))).toBe(true);
+  });
+
+  it("says how far ahead it is planned", () => {
+    const out = computeSchedule(input({ settings: only({ morning: { on: true, time: "08:30" } }) }));
+    expect(plannedUntil(out)).toBe("2026-11-10");
+    expect(plannedUntil([])).toBeNull();
+  });
+});
+
+describe("the to-dos line counts what Today shows", () => {
+  const todos = { on: true, time: "09:00", dayBefore: true };
+
+  it("leaves out the Inbox and to-dos moved to a later day", () => {
+    const items = [
+      item({ title: "Pretend unsorted", areaId: "inbox", pinnedDate: WED }),
+      item({ title: "Pretend moved", due: WED, pinnedDate: FRI }),
+      item({ title: "Pretend kept", due: WED }),
+    ];
+    const out = computeSchedule(input({ settings: only({ todos }), items }));
+    expect(out.find((r) => r.id === `todos:${WED}`)).toMatchObject({ title: "1 to-do today", body: "Pretend kept" });
+  });
+
+  it("a project with a session that day has its own reminder, not a place in the to-dos line", () => {
+    const sessionToday = item({ title: "Pretend film", due: WED, sessions: [{ id: "a", plannedFor: WED }, { id: "b" }] });
+    const dueOnly = item({ title: "Pretend album", due: WED, sessions: [{ id: "a" }] });
+    const out = computeSchedule(
+      input({ settings: only({ todos, session: { on: true, time: "10:00" } }), items: [sessionToday, dueOnly] }),
+    );
+    expect(out.map((r) => [r.id, r.body])).toEqual([
+      [`todos:${WED}`, "Pretend album"],
+      [`session:${WED}:${sessionToday.id}`, "Session 1 of 2 is planned for today."],
+    ]);
+  });
+});
+
+describe("clock helpers", () => {
+  it("localNow is the calendar date and minute", () => {
+    expect(localNow(new Date(2026, 10, 6, 0, 45, 30))).toEqual({ date: FRI, time: "00:45" });
+  });
+
+  it("msToDayChange: to just after the next 3am", () => {
+    expect(msToDayChange(new Date(2026, 10, 6, 2, 0, 0))).toBe(60 * 60 * 1000 + 1000);
+    expect(msToDayChange(new Date(2026, 10, 6, 3, 0, 30))).toBe(24 * 60 * 60 * 1000 - 29 * 1000);
+    expect(msToDayChange(new Date(2026, 10, 6, 23, 0, 0))).toBe(4 * 60 * 60 * 1000 + 1000);
+  });
+
+  it("msToDayChange across the UK clock change: 22:00 BST to 03:00 GMT is six hours", () => {
+    const was = process.env.TZ;
+    process.env.TZ = "Europe/London";
+    try {
+      expect(msToDayChange(new Date(2026, 9, 24, 22, 0, 0))).toBe(6 * 60 * 60 * 1000 + 1000);
+    } finally {
+      if (was === undefined) delete process.env.TZ;
+      else process.env.TZ = was;
+    }
   });
 });
