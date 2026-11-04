@@ -371,7 +371,20 @@ export async function saveAnswer(
   done: boolean,
 ): Promise<void> {
   const entry: AnswerEntry = { v: 1, prompt, answer: answer && answer.trim() ? answer : null, done, at: Date.now() };
-  await write(jk, [await seal(jk, "answer", date, `${await promptKey(jk, prompt)}:${deviceId}`, entry)]);
+  await write(jk, [await seal(jk, "answer", date, await ownAnswerSuffix(jk, date, prompt, deviceId), entry)]);
+}
+
+/**
+ * This device's answer row for a question: `<promptKey>:<deviceId>`, or, when that row is here
+ * and won't open (damaged), `<promptKey>:<deviceId>-2` beside it: the row that won't open is
+ * never written over (bug #20, re-review m4), and she can still answer and move on.
+ */
+async function ownAnswerSuffix(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<string> {
+  const pk = await promptKey(jk, prompt);
+  for (const device of [deviceId, `${deviceId}-2`]) {
+    if (!(await wontOpen(jk, journalId("answer", date, `${pk}:${device}`), "answer"))) return `${pk}:${device}`;
+  }
+  throw new Error(CANT_OPEN);
 }
 
 /**
@@ -380,7 +393,7 @@ export async function saveAnswer(
  * device's answer, and never blanks this device's own one.
  */
 export async function moveAnswerOn(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<void> {
-  const own = await db.journal.get(journalId("answer", date, `${await promptKey(jk, prompt)}:${deviceId}`));
+  const own = await db.journal.get(journalId("answer", date, await ownAnswerSuffix(jk, date, prompt, deviceId)));
   let answer: string | null = null;
   if (own) {
     const o = await openRow(jk, own, "answer");

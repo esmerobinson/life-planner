@@ -88,6 +88,27 @@ it("Edit turns the answers back into boxes; Save keeps the change and shows it r
   await waitFor(async () => expect((await readCheckinDay(jk, TODAY)).answers.get("K2")?.answer).toBe(`${WORDS[2]}, and pretend tea`));
 });
 
+it("Edit: clearing an answer to rewrite it, then a pause, keeps its box (re-review m2)", async () => {
+  await ensureCheckinSet(jk, TODAY, ["M1", "D3", "K2"]);
+  const me = "device-this-one-01";
+  for (const [i, id] of ["M1", "D3", "K2"].entries()) await saveAnswer(jk, TODAY, id, me, WORDS[i]!, true);
+  render(
+    <MemoryRouter>
+      <DailyCheckIn jk={jk} today={TODAY} deviceId={me} />
+    </MemoryRouter>,
+  );
+  await screen.findByText("Checked in for today");
+  await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+  await userEvent.clear(screen.getAllByRole("textbox", { name: "Your answer" })[1]!);
+  await new Promise((r) => setTimeout(r, 1500)); // autosaved, the day read again
+  const boxes = screen.getAllByRole("textbox", { name: "Your answer" });
+  expect(boxes).toHaveLength(3);
+  expect(boxes[1]).toHaveValue("");
+  await userEvent.type(boxes[1]!, "Pretend: a rewritten answer");
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(screen.getAllByLabelText("Your answer").map((a) => a.textContent)).toEqual([WORDS[0], "Pretend: a rewritten answer", WORDS[2]]);
+}, 15_000);
+
 it("Past check-ins: the latest few, then See all; Choose questions closed at the bottom", async () => {
   const me = "device-this-one-01";
   for (const d of ["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24"]) {

@@ -1,7 +1,7 @@
 import { db } from "./db";
-import { finishMorningPage, readMorningDay, readPromptSettings, saveMorningDraft, savePromptSettings } from "./repo";
+import { finishMorningPage, moveAnswerOn, readCheckinDay, readMorningDay, readPromptSettings, saveAnswer, saveMorningDraft, savePromptSettings } from "./repo";
 import { journalId } from "./validate";
-import { journalAad, sealJson, type JournalKey } from "../journal/crypto";
+import { journalAad, promptKey, sealJson, type JournalKey } from "../journal/crypto";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 
 // Testing session, bug (low): two journal rows whose ids don't depend on the key are written
@@ -49,4 +49,22 @@ it("a Choose questions row sealed with another key is never written over", async
   expect(await readPromptSettings(jk)).toBeNull();
   await savePromptSettings(jk, ["D3"], DAY).catch(() => undefined);
   expect(await db.journal.get("settings")).toEqual(before);
+});
+
+// Fix round 2 (re-review m4): the same for check-in typing. Her answer row on this device
+// that this key can't open is never written over by autosave, Next, Skip or Edit; what she
+// types now is kept beside it, so she can still answer and move on.
+it("this device's check-in answer row that won't open is never written over (autosave, Next, Skip, Edit)", async () => {
+  const id = journalId("answer", DAY, `${await promptKey(jk, "M1")}:${ME}`);
+  await db.journal.put({ id, kind: "answer", date: DAY, fp: jk.fp, iv: "AAAAAAAAAAAAAAAA", ct: "AAAAAAAAAAAAAAAAAAAAAA==" }); // damaged
+  const before = await db.journal.get(id);
+  await saveAnswer(jk, DAY, "M1", ME, "Pretend typed words", false); // autosave
+  expect(await db.journal.get(id)).toEqual(before);
+  expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend typed words", done: false });
+  await moveAnswerOn(jk, DAY, "M1", ME); // Next / Skip with nothing new typed
+  expect(await db.journal.get(id)).toEqual(before);
+  expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend typed words", done: true });
+  await saveAnswer(jk, DAY, "M1", ME, "Pretend edited words", true); // Next with words, or Edit
+  expect(await db.journal.get(id)).toEqual(before);
+  expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend edited words", done: true });
 });

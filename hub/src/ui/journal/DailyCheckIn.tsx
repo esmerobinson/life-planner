@@ -247,11 +247,14 @@ function Question({
 function CheckedIn({
   jk, day, deviceId, onProblem,
 }: { jk: JournalKey; day: CheckinDay; deviceId: string; onProblem: (p: string) => void }) {
-  const [editing, setEditing] = useState(false);
+  // While editing: the questions she had answered when she pressed Edit, kept until Save, so
+  // clearing one to rewrite it never takes its box away (re-review m2).
+  const [editingIds, setEditingIds] = useState<string[] | null>(null);
+  const editing = editingIds !== null;
   // What she just saved here, shown at once (the day is re-read a moment later).
   const [mine, setMine] = useState<Record<string, string>>({});
-  const answered = answeredPrompts(day);
   const answerOf = (id: string) => mine[id] ?? day.answers.get(id)?.answer ?? "";
+  const answered = editingIds ?? day.prompts.filter((id) => answerOf(id).trim() !== "");
   return (
     <>
       <DoneBox title="Checked in for today" line={CHECKED_IN_LINE} />
@@ -285,11 +288,11 @@ function CheckedIn({
       {answered.length > 0 && (
         <div className="btn-group">
           {editing ? (
-            <button type="button" onClick={() => setEditing(false)}>
+            <button type="button" onClick={() => setEditingIds(null)}>
               {SAVE_ANSWERS}
             </button>
           ) : (
-            <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
+            <button type="button" className="btn-secondary" onClick={() => setEditingIds(answered)}>
               {EDIT_ANSWERS}
             </button>
           )}
