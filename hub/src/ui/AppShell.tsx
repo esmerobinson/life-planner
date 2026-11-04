@@ -5,7 +5,7 @@ import { usePhone } from "./usePhone";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
-import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addContext";
+import { AddDefaultsContext, BASE_ADD_DEFAULTS, OpenAddContext, type AddDefaults } from "./addContext";
 import { AddButton } from "./AddButton";
 import { UndoLine } from "./DeleteButton";
 import { ShellUndoContext, type UndoNote } from "./undoContext";
@@ -103,9 +103,17 @@ export function AppShell() {
     await changed();
   }, [undoNote, changed]);
 
+  // "+ Add a book" (and the like): Add opens pre-set as asked, not as the page says.
+  const [addOverride, setAddOverride] = useState<AddDefaults | null>(null);
   const toggleAdd = useCallback((open: boolean) => {
     if (open) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
+    setAddOverride(null);
     setAdding(open);
+  }, []);
+  const openAddWith = useCallback((d: AddDefaults) => {
+    setAddOpened((n) => n + 1);
+    setAddOverride(d);
+    setAdding(true);
   }, []);
 
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
@@ -113,6 +121,7 @@ export function AppShell() {
   return (
     <ShellContext.Provider value={ctx}>
       <AddDefaultsContext.Provider value={setAddDefaults}>
+      <OpenAddContext.Provider value={openAddWith}>
       <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
@@ -143,10 +152,10 @@ export function AppShell() {
                 key={addOpened}
                 today={today}
                 autoFocus
-                defaults={addDefaults ?? BASE_ADD_DEFAULTS}
+                defaults={addOverride ?? addDefaults ?? BASE_ADD_DEFAULTS}
                 // A click outside, Escape or the button keep what was typed for the next open (I-5);
-                // Cancel and a successful add start afresh.
-                initial={addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
+                // Cancel and a successful add start afresh. Opened as asked ("+ Add a book"): fresh.
+                initial={!addOverride && addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
                 onDraft={(d) => {
                   addDraft.current = d;
                 }}
@@ -166,6 +175,7 @@ export function AppShell() {
       </div>
       </PanelProvider>
       </ShellUndoContext.Provider>
+      </OpenAddContext.Provider>
       </AddDefaultsContext.Provider>
     </ShellContext.Provider>
   );

@@ -1,12 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { useSessionsUndo } from "./undoSessions";
-import { archiveItem, changeToProject, deleteItem, getItem, itemToGoal, moveTo, removeFromToday, setMilestone, updateItem } from "../data/repo";
+import { leftReadingList, MOVED_TO_READING_LIST, useRowUndo, useSessionsUndo } from "./undoSessions";
+import {
+  archiveItem, changeToProject, deleteItem, getItem, itemToGoal, makeBook, moveTo, removeFromToday, setMilestone, unBook,
+  updateItem,
+} from "../data/repo";
+import { BOOK_AREA } from "../domain/books";
 import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR } from "./areas";
 import { ARROW_GLYPH, IconPopover } from "./IconPopover";
 import { useSaveError } from "./messages";
 
-type Become = "task" | "project" | "idea" | "goal";
+type Become = "task" | "project" | "idea" | "book" | "goal";
 
 type Choice =
   | { kind: "become"; to: Become }
@@ -21,13 +25,17 @@ const TYPES: { to: Become; label: string }[] = [
   { to: "task", label: "To-do" },
   { to: "project", label: "Project" },
   { to: "idea", label: "Idea" },
+  { to: "book", label: "Book" },
   { to: "goal", label: "Goal" },
 ];
 
 /**
  * The arrow icon (Move to). When the item's kind is known: "Change to" first (the types
- * it is not: To-do, Project, Idea, Goal), then the other areas, then This week (not for ideas)
- * and Remove from today (only on the Today list), then Archive and Delete (to the Bin).
+ * it is not: To-do, Project, Idea, Book, Goal), then the other areas (not for a book: books
+ * live under Mind), then This week (not for ideas) and Remove from today (only on the Today
+ * list), then Archive and Delete (to the Bin). "Book" moves it to Mind's reading list (with
+ * Undo when that moved it from another area); a book changed to anything else leaves the
+ * reading list (with Undo).
  * An unsorted Inbox item (`untyped`) has no type to change and no area to move between:
  * its menu is "Sort this…" (Sort one by one, opened on it), then Archive and Delete.
  */
@@ -42,8 +50,11 @@ export function MoveToMenu({
   untyped = false,
   milestone,
   project = false,
+  book = false,
   isOpen = true,
 }: {
+  /** A book on the reading list: "Change to" offers Idea instead of Book, and no areas. */
+  book?: boolean;
   /** Not done (only an open item can become a project, M-8). */
   isOpen?: boolean;
   /** A project to-do (it has sessions): "Change to" offers To-do instead of Project. */
@@ -66,17 +77,24 @@ export function MoveToMenu({
 }) {
   const { attempt, saveError } = useSaveError();
   const offerUndo = useSessionsUndo(today);
+  const offerRowUndo = useRowUndo(today);
 
   async function pick(c: Choice, close: (refocus?: boolean) => void) {
     // A project made a to-do or an idea loses its sessions: keep the whole row for Undo (I-2).
     const dropsSessions = project && c.kind === "become" && (c.to === "task" || c.to === "idea");
+    // A book made anything but a goal leaves the reading list (its author, pages … go): Undo too.
+    const leavesList = book && c.kind === "become" && c.to !== "goal" && c.to !== "book";
     const before: { row?: Item } = {};
     const ok = await attempt(async () => {
-      if (dropsSessions) before.row = await getItem(itemId);
+      if (dropsSessions || leavesList) before.row = await getItem(itemId);
       if (c.kind === "become") {
         // A project's archived copy keeps its sessions when it becomes a goal.
         if (c.to === "goal") await itemToGoal(itemId, areaId ?? "admin", today);
-        else if (c.to === "project") await changeToProject(itemId, today);
+        else if (c.to === "book") before.row = await makeBook(itemId, today);
+        else if (leavesList) {
+          await unBook(itemId, c.to === "idea" ? "idea" : "task", today);
+          if (c.to === "project") await changeToProject(itemId, today);
+        } else if (c.to === "project") await changeToProject(itemId, today);
         // An idea has no due date, repeat, day on Today or sessions; remove them explicitly (as the Inbox does).
         else if (c.to === "idea") {
           await updateItem(
@@ -93,9 +111,18 @@ export function MoveToMenu({
       else await deleteItem(itemId, today);
     });
     close(!ok); // the clicked choice is gone; on failure keep focus somewhere sensible
-    if (ok && dropsSessions && before.row) offerUndo(c.kind === "become" && c.to === "idea" ? "idea" : "task", before.row);
+    if (ok && c.kind === "become" && before.row) {
+      if (c.to === "book") {
+        // Undo when it moved from another area (Esme's brief), or lost a project's sessions.
+        if (before.row.areaId !== BOOK_AREA) offerRowUndo(MOVED_TO_READING_LIST, before.row);
+        else if (before.row.sessions) offerRowUndo("Changed to a book, without its sessions", before.row);
+      } else if (leavesList && c.to !== "goal") offerRowUndo(leftReadingList(c.to), before.row);
+      else if (dropsSessions) offerUndo(c.to === "idea" ? "idea" : "task", before.row);
+    }
     if (ok) await onMoved();
   }
+
+  const current: Become | undefined = project ? "project" : book ? "book" : kind;
 
   return (
     <IconPopover
@@ -119,7 +146,7 @@ export function MoveToMenu({
                 <div className="pop-menu-label" aria-hidden="true">
                   Change to
                 </div>
-                {TYPES.filter((t) => t.to !== (project ? "project" : kind) && (t.to !== "project" || isOpen)).map((t) => (
+                {TYPES.filter((t) => t.to !== current && (t.to !== "project" || isOpen)).map((t) => (
                   <button key={t.to} type="button" onClick={() => void pick({ kind: "become", to: t.to }, close)}>
                     {t.label}
                   </button>
@@ -136,7 +163,7 @@ export function MoveToMenu({
               <hr />
             </>
           )}
-          {!untyped && GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id !== areaId).map((a) => (
+          {!untyped && !book && GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id !== areaId).map((a) => (
             <button key={a.id} type="button" onClick={() => void pick({ kind: "area", areaId: a.id }, close)}>
               {a.label}
             </button>

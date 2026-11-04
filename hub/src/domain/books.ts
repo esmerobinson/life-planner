@@ -33,18 +33,19 @@ export function bookLine(item: Item): { pageLine: string | null; ratio: number |
   return { pageLine: `page ${at} of ${item.pages}`, ratio: at / item.pages };
 }
 
-/** Reading first, then Want to read, then Read (the mockup's order); newest finished first among Read. */
+/**
+ * Reading first, then Want to read, then Read (the mockup's order); newest finished first among
+ * Read; otherwise oldest added first, then by title (the stored order is by random id).
+ */
 export function sortBooks(books: Item[]): Item[] {
   const order: Record<BookStatus, number> = { reading: 0, want: 1, read: 2 };
-  return books
-    .map((b, i) => ({ b, i }))
-    .sort(
-      (x, y) =>
-        order[x.b.bookStatus ?? "want"] - order[y.b.bookStatus ?? "want"] ||
-        (x.b.bookStatus === "read" ? (y.b.finishedOn ?? "").localeCompare(x.b.finishedOn ?? "") : 0) ||
-        x.i - y.i,
-    )
-    .map((x) => x.b);
+  return [...books].sort(
+    (x, y) =>
+      order[x.bookStatus ?? "want"] - order[y.bookStatus ?? "want"] ||
+      (x.bookStatus === "read" ? (y.finishedOn ?? "").localeCompare(x.finishedOn ?? "") : 0) ||
+      x.createdAt.localeCompare(y.createdAt) ||
+      x.title.localeCompare(y.title),
+  );
 }
 
 /** An http(s) address (what a book's link may be). */

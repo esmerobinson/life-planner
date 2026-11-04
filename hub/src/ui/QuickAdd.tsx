@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { isActive } from "../domain/goalCounts";
-import { createGoal, createItem, listGoals } from "../data/repo";
+import { createBook, createGoal, createItem, listGoals } from "../data/repo";
+import { BOOK_AREA, BOOK_LIMITS, BOOK_STATUSES, BOOK_STATUS_LABEL, type BookStatus } from "../domain/books";
 import { MAX_GOAL_NOTES, MAX_NOTES_TEXT } from "../data/validate";
 import { DEFAULT_SESSIONS, MAX_SESSIONS, MIN_SESSIONS, newSessions } from "../domain/projects";
 import type { AreaId, Goal, ISODate, Priority, Weekday } from "../domain/types";
@@ -32,11 +33,14 @@ export interface AddDraft {
   deadline: string;
   target: string;
   sessionCount: string;
+  /** A book's author and status (Type "Book"). Optional so a draft kept by an older build still reads. */
+  author?: string;
+  bookStatus?: BookStatus;
 }
 
 /** Something was typed (a draft worth keeping); only choosing type or area is not. */
 export function draftHasContent(d: AddDraft): boolean {
-  return Boolean(d.title.trim() || d.notes.trim() || d.due || d.deadline || d.target.trim() || d.recur.length);
+  return Boolean(d.title.trim() || d.notes.trim() || d.due || d.deadline || d.target.trim() || d.recur.length || d.author?.trim());
 }
 
 /**
@@ -79,11 +83,15 @@ export function QuickAdd({
   const [deadline, setDeadline] = useState(initial?.deadline ?? "");
   const [target, setTarget] = useState(initial?.target ?? "");
   const [sessionCount, setSessionCount] = useState(initial?.sessionCount ?? String(DEFAULT_SESSIONS));
+  const [author, setAuthor] = useState(initial?.author ?? "");
+  const [bookStatus, setBookStatus] = useState<BookStatus>(initial?.bookStatus ?? "want");
   const draftRef = useRef(onDraft);
   draftRef.current = onDraft;
   useEffect(() => {
-    draftRef.current?.({ title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount });
-  }, [title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount]);
+    draftRef.current?.({
+      title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount, author, bookStatus,
+    });
+  }, [title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount, author, bookStatus]);
   const [message, setMessage] = useState("");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [saving, setSaving] = useState(false);
@@ -106,6 +114,7 @@ export function QuickAdd({
   }, [version]);
 
   const isGoal = type === "goal";
+  const isBookType = type === "book";
   const areaGoals = goals.filter((g) => g.areaId === areaId && isActive(g));
   const notesCap = isGoal ? MAX_GOAL_NOTES : MAX_NOTES_TEXT;
 
@@ -117,6 +126,11 @@ export function QuickAdd({
     setType(next);
     if (next === "goal") {
       setAreaId((a) => goalArea(a));
+      setGoalId("");
+    }
+    // Books always live under Mind.
+    if (next === "book") {
+      setAreaId(BOOK_AREA);
       setGoalId("");
     }
   }
@@ -150,6 +164,9 @@ export function QuickAdd({
       }
       if (!deadline) return setMessage("A project needs a deadline.");
     }
+    if (isBookType && author.trim().length > BOOK_LIMITS.author) {
+      return setMessage(`An author is at most ${BOOK_LIMITS.author} characters.`);
+    }
     if (notes.length > notesCap) {
       return setMessage(`Notes are at most ${notesCap.toLocaleString("en-GB")} characters here.`);
     }
@@ -168,7 +185,9 @@ export function QuickAdd({
 
   async function save(trimmed: string, monthlyTarget: number | undefined, count: number) {
     const page = notes.trim() ? { notes } : {};
-    if (isGoal) {
+    if (isBookType) {
+      await createBook({ title: trimmed, author, bookStatus, ...page }, today);
+    } else if (isGoal) {
       await createGoal(
         {
           title: trimmed,
@@ -224,6 +243,8 @@ export function QuickAdd({
     setDeadline("");
     setTarget("");
     setSessionCount(String(DEFAULT_SESSIONS));
+    setAuthor("");
+    setBookStatus("want");
     onAdded();
   }
 
@@ -240,13 +261,16 @@ export function QuickAdd({
           <option value="task">To-do</option>
           <option value="project">Project</option>
           <option value="idea">Idea</option>
+          <option value="book">Book</option>
           <option value="goal">Goal</option>
         </select>
       </label>
       <label className="form-field">
         <span className="form-label">Area</span>
         <select
-          value={areaId}
+          // A book always lives under Mind: shown, not changeable.
+          disabled={isBookType}
+          value={isBookType ? BOOK_AREA : areaId}
           onChange={(e) => {
             setAreaId(e.target.value as AreaId);
             setGoalId("");
@@ -259,7 +283,24 @@ export function QuickAdd({
           ))}
         </select>
       </label>
-      {isGoal ? (
+      {isBookType ? (
+        <>
+          <label className="form-field">
+            <span className="form-label">Author</span>
+            <input type="text" maxLength={BOOK_LIMITS.author} value={author} onChange={(e) => setAuthor(e.target.value)} />
+          </label>
+          <label className="form-field">
+            <span className="form-label">Status</span>
+            <select value={bookStatus} onChange={(e) => setBookStatus(e.target.value as BookStatus)}>
+              {BOOK_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {BOOK_STATUS_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      ) : isGoal ? (
         <>
           <label className="form-field">
             <span className="form-label">Kind of goal</span>

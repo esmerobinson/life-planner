@@ -13,6 +13,7 @@ import "./styles/add.css";
 import "./styles/panel.css";
 import "./styles/goals.css";
 import "./styles/pairing.css";
+import "./styles/books.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
