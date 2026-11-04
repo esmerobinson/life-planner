@@ -99,7 +99,7 @@ async function walkThrough(page: Page, prefix: string) {
 
   await s.getByText("All cards", { exact: true }).click();
   await expect(s.getByText("Introduction (optional reading)")).toBeVisible();
-  await s.getByText("Day 2 · The fictional kettle").click();
+  await s.getByText("Day 2 · The fictional kettle", { exact: true }).click(); // under All cards (Past exercises has it too, dated)
   await expect(s.getByRole("list", { name: "Your responses" }).getByText("6 out of 10")).toBeVisible();
   await shoot(page, `${prefix}-all-cards`);
   await noSidewaysScroll(page);
@@ -308,7 +308,7 @@ for (const width of [1280, 390]) {
       await expect(again.getByLabel("Pretend feature two, note")).toHaveValue("Pretend: only on weekdays");
       await expect(again.getByText("4 of 4 answered · Yes 2 · Partly 1 · No 1")).toBeVisible();
       await s.getByText("All cards", { exact: true }).click();
-      await s.getByText("Day 1 · Pretend checklist").click();
+      await s.getByText("Day 1 · Pretend checklist", { exact: true }).click(); // under All cards
       const mine = s.getByRole("list", { name: "Your responses" });
       await expect(mine.getByText("Pretend feature two: Partly — Pretend: only on weekdays")).toBeVisible();
       await expect(mine.getByText("Pretend feature three: No", { exact: true })).toBeVisible();

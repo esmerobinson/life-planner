@@ -8,7 +8,7 @@ import type { ISODate } from "../../domain/types";
 import type { JournalKey } from "../../journal/crypto";
 import { LoadLine, longDate, useLoadGuard } from "./bits";
 import { QuestionText } from "./DailyCheckIn";
-import { ResponseView } from "./ResponseView";
+import { OtherVersions, ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
 
 /** The line at the top of Read back (from the approved mockup). */
@@ -103,6 +103,7 @@ function ReadBackItem({ jk, item, today }: { jk: JournalKey; item: Item; today: 
         <summary>{`${date} · Exercise · ${card}`}</summary>
         <ResponseView text={e.text} parts={e.parts} />
         {!e.submitted && <p className="journal-muted">Not submitted</p>}
+        <OtherVersions others={e.others} />
       </details>
     );
   }

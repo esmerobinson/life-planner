@@ -126,9 +126,15 @@ describe("draft autosave", () => {
     const mine = `exercise-entry:${DAY}:${await exerciseCardKey(jk, 3, CARD.theme)}:${ME}`;
     await db.journal.put({ ...theirs, id: mine });
     const before = await db.journal.get(mine);
-    await expect(saveExerciseDraft(jk, DAY, ME, CARD, "Pretend")).rejects.toThrow(CANT_OPEN);
+    await expect(submitExerciseEntry(jk, DAY, ME, CARD, "Pretend")).rejects.toThrow(CANT_OPEN);
     expect(await db.journal.get(mine)).toEqual(before);
-    expect((await readExerciseEntry(jk, DAY, CARD)).unreadable).toBe(1);
+    // The same for this device's draft row.
+    await db.journal.put({ ...theirs, id: `${mine}-draft` });
+    const draft = await db.journal.get(`${mine}-draft`);
+    await expect(saveExerciseDraft(jk, DAY, ME, CARD, "Pretend")).rejects.toThrow(CANT_OPEN);
+    expect(await db.journal.get(`${mine}-draft`)).toEqual(draft);
+    expect(await db.journal.get(mine)).toEqual(before);
+    expect((await readExerciseEntry(jk, DAY, CARD)).unreadable).toBe(2);
   });
 });
 
@@ -331,8 +337,10 @@ describe("a card with parts: one answer per part, in the same sealed per-device 
 
   it("a draft keeps the parts (partly filled) and never marks done; it reads back", async () => {
     await saveExerciseDraft(jk, DAY, ME, kettle, answers(["Pretend chest", "", ""], null, null));
-    const id = `exercise-entry:${DAY}:${await exerciseCardIdKey(jk, kettle.id)}:${ME}`;
+    // A draft is its own row, apart from the one Submit writes (it can never overwrite a submit).
+    const id = `exercise-entry:${DAY}:${await exerciseCardIdKey(jk, kettle.id)}:${ME}-draft`;
     const stored = (await db.journal.get(id))!;
+    expect(validJournal(stored)).toBe(true);
     expect(JSON.stringify(stored)).not.toContain("Pretend chest");
     expect(await openJson(jk.key, stored, journalAad(id))).toMatchObject({ v: 2, text: "", parts: answers(["Pretend chest", "", ""], null, null) });
     expect((await readExerciseEntry(jk, DAY, kettle)).entry).toMatchObject({ parts: answers(["Pretend chest", "", ""], null, null), saved: false });
