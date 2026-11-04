@@ -10,7 +10,8 @@
 import { addDays, daysBetween, endOfMonth, mondayOf, monthOf, weekdayOf } from "../domain/dates";
 import { monthHit, type GoalSources } from "../domain/goalCounts";
 import { isHabit } from "../domain/habits";
-import { milestoneProgress, isSortedTask, tickOffDates } from "../domain/progress";
+import { milestoneProgress, isSortedTask } from "../domain/progress";
+import { isBook } from "../domain/books";
 import { isProject } from "../domain/projects";
 import { AREA_IDS, type Goal, type ISODate, type Item } from "../domain/types";
 import { MONTHS, STICKERS, type Source, type Sticker } from "./catalogue";
@@ -77,8 +78,56 @@ function gaps(sorted: readonly ISODate[], away: number): number {
   return n;
 }
 
-/** A plain to-do (not a habit) that is done. */
-const doneTodo = (it: Item) => isSortedTask(it) && !isHabit(it) && it.status === "done" && it.completedAt !== undefined;
+/** Not in the Bin. Archived things still count: archiving never takes anything away (review I3). */
+const kept = (it: Item) => it.status !== "deleted" && it.status !== "purged";
+
+/** A plain to-do (not a habit) that was done: done, or done and then archived. */
+const doneTodo = (it: Item) =>
+  isSortedTask(it) && !isHabit(it) && (it.status === "done" || it.status === "archived") && it.completedAt !== undefined;
+
+/** A habit month counts at 80% of its planned sessions, in any order (Esme, 2026-11-04). */
+export const HABIT_MONTH_SHARE = 0.8;
+
+/** Each habit's months since the start: planned sessions and sessions done (any days of that month). */
+function habitMonths(h: Item, start: ISODate, today: ISODate): { month: string; want: number; did: number }[] {
+  return monthsBetween(start, today).map((month) => {
+    const [y, m] = month.split("-").map(Number) as [number, number];
+    const from = `${month}-01` < start ? start : `${month}-01`;
+    const to = endOfMonth(y, m);
+    return { month, want: planned(h, from, to), did: new Set((h.doneDates ?? []).filter((d) => d >= from && d <= to)).size };
+  });
+}
+
+/**
+ * "Area cleared" (Esme, 2026-11-04): for each area and each calendar month since the start that
+ * has ENDED, every to-do due or planned in that month (from the start) was done by the month's
+ * end. Areas with nothing due that month don't count. Returns how many (area, month) pairs, so
+ * repeats are derived from the data (never stored increments: no double counting across devices).
+ */
+export function areasCleared(items: readonly Item[], start: ISODate, today: ISODate): number {
+  let n = 0;
+  for (const month of monthsBetween(start, today)) {
+    const [y, m] = month.split("-").map(Number) as [number, number];
+    const last = endOfMonth(y, m);
+    if (last >= today) continue; // only months that have ended
+    const from = `${month}-01` < start ? start : `${month}-01`;
+    const inMonth = (d: ISODate | undefined) => d !== undefined && d >= from && d <= last;
+    for (const area of AREA_IDS) {
+      if (area === "inbox") continue;
+      const due = items.filter(
+        (it) => kept(it) && isSortedTask(it) && !isHabit(it) && it.areaId === area && (inMonth(it.due) || inMonth(it.pinnedDate)),
+      );
+      if (due.length > 0 && due.every((it) => doneTodo(it) && it.completedAt! <= last)) n++;
+    }
+  }
+  return n;
+}
+
+/** The month after "YYYY-MM". */
+const nextMonth = (m: string) => {
+  const [y, mo] = m.split("-").map(Number) as [number, number];
+  return mo === 12 ? `${String(y + 1).padStart(4, "0")}-01` : `${m.slice(0, 5)}${String(mo + 1).padStart(2, "0")}`;
+};
 
 /** Planned sessions of a habit between two days (inclusive), by its weekdays. */
 function planned(it: Item, from: ISODate, to: ISODate): number {
@@ -116,28 +165,45 @@ export function counters(input: EarningInput): Counters {
   // To-dos per area: each done to-do once, on the day it was ticked (habits are sessions instead).
   for (const area of AREA_IDS) {
     if (area === "inbox") continue;
-    set(`todos:${area}`, items.filter((it) => doneTodo(it) && it.areaId === area).length);
+    set(`todos:${area}`, items.filter((it) => doneTodo(it) && after(it.completedAt) && it.areaId === area).length);
   }
-  set("projects", items.filter((it) => isProject(it) && it.status === "done").length);
-  set("late-ticks", items.filter((it) => doneTodo(it) && it.due !== undefined && it.completedAt! > it.due).length);
+  const doneProject = (it: Item) => isProject(it) && (it.status === "done" || it.status === "archived") && after(it.completedAt);
+  set("projects", items.filter(doneProject).length);
+  set("late-ticks", items.filter((it) => doneTodo(it) && after(it.completedAt) && it.due !== undefined && it.completedAt! > it.due).length);
+  set("reading-books", items.filter((it) => kept(it) && isBook(it) && it.bookStatus === "read" && after(it.finishedOn)).length);
 
-  // Habits: sessions, weeks with one, months finished, and coming back to one after a week off.
-  const habits = items.filter((it) => isSortedTask(it) && isHabit(it) && it.status === "open");
+  // Habits (archived ones too): sessions, weeks with one, months at 80%, a first full month, the
+  // longest run of 80% months (restarts quietly after a lower month), and coming back after a week off.
+  const habits = items.filter((it) => isSortedTask(it) && isHabit(it) && kept(it));
   const sessions = habits.flatMap((h) => days(h.doneDates ?? []));
   set("habit-sessions", sessions.length);
   set("habit-weeks", new Set(sessions.map(mondayOf)).size);
-  let monthsDone = 0;
+  let goodMonths = 0;
+  let fullMonths = 0; // habits that have had a full month (each habit's first counts once)
+  let longestRun = 0;
   for (const h of habits) {
-    for (const month of monthsBetween(start, today)) {
-      const [y, m] = month.split("-").map(Number) as [number, number];
-      const from = `${month}-01` < start ? start : `${month}-01`;
-      const to = endOfMonth(y, m);
-      const want = planned(h, from, to);
-      const did = (h.doneDates ?? []).filter((d) => d >= from && d <= to).length;
-      if (want > 0 && did >= want) monthsDone++;
+    let run = 0;
+    let prev = "";
+    let full = false;
+    for (const { month, want, did } of habitMonths(h, start, today)) {
+      const good = want > 0 && did >= want * HABIT_MONTH_SHARE;
+      if (want > 0 && did >= want) full = true;
+      if (good) {
+        goodMonths++;
+        run = prev !== "" && nextMonth(prev) === month ? run + 1 : 1;
+        prev = month;
+        longestRun = Math.max(longestRun, run);
+      } else {
+        run = 0;
+        prev = "";
+      }
     }
+    if (full) fullMonths++;
   }
-  set("habit-months", monthsDone);
+  set("habit-months", goodMonths);
+  set("habit-full-month", fullMonths);
+  set("area-cleared", areasCleared(items, start, today));
+  set("habit-run", longestRun);
   set("habit-after-week-off", habits.some((h) => gaps(days(h.doneDates ?? []), 7) > 0) ? 1 : 0);
 
   set("today-finished", days(input.todayDone.filter(after)).length);
@@ -184,11 +250,12 @@ export function counters(input: EarningInput): Counters {
 
   // Coming back (the start day counts: she opened the farm), and the months she did anything at all.
   const active = days([
-    ...items.flatMap(tickOffDates),
-    ...items.flatMap((it) => (it.sessions ?? []).map((s) => s.doneOn).filter(after)),
+    ...items.filter(doneTodo).map((it) => it.completedAt!),
+    ...sessions,
+    ...items.filter(kept).flatMap((it) => (it.sessions ?? []).map((s) => s.doneOn)),
     ...input.todayDone.filter(after),
     ...(journal ? [...journal.morning, ...journal.checkins, ...journal.exercise.map((e) => e.date)].filter(after) : []),
-  ].filter((d) => d <= today));
+  ].filter((d): d is ISODate => after(d) && d <= today));
   set("returns", gaps(days([start, ...active]), 3));
   for (const month of new Set(active.map((d) => MONTHS[Number(d.slice(5, 7)) - 1]!))) set(`month:${month}`, 1);
 

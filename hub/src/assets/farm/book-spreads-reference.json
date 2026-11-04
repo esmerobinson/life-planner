@@ -197,6 +197,50 @@
     "h": 152
    },
    "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 9.aseprite",
+   "frame": {
+    "x": 2088,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 10.aseprite",
+   "frame": {
+    "x": 2320,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
   }
  ],
  "meta": {
@@ -205,7 +249,7 @@
   "image": "book-spreads-reference.png",
   "format": "RGBA8888",
   "size": {
-   "w": 2088,
+   "w": 2552,
    "h": 152
   },
   "scale": "1",
@@ -225,51 +269,65 @@
     "color": "#000000ff"
    },
    {
-    "name": "pages-1-2",
+    "name": "contents-total-example",
     "from": 2,
     "to": 2,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
-    "name": "pages-3-4",
+    "name": "pages-1-2",
     "from": 3,
     "to": 3,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
-    "name": "pages-5-6",
+    "name": "pages-3-4",
     "from": 4,
     "to": 4,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
-    "name": "pages-7-8",
+    "name": "pages-5-6",
     "from": 5,
     "to": 5,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
-    "name": "pages-9-10",
+    "name": "pages-7-8",
     "from": 6,
     "to": 6,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
-    "name": "pages-11-12",
+    "name": "pages-9-10",
     "from": 7,
     "to": 7,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
-    "name": "pages-13-14",
+    "name": "pages-11-12",
     "from": 8,
     "to": 8,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-13-14",
+    "from": 9,
+    "to": 9,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-15-16",
+    "from": 10,
+    "to": 10,
     "direction": "forward",
     "color": "#000000ff"
    }

@@ -1,9 +1,8 @@
 import type { Item } from "../domain/types";
 import { todayList } from "../domain/triage";
 import { STICKERS, stickersIn } from "./catalogue";
-import type { Counters } from "./earning";
 import {
-  ACCESSORIES, ARRIVES_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, momentQueue, nookHost, sleeping, spreadOf,
+  ACCESSORIES, ARRIVES_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, momentQueue, nookHost, sleeping, spreadOf,
   spreadOfSticker, todayListFinished, unlockedAccessories, wakeAt,
 } from "./world";
 import type { CharacterId } from "./state";
@@ -47,14 +46,17 @@ it("sleeps at night and while she writes Morning pages", () => {
 });
 
 describe("accessories", () => {
-  const months = (...m: string[]): Counters => new Map(m.map((x) => [`month:${x}`, 1])) as never;
-  it("18 of them, unlocked by totals, seasons and awake host zones", () => {
-    expect(ACCESSORIES).toHaveLength(18);
-    expect(unlockedAccessories(0, new Set(), null)).toEqual([]);
-    expect(unlockedAccessories(5, new Set(), null)).toEqual(["A1"]);
-    expect(unlockedAccessories(100, new Set(), null)).toEqual(["A1", "A2", "A3", "A4", "A5", "A6", "A7"]);
-    expect(unlockedAccessories(0, new Set(), months("Nov"))).toEqual(["A9"]);
-    expect(unlockedAccessories(0, new Set(["pond", "museum"]), months("Dec"))).toEqual(["A10", "H4", "H7"]);
+  const hedgerow = (...keys: string[]) => new Set(keys);
+  it("20 of them, unlocked by totals, by earned Hedgerow months (kept for good) and awake host zones", () => {
+    expect(ACCESSORIES).toHaveLength(20);
+    expect(unlockedAccessories(0, new Set(), new Set())).toEqual([]);
+    expect(unlockedAccessories(5, new Set(), new Set())).toEqual(["A1"]);
+    expect(unlockedAccessories(100, new Set(), new Set())).toEqual(["A1", "A2", "A3", "A4", "A5", "A6", "A7"]);
+    expect(unlockedAccessories(130, new Set(), new Set())).toContain("A12");
+    expect(unlockedAccessories(174, new Set(), new Set())).not.toContain("A13"); // the crown is the whole collection (Esme)
+    expect(unlockedAccessories(175, new Set(), new Set())).toContain("A13");
+    expect(unlockedAccessories(0, new Set(), hedgerow("nov"))).toEqual(["A9"]); // November leaf: autumn
+    expect(unlockedAccessories(0, new Set(["pond", "museum"]), hedgerow("holly"))).toEqual(["A10", "H4", "H7"]);
   });
 });
 
@@ -70,16 +72,25 @@ describe("zones and beds", () => {
   it.each([[0, 0], [1, 1], [4, 1], [5, 2], [10, 3], [25, 4], [49, 4], [50, 5], [300, 5]])("%i to-dos: stage %i", (n, stage) => {
     expect(bedStage(n)).toBe(stage);
   });
+
+  it("a bed's stage comes from its earned stickers, so it never shrinks (review I3)", () => {
+    expect(bedStageEarned("Mind", new Set())).toBe(0);
+    expect(bedStageEarned("Mind", new Set(["seeds-mind", "sprout-mind"]))).toBe(1); // the sprout (3) isn't a stage
+    expect(bedStageEarned("Mind", new Set(["seeds-mind", "herbsprout", "chamomile", "herbbundle", "moth"]))).toBe(5);
+    expect(bedStageEarned("Writing", new Set(["seeds-mind"]))).toBe(0);
+  });
 });
 
 describe("the book", () => {
-  it("8 spreads: the contents, then two pages each", () => {
-    expect(SPREADS).toHaveLength(8);
+  it("9 spreads: the contents, then two pages each (the Meadow takes two; a back endpaper closes it)", () => {
+    expect(SPREADS).toHaveLength(9);
     expect(SPREADS[0]!.zones).toEqual([]);
-    expect(SPREADS[3]!.zones).toEqual(["meadow", "barnyard"]);
+    expect(SPREADS[3]!.zones).toEqual(["meadow"]);
+    expect(SPREADS[8]!.zones).toEqual(["lane"]);
     expect(spreadOf("beds")).toBe(1);
     expect(spreadOf("lane")).toBe(7);
-    expect(spreadOfSticker("hen")).toBe(3);
+    expect(spreadOfSticker("hen")).toBe(4);
+    expect(spreadOfSticker("oak-12")).toBe(3);
     // Every sticker has exactly one slot.
     const slots = SPREADS.flatMap((s) => s.pages.flatMap((p) => p?.slots ?? []));
     expect(slots.map((s) => s.sticker).sort()).toEqual(STICKERS.map((s) => s.key).sort());
@@ -87,23 +98,27 @@ describe("the book", () => {
 });
 
 describe("spots", () => {
-  it("every sticker has one fixed spot on the farm (the barnyard animals the designer's)", () => {
-    expect(SPOTS.size).toBe(170);
-    expect(SPOTS.get("hen")).toEqual({ x: 254, y: 40, placeholder: false });
-    expect(SPOTS.get("seeds-mind")!.placeholder).toBe(true);
+  it("every sticker has the designer's fixed spot: the farm (504x276) or a museum/aquarium interior", () => {
+    expect(SPOTS.size).toBe(176);
+    expect(SPOTS.get("area-cleared")).toMatchObject({ scene: "farm", placeholder: true }); // no designed spot yet
     for (const s of SPOTS.values()) {
+      if (s.zone !== "beds" || s.layer !== "ground" || !s.placeholder) expect(s.placeholder).toBe(false);
+      const [w, h] = s.scene === "farm" ? [504, 276] : [200, 96];
       expect(s.x).toBeGreaterThanOrEqual(0);
-      expect(s.x + 16).toBeLessThanOrEqual(336);
-      expect(s.y + 16).toBeLessThanOrEqual(184);
+      expect(s.x + 16).toBeLessThanOrEqual(w);
+      expect(s.y + 16).toBeLessThanOrEqual(h);
     }
+    expect([...SPOTS.values()].filter((s) => s.scene !== "farm")).toHaveLength(22);
+    expect(SPOTS.get("seeds-mind")).toMatchObject({ layer: "bed", draw: false });
+    expect(SPOTS.get("minnow")).toMatchObject({ scene: "aquarium-interior" });
   });
 });
 
 describe("the earned-moment queue", () => {
-  it("new stickers, in book order; journal stickers wait while she's on the Journal", () => {
+  it("new stickers, in book order; every moment waits while she's on the Journal (review I5)", () => {
     const derived = ["seeds-mind", "lilypad", "hi"];
     expect(momentQueue(derived, new Set(["hi"]), new Map(), false)).toEqual(["seeds-mind", "lilypad"]);
-    expect(momentQueue(derived, new Set(["hi"]), new Map(), true)).toEqual(["seeds-mind"]);
+    expect(momentQueue(derived, new Set(["hi"]), new Map(), true)).toEqual([]);
     expect(momentQueue(derived, new Set(), new Map([["seeds-mind", "seeds-mind"]]), false)).toEqual(["lilypad", "hi"]);
   });
 });

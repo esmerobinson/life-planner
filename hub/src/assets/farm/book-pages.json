@@ -351,6 +351,50 @@
     "h": 152
    },
    "duration": 100
+  },
+  {
+   "filename": "page-15",
+   "frame": {
+    "x": 1856,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "endpaper-back",
+   "frame": {
+    "x": 1972,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
   }
  ],
  "meta": {
@@ -359,7 +403,7 @@
   "image": "book-pages.png",
   "format": "RGBA8888",
   "size": {
-   "w": 1856,
+   "w": 2088,
    "h": 152
   },
   "scale": "1",
@@ -473,6 +517,20 @@
     "name": "page-14",
     "from": 15,
     "to": 15,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-15",
+    "from": 16,
+    "to": 16,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "endpaper-back",
+    "from": 17,
+    "to": 17,
     "direction": "forward",
     "color": "#000000ff"
    }

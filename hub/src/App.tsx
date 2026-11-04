@@ -98,7 +98,8 @@ export function AppRoutes() {
           <Route path="/backup" element={<BackupRoute />} />
           <Route path="/sync" element={<SyncPage />} />
           <Route path="/farm" element={<FarmPage />} />
-          <Route path="/farm/popin-demo" element={<PopInDemo />} />
+          {/* The monthly pop-in's demo: development builds only (review M8; StickerPopIn is unit-tested). */}
+          {import.meta.env.DEV && <Route path="/farm/popin-demo" element={<PopInDemo />} />}
           <Route path="/reminders" element={<RemindersPage />} />
         </Route>
       </Routes>

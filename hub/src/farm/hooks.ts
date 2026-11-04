@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { reducedMotion } from "./motion";
 import { canDraw } from "./sprites";
 
@@ -30,19 +30,34 @@ export function useTyping(): boolean {
 }
 
 /**
- * A frame counter that ticks every `ms`. Stays 0 with reduced motion, when `on` is false, where
- * nothing is drawn (the test DOM), and while the page is hidden.
+ * A frame counter that ticks every `ms`. Stays put with reduced motion (followed live, review M7),
+ * when `on` is false, where nothing is drawn (the test DOM), and while the page is hidden or the
+ * window isn't focused (battery; review M9).
  */
 export function useTicker(ms: number, on = true): number {
   const [tick, setTick] = useState(0);
+  const reduced = useReducedMotion();
   useEffect(() => {
-    if (!on || reducedMotion() || !canDraw()) return;
+    if (!on || reduced || !canDraw()) return;
     const t = setInterval(() => {
-      if (document.visibilityState !== "hidden") setTick((n) => n + 1);
+      if (document.visibilityState !== "hidden" && document.hasFocus()) setTick((n) => n + 1);
     }, ms);
     return () => clearInterval(t);
-  }, [ms, on]);
+  }, [ms, on, reduced]);
   return tick;
+}
+
+const REDUCED = "(prefers-reduced-motion: reduce)";
+function subscribeReduced(onChange: () => void) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => undefined;
+  const q = window.matchMedia(REDUCED);
+  q.addEventListener("change", onChange);
+  return () => q.removeEventListener("change", onChange);
+}
+
+/** prefers-reduced-motion, following changes made while the app is open. */
+export function useReducedMotion(): boolean {
+  return useSyncExternalStore(subscribeReduced, reducedMotion, () => false);
 }
 
 /** The local hour, re-read every minute (for the nook's sleeping at night). */

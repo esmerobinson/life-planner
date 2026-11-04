@@ -9,7 +9,7 @@ import { STICKER_BY_KEY } from "./catalogue";
 import { useFarm } from "./FarmContext";
 import { useHour, useTicker, useTyping } from "./hooks";
 import { IDLE_FRAME_MS, MOMENT_FRAME_MS, reducedMotion } from "./motion";
-import { ctx2d, drawCharacter, drawFrame, poseFrames, useSheets } from "./sprites";
+import { ctx2d, drawCharacter, drawFrame, drawSticker, poseFrames, useSheets } from "./sprites";
 import { CHARACTERS } from "./state";
 import { ACCESSORIES, NAMES, nookHost, sleeping } from "./world";
 import "./farm.css";
@@ -63,7 +63,8 @@ export function Nook({ phone = false }: { phone?: boolean }) {
     const last = moment.step >= MOMENT_STEPS.length - 1;
     const t = setTimeout(() => {
       if (last) {
-        void farm.markSeen(moment.key).finally(() => setMoment(null));
+        // A failed write leaves it unseen: it plays again later (review M6).
+        void farm.markSeen(moment.key).catch(() => undefined).finally(() => setMoment(null));
       } else setMoment({ ...moment, step: moment.step + 1 });
     }, MOMENT_FRAME_MS);
     return () => clearTimeout(t);
@@ -89,14 +90,14 @@ export function Nook({ phone = false }: { phone?: boolean }) {
     const at = STICKER_AT[step];
     const sticker = moment ? STICKER_BY_KEY.get(moment.key) : undefined;
     if (at && sticker) {
-      drawFrame(ctx, sheets["stickers-diecut"]!, 18, 18, sticker.index, at[0], at[1]);
+      drawSticker(ctx, sheets, sticker, "diecut", at[0], at[1]);
       if (step === 2) drawFrame(ctx, sheets["fx-sparkle"]!, 30, 30, 0, at[0] + 9 - 15, at[1] + 9 - 15);
     }
   }, [sheets, host, asleep, tick, moment, accFrame, farm?.glint]);
 
   const sticker = moment ? STICKER_BY_KEY.get(moment.key) : undefined;
   return (
-    <div className={phone ? "farm-nook is-phone" : "farm-nook"} data-host={host} data-pose={moment ? "happy" : asleep ? "sleep" : "idle"}>
+    <div className={phone ? (typing ? "farm-nook is-phone is-typing" : "farm-nook is-phone") : "farm-nook"} data-host={host} data-pose={moment ? "happy" : asleep ? "sleep" : "idle"}>
       <Link to="/farm" className="farm-nook-link" aria-label={`Esme's Farm (${NAMES[host]} is here)`}>
         <canvas ref={canvas} width={W} height={H} className="farm-px" style={{ width: W * SCALE, height: H * SCALE }} />
       </Link>

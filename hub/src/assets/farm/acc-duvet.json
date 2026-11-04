@@ -395,6 +395,50 @@
     "h": 24
    },
    "duration": 100
+  },
+  {
+   "filename": "Duvet / A12 Little satchel",
+   "frame": {
+    "x": 432,
+    "y": 0,
+    "w": 24,
+    "h": 24
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 24
+   },
+   "sourceSize": {
+    "w": 24,
+    "h": 24
+   },
+   "duration": 100
+  },
+  {
+   "filename": "Duvet / A13 Golden crown",
+   "frame": {
+    "x": 456,
+    "y": 0,
+    "w": 24,
+    "h": 24
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 24
+   },
+   "sourceSize": {
+    "w": 24,
+    "h": 24
+   },
+   "duration": 100
   }
  ],
  "meta": {
@@ -403,7 +447,7 @@
   "image": "acc-duvet.png",
   "format": "RGBA8888",
   "size": {
-   "w": 432,
+   "w": 480,
    "h": 24
   },
   "scale": "1",
@@ -531,6 +575,20 @@
     "name": "H7",
     "from": 17,
     "to": 17,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "A12",
+    "from": 18,
+    "to": 18,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "A13",
+    "from": 19,
+    "to": 19,
     "direction": "forward",
     "color": "#000000ff"
    }

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { usePhone } from "../ui/usePhone";
-import { MANIFEST } from "./catalogue";
+import { COLLECTION, MANIFEST } from "./catalogue";
 import { useFarm, type FarmView } from "./FarmContext";
 import { FarmScene } from "./FarmScene";
 import { useTicker } from "./hooks";
@@ -48,7 +48,7 @@ export function FarmPage() {
   }, [view]);
 
   const zones = spread === null ? [] : phone && spread > 0
-    ? [SPREADS[spread]!.pages[half]!.group]
+    ? [SPREADS[spread]!.pages[half]!.group].filter((g): g is string => !!g)
     : SPREADS[spread]!.zones;
   const zoneKey = zones.join();
   useEffect(() => {
@@ -67,8 +67,8 @@ export function FarmPage() {
   return (
     <div className="farm-page">
       <h1>Esme's Farm</h1>
-      <p className="visually-hidden" role="status" data-earned={view.earned.length}>
-        {view.earned.length} of 170 stickers
+      <p className="visually-hidden" role="status" data-earned={view.collected}>
+        {view.collected} of {COLLECTION.length} stickers
       </p>
       {arrivals.length > 0 && (
         <div className="farm-arrival" role="status">

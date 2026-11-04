@@ -29,7 +29,7 @@ export interface ManifestAsset {
 }
 export interface BookSlot { sticker: string; name: string; x: number; y: number; set: string; milestone: number | string }
 export interface BookLabel { set: string; x: number; y: number; count_x: number; earned_by: string }
-export interface BookPage { page: number; side: "left" | "right"; group: string; slots: BookSlot[]; labels: BookLabel[] }
+export interface BookPage { page: number; side: "left" | "right"; group: string | null; slots: BookSlot[]; labels: BookLabel[] }
 export interface Manifest {
   palette: Record<string, string>;
   assets: ManifestAsset[];
@@ -62,7 +62,7 @@ export function tagFrames(name: string, tag: string): number[] {
  */
 export type Source =
   | `todos:${Exclude<AreaId, "inbox">}`
-  | "today-finished" | "habit-weeks" | "habit-sessions" | "habit-months"
+  | "today-finished" | "habit-weeks" | "habit-sessions" | "habit-months" | "habit-full-month" | "habit-run" | "area-cleared"
   | "monthly-goals" | "whole-goals" | "projects"
   | "morning-pages" | "checkins" | "exercise-days" | "chapters" | "workbook:dbt" | "workbook:bpd"
   | "weekly-reviews" | "monthly-reviews" | "reading-books"
@@ -75,7 +75,7 @@ export const JOURNAL_SOURCES: ReadonlySet<Source> = new Set<Source>([
 ]);
 
 /** Sources whose part of the app isn't built yet: their stickers are defined but not earnable. */
-export const NOT_BUILT: ReadonlySet<Source> = new Set<Source>(["weekly-reviews", "monthly-reviews", "reading-books"]);
+export const NOT_BUILT: ReadonlySet<Source> = new Set<Source>(["weekly-reviews", "monthly-reviews"]);
 
 export interface Rule { source: Source; at: number }
 
@@ -107,6 +107,10 @@ const KIND_NOTES: Record<string, Rule> = {
   "habit again after a week off": { source: "habit-after-week-off", at: 1 },
 };
 
+/** The "Seasons kept" set's unit in the manifest. */
+export const SEASONS_KEPT_UNIT = "a habit kept: 100% of a month, or months in a row at 80%+";
+export const SEASONS_KEPT_SET = "Seasons kept";
+
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
 /** The rule for one manifest sticker. Throws for one it can't read (caught by the tests). */
@@ -118,6 +122,13 @@ export function ruleOf(s: Pick<ManifestSticker, "earned_by" | "milestone">): Rul
     if (s.milestone === "BPD done") return { source: "workbook:bpd", at: 1 };
   }
   if (s.earned_by === "each once" && typeof s.milestone === "string" && KIND_NOTES[s.milestone]) return KIND_NOTES[s.milestone]!;
+  // "Seasons kept" (Esme, 2026-11-04: "a special sticker for a whole month … a special 2 month
+  // one, 3 month one, you don't keep earning a 1 month one"): each earned once, ever.
+  if (s.earned_by === SEASONS_KEPT_UNIT) {
+    if (s.milestone === "100% month") return { source: "habit-full-month", at: 1 };
+    const run = typeof s.milestone === "string" ? /^(\d+) months 80%\+$/.exec(s.milestone) : null;
+    if (run) return { source: "habit-run", at: Number(run[1]) };
+  }
   if (s.earned_by === "did anything that month" && (MONTHS as readonly unknown[]).includes(s.milestone)) {
     return { source: `month:${s.milestone}`, at: 1 };
   }
@@ -129,6 +140,7 @@ export function ruleOf(s: Pick<ManifestSticker, "earned_by" | "milestone">): Rul
 // ---- the stickers --------------------------------------------------------------------------
 
 export interface Sticker {
+  /** Its frame in the stickers / stickers-ghost / stickers-diecut sheets (book order); -1: no art yet. */
   index: number;
   key: string;
   name: string;
@@ -141,24 +153,56 @@ export interface Sticker {
   journal: boolean;
   /** Its part of the app isn't built yet. */
   later: boolean;
+  /**
+   * A bonus sticker outside the collection (Esme, 2026-11-04: "the collection total stays 175";
+   * counters never count towards it): not in the totals, zone waking or set counts.
+   */
+  bonus?: true;
+  /** No art in the pack yet: drawn as the obvious magenta placeholder until the sprite designer draws it. */
+  placeholderArt?: true;
 }
 
 const rawStickers = (asset("stickers") as unknown as { stickers: ManifestSticker[] }).stickers;
 
-export const STICKERS: readonly Sticker[] = rawStickers.map((s) => {
-  const rule = ruleOf(s);
-  return {
-    index: s.index, key: s.key, name: s.name, group: s.group, set: s.set, earnedBy: s.earned_by, milestone: s.milestone,
-    rule, journal: JOURNAL_SOURCES.has(rule.source), later: NOT_BUILT.has(rule.source),
-  };
-});
+/**
+ * "Area cleared" (Esme, 2026-11-04): every time all the to-dos due in an area within a calendar
+ * month are done by its end. ONE shared sticker with a ×N count (not one per area: eight more
+ * would change the collection she completes). Placeholder art, slot and farm spot.
+ */
+export const AREA_CLEARED: Sticker = {
+  index: -1, key: "area-cleared", name: "Area cleared", group: "beds", set: "Area cleared",
+  earnedBy: "every to-do due in an area in a month, done by the month's end", milestone: 1,
+  rule: { source: "area-cleared", at: 1 }, journal: false, later: false, bonus: true, placeholderArt: true,
+};
+
+/** Every sticker, in book order: the collection (175: v2's 170 and the five "Seasons kept"), then the bonus. */
+export const STICKERS: readonly Sticker[] = [
+  ...rawStickers.map((s) => {
+    const rule = ruleOf(s);
+    return {
+      index: s.index, key: s.key, name: s.name, group: s.group, set: s.set, earnedBy: s.earned_by, milestone: s.milestone,
+      rule, journal: JOURNAL_SOURCES.has(rule.source), later: NOT_BUILT.has(rule.source),
+    };
+  }),
+  AREA_CLEARED,
+];
+
+/** The collection she completes (bonus stickers aside): 175. */
+export const COLLECTION: readonly Sticker[] = STICKERS.filter((s) => !s.bonus);
+
+/**
+ * Stickers earned more than once show a ×N count (Esme, 2026-11-04): Full month for each habit's
+ * first full month, Area cleared for each (area, month). N comes from the data, never stored.
+ */
+export const REPEATS: Readonly<Record<string, Source>> = { "full-month": "habit-full-month", "area-cleared": "area-cleared" };
 
 export const STICKER_BY_KEY: ReadonlyMap<string, Sticker> = new Map(STICKERS.map((s) => [s.key, s]));
 
 /** The ten groups (zones of the farm), in book order. */
 export const GROUPS: readonly string[] = MANIFEST.book.groups;
 
-export const stickersIn = (group: string): Sticker[] => STICKERS.filter((s) => s.group === group);
+/** A zone's stickers in the collection (bonus stickers aside). */
+export const stickersIn = (group: string): Sticker[] => COLLECTION.filter((s) => s.group === group);
 
 // ---- gentle hints ("how to earn it") -------------------------------------------------------
 // PLACEHOLDER WORDING: built from the manifest's metadata; Esme words these.
@@ -178,10 +222,13 @@ export function hintFor(s: Sticker): string {
   if (source.startsWith("month:")) return `Anything at all in ${MONTH_NAMES[source.slice(6)]}`;
   const later = " (this part of the app is coming later)";
   switch (source) {
-    case "today-finished": return `Today's list finished on ${plural(at, "day")}`;
+    case "today-finished": return `Everything on the day's list on Home done, on ${plural(at, "day")}`;
     case "habit-weeks": return `${plural(at, "week")} with a habit ticked`;
     case "habit-sessions": return plural(at, "habit session");
-    case "habit-months": return `${plural(at, "habit month")} finished`;
+    case "habit-months": return `${plural(at, "month")} with most of a habit's sessions done`;
+    case "habit-full-month": return "Every planned session of a habit in one month";
+    case "habit-run": return `${at} months one after another with most of a habit's sessions done`;
+    case "area-cleared": return "Every to-do due in one area in a month, done by the month's end";
     case "monthly-goals": return `${plural(at, "monthly goal")} reached`;
     case "whole-goals": return `${plural(at, "goal")} completed`;
     case "projects": return `${plural(at, "project")} finished`;
@@ -193,7 +240,7 @@ export function hintFor(s: Sticker): string {
     case "workbook:bpd": return "The whole BPD workbook";
     case "weekly-reviews": return `${plural(at, "weekly review")}${later}`;
     case "monthly-reviews": return `${plural(at, "monthly review")}${later}`;
-    case "reading-books": return `${plural(at, "book")} from the reading list${later}`;
+    case "reading-books": return `${plural(at, "book")} from the reading list finished`;
     case "started": return "Opening the farm";
     case "returns":
       return at === 1 ? "Coming back after a few days away" : at === 3 ? "Coming back a third time" : "Coming back a fifth time";

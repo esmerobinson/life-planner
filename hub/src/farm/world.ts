@@ -5,8 +5,8 @@
 
 import { tickedOffToday, todayList } from "../domain/triage";
 import type { Goal, ISODate, Item } from "../domain/types";
-import { GROUPS, MANIFEST, STICKERS, STICKER_BY_KEY, asset, stickersIn, type BookPage } from "./catalogue";
-import type { Counters } from "./earning";
+import rawSpots from "../assets/farm/sticker-spots.json";
+import { AREA_CLEARED, COLLECTION, GROUPS, MANIFEST, REPEATS, STICKERS, STICKER_BY_KEY, asset, stickersIn, type BookPage } from "./catalogue";
 import { CHARACTERS, type CharacterId } from "./state";
 
 // ---- characters ----------------------------------------------------------------------------
@@ -70,9 +70,12 @@ export const sleeping = (hour: number, writingMorningPages: boolean): boolean =>
 
 export interface Accessory { code: string; name: string; unlock: string; frame: number }
 
-/** The 18 accessories (the same codes fit every character: acc-<character>). */
+/**
+ * The 20 accessories (the same codes fit every character: acc-<character>). Esme, 2026-11-04:
+ * the crown (A13) means the whole collection, so it unlocks at all 175, not the pack's 170.
+ */
 export const ACCESSORIES: readonly Accessory[] = (asset("acc-domino") as unknown as { items: Omit<Accessory, "frame">[] }).items.map(
-  (it, frame) => ({ ...it, frame }),
+  (it, frame) => (it.code === "A13" ? { ...it, unlock: `${COLLECTION.length} stickers (the whole collection)`, frame } : { ...it, frame }),
 );
 
 const SEASONS: Record<string, number[]> = { spring: [3, 4, 5], summer: [6, 7, 8], autumn: [9, 10, 11], winter: [12, 1, 2] };
@@ -83,10 +86,13 @@ const MONTH_KEYS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
  * seasonal ones once she has been active in that season (then for good); host items once that
  * host's zone is awake. "Rainy days" (A11) waits for weather, which isn't built.
  */
-export function unlockedAccessories(total: number, awake: ReadonlySet<string>, c: Counters | null): string[] {
-  const activeMonths = new Set(MONTH_KEYS.flatMap((m, i) => ((c?.get(`month:${m}`) ?? 0) > 0 ? [i + 1] : [])));
+export function unlockedAccessories(total: number, awake: ReadonlySet<string>, earned: ReadonlySet<string>): string[] {
+  // Seasons from the EARNED Hedgerow stickers (kept for good), never from live counts (review I3).
+  const activeMonths = new Set(
+    MONTH_KEYS.flatMap((m, i) => (STICKERS.some((s) => s.rule.source === `month:${m}` && earned.has(s.key)) ? [i + 1] : [])),
+  );
   return ACCESSORIES.filter((a) => {
-    const n = /^(\d+) stickers$/.exec(a.unlock);
+    const n = /^(\d+) stickers\b/.exec(a.unlock);
     if (n) return total >= Number(n[1]);
     const season = SEASONS[a.unlock];
     if (season) return season.some((m) => activeMonths.has(m));
@@ -113,9 +119,28 @@ export const BED_POSITIONS = BEDS.bed_positions;
 /** A bed's stage, 0 (bare) to 5 (full), by to-dos in its area (1/5/10/25/50). */
 export const bedStage = (todos: number): number => BEDS.stage_at.filter((at) => todos >= at).length;
 
+/**
+ * A bed's stage from its EARNED stickers (review I3): the stage thresholds 1/5/10/25/50 are the
+ * bed's sticker milestones, and earned stickers are kept for good, so a bed never shrinks when a
+ * to-do is unticked or binned.
+ */
+export function bedStageEarned(area: string, earned: ReadonlySet<string>): number {
+  const bed = STICKERS.filter((s) => s.rule.source === `todos:${area.toLowerCase()}`);
+  return BEDS.stage_at.filter((at) => bed.some((s) => s.rule.at === at && earned.has(s.key))).length;
+}
+
 // ---- the book's spreads -----------------------------------------------------------------------
 
-export const PAGES: readonly BookPage[] = (asset("book-pages") as unknown as { pages: BookPage[] }).pages;
+/**
+ * The book's pages from the pack; the bonus "Area cleared" gets a PLACEHOLDER slot on the back
+ * endpaper (page 16, no slots of its own) until the sprite designer places it.
+ */
+export const BONUS_SLOT = { page: 16, x: 48, y: 66 };
+export const PAGES: readonly BookPage[] = (asset("book-pages") as unknown as { pages: BookPage[] }).pages.map((p) =>
+  p.page === BONUS_SLOT.page
+    ? { ...p, slots: [...p.slots, { sticker: AREA_CLEARED.key, name: AREA_CLEARED.name, x: BONUS_SLOT.x, y: BONUS_SLOT.y, set: AREA_CLEARED.set, milestone: 1 }] }
+    : p,
+);
 
 export interface Spread { index: number; pages: [BookPage | null, BookPage | null]; zones: string[] }
 
@@ -125,7 +150,7 @@ export const SPREADS: readonly Spread[] = [
   ...Array.from({ length: PAGES.length / 2 }, (_, i) => {
     const l = PAGES[2 * i]!;
     const r = PAGES[2 * i + 1]!;
-    return { index: i + 1, pages: [l, r] as [BookPage, BookPage], zones: [...new Set([l.group, r.group])] };
+    return { index: i + 1, pages: [l, r] as [BookPage, BookPage], zones: [...new Set([l.group, r.group])].filter((g): g is string => !!g) };
   }),
 ];
 
@@ -136,56 +161,60 @@ export const spreadOf = (zone: string): number => SPREADS.findIndex((s) => s.zon
 export const spreadOfSticker = (key: string): number =>
   SPREADS.findIndex((s) => s.pages.some((p) => p?.slots.some((sl) => sl.sticker === key)));
 
-// ---- fixed spots on the farm ------------------------------------------------------------------
+// ---- fixed spots ----------------------------------------------------------------------------
 
-/** The sprite designer's own spots (pxland4.py BARNYARD), top-left of the 16x16 sticker. */
-const DESIGNED_SPOTS: Record<string, [number, number]> = {
-  hen: [254, 40], "egg-nest": [270, 50], chick: [284, 42], piglet: [296, 30], cow: [238, 48],
-  "milk-churn": [304, 50], sheep: [282, 26], lamb: [268, 28],
-};
+export type Scene = "farm" | "museum-interior" | "aquarium-interior";
 
-export interface Spot { x: number; y: number; placeholder: boolean }
-
-const BBOXES = (asset("farm-zone-masks") as unknown as { bboxes: Record<string, [number, number, number, number]> }).bboxes;
-
-/**
- * PLACEHOLDER SPOTS: the art pack has no per-sticker farm positions (only the barnyard animals,
- * from the sprite designer). Until they're drawn, each other sticker gets a spot on a grid
- * inside its zone's ellipse (from the zone's box), in book order. They may overlap; the farm
- * marks them with a magenta dot so they read as unfinished.
- */
-function placeholderSpots(zone: string, n: number): [number, number][] {
-  const [x0, y0, x1, y1] = BBOXES[zone]!;
-  const cx = (x0 + x1) / 2;
-  const cy = (y0 + y1) / 2;
-  const rx = (x1 - x0) / 2 - 4;
-  const ry = (y1 - y0) / 2 - 4;
-  for (let step = 16; step >= 2; step--) {
-    const pts: [number, number][] = [];
-    for (let y = y0 + 4; y <= y1 - 4; y += step) {
-      for (let x = x0 + 4; x <= x1 - 4; x += step) {
-        if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) pts.push([Math.round(x) - 8, Math.round(y) - 8]);
-      }
-    }
-    if (pts.length >= n) return pts.slice(0, n);
-  }
-  return Array.from({ length: n }, () => [Math.round(cx) - 8, Math.round(cy) - 8]);
+export interface Spot {
+  scene: Scene;
+  zone: string;
+  /** ground / water / on-bed / bed (bed: no sprite, the bed's stage art shows it) / tank / case / frame… */
+  layer: string;
+  /** Top-left of the 16x16 sticker in its scene. */
+  x: number;
+  y: number;
+  /** Draw order on the farm (higher in front; characters use their body-box bottom). */
+  z: number;
+  /** Draw the sticker's sprite there (bed stickers don't: the bed shows them). */
+  draw: boolean;
+  /** Mirror it so it faces into its zone. */
+  flip: boolean;
+  /** No designed spot yet (the sticker was added after the art pack): drawn obviously wrong. */
+  placeholder: boolean;
 }
 
+interface RawSpot {
+  sticker: string; scene: Scene; zone: string; layer: string; x: number; y: number; z: number; draw_sprite: boolean; flip_horizontal: boolean;
+}
+const RAW_SPOTS = (rawSpots as unknown as { spots: RawSpot[] }).spots;
+
+/**
+ * The sprite designer's fixed spot for every sticker (sticker-spots.json: no overlaps, each in
+ * its zone). A sticker added since (Area cleared) gets a PLACEHOLDER spot at the edge of its
+ * zone until it's drawn, marked magenta on the farm.
+ */
 export const SPOTS: ReadonlyMap<string, Spot> = (() => {
   const out = new Map<string, Spot>();
-  for (const zone of GROUPS) {
-    const mine = stickersIn(zone);
-    const open = mine.filter((s) => !DESIGNED_SPOTS[s.key]);
-    const pts = placeholderSpots(zone, open.length);
-    open.forEach((s, i) => out.set(s.key, { x: pts[i]![0], y: pts[i]![1], placeholder: true }));
-    for (const s of mine) {
-      const d = DESIGNED_SPOTS[s.key];
-      if (d) out.set(s.key, { x: d[0], y: d[1], placeholder: false });
-    }
+  for (const r of RAW_SPOTS) {
+    out.set(r.sticker, {
+      scene: r.scene, zone: r.zone, layer: r.layer, x: r.x, y: r.y, z: r.z, draw: r.draw_sprite, flip: r.flip_horizontal, placeholder: false,
+    });
   }
+  const boxes = (asset("farm-zone-masks") as unknown as { bboxes: Record<string, [number, number, number, number]> }).bboxes;
+  STICKERS.filter((s) => !out.has(s.key)).forEach((s, i) => {
+    const [, , x1, y1] = boxes[s.group]!;
+    out.set(s.key, {
+      scene: "farm", zone: s.group, layer: "ground", x: x1 - 24 - i * 18, y: y1 - 22, z: y1 - 6, draw: true, flip: false, placeholder: true,
+    });
+  });
   return out;
 })();
+
+/** How many times a repeatable sticker (Full month, Area cleared) has been earned; 0 for others. */
+export function repeatCount(key: string, c: ReadonlyMap<string, number> | null): number {
+  const source = REPEATS[key];
+  return source && c ? c.get(source) ?? 0 : 0;
+}
 
 /** A sticker's spot id (each sticker has exactly one fixed spot: its own key). */
 export const spotIdOf = (key: string): string => key;
@@ -193,15 +222,21 @@ export const spotIdOf = (key: string): string => key;
 // ---- the earned moment queue ---------------------------------------------------------------
 
 /**
- * Stickers whose earned moment hasn't played yet, one at a time in book order. Journal stickers
- * wait while she is on the Journal pages (they arrive after she leaves).
+ * Stickers whose earned moment hasn't played yet, one at a time in book order. None while she is
+ * on the Journal pages (they arrive after she leaves).
  */
 export function momentQueue(derived: readonly string[], seen: ReadonlySet<string>, placed: ReadonlyMap<string, string>, onJournal: boolean): string[] {
-  return derived.filter((k) => !seen.has(k) && !placed.has(k) && !(onJournal && STICKER_BY_KEY.get(k)?.journal));
+  // Every moment waits on the Journal pages, whatever earned it (review I5): a check-in can also
+  // complete a monthly goal or a month, and those arrive after she leaves too.
+  if (onJournal) return [];
+  return derived.filter((k) => !seen.has(k) && !placed.has(k));
 }
 
 /** Book order index (for sorting). */
-export const bookIndex = (key: string): number => STICKER_BY_KEY.get(key)?.index ?? STICKERS.length;
+export const bookIndex = (key: string): number => {
+  const s = STICKER_BY_KEY.get(key);
+  return s ? STICKERS.indexOf(s) : STICKERS.length;
+};
 
 // ---- Today's list finished -------------------------------------------------------------------
 

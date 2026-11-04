@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { STICKER_BY_KEY } from "./catalogue";
 import { POPIN_FRAME_MS, POPIN_STEP_MS, reducedMotion } from "./motion";
-import { ctx2d, drawFrame, useSheets } from "./sprites";
+import { ctx2d, drawFrame, drawSticker, useSheets } from "./sprites";
 
 const COLS = 5;
 const PITCH = 20;
@@ -49,7 +49,7 @@ export function StickerPopIn({ stickers, onDone }: { stickers: readonly string[]
       const y = PAD + Math.floor(i / COLS) * PITCH;
       if (i < step.shown) {
         drawFrame(ctx, sheets["book-slot"]!, SLOT, SLOT, 1, x, y);
-        drawFrame(ctx, sheets["stickers"]!, 16, 16, STICKER_BY_KEY.get(k)!.index, x + 1, y + 1);
+        drawSticker(ctx, sheets, STICKER_BY_KEY.get(k)!, "sticker", x + 1, y + 1);
         if (i === step.shown - 1 && step.frame < 3) drawFrame(ctx, sheets["fx-sparkle"]!, 30, 30, step.frame, x + 9 - 15, y + 9 - 15);
       } else drawFrame(ctx, sheets["book-slot"]!, SLOT, SLOT, 0, x, y);
     });

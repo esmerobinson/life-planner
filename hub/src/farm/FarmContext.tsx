@@ -8,7 +8,7 @@ import { useLocation } from "react-router-dom";
 import { db } from "../data/db";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { loadJournalKey } from "../journal/keyStore";
-import { touchesJournal } from "../ui/useGoalSources";
+import { COLLECTION } from "./catalogue";
 import { counters, allEarned, derivedEarned, type Counters, type JournalFacts } from "./earning";
 import * as repo from "./farmRepo";
 import { readJournalFacts } from "./journalFacts";
@@ -25,6 +25,8 @@ export interface FarmView {
   /** Everything earned (book order): what the data earns, plus anything seen or placed. */
   earned: readonly string[];
   earnedSet: ReadonlySet<string>;
+  /** Collection stickers earned (of 175; bonus stickers and ×N counts never count). Arrivals and totals use it. */
+  collected: number;
   arrived: ReadonlySet<CharacterId>;
   awake: ReadonlySet<string>;
   /** Accessory codes unlocked. */
@@ -54,23 +56,30 @@ export function useFarm(): FarmView | null {
 
 /**
  * After a journal change, the farm re-reads the journal once things settle (a technical
- * debounce, not a motion timing): typing a page autosaves its draft often, and re-opening the
- * journal on every keystroke would be wasted work.
+ * debounce, not a motion timing). Re-reading opens only new or changed rows (journalFacts.ts).
  */
 const JOURNAL_RELOAD_MS = 2000;
 
+/** A changed-part key (`idb://<db>/<table>/…`) naming the journal table itself. */
+export const touchesJournalTable = (part: string): boolean => /^idb:\/\/[^/]+\/journal(\/|$)/.test(part);
+const touchesSyncMeta = (part: string): boolean => /^idb:\/\/[^/]+\/syncMeta(\/|$)/.test(part);
+
 /**
  * The journal's facts while it opens here (null while locked; never blocks the farm). Only read
- * once the farm has started (`on`).
+ * once the farm has started (`on`). Re-read when the journal table changes, or when the
+ * confirmed key itself changes; a sync's bookkeeping (syncMeta cursor writes) is not a reason
+ * (review I2).
  */
 function useJournalFacts(on: boolean): JournalFacts | null {
   const [facts, setFacts] = useState<JournalFacts | null>(null);
   const latest = useRef(0);
+  const keyFp = useRef<string | null>(null);
   const load = useCallback(async () => {
     const id = ++latest.current;
     let next: JournalFacts | null = null;
     try {
       const jk = await loadJournalKey(db);
+      keyFp.current = jk?.fp ?? null;
       if (jk) next = await readJournalFacts(jk);
     } catch {
       next = null;
@@ -81,11 +90,22 @@ function useJournalFacts(on: boolean): JournalFacts | null {
     if (!on) return;
     void load();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const onMutated = (parts: Record<string, unknown> | undefined) => {
-      const keys = Object.keys(parts ?? {});
-      if (keys.length > 0 && !keys.some(touchesJournal)) return;
+    const later = () => {
       clearTimeout(timer);
       timer = setTimeout(() => void load(), JOURNAL_RELOAD_MS);
+    };
+    const onMutated = (parts: Record<string, unknown> | undefined) => {
+      const keys = Object.keys(parts ?? {});
+      if (keys.length === 0 || keys.some(touchesJournalTable)) return later();
+      if (keys.some(touchesSyncMeta)) {
+        // Only a different confirmed key matters here (unlocked, re-paired or forgotten).
+        void loadJournalKey(db).then(
+          (jk) => {
+            if ((jk?.fp ?? null) !== keyFp.current) later();
+          },
+          () => undefined,
+        );
+      }
     };
     Dexie.on.storagemutated.subscribe(onMutated);
     return () => {
@@ -97,12 +117,29 @@ function useJournalFacts(on: boolean): JournalFacts | null {
   return on ? facts : null;
 }
 
-export function FarmProvider({ items, goals, today, children }: { items: Item[]; goals: Goal[]; today: ISODate; children: ReactNode }) {
+/**
+ * Every item that isn't in the Bin, archived ones included: archiving never takes anything away
+ * from the farm (review I3). The shell's lists leave archived items out, so the farm reads its own.
+ */
+function useFarmItems(): Item[] {
+  const [items, setItems] = useState<Item[]>([]);
+  useEffect(() => {
+    const sub = liveQuery(() => db.items.filter((i) => i.status !== "deleted" && i.status !== "purged").toArray()).subscribe({
+      next: setItems,
+      error: () => undefined,
+    });
+    return () => sub.unsubscribe();
+  }, []);
+  return items;
+}
+
+export function FarmProvider({ items: listItems, goals, today, children }: { items: Item[]; goals: Goal[]; today: ISODate; children: ReactNode }) {
   const [rows, setRows] = useState<unknown[] | null>(null);
   useEffect(() => {
     const sub = liveQuery(() => db.farm.toArray()).subscribe({ next: setRows, error: () => setRows([]) });
     return () => sub.unsubscribe();
   }, []);
+  const items = useFarmItems();
   const state = useMemo(() => (rows ? farmState(rows) : EMPTY_FARM), [rows]);
   const journal = useJournalFacts(state.start !== null);
   const location = useLocation();
@@ -115,14 +152,17 @@ export function FarmProvider({ items, goals, today, children }: { items: Item[];
   const derived = useMemo(() => (c ? derivedEarned(c) : []), [c]);
   const earned = useMemo(() => (state.start ? allEarned(c, state.seen, state.placed) : []), [c, state]);
   const earnedSet = useMemo(() => new Set(earned), [earned]);
-  const arrived = useMemo(() => new Set(arrivedAt(earned.length)), [earned.length]);
+  /** Collection stickers earned (bonus stickers and ×N counts never count towards it). */
+  const collected = useMemo(() => COLLECTION.filter((s) => earnedSet.has(s.key)).length, [earnedSet]);
+  // Once moved in, a character stays (review M5), even if fewer stickers show on this device.
+  const arrived = useMemo(() => new Set([...arrivedAt(collected), ...state.arrived]), [collected, state.arrived]);
   const awake = useMemo(() => awakeZones(earned), [earned]);
-  const unlocked = useMemo(() => unlockedAccessories(earned.length, awake, c), [earned.length, awake, c]);
+  const unlocked = useMemo(() => unlockedAccessories(collected, awake, earnedSet), [collected, awake, earnedSet]);
   const queue = useMemo(() => momentQueue(derived, state.seen, state.placed, onJournal), [derived, state, onJournal]);
 
   // Today's list finished: not derivable later, so it is noted when seen (once the farm has started).
   const started = state.start !== null;
-  const finished = useMemo(() => started && todayListFinished(items, goals, today), [started, items, goals, today]);
+  const finished = useMemo(() => started && todayListFinished(listItems, goals, today), [started, listItems, goals, today]);
   const noted = state.todayDone.includes(today);
   useEffect(() => {
     if (finished && !noted) void repo.recordTodayDone(today).catch(() => undefined);
@@ -140,6 +180,7 @@ export function FarmProvider({ items, goals, today, children }: { items: Item[];
       counters: c,
       earned,
       earnedSet,
+      collected,
       arrived,
       awake,
       unlocked,
@@ -158,7 +199,8 @@ export function FarmProvider({ items, goals, today, children }: { items: Item[];
       markArrived: (ch) => repo.markArrived(ch, today),
       setOutfit: repo.setOutfit,
     }),
-    [rows, today, state, c, earned, earnedSet, arrived, awake, unlocked, queue, journal, farmZones, setFarmZones, glint],
+    [rows, today, state, c, earned, earnedSet, collected, arrived, awake, unlocked, queue, journal, farmZones, setFarmZones, glint],
   );
   return <FarmContext.Provider value={view}>{children}</FarmContext.Provider>;
+
 }

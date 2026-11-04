@@ -4,12 +4,12 @@
 // not yet earned (the ghost; tap it for a gentle hint). Counts use the pixel font.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { STICKER_BY_KEY, STICKERS, asset, hintFor, stickersIn } from "./catalogue";
+import { COLLECTION, STICKER_BY_KEY, asset, hintFor, stickersIn } from "./catalogue";
 import type { FarmView } from "./FarmContext";
 import { isTypingTarget, useTicker } from "./hooks";
 import { PEEL_FRAME_MS, POP_FRAME_MS, TURN_FRAME_MS, reducedMotion } from "./motion";
-import { ctx2d, drawFrame, drawText, textWidth, useSheets, type Sheets } from "./sprites";
-import { SPREADS, type Spread } from "./world";
+import { ctx2d, drawCount, drawFrame, drawSticker, drawText, recolour, textWidth, useSheets, type Sheets } from "./sprites";
+import { SPREADS, repeatCount, type Spread } from "./world";
 
 export const BOOK_W = 232;
 export const BOOK_H = 152;
@@ -39,6 +39,20 @@ export function slotState(key: string, view: Pick<FarmView, "earnedSet" | "state
 /** "MIND BED 4/7"-style counts: earned stickers of a set / of a group. */
 const countIn = (keys: { key: string }[], earned: ReadonlySet<string>) => keys.filter((s) => earned.has(s.key)).length;
 
+/** The contents page's total plate (manifest contents_total_plate): "{n} OF 175", centred, in its colour. */
+const PLATE = (asset("book-pages") as unknown as {
+  contents_total_plate: { text_centre_x: number; text_y: number; colour: string; format: string };
+}).contents_total_plate;
+const tinted = new WeakMap<object, HTMLCanvasElement>();
+function plateFont(font: HTMLImageElement): HTMLImageElement {
+  let t = tinted.get(font);
+  if (!t) {
+    t = recolour(font, () => PLATE.colour);
+    tinted.set(font, t);
+  }
+  return t as unknown as HTMLImageElement;
+}
+
 function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | null, i: number, view: FarmView, peel: number, sparkle: { key: string; frame: number } | null) {
   const pages = s["book-pages"]!;
   drawFrame(ctx, pages, PAGE_W, BOOK_H, 2 * i, 0, 0);
@@ -50,17 +64,16 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
       const t = `${countIn(stickersIn(row.group), view.earnedSet)}/${stickersIn(row.group).length}`;
       drawText(ctx, font, t, PAGE_W + row.count_right_x - textWidth(t), row.y);
     }
-    // PLACEHOLDER position: the whole book's count under the rows (the pack gives no spot for it).
-    const last = CONTENTS[CONTENTS.length - 1]!;
-    const total = `${view.earned.length} OF ${STICKERS.length}`;
-    drawText(ctx, font, total, PAGE_W + last.count_right_x - textWidth(total), last.y + 14);
+    // The whole collection on its plate (bonus stickers and ×N counts never count).
+    const total = PLATE.format.replace("{n}", String(view.collected)).replace(/\d+$/, String(COLLECTION.length));
+    drawText(ctx, plateFont(font), total, PAGE_W + PLATE.text_centre_x - Math.floor(textWidth(total) / 2), PLATE.text_y);
     return;
   }
   spread!.pages.forEach((page, side) => {
     if (!page) return;
     const ox = side * PAGE_W;
     for (const label of page.labels) {
-      const inSet = STICKERS.filter((x) => x.set === label.set && x.group === page.group);
+      const inSet = COLLECTION.filter((x) => x.set === label.set && x.group === page.group);
       drawText(ctx, font, `${countIn(inSet, view.earnedSet)}/${inSet.length}`, ox + label.count_x, label.y);
     }
     for (const slot of page.slots) {
@@ -69,17 +82,17 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
       const state = slotState(slot.sticker, view);
       if (state === "ghost") {
         drawFrame(ctx, s["book-slot"]!, SLOT, SLOT, 0, x, slot.y);
-        drawFrame(ctx, s["stickers-ghost"]!, 16, 16, st.index, x + 1, slot.y + 1);
+        drawSticker(ctx, s, st, "ghost", x + 1, slot.y + 1);
       } else {
         drawFrame(ctx, s["book-slot"]!, SLOT, SLOT, 1, x, slot.y);
-        drawFrame(ctx, s["stickers"]!, 16, 16, st.index, x + 1, slot.y + 1);
+        drawSticker(ctx, s, st, "sticker", x + 1, slot.y + 1);
+        drawCount(ctx, font, repeatCount(slot.sticker, view.counters), x + 1, slot.y + 1);
         if (state === "ready") drawFrame(ctx, s["book-slot"]!, SLOT, SLOT, 2 + peel, x, slot.y);
       }
       if (sparkle?.key === slot.sticker) drawFrame(ctx, s["fx-sparkle"]!, 30, 30, sparkle.frame, x + 9 - 15, slot.y + 9 - 15);
     }
   });
 }
-
 /** The largest whole-number scale (1–3) at which `w` fits `avail`. */
 export const fitScale = (w: number, avail: number): number => Math.max(1, Math.min(3, Math.floor(avail / w)));
 
@@ -245,7 +258,7 @@ export function StickerBook({ view, phone, request, onRequestDone, onShow, onPla
         .filter((s) => !phone || s.side === half)
     : [];
   const pickedSlot = slots.find((s) => s.sticker === picked);
-  const where = show.kind === "closed" ? "Closed" : spread && spread.index > 0 ? spread.pages.map((p) => p && pageName(p.group)).filter(uniq).join(" · ") : "Contents";
+  const where = show.kind === "closed" ? "Closed" : spread && spread.index > 0 ? spread.pages.map((p) => p?.group && pageName(p.group)).filter((x) => !!x).filter(uniq).join(" · ") : "Contents";
 
   const onCanvasClick = (e: React.MouseEvent) => {
     if (busy) return;
@@ -299,7 +312,11 @@ export function StickerBook({ view, phone, request, onRequestDone, onShow, onPla
             left={Math.min(Math.max(0, (pickedSlot.x - offset) * scale - 40), windowW - 220)}
             top={(pickedSlot.y + SLOT) * scale + 4}
             onPlace={async () => {
-              await view.place(pickedSlot.sticker);
+              try {
+                await view.place(pickedSlot.sticker);
+              } catch {
+                return; // not placed (kept ready); the card stays so she can try again (review M6)
+              }
               setPicked(null);
               onPlaced(pickedSlot.sticker);
             }}

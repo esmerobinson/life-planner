@@ -1,5 +1,5 @@
 import type { Goal, ISODate, Item, Weekday } from "../domain/types";
-import { GROUPS, STICKERS, STICKER_BY_KEY, hintFor, ruleOf, stickersIn } from "./catalogue";
+import { COLLECTION, GROUPS, STICKERS, STICKER_BY_KEY, hintFor, ruleOf, stickersIn } from "./catalogue";
 import { allEarned, clipItems, counters, derivedEarned, workbookProgress, type EarningInput, type JournalFacts } from "./earning";
 
 // The v2 milestone table (tmp/game-design.md section 7), copied here by hand so the art pack's
@@ -28,14 +28,16 @@ const V2: Record<string, [string, number[]]> = {
   "Pressed and bound": ["reading-books", [1, 3, 6, 10, 15, 20]],
   "Dug up": ["projects", [1, 2, 3, 5, 8, 12]],
 };
-const GROUP_SIZES = { beds: 56, meadow: 14, barnyard: 12, orchard: 9, glasshouse: 12, pond: 14, aquarium: 10, farmhouse: 11, museum: 12, lane: 20 };
+// Meadow: v2's fourteen plus the five "Seasons kept" stickers (Esme, 2026-11-04).
+const GROUP_SIZES = { beds: 56, meadow: 19, barnyard: 12, orchard: 9, glasshouse: 12, pond: 14, aquarium: 10, farmhouse: 11, museum: 12, lane: 20 };
 
 describe("the 170 stickers match game design v2", () => {
-  it("170 stickers in 10 groups of the v2 sizes", () => {
-    expect(STICKERS).toHaveLength(170);
+  it("175 stickers (v2's 170 and the five Seasons kept) in 10 groups", () => {
+    expect(COLLECTION).toHaveLength(175);
+    expect(STICKERS.filter((s) => s.bonus).map((s) => s.key)).toEqual(["area-cleared"]); // outside the collection
     expect(GROUPS).toEqual(Object.keys(GROUP_SIZES));
     for (const [g, n] of Object.entries(GROUP_SIZES)) expect(stickersIn(g)).toHaveLength(n);
-    expect(new Set(STICKERS.map((s) => s.key)).size).toBe(170);
+    expect(new Set(STICKERS.map((s) => s.key)).size).toBe(176);
   });
 
   it.each(Object.entries(V2))("%s: source and milestones", (set, [source, milestones]) => {
@@ -62,7 +64,7 @@ describe("the 170 stickers match game design v2", () => {
       [...Array(12).fill("glasshouse"), ...Array(14).fill("pond"), ...Array(10).fill("aquarium"), "lane", "lane"].sort(),
     );
     expect(STICKERS.filter((s) => s.later).map((s) => s.set)).toEqual([
-      ...Array(6).fill("Kitchen"), ...Array(5).fill("Harvest table"), ...Array(6).fill("Pressed and bound"),
+      ...Array(6).fill("Kitchen"), ...Array(5).fill("Harvest table"),
     ]);
   });
 
@@ -137,15 +139,7 @@ describe("counters", () => {
     expect(count({ items }, "todos:mind")).toBe(0);
   });
 
-  it("a habit month is finished when every planned session that month (from the start) was done", () => {
-    // Mondays in November 2026 from the 2nd: 2, 9, 16, 23, 30.
-    const all = habit(["mon"], ["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23", "2026-11-30"]);
-    const most = habit(["mon"], ["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23"]);
-    expect(count({ items: [all] }, "habit-months")).toBe(1);
-    expect(count({ items: [most] }, "habit-months")).toBe(0);
-  });
-
-  it("back to it: a habit again after a week off (never counts the days missed)", () => {
+    it("back to it: a habit again after a week off (never counts the days missed)", () => {
     expect(count({ items: [habit(["mon"], ["2026-11-02", "2026-11-09"])] }, "habit-after-week-off")).toBe(0);
     expect(count({ items: [habit(["mon"], ["2026-11-02", "2026-11-16"])] }, "habit-after-week-off")).toBe(1);
   });

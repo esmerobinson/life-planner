@@ -5,7 +5,7 @@
    "frame": {
     "x": 0,
     "y": 0,
-    "w": 45,
+    "w": 41,
     "h": 47
    },
    "rotated": false,
@@ -13,11 +13,11 @@
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 45,
+    "w": 41,
     "h": 47
    },
    "sourceSize": {
-    "w": 45,
+    "w": 41,
     "h": 47
    },
    "duration": 100
@@ -29,7 +29,7 @@
   "image": "farm-museum-door.png",
   "format": "RGBA8888",
   "size": {
-   "w": 45,
+   "w": 41,
    "h": 47
   },
   "scale": "1",

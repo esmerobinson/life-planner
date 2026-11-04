@@ -5,218 +5,218 @@
    "frame": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 1.aseprite",
    "frame": {
-    "x": 336,
+    "x": 504,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 2.aseprite",
    "frame": {
-    "x": 672,
+    "x": 1008,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 3.aseprite",
    "frame": {
-    "x": 1008,
+    "x": 1512,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 4.aseprite",
    "frame": {
-    "x": 1344,
+    "x": 2016,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 5.aseprite",
    "frame": {
-    "x": 1680,
+    "x": 2520,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 6.aseprite",
    "frame": {
-    "x": 2016,
+    "x": 3024,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 7.aseprite",
    "frame": {
-    "x": 2352,
+    "x": 3528,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 8.aseprite",
    "frame": {
-    "x": 2688,
+    "x": 4032,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-zone-outlines 9.aseprite",
    "frame": {
-    "x": 3024,
+    "x": 4536,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   }
@@ -227,8 +227,8 @@
   "image": "farm-zone-outlines.png",
   "format": "RGBA8888",
   "size": {
-   "w": 3360,
-   "h": 184
+   "w": 5040,
+   "h": 276
   },
   "scale": "1",
   "frameTags": [

@@ -93,7 +93,7 @@ it("a tap on a farm zone opens the book at its page", async () => {
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Open the book at the pond" }));
   await waitFor(() => expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", "5"), { timeout: 3000 });
-  expect(document.querySelector(".farm-scene")).toHaveAttribute("data-highlight", "pond aquarium");
+  expect(document.querySelector(".farm-scene")).toHaveAttribute("data-highlight", "glasshouse pond");
 });
 
 it("a character's Wardrobe: pick one unlocked accessory (synced)", async () => {
@@ -110,10 +110,27 @@ it("a character's Wardrobe: pick one unlocked accessory (synced)", async () => {
   await waitFor(async () => expect(await db.farm.get("outfit:bap")).toMatchObject({ item: "A1" }));
 });
 
-it("on the Journal, Bap (once arrived) takes the nook; journal stickers wait until she leaves", async () => {
+it("on the Journal, Bap (once arrived) takes the nook", async () => {
   await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), ...["hi", "seeds-mind", "seeds-art", "seeds-body", "daisy"].map((k) => seenRow(k, "2026-11-03"))]);
   renderApp("/journal/check-in", "2026-11-04");
   await waitFor(() => expect(document.querySelector(".farm-nook")).toHaveAttribute("data-host", "bap"));
+});
+
+it("every sticker moment waits while she's on the Journal, whatever earned it, and plays once she leaves (review I5)", async () => {
+  await db.farm.put(startRow("dev-a", "2026-11-02"));
+  // Fictional: a Mind to-do ticked since the start (not a journal sticker) and the Welcome.
+  await db.items.put({
+    id: "t1", kind: "task", title: "Pretend task", links: [], areaId: "mind", priority: 2, status: "done",
+    completedAt: "2026-11-03", createdAt: "2026-10-01", touchedAt: "2026-11-03",
+  });
+  renderApp("/journal/check-in", "2026-11-04");
+  await screen.findByRole("heading", { level: 1, name: "Journal" });
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await db.farm.get("seen:hi")).toBeUndefined();
+  expect(await db.farm.get("seen:seeds-mind")).toBeUndefined();
+  const user = userEvent.setup();
+  await user.click(within(document.querySelector("nav[aria-label='Main']") as HTMLElement).getByRole("link", { name: "Goals" }));
+  await waitFor(async () => expect(await db.farm.get("seen:seeds-mind")).toBeTruthy(), { timeout: 4000 });
 });
 
 it("placed stickers stay placed (nothing is lost) even with no data behind them", async () => {

@@ -1,35 +1,39 @@
-// Esme's Farm: the farm beneath the book. One canvas at a whole-number scale (2x on the Mac; on
-// the phone it pans to the highlighted part). Built per the art pack: draw farm-base "asleep",
-// copy the "awake" pixels inside each awake zone's mask, then the beds (stage per to-dos), the
-// museum door (until Duvet), placed stickers at their spots and the characters who've arrived.
-// With a book page open, every pixel outside its zone(s) is dimmed by the manifest's highlight
-// rule and the zone's outline is drawn on top.
+// Esme's Farm: the farm beneath the book. One canvas at a whole-number scale (1x fits the Mac
+// panel, 2x where there's room; on the phone it pans to the highlighted part at 2x). Built per the
+// art pack: draw farm-base "asleep", copy the "awake" pixels inside each awake zone's mask, then
+// the beds (stage from earned bed stickers), the museum door (until Duvet), and then placed
+// stickers and characters together in z order (sticker-spots.json; characters use their
+// body-box bottom). With a book page open, everything outside its zone(s) is dimmed by the
+// manifest's highlight rule and the zone's outline is drawn on top.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { MANIFEST, STICKER_BY_KEY, asset } from "./catalogue";
 import type { FarmView } from "./FarmContext";
 import { useTicker } from "./hooks";
 import { IDLE_FRAME_MS, POP_FRAME_MS, reducedMotion } from "./motion";
-import { PLACEHOLDER, ctx2d, dimColour, drawCharacter, drawFrame, poseFrames, useSheets, type Sheets } from "./sprites";
+import {
+  PLACEHOLDER, ctx2d, dimColour, dimmedSheet, drawCharacter, drawCount, drawFrame, drawSticker, poseFrames, useSheets, type Sheets,
+} from "./sprites";
 import { CHARACTERS, type CharacterId } from "./state";
-import { ACCESSORIES, BED_ORDER, BED_POSITIONS, NAMES, SPOTS, bedStage } from "./world";
+import { ACCESSORIES, BED_ORDER, BED_POSITIONS, NAMES, SPOTS, bedStageEarned, repeatCount } from "./world";
 
-export const FARM_W = 336;
-export const FARM_H = 184;
+const BASE = asset("farm-base") as unknown as { frame: [number, number] };
+export const FARM_W = BASE.frame[0];
+export const FARM_H = BASE.frame[1];
 const MASKS = asset("farm-zone-masks") as unknown as { zones: string[]; bboxes: Record<string, [number, number, number, number]> };
 const DOOR = asset("farm-museum-door") as unknown as { position: [number, number]; frame: [number, number] };
 const SHEETS = [
-  "farm-base", "farm-zone-masks", "farm-zone-outlines", "farm-beds", "farm-museum-door", "stickers", "fx-sparkle",
+  "farm-base", "farm-zone-masks", "farm-zone-outlines", "farm-beds", "farm-museum-door", "stickers", "fx-sparkle", "font-small",
   ...CHARACTERS.map((c) => `char-${c}`), ...CHARACTERS.map((c) => `acc-${c}`),
 ];
 
-/** Where each character stands on the farm, and the zone it belongs to (manifest farm_character_spots). */
-const SPOT_OF: Record<CharacterId, { zone: string; at: [number, number] }> = Object.fromEntries(
+/** Where each character stands on the farm, its zone and draw order (manifest farm_character_spots). */
+const SPOT_OF: Record<CharacterId, { zone: string; at: [number, number]; z: number }> = Object.fromEntries(
   CHARACTERS.map((c) => {
-    const s = MANIFEST.farm_character_spots[c]!;
-    return [c, { zone: s.zone.split(" ")[0]!, at: s.frame_topleft }];
+    const s = MANIFEST.farm_character_spots[c] as unknown as { zone: string; frame_topleft: [number, number]; z?: number };
+    return [c, { zone: s.zone.split(" ")[0]!, at: s.frame_topleft, z: s.z ?? s.frame_topleft[1] + 30 }];
   }),
-) as Record<CharacterId, { zone: string; at: [number, number] }>;
+) as Record<CharacterId, { zone: string; at: [number, number]; z: number }>;
 
 const hex = (r: number, g: number, b: number) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 
@@ -61,11 +65,10 @@ interface StaticInput {
   awake: ReadonlySet<string>;
   stages: number[];
   doorClosed: boolean;
-  placed: readonly string[];
   highlight: readonly string[];
 }
 
-/** The farm without characters (redrawn only when what it shows changes). */
+/** The ground of the farm: base, awake zones, beds, door, the highlight rule (redrawn only when it changes). */
 function drawStatic(s: Sheets, inp: StaticInput): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = FARM_W;
@@ -94,17 +97,6 @@ function drawStatic(s: Sheets, inp: StaticInput): HTMLCanvasElement {
     drawFrame(ctx, s["farm-beds"]!, 26, 16, a * 6 + inp.stages[a]!, x, y);
   });
   if (inp.doorClosed) drawFrame(ctx, s["farm-museum-door"]!, DOOR.frame[0], DOOR.frame[1], 0, DOOR.position[0], DOOR.position[1]);
-  for (const key of inp.placed) {
-    const st = STICKER_BY_KEY.get(key);
-    const spot = SPOTS.get(key);
-    if (!st || !spot) continue;
-    drawFrame(ctx, s["stickers"]!, 16, 16, st.index, spot.x, spot.y);
-    if (spot.placeholder) {
-      // PLACEHOLDER SPOT (no designed position yet): an obviously wrong magenta mark.
-      ctx.fillStyle = PLACEHOLDER;
-      ctx.fillRect(spot.x + 6, spot.y + 16, 4, 1);
-    }
-  }
   if (inp.highlight.length > 0) {
     const on = inp.highlight.map((z) => m.get(z)).filter((x): x is Uint8Array => !!x);
     const img = ctx.getImageData(0, 0, FARM_W, FARM_H);
@@ -117,10 +109,6 @@ function drawStatic(s: Sheets, inp: StaticInput): HTMLCanvasElement {
       px[i * 4 + 2] = parseInt(to.slice(5, 7), 16);
     }
     ctx.putImageData(img, 0, 0);
-    for (const z of inp.highlight) {
-      const idx = MASKS.zones.indexOf(z);
-      if (idx >= 0) drawFrame(ctx, s["farm-zone-outlines"]!, FARM_W, FARM_H, idx, 0, 0);
-    }
   }
   return c;
 }
@@ -153,14 +141,25 @@ export function FarmScene({ view, phone, highlight, popKey, onZone, onCharacter 
     return () => ro.disconnect();
   }, []);
 
-  const todos = view.counters;
-  const stages = BED_ORDER.map((area) => bedStage(todos?.get(`todos:${area.toLowerCase()}` as never) ?? 0));
-  const placed = [...view.state.placed.keys()].sort();
-  const staticKey = [[...view.awake].sort().join(), stages.join(), view.arrived.has("duvet"), placed.join(), highlight.join()].join("|");
+  // Beds grow from EARNED stickers, so they never shrink (review I3).
+  const stages = BED_ORDER.map((area) => bedStageEarned(area, view.earnedSet));
+  const staticKey = [[...view.awake].sort().join(), stages.join(), view.arrived.has("duvet"), highlight.join()].join("|");
   const layer = useMemo(
-    () => (sheets ? drawStatic(sheets, { awake: view.awake, stages, doorClosed: !view.arrived.has("duvet"), placed, highlight }) : null),
+    () => (sheets ? drawStatic(sheets, { awake: view.awake, stages, doorClosed: !view.arrived.has("duvet"), highlight }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sheets, staticKey],
+  );
+
+  // Placed farm stickers that show a sprite, in z order (bed stickers are the bed's own stage art).
+  const placed = useMemo(
+    () =>
+      [...view.state.placed.keys()]
+        .flatMap((key) => {
+          const spot = SPOTS.get(key);
+          const st = STICKER_BY_KEY.get(key);
+          return spot && st && spot.scene === "farm" && spot.draw ? [{ key, spot, st }] : [];
+        }),
+    [view.state.placed],
   );
 
   // A placed sticker pops at its spot (fx-sparkle).
@@ -183,18 +182,41 @@ export function FarmScene({ view, phone, highlight, popKey, onZone, onCharacter 
     if (!ctx || !sheets || !layer) return;
     ctx.clearRect(0, 0, FARM_W, FARM_H);
     ctx.drawImage(layer, 0, 0);
+    const dimmed = (zone: string) => highlight.length > 0 && !highlight.includes(zone);
+    const stickerSheets = { ...sheets, stickers: sheets["stickers"]! } as Sheets;
+    const dimSheets = { ...sheets, stickers: dimmedSheet(sheets["stickers"]!) as unknown as HTMLImageElement } as Sheets;
+    const things: { z: number; draw: () => void }[] = [];
+    for (const p of placed) {
+      const { spot, st, key } = p;
+      things.push({
+        z: spot.z,
+        draw: () => {
+          drawSticker(ctx, dimmed(spot.zone) ? dimSheets : stickerSheets, st, "sticker", spot.x, spot.y, spot.flip);
+          drawCount(ctx, sheets["font-small"]!, repeatCount(key, view.counters), spot.x, spot.y);
+          if (spot.placeholder) {
+            // PLACEHOLDER SPOT (no designed position yet): an obviously wrong magenta mark.
+            ctx.fillStyle = PLACEHOLDER;
+            ctx.fillRect(spot.x + 6, spot.y + 16, 4, 1);
+          }
+        },
+      });
+    }
     for (const c of CHARACTERS) {
       if (!view.arrived.has(c)) continue;
       const loop = poseFrames(c, "idle");
       const outfit = view.state.outfits.get(c) ?? null;
       const acc = outfit && view.unlocked.includes(outfit) ? ACCESSORIES.find((a) => a.code === outfit)?.frame ?? null : null;
-      const { zone, at } = SPOT_OF[c];
-      const dim = highlight.length > 0 && !highlight.includes(zone);
-      drawCharacter(ctx, sheets, c, loop[tick % loop.length]!, at[0], at[1], acc, dim);
+      const { zone, at, z } = SPOT_OF[c];
+      things.push({ z, draw: () => drawCharacter(ctx, sheets, c, loop[tick % loop.length]!, at[0], at[1], acc, dimmed(zone)) });
+    }
+    things.sort((a, b) => a.z - b.z).forEach((t) => t.draw());
+    for (const z of highlight) {
+      const idx = MASKS.zones.indexOf(z);
+      if (idx >= 0) drawFrame(ctx, sheets["farm-zone-outlines"]!, FARM_W, FARM_H, idx, 0, 0);
     }
     const spot = pop && SPOTS.get(pop.key);
-    if (pop && spot) drawFrame(ctx, sheets["fx-sparkle"]!, 30, 30, pop.frame, spot.x + 8 - 15, spot.y + 8 - 15);
-  }, [sheets, layer, tick, view.arrived, view.state.outfits, view.unlocked, highlight, pop]);
+    if (pop && spot && spot.scene === "farm") drawFrame(ctx, sheets["fx-sparkle"]!, 30, 30, pop.frame, spot.x + 8 - 15, spot.y + 8 - 15);
+  }, [sheets, layer, tick, placed, view.arrived, view.state.outfits, view.unlocked, view.counters, highlight, pop]);
 
   // On the phone, pan to the highlighted part.
   useEffect(() => {

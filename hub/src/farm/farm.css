@@ -1,8 +1,8 @@
 /* Esme's Farm. Pixel art is shown only at whole-number scales (set inline from the art's own
    size), never smoothed. Colours are app tokens only. Not decided by Esme (from the sprite
    designer's mocks, or placeholders): the cream nook's 14px radius and padding (mock
-   "creamnook2"), the farm page's spacing, the slot card, the phone nook's spot (bottom left),
-   and the magenta sidebar tile (no tile colour chosen for the farm yet). */
+   "creamnook2"), the farm page's spacing, the slot card and the phone nook's spot (bottom left).
+   The phone's room under the last row (for the + and the nook) is in add.css. */
 
 .farm-px {
   image-rendering: pixelated;
@@ -29,19 +29,24 @@
   z-index: 14;
   margin: 0;
 }
-/* 28 + the nook's 82 + 16. */
-.app-shell.is-phone .app-content {
-  padding-bottom: calc(126px + env(safe-area-inset-bottom));
-}
 .farm-nook.is-phone .farm-nook-link {
   padding: 2px 4px 0;
 }
+/* While she types on the phone the nook steps aside (it's asleep then anyway; review M2). */
+.farm-nook.is-phone.is-typing {
+  visibility: hidden;
+}
 
-/* The sidebar entry: the little book icon at 2x (its tile is the magenta placeholder, ui/areas.ts). */
-.sidebar-item[href="/farm"] img,
+/* The sidebar entry (Esme, 2026-11-04): the 24px pixel barn, at 1x in the sidebar and 2x in the
+   phone's app grid (whole-number scales only), on its yellow tile (ui/areas.ts). */
+.sidebar-item[href="/farm"] img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
 .phone-app[href="/farm"] img {
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   image-rendering: pixelated;
 }
 

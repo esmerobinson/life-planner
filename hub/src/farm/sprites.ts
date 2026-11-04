@@ -203,3 +203,55 @@ export function drawText(ctx: CanvasRenderingContext2D, font: HTMLImageElement, 
 export const PALETTE = MANIFEST.palette;
 /** Undecided: obviously wrong on purpose (tokens.css --placeholder). */
 export const PLACEHOLDER = "#ff00ff";
+
+export type StickerLook = "sticker" | "ghost" | "diecut";
+const LOOK: Record<StickerLook, { sheet: string; size: number }> = {
+  sticker: { sheet: "stickers", size: 16 },
+  ghost: { sheet: "stickers-ghost", size: 16 },
+  diecut: { sheet: "stickers-diecut", size: 18 },
+};
+
+/**
+ * Draws one sticker (its art, or for a sticker with no art yet the obvious magenta placeholder:
+ * a filled square, or an outline for its ghost), optionally mirrored.
+ */
+export function drawSticker(
+  ctx: CanvasRenderingContext2D,
+  sheets: Sheets,
+  s: { index: number; placeholderArt?: true },
+  look: StickerLook,
+  x: number,
+  y: number,
+  flip = false,
+): void {
+  const { sheet, size } = LOOK[look];
+  if (s.placeholderArt || s.index < 0) {
+    ctx.fillStyle = PLACEHOLDER;
+    if (look === "ghost") {
+      ctx.fillRect(x + 1, y + 1, size - 2, 1);
+      ctx.fillRect(x + 1, y + size - 2, size - 2, 1);
+      ctx.fillRect(x + 1, y + 1, 1, size - 2);
+      ctx.fillRect(x + size - 2, y + 1, 1, size - 2);
+    } else ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+    return;
+  }
+  const img = sheets[sheet];
+  if (!img) return;
+  if (!flip) return drawFrame(ctx, img, size, size, s.index, x, y);
+  ctx.save();
+  ctx.translate(Math.round(x) + size, Math.round(y));
+  ctx.scale(-1, 1);
+  ctx.drawImage(img, s.index * size, 0, size, size, 0, 0, size, size);
+  ctx.restore();
+}
+
+/**
+ * A repeat count ("×N" for Full month and Area cleared; Esme, 2026-11-04) at the bottom right of
+ * a 16px sticker at (x, y), in the pixel font. The font has no "×", so it reads "X3" (PLACEHOLDER
+ * glyph until the sprite designer adds one).
+ */
+export function drawCount(ctx: CanvasRenderingContext2D, font: HTMLImageElement, n: number, x: number, y: number): void {
+  if (n < 2) return;
+  const text = `X${n}`;
+  drawText(ctx, font, text, x + 17 - textWidth(text), y + 12);
+}

@@ -5,42 +5,42 @@
    "frame": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   },
   {
    "filename": "farm-base 1.aseprite",
    "frame": {
-    "x": 336,
+    "x": 504,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "rotated": false,
    "trimmed": false,
    "spriteSourceSize": {
     "x": 0,
     "y": 0,
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "sourceSize": {
-    "w": 336,
-    "h": 184
+    "w": 504,
+    "h": 276
    },
    "duration": 100
   }
@@ -51,8 +51,8 @@
   "image": "farm-base.png",
   "format": "RGBA8888",
   "size": {
-   "w": 672,
-   "h": 184
+   "w": 1008,
+   "h": 276
   },
   "scale": "1",
   "frameTags": [

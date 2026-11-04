@@ -340,7 +340,7 @@
     24,
     24
    ],
-   "frames": 18,
+   "frames": 20,
    "tags": [
     {
      "name": "A1",
@@ -431,6 +431,16 @@
      "name": "H7",
      "from": 17,
      "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
     }
    ],
    "display": "same scale as the character",
@@ -525,6 +535,16 @@
      "code": "H7",
      "name": "Museum spectacles",
      "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "170 stickers"
     }
    ]
   },
@@ -536,7 +556,7 @@
     24,
     24
    ],
-   "frames": 18,
+   "frames": 20,
    "tags": [
     {
      "name": "A1",
@@ -627,6 +647,16 @@
      "name": "H7",
      "from": 17,
      "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
     }
    ],
    "display": "same scale as the character",
@@ -721,6 +751,16 @@
      "code": "H7",
      "name": "Museum spectacles",
      "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "170 stickers"
     }
    ]
   },
@@ -732,7 +772,7 @@
     24,
     24
    ],
-   "frames": 18,
+   "frames": 20,
    "tags": [
     {
      "name": "A1",
@@ -823,6 +863,16 @@
      "name": "H7",
      "from": 17,
      "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
     }
    ],
    "display": "same scale as the character",
@@ -917,6 +967,16 @@
      "code": "H7",
      "name": "Museum spectacles",
      "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "170 stickers"
     }
    ]
   },
@@ -928,7 +988,7 @@
     24,
     24
    ],
-   "frames": 18,
+   "frames": 20,
    "tags": [
     {
      "name": "A1",
@@ -1019,6 +1079,16 @@
      "name": "H7",
      "from": 17,
      "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
     }
    ],
    "display": "same scale as the character",
@@ -1113,6 +1183,16 @@
      "code": "H7",
      "name": "Museum spectacles",
      "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "170 stickers"
     }
    ]
   },
@@ -1124,7 +1204,7 @@
     24,
     24
    ],
-   "frames": 18,
+   "frames": 20,
    "tags": [
     {
      "name": "A1",
@@ -1215,6 +1295,16 @@
      "name": "H7",
      "from": 17,
      "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
     }
    ],
    "display": "same scale as the character",
@@ -1309,6 +1399,16 @@
      "code": "H7",
      "name": "Museum spectacles",
      "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "170 stickers"
     }
    ]
   },
@@ -1320,7 +1420,7 @@
     24,
     24
    ],
-   "frames": 18,
+   "frames": 20,
    "tags": [
     {
      "name": "A1",
@@ -1411,6 +1511,16 @@
      "name": "H7",
      "from": 17,
      "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
     }
    ],
    "display": "same scale as the character",
@@ -1505,6 +1615,16 @@
      "code": "H7",
      "name": "Museum spectacles",
      "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "170 stickers"
     }
    ]
   },
@@ -1535,7 +1655,7 @@
     116,
     152
    ],
-   "frames": 16,
+   "frames": 18,
    "tags": [
     {
      "name": "endpaper",
@@ -1616,6 +1736,16 @@
      "name": "page-14",
      "from": 15,
      "to": 15
+    },
+    {
+     "name": "page-15",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "endpaper-back",
+     "from": 17,
+     "to": 17
     }
    ],
    "display": "3x on Mac (a spread = 696x456)",
@@ -2299,12 +2429,68 @@
     {
      "page": 6,
      "side": "right",
+     "group": "meadow",
+     "slots": [
+      {
+       "sticker": "full-month",
+       "name": "Full month",
+       "x": 9,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "100% month"
+      },
+      {
+       "sticker": "oak-2",
+       "name": "Acorn, split",
+       "x": 28,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "2 months 80%+"
+      },
+      {
+       "sticker": "oak-3",
+       "name": "Oak seedling",
+       "x": 47,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "3 months 80%+"
+      },
+      {
+       "sticker": "oak-6",
+       "name": "Young oak",
+       "x": 66,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "6 months 80%+"
+      },
+      {
+       "sticker": "oak-12",
+       "name": "Great oak",
+       "x": 85,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "12 months 80%+"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Seasons kept",
+       "x": 10,
+       "y": 28,
+       "count_x": 70,
+       "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+"
+      }
+     ]
+    },
+    {
+     "page": 7,
+     "side": "left",
      "group": "barnyard",
      "slots": [
       {
        "sticker": "hen",
        "name": "Hen",
-       "x": 9,
+       "x": 13,
        "y": 36,
        "set": "Animals",
        "milestone": 1
@@ -2312,7 +2498,7 @@
       {
        "sticker": "egg-nest",
        "name": "Egg nest",
-       "x": 28,
+       "x": 32,
        "y": 36,
        "set": "Animals",
        "milestone": 10
@@ -2320,7 +2506,7 @@
       {
        "sticker": "chick",
        "name": "Chick",
-       "x": 47,
+       "x": 51,
        "y": 36,
        "set": "Animals",
        "milestone": 25
@@ -2328,7 +2514,7 @@
       {
        "sticker": "piglet",
        "name": "Piglet",
-       "x": 66,
+       "x": 70,
        "y": 36,
        "set": "Animals",
        "milestone": 50
@@ -2336,7 +2522,7 @@
       {
        "sticker": "cow",
        "name": "Cow",
-       "x": 85,
+       "x": 89,
        "y": 36,
        "set": "Animals",
        "milestone": 100
@@ -2344,7 +2530,7 @@
       {
        "sticker": "milk-churn",
        "name": "Milk churn",
-       "x": 9,
+       "x": 13,
        "y": 55,
        "set": "Animals",
        "milestone": 150
@@ -2352,7 +2538,7 @@
       {
        "sticker": "sheep",
        "name": "Sheep",
-       "x": 28,
+       "x": 32,
        "y": 55,
        "set": "Animals",
        "milestone": 200
@@ -2360,7 +2546,7 @@
       {
        "sticker": "lamb",
        "name": "Lamb",
-       "x": 47,
+       "x": 51,
        "y": 55,
        "set": "Animals",
        "milestone": 300
@@ -2368,7 +2554,7 @@
       {
        "sticker": "haybale",
        "name": "Hay bale",
-       "x": 9,
+       "x": 13,
        "y": 86,
        "set": "Barn things",
        "milestone": 1
@@ -2376,7 +2562,7 @@
       {
        "sticker": "feed-trough",
        "name": "Feed trough",
-       "x": 28,
+       "x": 32,
        "y": 86,
        "set": "Barn things",
        "milestone": 3
@@ -2384,7 +2570,7 @@
       {
        "sticker": "weathervane",
        "name": "Weathervane",
-       "x": 47,
+       "x": 51,
        "y": 86,
        "set": "Barn things",
        "milestone": 6
@@ -2392,7 +2578,7 @@
       {
        "sticker": "barn-lantern",
        "name": "Barn lantern",
-       "x": 66,
+       "x": 70,
        "y": 86,
        "set": "Barn things",
        "milestone": 12
@@ -2401,29 +2587,29 @@
      "labels": [
       {
        "set": "Animals",
-       "x": 10,
+       "x": 14,
        "y": 28,
-       "count_x": 48,
+       "count_x": 52,
        "earned_by": "habit sessions"
       },
       {
        "set": "Barn things",
-       "x": 10,
+       "x": 14,
        "y": 78,
-       "count_x": 64,
+       "count_x": 68,
        "earned_by": "habit months finished"
       }
      ]
     },
     {
-     "page": 7,
-     "side": "left",
+     "page": 8,
+     "side": "right",
      "group": "orchard",
      "slots": [
       {
        "sticker": "sapling",
        "name": "Sapling",
-       "x": 13,
+       "x": 9,
        "y": 36,
        "set": "Fruit trees",
        "milestone": 1
@@ -2431,7 +2617,7 @@
       {
        "sticker": "may",
        "name": "Blossom branch",
-       "x": 32,
+       "x": 28,
        "y": 36,
        "set": "Fruit trees",
        "milestone": 2
@@ -2439,7 +2625,7 @@
       {
        "sticker": "sep",
        "name": "Apple",
-       "x": 51,
+       "x": 47,
        "y": 36,
        "set": "Fruit trees",
        "milestone": 4
@@ -2447,7 +2633,7 @@
       {
        "sticker": "pear",
        "name": "Pear",
-       "x": 70,
+       "x": 66,
        "y": 36,
        "set": "Fruit trees",
        "milestone": 6
@@ -2455,7 +2641,7 @@
       {
        "sticker": "plum",
        "name": "Plum",
-       "x": 89,
+       "x": 85,
        "y": 36,
        "set": "Fruit trees",
        "milestone": 9
@@ -2463,7 +2649,7 @@
       {
        "sticker": "cherries",
        "name": "Cherry",
-       "x": 13,
+       "x": 9,
        "y": 55,
        "set": "Fruit trees",
        "milestone": 12
@@ -2471,7 +2657,7 @@
       {
        "sticker": "peach-tree",
        "name": "Peach tree",
-       "x": 32,
+       "x": 28,
        "y": 55,
        "set": "Fruit trees",
        "milestone": 18
@@ -2479,7 +2665,7 @@
       {
        "sticker": "tree-swing",
        "name": "Tree swing",
-       "x": 13,
+       "x": 9,
        "y": 86,
        "set": "Under the trees",
        "milestone": 1
@@ -2487,7 +2673,7 @@
       {
        "sticker": "picnic-blanket",
        "name": "Picnic blanket",
-       "x": 32,
+       "x": 28,
        "y": 86,
        "set": "Under the trees",
        "milestone": 3
@@ -2496,29 +2682,29 @@
      "labels": [
       {
        "set": "Fruit trees",
-       "x": 14,
+       "x": 10,
        "y": 28,
-       "count_x": 67,
+       "count_x": 63,
        "earned_by": "monthly goals hit"
       },
       {
        "set": "Under the trees",
-       "x": 14,
+       "x": 10,
        "y": 78,
-       "count_x": 86,
+       "count_x": 82,
        "earned_by": "whole goals completed"
       }
      ]
     },
     {
-     "page": 8,
-     "side": "right",
+     "page": 9,
+     "side": "left",
      "group": "glasshouse",
      "slots": [
       {
        "sticker": "seedtray",
        "name": "Seed tray",
-       "x": 9,
+       "x": 13,
        "y": 36,
        "set": "Glasshouse",
        "milestone": 1
@@ -2526,7 +2712,7 @@
       {
        "sticker": "seedling",
        "name": "Seedling pot",
-       "x": 28,
+       "x": 32,
        "y": 36,
        "set": "Glasshouse",
        "milestone": 3
@@ -2534,7 +2720,7 @@
       {
        "sticker": "wateringcan",
        "name": "Watering can",
-       "x": 47,
+       "x": 51,
        "y": 36,
        "set": "Glasshouse",
        "milestone": 5
@@ -2542,7 +2728,7 @@
       {
        "sticker": "geranium",
        "name": "Geranium",
-       "x": 66,
+       "x": 70,
        "y": 36,
        "set": "Glasshouse",
        "milestone": 10
@@ -2550,7 +2736,7 @@
       {
        "sticker": "cactus",
        "name": "Cactus",
-       "x": 85,
+       "x": 89,
        "y": 36,
        "set": "Glasshouse",
        "milestone": 15
@@ -2558,7 +2744,7 @@
       {
        "sticker": "fern",
        "name": "Fern",
-       "x": 9,
+       "x": 13,
        "y": 55,
        "set": "Glasshouse",
        "milestone": 25
@@ -2566,7 +2752,7 @@
       {
        "sticker": "sweet-peas",
        "name": "Sweet peas",
-       "x": 28,
+       "x": 32,
        "y": 55,
        "set": "Glasshouse",
        "milestone": 40
@@ -2574,7 +2760,7 @@
       {
        "sticker": "hanging-basket",
        "name": "Hanging basket",
-       "x": 47,
+       "x": 51,
        "y": 55,
        "set": "Glasshouse",
        "milestone": 50
@@ -2582,7 +2768,7 @@
       {
        "sticker": "orchid",
        "name": "Orchid",
-       "x": 66,
+       "x": 70,
        "y": 55,
        "set": "Glasshouse",
        "milestone": 75
@@ -2590,7 +2776,7 @@
       {
        "sticker": "lemontree",
        "name": "Lemon tree",
-       "x": 85,
+       "x": 89,
        "y": 55,
        "set": "Glasshouse",
        "milestone": 100
@@ -2598,7 +2784,7 @@
       {
        "sticker": "fig-tree",
        "name": "Fig tree",
-       "x": 9,
+       "x": 13,
        "y": 74,
        "set": "Glasshouse",
        "milestone": 150
@@ -2606,7 +2792,7 @@
       {
        "sticker": "roof-vine",
        "name": "Vine over the roof",
-       "x": 28,
+       "x": 32,
        "y": 74,
        "set": "Glasshouse",
        "milestone": 200
@@ -2615,22 +2801,22 @@
      "labels": [
       {
        "set": "Glasshouse",
-       "x": 10,
+       "x": 14,
        "y": 28,
-       "count_x": 63,
+       "count_x": 67,
        "earned_by": "mornings with morning pages"
       }
      ]
     },
     {
-     "page": 9,
-     "side": "left",
+     "page": 10,
+     "side": "right",
      "group": "pond",
      "slots": [
       {
        "sticker": "lilypad",
        "name": "Lily pad",
-       "x": 13,
+       "x": 9,
        "y": 36,
        "set": "Lily pads",
        "milestone": 1
@@ -2638,7 +2824,7 @@
       {
        "sticker": "pebble",
        "name": "Pebbles",
-       "x": 32,
+       "x": 28,
        "y": 36,
        "set": "Lily pads",
        "milestone": 5
@@ -2646,7 +2832,7 @@
       {
        "sticker": "cattail",
        "name": "Reeds",
-       "x": 51,
+       "x": 47,
        "y": 36,
        "set": "Lily pads",
        "milestone": 10
@@ -2654,7 +2840,7 @@
       {
        "sticker": "frogspawn",
        "name": "Frogspawn",
-       "x": 70,
+       "x": 66,
        "y": 36,
        "set": "Lily pads",
        "milestone": 25
@@ -2662,7 +2848,7 @@
       {
        "sticker": "snail",
        "name": "Pond snail",
-       "x": 89,
+       "x": 85,
        "y": 36,
        "set": "Lily pads",
        "milestone": 50
@@ -2670,7 +2856,7 @@
       {
        "sticker": "dragonfly",
        "name": "Dragonfly",
-       "x": 13,
+       "x": 9,
        "y": 55,
        "set": "Lily pads",
        "milestone": 75
@@ -2678,7 +2864,7 @@
       {
        "sticker": "waterlily",
        "name": "Water lily in flower",
-       "x": 32,
+       "x": 28,
        "y": 55,
        "set": "Lily pads",
        "milestone": 100
@@ -2686,7 +2872,7 @@
       {
        "sticker": "steppingstone",
        "name": "Stepping stone",
-       "x": 13,
+       "x": 9,
        "y": 86,
        "set": "Water's edge",
        "milestone": 1
@@ -2694,7 +2880,7 @@
       {
        "sticker": "newt",
        "name": "Newt",
-       "x": 32,
+       "x": 28,
        "y": 86,
        "set": "Water's edge",
        "milestone": 3
@@ -2702,7 +2888,7 @@
       {
        "sticker": "duckling",
        "name": "Duck",
-       "x": 51,
+       "x": 47,
        "y": 86,
        "set": "Water's edge",
        "milestone": 5
@@ -2710,7 +2896,7 @@
       {
        "sticker": "ducklings",
        "name": "Ducklings",
-       "x": 70,
+       "x": 66,
        "y": 86,
        "set": "Water's edge",
        "milestone": 10
@@ -2718,7 +2904,7 @@
       {
        "sticker": "moorhen",
        "name": "Moorhen",
-       "x": 89,
+       "x": 85,
        "y": 86,
        "set": "Water's edge",
        "milestone": 25
@@ -2726,7 +2912,7 @@
       {
        "sticker": "kingfisher",
        "name": "Kingfisher",
-       "x": 13,
+       "x": 9,
        "y": 105,
        "set": "Water's edge",
        "milestone": 50
@@ -2734,7 +2920,7 @@
       {
        "sticker": "willow",
        "name": "Willow",
-       "x": 32,
+       "x": 28,
        "y": 105,
        "set": "Water's edge",
        "milestone": 75
@@ -2743,29 +2929,29 @@
      "labels": [
       {
        "set": "Lily pads",
-       "x": 14,
+       "x": 10,
        "y": 28,
-       "count_x": 58,
+       "count_x": 54,
        "earned_by": "days checked in"
       },
       {
        "set": "Water's edge",
-       "x": 14,
+       "x": 10,
        "y": 78,
-       "count_x": 72,
+       "count_x": 68,
        "earned_by": "days with a mental health exercise (1/day)"
       }
      ]
     },
     {
-     "page": 10,
-     "side": "right",
+     "page": 11,
+     "side": "left",
      "group": "aquarium",
      "slots": [
       {
        "sticker": "minnow",
        "name": "Minnow",
-       "x": 9,
+       "x": 13,
        "y": 36,
        "set": "Stream fish",
        "milestone": 1
@@ -2773,7 +2959,7 @@
       {
        "sticker": "stickleback",
        "name": "Stickleback",
-       "x": 28,
+       "x": 32,
        "y": 36,
        "set": "Stream fish",
        "milestone": 3
@@ -2781,7 +2967,7 @@
       {
        "sticker": "roach",
        "name": "Roach",
-       "x": 47,
+       "x": 51,
        "y": 36,
        "set": "Stream fish",
        "milestone": 6
@@ -2789,7 +2975,7 @@
       {
        "sticker": "perch",
        "name": "Perch",
-       "x": 66,
+       "x": 70,
        "y": 36,
        "set": "Stream fish",
        "milestone": 10
@@ -2797,7 +2983,7 @@
       {
        "sticker": "carp",
        "name": "Carp",
-       "x": 85,
+       "x": 89,
        "y": 36,
        "set": "Stream fish",
        "milestone": 15
@@ -2805,7 +2991,7 @@
       {
        "sticker": "trout",
        "name": "Trout",
-       "x": 9,
+       "x": 13,
        "y": 55,
        "set": "Stream fish",
        "milestone": 20
@@ -2813,7 +2999,7 @@
       {
        "sticker": "eel",
        "name": "Eel",
-       "x": 28,
+       "x": 32,
        "y": 55,
        "set": "Stream fish",
        "milestone": 25
@@ -2821,7 +3007,7 @@
       {
        "sticker": "koi",
        "name": "Koi",
-       "x": 47,
+       "x": 51,
        "y": 55,
        "set": "Stream fish",
        "milestone": 30
@@ -2829,7 +3015,7 @@
       {
        "sticker": "moonfish",
        "name": "Moonfish (DBT, all 12)",
-       "x": 9,
+       "x": 13,
        "y": 86,
        "set": "Rare fish",
        "milestone": "DBT done"
@@ -2837,7 +3023,7 @@
       {
        "sticker": "golden-carp",
        "name": "Golden carp (BPD, all 22)",
-       "x": 28,
+       "x": 32,
        "y": 86,
        "set": "Rare fish",
        "milestone": "BPD done"
@@ -2846,29 +3032,29 @@
      "labels": [
       {
        "set": "Stream fish",
-       "x": 10,
+       "x": 14,
        "y": 28,
-       "count_x": 65,
+       "count_x": 69,
        "earned_by": "workbook chapters (34: BPD 22, DBT 12)"
       },
       {
        "set": "Rare fish",
-       "x": 10,
+       "x": 14,
        "y": 78,
-       "count_x": 55,
+       "count_x": 59,
        "earned_by": "a whole workbook finished"
       }
      ]
     },
     {
-     "page": 11,
-     "side": "left",
+     "page": 12,
+     "side": "right",
      "group": "farmhouse",
      "slots": [
       {
        "sticker": "lantern",
        "name": "Lantern",
-       "x": 13,
+       "x": 9,
        "y": 36,
        "set": "Kitchen",
        "milestone": 1
@@ -2876,7 +3062,7 @@
       {
        "sticker": "teapot",
        "name": "Teapot",
-       "x": 32,
+       "x": 28,
        "y": 36,
        "set": "Kitchen",
        "milestone": 4
@@ -2884,7 +3070,7 @@
       {
        "sticker": "quilt",
        "name": "Quilt",
-       "x": 51,
+       "x": 47,
        "y": 36,
        "set": "Kitchen",
        "milestone": 8
@@ -2892,7 +3078,7 @@
       {
        "sticker": "rocking-chair",
        "name": "Rocking chair",
-       "x": 70,
+       "x": 66,
        "y": 36,
        "set": "Kitchen",
        "milestone": 12
@@ -2900,7 +3086,7 @@
       {
        "sticker": "dresser",
        "name": "Dresser",
-       "x": 89,
+       "x": 85,
        "y": 36,
        "set": "Kitchen",
        "milestone": 26
@@ -2908,7 +3094,7 @@
       {
        "sticker": "old-clock",
        "name": "Old clock",
-       "x": 13,
+       "x": 9,
        "y": 55,
        "set": "Kitchen",
        "milestone": 52
@@ -2916,7 +3102,7 @@
       {
        "sticker": "jam",
        "name": "Jam jar",
-       "x": 13,
+       "x": 9,
        "y": 86,
        "set": "Harvest table",
        "milestone": 1
@@ -2924,7 +3110,7 @@
       {
        "sticker": "harvestbasket",
        "name": "Harvest basket",
-       "x": 32,
+       "x": 28,
        "y": 86,
        "set": "Harvest table",
        "milestone": 3
@@ -2932,7 +3118,7 @@
       {
        "sticker": "pie",
        "name": "Pie",
-       "x": 51,
+       "x": 47,
        "y": 86,
        "set": "Harvest table",
        "milestone": 6
@@ -2940,7 +3126,7 @@
       {
        "sticker": "bunting",
        "name": "Bunting",
-       "x": 70,
+       "x": 66,
        "y": 86,
        "set": "Harvest table",
        "milestone": 9
@@ -2948,7 +3134,7 @@
       {
        "sticker": "bigtable",
        "name": "Big table laid",
-       "x": 89,
+       "x": 85,
        "y": 86,
        "set": "Harvest table",
        "milestone": 12
@@ -2957,29 +3143,29 @@
      "labels": [
       {
        "set": "Kitchen",
-       "x": 14,
+       "x": 10,
        "y": 28,
-       "count_x": 50,
+       "count_x": 46,
        "earned_by": "weekly reviews"
       },
       {
        "set": "Harvest table",
-       "x": 14,
+       "x": 10,
        "y": 78,
-       "count_x": 78,
+       "count_x": 74,
        "earned_by": "monthly reviews"
       }
      ]
     },
     {
-     "page": 12,
-     "side": "right",
+     "page": 13,
+     "side": "left",
      "group": "museum",
      "slots": [
       {
        "sticker": "pressed-daisy",
        "name": "Pressed daisy",
-       "x": 9,
+       "x": 13,
        "y": 36,
        "set": "Pressed and bound",
        "milestone": 1
@@ -2987,7 +3173,7 @@
       {
        "sticker": "ribbon",
        "name": "Bookmark",
-       "x": 28,
+       "x": 32,
        "y": 36,
        "set": "Pressed and bound",
        "milestone": 3
@@ -2995,7 +3181,7 @@
       {
        "sticker": "old-map",
        "name": "Old map",
-       "x": 47,
+       "x": 51,
        "y": 36,
        "set": "Pressed and bound",
        "milestone": 6
@@ -3003,7 +3189,7 @@
       {
        "sticker": "fern-specimen",
        "name": "Fern specimen",
-       "x": 66,
+       "x": 70,
        "y": 36,
        "set": "Pressed and bound",
        "milestone": 10
@@ -3011,7 +3197,7 @@
       {
        "sticker": "feather-collection",
        "name": "Feather collection",
-       "x": 85,
+       "x": 89,
        "y": 36,
        "set": "Pressed and bound",
        "milestone": 15
@@ -3019,7 +3205,7 @@
       {
        "sticker": "illuminated-book",
        "name": "Illuminated book",
-       "x": 9,
+       "x": 13,
        "y": 55,
        "set": "Pressed and bound",
        "milestone": 20
@@ -3027,7 +3213,7 @@
       {
        "sticker": "ammonite",
        "name": "Ammonite",
-       "x": 9,
+       "x": 13,
        "y": 86,
        "set": "Dug up",
        "milestone": 1
@@ -3035,7 +3221,7 @@
       {
        "sticker": "trilobite",
        "name": "Trilobite",
-       "x": 28,
+       "x": 32,
        "y": 86,
        "set": "Dug up",
        "milestone": 2
@@ -3043,7 +3229,7 @@
       {
        "sticker": "fossil-leaf",
        "name": "Fossil leaf",
-       "x": 47,
+       "x": 51,
        "y": 86,
        "set": "Dug up",
        "milestone": 3
@@ -3051,7 +3237,7 @@
       {
        "sticker": "geode",
        "name": "Geode",
-       "x": 66,
+       "x": 70,
        "y": 86,
        "set": "Dug up",
        "milestone": 5
@@ -3059,7 +3245,7 @@
       {
        "sticker": "oldkey",
        "name": "Old key",
-       "x": 85,
+       "x": 89,
        "y": 86,
        "set": "Dug up",
        "milestone": 8
@@ -3067,7 +3253,7 @@
       {
        "sticker": "footprint-fossil",
        "name": "Footprint fossil",
-       "x": 9,
+       "x": 13,
        "y": 105,
        "set": "Dug up",
        "milestone": 12
@@ -3076,97 +3262,17 @@
      "labels": [
       {
        "set": "Pressed and bound",
-       "x": 10,
+       "x": 14,
        "y": 28,
-       "count_x": 94,
+       "count_x": 98,
        "earned_by": "Reading-list books"
       },
       {
        "set": "Dug up",
-       "x": 10,
-       "y": 78,
-       "count_x": 41,
-       "earned_by": "projects finished"
-      }
-     ]
-    },
-    {
-     "page": 13,
-     "side": "left",
-     "group": "lane",
-     "slots": [
-      {
-       "sticker": "hi",
-       "name": "Welcome",
-       "x": 13,
-       "y": 36,
-       "set": "Kind notes",
-       "milestone": "day one"
-      },
-      {
-       "sticker": "door",
-       "name": "Welcome back",
-       "x": 32,
-       "y": 36,
-       "set": "Kind notes",
-       "milestone": "3+ days away"
-      },
-      {
-       "sticker": "steps",
-       "name": "Back again",
-       "x": 51,
-       "y": 36,
-       "set": "Kind notes",
-       "milestone": "3rd return"
-      },
-      {
-       "sticker": "always-welcome",
-       "name": "Always welcome",
-       "x": 70,
-       "y": 36,
-       "set": "Kind notes",
-       "milestone": "5th return"
-      },
-      {
-       "sticker": "ok",
-       "name": "Late still counts",
-       "x": 89,
-       "y": 36,
-       "set": "Kind notes",
-       "milestone": "a late tick"
-      },
-      {
-       "sticker": "feather",
-       "name": "Short pages still count",
-       "x": 13,
-       "y": 55,
-       "set": "Kind notes",
-       "milestone": "short pages"
-      },
-      {
-       "sticker": "candle",
-       "name": "Light left on",
-       "x": 32,
-       "y": 55,
-       "set": "Kind notes",
-       "milestone": "check-in after a gap"
-      },
-      {
-       "sticker": "back-to-it",
-       "name": "Back to it",
-       "x": 51,
-       "y": 55,
-       "set": "Kind notes",
-       "milestone": "habit again after a week off"
-      }
-     ],
-     "labels": [
-      {
-       "set": "Kind notes",
        "x": 14,
-       "y": 28,
-       "count_x": 63,
-       "earned_by": "each once"
+       "y": 78,
+       "count_x": 45,
+       "earned_by": "projects finished"
       }
      ]
     },
@@ -3176,9 +3282,89 @@
      "group": "lane",
      "slots": [
       {
+       "sticker": "hi",
+       "name": "Welcome",
+       "x": 9,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "day one"
+      },
+      {
+       "sticker": "door",
+       "name": "Welcome back",
+       "x": 28,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "3+ days away"
+      },
+      {
+       "sticker": "steps",
+       "name": "Back again",
+       "x": 47,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "3rd return"
+      },
+      {
+       "sticker": "always-welcome",
+       "name": "Always welcome",
+       "x": 66,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "5th return"
+      },
+      {
+       "sticker": "ok",
+       "name": "Late still counts",
+       "x": 85,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "a late tick"
+      },
+      {
+       "sticker": "feather",
+       "name": "Short pages still count",
+       "x": 9,
+       "y": 55,
+       "set": "Kind notes",
+       "milestone": "short pages"
+      },
+      {
+       "sticker": "candle",
+       "name": "Light left on",
+       "x": 28,
+       "y": 55,
+       "set": "Kind notes",
+       "milestone": "check-in after a gap"
+      },
+      {
+       "sticker": "back-to-it",
+       "name": "Back to it",
+       "x": 47,
+       "y": 55,
+       "set": "Kind notes",
+       "milestone": "habit again after a week off"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Kind notes",
+       "x": 10,
+       "y": 28,
+       "count_x": 59,
+       "earned_by": "each once"
+      }
+     ]
+    },
+    {
+     "page": 15,
+     "side": "left",
+     "group": "lane",
+     "slots": [
+      {
        "sticker": "robin",
        "name": "January robin",
-       "x": 9,
+       "x": 13,
        "y": 36,
        "set": "Hedgerow",
        "milestone": "Jan"
@@ -3186,7 +3372,7 @@
       {
        "sticker": "feb",
        "name": "February snowdrop",
-       "x": 28,
+       "x": 32,
        "y": 36,
        "set": "Hedgerow",
        "milestone": "Feb"
@@ -3194,7 +3380,7 @@
       {
        "sticker": "mar",
        "name": "March daffodil",
-       "x": 47,
+       "x": 51,
        "y": 36,
        "set": "Hedgerow",
        "milestone": "Mar"
@@ -3202,7 +3388,7 @@
       {
        "sticker": "welliespuddle",
        "name": "April wellies",
-       "x": 66,
+       "x": 70,
        "y": 36,
        "set": "Hedgerow",
        "milestone": "Apr"
@@ -3210,7 +3396,7 @@
       {
        "sticker": "bloom",
        "name": "May blossom",
-       "x": 85,
+       "x": 89,
        "y": 36,
        "set": "Hedgerow",
        "milestone": "May"
@@ -3218,7 +3404,7 @@
       {
        "sticker": "jun",
        "name": "June strawberry",
-       "x": 9,
+       "x": 13,
        "y": 55,
        "set": "Hedgerow",
        "milestone": "Jun"
@@ -3226,7 +3412,7 @@
       {
        "sticker": "hay-cart",
        "name": "July hay cart",
-       "x": 28,
+       "x": 32,
        "y": 55,
        "set": "Hedgerow",
        "milestone": "Jul"
@@ -3234,7 +3420,7 @@
       {
        "sticker": "blackberries",
        "name": "August blackberries",
-       "x": 47,
+       "x": 51,
        "y": 55,
        "set": "Hedgerow",
        "milestone": "Aug"
@@ -3242,7 +3428,7 @@
       {
        "sticker": "conker",
        "name": "September conker",
-       "x": 66,
+       "x": 70,
        "y": 55,
        "set": "Hedgerow",
        "milestone": "Sep"
@@ -3250,7 +3436,7 @@
       {
        "sticker": "toadstool",
        "name": "October toadstool",
-       "x": 85,
+       "x": 89,
        "y": 55,
        "set": "Hedgerow",
        "milestone": "Oct"
@@ -3258,7 +3444,7 @@
       {
        "sticker": "nov",
        "name": "November leaf",
-       "x": 9,
+       "x": 13,
        "y": 74,
        "set": "Hedgerow",
        "milestone": "Nov"
@@ -3266,7 +3452,7 @@
       {
        "sticker": "holly",
        "name": "December holly",
-       "x": 28,
+       "x": 32,
        "y": 74,
        "set": "Hedgerow",
        "milestone": "Dec"
@@ -3275,12 +3461,20 @@
      "labels": [
       {
        "set": "Hedgerow",
-       "x": 10,
+       "x": 14,
        "y": 28,
-       "count_x": 54,
+       "count_x": 58,
        "earned_by": "did anything that month"
       }
      ]
+    },
+    {
+     "page": 16,
+     "side": "right",
+     "group": null,
+     "slots": [],
+     "labels": [],
+     "note": "back endpaper"
     }
    ],
    "contents_rows": [
@@ -3300,51 +3494,66 @@
      "group": "barnyard",
      "y": 50,
      "count_right_x": 102,
-     "page": 6
+     "page": 7
     },
     {
      "group": "orchard",
      "y": 60,
      "count_right_x": 102,
-     "page": 7
+     "page": 8
     },
     {
      "group": "glasshouse",
      "y": 70,
      "count_right_x": 102,
-     "page": 8
+     "page": 9
     },
     {
      "group": "pond",
      "y": 80,
      "count_right_x": 102,
-     "page": 9
+     "page": 10
     },
     {
      "group": "aquarium",
      "y": 90,
      "count_right_x": 102,
-     "page": 10
+     "page": 11
     },
     {
      "group": "farmhouse",
      "y": 100,
      "count_right_x": 102,
-     "page": 11
+     "page": 12
     },
     {
      "group": "museum",
      "y": 110,
      "count_right_x": 102,
-     "page": 12
+     "page": 13
     },
     {
      "group": "lane",
      "y": 120,
      "count_right_x": 102,
-     "page": 13
+     "page": 14
     }
    ],
+   "contents_total_plate": {
+    "box": [
+     24,
+     131,
+     88,
+     142
+    ],
+    "text_centre_x": 56,
+    "text_y": 135,
+    "colour": "#df7e6f",
+    "format": "{n} OF 175",
+    "font": "font-small",
+    "max_text_width": 41,
+    "note": "Centre the text on text_centre_x (width = sum of glyph widths + 1 per gap - 1; the widest, all-collected text fits between the ornaments). When all are collected: same text, and the plate's two gold ornaments may glint (fx-sparkle)."
+   },
    "spread_size": [
     232,
     152
@@ -3424,7 +3633,7 @@
     232,
     152
    ],
-   "frames": 9,
+   "frames": 11,
    "tags": [
     {
      "name": "closed",
@@ -3437,39 +3646,49 @@
      "to": 1
     },
     {
-     "name": "pages-1-2",
+     "name": "contents-total-example",
      "from": 2,
      "to": 2
     },
     {
-     "name": "pages-3-4",
+     "name": "pages-1-2",
      "from": 3,
      "to": 3
     },
     {
-     "name": "pages-5-6",
+     "name": "pages-3-4",
      "from": 4,
      "to": 4
     },
     {
-     "name": "pages-7-8",
+     "name": "pages-5-6",
      "from": 5,
      "to": 5
     },
     {
-     "name": "pages-9-10",
+     "name": "pages-7-8",
      "from": 6,
      "to": 6
     },
     {
-     "name": "pages-11-12",
+     "name": "pages-9-10",
      "from": 7,
      "to": 7
     },
     {
-     "name": "pages-13-14",
+     "name": "pages-11-12",
      "from": 8,
      "to": 8
+    },
+    {
+     "name": "pages-13-14",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "pages-15-16",
+     "from": 10,
+     "to": 10
     }
    ],
    "display": "reference only",
@@ -3798,7 +4017,7 @@
     16,
     16
    ],
-   "frames": 170,
+   "frames": 175,
    "tags": [
     {
      "name": "beds:Mind bed",
@@ -3851,83 +4070,88 @@
      "to": 69
     },
     {
-     "name": "barnyard:Animals",
+     "name": "meadow:Seasons kept",
      "from": 70,
-     "to": 77
+     "to": 74
+    },
+    {
+     "name": "barnyard:Animals",
+     "from": 75,
+     "to": 82
     },
     {
      "name": "barnyard:Barn things",
-     "from": 78,
-     "to": 81
+     "from": 83,
+     "to": 86
     },
     {
      "name": "orchard:Fruit trees",
-     "from": 82,
-     "to": 88
+     "from": 87,
+     "to": 93
     },
     {
      "name": "orchard:Under the trees",
-     "from": 89,
-     "to": 90
+     "from": 94,
+     "to": 95
     },
     {
      "name": "glasshouse:Glasshouse",
-     "from": 91,
-     "to": 102
+     "from": 96,
+     "to": 107
     },
     {
      "name": "pond:Lily pads",
-     "from": 103,
-     "to": 109
+     "from": 108,
+     "to": 114
     },
     {
      "name": "pond:Water's edge",
-     "from": 110,
-     "to": 116
+     "from": 115,
+     "to": 121
     },
     {
      "name": "aquarium:Stream fish",
-     "from": 117,
-     "to": 124
+     "from": 122,
+     "to": 129
     },
     {
      "name": "aquarium:Rare fish",
-     "from": 125,
-     "to": 126
+     "from": 130,
+     "to": 131
     },
     {
      "name": "farmhouse:Kitchen",
-     "from": 127,
-     "to": 132
-    },
-    {
-     "name": "farmhouse:Harvest table",
-     "from": 133,
+     "from": 132,
      "to": 137
     },
     {
-     "name": "museum:Pressed and bound",
+     "name": "farmhouse:Harvest table",
      "from": 138,
-     "to": 143
+     "to": 142
+    },
+    {
+     "name": "museum:Pressed and bound",
+     "from": 143,
+     "to": 148
     },
     {
      "name": "museum:Dug up",
-     "from": 144,
-     "to": 149
+     "from": 149,
+     "to": 154
     },
     {
      "name": "lane:Kind notes",
-     "from": 150,
-     "to": 157
+     "from": 155,
+     "to": 162
     },
     {
      "name": "lane:Hedgerow",
-     "from": 158,
-     "to": 169
+     "from": 163,
+     "to": 174
     }
    ],
    "display": "2x in the nook and monthly review (32 px); book scale in the book",
-   "notes": "All 170 stickers in book order. Tags = group:set.",
+   "notes": "All 175 stickers in book order. Tags = group:set.",
    "stickers": [
     {
      "index": 0,
@@ -4631,6 +4855,56 @@
     },
     {
      "index": 70,
+     "key": "full-month",
+     "name": "Full month",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "100% month",
+     "tier": "everyday"
+    },
+    {
+     "index": 71,
+     "key": "oak-2",
+     "name": "Acorn, split",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "2 months 80%+",
+     "tier": "everyday"
+    },
+    {
+     "index": 72,
+     "key": "oak-3",
+     "name": "Oak seedling",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "3 months 80%+",
+     "tier": "everyday"
+    },
+    {
+     "index": 73,
+     "key": "oak-6",
+     "name": "Young oak",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "6 months 80%+",
+     "tier": "everyday"
+    },
+    {
+     "index": 74,
+     "key": "oak-12",
+     "name": "Great oak",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "12 months 80%+",
+     "tier": "everyday"
+    },
+    {
+     "index": 75,
      "key": "hen",
      "name": "Hen",
      "group": "barnyard",
@@ -4640,7 +4914,7 @@
      "tier": "everyday"
     },
     {
-     "index": 71,
+     "index": 76,
      "key": "egg-nest",
      "name": "Egg nest",
      "group": "barnyard",
@@ -4650,7 +4924,7 @@
      "tier": "everyday"
     },
     {
-     "index": 72,
+     "index": 77,
      "key": "chick",
      "name": "Chick",
      "group": "barnyard",
@@ -4660,7 +4934,7 @@
      "tier": "everyday"
     },
     {
-     "index": 73,
+     "index": 78,
      "key": "piglet",
      "name": "Piglet",
      "group": "barnyard",
@@ -4670,7 +4944,7 @@
      "tier": "everyday"
     },
     {
-     "index": 74,
+     "index": 79,
      "key": "cow",
      "name": "Cow",
      "group": "barnyard",
@@ -4680,7 +4954,7 @@
      "tier": "everyday"
     },
     {
-     "index": 75,
+     "index": 80,
      "key": "milk-churn",
      "name": "Milk churn",
      "group": "barnyard",
@@ -4690,7 +4964,7 @@
      "tier": "everyday"
     },
     {
-     "index": 76,
+     "index": 81,
      "key": "sheep",
      "name": "Sheep",
      "group": "barnyard",
@@ -4700,7 +4974,7 @@
      "tier": "everyday"
     },
     {
-     "index": 77,
+     "index": 82,
      "key": "lamb",
      "name": "Lamb",
      "group": "barnyard",
@@ -4710,7 +4984,7 @@
      "tier": "everyday"
     },
     {
-     "index": 78,
+     "index": 83,
      "key": "haybale",
      "name": "Hay bale",
      "group": "barnyard",
@@ -4720,7 +4994,7 @@
      "tier": "everyday"
     },
     {
-     "index": 79,
+     "index": 84,
      "key": "feed-trough",
      "name": "Feed trough",
      "group": "barnyard",
@@ -4730,7 +5004,7 @@
      "tier": "everyday"
     },
     {
-     "index": 80,
+     "index": 85,
      "key": "weathervane",
      "name": "Weathervane",
      "group": "barnyard",
@@ -4740,7 +5014,7 @@
      "tier": "everyday"
     },
     {
-     "index": 81,
+     "index": 86,
      "key": "barn-lantern",
      "name": "Barn lantern",
      "group": "barnyard",
@@ -4750,7 +5024,7 @@
      "tier": "everyday"
     },
     {
-     "index": 82,
+     "index": 87,
      "key": "sapling",
      "name": "Sapling",
      "group": "orchard",
@@ -4760,7 +5034,7 @@
      "tier": "special"
     },
     {
-     "index": 83,
+     "index": 88,
      "key": "may",
      "name": "Blossom branch",
      "group": "orchard",
@@ -4770,7 +5044,7 @@
      "tier": "special"
     },
     {
-     "index": 84,
+     "index": 89,
      "key": "sep",
      "name": "Apple",
      "group": "orchard",
@@ -4780,7 +5054,7 @@
      "tier": "special"
     },
     {
-     "index": 85,
+     "index": 90,
      "key": "pear",
      "name": "Pear",
      "group": "orchard",
@@ -4790,7 +5064,7 @@
      "tier": "special"
     },
     {
-     "index": 86,
+     "index": 91,
      "key": "plum",
      "name": "Plum",
      "group": "orchard",
@@ -4800,7 +5074,7 @@
      "tier": "special"
     },
     {
-     "index": 87,
+     "index": 92,
      "key": "cherries",
      "name": "Cherry",
      "group": "orchard",
@@ -4810,7 +5084,7 @@
      "tier": "special"
     },
     {
-     "index": 88,
+     "index": 93,
      "key": "peach-tree",
      "name": "Peach tree",
      "group": "orchard",
@@ -4820,7 +5094,7 @@
      "tier": "special"
     },
     {
-     "index": 89,
+     "index": 94,
      "key": "tree-swing",
      "name": "Tree swing",
      "group": "orchard",
@@ -4830,7 +5104,7 @@
      "tier": "special"
     },
     {
-     "index": 90,
+     "index": 95,
      "key": "picnic-blanket",
      "name": "Picnic blanket",
      "group": "orchard",
@@ -4840,7 +5114,7 @@
      "tier": "special"
     },
     {
-     "index": 91,
+     "index": 96,
      "key": "seedtray",
      "name": "Seed tray",
      "group": "glasshouse",
@@ -4850,7 +5124,7 @@
      "tier": "special"
     },
     {
-     "index": 92,
+     "index": 97,
      "key": "seedling",
      "name": "Seedling pot",
      "group": "glasshouse",
@@ -4860,7 +5134,7 @@
      "tier": "special"
     },
     {
-     "index": 93,
+     "index": 98,
      "key": "wateringcan",
      "name": "Watering can",
      "group": "glasshouse",
@@ -4870,7 +5144,7 @@
      "tier": "special"
     },
     {
-     "index": 94,
+     "index": 99,
      "key": "geranium",
      "name": "Geranium",
      "group": "glasshouse",
@@ -4880,7 +5154,7 @@
      "tier": "special"
     },
     {
-     "index": 95,
+     "index": 100,
      "key": "cactus",
      "name": "Cactus",
      "group": "glasshouse",
@@ -4890,7 +5164,7 @@
      "tier": "special"
     },
     {
-     "index": 96,
+     "index": 101,
      "key": "fern",
      "name": "Fern",
      "group": "glasshouse",
@@ -4900,7 +5174,7 @@
      "tier": "special"
     },
     {
-     "index": 97,
+     "index": 102,
      "key": "sweet-peas",
      "name": "Sweet peas",
      "group": "glasshouse",
@@ -4910,7 +5184,7 @@
      "tier": "special"
     },
     {
-     "index": 98,
+     "index": 103,
      "key": "hanging-basket",
      "name": "Hanging basket",
      "group": "glasshouse",
@@ -4920,7 +5194,7 @@
      "tier": "special"
     },
     {
-     "index": 99,
+     "index": 104,
      "key": "orchid",
      "name": "Orchid",
      "group": "glasshouse",
@@ -4930,7 +5204,7 @@
      "tier": "special"
     },
     {
-     "index": 100,
+     "index": 105,
      "key": "lemontree",
      "name": "Lemon tree",
      "group": "glasshouse",
@@ -4940,7 +5214,7 @@
      "tier": "special"
     },
     {
-     "index": 101,
+     "index": 106,
      "key": "fig-tree",
      "name": "Fig tree",
      "group": "glasshouse",
@@ -4950,7 +5224,7 @@
      "tier": "special"
     },
     {
-     "index": 102,
+     "index": 107,
      "key": "roof-vine",
      "name": "Vine over the roof",
      "group": "glasshouse",
@@ -4960,7 +5234,7 @@
      "tier": "special"
     },
     {
-     "index": 103,
+     "index": 108,
      "key": "lilypad",
      "name": "Lily pad",
      "group": "pond",
@@ -4970,7 +5244,7 @@
      "tier": "special"
     },
     {
-     "index": 104,
+     "index": 109,
      "key": "pebble",
      "name": "Pebbles",
      "group": "pond",
@@ -4980,7 +5254,7 @@
      "tier": "special"
     },
     {
-     "index": 105,
+     "index": 110,
      "key": "cattail",
      "name": "Reeds",
      "group": "pond",
@@ -4990,7 +5264,7 @@
      "tier": "special"
     },
     {
-     "index": 106,
+     "index": 111,
      "key": "frogspawn",
      "name": "Frogspawn",
      "group": "pond",
@@ -5000,7 +5274,7 @@
      "tier": "special"
     },
     {
-     "index": 107,
+     "index": 112,
      "key": "snail",
      "name": "Pond snail",
      "group": "pond",
@@ -5010,7 +5284,7 @@
      "tier": "special"
     },
     {
-     "index": 108,
+     "index": 113,
      "key": "dragonfly",
      "name": "Dragonfly",
      "group": "pond",
@@ -5020,7 +5294,7 @@
      "tier": "special"
     },
     {
-     "index": 109,
+     "index": 114,
      "key": "waterlily",
      "name": "Water lily in flower",
      "group": "pond",
@@ -5030,7 +5304,7 @@
      "tier": "special"
     },
     {
-     "index": 110,
+     "index": 115,
      "key": "steppingstone",
      "name": "Stepping stone",
      "group": "pond",
@@ -5040,7 +5314,7 @@
      "tier": "special"
     },
     {
-     "index": 111,
+     "index": 116,
      "key": "newt",
      "name": "Newt",
      "group": "pond",
@@ -5050,7 +5324,7 @@
      "tier": "special"
     },
     {
-     "index": 112,
+     "index": 117,
      "key": "duckling",
      "name": "Duck",
      "group": "pond",
@@ -5060,7 +5334,7 @@
      "tier": "special"
     },
     {
-     "index": 113,
+     "index": 118,
      "key": "ducklings",
      "name": "Ducklings",
      "group": "pond",
@@ -5070,7 +5344,7 @@
      "tier": "special"
     },
     {
-     "index": 114,
+     "index": 119,
      "key": "moorhen",
      "name": "Moorhen",
      "group": "pond",
@@ -5080,7 +5354,7 @@
      "tier": "special"
     },
     {
-     "index": 115,
+     "index": 120,
      "key": "kingfisher",
      "name": "Kingfisher",
      "group": "pond",
@@ -5090,7 +5364,7 @@
      "tier": "special"
     },
     {
-     "index": 116,
+     "index": 121,
      "key": "willow",
      "name": "Willow",
      "group": "pond",
@@ -5100,7 +5374,7 @@
      "tier": "special"
     },
     {
-     "index": 117,
+     "index": 122,
      "key": "minnow",
      "name": "Minnow",
      "group": "aquarium",
@@ -5110,7 +5384,7 @@
      "tier": "special"
     },
     {
-     "index": 118,
+     "index": 123,
      "key": "stickleback",
      "name": "Stickleback",
      "group": "aquarium",
@@ -5120,7 +5394,7 @@
      "tier": "special"
     },
     {
-     "index": 119,
+     "index": 124,
      "key": "roach",
      "name": "Roach",
      "group": "aquarium",
@@ -5130,7 +5404,7 @@
      "tier": "special"
     },
     {
-     "index": 120,
+     "index": 125,
      "key": "perch",
      "name": "Perch",
      "group": "aquarium",
@@ -5140,7 +5414,7 @@
      "tier": "special"
     },
     {
-     "index": 121,
+     "index": 126,
      "key": "carp",
      "name": "Carp",
      "group": "aquarium",
@@ -5150,7 +5424,7 @@
      "tier": "special"
     },
     {
-     "index": 122,
+     "index": 127,
      "key": "trout",
      "name": "Trout",
      "group": "aquarium",
@@ -5160,7 +5434,7 @@
      "tier": "special"
     },
     {
-     "index": 123,
+     "index": 128,
      "key": "eel",
      "name": "Eel",
      "group": "aquarium",
@@ -5170,7 +5444,7 @@
      "tier": "special"
     },
     {
-     "index": 124,
+     "index": 129,
      "key": "koi",
      "name": "Koi",
      "group": "aquarium",
@@ -5180,7 +5454,7 @@
      "tier": "special"
     },
     {
-     "index": 125,
+     "index": 130,
      "key": "moonfish",
      "name": "Moonfish (DBT, all 12)",
      "group": "aquarium",
@@ -5190,7 +5464,7 @@
      "tier": "special"
     },
     {
-     "index": 126,
+     "index": 131,
      "key": "golden-carp",
      "name": "Golden carp (BPD, all 22)",
      "group": "aquarium",
@@ -5200,7 +5474,7 @@
      "tier": "special"
     },
     {
-     "index": 127,
+     "index": 132,
      "key": "lantern",
      "name": "Lantern",
      "group": "farmhouse",
@@ -5210,7 +5484,7 @@
      "tier": "special"
     },
     {
-     "index": 128,
+     "index": 133,
      "key": "teapot",
      "name": "Teapot",
      "group": "farmhouse",
@@ -5220,7 +5494,7 @@
      "tier": "special"
     },
     {
-     "index": 129,
+     "index": 134,
      "key": "quilt",
      "name": "Quilt",
      "group": "farmhouse",
@@ -5230,7 +5504,7 @@
      "tier": "special"
     },
     {
-     "index": 130,
+     "index": 135,
      "key": "rocking-chair",
      "name": "Rocking chair",
      "group": "farmhouse",
@@ -5240,7 +5514,7 @@
      "tier": "special"
     },
     {
-     "index": 131,
+     "index": 136,
      "key": "dresser",
      "name": "Dresser",
      "group": "farmhouse",
@@ -5250,7 +5524,7 @@
      "tier": "special"
     },
     {
-     "index": 132,
+     "index": 137,
      "key": "old-clock",
      "name": "Old clock",
      "group": "farmhouse",
@@ -5260,7 +5534,7 @@
      "tier": "special"
     },
     {
-     "index": 133,
+     "index": 138,
      "key": "jam",
      "name": "Jam jar",
      "group": "farmhouse",
@@ -5270,7 +5544,7 @@
      "tier": "special"
     },
     {
-     "index": 134,
+     "index": 139,
      "key": "harvestbasket",
      "name": "Harvest basket",
      "group": "farmhouse",
@@ -5280,7 +5554,7 @@
      "tier": "special"
     },
     {
-     "index": 135,
+     "index": 140,
      "key": "pie",
      "name": "Pie",
      "group": "farmhouse",
@@ -5290,7 +5564,7 @@
      "tier": "special"
     },
     {
-     "index": 136,
+     "index": 141,
      "key": "bunting",
      "name": "Bunting",
      "group": "farmhouse",
@@ -5300,7 +5574,7 @@
      "tier": "special"
     },
     {
-     "index": 137,
+     "index": 142,
      "key": "bigtable",
      "name": "Big table laid",
      "group": "farmhouse",
@@ -5310,7 +5584,7 @@
      "tier": "special"
     },
     {
-     "index": 138,
+     "index": 143,
      "key": "pressed-daisy",
      "name": "Pressed daisy",
      "group": "museum",
@@ -5320,7 +5594,7 @@
      "tier": "special"
     },
     {
-     "index": 139,
+     "index": 144,
      "key": "ribbon",
      "name": "Bookmark",
      "group": "museum",
@@ -5330,7 +5604,7 @@
      "tier": "special"
     },
     {
-     "index": 140,
+     "index": 145,
      "key": "old-map",
      "name": "Old map",
      "group": "museum",
@@ -5340,7 +5614,7 @@
      "tier": "special"
     },
     {
-     "index": 141,
+     "index": 146,
      "key": "fern-specimen",
      "name": "Fern specimen",
      "group": "museum",
@@ -5350,7 +5624,7 @@
      "tier": "special"
     },
     {
-     "index": 142,
+     "index": 147,
      "key": "feather-collection",
      "name": "Feather collection",
      "group": "museum",
@@ -5360,7 +5634,7 @@
      "tier": "special"
     },
     {
-     "index": 143,
+     "index": 148,
      "key": "illuminated-book",
      "name": "Illuminated book",
      "group": "museum",
@@ -5370,7 +5644,7 @@
      "tier": "special"
     },
     {
-     "index": 144,
+     "index": 149,
      "key": "ammonite",
      "name": "Ammonite",
      "group": "museum",
@@ -5380,7 +5654,7 @@
      "tier": "special"
     },
     {
-     "index": 145,
+     "index": 150,
      "key": "trilobite",
      "name": "Trilobite",
      "group": "museum",
@@ -5390,7 +5664,7 @@
      "tier": "special"
     },
     {
-     "index": 146,
+     "index": 151,
      "key": "fossil-leaf",
      "name": "Fossil leaf",
      "group": "museum",
@@ -5400,7 +5674,7 @@
      "tier": "special"
     },
     {
-     "index": 147,
+     "index": 152,
      "key": "geode",
      "name": "Geode",
      "group": "museum",
@@ -5410,7 +5684,7 @@
      "tier": "special"
     },
     {
-     "index": 148,
+     "index": 153,
      "key": "oldkey",
      "name": "Old key",
      "group": "museum",
@@ -5420,7 +5694,7 @@
      "tier": "special"
     },
     {
-     "index": 149,
+     "index": 154,
      "key": "footprint-fossil",
      "name": "Footprint fossil",
      "group": "museum",
@@ -5430,7 +5704,7 @@
      "tier": "special"
     },
     {
-     "index": 150,
+     "index": 155,
      "key": "hi",
      "name": "Welcome",
      "group": "lane",
@@ -5440,7 +5714,7 @@
      "tier": "special"
     },
     {
-     "index": 151,
+     "index": 156,
      "key": "door",
      "name": "Welcome back",
      "group": "lane",
@@ -5450,7 +5724,7 @@
      "tier": "special"
     },
     {
-     "index": 152,
+     "index": 157,
      "key": "steps",
      "name": "Back again",
      "group": "lane",
@@ -5460,7 +5734,7 @@
      "tier": "special"
     },
     {
-     "index": 153,
+     "index": 158,
      "key": "always-welcome",
      "name": "Always welcome",
      "group": "lane",
@@ -5470,7 +5744,7 @@
      "tier": "special"
     },
     {
-     "index": 154,
+     "index": 159,
      "key": "ok",
      "name": "Late still counts",
      "group": "lane",
@@ -5480,7 +5754,7 @@
      "tier": "special"
     },
     {
-     "index": 155,
+     "index": 160,
      "key": "feather",
      "name": "Short pages still count",
      "group": "lane",
@@ -5490,7 +5764,7 @@
      "tier": "special"
     },
     {
-     "index": 156,
+     "index": 161,
      "key": "candle",
      "name": "Light left on",
      "group": "lane",
@@ -5500,7 +5774,7 @@
      "tier": "special"
     },
     {
-     "index": 157,
+     "index": 162,
      "key": "back-to-it",
      "name": "Back to it",
      "group": "lane",
@@ -5510,7 +5784,7 @@
      "tier": "special"
     },
     {
-     "index": 158,
+     "index": 163,
      "key": "robin",
      "name": "January robin",
      "group": "lane",
@@ -5520,7 +5794,7 @@
      "tier": "special"
     },
     {
-     "index": 159,
+     "index": 164,
      "key": "feb",
      "name": "February snowdrop",
      "group": "lane",
@@ -5530,7 +5804,7 @@
      "tier": "special"
     },
     {
-     "index": 160,
+     "index": 165,
      "key": "mar",
      "name": "March daffodil",
      "group": "lane",
@@ -5540,7 +5814,7 @@
      "tier": "special"
     },
     {
-     "index": 161,
+     "index": 166,
      "key": "welliespuddle",
      "name": "April wellies",
      "group": "lane",
@@ -5550,7 +5824,7 @@
      "tier": "special"
     },
     {
-     "index": 162,
+     "index": 167,
      "key": "bloom",
      "name": "May blossom",
      "group": "lane",
@@ -5560,7 +5834,7 @@
      "tier": "special"
     },
     {
-     "index": 163,
+     "index": 168,
      "key": "jun",
      "name": "June strawberry",
      "group": "lane",
@@ -5570,7 +5844,7 @@
      "tier": "special"
     },
     {
-     "index": 164,
+     "index": 169,
      "key": "hay-cart",
      "name": "July hay cart",
      "group": "lane",
@@ -5580,7 +5854,7 @@
      "tier": "special"
     },
     {
-     "index": 165,
+     "index": 170,
      "key": "blackberries",
      "name": "August blackberries",
      "group": "lane",
@@ -5590,7 +5864,7 @@
      "tier": "special"
     },
     {
-     "index": 166,
+     "index": 171,
      "key": "conker",
      "name": "September conker",
      "group": "lane",
@@ -5600,7 +5874,7 @@
      "tier": "special"
     },
     {
-     "index": 167,
+     "index": 172,
      "key": "toadstool",
      "name": "October toadstool",
      "group": "lane",
@@ -5610,7 +5884,7 @@
      "tier": "special"
     },
     {
-     "index": 168,
+     "index": 173,
      "key": "nov",
      "name": "November leaf",
      "group": "lane",
@@ -5620,7 +5894,7 @@
      "tier": "special"
     },
     {
-     "index": 169,
+     "index": 174,
      "key": "holly",
      "name": "December holly",
      "group": "lane",
@@ -5639,7 +5913,7 @@
     16,
     16
    ],
-   "frames": 170,
+   "frames": 175,
    "tags": [
     {
      "name": "beds:Mind bed",
@@ -5692,79 +5966,84 @@
      "to": 69
     },
     {
-     "name": "barnyard:Animals",
+     "name": "meadow:Seasons kept",
      "from": 70,
-     "to": 77
+     "to": 74
+    },
+    {
+     "name": "barnyard:Animals",
+     "from": 75,
+     "to": 82
     },
     {
      "name": "barnyard:Barn things",
-     "from": 78,
-     "to": 81
+     "from": 83,
+     "to": 86
     },
     {
      "name": "orchard:Fruit trees",
-     "from": 82,
-     "to": 88
+     "from": 87,
+     "to": 93
     },
     {
      "name": "orchard:Under the trees",
-     "from": 89,
-     "to": 90
+     "from": 94,
+     "to": 95
     },
     {
      "name": "glasshouse:Glasshouse",
-     "from": 91,
-     "to": 102
+     "from": 96,
+     "to": 107
     },
     {
      "name": "pond:Lily pads",
-     "from": 103,
-     "to": 109
+     "from": 108,
+     "to": 114
     },
     {
      "name": "pond:Water's edge",
-     "from": 110,
-     "to": 116
+     "from": 115,
+     "to": 121
     },
     {
      "name": "aquarium:Stream fish",
-     "from": 117,
-     "to": 124
+     "from": 122,
+     "to": 129
     },
     {
      "name": "aquarium:Rare fish",
-     "from": 125,
-     "to": 126
+     "from": 130,
+     "to": 131
     },
     {
      "name": "farmhouse:Kitchen",
-     "from": 127,
-     "to": 132
-    },
-    {
-     "name": "farmhouse:Harvest table",
-     "from": 133,
+     "from": 132,
      "to": 137
     },
     {
-     "name": "museum:Pressed and bound",
+     "name": "farmhouse:Harvest table",
      "from": 138,
-     "to": 143
+     "to": 142
+    },
+    {
+     "name": "museum:Pressed and bound",
+     "from": 143,
+     "to": 148
     },
     {
      "name": "museum:Dug up",
-     "from": 144,
-     "to": 149
+     "from": 149,
+     "to": 154
     },
     {
      "name": "lane:Kind notes",
-     "from": 150,
-     "to": 157
+     "from": 155,
+     "to": 162
     },
     {
      "name": "lane:Hedgerow",
-     "from": 158,
-     "to": 169
+     "from": 163,
+     "to": 174
     }
    ],
    "display": "same as stickers",
@@ -5778,7 +6057,7 @@
     18,
     18
    ],
-   "frames": 170,
+   "frames": 175,
    "tags": [
     {
      "name": "beds:Mind bed",
@@ -5831,79 +6110,84 @@
      "to": 69
     },
     {
-     "name": "barnyard:Animals",
+     "name": "meadow:Seasons kept",
      "from": 70,
-     "to": 77
+     "to": 74
+    },
+    {
+     "name": "barnyard:Animals",
+     "from": 75,
+     "to": 82
     },
     {
      "name": "barnyard:Barn things",
-     "from": 78,
-     "to": 81
+     "from": 83,
+     "to": 86
     },
     {
      "name": "orchard:Fruit trees",
-     "from": 82,
-     "to": 88
+     "from": 87,
+     "to": 93
     },
     {
      "name": "orchard:Under the trees",
-     "from": 89,
-     "to": 90
+     "from": 94,
+     "to": 95
     },
     {
      "name": "glasshouse:Glasshouse",
-     "from": 91,
-     "to": 102
+     "from": 96,
+     "to": 107
     },
     {
      "name": "pond:Lily pads",
-     "from": 103,
-     "to": 109
+     "from": 108,
+     "to": 114
     },
     {
      "name": "pond:Water's edge",
-     "from": 110,
-     "to": 116
+     "from": 115,
+     "to": 121
     },
     {
      "name": "aquarium:Stream fish",
-     "from": 117,
-     "to": 124
+     "from": 122,
+     "to": 129
     },
     {
      "name": "aquarium:Rare fish",
-     "from": 125,
-     "to": 126
+     "from": 130,
+     "to": 131
     },
     {
      "name": "farmhouse:Kitchen",
-     "from": 127,
-     "to": 132
-    },
-    {
-     "name": "farmhouse:Harvest table",
-     "from": 133,
+     "from": 132,
      "to": 137
     },
     {
-     "name": "museum:Pressed and bound",
+     "name": "farmhouse:Harvest table",
      "from": 138,
-     "to": 143
+     "to": 142
+    },
+    {
+     "name": "museum:Pressed and bound",
+     "from": 143,
+     "to": 148
     },
     {
      "name": "museum:Dug up",
-     "from": 144,
-     "to": 149
+     "from": 149,
+     "to": 154
     },
     {
      "name": "lane:Kind notes",
-     "from": 150,
-     "to": 157
+     "from": 155,
+     "to": 162
     },
     {
      "name": "lane:Hedgerow",
-     "from": 158,
-     "to": 169
+     "from": 163,
+     "to": 174
     }
    ],
    "display": "same as stickers",
@@ -5914,8 +6198,8 @@
    "png": "farm-base.png",
    "json": "farm-base.json",
    "frame": [
-    336,
-    184
+    504,
+    276
    ],
    "frames": 2,
    "tags": [
@@ -5930,8 +6214,8 @@
      "to": 1
     }
    ],
-   "display": "2x on Mac (672x368); on phone pan to the highlighted zone at 2x",
-   "notes": "The whole farm with no characters, no placed animals and bare beds. Draw 'asleep', then for each awake zone copy the 'awake' pixels inside that zone's mask. Beds, characters and the museum door are separate layers (below).",
+   "display": "1x fits the Mac panel (504x276) or 2x (1008x552) where there's room; on phone pan to the highlighted zone at 2x",
+   "notes": "The whole farm (504x276) with no characters, no stickers and bare beds. Draw 'asleep', then for each awake zone copy the 'awake' pixels inside that zone's mask. Then layers: farm-beds, placed stickers (sticker-spots.json, sorted by z), the museum door, characters.",
    "fade_map_asleep": {
     "#3a412f": "#51553d",
     "#e9e3d6": "#e3ddcd",
@@ -5973,15 +6257,15 @@
      "#df7e6f"
     ]
    },
-   "highlight_rule": "When a book page is open: every pixel outside its zone mask(s) -> stone if in dark_colours else paper; then draw that zone's outline overlay."
+   "highlight_rule": "When a book page is open: every pixel outside its zone mask(s) -> stone if in dark_colours else paper (placed stickers and characters too); then draw that zone's outline overlay."
   },
   {
    "name": "farm-zone-masks",
    "png": "farm-zone-masks.png",
    "json": "farm-zone-masks.json",
    "frame": [
-    336,
-    184
+    504,
+    276
    ],
    "frames": 10,
    "tags": [
@@ -6037,7 +6321,7 @@
     }
    ],
    "display": "same as farm-base",
-   "notes": "One frame per zone: ink where the zone is. Use for waking, highlighting and tap targets.",
+   "notes": "One frame per zone: ink where the zone is (zones don't overlap). For waking, highlighting and tap targets.",
    "zones": [
     "orchard",
     "farmhouse",
@@ -6052,75 +6336,75 @@
    ],
    "bboxes": {
     "orchard": [
-     13,
-     17,
-     112,
-     70
+     12,
+     22,
+     167,
+     109
     ],
     "farmhouse": [
-     132,
-     7,
-     175,
-     55
+     173,
+     19,
+     279,
+     110
     ],
     "museum": [
-     174,
-     8,
-     209,
-     55
+     267,
+     20,
+     312,
+     83
     ],
     "barnyard": [
-     218,
-     16,
-     317,
-     69
+     309,
+     18,
+     487,
+     107
     ],
     "beds": [
-     11,
-     78,
-     129,
-     117
+     18,
+     106,
+     199,
+     198
     ],
     "glasshouse": [
-     134,
-     76,
-     185,
-     115
+     181,
+     110,
+     305,
+     204
     ],
     "pond": [
-     194,
-     94,
-     250,
-     130
+     261,
+     132,
+     424,
+     228
     ],
     "aquarium": [
-     253,
-     88,
-     300,
-     120
+     382,
+     134,
+     453,
+     182
     ],
     "meadow": [
-     134,
-     143,
-     265,
-     171
+     196,
+     185,
+     500,
+     260
     ],
     "lane": [
-     6,
-     126,
-     93,
-     177
+     1,
+     191,
+     215,
+     266
     ]
    },
-   "wake_rule": "v2: a zone wakes at about half its stickers placed (phase 1: earned, auto-waking)."
+   "wake_rule": "v2: a zone wakes at about half its stickers placed."
   },
   {
    "name": "farm-zone-outlines",
    "png": "farm-zone-outlines.png",
    "json": "farm-zone-outlines.json",
    "frame": [
-    336,
-    184
+    504,
+    276
    ],
    "frames": 10,
    "tags": [
@@ -6230,39 +6514,39 @@
     }
    ],
    "display": "same as farm-base",
-   "notes": "8 beds x 6 stages (0 bare .. 5 full; stages at 1/5/10/25/50 to-dos in that area). Draw at bed_positions[area]. The sprout (3) and prize-crop (100) stickers don't change the stage.",
+   "notes": "8 beds x 6 stages (0 bare .. 5 full; stages at 1/5/10/25/50 to-dos in that area). Draw at bed_positions[area], under placed stickers. The sprout (3) and prize-crop (100) stickers stand in front of their bed; the critter (50) visits the bed (sticker-spots.json).",
    "bed_positions": {
     "Mind": [
-     13,
-     76
+     27,
+     108
     ],
     "Writing": [
-     39,
-     74
+     69,
+     108
     ],
     "Art": [
-     65,
-     75
+     111,
+     108
     ],
     "Content": [
-     91,
-     76
+     153,
+     108
     ],
     "Body": [
-     17,
-     96
+     27,
+     148
     ],
     "Tech": [
-     43,
-     97
+     69,
+     148
     ],
     "Production": [
-     69,
-     96
+     111,
+     148
     ],
     "Admin": [
-     95,
-     95
+     153,
+     148
     ]
    },
    "order": [
@@ -6288,7 +6572,7 @@
    "png": "farm-museum-door.png",
    "json": "farm-museum-door.json",
    "frame": [
-    45,
+    41,
     47
    ],
    "frames": 1,
@@ -6300,11 +6584,89 @@
     }
    ],
    "display": "same as farm-base",
-   "notes": "Draw over the farm at (170, 4) until Duvet arrives (120 stickers).",
+   "notes": "Draw over the farm at (276, 26) until Duvet arrives (120 stickers).",
    "position": [
-    170,
-    4
+    276,
+    26
    ]
+  },
+  {
+   "name": "sticker-spots",
+   "json": "sticker-spots.json",
+   "frames": 175,
+   "notes": "Fixed farm / interior spot for every sticker, with z-order, layer and facing. No overlaps (checked); each farm spot lies inside its zone."
+  },
+  {
+   "name": "farm-preview",
+   "png": "farm-preview.png",
+   "json": "farm-preview.json",
+   "frame": [
+    504,
+    276
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "all-placed",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "half-placed",
+     "from": 1,
+     "to": 1
+    }
+   ],
+   "display": "reference only",
+   "notes": "Check renders: every sticker placed at its spot with everyone home; and the first half of every set placed (before Duvet, museum closed)."
+  },
+  {
+   "name": "interior-museum",
+   "png": "interior-museum.png",
+   "json": "interior-museum.json",
+   "frame": [
+    200,
+    96
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "ghosts",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "all-placed",
+     "from": 1,
+     "to": 1
+    }
+   ],
+   "display": "2x or 3x beneath the book on the Museum pages",
+   "notes": "Museum interior (phase 3 per v2, drawn now). Frame 0: every spot as a ghost outline; frame 1: reference with every find and Duvet in his spectacles. Spots in sticker-spots.json (scene museum-interior). Curator Duvet stands at (86, 62)."
+  },
+  {
+   "name": "interior-aquarium",
+   "png": "interior-aquarium.png",
+   "json": "interior-aquarium.json",
+   "frame": [
+    200,
+    96
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "ghosts",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "all-placed",
+     "from": 1,
+     "to": 1
+    }
+   ],
+   "display": "2x or 3x beneath the book on the Aquarium pages",
+   "notes": "Aquarium interior. Frame 0: ghosts; frame 1: every fish (rare fish in the round tank) and Bap on his pad at (68, 60). Spots in sticker-spots.json."
   },
   {
    "name": "ui-book-icon",
@@ -6504,52 +6866,107 @@
    ],
    "display": "same scale as the book",
    "notes": "The 'ready to place' corner: loop these two frames over a filled slot until she places the sticker on the farm herself (fixed spots)."
+  },
+  {
+   "name": "esmes-farm-icon",
+   "svg": "esmes-farm-icon.svg",
+   "png_pixel_option": "esmes-farm-icon-pixel.png",
+   "display": {
+    "sidebar": "svg at 20px on a 28px tile",
+    "phone_grid": "svg at 40px on a 62px tile",
+    "pixel_option": "24x24 png at 1x / 2x (48) with image-rendering: pixelated"
+   },
+   "tile_colour": {
+    "proposed": "#e2cd5b",
+    "status": "needs Esme's OK (new role for roomyellow); coral #df7e6f was tried and fights the red barn"
+   },
+   "notes": "Sidebar style: 32 viewBox, ink #3a412f strokes 2.4, round caps/joins. Gambrel barn, cross-braced door, hay-loft window, sprout. Preview: mock-rows/farm-icon.html."
   }
  ],
  "farm_character_spots": {
   "domino": {
-   "zone": "beds",
    "frame_topleft": [
-    112,
-    66
+    182,
+    90
    ],
-   "note": "32x32 frame; body box at (116,72)"
+   "body_box": [
+    186,
+    96,
+    24,
+    24
+   ],
+   "z": 120,
+   "zone": "beds"
   },
   "bap": {
-   "zone": "pond",
    "frame_topleft": [
-    206,
-    94
+    314,
+    146
    ],
-   "note": "Bap frames include his lily pad"
+   "body_box": [
+    318,
+    150,
+    24,
+    24
+   ],
+   "z": 174,
+   "zone": "pond"
   },
   "puddle": {
-   "zone": "lane (farm stand)",
    "frame_topleft": [
-    70,
-    124
-   ]
+    96,
+    186
+   ],
+   "body_box": [
+    100,
+    192,
+    24,
+    24
+   ],
+   "z": 216,
+   "zone": "lane (farm stand)"
   },
   "clover": {
-   "zone": "glasshouse",
    "frame_topleft": [
-    174,
-    86
-   ]
+    296,
+    124
+   ],
+   "body_box": [
+    300,
+    130,
+    24,
+    24
+   ],
+   "z": 154,
+   "zone": "glasshouse"
   },
   "crumpet": {
-   "zone": "barnyard",
    "frame_topleft": [
-    286,
-    30
-   ]
+    436,
+    64
+   ],
+   "body_box": [
+    440,
+    70,
+    24,
+    24
+   ],
+   "z": 94,
+   "zone": "barnyard"
   },
   "duvet": {
-   "zone": "museum (door)",
    "frame_topleft": [
-    192,
-    38
-   ]
+    290,
+    56
+   ],
+   "body_box": [
+    294,
+    62,
+    24,
+    24
+   ],
+   "z": 86,
+   "zone": "museum"
   }
  },
  "arrivals": [
@@ -6606,8 +7023,8 @@
    232,
    152
   ],
-  "pages": 14,
-  "stickers": 170,
+  "pages": 16,
+  "stickers": 175,
   "groups": [
    "beds",
    "meadow",
@@ -6621,5 +7038,18 @@
    "lane"
   ]
  },
- "decisions": "tmp/decisions-record.md (Game section, 2026-11-04)"
+ "decisions": "tmp/decisions-record.md (Game section, 2026-11-04)",
+ "accessory_thresholds": {
+  "A12": {
+   "name": "Little satchel",
+   "at_stickers": 130,
+   "all_characters": true
+  },
+  "A13": {
+   "name": "Golden crown",
+   "at_stickers": 170,
+   "all_characters": true,
+   "note": "Replaces any hat while worn (same head anchor). 170 = v2 threshold; the collection is now 175, so it could move to 175 if Esme wants it to mean everything."
+  }
+ }
 }
