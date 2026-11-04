@@ -60,6 +60,15 @@ describe("journal.css", () => {
     expect(streak).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
+  it("workbook bars and chapter map: the approved mockup's values (2A + 2C)", () => {
+    expect(code).toMatch(/\.wb-bars \{[^}]*flex-direction: column;[^}]*gap: 12px/);
+    expect(code).toMatch(/button\.wb-bar \{[^}]*gap: 6px;[^}]*padding: 0;[^}]*background: none/);
+    expect(code).toMatch(/\.wb-ch \{[^}]*background: var\(--row\);[^}]*border-radius: var\(--radius-tile\);[^}]*padding: 10px 12px/);
+    expect(code).toMatch(/button\.wb-dot \{[^}]*width: 9px;[^}]*height: 9px;[^}]*border-radius: 50%;[^}]*background: var\(--track\)/);
+    expect(code).toMatch(/button\.wb-dot\.on \{[^}]*background: var\(--bar-fill\)/);
+    expect(code).toMatch(/button\.wb-dot\.now \{[^}]*outline: 2px solid var\(--journal-violet\);[^}]*outline-offset: 1px/);
+  });
+
   it("exercise cards: the Day chip is the Journal violet; the star is drawn in --text on no background", () => {
     expect(code).toMatch(/\.chip\.exercise-day \{[^}]*background: var\(--journal-violet\)/);
     expect(code).toMatch(/button\.exercise-star\[aria-pressed\] \{[^}]*background: none;[^}]*color: var\(--text\)/);

@@ -14,6 +14,8 @@ import { exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows"
 import { Streak } from "../Streak";
 import { LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { CardExample, ExerciseResponseBox } from "./ExerciseResponseBox";
+import { ChapterMap, WorkbookBars } from "./WorkbookProgress";
+import { workbooks } from "../../journal/workbooks";
 import { ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
 
@@ -66,6 +68,8 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const [saved, setSaved] = useState<ExerciseCard | null>(null);
   // Opens a card's review under All cards (the "See what you wrote" link).
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
+  // The chapter map pop-up, open on this book (null: closed).
+  const [mapOf, setMapOf] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const scrollUp = useRef(false);
@@ -207,6 +211,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       {NEXT_ONE}
     </button>
   );
+  const books = useMemo(() => (set && plan ? workbooks(set, plan) : []), [set, plan]);
   const restarts = asking && progress ? replacingRestarts(progress.marks, asking) : false;
   const titles = useMemo(() => new Map((set?.tracks ?? []).filter((t) => t.title).map((t) => [t.id, t.title])), [set]);
 
@@ -235,6 +240,18 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       {progress && progress.unreadable > 0 && set && <p className="journal-muted">{CANT_OPEN}</p>}
       {plan && (
         <>
+          <WorkbookBars books={books} onOpen={setMapOf} />
+          {mapOf && (
+            <ChapterMap
+              books={books}
+              start={mapOf}
+              onClose={() => setMapOf(null)}
+              onPick={(id) => {
+                setMapOf(null);
+                setReveal((r) => ({ id, n: (r?.n ?? 0) + 1 }));
+              }}
+            />
+          )}
           <ImportPill label="Update cards" fileLabel="Exercise card file (update)" busy={busy} onFile={(f) => void chosen(f)} />
           <div ref={stage} className="exercise-stage">
             {savedCard && (
