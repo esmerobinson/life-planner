@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, readCheckinDay, readPromptSettings, saveAnswer,
+  CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, moveAnswerOn, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
 } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
@@ -121,8 +121,8 @@ export function QuestionText({ id }: { id: string }) {
  * One question. The answer box shows the newest answer from any device and saves this
  * device's own row (not yet "moved past") after a pause in typing, on blur, when it goes away
  * and when the app is hidden. Next and Skip save it as moved past; Skip keeps anything typed.
- * Next / Skip on a box left untouched never copies or blanks another device's answer: it
- * writes nothing when the question is already moved past anywhere, else only "moved past".
+ * Next / Skip on a box left untouched never copies another device's answer and never blanks
+ * this device's own: it writes nothing when already moved past anywhere, else only "moved past".
  */
 function Question({
   jk, day, step, deviceId, onProblem,
@@ -181,7 +181,10 @@ function Question({
       if (untouched && doneThere.current) {
         moved.current = true; // already moved past on another device: nothing to write
       } else {
-        await enqueue(() => saveAnswer(jk, day.date, prompt, deviceId, untouched ? null : value, true));
+        // Nothing new typed: keep what this device already saved (never blank it).
+        await enqueue(() =>
+          untouched ? moveAnswerOn(jk, day.date, prompt, deviceId) : saveAnswer(jk, day.date, prompt, deviceId, value, true),
+        );
         moved.current = true; // the next question shows once the save is read back
       }
       onProblem("");

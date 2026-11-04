@@ -339,6 +339,22 @@ export async function saveAnswer(
   await write(jk, [await seal(jk, "answer", date, `${await promptKey(jk, prompt)}:${deviceId}`, entry)]);
 }
 
+/**
+ * Next / Skip on a box with nothing new typed: marks this device's row moved past and keeps
+ * whatever answer that row already holds (typed here earlier). Never copies another
+ * device's answer, and never blanks this device's own one.
+ */
+export async function moveAnswerOn(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<void> {
+  const own = await db.journal.get(journalId("answer", date, `${await promptKey(jk, prompt)}:${deviceId}`));
+  let answer: string | null = null;
+  if (own) {
+    const o = await openRow(jk, own, "answer");
+    if (o.state !== "ok") throw new Error("That answer could not be read, so it was left as it is.");
+    answer = o.entry.answer;
+  }
+  await saveAnswer(jk, date, prompt, deviceId, answer, true);
+}
+
 /** Every day with a check-in, newest first. */
 export async function listCheckinDays(jk: JournalKey): Promise<CheckinDay[]> {
   const rows = await db.journal.where("kind").anyOf("set", "answer", "checkin").toArray();
