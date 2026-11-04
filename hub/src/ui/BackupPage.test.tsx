@@ -115,7 +115,7 @@ describe("Import from a file (moved here from the Inbox)", () => {
 });
 
 describe("shell", () => {
-  it("Backup link is always visible in the shell and the sidebar still has exactly thirteen items", () => {
+  it("Backup link is always visible in the shell and the sidebar still has exactly fourteen items", () => {
     vi.stubGlobal("navigator", {});
     render(
       <MemoryRouter initialEntries={["/x"]}>
@@ -123,7 +123,7 @@ describe("shell", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("link", { name: "Backup" })).toHaveAttribute("href", "/backup");
-    expect(within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link")).toHaveLength(13);
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link")).toHaveLength(14);
   });
 });
 

@@ -20,6 +20,8 @@ import { PanelProvider } from "./panelContext";
 import { SidePanel } from "./SidePanel";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
+import { FarmProvider } from "../farm/FarmContext";
+import { Nook } from "../farm/Nook";
 
 /** How often the shell re-reads the clock (a technical check, not a motion timing). */
 const CLOCK_CHECK_MS = 60_000;
@@ -115,6 +117,7 @@ export function AppShell() {
       <AddDefaultsContext.Provider value={setAddDefaults}>
       <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
+      <FarmProvider items={items} goals={goals} today={today}>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
@@ -162,8 +165,10 @@ export function AppShell() {
               />
             )}
           </AddButton>
+          {phone && <Nook phone />}
         </main>
       </div>
+      </FarmProvider>
       </PanelProvider>
       </ShellUndoContext.Provider>
       </AddDefaultsContext.Provider>

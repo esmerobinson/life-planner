@@ -8,13 +8,13 @@ describe("areas", () => {
     ]);
   });
 
-  it("NAV has thirteen entries in order with exact labels and paths", () => {
+  it("NAV has fourteen entries in order with exact labels and paths", () => {
     expect(NAV.map((n) => [n.label, n.path])).toEqual([
       ["Home", "/"], ["Today", "/today"], ["Goals", "/goals"], ["Admin", "/area/admin"],
       ["Mind", "/area/mind"], ["Writing", "/area/writing"], ["Art", "/area/art"],
       ["Content", "/area/content"], ["Body", "/area/body"],
       ["Tech projects", "/area/tech"], ["Production", "/area/production"],
-      ["Journal", "/journal"], ["Vision board", "/vision"],
+      ["Journal", "/journal"], ["Vision board", "/vision"], ["Esme's Farm", "/farm"],
     ]);
   });
 

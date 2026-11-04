@@ -67,7 +67,7 @@ afterEach(() => {
 describe("phone layout (below 700px)", () => {
   beforeEach(() => setPhone(true));
 
-  it("Home: Esmeworld title, Inbox pill, the 12 apps in sidebar order, Today, then the footer links; no sidebar", async () => {
+  it("Home: Esmeworld title, Inbox pill, the 13 apps in sidebar order, Today, then the footer links; no sidebar", async () => {
     await createItem({ kind: "task", title: "Phone pick", areaId: "body", priority: 3, due: todayISO() }, todayISO());
     renderAt(["/"]);
     expect(await screen.findByText("Phone pick")).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe("phone layout (below 700px)", () => {
     const apps = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link");
     expect(apps.map((a) => a.textContent)).toEqual([
       "Today", "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
-      "Tech projects", "Production", "Journal", "Vision board",
+      "Tech projects", "Production", "Journal", "Vision board", "Esme's Farm",
     ]);
     expect(apps[5]).toHaveAttribute("href", "/area/art");
     expect(screen.getByRole("heading", { level: 2, name: "Today" })).toBeInTheDocument();

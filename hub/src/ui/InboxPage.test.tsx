@@ -254,12 +254,12 @@ describe("AppShell additions", () => {
     expect(screen.queryByRole("link", { name: /Inbox \(/ })).toBeNull();
   });
 
-  it("Sidebar still shows exactly thirteen items (no Inbox) with the shell rendered", async () => {
+  it("Sidebar still shows exactly fourteen items (no Inbox) with the shell rendered", async () => {
     await createItem({ kind: "task", title: "Loose end", areaId: "inbox", priority: 2 }, TODAY);
     renderShell();
     await screen.findByRole("link", { name: "Inbox (1)" });
     const nav = within(document.querySelector(".sidebar") as HTMLElement).getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(13);
+    expect(within(nav).getAllByRole("link")).toHaveLength(14);
     expect(within(nav).queryByText(/Inbox/)).toBeNull();
   });
 });

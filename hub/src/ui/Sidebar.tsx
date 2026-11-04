@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { NAV } from "./areas";
 import { useSyncState } from "../sync";
+import { Nook } from "../farm/Nook";
 
 const GROUPS: { group: 1 | 2 | 3; name: string }[] = [
   { group: 1, name: "Overview" },
@@ -44,6 +45,7 @@ export function Sidebar() {
       <div className="sidebar-footer">
         <FooterLinks />
       </div>
+      <Nook />
     </aside>
   );
 }

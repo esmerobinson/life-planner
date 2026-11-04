@@ -15,6 +15,7 @@ import { TodayPanel } from "./ui/TodayPanel";
 import { JournalCard } from "./ui/JournalCard";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
+import { FarmPage, PopInDemo } from "./farm/FarmPage";
 
 function TodayRoute() {
   // Today's Add opens as a to-do. It never pinned to today, so it still does not.
@@ -89,7 +90,7 @@ export function AppRoutes() {
               <Route key={n.id} path={n.path} element={<VisionPage />} />
             ) : n.id === "journal" ? (
               <Route key={n.id} path={n.path} element={<JournalRoute />} />
-            ) : n.id === "goals" || n.path.startsWith("/area/") ? null : (
+            ) : n.id === "goals" || n.id === "farm" || n.path.startsWith("/area/") ? null : (
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
             ),
           )}
@@ -102,6 +103,8 @@ export function AppRoutes() {
           <Route path="/bin" element={<BinRoute />} />
           <Route path="/backup" element={<BackupRoute />} />
           <Route path="/sync" element={<SyncPage />} />
+          <Route path="/farm" element={<FarmPage />} />
+          <Route path="/farm/popin-demo" element={<PopInDemo />} />
         </Route>
       </Routes>
   );

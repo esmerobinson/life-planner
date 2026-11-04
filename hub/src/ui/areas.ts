@@ -12,6 +12,7 @@ import vision from "../assets/icons/vision-board.svg";
 import tech from "../assets/icons/tech.svg";
 import production from "../assets/icons/production.svg";
 import admin from "../assets/icons/admin.svg";
+import farmIcon from "../assets/farm/farm-nav-icon.png";
 
 export type NavEntry = {
   id: string;
@@ -36,6 +37,8 @@ export const NAV: NavEntry[] = [
   { id: "production", label: "Production", path: "/area/production", icon: production, tile: "#d59770", group: 2 },
   { id: "journal", label: "Journal", path: "/journal", icon: journal, tile: "#9285c5", group: 3 },
   { id: "vision", label: "Vision board", path: "/vision", icon: vision, tile: "#ecca7d", group: 3 },
+  // Esme's Farm: the one entry point for the game. The tile colour is undecided (magenta placeholder).
+  { id: "farm", label: "Esme's Farm", path: "/farm", icon: farmIcon, tile: "#ff00ff", group: 3 },
 ];
 
 /** Area choices for forms: every area in AREA_IDS order (the inbox first), labels from NAV. */

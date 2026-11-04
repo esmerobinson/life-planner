@@ -1,0 +1,205 @@
+/* Esme's Farm. Pixel art is shown only at whole-number scales (set inline from the art's own
+   size), never smoothed. Colours are app tokens only. Not decided by Esme (from the sprite
+   designer's mocks, or placeholders): the cream nook's 14px radius and padding (mock
+   "creamnook2"), the farm page's spacing, the slot card, the phone nook's spot (bottom left),
+   and the magenta sidebar tile (no tile colour chosen for the farm yet). */
+
+.farm-px {
+  image-rendering: pixelated;
+  display: block;
+}
+
+/* ---- the nook ---- */
+.farm-nook {
+  margin-top: var(--space-3);
+}
+.farm-nook-link {
+  display: flex;
+  justify-content: center;
+  background: var(--panel);
+  border-radius: 14px; /* sprite designer's mock (creamnook2); not Esme's */
+  padding: 2px 0 0;
+}
+.farm-nook.is-phone {
+  position: fixed;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 20;
+  margin: 0;
+}
+.farm-nook.is-phone .farm-nook-link {
+  padding: 2px 4px 0;
+}
+
+/* The sidebar entry: the little book icon at 2x (its tile is the magenta placeholder, ui/areas.ts). */
+.sidebar-item[href="/farm"] img,
+.phone-app[href="/farm"] img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+/* ---- the page ---- */
+.farm-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-stack);
+}
+.farm-page > h1 {
+  align-self: stretch;
+}
+
+.farm-book {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+.farm-book-window {
+  position: relative;
+}
+.farm-book-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.farm-book-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.farm-book-layer canvas {
+  cursor: pointer;
+}
+.farm-slot {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.farm-slot:focus-visible,
+.farm-zone-hit:focus-visible,
+.farm-char-hit:focus-visible {
+  outline: 2px solid var(--placeholder);
+}
+.farm-book-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-buttons);
+}
+.farm-book-where {
+  min-width: 12em;
+  text-align: center;
+  font-weight: 600;
+}
+
+.farm-pop {
+  position: absolute;
+  z-index: 5;
+  width: 220px;
+  background: var(--panel);
+  border-radius: var(--radius-tile);
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
+  box-shadow: 0 0 0 1px var(--track);
+}
+.farm-pop p {
+  margin: 0 0 var(--space-2);
+}
+.farm-pop-title {
+  font-weight: 600;
+}
+.farm-pop-close {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+.farm-pop-hint,
+.farm-muted {
+  font-size: 14px;
+}
+
+.farm-scene {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.farm-scene-layer {
+  position: relative;
+}
+.farm-zone-hit,
+.farm-char-hit {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.farm-cast,
+.farm-wardrobe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-buttons);
+  justify-content: center;
+}
+.farm-wardrobe {
+  justify-content: flex-start;
+}
+.farm-cast button[aria-pressed="true"],
+.farm-wardrobe button[aria-pressed="true"] {
+  background: var(--track);
+}
+
+.farm-character {
+  position: relative;
+  width: min(560px, 100%);
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: var(--pad-card);
+}
+.farm-character-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.farm-character h2 {
+  margin: 0;
+}
+.farm-character h3 {
+  margin: var(--space-4) 0 var(--space-2);
+}
+.farm-character-top p {
+  margin: var(--space-1) 0 0;
+}
+
+.farm-arrival {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: var(--space-2) var(--space-4);
+}
+.farm-arrival-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-weight: 600;
+}
+
+.farm-popin {
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: var(--space-2);
+}
