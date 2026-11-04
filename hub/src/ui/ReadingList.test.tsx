@@ -172,6 +172,18 @@ describe("A book's side panel", () => {
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
   });
 
+  it("a link that isn't a web address says so and stays in Edit (nothing saved)", async () => {
+    const { want } = await pretendBooks();
+    renderApp(`/area/mind?open=${want.id}`, TODAY);
+    const panel = within(await screen.findByRole("complementary", { name: "Pretend Quiet Hours" }));
+    await userEvent.click(panel.getByRole("button", { name: "Edit" }));
+    await userEvent.type(panel.getByLabelText("Link"), "not a link");
+    await userEvent.click(panel.getByRole("button", { name: "Done" }));
+    expect(await panel.findByText("A link starts with https:// (or http://).")).toBeInTheDocument();
+    expect(panel.getByLabelText("Link")).toBeInTheDocument();
+    expect((await db.items.get(want.id))!.link).toBeUndefined();
+  });
+
   it("Edit → Type → Book on an idea in Art moves it to Mind, with Undo", async () => {
     const idea = await createItem({ kind: "idea", title: "Pretend comic to read", areaId: "art", priority: 2 }, "2026-10-01");
     renderApp(`/area/art?open=${idea.id}`, TODAY);

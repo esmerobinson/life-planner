@@ -130,6 +130,7 @@ export function ItemPanel({
     escape.current = editing
       ? () => {
           setEditing(false);
+          setFieldError(null);
           return true;
         }
       : null;
@@ -142,6 +143,7 @@ export function ItemPanel({
     const now = fieldsOf(item);
     setFields(now);
     setSnapshot(now);
+    setFieldError(null);
     setEditing(true);
   }
 
