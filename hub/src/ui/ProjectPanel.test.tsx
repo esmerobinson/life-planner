@@ -158,6 +158,24 @@ describe("a project's side panel", () => {
     await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions!.map((s) => s.id)).toEqual(["a", "b", "d"]));
   });
 
+  it("a session planned for a past day that is not done says Planned, in the plain muted style (no late colour); today and later still say On", async () => {
+    const { panel } = await openProject([
+      { id: "a", plannedFor: "2026-10-30" },
+      { id: "b", plannedFor: TODAY },
+      { id: "c", plannedFor: "2026-11-05" },
+      { id: "d", plannedFor: "2026-10-29", doneOn: "2026-10-31" },
+    ]);
+    const rows = sessionRows(panel);
+    const past = within(rows[0]).getByText("Planned Fri 30 Oct");
+    expect(past).toHaveClass("strip-meta");
+    expect(past.querySelector(".strip-late")).toBeNull();
+    expect(past).not.toHaveClass("strip-late");
+    expect(within(rows[0]).queryByText(/^On /)).toBeNull();
+    expect(within(rows[1]).getByText("On Mon 2 Nov")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("On Thu 5 Nov")).toBeInTheDocument();
+    expect(within(rows[3]).getByText("Done Sat 31 Oct")).toBeInTheDocument();
+  });
+
   it("Remove session offers Undo, which brings the session back with its title, details and day", async () => {
     const { p, panel } = await openProject(FOUR);
     const before = (await db.items.get(p.id))!;

@@ -98,7 +98,10 @@ function SessionRow({
   const title = useDraft(s.title ?? "", (t) => save({ title: t }));
   const meta = done
     ? s.doneOn === today ? "Done today" : `Done ${dayLabel(s.doneOn!, today)}`
-    : s.plannedFor !== undefined ? `On ${dayLabel(s.plannedFor, today)}` : null;
+    : s.plannedFor === undefined ? null
+    // A past planned day reads like a missed due date, but plain: no late colour, no guilt.
+    : s.plannedFor < today ? `Planned ${dayLabel(s.plannedFor, today)}`
+    : `On ${dayLabel(s.plannedFor, today)}`;
   return (
     <li className={done ? "strip session-row crossed" : "strip session-row"}>
       <input
