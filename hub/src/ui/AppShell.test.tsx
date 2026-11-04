@@ -141,7 +141,10 @@ describe("the round Add button (1C)", () => {
     renderShell(<p>page</p>);
     const add = screen.getByRole("button", { name: "Add" });
     expect(add).toHaveClass("add-fab");
-    expect(add).toHaveTextContent("+");
+    // The plus is a drawn, centred icon (a "+" character sat off-centre).
+    const icon = add.querySelector("svg.add-fab-icon");
+    expect(icon).not.toBeNull();
+    expect(icon!.querySelector("g")).not.toHaveAttribute("transform");
     expect(add.closest(".shell-actions")).toBeNull();
     await userEvent.click(add);
     const card = screen.getByRole("dialog", { name: "Add" });

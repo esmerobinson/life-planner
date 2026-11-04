@@ -97,7 +97,12 @@ export function AddButton({
         aria-expanded={open}
         onClick={() => onToggle(!open)}
       >
-        <span aria-hidden="true">{open && !phone ? "×" : "+"}</span>
+        {/* Drawn, not a font glyph: a "+" or "×" character sits off-centre in most fonts. */}
+        <svg className="add-fab-icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+          <g transform={open && !phone ? "rotate(45 10 10)" : undefined}>
+            <path d="M10 3v14M3 10h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+          </g>
+        </svg>
       </button>
       )}
     </>
