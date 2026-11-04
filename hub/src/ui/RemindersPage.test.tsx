@@ -12,7 +12,8 @@ import { Sidebar } from "./Sidebar";
 type W = { webkit?: unknown };
 
 /** A pretend Mac bridge answering like main.swift's. */
-function fakeMac(status: "authorized" | "denied" | "not-determined", afterAsk: "authorized" | "denied" = "authorized") {
+type Answer = "authorized" | "denied" | "not-determined";
+function fakeMac(status: Answer, afterAsk: Answer = "authorized") {
   let current: string = status;
   const postMessage = vi.fn(async (m: { action: string }) => {
     if (m.action === "requestPermission") current = afterAsk;
@@ -101,6 +102,12 @@ describe("Reminders page (4A, a simple list)", () => {
     expect(await screen.findByText(/the Mac asks once/)).toBeInTheDocument();
     // Allowed: the schedule goes to the Mac straight away.
     await waitFor(() => expect(actions(mac)).toContain("schedule"));
+  });
+
+  it("says so when the Mac didn't ask (still no answer after asking)", async () => {
+    fakeMac("not-determined", "not-determined");
+    renderPage();
+    expect(await screen.findByText(/The Mac didn't ask whether Esmeworld may send notifications/)).toBeInTheDocument();
   });
 
   it("never asks again once the Mac has an answer, and says how to turn them back on", async () => {

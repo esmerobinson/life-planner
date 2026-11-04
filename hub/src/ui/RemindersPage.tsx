@@ -183,6 +183,11 @@ export function RemindersPage() {
         <p className="rem-note" role="status">
           Notifications are turned off for Esmeworld. Turn them on in System Settings, Notifications, Esmeworld.
         </p>
+      ) : place === "mac" && permission === "not-determined" && asked.current ? (
+        // Asked, yet no answer: the Mac didn't put up its question (e.g. it won't for this build).
+        <p className="rem-note" role="status">
+          The Mac didn't ask whether Esmeworld may send notifications, so reminders can't pop up yet.
+        </p>
       ) : place === "mac" ? (
         <p className="rem-foot">The first time you turn one on, the Mac asks once whether Esmeworld may send notifications.</p>
       ) : null}
