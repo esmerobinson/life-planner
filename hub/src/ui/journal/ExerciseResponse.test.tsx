@@ -55,7 +55,7 @@ it("a writing box under the card (after Try this and the book line, as in the mo
   expect(submit).toBeDisabled(); // nothing written yet
 });
 
-it("Submit seals the response and marks today's card done; reloaded it shows 'Saved' with the text, editable, and Submit again updates the row", async () => {
+it("Submit seals the response and marks today's card done; reloaded, the next card shows in its place (the answer only in See what you wrote)", async () => {
   const first = renderApp("/journal", TODAY);
   const card = await todayCard();
   await userEvent.type(await box(), "Pretend cloud, floating");
@@ -67,18 +67,10 @@ it("Submit seals the response and marks today's card done; reloaded it shows 'Sa
   expect(JSON.stringify(await db.journal.toArray())).not.toContain("floating");
   first.unmount();
   renderApp("/journal", TODAY);
-  const again = await todayCard();
-  // The text stays, editable.
-  const b = await box();
-  await waitFor(() => expect(b).toHaveValue("Pretend cloud, floating"));
-  expect(await within(again).findByText("Saved")).toBeInTheDocument();
-  expect(within(again).queryByRole("button", { name: "Submit" })).toBeNull();
-  await userEvent.type(b, " away");
-  expect(within(again).queryByText("Saved")).toBeNull();
-  await userEvent.click(within(again).getByRole("button", { name: "Submit" }));
-  await waitFor(async () =>
-    expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating away", saved: true }),
-  );
+  const s = await section();
+  await within(s).findByRole("article", { name: "Next card: Day 2" });
+  expect(within(s).getAllByRole("article")).toHaveLength(1);
+  expect(within(s).queryByDisplayValue("Pretend cloud, floating")).toBeNull();
   expect(await db.journal.where("kind").equals("exercise-entry").count()).toBe(1);
 });
 

@@ -108,7 +108,8 @@ describe("a checklist card", () => {
     await userEvent.click(within(rowOf(card, "Pretend feature four")).getByRole("button", { name: "Yes" }));
     expect(submit).toBeEnabled();
     await userEvent.click(submit);
-    expect(await within(card).findByText("Saved", {}, { timeout: 5000 })).toBeInTheDocument();
+    // The card gives way to the next one once saved (never shown finished).
+    await within(await section()).findByRole("article", { name: /Next card/ }, { timeout: 5000 });
     expect(await answerOf(NOTES)).toEqual([
       ["Pretend feature one", "Yes", ""], ["Pretend feature two", "Partly", ""], ["Pretend feature three", "No", ""],
       ["Pretend feature four", "Yes", "Pretend only a note"],

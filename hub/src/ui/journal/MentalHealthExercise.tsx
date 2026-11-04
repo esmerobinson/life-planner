@@ -17,8 +17,6 @@ import { CardExample, ExerciseResponseBox } from "./ExerciseResponseBox";
 import { ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
 
-/** Under today's card once it is done. */
-export const DONE_LINE = "Done for today · next card tomorrow";
 export const REPLACE_QUESTION = "Replace your exercise cards?";
 /** Said with the question only when progress would be lost (a done card's id isn't in the new file). */
 export const RESTARTS_LINE = "Replacing your cards restarts your exercise progress.";
@@ -66,8 +64,6 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   // Just submitted: waiting for the saved state to be read back, then the line above the next card.
   const [waiting, setWaiting] = useState<string | null>(null);
   const [saved, setSaved] = useState<ExerciseCard | null>(null);
-  // Every card done today and none left to show.
-  const [finished, setFinished] = useState(false);
   // Opens a card's review under All cards (the "See what you wrote" link).
   const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,7 +97,6 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
     setTrail([]);
     setWaiting(null);
     setSaved(null);
-    setFinished(false);
   }, [today]);
   // Never blank: "Loading…", then the can't-open line and Try again.
   const guard = useLoadGuard(cards === null, load);
@@ -154,13 +149,27 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const starred = progress?.starred ?? new Set<string>();
   const row = useMemo(() => rowStatus(exerciseDoneDays(progress?.marks ?? []), today), [progress, today]);
   const byId = new Map((set?.cards ?? []).map((c) => [c.id, c]));
-  const shown = plan ? ((shownId && byId.get(shownId)) || plan.today.card) : null;
+  // Never a finished card (2026-11-04: "I'm still seeing day 1 and have to scroll down to day
+  // 2"): the card chosen, else today's, else the next not done today. None left: all done.
+  const shown = plan
+    ? ([shownId ? byId.get(shownId) : undefined, plan.today.card, ...plan.queue].find((c) => c && !plan.doneToday.has(c.id)) ?? null)
+    : null;
+  const finished = !!plan && !shown;
   const isToday = !!plan && shown?.id === plan.today.card.id;
+  // Opened (or reloaded) after today's card was submitted: the line names the last card done today.
+  const savedCard =
+    saved ??
+    (plan && shownId === null && plan.today.done
+      ? (byId.get(
+          responses
+            .filter((e) => e.date === today && e.submitted && plan.doneToday.has(e.id))
+            .reduce<ExerciseResponse | null>((a, e) => (!a || e.at > a.at ? e : a), null)?.id ?? "",
+        ) ?? plan.today.card)
+      : null);
   // Not done today, not on the page, not left behind unsubmitted.
   const upcoming = plan?.queue.filter((c) => c.id !== shown?.id && !plan.doneToday.has(c.id)) ?? [];
   const next = upcoming.find((c) => !trail.includes(c.id)) ?? null;
   const back = trail.length > 0 ? byId.get(trail[trail.length - 1]!) ?? null : null;
-  const done = plan?.today.done ?? false;
 
   // Once a submit is read back as done, the card gives way to the next one not done (or a gentle line).
   useEffect(() => {
@@ -169,7 +178,6 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
     setWaiting(null);
     setSaved(byId.get(waiting) ?? null);
     setShownId(after?.id ?? null);
-    setFinished(!after);
     setTrail((t) => t.filter((id) => !plan.doneToday.has(id)));
     scrollUp.current = true;
   });
@@ -229,15 +237,15 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
         <>
           <ImportPill label="Update cards" fileLabel="Exercise card file (update)" busy={busy} onFile={(f) => void chosen(f)} />
           <div ref={stage} className="exercise-stage">
-            {saved && (
+            {savedCard && (
               <p className="journal-muted exercise-saved" role="status">
-                {finished ? ALL_DONE_LINE : savedLine(saved)}{" "}
-                <button type="button" className="quiet-link" onClick={() => setReveal((r) => ({ id: saved.id, n: (r?.n ?? 0) + 1 }))}>
+                {finished ? ALL_DONE_LINE : savedLine(savedCard)}{" "}
+                <button type="button" className="quiet-link" onClick={() => setReveal((r) => ({ id: savedCard.id, n: (r?.n ?? 0) + 1 }))}>
                   {SEE_WHAT_YOU_WROTE}
                 </button>
               </p>
             )}
-            {finished && !saved && <p className="journal-muted exercise-saved">{ALL_DONE_LINE}</p>}
+            {finished && !savedCard && <p className="journal-muted exercise-saved">{ALL_DONE_LINE}</p>}
             {!finished && shown && (
               <article
                 key={shown.id}
@@ -269,7 +277,6 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
                     <StarToggle on={starred.has(shown.id)} disabled={busy} onToggle={(on) => star(shown.id, on)} />
                   </div>
                 )}
-                {isToday && done && <p className="journal-muted">{DONE_LINE}</p>}
               </article>
             )}
           </div>

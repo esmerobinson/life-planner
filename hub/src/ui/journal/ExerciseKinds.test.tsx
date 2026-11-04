@@ -94,7 +94,7 @@ describe("newer part kinds", () => {
     expect(submit).toBeDisabled();
     await userEvent.type(within(card).getByRole("textbox", { name: "Set off by, row 2" }), "Pretend news");
     await userEvent.click(submit);
-    expect(await within(card).findByText("Saved")).toBeInTheDocument();
+    await waitFor(() => expect(card).not.toBeInTheDocument()); // saved: the next card takes its place
     expect((await readExerciseEntry(jk, TODAY, cardRef(KINDS.cards[0]!))).entry!.parts![0]!.answer).toEqual([
       ["Pretend calm", "Pretend tea"], ["Pretend fizz", "Pretend news"],
     ]);

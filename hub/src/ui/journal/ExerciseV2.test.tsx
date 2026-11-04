@@ -107,7 +107,7 @@ describe("a card with parts", () => {
     await userEvent.type(lines[2]!, "Pretend feet");
     expect(within(card).getByText("3 of 3 filled")).toBeInTheDocument();
     await userEvent.click(within(card).getByRole("button", { name: "Submit" }));
-    expect(await within(card).findByText("Saved")).toBeInTheDocument();
+    await waitFor(() => expect(card).not.toBeInTheDocument()); // saved: the next card takes its place
     const entry = (await readExerciseEntry(jk, TODAY, cardRef(KETTLE))).entry!;
     expect(entry.parts!.map((a) => a.answer)).toEqual(["Pretend high", ["Pretend chest", "Pretend hands", "Pretend feet"], 7, "Tin"]);
     expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY)).toMatchObject({ id: KETTLE.id, done: true });
