@@ -150,7 +150,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
 
   if (notes === null) return <LoadLine guard={guard} />;
 
-  const editor = (e: Editing, gone = false) => (
+  const editor = (e: Editing, gone = false, after?: React.ReactNode) => (
     <li key={`editor|${e.id}`}>
       {gone && <p className="journal-muted">{DELETED_ELSEWHERE}</p>}
       <NoteEditor
@@ -165,16 +165,18 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
         onDelete={!e.isNew && !gone ? () => remove(e) : undefined}
         onProblem={setProblem}
       />
+      {after}
     </li>
   );
   const card = (n: Note) =>
     editing?.id === n.id ? (
-      editor(editing)
+      // Every other version stays in view while she writes (bug #22): Save changes only hers.
+      editor(editing, false, <ReadOnlyVersions versions={[n, ...n.others].filter((v) => !editing.seen.includes(v.vid))} />)
     ) : (
       <li key={n.id} className="strip no-tick notes-card">
         <div>
           <NoteBody note={n} />
-          <OtherNoteVersions note={n} onEdit={(v) => edit(n, n.prompt, v)} />
+          <ReadOnlyVersions versions={n.others} onEdit={(v) => edit(n, n.prompt, v)} />
         </div>
         <div className="strip-actions">
           <button type="button" className="quiet-link" aria-label={`Edit: ${n.thought}`} onClick={() => edit(n, n.prompt)}>
@@ -204,8 +206,12 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
           {g.prompts.flatMap((p) => {
             const mine = notes.filter((n) => n.prompt === p);
             if (editing && editing.isNew && editing.prompt === p) return [...mine.map(card), editor(editing)];
-            if (mine.length > 0) return mine.map(card);
+            // A new answer she started here and hasn't saved keeps its way back in, even once the
+            // prompt has a note (one from another device, say: bug #27).
+            const started = drafts.some((d) => d.fields.prompt === p && !notes.some((n) => n.id === d.id));
+            if (mine.length > 0 && !started) return mine.map(card);
             return [
+              ...mine.map(card),
               <li key={p} className="strip no-tick notes-prompt">
                 <div className="strip-body">
                   <div className="strip-title">{p}</div>
@@ -238,20 +244,26 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
 }
 
 /**
- * Other versions of a note (written on another device without seeing the one shown), each with
- * its own Edit: changing or deleting one leaves every other version as it is (R-I1).
+ * A note's other versions (written on another device without seeing the one shown), each under
+ * "Another version (from …)", and with `onEdit` its own Edit: changing or deleting one leaves
+ * every other version as it is (R-I1).
  */
-function OtherNoteVersions({ note, onEdit }: { note: Note; onEdit: (v: NoteVersion) => void }) {
-  if (note.others.length === 0) return null;
+function ReadOnlyVersions({ versions, onEdit }: { versions: NoteVersion[]; onEdit?: (v: NoteVersion) => void }) {
+  if (versions.length === 0) return null;
   return (
     <>
-      {note.others.map((o) => (
+      {versions.map((o) => (
         <div key={o.vid}>
           <p className="journal-muted">
-            {anotherVersion(o.at)}{" "}
-            <button type="button" className="quiet-link" aria-label={`Edit another version: ${o.thought}`} onClick={() => onEdit(o)}>
-              Edit
-            </button>
+            {anotherVersion(o.at)}
+            {onEdit && (
+              <>
+                {" "}
+                <button type="button" className="quiet-link" aria-label={`Edit another version: ${o.thought}`} onClick={() => onEdit(o)}>
+                  Edit
+                </button>
+              </>
+            )}
           </p>
           <NoteBody note={o} />
         </div>
@@ -313,6 +325,7 @@ function TodayNote({ note, read, onTick }: { note: Note; read: boolean; onTick: 
       />
       <div>
         <NoteBody note={note} />
+        <ReadOnlyVersions versions={note.others} />
         <label htmlFor={id} className="strip-meta notes-read-label">
           I read this today
         </label>
@@ -493,7 +506,10 @@ export function HardMomentView({ jk, onClose }: { jk: JournalKey; onClose: () =>
         <ul className="strip-list notes-hard-list">
           {notes.map((n) => (
             <li key={n.id} className="strip no-tick notes-card">
-              <NoteBody note={n} />
+              <div>
+                <NoteBody note={n} />
+                <ReadOnlyVersions versions={n.others} />
+              </div>
             </li>
           ))}
         </ul>

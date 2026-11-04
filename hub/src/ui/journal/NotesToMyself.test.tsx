@@ -2,8 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../../data/db";
-import { deleteNote, listNoteReads, listNotes, saveNote, setNoteRead } from "../../data/repo";
-import type { JournalKey } from "../../journal/crypto";
+import { CANT_OPEN, deleteNote, listNoteReads, listNotes, saveNote, setNoteRead } from "../../data/repo";
+import { journalAad, sealJson, type JournalKey } from "../../journal/crypto";
 import { NOTE_GROUPS } from "../../journal/notes";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
@@ -323,6 +323,19 @@ describe("Hard moment", () => {
     expect(within(view).queryByRole("checkbox")).toBeNull(); // nothing to do here, just read
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("a note that won't open on this device says so (re-review m8)", async () => {
+    await confirmedDevice(db, jk);
+    await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend own worry", steady: "Pretend own answer" });
+    const other = await keyFor("fake-other-journal-key");
+    const id = `note:${TODAY}:00000000000000bb_${OTHER}_0000aaaa`;
+    await db.journal.put({ id, kind: "note", date: TODAY, fp: other.fp, ...(await sealJson(other.key, { v: 1, ...fields, thought: "x", steady: "y", createdAt: 1, at: 1 }, journalAad(id))) });
+    renderApp("/journal/exercise", TODAY);
+    await userEvent.click(await screen.findByRole("button", { name: "Hard moment" }));
+    const view = await screen.findByRole("dialog", { name: "Notes to myself" });
+    expect(await within(view).findByText("Pretend own answer")).toBeInTheDocument();
+    expect(within(view).getByText(CANT_OPEN)).toBeInTheDocument();
   });
 
   it("with no notes yet, a kind line pointing to the tab", async () => {
