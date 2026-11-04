@@ -91,10 +91,10 @@ describe("AppShell", () => {
 
   it("today follows the clock: after midnight, a focus event updates children", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(2026, 9, 27, 23, 50));
+    vi.setSystemTime(new Date(2026, 9, 28, 2, 50));
     renderShell(<ShowToday />);
     expect(await screen.findByText("date:2026-10-27")).toBeInTheDocument();
-    vi.setSystemTime(new Date(2026, 9, 28, 0, 10));
+    vi.setSystemTime(new Date(2026, 9, 28, 3, 10));
     act(() => {
       window.dispatchEvent(new Event("focus"));
     });
@@ -103,10 +103,10 @@ describe("AppShell", () => {
 
   it("a visibilitychange to visible also updates today", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(2026, 9, 27, 23, 50));
+    vi.setSystemTime(new Date(2026, 9, 28, 2, 50));
     renderShell(<ShowToday />);
     await screen.findByText("date:2026-10-27");
-    vi.setSystemTime(new Date(2026, 9, 28, 0, 10));
+    vi.setSystemTime(new Date(2026, 9, 28, 3, 10));
     act(() => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
@@ -115,10 +115,10 @@ describe("AppShell", () => {
 
   it("a tab left focused across midnight moves to the new day without a focus event", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
-    vi.setSystemTime(new Date(2026, 9, 27, 23, 59, 30));
+    vi.setSystemTime(new Date(2026, 9, 28, 2, 59, 30));
     renderShell(<ShowToday />);
     expect(await screen.findByText("date:2026-10-27")).toBeInTheDocument();
-    vi.setSystemTime(new Date(2026, 9, 28, 0, 0, 30));
+    vi.setSystemTime(new Date(2026, 9, 28, 3, 0, 30));
     act(() => {
       vi.advanceTimersByTime(60_000);
     });

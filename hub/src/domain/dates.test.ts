@@ -26,6 +26,14 @@ describe("dates", () => {
     expect(isValidISODate("2026-02-30")).toBe(false);
     expect(isValidISODate("2026-02-28")).toBe(true);
   });
+  it("a day runs from 3am to 3am (Esme's choice): 1am and 2:59am count as yesterday", () => {
+    expect(todayISO(new Date(2026, 10, 4, 1, 0))).toBe("2026-11-03");
+    expect(todayISO(new Date(2026, 10, 4, 2, 59))).toBe("2026-11-03");
+    expect(todayISO(new Date(2026, 10, 4, 3, 0))).toBe("2026-11-04");
+    expect(todayISO(new Date(2026, 10, 4, 23, 59))).toBe("2026-11-04");
+    expect(todayISO(new Date(2026, 0, 1, 2, 0))).toBe("2025-12-31");
+  });
+
   it("todayISO is valid", () => {
     expect(isValidISODate(todayISO())).toBe(true);
   });
