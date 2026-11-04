@@ -449,8 +449,9 @@ async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boole
   // its ticks go back on and the result is a new local change, sent next (I-4, sessionTicks.ts).
   if (c.table === "items") {
     const merged = await carrySessionTicks(db, row as unknown as Item);
-    // This write skips the change tracker, so it is checked here as every local write is.
-    if (merged && validItem({ ...merged, updatedAt: c.updatedAt + 1 })) {
+    // This write skips the change tracker, so carrySessionTicks has checked it as every local
+    // write is (an unreadable merge is dropped there, with its notes, and the row applies as it is).
+    if (merged) {
       const stamp = Math.max(Date.now(), c.updatedAt + 1);
       await db.items.put({ ...merged, updatedAt: stamp });
       await db.pending.put({ table: "items", id: c.id, updatedAt: stamp });

@@ -91,6 +91,23 @@ describe("session ticks from two devices", () => {
     expect(await db.syncMeta.get(`sessionTicks:${id}`)).toBeUndefined(); // accepted: forgotten
   });
 
+  // R-4: if putting the notes on would make an unreadable row, the notes go and the incoming row wins as it is.
+  it("notes that would make an invalid row are dropped, and the incoming row is applied as it is", async () => {
+    const { server, m, id } = await setUp();
+    clock += 60_000;
+    await setSessionDone(id, "s1", true, TODAY); // the phone, offline
+    await db.syncMeta.put({ key: `sessionTicks:${id}`, value: { s1: { doneOn: "not-a-date", at: clock } } }); // a damaged note
+    clock += 60_000;
+    await macSets(m, id, "s2", TODAY);
+    await syncOnce({ db: m, fetch: server.fetch });
+
+    await syncOnce({ db, fetch: server.fetch });
+    expect(done(await db.items.get(id))).toEqual(["s2"]); // the Mac's row, untouched
+    expect(await db.syncMeta.get(`sessionTicks:${id}`)).toBeUndefined(); // the notes are gone
+    expect(await db.pending.count()).toBe(0); // nothing odd is sent
+    expect(await db.quarantine.count()).toBe(0);
+  });
+
   it("a local untick is carried too, and nothing else is merged (the newer row's other fields win)", async () => {
     const { server, m, id } = await setUp();
     await setSessionDone(id, "s3", true, TODAY);

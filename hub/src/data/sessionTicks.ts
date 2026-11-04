@@ -16,6 +16,7 @@ import { todayISO } from "../domain/dates";
 import { isProject, withSessions } from "../domain/projects";
 import type { Item, Session } from "../domain/types";
 import type { HubDB } from "./db";
+import { validItem } from "./validate";
 
 const PREFIX = "sessionTicks:";
 export const ticksKey = (itemId: string) => `${PREFIX}${itemId}`;
@@ -72,7 +73,14 @@ export async function carrySessionTicks(db: HubDB, incoming: Item): Promise<Item
     await db.syncMeta.delete(ticksKey(incoming.id));
     return null;
   }
-  return withSessions(incoming, sessions, todayISO());
+  const merged = withSessions(incoming, sessions, todayISO());
+  // Notes that would make a row the app cannot read (a damaged note): they go, and the
+  // incoming row is applied as it is (R-4). The written row gets updatedAt + 1 in the engine.
+  if (!validItem({ ...merged, updatedAt: (incoming.updatedAt ?? 0) + 1 })) {
+    await db.syncMeta.delete(ticksKey(incoming.id));
+    return null;
+  }
+  return merged;
 }
 
 /**
