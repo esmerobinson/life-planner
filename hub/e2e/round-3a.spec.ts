@@ -145,7 +145,7 @@ test.describe("at 1280px", () => {
     await expect(box.getByText("Done for today")).toBeVisible();
     await expect(page.getByRole("list", { name: "To-dos" }).getByText("Pretend book session")).toHaveCount(0);
     await shoot(page, "desktop-1280-habits");
-    await page.goto("/today");
+    await page.goto("/");
     const list = page.getByRole("list", { name: "Today" });
     await list.getByRole("checkbox", { name: "Mark done: Book a pretend writing day" }).click();
     // The ticked to-do moves to the closed "Done today" dropdown; the one done earlier is already there.
@@ -199,7 +199,7 @@ test.describe("at 390px", () => {
     await fits(page);
     await shoot(page, "phone-390-goal-panel-edit");
 
-    await page.goto("/today");
+    await page.goto("/");
     await fits(page);
     await shoot(page, "phone-390-today-done-collapsed");
     await page.getByText(/^Done today \(\d+\)$/).click();

@@ -147,10 +147,10 @@ test.describe("at 1280px", () => {
 
   test("the Home rows open their tabs", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("region", { name: "Journal" }).getByRole("button", { name: "Daily check-in" }).click();
+    await page.getByRole("list", { name: "Journal" }).getByRole("button", { name: "Daily check-in" }).click();
     await expect(page).toHaveURL(/\/journal\/check-in$/);
     await page.goto("/");
-    await page.getByRole("region", { name: "Journal" }).getByRole("button", { name: "Morning pages" }).click();
+    await page.getByRole("list", { name: "Journal" }).getByRole("button", { name: "Morning pages" }).click();
     await expect(page).toHaveURL(/\/journal\/morning$/);
   });
 });

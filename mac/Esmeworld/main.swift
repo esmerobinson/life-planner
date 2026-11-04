@@ -8,6 +8,7 @@
 // Native chrome is system default only: standard window, standard menus, no colours.
 
 import AppKit
+import UserNotifications
 import WebKit
 
 // MARK: - Constants
@@ -253,14 +254,243 @@ final class ConsoleBridge: NSObject, WKScriptMessageHandler {
     }
 }
 
+// MARK: - Reminders (local notifications)
+
+
+/// The web app works out the reminders ahead (hub/src/reminders/schedule.ts: soonest first, up
+/// to 60) and sends the whole list here; this replaces every pending Esmeworld reminder with
+/// it. They are ordinary scheduled local notifications, so they fire with the app closed. Only
+/// titles, counts and an app path cross the bridge (never journal text).
+///
+/// Messages (window.webkit.messageHandlers.esmeworldReminders.postMessage, which returns a
+/// Promise with the reply):
+///   { action: "status" }                → { status }
+///   { action: "requestPermission" }     → { status }   (macOS asks once, the first time)
+///   { action: "schedule", reminders, today?, keepToday? } → { status, scheduled, pending }
+///      `today` (the app-day) and `keepToday` (today's reminder ids that still stand): any other
+///      of today's already in Notification Center is taken out (it was done).
+/// status is "authorized", "denied" or "not-determined". Nothing is scheduled until she allows
+/// notifications; the app never asks at launch (only the Reminders page asks).
+///
+/// Self-test: the binary shares her bundle id (so her notification settings and her pending
+/// list, 64 at most). It uses its own identifier prefix, and only the harness's probe schedule
+/// (`selfTestProbe: true`) is ever scheduled: the page's own scheduler is answered and ignored.
+final class RemindersBridge: NSObject, WKScriptMessageHandlerWithReply {
+    static let name = "esmeworldReminders"
+    /// Apple keeps at most 64 pending requests per app; the web app sends at most 60, which
+    /// leaves room for the self-test's 2 probe requests.
+    static let maxRequests = 60
+    /// Every Esmeworld reminder's identifier starts with this; the self-test's never match hers.
+    static var prefix: String { isSelfTest ? "esmeworld-selftest." : "esmeworld.reminder." }
+
+    private let center = UNUserNotificationCenter.current()
+    /// Schedules (and the self-test's cleanups) run one at a time, in the order they arrived.
+    private var queue: [(@escaping () -> Void) -> Void] = []
+    private var busy = false
+
+    static func statusName(_ s: UNAuthorizationStatus) -> String {
+        switch s {
+        case .authorized, .provisional: return "authorized"
+        case .denied: return "denied"
+        case .notDetermined: return "not-determined"
+        default: return "denied"
+        }
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping @MainActor (Any?, String?) -> Void)
+    {
+        // Only the app's own page may schedule.
+        let origin = message.frameInfo.securityOrigin
+        guard message.frameInfo.isMainFrame, origin.protocol == kScheme, origin.host == kHost,
+              let body = message.body as? [String: Any], let action = body["action"] as? String
+        else {
+            replyHandler(nil, "not allowed")
+            return
+        }
+        switch action {
+        case "status":
+            status { replyHandler(["status": $0], nil) }
+        case "requestPermission":
+            requestPermission { replyHandler(["status": $0], nil) }
+        case "schedule":
+            // A missing or malformed list is refused: it never empties her pending reminders.
+            guard let raw = body["reminders"] as? [Any] else {
+                replyHandler(nil, "reminders must be a list")
+                return
+            }
+            if isSelfTest && body["selfTestProbe"] as? Bool != true {
+                // The page's own scheduler during a self-test: never scheduled.
+                status { replyHandler(["status": $0, "scheduled": 0, "pending": 0, "ignored": true], nil) }
+                return
+            }
+            let list = raw.compactMap { $0 as? [String: Any] }
+            let today = body["today"] as? String
+            let keep = Set((body["keepToday"] as? [Any] ?? []).compactMap { $0 as? String })
+            schedule(list, today: today, keepToday: keep) { status, scheduled, pending in
+                replyHandler(["status": status, "scheduled": scheduled, "pending": pending], nil)
+            }
+        default:
+            replyHandler(nil, "unknown action")
+        }
+    }
+
+    func status(_ done: @escaping @MainActor (String) -> Void) {
+        center.getNotificationSettings { s in
+            let name = Self.statusName(s.authorizationStatus)
+            DispatchQueue.main.async { MainActor.assumeIsolated { done(name) } }
+        }
+    }
+
+    /// macOS shows its own prompt only while the answer is "not determined". The self-test
+    /// never asks (it must not put a prompt on her screen): it only reports the status.
+    func requestPermission(_ done: @escaping @MainActor (String) -> Void) {
+        if isSelfTest { status(done); return }
+        center.requestAuthorization(options: [.alert, .sound]) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.status(done)
+                }
+            }
+        }
+    }
+
+    /// "YYYY-MM-DDTHH:MM" (local wall-clock time, Gregorian whatever her calendar setting) as
+    /// calendar components, or nil: a real date, this year or next, nothing more or less.
+    static func components(_ at: String, now: Date = Date()) -> DateComponents? {
+        let gregorian = Calendar(identifier: .gregorian)
+        guard at.count == 16, at.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$"#, options: .regularExpression) != nil else { return nil }
+        let parts = at.split(whereSeparator: { $0 == "-" || $0 == "T" || $0 == ":" }).compactMap { Int($0) }
+        let thisYear = gregorian.component(.year, from: now)
+        guard parts.count == 5, (thisYear...thisYear + 1).contains(parts[0]), (1...12).contains(parts[1]),
+              (0...23).contains(parts[3]), (0...59).contains(parts[4]) else { return nil }
+        var c = DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: parts[3], minute: parts[4])
+        // The day must exist in that month (no 30 February).
+        guard let firstOfMonth = gregorian.date(from: DateComponents(year: parts[0], month: parts[1], day: 1)),
+              let days = gregorian.range(of: .day, in: .month, for: firstOfMonth), days.contains(parts[2]) else { return nil }
+        c.calendar = gregorian
+        return c
+    }
+
+    /// An app route ("/today"), never another site.
+    static func isAppPath(_ p: String) -> Bool {
+        p.hasPrefix("/") && !p.hasPrefix("//") && !p.contains("\\") && p.count < 512
+    }
+
+    /// The app-day in an id ("checkin:2026-11-04", "session:2026-11-04:<item>").
+    static func appDay(ofID id: String) -> String? {
+        let parts = id.split(separator: ":", omittingEmptySubsequences: false)
+        return parts.count >= 2 ? String(parts[1]) : nil
+    }
+
+    /// Replaces every pending Esmeworld reminder with `list`. Nothing is added unless she has
+    /// allowed notifications. `pending` is how many of ours the system then holds
+    /// (getPendingNotificationRequests).
+    func schedule(_ list: [[String: Any]], today: String?, keepToday: Set<String>,
+                  _ done: @escaping @MainActor (String, Int, Int) -> Void)
+    {
+        let requests: [UNNotificationRequest] = list.prefix(Self.maxRequests).compactMap { r in
+            guard let id = r["id"] as? String, !id.isEmpty, id.count < 200,
+                  let at = r["at"] as? String, let when = Self.components(at),
+                  let title = r["title"] as? String, let text = r["body"] as? String,
+                  let path = r["path"] as? String, Self.isAppPath(path) else { return nil }
+            let content = UNMutableNotificationContent()
+            content.title = String(title.prefix(200))
+            content.body = String(text.prefix(400))
+            content.sound = .default
+            content.userInfo = ["path": path]
+            let trigger = UNCalendarNotificationTrigger(dateMatching: when, repeats: false)
+            return UNNotificationRequest(identifier: Self.prefix + id, content: content, trigger: trigger)
+        }
+        enqueue { [center] finished in
+            center.getNotificationSettings { s in
+                let status = Self.statusName(s.authorizationStatus)
+                let allowed = s.authorizationStatus == .authorized || s.authorizationStatus == .provisional
+                center.getPendingNotificationRequests { pending in
+                    let ours = pending.map(\.identifier).filter { $0.hasPrefix(Self.prefix) }
+                    if !allowed {
+                        // Not allowed (yet): leave nothing of ours waiting.
+                        center.removePendingNotificationRequests(withIdentifiers: ours)
+                        DispatchQueue.main.async { MainActor.assumeIsolated { done(status, 0, 0); finished() } }
+                        return
+                    }
+                    if let today {
+                        // Today's reminders already shown whose thing is now done leave Notification Center.
+                        center.getDeliveredNotifications { delivered in
+                            let gone = delivered.map(\.request.identifier).filter { full in
+                                guard full.hasPrefix(Self.prefix) else { return false }
+                                let id = String(full.dropFirst(Self.prefix.count))
+                                return Self.appDay(ofID: id) == today && !keepToday.contains(id)
+                            }
+                            if !gone.isEmpty { center.removeDeliveredNotifications(withIdentifiers: gone) }
+                        }
+                    }
+                    center.removePendingNotificationRequests(withIdentifiers: ours)
+                    let group = DispatchGroup()
+                    let lock = NSLock()
+                    var added = 0
+                    for req in requests {
+                        group.enter()
+                        center.add(req) { error in
+                            if error == nil { lock.lock(); added += 1; lock.unlock() }
+                            group.leave()
+                        }
+                    }
+                    group.notify(queue: .global()) {
+                        center.getPendingNotificationRequests { after in
+                            let count = after.filter { $0.identifier.hasPrefix(Self.prefix) }.count
+                            DispatchQueue.main.async { MainActor.assumeIsolated { done(status, added, count); finished() } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Self-test only: removes the self-test's own pending reminders (never hers), in turn
+    /// after any schedule still running; then reports how many of its own are left.
+    func removeSelfTestReminders(_ done: @escaping @MainActor (Int) -> Void) {
+        precondition(isSelfTest)
+        enqueue { [center] finished in
+            center.getPendingNotificationRequests { pending in
+                center.removePendingNotificationRequests(
+                    withIdentifiers: pending.map(\.identifier).filter { $0.hasPrefix(Self.prefix) })
+                center.getPendingNotificationRequests { after in
+                    let left = after.filter { $0.identifier.hasPrefix(Self.prefix) }.count
+                    DispatchQueue.main.async { MainActor.assumeIsolated { done(left); finished() } }
+                }
+            }
+        }
+    }
+
+    private func enqueue(_ job: @escaping (@escaping () -> Void) -> Void) {
+        queue.append(job)
+        runNext()
+    }
+
+    private func runNext() {
+        guard !busy, !queue.isEmpty else { return }
+        busy = true
+        let job = queue.removeFirst()
+        job { [weak self] in
+            self?.busy = false
+            self?.runNext()
+        }
+    }
+}
+
 // MARK: - App
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
-    WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate
+    WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, UNUserNotificationCenterDelegate
 {
     var window: NSWindow!
     var webView: WKWebView!
     let console = ConsoleBridge()
+    let reminders = RemindersBridge()
+    /// A reminder clicked before the window existed (the click launched the app): opened first.
+    private var launchPath: String?
 
     /// The WebCrypto master key handed to WebKit (see WebCryptoMasterKey). nil only
     /// if the key file could not be read or made.
@@ -274,6 +504,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var downloadWaiter: CheckedContinuation<URL, Error>?
     private var selfTestDownloadDir: URL?
     private var downloadDestinations: [ObjectIdentifier: URL] = [:]
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Before launch finishes, so a reminder click that launched the app reaches us. Never in
+        // the self-test: a click on one of her reminders must not go to its hidden window.
+        if !isSelfTest { UNUserNotificationCenter.current().delegate = self }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -313,7 +549,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         window.setFrameAutosaveName("EsmeworldMainWindow")
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        webView.load(URLRequest(url: kStartURL))
+        webView.load(URLRequest(url: launchPath.flatMap(Self.appURL) ?? kStartURL))
+        launchPath = nil
+    }
+
+    /// esmeworld://app<path> for an app path ("/today"), or nil.
+    static func appURL(_ path: String) -> URL? {
+        RemindersBridge.isAppPath(path) ? URL(string: "\(kScheme)://\(kHost)\(path)") : nil
     }
 
     /// Self-test only: a separate persistent store, so the self-test never shares
@@ -364,6 +606,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         let config = WKWebViewConfiguration()
         config.websiteDataStore = dataStore
         config.setURLSchemeHandler(WebAppSchemeHandler(root: webRoot), forURLScheme: kScheme)
+        // Reminders: the web app sends its schedule here (RemindersBridge).
+        config.userContentController.addScriptMessageHandler(reminders, contentWorld: .page, name: RemindersBridge.name)
         if isSelfTest || isDebug {
             config.userContentController.add(console, name: ConsoleBridge.name)
             config.userContentController.addUserScript(
@@ -561,6 +805,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         completionHandler(masterKey.map { $0 as NSData })
     }
 
+    // MARK: Reminders (UNUserNotificationCenterDelegate)
+
+    /// While Esmeworld is the front app, a reminder still shows as a banner.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void)
+    {
+        completionHandler([.banner, .list, .sound])
+    }
+
+    /// Clicking a reminder opens Esmeworld at its page.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void)
+    {
+        let path = response.notification.request.content.userInfo["path"] as? String
+        let clicked = response.actionIdentifier == UNNotificationDefaultActionIdentifier
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                if let path, clicked { self?.openFromReminder(path) }
+                completionHandler()
+            }
+        }
+    }
+
+    /// Shows the window and goes to `path`: through the app's router when the page is up (no
+    /// reload, nothing typed is lost), else by loading that address.
+    @MainActor
+    func openFromReminder(_ path: String) {
+        guard Self.appURL(path) != nil else { return }
+        guard webView != nil, let window else {
+            launchPath = path // the window isn't made yet; applicationDidFinishLaunching opens it
+            return
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        go(toAppPath: path)
+    }
+
+    /// Goes to an app path inside the web view (the router, else a load).
+    @MainActor
+    func go(toAppPath path: String, then done: (() -> Void)? = nil) {
+        guard let url = Self.appURL(path), let webView else { done?(); return }
+        webView.callAsyncJavaScript(
+            "return typeof window.esmeworldNavigate === 'function' ? window.esmeworldNavigate(p) === true : false",
+            arguments: ["p": path], in: nil, in: .page
+        ) { result in
+            if case .success(let went) = result, went as? Bool == true { done?(); return }
+            webView.load(URLRequest(url: url))
+            done?()
+        }
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         // The page's process crashed or was killed; bring the app back.
         webView.reload()
@@ -743,12 +1038,131 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         """
     }
 
+    /// Our pending requests, as the system holds them (self-test prefix only).
+    private func selfTestPending() async -> [String] {
+        await withCheckedContinuation { (c: CheckedContinuation<[String], Never>) in
+            UNUserNotificationCenter.current().getPendingNotificationRequests { reqs in
+                c.resume(returning: reqs.map(\.identifier).filter { $0.hasPrefix(RemindersBridge.prefix) })
+            }
+        }
+    }
+
+    /// Never asks for permission (the bridge refuses to in the self-test, so no prompt reaches
+    /// her screen). When notifications aren't allowed for Esmeworld, the scheduling part is
+    /// skipped and says so. Everything it schedules uses the self-test prefix and is removed.
+    @MainActor
+    private func runReminderSelfTest(_ check: (Bool, String) -> Void) async {
+        do {
+            // The Reminders page, in the Mac app, speaks of this Mac.
+            try await load(URL(string: "esmeworld://app/reminders")!)
+            let page = try await js("""
+            \(Self.waitJS("document.querySelectorAll('.rem-row').length > 0"))
+            return JSON.stringify({
+              h1: (document.querySelector('h1')?.textContent || '').trim(),
+              rows: document.querySelectorAll('.rem-row').length,
+              mac: (document.querySelector('.rem-intro')?.textContent || '').includes('on this Mac'),
+            });
+            """)
+            say("reminders.page h1=\(page["h1"] ?? "nil") rows=\(page["rows"] ?? "nil") mac=\(page["mac"] as? Bool ?? false)")
+            check(page["h1"] as? String == "Reminders", "Reminders page")
+            check(page["rows"] as? Int == 6, "Reminders page has six rows")
+            check(page["mac"] as? Bool == true, "Reminders page knows it is in the Mac app")
+
+            // The bridge's time parsing (checked here, whether or not notifications are allowed).
+            let y = Calendar(identifier: .gregorian).component(.year, from: Date())
+            let good = RemindersBridge.components("\(y + 1)-01-31T09:05")
+            let bad = ["\(y + 1)-02-30T09:00", "\(y + 1)-01-31T09:00:00", "\(y + 5)-01-01T09:00", "\(y + 1)-13-01T09:00",
+                       "\(y + 1)-01-31T24:00", "not a date", "\(y + 1)-1-31T09:00"].filter { RemindersBridge.components($0) != nil }
+            say("reminders.parse good=\(good?.day ?? -1)/\(good?.minute ?? -1) acceptedBad=\(bad)")
+            check(good?.day == 31 && good?.minute == 5 && good?.calendar?.identifier == .gregorian, "a valid reminder time is read")
+            check(bad.isEmpty, "invalid reminder times are refused")
+
+            // The bridge: status, a permission request (answered without asking), a schedule.
+            let r = try await js("""
+            const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(RemindersBridge.name);
+            if (!h || typeof h.postMessage !== "function") return JSON.stringify({ bridge: false });
+            const st = await h.postMessage({ action: "status" });
+            const asked = await h.postMessage({ action: "requestPermission" });
+            const far = new Date(); far.setDate(far.getDate() + 300);
+            const p = (n) => String(n).padStart(2, "0");
+            const d = far.getFullYear() + "-" + p(far.getMonth() + 1) + "-" + p(far.getDate());
+            const y = new Date().getFullYear();
+            // The page's own scheduler is never scheduled in a self-test (only the probe below is).
+            const page = await h.postMessage({ action: "schedule", reminders: [
+              { id: "selftest:page", at: d + "T09:00", title: "x", body: "x", path: "/today" },
+            ] });
+            let malformed = "accepted";
+            try { await h.postMessage({ action: "schedule", reminders: "not a list", selfTestProbe: true }); } catch (e) { malformed = "rejected"; }
+            const reply = await h.postMessage({ action: "schedule", selfTestProbe: true, reminders: [
+              { id: "selftest:a", at: d + "T09:00", title: "Self-test", body: "Pretend reminder one", path: "/today" },
+              { id: "selftest:b", at: d + "T10:00", title: "Self-test", body: "Pretend reminder two", path: "/journal/morning" },
+              { id: "selftest:bad-date", at: "not a date", title: "x", body: "x", path: "/today" },
+              { id: "selftest:no-such-day", at: (y + 1) + "-02-30T09:00", title: "x", body: "x", path: "/today" },
+              { id: "selftest:seconds", at: d + "T09:00:00", title: "x", body: "x", path: "/today" },
+              { id: "selftest:far-year", at: (y + 5) + "-01-01T09:00", title: "x", body: "x", path: "/today" },
+              { id: "selftest:bad-path", at: d + "T11:00", title: "x", body: "x", path: "https://example.org/" },
+              "not an object",
+            ] });
+            let unknown = "accepted";
+            try { await h.postMessage({ action: "no-such-action" }); } catch (e) { unknown = "rejected"; }
+            return JSON.stringify({
+              bridge: true, status: st.status, asked: asked.status, pageIgnored: page.ignored === true && page.scheduled === 0,
+              malformed, scheduled: reply.scheduled, pending: reply.pending, replyStatus: reply.status, unknown,
+            });
+            """)
+            let status = r["status"] as? String ?? "nil"
+            say("reminders.bridge=\(r["bridge"] as? Bool ?? false) status=\(status) afterRequest=\(r["asked"] ?? "nil") unknownAction=\(r["unknown"] ?? "nil")")
+            check(r["bridge"] as? Bool == true, "reminders bridge exists")
+            check(["authorized", "denied", "not-determined"].contains(status), "reminders status")
+            check(r["asked"] as? String == status, "self-test never asks for notification permission")
+            check(r["unknown"] as? String == "rejected", "reminders bridge rejects unknown actions")
+            say("reminders.pageSchedulerIgnored=\(r["pageIgnored"] as? Bool ?? false) malformedList=\(r["malformed"] ?? "nil")")
+            check(r["pageIgnored"] as? Bool == true, "the page's own scheduler is never scheduled in a self-test")
+            check(r["malformed"] as? String == "rejected", "a malformed reminders list is refused")
+            let scheduled = r["scheduled"] as? Int ?? -1
+            let pendingReply = r["pending"] as? Int ?? -1
+            if status == "authorized" {
+                let held = await selfTestPending()
+                say("reminders.schedule scheduled=\(scheduled) pending=\(pendingReply) getPendingNotificationRequests=\(held.count)")
+                check(scheduled == 2 && pendingReply == 2 && held.count == 2, "schedule sent and held (2 valid of 8)")
+            } else {
+                say("reminders.schedule=skipped (notifications not authorised: \(status)) scheduled=\(scheduled) pending=\(pendingReply)")
+                check(scheduled == 0 && pendingReply == 0, "nothing scheduled while not authorised")
+            }
+
+            // A reminder's link: opens the page through the app's router.
+            try await load(kStartURL)
+            _ = try await js("""
+            \(Self.waitJS("typeof window.esmeworldNavigate === 'function'"))
+            return JSON.stringify({});
+            """)
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+                go(toAppPath: "/journal/morning") { c.resume() }
+            }
+            let nav = try await js("""
+            \(Self.waitJS("location.pathname === '/journal/morning'"))
+            return JSON.stringify({ path: location.pathname });
+            """)
+            say("reminders.link path=\(nav["path"] ?? "nil")")
+            check(nav["path"] as? String == "/journal/morning", "a reminder's link opens its page")
+        } catch {
+            check(false, "reminders: \(error.localizedDescription)")
+        }
+    }
+
     @MainActor
     private func runSelfTest() async {
         var ok = true
         func check(_ cond: Bool, _ what: String) {
             if !cond { ok = false; say("FAIL \(what)") }
         }
+
+        // Leftovers of a self-test that was killed (watchdog, timeout) go first.
+        let leftover = await withCheckedContinuation { (c: CheckedContinuation<Int, Never>) in
+            reminders.removeSelfTestReminders { c.resume(returning: $0) }
+        }
+        say("reminders.cleanedAtStart left=\(leftover)")
+        check(leftover == 0, "self-test reminders cleaned up at the start")
 
         do {
             // (a) + (b): home page title and sidebar links.
@@ -956,9 +1370,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                     say("download.pageSays=\(page["text"] ?? "")")
                 }
             }
+            // (f) Reminders: the page, the bridge, a schedule sent and held, a reminder's link.
+            await runReminderSelfTest(check)
         } catch {
             check(false, "error \(error.localizedDescription)")
         }
+        // Through the bridge's queue, so it runs after any schedule still in flight.
+        let left = await withCheckedContinuation { (c: CheckedContinuation<Int, Never>) in
+            reminders.removeSelfTestReminders { c.resume(returning: $0) }
+        }
+        let afterCleanup = await selfTestPending()
+        say("reminders.selfTestCleanedUp left=\(left) getPendingNotificationRequests=\(afterCleanup.count)")
+        check(left == 0 && afterCleanup.isEmpty, "self-test reminders all removed")
 
         say("consoleErrors=\(console.messages.count)")
         say(ok ? "PASS" : "FAILED")

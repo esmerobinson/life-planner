@@ -76,7 +76,7 @@ async function walkThrough(page: Page, prefix: string) {
   const next = s.getByRole("article", { name: "Next card: Day 2" });
   await expect(next.getByText("The fictional kettle")).toBeVisible();
   await expect(s.getByRole("article")).toHaveCount(1);
-  await expect(s.getByText(/Day 1 saved\. Here's the next one if you'd like to keep going\./)).toBeVisible();
+  await expect(s.getByText(/Day 1 · Pretend weather saved\. Here's the next one if you'd like to keep going\./)).toBeVisible();
   await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
   await shoot(page, `${prefix}-after-submit`);
   await expect(next.getByRole("button", { name: "Submit" })).toBeDisabled();

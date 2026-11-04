@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./db";
 import {
   addMonthGoal, addSuggestedGoal, createGoal, deleteGoal, listJournalledDays, minusOne, planMonth, plusOne,
-  removeMonthGoal, saveGoalNotes, setGoalActive, setMonthStep, tickDailyGoal, updateGoal, undoMonthEdits, updateMonthGoal, DAILY_COUNT_TITLE,
+  removeMonthGoal, saveGoalNotes, setGoalActive, setMonthStep, updateGoal, undoMonthEdits, updateMonthGoal,
 } from "./repo";
 import { validGoal } from "./validate";
 import { SUGGESTED_GOALS } from "../domain/suggestedGoals";
@@ -186,26 +186,6 @@ describe("updateGoal: daily and counts from", () => {
     expect((await stored(g.id)).countsFrom).toEqual(["journal", { area: "mind" }]);
     await updateGoal(g.id, { countsFrom: [] }, TODAY);
     expect("countsFrom" in (await stored(g.id))).toBe(false);
-  });
-});
-
-describe("a daily goal's Home tick (no automatic source)", () => {
-  it("logs today on this month's first count, once; unticking takes it off", async () => {
-    const g = await createGoal({ title: "Pretend daily", areaId: "body", kind: "practice", rhythm: "daily" }, TODAY);
-    await addMonthGoal(g.id, { kind: "count", title: "Days stretched", target: 30 }, TODAY);
-    await tickDailyGoal(g.id, TODAY, true);
-    await tickDailyGoal(g.id, TODAY, true);
-    expect((await stored(g.id)).monthGoals![0]!.log).toEqual([TODAY]);
-    await tickDailyGoal(g.id, TODAY, false);
-    expect((await stored(g.id)).monthGoals![0]!.log).toBeUndefined();
-  });
-
-  it("with no count this month: plans from last month, else makes a count of every day", async () => {
-    const g = await createGoal({ title: "Pretend daily", areaId: "body", kind: "practice", rhythm: "daily" }, TODAY);
-    await tickDailyGoal(g.id, TODAY, true);
-    expect((await stored(g.id)).monthGoals).toEqual([
-      { id: expect.any(String), month: "2026-11", kind: "count", title: DAILY_COUNT_TITLE, target: 30, log: [TODAY] },
-    ]);
   });
 });
 

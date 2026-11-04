@@ -13,6 +13,9 @@ import "./styles/add.css";
 import "./styles/panel.css";
 import "./styles/goals.css";
 import "./styles/pairing.css";
+import "./styles/reminders.css";
+import "./styles/books.css";
+import "./styles/search.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

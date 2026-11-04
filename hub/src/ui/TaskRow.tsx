@@ -9,6 +9,7 @@ import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
 import { ProjectEdge, ProjectLine, SessionBoxes } from "./ProjectBits";
 import { isProject } from "../domain/projects";
+import { isBook } from "../domain/books";
 import { usePanel } from "./panelContext";
 import { ScheduleMenu } from "./ScheduleMenu";
 
@@ -150,7 +151,10 @@ export function TaskRow({
   untyped = false,
   className,
   onTodayList,
+  meta,
 }: {
+  /** Small lines under the title (a book's author and page). */
+  meta?: ReactNode;
   item: Item;
   today: ISODate;
   /** Marks it done; resolving to false (the save failed) unticks the box again. */
@@ -214,6 +218,7 @@ export function TaskRow({
           isTask && !crossed && <DueLine item={item} today={today} />
         )}
         {habit && <div className="strip-meta">{crossed ? HABIT_WORDS.doneForToday : HABIT_WORDS.schedule(item.recur)}</div>}
+        {meta}
         <SeeMore item={item} />
       </div>
       <div className="strip-actions">
@@ -234,6 +239,7 @@ export function TaskRow({
           areaId={item.areaId}
           kind={untyped ? undefined : item.kind}
           project={project}
+          book={!untyped && isBook(item)}
           isOpen={item.status === "open"}
           untyped={untyped}
           today={today}

@@ -9,7 +9,6 @@ import { AppShell } from "./AppShell";
 import { HomePage } from "./HomePage";
 import { phoneTitle } from "./PhoneTopBar";
 import { useShellToday } from "./shellContext";
-import { TodayPanel } from "./TodayPanel";
 
 function setPhone(matches: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -34,17 +33,12 @@ function JournalSpy() {
   return <h1>{`Journal at ${l.pathname}${l.hash}`}</h1>;
 }
 
-function TodayRoute() {
-  return <TodayPanel today={useShellToday()} />;
-}
-
 function renderAt(entries: string[], index = entries.length - 1) {
   return render(
     <MemoryRouter initialEntries={entries} initialIndex={index}>
       <Routes>
         <Route element={<AppShell />}>
           <Route path="/" element={<HomeRoute />} />
-          <Route path="/today" element={<TodayRoute />} />
           <Route path="/goals" element={<h1>Goals</h1>} />
           <Route path="/area/art" element={<h1>Art</h1>} />
           <Route path="/goals/:id" element={<h1>A goal opened</h1>} />
@@ -67,7 +61,7 @@ afterEach(() => {
 describe("phone layout (below 700px)", () => {
   beforeEach(() => setPhone(true));
 
-  it("Home: Esmeworld title, Inbox pill, the 12 apps in sidebar order, Today, then the footer links; no sidebar", async () => {
+  it("Home: Esmeworld title, Inbox pill, the 11 apps in sidebar order (no Today: Home is the Today page), Today, then the footer links; no sidebar", async () => {
     await createItem({ kind: "task", title: "Phone pick", areaId: "body", priority: 3, due: todayISO() }, todayISO());
     renderAt(["/"]);
     expect(await screen.findByText("Phone pick")).toBeInTheDocument();
@@ -76,26 +70,26 @@ describe("phone layout (below 700px)", () => {
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
     const apps = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link");
     expect(apps.map((a) => a.textContent)).toEqual([
-      "Today", "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
+      "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
       "Tech projects", "Production", "Journal", "Vision board",
     ]);
-    expect(apps[5]).toHaveAttribute("href", "/area/art");
+    expect(apps[4]).toHaveAttribute("href", "/area/art");
     expect(screen.getByRole("heading", { level: 2, name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inbox (1)" })).toHaveAttribute("href", "/inbox");
     const footer = screen.getByRole("navigation", { name: "More" });
-    expect(within(footer).getAllByRole("link").map((a) => a.textContent)).toEqual(["Backup", "Sync", "Bin"]);
+    expect(within(footer).getAllByRole("link").map((a) => a.textContent)).toEqual(["Repeating", "Reminders", "Backup", "Sync", "Bin"]);
     // Desktop-only parts of Home stay off the phone Home.
     expect(screen.queryByText("Goals this month")).toBeNull();
   });
 
   it("another page: round Back arrow, the title in the bar, the Inbox pill; the page h1 stays for screen readers", async () => {
-    renderAt(["/today"]);
-    await screen.findByText("Nothing planned for today.");
+    renderAt(["/goals"]);
+    await screen.findByRole("heading", { level: 1, name: "Goals" });
     const bar = document.querySelector(".phone-top")!;
     expect(within(bar as HTMLElement).getByRole("button", { name: "Back" })).toHaveTextContent("←");
-    expect(bar).toHaveTextContent("Today");
+    expect(bar).toHaveTextContent("Goals");
     expect(within(bar as HTMLElement).getByRole("link", { name: "Inbox" })).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 1, name: "Today" })).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { level: 1, name: "Goals" })).toHaveLength(1);
     expect(document.querySelector(".app-content")).toHaveClass("has-bar-title");
   });
 
@@ -113,20 +107,23 @@ describe("phone layout (below 700px)", () => {
     expect(screen.getByTestId("nav-type")).toHaveTextContent("REPLACE");
   });
 
-  it("Home shows the Journal card under the app grid and above Today", async () => {
+  it("Home: under the app grid, Today's list starts with the Journal rows; no separate Journal section", async () => {
+    await createItem({ kind: "task", title: "Phone pick", areaId: "body", priority: 3, due: todayISO() }, todayISO());
     renderAt(["/"]);
-    await screen.findByText("Nothing planned for today.");
+    const pick = await screen.findByText("Phone pick");
     const grid = screen.getByRole("navigation", { name: "Main" });
-    const journal = screen.getByRole("region", { name: "Journal" });
     const today = screen.getByRole("heading", { level: 2, name: "Today" });
+    const journal = screen.getByRole("list", { name: "Journal" });
     expect(within(journal).getByRole("button", { name: "Morning pages" })).toBeEnabled();
     expect(within(journal).getByRole("button", { name: "Daily check-in" })).toBeEnabled();
     const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(follows(grid, journal)).toBe(true);
-    expect(follows(journal, today)).toBe(true);
+    expect(follows(grid, today)).toBe(true);
+    expect(follows(today, journal)).toBe(true);
+    expect(follows(journal, pick)).toBe(true);
+    expect(screen.queryByRole("heading", { name: "Journal" })).toBeNull();
   });
 
-  it("the phone Home card's buttons open the Journal's two parts", async () => {
+  it("the phone Home rows open the Journal's parts", async () => {
     setPhone(true);
     const first = renderAt(["/"]);
     await userEvent.click(await screen.findByRole("button", { name: "Morning pages" }));
@@ -161,7 +158,8 @@ describe("desktop layout (700px and wider) is unchanged", () => {
 
 describe("phoneTitle", () => {
   it("names the sidebar pages and footer pages, and nothing for an opened goal or unknown page", () => {
-    expect(phoneTitle("/today")).toBe("Today");
+    expect(phoneTitle("/goals")).toBe("Goals");
+    expect(phoneTitle("/today")).toBeNull(); // no Today page: /today goes Home
     expect(phoneTitle("/area/tech")).toBe("Tech projects");
     expect(phoneTitle("/vision")).toBe("Vision board");
     expect(phoneTitle("/inbox/")).toBe("Inbox");

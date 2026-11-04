@@ -1,10 +1,12 @@
 import { useContext, useEffect, useState } from "react";
 import { isActive } from "../domain/goalCounts";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { listItems, restoreItem, untickItem } from "../data/repo";
 import { doneToday, HABIT_WORDS, isHabit, sessions } from "../domain/habits";
 import type { ISODate, Item } from "../domain/types";
 import { useAddDefaults } from "./addContext";
+import { BOOK_AREA, isBook } from "../domain/books";
+import { ReadingList } from "./ReadingList";
 import { REPEAT_GLYPH } from "./IconPopover";
 import { ProgressBar } from "./ProgressBar";
 import { GOAL_AREAS } from "./areas";
@@ -16,11 +18,12 @@ import { ShellContext } from "./shellContext";
 import { TaskRow, useTick } from "./TaskRow";
 import { useHubData } from "./useHubData";
 
-type View = "all" | "tasks" | "ideas" | "goals";
+type View = "all" | "tasks" | "ideas" | "books" | "goals";
 const FILTERS: { id: View; label: string }[] = [
   { id: "all", label: "All" },
   { id: "tasks", label: "To-dos" },
   { id: "ideas", label: "Ideas" },
+  { id: "books", label: "Books" },
   { id: "goals", label: "Goals" },
 ];
 
@@ -35,7 +38,7 @@ export function AreaPage({ today }: { today: ISODate }) {
   const [archiveFailed, setArchiveFailed] = useState(false);
   const shell = useContext(ShellContext);
   // Add opens in this area, as the filter shown (All: a to-do).
-  useAddDefaults(view === "ideas" ? "idea" : view === "goals" ? "goal" : "task", area?.id);
+  useAddDefaults(view === "ideas" ? "idea" : view === "books" ? "book" : view === "goals" ? "goal" : "task", area?.id);
 
   // Archived items are not in useHubData; re-read whenever the open items change.
   const id = area?.id;
@@ -81,9 +84,14 @@ export function AreaPage({ today }: { today: ISODate }) {
   // Habits live in their own box at the top, not in the To-dos list (round 3).
   const habits = view === "all" || view === "tasks" ? mine.filter(isHabit) : [];
   const tasks = view === "all" || view === "tasks" ? mine.filter((i) => i.kind === "task" && !isHabit(i)) : [];
-  const ideas = view === "all" || view === "ideas" ? mine.filter((i) => i.kind === "idea") : [];
+  const ideas = view === "all" || view === "ideas" ? mine.filter((i) => i.kind === "idea" && !isBook(i)) : [];
+  // Books group under "Reading list" inside Ideas (2026-11-04); they always live under Mind,
+  // so Mind always shows the list (with "+ Add a book") and has a Books pill.
+  const hasBooksPill = area.id === BOOK_AREA;
+  const books = view === "all" || view === "ideas" || view === "books" ? mine.filter(isBook) : [];
+  const showReading = (view === "all" || view === "ideas" || view === "books") && (hasBooksPill || books.length > 0);
   const areaGoals = view === "all" || view === "goals" ? goals.filter((g) => g.areaId === area.id && isActive(g)) : [];
-  const empty = loaded && habits.length + tasks.length + ideas.length + areaGoals.length === 0;
+  const empty = loaded && habits.length + tasks.length + ideas.length + books.length + areaGoals.length === 0;
   // Mind's Habits box also holds the three Journal rows, after her own habits (Journal v2).
   const journalHabits = area.id === "mind" && (view === "all" || view === "tasks");
 
@@ -124,10 +132,13 @@ export function AreaPage({ today }: { today: ISODate }) {
             })}
             {journalHabits && <JournalHabitRows today={today} />}
           </ul>
+          <Link to="/repeating" className="quiet-link">
+            Manage repeats
+          </Link>
         </section>
       )}
       <div role="group" aria-label="Show" className="btn-group">
-        {FILTERS.map((t) => (
+        {FILTERS.filter((t) => t.id !== "books" || hasBooksPill).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -159,14 +170,17 @@ export function AreaPage({ today }: { today: ISODate }) {
           onUndo={(itemId) => void save(() => untickItem(itemId, today))}
         />
       )}
-      {ideas.length > 0 && (
+      {(ideas.length > 0 || showReading) && (
         <section>
           {view === "all" && <h2>Ideas</h2>}
-          <ul aria-label="Ideas" className="strip-list">
-            {ideas.map((it) => (
-              <TaskRow key={it.id} item={it} today={today} onMoved={changed} />
-            ))}
-          </ul>
+          {ideas.length > 0 && (
+            <ul aria-label="Ideas" className="strip-list">
+              {ideas.map((it) => (
+                <TaskRow key={it.id} item={it} today={today} onMoved={changed} />
+              ))}
+            </ul>
+          )}
+          {showReading && loaded && <ReadingList books={books} today={today} onMoved={changed} />}
         </section>
       )}
       {areaGoals.length > 0 && (

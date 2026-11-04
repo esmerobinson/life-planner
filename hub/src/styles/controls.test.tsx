@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { QuickAdd } from "../ui/QuickAdd";
 import { MoveToMenu } from "../ui/MoveToMenu";
-import { JournalCard } from "../ui/JournalCard";
+import { JournalRows } from "../ui/JournalCard";
 import { AreaPage } from "../ui/AreaPage";
 
 // The project has no @types/node; vitest runs in node, so declare just what is used.
@@ -232,10 +232,10 @@ describe("controls.css (approved mockup A, soft pills)", () => {
 
     const journal = render(
       <MemoryRouter>
-        <JournalCard today="2026-10-27" />
+        <JournalRows today="2026-10-27" />
       </MemoryRouter>,
     );
-    // The Journal card's rows are strips now (Journal rows, 2026-11-02), not a pill group.
+    // The Journal rows are strips now (Journal rows, 2026-11-02), not a pill group.
     expect(screen.getByRole("button", { name: "Morning pages" }).closest("ul")?.classList.contains("strip-list")).toBe(true);
     journal.unmount();
 

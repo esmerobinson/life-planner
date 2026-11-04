@@ -109,8 +109,8 @@ describe("a checklist card", () => {
     await userEvent.click(within(rowOf(card, "Pretend feature four")).getByRole("button", { name: "Yes" }));
     expect(submit).toBeEnabled();
     await userEvent.click(submit);
-    // The card gives way to the next one once saved (never shown finished).
-    await within(await section()).findByRole("article", { name: /Next card/ }, { timeout: 5000 });
+    // Submit replaces the card with the next one, so wait for the saved answer, not the old card's label.
+    await waitFor(async () => expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY)?.done).toBe(true), { timeout: 5000 });
     expect(await answerOf(NOTES)).toEqual([
       ["Pretend feature one", "Yes", ""], ["Pretend feature two", "Partly", ""], ["Pretend feature three", "No", ""],
       ["Pretend feature four", "Yes", "Pretend only a note"],

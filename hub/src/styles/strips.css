@@ -293,7 +293,8 @@ button.icon svg {
      appear). Not --panel: the two 30px icon squares are --panel and would vanish, and the
      goal panel's strips would blend into its --panel background. The tick box and the
      two icons are unchanged. */
-button.quiet-link {
+button.quiet-link,
+a.quiet-link {
   background: none;
   border: 0;
   border-radius: 0;
@@ -306,8 +307,15 @@ button.quiet-link {
   text-align: left;
 }
 
+a.quiet-link {
+  text-decoration: none;
+  align-self: flex-start; /* in the Habits box (a column): as wide as its words, not the box */
+}
+
 button.quiet-link:hover,
-button.quiet-link:focus-visible {
+button.quiet-link:focus-visible,
+a.quiet-link:hover,
+a.quiet-link:focus-visible {
   text-decoration: underline;
 }
 

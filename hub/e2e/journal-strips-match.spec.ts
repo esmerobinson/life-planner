@@ -70,7 +70,7 @@ test("Home's Journal rows match a task strip with the same content; 8px between 
   const todos = page.getByRole("list", { name: "To-dos" });
   const plain = await look(todos.locator("li.strip", { hasText: "Pretend plain to-do" }));
   await page.goto("/");
-  const rows = page.getByRole("region", { name: "Journal" }).locator("li.strip");
+  const rows = page.getByRole("list", { name: "Journal" }).locator("li.strip");
   await expect(rows).toHaveCount(3);
   // Locked here: no small line (the exercise's "Day N · Theme" needs the cards) and no streak.
   for (const i of [0, 1, 2]) same(await look(rows.nth(i)), plain);
@@ -78,15 +78,10 @@ test("Home's Journal rows match a task strip with the same content; 8px between 
   expect(gap).toBe(8);
 });
 
-test("Today's Journal rows match Home's, and Mind's Habits rows match a task strip with a small line", async ({ page }) => {
+test("Mind's Habits rows match a task strip with a small line", async ({ page }) => {
   await seedTasks(page);
   await page.goto("/area/art");
-  const plain = await look(page.getByRole("list", { name: "To-dos" }).locator("li.strip", { hasText: "Pretend plain to-do" }));
   const dated = await look(page.getByRole("list", { name: "To-dos" }).locator("li.strip", { hasText: "Pretend dated to-do" }));
-  await page.goto("/today");
-  const today = page.getByRole("region", { name: "Journal" }).locator("li.strip");
-  await expect(today).toHaveCount(3);
-  for (const i of [0, 1, 2]) same(await look(today.nth(i)), plain);
   await page.goto("/area/mind");
   const habits = page.getByRole("list", { name: "Habits" }).locator("li.journal-row");
   await expect(habits).toHaveCount(3);

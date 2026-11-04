@@ -8,7 +8,7 @@ import type { ISODate } from "../../domain/types";
 import type { JournalKey } from "../../journal/crypto";
 import { LoadLine, longDate, useLoadGuard } from "./bits";
 import { QuestionText } from "./DailyCheckIn";
-import { ResponseView } from "./ResponseView";
+import { cardTitle, OtherVersions, ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
 
 /** The line at the top of Read back (from the approved mockup). */
@@ -16,7 +16,7 @@ export const READ_BACK_LINE = "Your past exercise responses, check-ins and morni
 export const NOTHING_YET = "Nothing to read back yet.";
 
 type Item =
-  | { kind: "exercise"; date: ISODate; entry: ExerciseResponse; book: string }
+  | { kind: "exercise"; date: ISODate; entry: ExerciseResponse; title: string }
   | { kind: "checkin"; date: ISODate; day: CheckinDay }
   | { kind: "page"; date: ISODate; id: string; n: number };
 
@@ -43,16 +43,17 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         listReadBack(),
         readExerciseCards(jk),
       ]);
-      // Each response's book (two books of cards), by card id.
-      const books = new Map<string, string>();
-      if (cards.state === "ok") {
-        const titles = new Map(cards.set.tracks.map((t) => [t.id, t.title]));
-        for (const c of cards.set.cards) if (titles.get(c.track)) books.set(c.id, titles.get(c.track)!);
-      }
+      // Each response's title: its own card (by its full id), with that card's book.
+      const set = cards.state === "ok" ? cards.set : null;
+      const titles = new Map((set?.tracks ?? []).map((t) => [t.id, t.title]));
+      const title = (e: ExerciseResponse) => {
+        const c = set?.cards.find((x) => x.id === e.id && (!x.legacy || x.theme === e.theme));
+        return cardTitle(e, c ? titles.get(c.track) : undefined, !!c);
+      };
       if (id !== latest.current) return;
       const pageCount = new Map<ISODate, number>();
       const list: Item[] = [
-        ...exercises.entries.map((entry): Item => ({ kind: "exercise", date: entry.date, entry, book: books.get(entry.id) ?? "" })),
+        ...exercises.entries.map((entry): Item => ({ kind: "exercise", date: entry.date, entry, title: title(entry) })),
         ...checkins
           // Only what she answered: a day of skips isn't listed (Esme, 2026-11-04).
           .filter((d) => answeredPrompts(d).length > 0)
@@ -98,12 +99,12 @@ function ReadBackItem({ jk, item, today }: { jk: JournalKey; item: Item; today: 
   const date = longDate(item.date);
   if (item.kind === "exercise") {
     const e = item.entry;
-    const card = [item.book, e.day !== null ? `Day ${e.day}` : "", e.theme].filter(Boolean).join(" · ");
     return (
       <details>
-        <summary>{`${date} · Exercise · ${card}`}</summary>
+        <summary>{`${date} · Exercise · ${item.title}`}</summary>
         <ResponseView text={e.text} parts={e.parts} />
         {!e.submitted && <p className="journal-muted">Not submitted</p>}
+        <OtherVersions others={e.others} />
       </details>
     );
   }

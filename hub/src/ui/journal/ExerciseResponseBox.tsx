@@ -9,6 +9,7 @@ import { emptyPart, hasTracker, trackerDaysFilled, type CardPart, type ExerciseC
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { useDbChanges } from "./useJournalKey";
+import { EARLIER_ANSWER, ResponseView } from "./ResponseView";
 
 const SAVE_PROBLEM = "That didn't save. Try again.";
 /** A running count, to tell whether a read started after a write had landed. */
@@ -130,6 +131,33 @@ function valueFrom(parts: CardPart[], entry: ExerciseResponse | null): ResponseV
   });
 }
 
+/**
+ * The stored response still fills the card as it is now. False once a re-imported card gained
+ * or changed a part she hasn't answered: the card isn't finished as it stands, so it shows again.
+ */
+export const fillsCard = (card: ExerciseCard, entry: ExerciseResponse | null): boolean =>
+  responseComplete(valueFrom(card.parts, entry));
+
+/**
+ * What the stored response holds that the card as it is now has no place for (a part whose
+ * prompt or kind changed in a re-imported card, or a single text from before it had parts).
+ * Shown read-only above the inputs, and kept by every save (journalRepo responseEntry).
+ */
+function unplaced(parts: CardPart[], entry: ExerciseResponse | null): { text: string; parts: PartAnswer[] } | null {
+  if (!entry || parts.length === 0) return null;
+  const used = new Set<PartAnswer>();
+  parts.forEach((p, i) => {
+    const prev = entry.parts?.find((a) => a.prompt === p.prompt && a.kind === p.kind) ?? entry.parts?.[i];
+    if (prev && prev.kind === p.kind) used.add(prev);
+  });
+  const words = (v: unknown): boolean => (Array.isArray(v) ? v.some(words) : typeof v === "string" ? v.trim() !== "" : v !== null);
+  const left = (entry.parts ?? []).filter(
+    (a) => !used.has(a) && words(a.kind === "checklist" && Array.isArray(a.answer) ? (a.answer as unknown[]).map((r) => (Array.isArray(r) ? r.slice(1) : r)) : a.answer),
+  );
+  const text = entry.text.trim() !== "" ? entry.text : "";
+  return left.length || text ? { text, parts: left } : null;
+}
+
 const UNSAVED = "\u0000unsaved";
 const keyOf = (v: ResponseValue) => (typeof v === "string" ? v : JSON.stringify(v));
 
@@ -154,6 +182,7 @@ function ResponseField({
 }) {
   const ref = useMemo(() => cardRef(card), [card.id, card.day, card.theme, card.legacy]);
   const stored = useMemo(() => valueFrom(card.parts, entry), [card.parts, entry]);
+  const earlier = useMemo(() => unplaced(card.parts, entry), [card.parts, entry]);
   const storedKey = keyOf(stored);
   const [value, setValue] = useState<ResponseValue>(stored);
   const [busy, setBusy] = useState(false);
@@ -229,6 +258,8 @@ function ResponseField({
     if (busy) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
+    // Exactly what is in the box now (a last word the keyboard was still finishing included).
+    if (typeof latest.current === "string" && box.current && box.current.value !== latest.current) latest.current = box.current.value;
     const v = latest.current;
     if (log ? !(responseLoggable(v) && trackerNewInput(v, carried)) : !responseComplete(v)) return;
     setBusy(true);
@@ -250,6 +281,12 @@ function ResponseField({
   const showSaved = entry?.saved === true && keyOf(value) === storedKey;
   return (
     <div className="exercise-response-wrap">
+      {earlier && (
+        <div>
+          <p className="journal-muted">{EARLIER_ANSWER}</p>
+          <ResponseView text={earlier.text} parts={earlier.parts.length ? earlier.parts : null} />
+        </div>
+      )}
       {typeof value === "string" ? (
         <textarea
           ref={box}

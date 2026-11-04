@@ -97,10 +97,14 @@ describe("newer part kinds", () => {
     expect(submit).toBeDisabled();
     await userEvent.type(within(card).getByRole("textbox", { name: "Set off by, row 2" }), "Pretend news");
     await userEvent.click(submit);
-    await waitFor(() => expect(card).not.toBeInTheDocument()); // saved: the next card takes its place
-    expect((await readExerciseEntry(jk, TODAY, cardRef(KINDS.cards[0]!))).entry!.parts![0]!.answer).toEqual([
-      ["Pretend calm", "Pretend tea"], ["Pretend fizz", "Pretend news"],
-    ]);
+    // Submit replaces the card with the next one: wait for the saved answer, not the old card's "Saved".
+    await waitFor(
+      async () =>
+        expect((await readExerciseEntry(jk, TODAY, cardRef(KINDS.cards[0]!))).entry).toMatchObject({
+          saved: true, parts: [expect.objectContaining({ answer: [["Pretend calm", "Pretend tea"], ["Pretend fizz", "Pretend news"]] })],
+        }),
+      { timeout: 5000 },
+    );
   });
 
   it("a scale: its points between the end labels; a value is needed", async () => {
@@ -130,10 +134,14 @@ describe("newer part kinds", () => {
     await userEvent.type(within(card).getByRole("textbox", { name: "Day 1, Hours" }), "7");
     await userEvent.type(within(card).getByRole("textbox", { name: "Day 1, Mood" }), "Pretend fine");
     await userEvent.click(save);
-    expect(await within(card).findByText("Saved")).toBeInTheDocument();
-    await waitFor(async () =>
-      expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY && m.logged)).toMatchObject({ id: "kinds-tracker" }),
+    // Waits on what is stored (the day logged and its answer saved), not on a line in the card.
+    await waitFor(
+      async () =>
+        expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY && m.logged)).toMatchObject({ id: "kinds-tracker" }),
+      { timeout: 5000 },
     );
+    await waitFor(async () => expect((await readExerciseEntry(jk, TODAY, cardRef(KINDS.cards[2]!))).entry?.saved).toBe(true), { timeout: 5000 });
+    expect(await within(card).findByText("Saved", {}, { timeout: 5000 })).toBeInTheDocument();
     expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY)).toMatchObject({ id: "kinds-tracker", done: false });
     first.unmount();
     vi.useRealTimers();

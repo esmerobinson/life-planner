@@ -1,6 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useShellToday } from "./ui/shellContext";
-import { useAddDefaults } from "./ui/addContext";
 import { AppShell } from "./ui/AppShell";
 import { NAV } from "./ui/areas";
 import { AreaPage } from "./ui/AreaPage";
@@ -11,22 +10,19 @@ import { InboxPage } from "./ui/InboxPage";
 import { BinPage } from "./ui/BinPage";
 import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
-import { TodayPanel } from "./ui/TodayPanel";
-import { JournalCard } from "./ui/JournalCard";
+import { RemindersPage } from "./ui/RemindersPage";
+import { RepeatingPage } from "./ui/RepeatingPage";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
 
-function TodayRoute() {
-  // Today's Add opens as a to-do. It never pinned to today, so it still does not.
-  useAddDefaults("task", "inbox");
-  const today = useShellToday();
-  // Journal v2: the Journal rows get their own section, under the to-dos.
-  return (
-    <div className="today-page">
-      <TodayPanel today={today} />
-      <JournalCard today={today} />
-    </div>
-  );
+/**
+ * There is no Today page (Esme, 2026-11-04: "today page is a little redundant with the
+ * existence of home"): old /today links and notifications open Home, keeping what they asked
+ * for (?open=<id>, a #hash).
+ */
+function TodayRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: "/", search, hash }} replace />;
 }
 
 function HomeRoute() {
@@ -63,6 +59,10 @@ function JournalRoute() {
   return <JournalPage today={useShellToday()} />;
 }
 
+function RepeatingRoute() {
+  return <RepeatingPage today={useShellToday()} />;
+}
+
 function BackupRoute() {
   return <BackupPage today={useShellToday()} />;
 }
@@ -83,8 +83,6 @@ export function AppRoutes() {
           {NAV.map((n) =>
             n.id === "home" ? (
               <Route key={n.id} path={n.path} element={<HomeRoute />} />
-            ) : n.id === "today" ? (
-              <Route key={n.id} path={n.path} element={<TodayRoute />} />
             ) : n.id === "vision" ? (
               <Route key={n.id} path={n.path} element={<VisionPage />} />
             ) : n.id === "journal" ? (
@@ -93,6 +91,7 @@ export function AppRoutes() {
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
             ),
           )}
+          <Route path="/today" element={<TodayRedirect />} />
           <Route path="/journal/:tab" element={<JournalRoute />} />
           <Route path="/goals" element={<GoalsRoute />} />
           <Route path="/goals/:id" element={<GoalDetailRoute />} />
@@ -102,6 +101,8 @@ export function AppRoutes() {
           <Route path="/bin" element={<BinRoute />} />
           <Route path="/backup" element={<BackupRoute />} />
           <Route path="/sync" element={<SyncPage />} />
+          <Route path="/reminders" element={<RemindersPage />} />
+          <Route path="/repeating" element={<RepeatingRoute />} />
         </Route>
       </Routes>
   );

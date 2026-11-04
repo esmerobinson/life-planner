@@ -14,10 +14,10 @@ import type { ISODate } from "../../domain/types";
 import { exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows";
 import { Streak } from "../Streak";
 import { LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
-import { CardExample, ExerciseResponseBox } from "./ExerciseResponseBox";
+import { CardExample, ExerciseResponseBox, fillsCard } from "./ExerciseResponseBox";
 import { ChapterMap, WorkbookBars } from "./WorkbookProgress";
 import { workbooks } from "../../journal/workbooks";
-import { ResponseView } from "./ResponseView";
+import { cardTitle, OtherVersions, ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
 
 export const REPLACE_QUESTION = "Replace your exercise cards?";
@@ -28,9 +28,9 @@ export const CARDS_SYNCING = "Your cards are still syncing…";
 /** Beside Submit on today's card (the approved mockup). */
 export const SUBMIT_TICKS = "Submitting ticks today's exercise.";
 export const NEXT_ONE = "Do the next one →";
-/** Above the next card once one is submitted. */
-export const savedLine = (card: ExerciseCard) =>
-  `${card.day !== null && !card.optional ? `Day ${card.day}` : "That card"} saved. Here's the next one if you'd like to keep going.`;
+/** Above the next card once one is submitted: which card, by its book and title (never a bare "Day N"). */
+export const savedLine = (card: ExerciseCard, book = "") =>
+  `${card.optional ? card.theme : cardTitle(card, book, true)} saved. Here's the next one if you'd like to keep going.`;
 /** When the card just submitted was the last one not done. */
 export const ALL_DONE_LINE = "That's every card for now. Lovely work.";
 export const SEE_WHAT_YOU_WROTE = "See what you wrote";
@@ -71,6 +71,8 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   // Just submitted: waiting for the saved state to be read back, then the line above the next card.
   const [waiting, setWaiting] = useState<string | null>(null);
   const [saved, setSaved] = useState<ExerciseCard | null>(null);
+  // The card on the page now (kept there while it is: see `shown`).
+  const [onScreen, setOnScreen] = useState<string | null>(null);
   // The chapter map pop-up, open on this book (and perhaps straight on one card; null: closed).
   const [mapOf, setMapOf] = useState<{ book: string; card: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -104,6 +106,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
     setTrail([]);
     setWaiting(null);
     setSaved(null);
+    setOnScreen(null);
   }, [today]);
   // Never blank: "Loading…", then the can't-open line and Try again.
   const guard = useLoadGuard(cards === null, load);
@@ -156,11 +159,20 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const starred = progress?.starred ?? new Set<string>();
   const row = useMemo(() => rowStatus(exerciseDoneDays(progress?.marks ?? []), today), [progress, today]);
   const byId = new Map((set?.cards ?? []).map((c) => [c.id, c]));
+  // Finished today: done, and what she submitted still fills the card as it is now (a re-imported
+  // card with a new part to answer shows again, her earlier answer on it).
+  const finishedToday = (c: ExerciseCard) =>
+    !!plan?.doneToday.has(c.id) && fillsCard(c, responses.find((e) => e.date === today && e.submitted && isFor(c, e)) ?? null);
   // Never a finished card (2026-11-04: "I'm still seeing day 1 and have to scroll down to day
   // 2"): the card chosen, else today's, else the next not done today. None left: all done.
+  // The card already on the page stays while it is there (review I4b): one finished on another
+  // device while she types here stays hers to finish; only her own Submit here moves on.
   const shown = plan
-    ? ([shownId ? byId.get(shownId) : undefined, plan.today.card, ...plan.queue].find((c) => c && !plan.doneToday.has(c.id)) ?? null)
+    ? ([shownId ? byId.get(shownId) : undefined, plan.today.card, ...plan.queue].find((c) => c && (c.id === onScreen || !finishedToday(c))) ?? null)
     : null;
+  useEffect(() => {
+    if ((shown?.id ?? null) !== onScreen) setOnScreen(shown?.id ?? null);
+  });
   const finished = !!plan && !shown;
   const isToday = !!plan && shown?.id === plan.today.card.id;
   // Opened (or reloaded) after today's card was submitted: the line names the last card done today.
@@ -181,8 +193,12 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   // Once a submit is read back as done, the card gives way to the next one not done (or a gentle line).
   useEffect(() => {
     if (!waiting || !plan || !plan.doneToday.has(waiting)) return;
+    // She has already moved to another card (Do the next one, Back): she stays where she is.
+    // (The submitted card stays on the page until this moves on, so this compares like with like.)
+    if (shown?.id !== waiting) return setWaiting(null);
     const after = plan.queue.find((c) => c.id !== waiting && !plan.doneToday.has(c.id)) ?? null;
     setWaiting(null);
+    setOnScreen(null);
     setSaved(byId.get(waiting) ?? null);
     setShownId(after?.id ?? null);
     setTrail((t) => t.filter((id) => !plan.doneToday.has(id)));
@@ -266,7 +282,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
           <div ref={stage} className="exercise-stage">
             {savedCard && (
               <p className="journal-muted exercise-saved" role="status">
-                {finished ? ALL_DONE_LINE : savedLine(savedCard)}{" "}
+                {finished ? ALL_DONE_LINE : savedLine(savedCard, titles.get(savedCard.track))}{" "}
                 <button type="button" className="quiet-link" onClick={() => setMapOf({ book: savedCard.track, card: savedCard.id })}>
                   {SEE_WHAT_YOU_WROTE}
                 </button>
@@ -309,7 +325,8 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
           </div>
         </>
       )}
-      <PastExercises past={responses.filter((e) => e.date < today)} cards={set?.cards ?? []} />
+      {/* Today's too (Esme, 2026-11-04: "I submitted … but cant see it in past exercises"). */}
+      <PastExercises past={responses} cards={set?.cards ?? []} />
       {plan && books.length > 0 && (
         <div className="btn-group">
           <button type="button" className="btn-secondary" onClick={() => setMapOf({ book: books[0]!.id, card: null })}>
@@ -477,8 +494,8 @@ function ReadMore({ card }: { card: ExerciseCard }) {
 const isFor = (c: ExerciseCard, e: ExerciseResponse) => c.id === e.id && (!c.legacy || c.theme === e.theme);
 
 /**
- * Past exercises (journal polish brief §2): earlier days' responses, newest first, each
- * "Day N · Theme · <date>". Opening one shows the card (from the stored set; if the set was
+ * Past exercises (journal polish brief §2): her responses, today's too, newest first, each
+ * "<date> · <book> · Day N · Theme" (cardTitle). Opening one shows the card (from the stored set; if the set was
  * replaced and the card is gone, just the theme stored with the response) and her response.
  * These are readable any time.
  */
@@ -508,10 +525,10 @@ function PastExercises({ past, cards }: { past: ExerciseResponse[]; cards: Exerc
 
 function PastExercise({ entry, card }: { entry: ExerciseResponse; card: ExerciseCard | null }) {
   const [open, setOpen] = useState(false);
-  const name = entry.day !== null ? `Day ${entry.day} · ${entry.theme}` : entry.theme;
+  const book = useContext(TrackTitles).get(card?.track ?? "");
   return (
     <details onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>{`${name} · ${longDate(entry.date)}`}</summary>
+      <summary>{`${longDate(entry.date)} · ${cardTitle(entry, book, card !== null)}`}</summary>
       {open && (
         <div className="exercise-card exercise-boxed">
           {card && <CardBody card={card} />}
@@ -519,6 +536,7 @@ function PastExercise({ entry, card }: { entry: ExerciseResponse; card: Exercise
             <h3 className="exercise-label">Your response</h3>
             <ResponseView text={entry.text} parts={entry.parts} />
             {!entry.submitted && <p className="journal-muted">Not submitted</p>}
+            <OtherVersions others={entry.others} />
           </div>
         </div>
       )}
@@ -589,6 +607,7 @@ function CardReview({
                   {!e.submitted && <span className="journal-muted"> · Not submitted</span>}
                 </p>
                 <ResponseView text={e.text} parts={e.parts} />
+                <OtherVersions others={e.others} />
               </li>
             ))}
           </ul>

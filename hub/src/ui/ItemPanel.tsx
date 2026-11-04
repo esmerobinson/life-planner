@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isActive } from "../domain/goalCounts";
-import { getItem, saveItemNotes, updateItem } from "../data/repo";
-import { useSessionsUndo } from "./undoSessions";
+import { getItem, makeBook, saveItemNotes, setBookStatus, unBook, updateItem } from "../data/repo";
+import { CHANGED_TO_BOOK, leftReadingList, MOVED_TO_READING_LIST, useRowUndo, useSessionsUndo } from "./undoSessions";
+import { BOOK_AREA, BOOK_LIMITS, BOOK_STATUSES, BOOK_STATUS_LABEL, bookLine, isBook, isWebLink } from "../domain/books";
+import { ProgressBar } from "./ProgressBar";
+import { RepeatBox } from "./RepeatBox";
 import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
 import { dayLabel } from "../domain/display";
@@ -18,10 +21,10 @@ import { ProjectSummary, SessionList } from "./ProjectPanel";
 import { DEFAULT_SESSIONS, isProject, newSessions, withSessions } from "../domain/projects";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
 
-/** The Type property: a project is a to-do with sessions, shown as its own type. */
-type PanelKind = Item["kind"] | "project";
-const TYPE_LABEL: Record<PanelKind, string> = { task: "To-do", project: "Project", idea: "Idea" };
-const kindOf = (it: Item): PanelKind => (isProject(it) ? "project" : it.kind);
+/** The Type property: a project is a to-do with sessions, a book an idea on the reading list, each shown as its own type. */
+type PanelKind = Item["kind"] | "project" | "book";
+const TYPE_LABEL: Record<PanelKind, string> = { task: "To-do", project: "Project", idea: "Idea", book: "Book" };
+const kindOf = (it: Item): PanelKind => (isProject(it) ? "project" : isBook(it) ? "book" : it.kind);
 
 interface Fields {
   kind: PanelKind;
@@ -30,6 +33,11 @@ interface Fields {
   goalId: string;
   priority: Priority;
   milestone: boolean;
+  /** A book's fields, as typed. */
+  author: string;
+  pages: string;
+  pageAt: string;
+  link: string;
 }
 
 const fieldsOf = (it: Item): Fields => ({
@@ -39,7 +47,40 @@ const fieldsOf = (it: Item): Fields => ({
   goalId: it.goalId ?? "",
   priority: it.priority,
   milestone: it.milestone === true,
+  author: it.author ?? "",
+  pages: it.pages === undefined ? "" : String(it.pages),
+  pageAt: it.pageAt === undefined ? "" : String(it.pageAt),
+  link: it.link ?? "",
 });
+
+/** A page number as typed: blank is none; otherwise a whole number in range, or null when it isn't. */
+function pageNumber(text: string, min: number): number | undefined | null {
+  const t = text.trim();
+  if (t === "") return undefined;
+  const n = Number(t);
+  return Number.isInteger(n) && n >= min && n <= BOOK_LIMITS.pages ? n : null;
+}
+
+/**
+ * The book fields typed in Edit, checked, as a patch for the row (undefined removes a field),
+ * or the plain message that says what to fix.
+ */
+function bookFieldsPatch(f: Fields, was: Fields): { patch: Partial<Item> } | { message: string } {
+  const patch: Partial<Item> = {};
+  const author = f.author.trim();
+  if (author.length > BOOK_LIMITS.author) return { message: `An author is at most ${BOOK_LIMITS.author} characters.` };
+  if (author !== was.author.trim()) patch.author = author || undefined;
+  const link = f.link.trim();
+  if (link && (link.length > BOOK_LIMITS.link || !isWebLink(link))) return { message: "A link starts with https:// (or http://)." };
+  if (link !== was.link.trim()) patch.link = link || undefined;
+  const pages = pageNumber(f.pages, 1);
+  if (pages === null) return { message: "Pages is a whole number, 1 or more." };
+  let pageAt = pageNumber(f.pageAt, 0);
+  if (pageAt === null) return { message: "The page reached is a whole number, 0 or more." };
+  if (pages !== undefined && pageAt !== undefined && pageAt > pages) pageAt = pages;
+  if (f.pages !== was.pages || f.pageAt !== was.pageAt) Object.assign(patch, { pages, pageAt });
+  return { patch };
+}
 
 /**
  * A task or idea in the side panel: the title (always editable, saved on blur), the
@@ -65,6 +106,8 @@ export function ItemPanel({
   const panel = usePanel();
   const { attempt, saveError } = useSaveError();
   const offerUndo = useSessionsUndo(today);
+  const offerRowUndo = useRowUndo(today);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<Fields>(() => fieldsOf(item));
   const [snapshot, setSnapshot] = useState<Fields>(() => fieldsOf(item));
@@ -88,6 +131,7 @@ export function ItemPanel({
     escape.current = editing
       ? () => {
           setEditing(false);
+          setFieldError(null);
           return true;
         }
       : null;
@@ -100,6 +144,7 @@ export function ItemPanel({
     const now = fieldsOf(item);
     setFields(now);
     setSnapshot(now);
+    setFieldError(null);
     setEditing(true);
   }
 
@@ -109,7 +154,46 @@ export function ItemPanel({
     const f = fields;
     const was = snapshot;
     const patch: Partial<Item> = {};
+    setFieldError(null);
     if (f.priority !== was.priority) patch.priority = f.priority;
+    const toBook = !inbox && f.kind === "book" && was.kind !== "book";
+    const fromBook = !inbox && was.kind === "book" && f.kind !== "book";
+    if (f.kind === "book") {
+      const book = bookFieldsPatch(f, was);
+      if ("message" in book) {
+        setFieldError(book.message);
+        return;
+      }
+      Object.assign(patch, book.patch);
+    }
+    if (toBook || fromBook) {
+      // As the arrow menu's Change to: makeBook / unBook put the fields the new type doesn't
+      // show away (nothing is lost) and bring back what was put away; then what was typed here.
+      if (fromBook && f.areaId !== was.areaId) patch.areaId = f.areaId;
+      if (fromBook && f.kind !== "idea") {
+        if (f.due !== was.due) patch.due = f.due || undefined;
+        if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
+      }
+      setBusy(true);
+      const before: { row?: Item } = {};
+      try {
+        await write(async () => {
+          before.row = await getItem(item.id);
+          if (toBook) await makeBook(item.id, today);
+          else await unBook(item.id, f.kind === "project" ? "project" : f.kind === "task" ? "task" : "idea", today);
+          if (Object.keys(patch).length) await updateItem(item.id, patch, today);
+        });
+        const row = before.row;
+        if (row && toBook) offerRowUndo(row.areaId !== BOOK_AREA ? MOVED_TO_READING_LIST : CHANGED_TO_BOOK, row);
+        else if (row) offerRowUndo(leftReadingList(f.kind === "book" ? "idea" : f.kind), row);
+        setEditing(false);
+      } catch {
+        // The save message shows; stay in Edit mode with the changes.
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (!inbox && f.kind !== was.kind) {
       // Project <-> to-do: the sessions come or go (a project does not repeat); an idea has none.
       // A done to-do made a project is open again: a project is done only when its sessions are (I-1).
@@ -118,11 +202,12 @@ export function ItemPanel({
         // The status follows the sessions (R-5): done, with completedAt, only when every one is ticked.
         const { status, completedAt } = withSessions(item, patch.sessions!, today);
         if ((item.status === "open" || item.status === "done") && (status !== item.status || completedAt !== item.completedAt)) Object.assign(patch, { status, completedAt });
-      } else patch.kind = f.kind;
+      } else patch.kind = f.kind === "book" ? "idea" : f.kind;
       if (was.kind === "project" && f.kind !== "project") patch.sessions = undefined;
     }
-    if (!inbox && f.areaId !== was.areaId) patch.areaId = f.areaId;
-    if (inbox || f.kind !== "idea") {
+    // A book's area is always Mind (the select is shown but not changeable).
+    if (!inbox && f.kind !== "book" && f.areaId !== was.areaId) patch.areaId = f.areaId;
+    if (inbox || (f.kind !== "idea" && f.kind !== "book")) {
       if (f.due !== was.due) patch.due = f.due || undefined;
       if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
       const flag = Boolean(f.goalId && f.milestone);
@@ -144,7 +229,8 @@ export function ItemPanel({
         if (dropsSessions) before.row = await getItem(item.id);
         await updateItem(item.id, patch, today);
       });
-      if (dropsSessions && before.row) offerUndo(f.kind === "idea" ? "idea" : "task", before.row);
+      const row = before.row;
+      if (dropsSessions && row) offerUndo(f.kind === "idea" ? "idea" : "task", row);
       setEditing(false);
     } catch {
       // The save message shows; stay in Edit mode with the changes.
@@ -157,8 +243,11 @@ export function ItemPanel({
   // Days untouched, when it is in Needs a look's "Not looked at in a while" group.
   const stale = needsALook([item], today).stale.length > 0 ? daysBetween(item.touchedAt, today) : null;
   const isTask = inbox || item.kind === "task";
-  const showGoal = editing ? inbox || fields.kind !== "idea" : isTask;
+  const showGoal = editing ? inbox || (fields.kind !== "idea" && fields.kind !== "book") : isTask;
   const project = isProject(item);
+  const book = isBook(item);
+  // The book properties show for a book, and in Edit once Type is Book.
+  const showBook = !inbox && (editing ? fields.kind === "book" : book);
   // A project's due date is its deadline (2C).
   const dueKey = (editing ? fields.kind === "project" : project) ? "Deadline" : "Due";
 
@@ -166,16 +255,21 @@ export function ItemPanel({
     <div className="peek-body">
       <PanelTop
         phone={phone}
-        kicker={project ? "Project" : undefined}
+        kicker={project ? "Project" : book ? "Book" : undefined}
         editing={editing}
         busy={busy}
         onEdit={startEdit}
         onDone={() => void done()}
-        onCancel={() => setEditing(false)}
+        onCancel={() => {
+          setFieldError(null);
+          setEditing(false);
+        }}
       />
       <div className="peek-content">
       <TitleBox value={title.value} onChange={title.set} onBlur={title.flush} />
       {saveError && <p className="form-message">{saveError}</p>}
+      {fieldError && <p className="form-message">{fieldError}</p>}
+      <RepeatBox item={item} today={today} onChanged={onChanged} />
       <div className="peek-props">
         {!inbox && (
           <>
@@ -189,6 +283,7 @@ export function ItemPanel({
                 <option value="task">To-do</option>
                 <option value="project">Project</option>
                 <option value="idea">Idea</option>
+                <option value="book">Book</option>
               </select>
             ) : (
               <span>
@@ -197,11 +292,49 @@ export function ItemPanel({
             )}
           </>
         )}
+        {showBook && (
+          <>
+            {book && (
+              <>
+                <span className="peek-key">Status</span>
+                {/* Always live (not only in Edit): tapping a pill changes the status at once. */}
+                <div role="group" aria-label="Status" className="btn-group book-status">
+                  {BOOK_STATUSES.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={item.bookStatus === s}
+                      onClick={() => {
+                        if (item.bookStatus !== s) void write(() => setBookStatus(item.id, s, today)).catch(() => {});
+                      }}
+                    >
+                      {BOOK_STATUS_LABEL[s]}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <span className="peek-key">Author</span>
+            {editing ? (
+              <input
+                type="text"
+                aria-label="Author"
+                maxLength={BOOK_LIMITS.author}
+                value={fields.author}
+                onChange={(e) => setFields({ ...fields, author: e.target.value })}
+              />
+            ) : (
+              <span>{item.author ?? "None"}</span>
+            )}
+          </>
+        )}
         <span className="peek-key">Area</span>
         {editing && !inbox ? (
           <select
             aria-label="Area"
-            value={fields.areaId}
+            // A book always lives under Mind: shown, not changeable.
+            disabled={fields.kind === "book"}
+            value={fields.kind === "book" ? BOOK_AREA : fields.areaId}
             onChange={(e) => setFields({ ...fields, areaId: e.target.value as AreaId })}
           >
             {GOAL_AREAS.map((a) => (
@@ -215,6 +348,7 @@ export function ItemPanel({
             <span className="chip">{inbox ? "Inbox" : areaLabel(item.areaId)}</span>
           </span>
         )}
+        {showBook && <BookPages item={item} editing={editing} fields={fields} setFields={setFields} today={today} />}
         {/* The stale reason left the Needs-a-look strip (compact strips); read-only here. */}
         {stale !== null && (
           <>
@@ -324,6 +458,85 @@ export function ItemPanel({
       </div>
     </div>
   );
+}
+
+/**
+ * A book's Pages, Finished and Link properties: "page 120 of 300" over a bar, the day it was
+ * marked Read, and its link (opens in a new tab). In Edit: the page reached, the page count and
+ * the link as fields.
+ */
+function BookPages({
+  item, editing, fields, setFields, today,
+}: { item: Item; editing: boolean; fields: Fields; setFields: (f: Fields) => void; today: ISODate }) {
+  const { pageLine, ratio } = bookLine(item);
+  const pagesView = pageLine ?? (item.pages ? `${item.pages} pages` : "None");
+  return (
+    <>
+      <span className="peek-key">Pages</span>
+      {editing ? (
+        <span className="book-page-fields">
+          <input
+            type="number"
+            aria-label="Page reached"
+            min={0}
+            max={BOOK_LIMITS.pages}
+            step={1}
+            value={fields.pageAt}
+            onChange={(e) => setFields({ ...fields, pageAt: e.target.value })}
+          />
+          <span>of</span>
+          <input
+            type="number"
+            aria-label="Pages"
+            min={1}
+            max={BOOK_LIMITS.pages}
+            step={1}
+            value={fields.pages}
+            onChange={(e) => setFields({ ...fields, pages: e.target.value })}
+          />
+        </span>
+      ) : (
+        <span>
+          {pagesView}
+          {ratio !== null && (
+            <span className="book-panel-bar">
+              <ProgressBar ratio={ratio} label={`${item.title}: ${pageLine}`} />
+            </span>
+          )}
+        </span>
+      )}
+      {!editing && item.bookStatus === "read" && item.finishedOn && (
+        <>
+          <span className="peek-key">Finished</span>
+          <span>{dayLabel(item.finishedOn, today)}</span>
+        </>
+      )}
+      <span className="peek-key">Link</span>
+      {editing ? (
+        <input
+          type="url"
+          aria-label="Link"
+          maxLength={BOOK_LIMITS.link}
+          placeholder="https://"
+          value={fields.link}
+          onChange={(e) => setFields({ ...fields, link: e.target.value })}
+        />
+      ) : item.link ? (
+        <span className="book-link">
+          <a href={item.link} target="_blank" rel="noopener noreferrer">
+            {linkLabel(item.link)}
+          </a>
+        </span>
+      ) : (
+        <span>None</span>
+      )}
+    </>
+  );
+}
+
+/** A link shown by its address without the scheme ("library.example.test/lantern"). */
+function linkLabel(url: string): string {
+  return url.replace(/^https?:\/\//i, "").replace(/\/$/, "");
 }
 
 /** A textarea that is always as tall as its text (also when the panel is resized). */

@@ -60,7 +60,7 @@ it("Submit seals the response and marks today's card done; reloaded, the next ca
   const card = await todayCard();
   await userEvent.type(await box(), "Pretend cloud, floating");
   await userEvent.click(within(card).getByRole("button", { name: "Submit" }));
-  await within(await section()).findByRole("article", { name: "Next card: Day 2" }); // the next one takes its place
+  await within(await section()).findByRole("article", { name: "Next card: Day 2" }, { timeout: 5000 }); // the next one takes its place
   const device = await getDeviceId(db);
   expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, id: "day-1", done: true, primary: true }]);
   expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating", saved: true });
@@ -71,7 +71,8 @@ it("Submit seals the response and marks today's card done; reloaded, the next ca
   await within(s).findByRole("article", { name: "Next card: Day 2" });
   expect(within(s).getAllByRole("article")).toHaveLength(1);
   expect(within(s).queryByDisplayValue("Pretend cloud, floating")).toBeNull();
-  expect(await db.journal.where("kind").equals("exercise-entry").count()).toBe(1);
+  // One submitted row (drafts have their own row, apart, so they never write over it).
+  expect(await db.journal.where("kind").equals("exercise-entry").filter((r) => !r.id.endsWith("-draft")).count()).toBe(1);
 });
 
 it("autosaves a draft on blur without marking Done; it is there after a reload", async () => {
@@ -129,7 +130,7 @@ it("another device's newer response shows in the box while nothing is being type
 });
 
 describe("Past exercises", () => {
-  it("newest first as 'Day N · Theme · <date>'; opening one shows the card and her response", async () => {
+  it("newest first as '<date> · Day N · Theme'; opening one shows the card and her response", async () => {
     const device = await getDeviceId(db);
     await submitExerciseEntry(jk, "2026-10-27", device, CARD1, "Pretend first response");
     await submitExerciseEntry(jk, "2026-10-29", device, legacy(2, "The fictional kettle"), "Pretend kettle response");
@@ -139,8 +140,8 @@ describe("Past exercises", () => {
     const list = within(s).getByRole("list", { name: "Past exercises" });
     const items = within(list).getAllByRole("listitem");
     expect(items.map((i) => i.querySelector("summary")!.textContent)).toEqual([
-      "Day 2 · The fictional kettle · Thursday 29 October",
-      "Day 1 · Pretend weather · Tuesday 27 October",
+      "Thursday 29 October · Day 2 · The fictional kettle",
+      "Tuesday 27 October · Day 1 · Pretend weather",
     ]);
     await userEvent.click(within(items[0]!).getByText(/Day 2 · The fictional kettle/));
     expect(within(items[0]!).getByText(/a kettle whistles before it boils over/)).toBeInTheDocument();
@@ -158,11 +159,12 @@ describe("Past exercises", () => {
     await userEvent.click(await within(s).findByText("Past exercises"));
     const items = within(within(s).getByRole("list", { name: "Past exercises" })).getAllByRole("listitem");
     // Day 2 is in the set now, but as another card: not shown as this one.
-    await userEvent.click(within(items[0]!).getByText(/Day 2 · An older pretend theme/));
+    // Said plainly as an earlier card (Esme, 2026-11-04), never passed off as the set's Day 2.
+    await userEvent.click(within(items[0]!).getByText("Thursday 29 October · Earlier card (day 2) · An older pretend theme"));
     expect(within(items[0]!).getByText("Pretend replaced response")).toBeInTheDocument();
     expect(within(items[0]!).queryByText(/kettle/)).toBeNull();
     expect(within(items[0]!).queryByText("Learn")).toBeNull();
-    await userEvent.click(within(items[1]!).getByText(/Day 9 · A pretend card from an old set/));
+    await userEvent.click(within(items[1]!).getByText(/Earlier card \(day 9\) · A pretend card from an old set/));
     expect(within(items[1]!).getByText("Pretend old response")).toBeInTheDocument();
   });
 

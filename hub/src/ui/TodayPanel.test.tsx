@@ -238,10 +238,10 @@ describe("TodayPanel", () => {
     // Change to (not To-do, which it is), the other areas (not Writing, where it is), then
     // This week, Remove from today and Archive.
     expect(within(within(group).getByRole("group", { name: "Change to" })).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Project", "Idea", "Goal",
+      "Project", "Idea", "Book", "Goal",
     ]);
     expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "Project", "Idea", "Goal",
+      "Project", "Idea", "Book", "Goal",
       "Admin", "Mind", "Art", "Content", "Body", "Tech projects", "Production",
       "This week", "Remove from today", "Archive", "Delete",
     ]);

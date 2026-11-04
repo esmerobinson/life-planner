@@ -28,7 +28,7 @@ test("an item added in one tab shows in another tab's Inbox without reload", asy
   await expectNoReload(b);
 });
 
-test("a tick in one tab updates another tab's Today without reload", async ({ context }) => {
+test("a tick in one tab updates another tab's Home (Today list) without reload", async ({ context }) => {
   const a = await context.newPage();
   await a.goto("/");
 
@@ -47,9 +47,9 @@ test("a tick in one tab updates another tab's Today without reload", async ({ co
   const b = await context.newPage();
   await b.goto("/");
 
-  // Reach Today in both by in-app navigation (no document load), then mark B.
+  // Reach Home (Today's list) in both by in-app navigation (no document load), then mark B.
   for (const p of [a, b]) {
-    await p.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Today" }).click();
+    await p.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Home" }).click();
     await expect(p.getByRole("heading", { name: "Today" }).first()).toBeVisible();
   }
   await mark(b);

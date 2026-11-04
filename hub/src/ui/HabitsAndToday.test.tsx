@@ -79,7 +79,7 @@ describe("Today keeps what was ticked off today", () => {
   it("a ticked to-do leaves the list for a closed 'Done today (N)' dropdown; unticking brings it back", async () => {
     await createItem({ kind: "task", title: "First pretend", areaId: "art", priority: 2, pinnedDate: TODAY }, TODAY);
     await createItem({ kind: "task", title: "Second pretend", areaId: "art", priority: 2, pinnedDate: TODAY }, TODAY);
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     const list = await screen.findByRole("list", { name: "Today" });
     const titles = () => within(list).getAllByRole("listitem").map((li) => li.querySelector(".strip-title")!.textContent);
     expect(titles().sort()).toEqual(["First pretend", "Second pretend"]);
@@ -103,7 +103,7 @@ describe("Today keeps what was ticked off today", () => {
     await tickItem(a.id, TODAY);
     const b = await createItem({ kind: "task", title: "Done yesterday", areaId: "art", priority: 2 }, TODAY);
     await tickItem(b.id, "2026-10-27");
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     const fold = (await screen.findByText("Done today (1)")).closest("details")!;
     expect(within(fold).getByRole("checkbox", { name: "Done: Done today", hidden: true })).toBeChecked();
     expect(screen.queryByText("Done yesterday")).toBeNull();
@@ -115,7 +115,7 @@ describe("Today keeps what was ticked off today", () => {
       TODAY,
     );
     await tickItem(p.id, TODAY);
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     const list = await screen.findByRole("list", { name: "Today" });
     expect(within(list).getByRole("checkbox", { name: "Done: Pretend project" }).closest("li")).toHaveClass("crossed");
     expect(screen.queryByText(/^Done today/)).toBeNull();
@@ -127,7 +127,7 @@ describe("Today keeps what was ticked off today", () => {
       TODAY,
     );
     await tickItem(p.id, TODAY);
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     const fold = (await screen.findByText("Done today (1)")).closest("details")!;
     expect(within(fold).getByText("Pretend project")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Today" })).toBeNull();
@@ -136,7 +136,7 @@ describe("Today keeps what was ticked off today", () => {
   it("a habit ticked on Today stays in the rhythm list, crossed out, last", async () => {
     await habit("Pretend stretch");
     await habit("Pretend walk");
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     const rhythm = await screen.findByRole("list", { name: "Rhythm" });
     await userEvent.click(within(rhythm).getByRole("checkbox", { name: "Mark done: Pretend stretch" }));
     await vi.waitFor(() =>

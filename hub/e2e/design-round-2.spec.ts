@@ -109,7 +109,7 @@ test("area page: strips, icons, due line, goal card, month count and the done fo
   // Move to: Change to first (the types it is not), then the areas.
   await page.getByRole("button", { name: "Move to: A comic about a snail who runs a post office" }).click();
   const menu = page.getByRole("group", { name: "Move A comic about a snail who runs a post office to" });
-  await expect(menu.getByRole("group", { name: "Change to" }).getByRole("button")).toHaveText(["To-do", "Project", "Goal"]);
+  await expect(menu.getByRole("group", { name: "Change to" }).getByRole("button")).toHaveText(["To-do", "Project", "Book", "Goal"]);
   await shoot(page, "area-move-popover-1280");
   await page.keyboard.press("Escape");
 
@@ -117,20 +117,18 @@ test("area page: strips, icons, due line, goal card, month count and the done fo
   await shoot(page, "area-done-open-1280");
 });
 
-test("goals, today and inbox at desktop width", async ({ page }) => {
+test("goals, inbox and Home at desktop width", async ({ page }) => {
   await seedFictionalWorld(page);
   await page.goto("/goals");
   await expect(page.getByRole("heading", { level: 2, name: "Writing" })).toBeVisible();
   await expect(page.getByText("By 31 Dec")).toBeVisible();
   await shoot(page, "goals-1280");
-  await page.goto("/today");
-  await expect(page.getByText("Draft the pretend essay opening")).toBeVisible();
-  await shoot(page, "today-1280");
   await page.goto("/inbox");
   await expect(page.getByText("Pretend loose thought to file")).toBeVisible();
   await shoot(page, "inbox-1280");
   await page.goto("/");
   await expect(page.getByRole("link", { name: "Finish the pretend essay collection" })).toBeVisible();
+  await expect(page.getByText("Draft the pretend essay opening")).toBeVisible();
   await shoot(page, "home-1280");
 });
 
@@ -182,11 +180,11 @@ test.describe("phone width (390px)", () => {
     await expectNothingSpills(page);
   });
 
-  test("goals, today and inbox at phone width", async ({ page }) => {
+  test("goals, Home and inbox at phone width", async ({ page }) => {
     await seedFictionalWorld(page);
     for (const [path, name, text] of [
       ["/goals", "goals-390", "By 31 Dec"],
-      ["/today", "today-390", "Draft the pretend essay opening"],
+      ["/", "home-390", "Draft the pretend essay opening"],
       ["/inbox", "inbox-390", "Pretend loose thought to file"],
     ] as const) {
       await page.goto(path);

@@ -38,10 +38,17 @@ export function weekdayOf(d: ISODate): Weekday {
   return WEEKDAYS[new Date(toUTC(d)).getUTCDay()];
 }
 
-/** Today's local calendar date. */
-export function todayISO(): ISODate {
-  const now = new Date();
-  return fromUTC(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+/**
+ * Esme's day ends at 3am (her choice, 2026-11-04): anything done before 3am still counts as the
+ * previous day (a 1am exercise is yesterday's). Every "today" in the app comes from here.
+ */
+export const DAY_ENDS_AT_HOUR = 3;
+
+/** Today's local date, where a day runs from 3am to 3am (see DAY_ENDS_AT_HOUR). */
+export function todayISO(at: Date = new Date()): ISODate {
+  const shifted = new Date(at.getTime());
+  shifted.setHours(shifted.getHours() - DAY_ENDS_AT_HOUR);
+  return fromUTC(Date.UTC(shifted.getFullYear(), shifted.getMonth(), shifted.getDate()));
 }
 
 /** Last calendar day of a month (month is 1 to 12). No local-timezone conversion. */

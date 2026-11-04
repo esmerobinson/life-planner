@@ -125,6 +125,14 @@ textarea.peek-title {
   overflow: hidden;
 }
 
+/* A repeating item's line and buttons (Stop repeating, Delete) under the title: the line, then
+   the buttons --gap-buttons below it. Existing button and spacing values only. */
+.repeat-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-buttons);
+}
+
 /* Properties (.props). */
 .peek-props {
   display: grid;

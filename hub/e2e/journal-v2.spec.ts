@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
 import { openCardInMap, pageDate } from "./helpers";
 
-/* Journal v2 end to end, with a lived-in FICTIONAL journal: the rows on Home, on Today (their
-   own Journal section under the to-dos) and in Mind's Habits box; then every Journal tab (the
+/* Journal v2 end to end, with a lived-in FICTIONAL journal: the rows on Home (at the top of
+   Today's list) and in Mind's Habits box; then every Journal tab (the
    exercise with Read more open and "Do the next one", morning pages, the check-in, Read back),
    at 1280 and 390, never scrolling sideways. Set SHOTS_DIR to save screenshots. The sync address
    is a made-up one that never answers. */
@@ -68,21 +68,15 @@ async function walk(page: Page, w: number) {
   await livedIn(page);
   const shot = (name: string) => shoot(page, `jv2-${w}-${name}`);
 
-  // Home: the three mint rows, the exercise first.
+  // Home: the three mint rows at the top of Today's list, the exercise first; the to-dos below.
   await page.goto("/");
-  const journal = page.getByRole("region", { name: "Journal" });
+  const journal = page.getByRole("list", { name: "Journal" });
   await expect(journal.locator("li.journal-row .strip-title")).toHaveText(["Mental health exercise", "Morning pages", "Daily check-in"]);
   await expect(journal.getByText("Day 2 · The fictional kettle")).toBeVisible();
   await expect(journal.locator("li.journal-row").nth(1).locator(".streak-n")).toHaveText("4");
+  await expect(page.getByText("Water the pretend fern")).toBeVisible();
   await noSidewaysScroll(page);
   await shot("home");
-
-  // Today: a Journal section under the to-dos.
-  await page.goto("/today");
-  await expect(page.getByText("Water the pretend fern")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Journal" }).locator("li.journal-row")).toHaveCount(3);
-  await noSidewaysScroll(page);
-  await shot("today");
 
   // Mind: the rows in the Habits box, after her own habit.
   await page.goto("/area/mind");
@@ -145,7 +139,7 @@ async function walk(page: Page, w: number) {
 
 test.describe("at 1280px", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
-  test("rows on Home, Today and Mind; every Journal tab", async ({ page }) => {
+  test("rows on Home and Mind; every Journal tab", async ({ page }) => {
     test.setTimeout(120_000);
     await walk(page, 1280);
   });
@@ -153,7 +147,7 @@ test.describe("at 1280px", () => {
 
 test.describe("at 390px", () => {
   test.use({ viewport: { width: 390, height: 844 } });
-  test("rows on Home, Today and Mind; every Journal tab", async ({ page }) => {
+  test("rows on Home and Mind; every Journal tab", async ({ page }) => {
     test.setTimeout(120_000);
     await walk(page, 390);
   });
