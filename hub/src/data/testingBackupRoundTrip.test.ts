@@ -51,9 +51,12 @@ const goals: Goal[] = [
 async function journalRows(): Promise<{ rows: JournalRow[]; photo: FileRow }> {
   const jk = await keyFor("pretend-roundtrip-passphrase");
   const dev = "devicePretend01";
-  const suffix: Partial<Record<JournalRow["kind"], string | undefined>> = {
+  // Kinds added later (e.g. "note", "note-read" in journal-v3) are listed here too, so the
+  // test covers every kind the app knows on whichever branch it runs.
+  const suffix: Record<string, string | undefined> = {
     page: "11111111-1111-4111-8111-111111111111", photo: "photo1", draft: dev, answer: `abcdef012345:${dev}`,
     exercise: dev, stars: dev, "exercise-entry": `0123456789ab:${dev}`, cards: undefined,
+    note: "22222222-2222-4222-8222-222222222222", "note-read": dev,
   };
   const rows: JournalRow[] = [];
   for (const kind of JOURNAL_KINDS) {
