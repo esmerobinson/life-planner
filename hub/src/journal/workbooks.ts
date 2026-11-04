@@ -76,7 +76,8 @@ export function workbooks(set: CardSet, plan: ExercisePlan): Workbook[] {
       done: cards.filter(isDone).length,
       n: at.day,
       chapter: chaptered ? (map.find((m) => m.cards.some((d) => d.card.id === at.id))?.n ?? null) : null,
-      chapters: chaptered ? map.length : 0,
+      // The book's last chapter number, so "Chapter C of N" holds when its numbers don't start at 1 (review M9).
+      chapters: chaptered ? Math.max(map.length, ...cards.map((c) => c.chapter ?? 0)) : 0,
       map,
     });
   }

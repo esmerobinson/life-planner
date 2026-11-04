@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useState, type RefObject } from "react";
 
 /** Whether tabs of these natural widths, `gap` apart, fit in `room` without scrolling. */
 export function tabsFit(widths: readonly number[], gap: number, room: number): boolean {
@@ -30,19 +30,22 @@ function naturalWidth(tab: HTMLElement): number {
  */
 export function useTabsStacked(nav: RefObject<HTMLElement | null>, phone: boolean): boolean {
   const [stacked, setStacked] = useState(phone);
-  useLayoutEffect(() => {
+  const measure = useCallback(() => {
     const el = nav.current;
     if (!el) return;
-    const measure = () => {
-      if (phone) return setStacked(true);
-      const tabs = [...el.children].filter((c) => c instanceof HTMLElement && c.classList.contains("journal-tab")) as HTMLElement[];
-      setStacked(!tabsFit(tabs.map(naturalWidth), px(getComputedStyle(el).columnGap), el.clientWidth));
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
+    if (phone) return setStacked(true);
+    const tabs = [...el.children].filter((c) => c instanceof HTMLElement && c.classList.contains("journal-tab")) as HTMLElement[];
+    setStacked(!tabsFit(tabs.map(naturalWidth), px(getComputedStyle(el).columnGap), el.clientWidth));
+  }, [nav, phone]);
+  // After every render (the ticks and streaks arrive later): measured only.
+  useLayoutEffect(measure);
+  // One observer for the row's size (review M11: not made again on every render).
+  useLayoutEffect(() => {
+    const el = nav.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  });
+  }, [nav, measure]);
   return stacked;
 }

@@ -45,4 +45,14 @@ describe("workbooks", () => {
     const onlyFirst = checkCardFile({ ...FAKE_CARD_FILE_BOOKS, cards: FAKE_CARD_FILE_BOOKS.cards.filter((c) => c.id.startsWith("b-")) })!;
     expect(workbooks(onlyFirst, planExercise(onlyFirst.cards, [], new Set(), TODAY, ME)).map((b) => b.id)).toEqual(["bpd"]);
   });
+
+  it("chapters numbered from where the book starts: 'Chapter C of N' never has C past N (review M9)", () => {
+    const later = checkCardFile({
+      ...FAKE_CARD_FILE_BOOKS,
+      cards: FAKE_CARD_FILE_BOOKS.cards.map((c) => (c.chapter ? { ...c, chapter: c.chapter + 4 } : c)),
+    })!;
+    const [bpd] = workbooks(later, planExercise(later.cards, [], new Set(), TODAY, ME));
+    expect(bpd).toMatchObject({ chapter: 5 });
+    expect(bpd!.chapter!).toBeLessThanOrEqual(bpd!.chapters);
+  });
 });
