@@ -82,7 +82,7 @@ async function walkThrough(page: Page, prefix: string) {
   await shoot(page, `${prefix}-unlock`);
   await page.getByLabel("Sync passphrase").fill("fake-wrong-passphrase");
   await page.getByRole("button", { name: "Unlock" }).click();
-  await expect(page.getByRole("alert")).toContainText("isn't the journal's passphrase");
+  await expect(page.getByRole("alert")).toContainText("doesn't open your journal");
   await page.getByLabel("Sync passphrase").fill(PASS);
   await page.getByRole("button", { name: "Unlock" }).click();
   await expect(page.getByText("Add your exercise cards")).toBeVisible(); // open, on the exercise tab

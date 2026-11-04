@@ -64,7 +64,7 @@ describe("locked", () => {
     const field = await screen.findByLabelText("Sync passphrase");
     await userEvent.type(field, "fake-wrong-passphrase");
     await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
-    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent("isn't the journal's passphrase");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent("doesn't open your journal");
     expect(await loadJournalKey(db)).toBeUndefined();
     expect(await db.syncMeta.get("journalCandidate")).toBeUndefined();
     expect(field).toHaveValue("");
