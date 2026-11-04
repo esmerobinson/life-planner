@@ -11,6 +11,22 @@ export const ALSO_SUBMITTED = "Also submitted";
 export const EARLIER_ANSWER = "Your earlier answer (the card has changed since)";
 
 /**
+ * A card's or a response's title wherever it is listed: its book (when the set names books),
+ * "Day N" and its theme, e.g. "Pretend DBT book · Day 1 · Pretend costs". Two books are each
+ * numbered from Day 1, so a bare "Day 1" could be either (Esme, 2026-11-04: "day two doesnt
+ * show as this one"). A response from the earliest (version 1) cards that no card in the set
+ * matches says so, rather than passing for another book's Day N.
+ */
+export function cardTitle(
+  e: { id: string; day: number | null; theme: string },
+  book: string | undefined,
+  inSet: boolean,
+): string {
+  if (!inSet && e.day !== null && e.id === `day-${e.day}`) return `Earlier card (day ${e.day}) · ${e.theme}`;
+  return [book ?? "", e.day !== null ? `Day ${e.day}` : "", e.theme].filter(Boolean).join(" · ");
+}
+
+/**
  * A response to an exercise card, read-only (Past exercises, All cards, Read back): the one
  * text, or each part's prompt and answer (a list as its numbered lines, a rating as "N out of
  * 10", a choice as the option chosen). Always from what is stored, with its own prompts, never

@@ -45,7 +45,7 @@ test("type a long answer, Submit at once, and reread it word for word", async ({
   // Past exercises lists today's answer, exactly.
   await s.getByText("Past exercises", { exact: true }).click();
   const past = s.getByRole("list", { name: "Past exercises" });
-  await past.getByText(/^Day 1 · Pretend weather · /).click();
+  await past.getByText(/ · Day 1 · Pretend weather$/).click(); // the date first, then the card
   await expect(past.locator(".journal-past-answer")).toHaveText(LONG);
 
   // See what you wrote: the card's own review.

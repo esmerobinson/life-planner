@@ -885,12 +885,13 @@ export async function readLatestExerciseEntry(jk: JournalKey, date: ISODate, car
 export async function listExerciseEntries(jk: JournalKey, before: ISODate): Promise<{ entries: ExerciseResponse[]; unreadable: number }> {
   const rows = (await db.journal.where("kind").equals("exercise-entry").toArray()).filter((r) => r.date < before);
   const { groups, unreadable } = await openResponses(jk, rows);
-  // One entry per card and day: the same card's rows under its earlier (day and theme) key and
-  // under its id, on one day, read as one (Esme, 2026-11-04: "theres repeats in the read back").
+  // One entry per card and day, by the card's full id (a version 1 row by its own day and theme,
+  // apart from every id'd card): never by day number alone, since two books each have a Day 1
+  // (Esme, 2026-11-04).
   const byCard = new Map<string, { date: ISODate; entries: ExerciseResponseEntry[] }>();
   for (const g of groups) {
     const e = g.entries[0]!;
-    const k = JSON.stringify([g.date, e.day ?? (e.v === 2 ? e.id : ""), e.theme]);
+    const k = JSON.stringify(e.v === 2 ? [g.date, "id", e.id] : [g.date, "v1", e.day, e.theme]);
     const have = byCard.get(k);
     if (have) have.entries.push(...g.entries);
     else byCard.set(k, { date: g.date, entries: [...g.entries] });

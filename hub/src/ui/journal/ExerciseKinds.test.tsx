@@ -64,9 +64,12 @@ describe("two books", () => {
     const list = within(s).getByRole("list", { name: "All cards" });
     const lines = [...list.children].map((li) => (li.getAttribute("role") === "presentation" ? `# ${li.textContent}` : li.querySelector("summary > span")!.textContent));
     expect(lines).toEqual([
-      "# Pretend first workbook", "# Chapter 1 · Pretend chapter", "Day 1 · Pretend first one", "Day 2 · Pretend first two",
-      "# Chapter 2 · Pretend later chapter", "Day 3 · Pretend first three",
-      "# Pretend second workbook", "# Chapter 1 · Pretend chapter", "Day 1 · Pretend second one", "Day 2 · Pretend second two",
+      // Each card names its book too: both books have a Day 1 (Esme, 2026-11-04).
+      "# Pretend first workbook", "# Chapter 1 · Pretend chapter",
+      "Pretend first workbook · Day 1 · Pretend first one", "Pretend first workbook · Day 2 · Pretend first two",
+      "# Chapter 2 · Pretend later chapter", "Pretend first workbook · Day 3 · Pretend first three",
+      "# Pretend second workbook", "# Chapter 1 · Pretend chapter",
+      "Pretend second workbook · Day 1 · Pretend second one", "Pretend second workbook · Day 2 · Pretend second two",
     ]);
   });
 

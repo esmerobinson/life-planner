@@ -118,7 +118,7 @@ it("Submit marks today's exercise done and the card gives way, in place, to the 
   expect(within(next).getByText("The fictional kettle")).toBeInTheDocument();
   expect(await within(next).findByRole("textbox", { name: "Your response" })).toHaveValue("");
   expect(within(next).getByRole("button", { name: "Submit" })).toBeDisabled(); // its own Submit
-  expect(await within(s).findByText(/Day 1 saved\. Here's the next one if you'd like to keep going\./)).toBeInTheDocument();
+  expect(await within(s).findByText(/Day 1 · Pretend weather saved\. Here's the next one if you'd like to keep going\./)).toBeInTheDocument();
   // Today's exercise is ticked (as Done used to), here and on the tab.
   expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, id: "day-1", done: true, primary: true }]);
   expect(tabTick()).not.toBeNull();
@@ -178,7 +178,7 @@ it("submitting the second card works too: it is replaced by the third, nothing u
   const third = await within(s).findByRole("article", { name: "Next card: Day 3" });
   expect(articles(s)).toHaveLength(1);
   expect(within(third).getByText("Imaginary pebbles")).toBeInTheDocument();
-  expect(await within(s).findByText(/Day 2 saved\. Here's the next one if you'd like to keep going\./)).toBeInTheDocument();
+  expect(await within(s).findByText(/Day 2 · The fictional kettle saved\. Here's the next one if you'd like to keep going\./)).toBeInTheDocument();
   await waitFor(async () =>
     expect((await readExerciseProgress(jk)).marks).toEqual([
       { date: TODAY, device, id: "day-1", done: true, primary: true },
