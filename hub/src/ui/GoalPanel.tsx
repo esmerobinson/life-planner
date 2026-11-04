@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  createItem, deleteGoal, deleteItem, goalToProject, restoreGoalFromBin, saveGoalNotes, setGoalActive, setGoalOnHome,
+  createItem, deleteGoal, deleteItem, goalToItem, goalToProject, restoreGoalFromBin, saveGoalNotes, setGoalActive, setGoalOnHome,
   undoMonthEdits, untickItem, updateGoal, type GoalPatch, type MonthEdit,
 } from "../data/repo";
 import { useShellUndo } from "./undoContext";
@@ -30,7 +30,7 @@ export const COMPLETED_CAP = 10;
  * The Type select: a daily goal is a practice with rhythm "daily"; "project" changes the goal
  * into a project to-do (fix round 1: Change to → Project; the goal goes to the Bin).
  */
-type TypeChoice = Goal["kind"] | "daily" | "project";
+type TypeChoice = Goal["kind"] | "daily" | "project" | "idea" | "task";
 
 interface Fields {
   title: string;
@@ -210,6 +210,7 @@ export function GoalPanel({
       }
     }
     if (f.kind === "project") return void toProject(f, monthlyTarget);
+    if (f.kind === "idea" || f.kind === "task") return void toItem(f, f.kind);
     // Only what was changed in Edit is written, so a change synced in meanwhile is kept (review M-3).
     const was = snapshot;
     const patch: GoalPatch = {};
@@ -282,6 +283,45 @@ export function GoalPanel({
     }
   }
 
+  /**
+   * Change to → Idea / To-do: an idea (or a to-do, with the deadline shown here) with the title,
+   * area and notes. The goal, with its why, how often and month goals, goes to the Bin, never
+   * destroyed; the panel shows the new item, with an Undo line (the goal back, the item to the Bin).
+   */
+  async function toItem(f: Fields, kind: "idea" | "task") {
+    setBusy(true);
+    let id: string | undefined;
+    try {
+      const ok = await attempt(async () => {
+        id = await goalToItem(goal.id, kind, today, {
+          title: f.title.trim(), areaId: f.areaId, ...(kind === "task" ? { deadline: f.deadline || undefined } : {}),
+        });
+      });
+      if (!ok || !id) return;
+      const itemId = id;
+      // Month goals saved during this Edit went to the Bin with the goal: nothing to undo on close.
+      session.current = { edits: [], saves: [] };
+      setEditing(false);
+      panel?.open(itemId);
+      await onChanged();
+      undoNote({
+        message: `Changed to ${kind === "idea" ? "an idea" : "a to-do"}; the goal is in the Bin`,
+        undo: async () => {
+          try {
+            await restoreGoalFromBin(goal.id, today);
+            await deleteItem(itemId, today);
+            panel?.open(goal.id);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function addTask() {
     const title = newTitle.trim();
     if (!title) return;
@@ -342,9 +382,11 @@ export function GoalPanel({
               <option value="practice">Practice</option>
               <option value="daily">Daily</option>
               <option value="project">Project</option>
+              <option value="idea">Idea</option>
+              <option value="task">To-do</option>
             </select>
           </label>
-          {(fields.kind === "finite" || fields.kind === "project") && (
+          {(fields.kind === "finite" || fields.kind === "project" || fields.kind === "task") && (
             <label className="form-field">
               <span className="form-label">Deadline</span>
               <input type="date" value={fields.deadline} onChange={(e) => setFields({ ...fields, deadline: e.target.value })} />

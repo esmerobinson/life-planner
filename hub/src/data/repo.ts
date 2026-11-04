@@ -401,6 +401,37 @@ export async function goalToProject(
   });
 }
 
+/**
+ * "Change to → Idea" / "→ To-do" for a goal: an idea (or a plain to-do) in the goal's area
+ * with its title and notes (`with` overrides the title and area from the panel's Edit; a
+ * to-do keeps the deadline, an idea has no due date). The goal, with everything only a goal
+ * has (why, how often, month goals and log, deadline), goes to the Bin and is never
+ * destroyed, so Undo can restore it. Its linked tasks keep their goalId, as a binned goal's
+ * do. Returns the new item's id. One transaction.
+ */
+export async function goalToItem(
+  goalId: string,
+  kind: "idea" | "task",
+  today: ISODate,
+  with_: { title?: string; areaId?: AreaId; deadline?: ISODate } = {},
+): Promise<string> {
+  return db.transaction("rw", db.goals, db.items, async () => {
+    const goal = await db.goals.get(goalId);
+    if (!goal || goal.status !== undefined) throw new Error("that goal does not exist");
+    const title = (with_.title ?? goal.title).trim();
+    if (!title) throw new Error(`${kind === "idea" ? "an idea" : "a to-do"} needs a title`);
+    const areaId = with_.areaId ?? goal.areaId;
+    const due = kind === "task" ? ("deadline" in with_ ? with_.deadline : goal.deadline) : undefined;
+    if (due !== undefined && !isValidISODate(due)) throw new Error("that deadline is not a real date");
+    const item = await createItem(
+      { kind, title, areaId, priority: 2, ...(goal.notes ? { notes: goal.notes } : {}), ...(due ? { due } : {}) },
+      today,
+    );
+    await db.goals.put({ ...goal, status: "deleted", deletedAt: today });
+    return item.id;
+  });
+}
+
 export async function moveTo(
   id: string,
   list: "today" | "tomorrow" | "week",
