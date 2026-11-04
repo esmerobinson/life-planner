@@ -1028,18 +1028,21 @@ export async function listExerciseEntries(jk: JournalKey, before: ISODate): Prom
 
 // ---- notes to myself (journal v3) ----------------------------------------------------------
 //
-// A note is a group of rows `note:<date>:<nid>_<deviceId>`, one VERSION per device (review I1):
-// each device writes only its own, so two devices can never overwrite each other's words. The
-// note's id is `note:<date>:<nid>` (the day it was first written and a random key). Each version
-// has its own random id and names the versions she had in front of her (`seen`), so a version is
-// written over only by one made having seen it: never by clocks, which differ between devices.
-// The view shows the newest, and any version written without seeing it as "another version".
+// A note is a group of rows `note:<date>:<nid>_<deviceId>_<vid>`, one row per VERSION (review
+// I1, R-I1): a save always writes a new row, so no device ever writes over anything, not even its
+// own earlier words. The note's id is `note:<date>:<nid>` (the day it was first written and a
+// random key). Each version has its own random id and names the version she was changing
+// (`seen`), so it replaces that one only: never by clocks, which differ between devices, and
+// never another version she didn't have open. The view shows the newest, and every version not
+// replaced as "another version", each of which she can change or let go of on its own.
 // Her note while she writes it is that device's draft row, `…_<deviceId>_draft` (review I2).
 
 const NOTE_DRAFT = "_draft";
 
-/** One version of a note (one device's row). */
+/** One version of a note (one row). */
 export interface NoteVersion {
+  /** This version's id: what changing or deleting it replaces. */
+  vid: string;
   prompt: string | null;
   thought: string;
   steady: string;
@@ -1054,7 +1057,7 @@ export interface Note extends NoteVersion {
   /** The day it was first written (in its id). */
   date: ISODate;
   createdAt: number;
-  /** Every version of it here now (by id): what an edit opened now is written over. */
+  /** The version shown (by id): what an edit of it opened now replaces (never the others). */
   seen: string[];
   /** Other versions with different words, written without seeing this one (newest first). */
   others: NoteVersion[];
@@ -1079,24 +1082,27 @@ export function newNoteId(today: ISODate): string {
   return journalId("note", today, [...bytes].map((b) => b.toString(16).padStart(2, "0")).join(""));
 }
 
-/** A note row's note id, device and whether it is a draft (an earlier single-row note is its own note). */
+/**
+ * A note row's note id, device and whether it is a draft: `<nid>_<deviceId>_<vid>` (a version),
+ * `<nid>_<deviceId>_draft`, or `<nid>_<deviceId>` (round 1's one row per device). An earlier
+ * single-row note is its own note.
+ */
 function noteRowParts(row: JournalRow): { id: string; device: string; draft: boolean } {
-  const rest = suffixOf(row);
-  const i = rest.indexOf("_");
-  if (i < 0) return { id: row.id, device: "", draft: false };
-  const tail = rest.slice(i + 1);
-  const draft = tail.endsWith(NOTE_DRAFT);
-  return { id: `note:${row.date}:${rest.slice(0, i)}`, device: draft ? tail.slice(0, -NOTE_DRAFT.length) : tail, draft };
+  const [nid, device, tail] = suffixOf(row).split("_");
+  if (device === undefined) return { id: row.id, device: "", draft: false };
+  return { id: `note:${row.date}:${nid}`, device, draft: `_${tail}` === NOTE_DRAFT };
 }
 const noteRowId = (id: string, deviceId: string, draft = false) => `${id}_${deviceId}${draft ? NOTE_DRAFT : ""}`;
+/** A version's own row: never written again (the vid is 8 hex here, so the id fits SUFFIX). */
+const versionRowId = (id: string, deviceId: string, vid: string) => `${id}_${deviceId}_${vid}`;
 const noteDate = (id: string) => id.slice("note:".length, "note:".length + 10);
 const filled = (f: Pick<NoteFields, "thought" | "steady" | "memory" | "skill">) =>
   [f.thought, f.steady, f.memory, f.skill].some((x) => x.trim() !== "");
 const noteKey = (v: NoteVersion) => JSON.stringify([v.prompt, v.thought, v.steady, v.memory, v.skill]);
 /** A version's id (the earliest notes had none: their row and time stand in). */
 const vidOf = (rowId: string, e: NoteEntry) => e.vid ?? `${rowId}@${e.at}`;
-const newVid = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, "0")).join("");
-const versionOf = (e: NoteEntry): NoteVersion => ({ prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill, at: e.at });
+const newVid = () => [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, "0")).join("");
+const versionOf = (e: NoteEntry, vid: string): NoteVersion => ({ vid, prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill, at: e.at });
 
 /**
  * Every note (deleted ones left out), oldest first, how many rows wouldn't open here, and this
@@ -1129,12 +1135,12 @@ export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ no
   const notes: Note[] = [];
   for (const [id, { date, versions }] of groups) {
     const heads = versions.filter((v) => !versions.some((w) => w !== v && (w.e.seen ?? []).includes(v.vid)));
-    const live = heads.map((v) => v.e).filter((v) => !v.deleted).sort((a, b) => b.at - a.at);
+    const live = heads.filter((v) => !v.e.deleted).sort((a, b) => b.e.at - a.e.at);
     if (live.length === 0) continue;
-    const shown = versionOf(live[0]!);
+    const shown = versionOf(live[0]!.e, live[0]!.vid);
     const seen = new Set([noteKey(shown)]);
     const others: NoteVersion[] = [];
-    for (const v of live.slice(1).map(versionOf)) {
+    for (const v of live.slice(1).map((h) => versionOf(h.e, h.vid))) {
       if (seen.has(noteKey(v))) continue;
       seen.add(noteKey(v));
       others.push(v);
@@ -1142,7 +1148,7 @@ export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ no
     notes.push({
       ...shown, id, date, others,
       createdAt: Math.min(...versions.map((v) => v.e.createdAt)),
-      seen: versions.map((v) => v.vid),
+      seen: [shown.vid],
     });
   }
   notes.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
@@ -1150,7 +1156,7 @@ export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ no
   return { notes, unreadable, drafts };
 }
 
-/** A note's rows here, opened. This device's own row that won't open is never written over. */
+/** A note's rows here, opened. This device's draft row that won't open is never written over. */
 async function noteRows(jk: JournalKey, id: string, deviceId: string) {
   const rows = (await db.journal.where("date").equals(noteDate(id)).toArray()).filter(
     (r) => r.kind === "note" && (r.id === id || r.id.startsWith(`${id}_`)),
@@ -1159,9 +1165,8 @@ async function noteRows(jk: JournalKey, id: string, deviceId: string) {
   for (const row of rows) {
     const o = await openRow(jk, row, "note");
     const part = noteRowParts(row);
-    const mine = part.device === deviceId;
     if (o.state !== "ok") {
-      if (mine) throw new Error(CANT_OPEN);
+      if (part.draft && part.device === deviceId) throw new Error(CANT_OPEN);
       continue;
     }
     if (!part.draft) versions.push(o.entry);
@@ -1190,12 +1195,13 @@ export async function saveNote(
   const id = opts.id ?? newNoteId(today);
   const { versions, hasDraft } = await noteRows(jk, id, deviceId);
   const at = Date.now();
+  const vid = newVid();
   const entry = {
     v: 1, prompt: fields.prompt, thought: fields.thought, steady: fields.steady, memory: fields.memory, skill: fields.skill,
-    createdAt: versions.length ? Math.min(...versions.map((v) => v.createdAt)) : at, at, vid: newVid(), seen: opts.seen ?? [],
+    createdAt: versions.length ? Math.min(...versions.map((v) => v.createdAt)) : at, at, vid, seen: opts.seen ?? [],
   };
   const date = noteDate(id);
-  const row = await seal(jk, "note", date, noteRowId(id, deviceId).slice(`note:${date}:`.length), entry);
+  const row = await seal(jk, "note", date, versionRowId(id, deviceId, vid).slice(`note:${date}:`.length), entry);
   await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft))]);
   return id;
 }
@@ -1216,14 +1222,15 @@ export async function clearNoteDraft(jk: JournalKey, deviceId: string, id: strin
   if (rows.length) await write(jk, rows);
 }
 
-/** Deletes a note: this device's version says so (nothing in it), written over `seen` (only what she saw goes). */
+/** Deletes the version(s) in `seen` (a new row saying so, nothing in it): any other version stays. */
 export async function deleteNote(jk: JournalKey, deviceId: string, id: string, seen: string[]): Promise<void> {
   const { versions, hasDraft } = await noteRows(jk, id, deviceId);
   if (versions.length === 0) throw new Error("That note isn't here.");
   const at = Date.now();
-  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: Math.min(...versions.map((v) => v.createdAt)), at, vid: newVid(), seen, deleted: true };
+  const vid = newVid();
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: Math.min(...versions.map((v) => v.createdAt)), at, vid, seen, deleted: true };
   const date = noteDate(id);
-  const row = await seal(jk, "note", date, noteRowId(id, deviceId).slice(`note:${date}:`.length), empty);
+  const row = await seal(jk, "note", date, versionRowId(id, deviceId, vid).slice(`note:${date}:`.length), empty);
   await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft))]);
 }
 

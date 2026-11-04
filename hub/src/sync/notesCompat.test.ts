@@ -74,7 +74,8 @@ it("this version: a note and its read tick sync to another device, sealed, and o
   const server = new FakeSyncServer(TOKEN);
   const id = await saveNote(jk, DAY, "device-mac-0001", { prompt: null, thought: "Pretend synced thought", steady: "Pretend synced answer", memory: "", skill: "" });
   await setNoteRead(jk, DAY, "device-mac-0001", id, true);
-  const rid = `${id}_device-mac-0001`; // the Mac's own version of the note
+  const rid = (await db.journal.where("kind").equals("note").first())!.id; // the Mac's version of the note, its own row
+  expect(rid.startsWith(`${id}_device-mac-0001_`)).toBe(true);
   expect((await syncOnce({ db, fetch: server.fetch })).kind).toBe("ok");
   const phone = await device();
   expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");

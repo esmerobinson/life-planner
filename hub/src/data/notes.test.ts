@@ -42,6 +42,7 @@ describe("row ids", () => {
   it("note:<date>:<nid>_<deviceId>, its _draft and note-read:<date>:<deviceId> are valid journal rows; other shapes are not", () => {
     const nid = "0123456789abcdef";
     expect(validJournal(row({ id: `note:${DAY}:${nid}_${ME}`, kind: "note" }))).toBe(true);
+    expect(validJournal(row({ id: `note:${DAY}:${nid}_3f2a1b4c-0000-4000-8000-000000000001_0a1b2c3d`, kind: "note" }))).toBe(true); // a version's own row
     expect(validJournal(row({ id: `note:${DAY}:${nid}_${ME}_draft`, kind: "note" }))).toBe(true);
     expect(validJournal(row({ id: `note:${DAY}:${nid}_3f2a1b4c-0000-4000-8000-000000000001_draft`, kind: "note" }))).toBe(true);
     expect(validJournal(row({ id: `note-read:${DAY}:${ME}`, kind: "note-read" }))).toBe(true);
@@ -56,13 +57,13 @@ describe("notes", () => {
   it("saves a note sealed (nothing typed in clear) on this device's own row and lists it back", async () => {
     const id = await saveNote(jk, DAY, ME, PRETEND);
     expect(id).toMatch(new RegExp(`^note:${DAY}:[0-9a-f]{16}$`));
-    const stored = await db.journal.get(`${id}_${ME}`);
+    const [stored] = (await db.journal.where("kind").equals("note").toArray()).filter((r) => r.id.startsWith(`${id}_${ME}_`));
     expect(stored).toMatchObject({ kind: "note", date: DAY, fp: jk.fp });
     expect(JSON.stringify(stored)).not.toContain("Pretend");
-    expect(await db.pending.get(["journal", `${id}_${ME}`])).toBeTruthy(); // it syncs
+    expect(await db.pending.get(["journal", stored!.id])).toBeTruthy(); // it syncs
     const { notes, unreadable } = await listNotes(jk);
     expect(unreadable).toBe(0);
-    expect(notes).toEqual([{ id, date: DAY, ...PRETEND, createdAt: expect.any(Number), at: expect.any(Number), seen: [expect.any(String)], others: [] }]);
+    expect(notes).toEqual([{ id, date: DAY, ...PRETEND, createdAt: expect.any(Number), at: expect.any(Number), vid: expect.stringMatching(/^[0-9a-f]{8}$/), seen: [expect.any(String)], others: [] }]);
   });
 
   it("an own thought has no prompt; the optional fields are kept", async () => {
@@ -90,21 +91,25 @@ describe("notes", () => {
     const id = await saveNote(jk, DAY, ME, PRETEND);
     await deleteNote(jk, ME, id, (await listNotes(jk)).notes[0]!.seen);
     expect((await listNotes(jk)).notes).toEqual([]);
-    const rid = `${id}_${ME}`;
-    const opened = (await openJson(jk.key, (await db.journal.get(rid))!, journalAad(rid))) as Record<string, unknown>;
+    const rows = await db.journal.where("kind").equals("note").toArray();
+    const opened = (await Promise.all(rows.map((r) => openJson(jk.key, r, journalAad(r.id))))).find((e) => (e as { deleted?: boolean }).deleted) as Record<string, unknown>;
     expect(opened).toMatchObject({ deleted: true, thought: "", steady: "", memory: "", skill: "" });
   });
 
-  it("this device's version sealed with another key is counted unreadable on its own and never written over", async () => {
+  it("rows sealed with another key are counted unreadable on their own and never written over", async () => {
     const id = journalId("note", DAY, "00000000000000aa");
     const rid = `${id}_${ME}`;
     await db.journal.put({ id: rid, kind: "note", date: DAY, fp: other.fp, ...(await sealJson(other.key, { v: 1, ...PRETEND, createdAt: 1, at: 1 }, journalAad(rid))) });
+    const draft = `${id}_${ME}_draft`;
+    await db.journal.put({ id: draft, kind: "note", date: DAY, fp: other.fp, ...(await sealJson(other.key, { v: 1, ...PRETEND, createdAt: 1, at: 1, draft: true }, journalAad(draft))) });
+    const before = [await db.journal.get(rid), await db.journal.get(draft)];
     await saveNote(jk, DAY, ME, PRETEND);
-    expect((await listNotes(jk)).unreadable).toBe(1);
-    await expect(saveNote(jk, DAY, ME, PRETEND, { id })).rejects.toThrow(CANT_OPEN);
-    await expect(deleteNote(jk, ME, id, [])).rejects.toThrow(CANT_OPEN);
+    expect((await listNotes(jk)).unreadable).toBe(2);
+    // A version is a new row of its own; the draft row that won't open refuses.
     await expect(saveNoteDraft(jk, ME, id, PRETEND, [])).rejects.toThrow(CANT_OPEN);
-    expect((await db.journal.get(rid))!.fp).toBe(other.fp);
+    await saveNote(jk, DAY, ME, PRETEND, { id }).catch(() => undefined);
+    await deleteNote(jk, ME, id, []).catch(() => undefined);
+    expect([await db.journal.get(rid), await db.journal.get(draft)]).toEqual(before);
   });
 
   it("nothing is written without the confirmed key", async () => {
@@ -114,19 +119,55 @@ describe("notes", () => {
   });
 });
 
-describe("two devices never overwrite each other's words (review I1)", () => {
-  it("both edit the same note without seeing the other's: the newest shows, the other below as another version", async () => {
+describe("two devices never overwrite each other's words (review I1, R-I1)", () => {
+  it("both edit the same note without seeing each other's: the newest shows, the other below as another version", async () => {
     const id = await saveNote(jk, DAY, ME, PRETEND);
-    const base = (await listNotes(jk)).notes[0]!.seen;
+    const seen = (await listNotes(jk)).notes[0]!.seen;
     // The Mac edits; the phone, which hadn't seen that, edits too (later).
-    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend Mac words" }, { id, seen: base });
-    await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen: base });
+    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend Mac words" }, { id, seen });
+    await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen });
     const [n] = (await listNotes(jk)).notes;
     expect(n).toMatchObject({ steady: "Pretend phone words" });
     expect(n!.others.map((o) => o.steady)).toEqual(["Pretend Mac words"]);
-    // Once she saves with both in front of her, it is one note again.
-    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend both, joined" }, { id, seen: n!.seen });
-    expect((await listNotes(jk)).notes).toEqual([expect.objectContaining({ steady: "Pretend both, joined", others: [] })]);
+  });
+
+  it("editing the version shown keeps the other version: both texts survive, on either device (R-I1)", async () => {
+    const id = await saveNote(jk, DAY, ME, PRETEND);
+    const seen = (await listNotes(jk)).notes[0]!.seen;
+    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend Mac words" }, { id, seen });
+    await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen });
+    // On the Mac she fixes a word in the version shown (the phone's): the Mac's own words stay.
+    const shown = (await listNotes(jk)).notes[0]!;
+    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend phone words, fixed" }, { id, seen: shown.seen });
+    const [after] = (await listNotes(jk)).notes;
+    expect(after!.steady).toBe("Pretend phone words, fixed");
+    expect(after!.others.map((o) => o.steady)).toEqual(["Pretend Mac words"]);
+    // A second edit on the same device never writes over the first: nothing is ever overwritten.
+    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend phone words, fixed twice" }, { id, seen: after!.seen });
+    expect((await listNotes(jk)).notes[0]!.others.map((o) => o.steady)).toEqual(["Pretend Mac words"]);
+    const opened = await Promise.all(
+      (await db.journal.where("kind").equals("note").toArray()).map(async (r) => ((await openJson(jk.key, r, journalAad(r.id))) as { steady: string }).steady),
+    );
+    expect(opened).toEqual(expect.arrayContaining(["Pretend Mac words", "Pretend phone words", "Pretend phone words, fixed", PRETEND.steady]));
+  });
+
+  it("deleting the version shown leaves the other version as the note (R-I1)", async () => {
+    const id = await saveNote(jk, DAY, ME, PRETEND);
+    const seen = (await listNotes(jk)).notes[0]!.seen;
+    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend Mac words" }, { id, seen });
+    await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen });
+    await deleteNote(jk, ME, id, (await listNotes(jk)).notes[0]!.seen);
+    expect((await listNotes(jk)).notes).toEqual([expect.objectContaining({ id, steady: "Pretend Mac words", others: [] })]);
+  });
+
+  it("each other version can be let go of on its own: then it is one note again", async () => {
+    const id = await saveNote(jk, DAY, ME, PRETEND);
+    const seen = (await listNotes(jk)).notes[0]!.seen;
+    await saveNote(jk, DAY, ME, { ...PRETEND, steady: "Pretend Mac words" }, { id, seen });
+    await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen });
+    const other = (await listNotes(jk)).notes[0]!.others[0]!;
+    await deleteNote(jk, ME, id, [other.vid]);
+    expect((await listNotes(jk)).notes).toEqual([expect.objectContaining({ steady: "Pretend phone words", others: [] })]);
   });
 
   it("an edit after another's, having seen it, replaces it quietly", async () => {
@@ -137,13 +178,13 @@ describe("two devices never overwrite each other's words (review I1)", () => {
 
   it("an edit the deleting device never saw keeps the note", async () => {
     const id = await saveNote(jk, DAY, ME, PRETEND);
-    const base = (await listNotes(jk)).notes[0]!.seen;
-    await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen: base });
-    await deleteNote(jk, ME, id, base); // the Mac deletes what it had (not the phone's edit)
+    const seen = (await listNotes(jk)).notes[0]!.seen;
+    await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen });
+    await deleteNote(jk, ME, id, seen); // the Mac deletes what it had (not the phone's edit)
     expect((await listNotes(jk)).notes).toEqual([expect.objectContaining({ id, steady: "Pretend phone words" })]);
   });
 
-  it("a delete made having seen every version removes the note", async () => {
+  it("a delete made having seen the only version removes the note", async () => {
     const id = await saveNote(jk, DAY, ME, PRETEND);
     await saveNote(jk, DAY, PHONE, { ...PRETEND, steady: "Pretend phone words" }, { id, seen: (await listNotes(jk)).notes[0]!.seen });
     await deleteNote(jk, ME, id, (await listNotes(jk)).notes[0]!.seen);

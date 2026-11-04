@@ -198,6 +198,43 @@ it("two devices' versions written apart: the newest shows, the other below as an
   expect(within(own).getByText("Pretend iPad words")).toBeInTheDocument();
 });
 
+describe("another version is never dropped by changing the one shown (R-I1)", () => {
+  async function twoVersions() {
+    await confirmedDevice(db, jk);
+    const id = await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend thought", steady: "Pretend first words" });
+    const seen = (await listNotes(jk)).notes[0]!.seen;
+    await saveNote(jk, TODAY, "device-ipad-001", { ...fields, thought: "Pretend thought", steady: "Pretend iPad words" }, { id, seen });
+    await new Promise((r) => setTimeout(r, 5));
+    await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend thought", steady: "Pretend phone words" }, { id, seen });
+    renderApp("/journal/notes", TODAY);
+    return within(await section()).findByRole("group", { name: "My own thoughts" });
+  }
+
+  it("Edit the version shown and Save: the other version is still there below", async () => {
+    const own = await twoVersions();
+    await userEvent.click(await within(own).findByRole("button", { name: "Edit: Pretend thought" }));
+    const answer = within(own).getByRole("textbox", { name: "What I know when I'm steady…" });
+    expect(answer).toHaveValue("Pretend phone words");
+    await userEvent.type(answer, ", fixed");
+    await userEvent.click(within(own).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(within(own).queryByRole("form")).toBeNull());
+    expect(await within(own).findByText("Pretend phone words, fixed")).toBeInTheDocument();
+    expect(within(own).getByText("Pretend iPad words")).toBeInTheDocument();
+    expect(within(own).getByText(/^Another version \(from .+\)$/)).toBeInTheDocument();
+  });
+
+  it("the other version has its own Edit; deleting it there leaves the one shown", async () => {
+    const own = await twoVersions();
+    await userEvent.click(await within(own).findByRole("button", { name: "Edit another version: Pretend thought" }));
+    expect(within(own).getByRole("textbox", { name: "What I know when I'm steady…" })).toHaveValue("Pretend iPad words");
+    await userEvent.click(within(own).getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(own).getByRole("button", { name: "Delete it" }));
+    await waitFor(async () => expect((await listNotes(jk)).notes).toEqual([expect.objectContaining({ steady: "Pretend phone words", others: [] })]));
+    await waitFor(() => expect(within(own).queryByText("Pretend iPad words")).toBeNull());
+    expect(within(own).getByText("Pretend phone words")).toBeInTheDocument();
+  });
+});
+
 it("the tick shows this device's own: unticked here, it stays unticked (review M1)", async () => {
   await confirmedDevice(db, jk);
   const id = await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend thought", steady: "Pretend words" });

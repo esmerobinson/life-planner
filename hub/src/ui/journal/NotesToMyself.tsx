@@ -110,11 +110,16 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
     }
   }
 
-  /** Opens the editor for a note, or a new one (her draft of it, if she has one). */
-  function edit(note: Note | null, prompt: string | null) {
+  /**
+   * Opens the editor for a note's version shown (or, with `version`, one of its other versions),
+   * or a new note (her draft of it, if she has one). Saving or deleting replaces that one
+   * version only; the others stay (R-I1).
+   */
+  function edit(note: Note | null, prompt: string | null, version?: NoteVersion) {
     if (note) {
       const d = drafts.find((x) => x.id === note.id);
-      return setEditing({ id: note.id, prompt: note.prompt, isNew: false, seen: d ? d.seen : note.seen, start: d ? d.fields : fieldsOf(note) });
+      const v = version ?? note;
+      return setEditing({ id: note.id, prompt: note.prompt, isNew: false, seen: d ? d.seen : [v.vid], start: d ? d.fields : fieldsOf(v) });
     }
     const known = new Set(notes?.map((n) => n.id));
     const own = (p: string | null) => p === null || !ALL_PROMPTS.has(p);
@@ -169,7 +174,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
       <li key={n.id} className="strip no-tick notes-card">
         <div>
           <NoteBody note={n} />
-          <OtherNoteVersions note={n} />
+          <OtherNoteVersions note={n} onEdit={(v) => edit(n, n.prompt, v)} />
         </div>
         <div className="strip-actions">
           <button type="button" className="quiet-link" aria-label={`Edit: ${n.thought}`} onClick={() => edit(n, n.prompt)}>
@@ -232,14 +237,22 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
   );
 }
 
-/** Other versions of a note (written on another device without seeing this one), read-only. */
-function OtherNoteVersions({ note }: { note: Note }) {
+/**
+ * Other versions of a note (written on another device without seeing the one shown), each with
+ * its own Edit: changing or deleting one leaves every other version as it is (R-I1).
+ */
+function OtherNoteVersions({ note, onEdit }: { note: Note; onEdit: (v: NoteVersion) => void }) {
   if (note.others.length === 0) return null;
   return (
     <>
       {note.others.map((o) => (
-        <div key={o.at}>
-          <p className="journal-muted">{anotherVersion(o.at)}</p>
+        <div key={o.vid}>
+          <p className="journal-muted">
+            {anotherVersion(o.at)}{" "}
+            <button type="button" className="quiet-link" aria-label={`Edit another version: ${o.thought}`} onClick={() => onEdit(o)}>
+              Edit
+            </button>
+          </p>
           <NoteBody note={o} />
         </div>
       ))}
