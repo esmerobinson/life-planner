@@ -15,7 +15,7 @@ import { PanelTop } from "./PanelTop";
 import type { EscapeHandler } from "./SidePanel";
 import { PageEditor } from "./PageEditor";
 import { ProjectSummary, SessionList } from "./ProjectPanel";
-import { DEFAULT_SESSIONS, isProject, newSessions } from "../domain/projects";
+import { DEFAULT_SESSIONS, isProject, newSessions, withSessions } from "../domain/projects";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
 
 /** The Type property: a project is a to-do with sessions, shown as its own type. */
@@ -115,7 +115,9 @@ export function ItemPanel({
       // A done to-do made a project is open again: a project is done only when its sessions are (I-1).
       if (f.kind === "project") {
         Object.assign(patch, { kind: "task", sessions: item.sessions ?? newSessions(DEFAULT_SESSIONS), recur: undefined });
-        if (item.status === "done") Object.assign(patch, { status: "open", completedAt: undefined });
+        // The status follows the sessions (R-5): done, with completedAt, only when every one is ticked.
+        const { status, completedAt } = withSessions(item, patch.sessions!, today);
+        if ((item.status === "open" || item.status === "done") && (status !== item.status || completedAt !== item.completedAt)) Object.assign(patch, { status, completedAt });
       } else patch.kind = f.kind;
       if (was.kind === "project" && f.kind !== "project") patch.sessions = undefined;
     }

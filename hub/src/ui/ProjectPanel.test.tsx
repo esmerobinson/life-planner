@@ -47,6 +47,33 @@ describe("Edit → Type in the panel", () => {
     expect(got.status).toBe("open");
     expect(got.completedAt).toBeUndefined();
   });
+
+  async function ideaWithSessions(sessions: Session[]) {
+    const t = await createItem({ kind: "idea", title: "Pretend idea with old sessions", areaId: "art", priority: 2, sessions }, "2026-10-29");
+    renderApp(`/area/art?open=${t.id}`, TODAY);
+    const panel = await screen.findByRole("complementary", { name: "Pretend idea with old sessions" });
+    await userEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+    await userEvent.selectOptions(within(panel).getByLabelText("Type"), "project");
+    await userEvent.click(within(panel).getByRole("button", { name: "Done" }));
+    await vi.waitFor(async () => expect((await db.items.get(t.id))!.kind).toBe("task"));
+    return (await db.items.get(t.id))!;
+  }
+
+  it("bringing back sessions that are all ticked makes the project done, with completedAt (R-5)", async () => {
+    const got = await ideaWithSessions([
+      { id: "x", doneOn: "2026-10-30" },
+      { id: "y", doneOn: "2026-10-31" },
+    ]);
+    expect(got.sessions).toHaveLength(2);
+    expect(got.status).toBe("done");
+    expect(got.completedAt).toBe(TODAY);
+  });
+
+  it("bringing back sessions that are not all ticked leaves the project open", async () => {
+    const got = await ideaWithSessions([{ id: "x", doneOn: "2026-10-30" }, { id: "y" }]);
+    expect(got.status).toBe("open");
+    expect(got.completedAt).toBeUndefined();
+  });
 });
 
 describe("Edit → Type away from Project (I-2)", () => {
