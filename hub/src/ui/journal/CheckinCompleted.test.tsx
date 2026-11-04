@@ -24,8 +24,11 @@ beforeEach(async () => {
   await Promise.all([db.journal.clear(), db.files.clear(), db.pending.clear(), db.syncMeta.clear()]);
   await confirmedDevice(db, jk);
 });
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // Writes a test's check-in makes as it goes away (a box saving on unmount, the first-open set)
+  // land before the next test clears the store, so they never turn up in it.
+  await new Promise((r) => setTimeout(r, 150));
   vi.useRealTimers();
 });
 

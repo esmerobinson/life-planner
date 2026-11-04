@@ -381,12 +381,29 @@ export async function saveAnswer(
    * (`<promptKey>:<deviceId>-e<session>`), never over an earlier one (bug #24), and an emptied
    * answer is saved as cleared on purpose (bug #30).
    */
-  edit?: { session: string },
+  edit?: { session: string; seenAt?: number },
 ): Promise<void> {
   const text = answer && answer.trim() ? answer : null;
-  const entry: AnswerEntry = { v: 1, prompt, answer: text, done, at: Date.now(), ...(edit && text === null ? { cleared: true as const } : {}) };
-  const suffix = edit ? `${await promptKey(jk, prompt)}:${deviceId}-e${edit.session}` : await ownAnswerSuffix(jk, date, prompt, deviceId);
+  const pk = await promptKey(jk, prompt);
+  // An Edit is always newer than the answer she had in front of her (`seenAt`; without it, every
+  // answer here now), whatever this device's clock says (bug #32: a phone's clock ahead never
+  // wins over her change here). Words that arrive from elsewhere while she edits can still be newer.
+  const before = edit ? (edit.seenAt !== undefined ? [edit.seenAt] : (await answersTo(jk, date, pk)).map((e) => e.at)) : [];
+  const at = Math.max(Date.now(), ...before.map((t) => t + 1));
+  const entry: AnswerEntry = { v: 1, prompt, answer: text, done, at, ...(edit && text === null ? { cleared: true as const } : {}) };
+  const suffix = edit ? `${pk}:${deviceId}-e${edit.session}` : await ownAnswerSuffix(jk, date, prompt, deviceId);
   await write(jk, [await seal(jk, "answer", date, suffix, entry)]);
+}
+
+/** Every answer row to one question on a day (any device) that opens here. */
+async function answersTo(jk: JournalKey, date: ISODate, pk: string): Promise<AnswerEntry[]> {
+  const prefix = `answer:${date}:${pk}:`;
+  const out: AnswerEntry[] = [];
+  for (const row of (await rowsOn(date)).filter((r) => r.kind === "answer" && r.id.startsWith(prefix))) {
+    const o = await openRow(jk, row, "answer");
+    if (o.state === "ok") out.push(o.entry);
+  }
+  return out;
 }
 
 /**
@@ -404,18 +421,19 @@ async function ownAnswerSuffix(jk: JournalKey, date: ISODate, prompt: string, de
 
 /**
  * Next / Skip on a box with nothing new typed: marks this device's row moved past and keeps
- * whatever answer that row already holds (typed here earlier). Never copies another
- * device's answer, and never blanks this device's own one.
+ * whatever answer that row already holds (typed here earlier), with the time it was typed.
+ * Never copies another device's answer, never blanks this device's own one, and never makes
+ * its words look newer than they are.
  */
 export async function moveAnswerOn(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<void> {
-  const own = await db.journal.get(journalId("answer", date, await ownAnswerSuffix(jk, date, prompt, deviceId)));
-  let answer: string | null = null;
-  if (own) {
-    const o = await openRow(jk, own, "answer");
-    if (o.state !== "ok") throw new Error("That answer could not be read, so it was left as it is.");
-    answer = o.entry.answer;
-  }
-  await saveAnswer(jk, date, prompt, deviceId, answer, true);
+  const suffix = await ownAnswerSuffix(jk, date, prompt, deviceId);
+  const own = await db.journal.get(journalId("answer", date, suffix));
+  if (!own) return saveAnswer(jk, date, prompt, deviceId, null, true); // nothing here: an empty answer never wins
+  const o = await openRow(jk, own, "answer");
+  if (o.state !== "ok") throw new Error("That answer could not be read, so it was left as it is.");
+  // Only "moved past" changes: the words keep the time they were written, so they never look
+  // newer than an answer (or a clear) made since on another device (bug #33).
+  await write(jk, [await seal(jk, "answer", date, suffix, { ...o.entry, done: true })]);
 }
 
 /** Every day with a check-in, newest first. */

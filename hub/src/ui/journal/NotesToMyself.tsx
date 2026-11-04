@@ -135,9 +135,11 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
     setProblem("");
     await load();
   }
-  async function cancel(e: Editing) {
+  /** Cancel: the editor closes at once; her draft is let go once any save still landing has. */
+  async function cancel(e: Editing, landing: Promise<unknown>) {
     typed.current.delete(e.id);
     setEditing(null);
+    await landing.catch(() => undefined);
     await clearNoteDraft(jk, deviceId, e.id).catch(() => undefined);
   }
   async function remove(e: Editing) {
@@ -160,7 +162,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
         editing={e}
         start={typed.current.get(e.id) ?? e.start}
         onTyped={(f) => typed.current.set(e.id, f)}
-        onCancel={() => void cancel(e)}
+        onCancel={(landing) => void cancel(e, landing)}
         onSave={(f) => save(e, f)}
         onDelete={!e.isNew && !gone ? () => remove(e) : undefined}
         onProblem={setProblem}
@@ -349,7 +351,8 @@ function NoteEditor({
   start: NoteFields;
   onTyped: (f: NoteFields) => void;
   onSave: (f: NoteFields) => Promise<void>;
-  onCancel: () => void;
+  /** Cancelled: `landing` settles once any draft save still in flight has landed. */
+  onCancel: (landing: Promise<unknown>) => void;
   onDelete?: () => Promise<void>;
   onProblem: (p: string) => void;
 }) {
@@ -391,7 +394,15 @@ function NoteEditor({
     timer.current = setTimeout(flush, AUTOSAVE_MS);
   }
 
-  /** Saving, cancelling or deleting: the draft stops, and waits for one in flight to land first. */
+  /** Cancel closes at once (no waiting on a slow save); nothing more is kept as a draft. */
+  function cancelNow() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    closed.current = true;
+    onCancel(queue.current);
+  }
+
+  /** Saving or deleting: the draft stops, and waits for one in flight to land first. */
   async function close(fn: () => Promise<void> | void) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -449,7 +460,7 @@ function NoteEditor({
           <button type="submit" disabled={busy || !ready}>
             Save
           </button>
-          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void close(onCancel)}>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={cancelNow}>
             Cancel
           </button>
           {onDelete && (
