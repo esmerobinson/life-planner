@@ -58,7 +58,13 @@ describe("needsALook", () => {
     expect(ids(r.stale)).toEqual([s2.id, s1.id]);
   });
 
-  it("excludes recurring, ideas, done, archived and inbox items", () => {
+  it("an inbox item is included by its deadline only, never as not looked at (bug #8)", () => {
+    const late = item({ areaId: "inbox", due: "2026-10-01" });
+    const r = needsALook([late, item({ areaId: "inbox", touchedAt: "2026-01-01" })], TODAY);
+    expect(r).toEqual({ overdue: [late], dueSoon: [], stale: [] });
+  });
+
+  it("excludes recurring, ideas, done, archived and undated inbox items", () => {
     const old = { touchedAt: "2026-01-01", due: "2026-10-01" };
     const r = needsALook(
       [
@@ -66,7 +72,7 @@ describe("needsALook", () => {
         item({ ...old, kind: "idea" }),
         item({ ...old, status: "done" }),
         item({ ...old, status: "archived" }),
-        item({ ...old, areaId: "inbox" }),
+        item({ touchedAt: "2026-01-01", areaId: "inbox" }),
       ],
       TODAY,
     );

@@ -18,7 +18,8 @@
 
 import { applyUntracked } from "../data/changeTracking";
 import { carrySessionTicks, forgetAcceptedTicks, restampTicks } from "../data/sessionTicks";
-import type { Item } from "../domain/types";
+import { pictureIds } from "../domain/page";
+import type { FileRow, Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
 import { retireCandidateForToken } from "../journal/keyStore";
@@ -214,6 +215,8 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   /** Halves of a batch the server refused with 400, being narrowed down to the culprit(s). */
   const probes: Batch[] = [];
   let finished = false;
+  /** This device's copies of pictures that arrived emptied (purged) this run, checked once the last page is in. */
+  const emptied = new Map<string, { local: FileRow; stamp: number }>();
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const probing = probes.length > 0;
@@ -310,7 +313,7 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
       return { kind: "error", message: FAILED_MESSAGE };
     }
 
-    received += await applyReply(db, batch.changes, batch.pendingVersions, reply);
+    received += await applyReply(db, batch.changes, batch.pendingVersions, reply, emptied);
     for (const c of batch.changes) attempted.add(keyOf(c.table, c.id));
     sent += batch.changes.length;
     cursor = reply.cursor;
@@ -389,6 +392,7 @@ async function applyReply(
   sentChanges: WireChange[],
   pendingVersions: Map<string, number>,
   reply: { cursor: number; hasMore: boolean; changes: WireChange[] },
+  emptied: Map<string, { local: FileRow; stamp: number }>,
 ): Promise<number> {
   return applyUntracked(db, async () => {
     // The sent versions are answered: clear them unless the row was edited again meanwhile.
@@ -404,7 +408,20 @@ async function applyReply(
         await holdForLater(db, c, reply.cursor);
         continue;
       }
-      if (await applyRow(db, c, reply.cursor)) written++;
+      const before = c.table === "files" && c.data.status === "purged" ? ((await db.files.get(c.id)) as FileRow | undefined) : undefined;
+      if (await applyRow(db, c, reply.cursor)) {
+        written++;
+        if (before && before.status !== "purged" && before.encrypted !== true && before.data && !emptied.has(c.id)) {
+          emptied.set(c.id, { local: before, stamp: c.updatedAt });
+        }
+      }
+    }
+    // Only on the last page (a page in between may hold the picture's page still in the Bin,
+    // its "emptied" row on a later page), and only when needed: awaiting an async helper that
+    // does no IndexedDB work would let this Dexie transaction commit early (PrematureCommitError).
+    if (!reply.hasMore && emptied.size > 0) {
+      await keepPicturesStillShown(db, emptied);
+      emptied.clear();
     }
     // A sent item that came back with no other version won: the session ticks it carried are settled.
     const returned = new Set(reply.changes.filter((c) => c.table === "items").map((c) => c.id));
@@ -463,6 +480,34 @@ async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boole
   if (waiting) await db.pending.delete([c.table, c.id]);
   if (held && held.updatedAt <= c.updatedAt) await db.quarantine.delete([c.table, c.id]);
   return true;
+}
+
+/**
+ * A picture another device emptied (its page was emptied from that device's Bin) is put back
+ * here when a page on THIS device still shows it once the whole reply is applied: e.g. the
+ * page was restored or edited here meanwhile and won, or another page here shows the same
+ * picture. The kept copy is stamped newer than the emptied one and sent, so the emptied copy
+ * never wins over the only copy that still has the image, and it reaches the other devices
+ * again. A page that was itself emptied (purged) shows nothing. Runs once the last page of a
+ * sync run is in, so a page whose own emptied row comes on a later page isn't counted. Inside applyReply's
+ * untracked transaction.
+ */
+async function keepPicturesStillShown(db: HubDB, emptied: Map<string, { local: FileRow; stamp: number }>): Promise<void> {
+  const shown = new Set<string>();
+  const note = (r: { status?: string; notes?: string }) => {
+    if (r.status !== "purged") pictureIds(r.notes ?? "").forEach((id) => shown.add(id));
+  };
+  await db.items.each(note);
+  await db.goals.each(note);
+  for (const [id, { local, stamp }] of emptied) {
+    if (!shown.has(id)) continue;
+    // A later page brought a newer version of this picture: that one stands.
+    const now = (await db.files.get(id)) as FileRow | undefined;
+    if (!now || now.status !== "purged" || now.updatedAt !== stamp) continue;
+    const updatedAt = Math.max(Date.now(), stamp + 1);
+    await db.files.put({ ...local, updatedAt });
+    await db.pending.put({ table: "files", id, updatedAt });
+  }
 }
 
 /** Keeps a row of an unknown table in quarantine (the newest version of it only). */

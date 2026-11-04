@@ -107,4 +107,52 @@ describe("pictures sync", () => {
     await syncOnce({ db: phone, fetch: server.fetch });
     expect(await phone.files.get("p1")).toMatchObject({ data: "", status: "purged" });
   });
+
+  const page = (id: string, notes: string, status: Item["status"] = "open"): Item => ({
+    id, kind: "task", title: "Pretend page", notes, links: [], areaId: "art", priority: 2,
+    status, createdAt: "2026-10-28", touchedAt: "2026-10-28",
+  });
+
+  it("an emptied picture still empties on a device whose copy of the page was emptied in the same sync", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const mac = await device("mac");
+    const phone = await device("phone");
+    await mac.files.add(picture("p2"));
+    await mac.items.add(page("i2", pictureLine("p2"), "deleted"));
+    await syncOnce({ db: mac, fetch: server.fetch });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    clock += 60_000;
+    // The Mac empties its Bin (the same tombstones as repo.ts emptyBin).
+    await mac.transaction("rw", mac.items, mac.files, async () => {
+      await mac.items.put({
+        id: "i2", kind: "task", title: "", links: [], areaId: "art", priority: 2,
+        status: "purged", createdAt: "2026-10-28", touchedAt: "2026-10-29",
+      });
+      await mac.files.put({ ...picture("p2"), data: "", width: 0, height: 0, status: "purged" });
+    });
+    await syncOnce({ db: mac, fetch: server.fetch });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    expect(await phone.files.get("p2")).toMatchObject({ data: "", status: "purged" });
+    expect(await phone.pending.count()).toBe(0);
+  });
+
+  it("an emptied picture another page on this device still shows is kept and sent back", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const mac = await device("mac");
+    const phone = await device("phone");
+    await mac.files.add(picture("p3"));
+    await syncOnce({ db: mac, fetch: server.fetch });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    // The phone (offline) puts the same picture on another page; the Mac empties it.
+    clock += 60_000;
+    await phone.items.add(page("other", `Pretend copy:\n${pictureLine("p3")}`));
+    clock += 60_000;
+    await mac.files.put({ ...picture("p3"), data: "", width: 0, height: 0, status: "purged" });
+    await syncOnce({ db: mac, fetch: server.fetch });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    expect((await phone.files.get("p3"))!.data).toBe("/9j/4AAQ");
+    await syncOnce({ db: mac, fetch: server.fetch });
+    expect((await mac.files.get("p3"))!.data).toBe("/9j/4AAQ");
+    expect(server.data("files", "p3")).toMatchObject({ data: "/9j/4AAQ" });
+  });
 });

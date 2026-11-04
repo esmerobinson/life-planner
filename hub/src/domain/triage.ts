@@ -25,7 +25,7 @@ export function withTickedOff(
   items: Item[],
   today: ISODate,
 ): { rhythm: Item[]; picks: Item[]; alsoDue: Item[]; doneToday: Item[] } {
-  const sorted = (i: Item) => i.kind === "task" && i.areaId !== "inbox";
+  const sorted = (i: Item) => i.kind === "task" && (i.areaId !== "inbox" || datedInbox(i));
   const inRhythm = new Set(pick.rhythm.map((i) => i.id));
   const extraHabits = items.filter(
     (i) => sorted(i) && isHabit(i) && i.status === "open" && doneToday(i, today) && !inRhythm.has(i.id),
@@ -45,6 +45,14 @@ export function withTickedOff(
     alsoDue: pick.alsoDue,
     doneToday: finishedToday,
   };
+}
+
+/**
+ * An Inbox item is unsorted, so Today never picks it by priority or repeat; but a day or a
+ * deadline she gave it from the Inbox ("Do it on", "Deadline") counts like any to-do's.
+ */
+export function datedInbox(i: Item): boolean {
+  return i.areaId === "inbox" && (i.pinnedDate !== undefined || i.due !== undefined);
 }
 
 export const CAPACITY = 4;
@@ -83,10 +91,11 @@ export function pickToday(
 
   const live = items.filter(
     (i) =>
-      i.kind === "task" && i.status === "open" && i.areaId !== "inbox" && i.hiddenOn !== today,
+      i.kind === "task" && i.status === "open" && (i.areaId !== "inbox" || datedInbox(i)) && i.hiddenOn !== today,
   );
+  const inbox = (i: Item) => i.areaId === "inbox";
 
-  const rhythm = live.filter((i) => i.recur?.includes(wd));
+  const rhythm = live.filter((i) => !inbox(i) && i.recur?.includes(wd));
   const isRecurring = (i: Item) => (i.recur?.length ?? 0) > 0;
   const pool = live.filter((i) => !isRecurring(i));
 
@@ -120,12 +129,12 @@ export function pickToday(
 
   const dueIds = new Set(due.map((i) => i.id));
   const p1 = rest
-    .filter((i) => i.priority === 1 && !dueIds.has(i.id) && !isProject(i))
+    .filter((i) => i.priority === 1 && !dueIds.has(i.id) && !isProject(i) && !inbox(i))
     .sort((a, b) => behind(a) - behind(b));
   picks.push(...p1.slice(0, Math.max(0, CAPACITY - picks.length)));
 
   if (picks.length < CAPACITY) {
-    const p2 = rest.filter((i) => i.priority === 2 && !dueIds.has(i.id) && !isProject(i));
+    const p2 = rest.filter((i) => i.priority === 2 && !dueIds.has(i.id) && !isProject(i) && !inbox(i));
     if (p2.length > 0) {
       const start = daysBetween("1970-01-01", today) % p2.length;
       const count = Math.min(CAPACITY - picks.length, p2.length);

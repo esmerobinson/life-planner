@@ -4,7 +4,7 @@ import { unstamped } from "../test/unstamped";
 import {
   createItem, createGoal, tickItem, untickItem, moveTo, removeFromToday,
   archiveItem, restoreItem, listItems, setMilestone, updateItems, updateItem, updateGoal, archiveItems,
-  itemToGoal, pinTo, saveGoalNotes, setGoalOnHome, deleteGoal,
+  itemToGoal, pinTo, saveGoalNotes, setGoalOnHome, deleteGoal, listGoals,
 } from "./repo";
 import { exportBackup, restoreBackup } from "./backup";
 
@@ -138,6 +138,26 @@ describe("repo", () => {
     expect((await db.items.get(it1.id))?.milestone).toBe(true);
     await setMilestone(it1.id, false, today);
     expect(await db.items.get(it1.id)).not.toHaveProperty("milestone");
+  });
+});
+
+describe("list order (bug #15)", () => {
+  it("items and goals come oldest first, then in the order they were made, whatever their ids", async () => {
+    const row = { ...base, links: [], status: "open" as const, touchedAt: today };
+    await db.items.bulkPut([
+      { ...row, id: "f-old", title: "Pretend older", createdAt: "2026-09-01" },
+      { ...row, id: "0-new", title: "Pretend newer", createdAt: "2026-10-27" },
+    ]);
+    const a = await createItem({ ...base, title: "Pretend made first today" }, "2026-10-27");
+    const b = await createItem({ ...base, title: "Pretend made second today" }, "2026-10-27");
+    const ids = (await listItems()).map((i) => i.id);
+    expect(ids[0]).toBe("f-old"); // the older day first, although its id sorts last
+    expect(ids.indexOf(a.id)).toBeLessThan(ids.indexOf(b.id)); // same day: in the order made
+    expect(ids).toHaveLength(4);
+    const g1 = await createGoal({ title: "Pretend goal one", areaId: "art", kind: "practice" }, today);
+    const g2 = await createGoal({ title: "Pretend goal two", areaId: "art", kind: "practice" }, today);
+    await db.goals.put({ id: "ffff", title: "Pretend oldest goal", areaId: "art", kind: "practice", milestones: [], createdAt: "2026-01-01" });
+    expect((await listGoals()).map((g) => g.id)).toEqual(["ffff", g1.id, g2.id]);
   });
 });
 

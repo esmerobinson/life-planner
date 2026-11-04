@@ -230,6 +230,8 @@ function AddMonthGoal({
   const [title, setTitle] = useState("");
   const [target, setTarget] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
+  /** A save is under way: the second click of a double-click must not add the goal again. */
+  const saving = useRef(false);
   const month = monthName(today);
   useEffect(() => {
     if (open) titleRef.current?.focus();
@@ -249,18 +251,23 @@ function AddMonthGoal({
       aria-label={`Add ${article(month)} ${month} goal`}
       onSubmit={(e) => {
         e.preventDefault();
-        if (!ready) return;
+        if (!ready || saving.current) return;
+        saving.current = true;
         let id = "";
         const saved = write(async () => {
           id = await addMonthGoal(goal.id, { kind, title, ...(kind === "count" ? { target: t } : {}) }, today);
         });
         track?.(saved, () => ({ kind: "add", id }));
-        void saved.then((ok) => {
-          if (!ok) return;
-          setTitle("");
-          setTarget("");
-          setOpen(false);
-        });
+        void saved
+          .finally(() => {
+            saving.current = false;
+          })
+          .then((ok) => {
+            if (!ok) return;
+            setTitle("");
+            setTarget("");
+            setOpen(false);
+          });
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
