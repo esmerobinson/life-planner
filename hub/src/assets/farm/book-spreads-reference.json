@@ -1,0 +1,286 @@
+{
+ "frames": [
+  {
+   "filename": "book-spreads-reference 0.aseprite",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 1.aseprite",
+   "frame": {
+    "x": 232,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 2.aseprite",
+   "frame": {
+    "x": 464,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 3.aseprite",
+   "frame": {
+    "x": 696,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 4.aseprite",
+   "frame": {
+    "x": 928,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 5.aseprite",
+   "frame": {
+    "x": 1160,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 6.aseprite",
+   "frame": {
+    "x": 1392,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 7.aseprite",
+   "frame": {
+    "x": 1624,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "book-spreads-reference 8.aseprite",
+   "frame": {
+    "x": 1856,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 152
+   },
+   "duration": 100
+  }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3",
+  "image": "book-spreads-reference.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 2088,
+   "h": 152
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "closed",
+    "from": 0,
+    "to": 0,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "contents",
+    "from": 1,
+    "to": 1,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-1-2",
+    "from": 2,
+    "to": 2,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-3-4",
+    "from": 3,
+    "to": 3,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-5-6",
+    "from": 4,
+    "to": 4,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-7-8",
+    "from": 5,
+    "to": 5,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-9-10",
+    "from": 6,
+    "to": 6,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-11-12",
+    "from": 7,
+    "to": 7,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "pages-13-14",
+    "from": 8,
+    "to": 8,
+    "direction": "forward",
+    "color": "#000000ff"
+   }
+  ],
+  "layers": [
+   {
+    "name": "Layer 1",
+    "opacity": 255,
+    "blendMode": "normal"
+   }
+  ],
+  "slices": []
+ }
+}
