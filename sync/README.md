@@ -158,6 +158,10 @@ TOKEN=$(node -e "import('$SYNC/shared/token.ts').then(async m => console.log(awa
 
 ### Changing the passphrase later
 
+**Changing the passphrase is for convenience. If someone may know your passphrase, ask for a
+full re-key first; changing it alone does not lock them out of the journal.** (The journal's key
+is not re-encrypted when the passphrase changes, so every passphrase it ever had still opens it.)
+
 Your journal keeps working through a passphrase change, as long as you do it in this order:
 
 1. Run the helper again (`node "$SYNC/tools/set-passphrase.mjs"`) and type the new passphrase.
