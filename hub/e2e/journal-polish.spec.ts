@@ -169,17 +169,20 @@ for (const width of [1280, 1920]) {
       await response.fill(`${"Pretend line\n".repeat(14)}Pretend last line`);
       expect((await response.boundingBox())!.height).toBeGreaterThan(before);
 
-      // Past exercises: newest first; one opens to the card and her response.
+      // Past exercises: newest first, today's too (the draft just typed in the next card, then
+      // the one submitted, Esme 2026-11-04); one opens to the card and her response.
       const s = exercise(page);
       await s.getByText("Past exercises", { exact: true }).click();
       const items = s.getByRole("list", { name: "Past exercises" }).getByRole("listitem");
-      await expect(items).toHaveCount(2);
-      await expect(items.nth(0).locator("summary")).toHaveText(/^Day 2 · The fictional kettle · /);
-      await expect(items.nth(1).locator("summary")).toHaveText(/^Day 1 · Pretend weather · /);
-      await items.nth(0).locator("summary").click();
-      await expect(items.nth(0).getByText(/a kettle whistles before it boils over/)).toBeVisible();
-      await expect(items.nth(0).getByText("In your book: Pretend workbook, page 2")).toBeVisible();
-      await expect(items.nth(0).getByText(/my shoulders whistled first/)).toBeVisible();
+      await expect(items).toHaveCount(4);
+      await expect(items.nth(0).locator("summary")).toHaveText(/^Day 4 · A pretend lighthouse · /);
+      await expect(items.nth(1).locator("summary")).toHaveText(/^Day 3 · Imaginary pebbles · /);
+      await expect(items.nth(2).locator("summary")).toHaveText(/^Day 2 · The fictional kettle · /);
+      await expect(items.nth(3).locator("summary")).toHaveText(/^Day 1 · Pretend weather · /);
+      await items.nth(2).locator("summary").click();
+      await expect(items.nth(2).getByText(/a kettle whistles before it boils over/)).toBeVisible();
+      await expect(items.nth(2).getByText("In your book: Pretend workbook, page 2")).toBeVisible();
+      await expect(items.nth(2).getByText(/my shoulders whistled first/)).toBeVisible();
       await noSidewaysScroll(page);
       await shoot(page, `past-exercises-${width}`, s);
 
@@ -206,7 +209,7 @@ test.describe("at 390px", () => {
     await shoot(page, "exercise-submitted-390", exercise(page));
     const s = exercise(page);
     await s.getByText("Past exercises", { exact: true }).click();
-    await s.getByRole("list", { name: "Past exercises" }).getByRole("listitem").nth(0).locator("summary").click();
+    await s.getByRole("list", { name: "Past exercises" }).getByRole("listitem").filter({ hasText: "The fictional kettle" }).locator("summary").click();
     await expect(s.getByText(/my shoulders whistled first/)).toBeVisible();
     await noSidewaysScroll(page);
     await shoot(page, "past-exercises-390", s);
@@ -223,7 +226,7 @@ for (const width of [360, 430]) {
       await noSidewaysScroll(page);
       const s = exercise(page);
       await s.getByText("Past exercises", { exact: true }).click();
-      await s.getByRole("list", { name: "Past exercises" }).getByRole("listitem").nth(0).locator("summary").click();
+      await s.getByRole("list", { name: "Past exercises" }).getByRole("listitem").filter({ hasText: "The fictional kettle" }).locator("summary").click();
       await expect(s.getByText(/my shoulders whistled first/)).toBeVisible();
       await noSidewaysScroll(page);
     });
