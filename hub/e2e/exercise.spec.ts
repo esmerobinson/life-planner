@@ -67,15 +67,17 @@ async function walkThrough(page: Page, prefix: string) {
   await shoot(page, `${prefix}-read-more`);
 
   await today.getByLabel("Your response").fill("Pretend: one small grey cloud, floating past the made-up hill.");
+  await shoot(page, `${prefix}-before-submit`);
+  await expect(today.getByRole("checkbox", { name: "Done" })).toHaveCount(0); // Submit is the only way
   await today.getByRole("button", { name: "Submit" }).click();
-  await expect(today.getByText("Saved")).toBeVisible();
-  await expect(s.getByText("Done for today · next card tomorrow")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
 
-  // Do the next one →: the kettle, a card with parts.
-  await today.getByRole("button", { name: "Do the next one →" }).click();
+  // The card gives way, in place, to the next one (the kettle, a card with parts); one card on the page.
   const next = s.getByRole("article", { name: "Next card: Day 2" });
   await expect(next.getByText("The fictional kettle")).toBeVisible();
+  await expect(s.getByRole("article")).toHaveCount(1);
+  await expect(s.getByText(/Day 1 saved\. Here's the next one if you'd like to keep going\./)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
+  await shoot(page, `${prefix}-after-submit`);
   await expect(next.getByRole("button", { name: "Submit" })).toBeDisabled();
   await next.getByLabel("What does your pretend whistle sound like?").fill("Pretend: a small train");
   for (const [n, w] of [[1, "Pretend chest"], [2, "Pretend hands"]] as const) {
@@ -90,7 +92,9 @@ async function walkThrough(page: Page, prefix: string) {
   await expect(next.getByRole("button", { name: "Submit" })).toBeDisabled();
   await next.getByLabel("Three pretend places you feel it, 3").fill("Pretend feet");
   await next.getByRole("button", { name: "Submit" }).click();
-  await expect(next.getByText("Saved")).toBeVisible();
+  await expect(s.getByRole("article", { name: "Next card: Day 3" })).toBeVisible(); // replaced again, in place
+  await expect(s.getByRole("article")).toHaveCount(1);
+  await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
   await noSidewaysScroll(page);
 
   await s.getByText("All cards", { exact: true }).click();
@@ -111,7 +115,7 @@ async function walkThrough(page: Page, prefix: string) {
   // Reloaded: still today's card, done.
   await page.reload();
   await expect(section(page).getByText("Done for today · next card tomorrow")).toBeVisible();
-  await expect(section(page).getByRole("checkbox", { name: "Done", exact: true })).toBeChecked();
+  await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
 }
 
 test.describe("at 1280px", () => {
@@ -296,7 +300,7 @@ for (const width of [1280, 390]) {
       await expect(today.getByText("4 of 4 answered · Yes 2 · Partly 1 · No 1")).toBeVisible();
       await shootCard(today, `checklist-${width}-answered`);
       await today.getByRole("button", { name: "Submit" }).click();
-      await expect(today.getByText("Saved")).toBeVisible();
+      await expect(s.getByRole("article", { name: "Next card: Day 2" })).toBeVisible(); // the next one takes its place
 
       // Reloaded: the answers come back; All cards shows each item with its choice and note.
       await page.reload();

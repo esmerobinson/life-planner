@@ -78,9 +78,11 @@ async function submitResponse(page: Page) {
   const box = s.getByRole("textbox", { name: "Your response" });
   await box.fill("Pretend: I put down one imaginary pebble.\nIt was a kind word to myself.\nThat counts.");
   await s.getByRole("button", { name: "Submit" }).click();
-  await expect(s.getByText("Saved", { exact: true })).toBeVisible();
-  await expect(s.getByRole("checkbox", { name: "Done", exact: true })).toBeChecked();
-  await expect(s.getByText("Done for today · next card tomorrow")).toBeVisible();
+  // The card gives way, in place, to the next one; the tab stays ticked.
+  await expect(s.getByText(/Day 3 saved\. Here's the next one/)).toBeVisible();
+  await expect(s.getByRole("article")).toHaveCount(1);
+  await expect(s.getByText("A pretend lighthouse")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
 }
 
 for (const width of [1280, 1920]) {
@@ -166,8 +168,6 @@ for (const width of [1280, 1920]) {
       const before = (await response.boundingBox())!.height;
       await response.fill(`${"Pretend line\n".repeat(14)}Pretend last line`);
       expect((await response.boundingBox())!.height).toBeGreaterThan(before);
-      await exercise(page).getByRole("button", { name: "Submit" }).click();
-      await expect(exercise(page).getByText("Saved", { exact: true })).toBeVisible();
 
       // Past exercises: newest first; one opens to the card and her response.
       const s = exercise(page);

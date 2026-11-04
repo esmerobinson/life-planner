@@ -131,7 +131,7 @@ describe("newer part kinds", () => {
     await waitFor(async () =>
       expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY && m.logged)).toMatchObject({ id: "kinds-tracker" }),
     );
-    expect(within(card).getByRole("checkbox", { name: "Done" })).not.toBeChecked();
+    expect((await readExerciseProgress(jk)).marks.find((m) => m.date === TODAY)).toMatchObject({ id: "kinds-tracker", done: false });
     first.unmount();
     vi.useRealTimers();
     // The next day: the same card, Day 2 of 3, with Day 1 brought forward.

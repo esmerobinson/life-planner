@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseProgress,
-  recordExerciseShown, saveExerciseMark, setExerciseStar, type CardsState, type ExerciseProgress, type ExerciseResponse,
+  recordExerciseShown, setExerciseStar, type CardsState, type ExerciseProgress, type ExerciseResponse,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
 import type { JournalKey } from "../../journal/crypto";
@@ -27,6 +27,12 @@ export const CARDS_SYNCING = "Your cards are still syncing…";
 /** Beside Submit on today's card (the approved mockup). */
 export const SUBMIT_TICKS = "Submitting ticks today's exercise.";
 export const NEXT_ONE = "Do the next one →";
+/** Above the next card once one is submitted. */
+export const savedLine = (card: ExerciseCard) =>
+  `${card.day !== null && !card.optional ? `Day ${card.day}` : "That card"} saved. Here's the next one if you'd like to keep going.`;
+/** When the card just submitted was the last one not done. */
+export const ALL_DONE_LINE = "That's every card for now. Lovely work.";
+export const SEE_WHAT_YOU_WROTE = "See what you wrote";
 const SAVE_PROBLEM = "That didn't save. Try again.";
 /** In All cards, over a card's own responses. */
 export const YOUR_RESPONSES = "Your responses";
@@ -41,8 +47,10 @@ const MAX_FILE_BYTES = 16 * 1024 * 1024;
  * Mental health exercise (exercise brief; Journal v2 tab): one learn + try card a day. The
  * cards are her private study notes, imported from a file and stored sealed with the journal
  * key (never in the app itself). Today's card is the lowest one not yet done this round; once
- * shown it stays today's card all day, done or not. "Do the next one →" opens the next card not
- * yet done, in the same sitting, with its own response box (its Submit marks it done today too).
+ * shown it stays today's card all day, done or not. Submit is the only way to finish a card.
+ * After it, the card is replaced in place by the next one not yet done (never stacked below),
+ * with a short line above it; "Do the next one →" does the same without submitting. One card is
+ * on the page at a time, and what she wrote stays reachable under Read back and All cards.
  */
 export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; today: ISODate; deviceId: string }) {
   const [cards, setCards] = useState<CardsState | null>(null);
@@ -51,10 +59,20 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const [responses, setResponses] = useState<ExerciseResponse[]>([]);
   const [problem, setProblem] = useState("");
   const [asking, setAsking] = useState<CardSet | null>(null);
-  // Further cards opened with "Do the next one" in this sitting (ids, in order).
-  const [opened, setOpened] = useState<string[]>([]);
+  // The one card on the page: null is today's card. "Do the next one" and Submit replace it in
+  // place; `trail` is the cards left behind unsubmitted (the Back link returns to the last).
+  const [shownId, setShownId] = useState<string | null>(null);
+  const [trail, setTrail] = useState<string[]>([]);
+  // Just submitted: waiting for the saved state to be read back, then the line above the next card.
+  const [waiting, setWaiting] = useState<string | null>(null);
+  const [saved, setSaved] = useState<ExerciseCard | null>(null);
+  // Every card done today and none left to show.
+  const [finished, setFinished] = useState(false);
+  // Opens a card's review under All cards (the "See what you wrote" link).
+  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [ticking, setTicking] = useState<boolean | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const scrollUp = useRef(false);
   const latest = useRef(0);
   const guardFail = useRef<() => void>(() => undefined);
   const loaded = useRef(false);
@@ -78,7 +96,13 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   }, [jk, today]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
-  useEffect(() => setOpened([]), [today]);
+  useEffect(() => {
+    setShownId(null);
+    setTrail([]);
+    setWaiting(null);
+    setSaved(null);
+    setFinished(false);
+  }, [today]);
   // Never blank: "Loading…", then the can't-open line and Try again.
   const guard = useLoadGuard(cards === null, load);
   guardFail.current = guard.fail;
@@ -130,14 +154,51 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const starred = progress?.starred ?? new Set<string>();
   const row = useMemo(() => rowStatus(exerciseDoneDays(progress?.marks ?? []), today), [progress, today]);
   const byId = new Map((set?.cards ?? []).map((c) => [c.id, c]));
-  const extras = opened.map((id) => byId.get(id)).filter((c): c is ExerciseCard => c !== undefined);
-  const next = plan ? upNext(plan, new Set(opened)) : null;
+  const shown = plan ? ((shownId && byId.get(shownId)) || plan.today.card) : null;
+  const isToday = !!plan && shown?.id === plan.today.card.id;
+  // Not done today, not on the page, not left behind unsubmitted.
+  const upcoming = plan?.queue.filter((c) => c.id !== shown?.id && !plan.doneToday.has(c.id)) ?? [];
+  const next = upcoming.find((c) => !trail.includes(c.id)) ?? null;
+  const back = trail.length > 0 ? byId.get(trail[trail.length - 1]!) ?? null : null;
+  const done = plan?.today.done ?? false;
+
+  // Once a submit is read back as done, the card gives way to the next one not done (or a gentle line).
+  useEffect(() => {
+    if (!waiting || !plan || !plan.doneToday.has(waiting)) return;
+    const after = plan.queue.find((c) => c.id !== waiting && !plan.doneToday.has(c.id)) ?? null;
+    setWaiting(null);
+    setSaved(byId.get(waiting) ?? null);
+    setShownId(after?.id ?? null);
+    setFinished(!after);
+    setTrail((t) => t.filter((id) => !plan.doneToday.has(id)));
+    scrollUp.current = true;
+  });
+  // The tab goes back to the top of the new card.
+  useEffect(() => {
+    if (!scrollUp.current) return;
+    scrollUp.current = false;
+    stage.current?.scrollIntoView?.({ block: "start" });
+  }, [shownId, finished]);
+
+  function goNext() {
+    if (!next || !shown) return;
+    setTrail((t) => [...t, shown.id]);
+    setShownId(next.id);
+    setSaved(null);
+    scrollUp.current = true;
+  }
+  function goBack() {
+    if (!back) return;
+    setTrail((t) => t.slice(0, -1));
+    setShownId(back.id);
+    setSaved(null);
+    scrollUp.current = true;
+  }
   const nextButton = next && (
-    <button type="button" className="btn-secondary exercise-next" disabled={busy} onClick={() => setOpened((o) => [...o, next.id])}>
+    <button type="button" className="btn-secondary exercise-next" disabled={busy} onClick={goNext}>
       {NEXT_ONE}
     </button>
   );
-  const done = plan?.today.done ?? false;
   const restarts = asking && progress ? replacingRestarts(progress.marks, asking) : false;
   const titles = useMemo(() => new Map((set?.tracks ?? []).filter((t) => t.title).map((t) => [t.id, t.title])), [set]);
 
@@ -167,58 +228,51 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       {plan && (
         <>
           <ImportPill label="Update cards" fileLabel="Exercise card file (update)" busy={busy} onFile={(f) => void chosen(f)} />
-          <article className="exercise-card" aria-label="Today's card">
-            <CardHead card={plan.today.card} streak={row} round={plan.round} />
-            <CardBody card={plan.today.card} />
-            <ReadMore card={plan.today.card} />
-            <ExerciseResponseBox
-              key={`${today}|${plan.today.card.id}`}
-              jk={jk}
-              today={today}
-              deviceId={deviceId}
-              card={plan.today.card}
-              todayId={plan.today.card.id}
-              onProblem={setProblem}
-              note={<span className="journal-muted">{SUBMIT_TICKS}</span>}
-              after={extras.length === 0 ? nextButton : null}
-            />
-            <div className="exercise-actions">
-              <label className="form-check">
-                <input
-                  type="checkbox"
-                  className="tick"
-                  checked={ticking ?? done}
-                  disabled={busy}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setTicking(on); // shown at once; the saved state takes over once read back
-                    void attempt(() => saveExerciseMark(jk, today, deviceId, plan.today.card.id, on)).finally(() => setTicking(null));
-                  }}
+          <div ref={stage} className="exercise-stage">
+            {saved && (
+              <p className="journal-muted exercise-saved" role="status">
+                {finished ? ALL_DONE_LINE : savedLine(saved)}{" "}
+                <button type="button" className="quiet-link" onClick={() => setReveal((r) => ({ id: saved.id, n: (r?.n ?? 0) + 1 }))}>
+                  {SEE_WHAT_YOU_WROTE}
+                </button>
+              </p>
+            )}
+            {finished && !saved && <p className="journal-muted exercise-saved">{ALL_DONE_LINE}</p>}
+            {!finished && shown && (
+              <article
+                key={shown.id}
+                className={isToday ? "exercise-card" : "exercise-card exercise-boxed"}
+                aria-label={isToday ? "Today's card" : `Next card: ${shown.day !== null ? `Day ${shown.day}` : shown.theme}`}
+              >
+                {back && (
+                  <button type="button" className="btn-secondary exercise-back" onClick={goBack}>
+                    {`← Back to ${back.day !== null ? `Day ${back.day}` : back.theme}`}
+                  </button>
+                )}
+                <CardHead card={shown} streak={row} round={plan.round} />
+                <CardBody card={shown} />
+                <ReadMore card={shown} />
+                <ExerciseResponseBox
+                  key={`${today}|${shown.id}`}
+                  jk={jk}
+                  today={today}
+                  deviceId={deviceId}
+                  card={shown}
+                  todayId={plan.today.card.id}
+                  onProblem={setProblem}
+                  onSubmitted={() => setWaiting(shown.id)}
+                  note={plan.doneToday.size === 0 ? <span className="journal-muted">{SUBMIT_TICKS}</span> : undefined}
+                  after={nextButton}
                 />
-                <span>Done</span>
-              </label>
-              <StarToggle on={starred.has(plan.today.card.id)} disabled={busy} onToggle={(on) => star(plan.today.card.id, on)} />
-            </div>
-            {done && <p className="journal-muted">{DONE_LINE}</p>}
-          </article>
-          {extras.map((card, i) => (
-            <article key={card.id} className="exercise-card exercise-boxed" aria-label={`Next card: Day ${card.day}`}>
-              <CardHead card={card} />
-              <CardBody card={card} />
-              <ReadMore card={card} />
-              <ExerciseResponseBox
-                key={`${today}|${card.id}`}
-                jk={jk}
-                today={today}
-                deviceId={deviceId}
-                card={card}
-                todayId={plan.today.card.id}
-                onProblem={setProblem}
-                after={i === extras.length - 1 ? nextButton : null}
-              />
-              {plan.doneToday.has(card.id) && <p className="journal-muted">Done</p>}
-            </article>
-          ))}
+                {!shown.optional && (
+                  <div className="exercise-actions">
+                    <StarToggle on={starred.has(shown.id)} disabled={busy} onToggle={(on) => star(shown.id, on)} />
+                  </div>
+                )}
+                {isToday && done && <p className="journal-muted">{DONE_LINE}</p>}
+              </article>
+            )}
+          </div>
         </>
       )}
       <PastExercises past={responses.filter((e) => e.date < today)} cards={set?.cards ?? []} />
@@ -231,6 +285,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
           busy={busy}
           onStar={star}
           onFile={(f) => void chosen(f)}
+          reveal={reveal}
         />
       )}
       {asking && (
@@ -468,7 +523,7 @@ function StarToggle({ on, disabled, onToggle }: { on: boolean; disabled: boolean
  * newest first). Import lives here too.
  */
 function AllCards({
-  set, responses, done, starred, busy, onStar, onFile,
+  set, responses, done, starred, busy, onStar, onFile, reveal,
 }: {
   set: CardSet;
   responses: ExerciseResponse[];
@@ -477,10 +532,16 @@ function AllCards({
   busy: boolean;
   onStar: (id: string, on: boolean) => void;
   onFile: (f: File) => void;
+  reveal: { id: string; n: number } | null;
 }) {
   const [open, setOpen] = useState(false);
+  const fold = useRef<HTMLDetailsElement>(null);
+  // "See what you wrote": the fold opens (and the card in it, below).
+  useEffect(() => {
+    if (reveal && fold.current) fold.current.open = true;
+  }, [reveal]);
   return (
-    <details className="journal-fold" onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <details ref={fold} className="journal-fold" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>All cards</summary>
       {open && (
         <>
@@ -499,6 +560,7 @@ function AllCards({
                     starred={starred.has(g.card.id)}
                     busy={busy}
                     onStar={onStar}
+                    reveal={reveal?.id === g.card.id ? reveal.n : 0}
                   />
                 </li>
               ),
@@ -535,7 +597,7 @@ function grouped(set: CardSet): Group[] {
 }
 
 function OneCard({
-  card, responses, done, starred, busy, onStar,
+  card, responses, done, starred, busy, onStar, reveal,
 }: {
   card: ExerciseCard;
   responses: ExerciseResponse[];
@@ -543,10 +605,18 @@ function OneCard({
   starred: boolean;
   busy: boolean;
   onStar: (id: string, on: boolean) => void;
+  /** Counts up each time "See what you wrote" asks for this card (0: not asked). */
+  reveal: number;
 }) {
   const [open, setOpen] = useState(false);
+  const el = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (reveal === 0 || !el.current) return;
+    el.current.open = true;
+    el.current.scrollIntoView?.({ block: "start" });
+  }, [reveal]);
   return (
-    <details onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <details ref={el} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>
         <span>{card.optional ? `${card.theme} (optional reading)` : `Day ${card.day} · ${card.theme}`}</span>
         {done && (

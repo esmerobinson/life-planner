@@ -55,27 +55,30 @@ it("a writing box under the card (after Try this and the book line, as in the mo
   expect(submit).toBeDisabled(); // nothing written yet
 });
 
-it("Submit seals the response, marks today's card Done and shows 'Saved'; editing and Submit again updates the row", async () => {
-  renderApp("/journal", TODAY);
+it("Submit seals the response and marks today's card done; reloaded it shows 'Saved' with the text, editable, and Submit again updates the row", async () => {
+  const first = renderApp("/journal", TODAY);
   const card = await todayCard();
   await userEvent.type(await box(), "Pretend cloud, floating");
   await userEvent.click(within(card).getByRole("button", { name: "Submit" }));
-  expect(await within(card).findByText("Saved")).toBeInTheDocument();
-  await waitFor(() => expect(within(card).getByRole("checkbox", { name: "Done" })).toBeChecked());
-  expect(within(await section()).getByText("Done for today · next card tomorrow")).toBeInTheDocument();
+  await within(await section()).findByRole("article", { name: "Next card: Day 2" }); // the next one takes its place
   const device = await getDeviceId(db);
   expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, id: "day-1", done: true, primary: true }]);
   expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating", saved: true });
   expect(JSON.stringify(await db.journal.toArray())).not.toContain("floating");
+  first.unmount();
+  renderApp("/journal", TODAY);
+  const again = await todayCard();
   // The text stays, editable.
   const b = await box();
-  expect(b).toHaveValue("Pretend cloud, floating");
-  expect(within(card).queryByRole("button", { name: "Submit" })).toBeNull();
+  await waitFor(() => expect(b).toHaveValue("Pretend cloud, floating"));
+  expect(await within(again).findByText("Saved")).toBeInTheDocument();
+  expect(within(again).queryByRole("button", { name: "Submit" })).toBeNull();
   await userEvent.type(b, " away");
-  expect(within(card).queryByText("Saved")).toBeNull();
-  await userEvent.click(within(card).getByRole("button", { name: "Submit" }));
-  expect(await within(card).findByText("Saved")).toBeInTheDocument();
-  expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating away", saved: true });
+  expect(within(again).queryByText("Saved")).toBeNull();
+  await userEvent.click(within(again).getByRole("button", { name: "Submit" }));
+  await waitFor(async () =>
+    expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating away", saved: true }),
+  );
   expect(await db.journal.where("kind").equals("exercise-entry").count()).toBe(1);
 });
 
@@ -88,7 +91,6 @@ it("autosaves a draft on blur without marking Done; it is there after a reload",
   view.unmount();
   renderApp("/journal", TODAY);
   expect(await box()).toHaveValue("Pretend half a thought");
-  expect(within(await todayCard()).getByRole("checkbox", { name: "Done" })).not.toBeChecked();
 });
 
 it("autosaves after a pause in typing", async () => {

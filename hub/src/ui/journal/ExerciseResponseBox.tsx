@@ -36,7 +36,7 @@ export const SAVE_TODAY = "Save today's entry";
  * comes in while nothing typed here is waiting.
  */
 export function ExerciseResponseBox({
-  jk, today, deviceId, card, todayId, onProblem, note, after,
+  jk, today, deviceId, card, todayId, onProblem, onSubmitted, note, after,
 }: {
   jk: JournalKey;
   today: ISODate;
@@ -44,6 +44,8 @@ export function ExerciseResponseBox({
   card: ExerciseCard;
   todayId: string;
   onProblem: (p: string) => void;
+  /** After Submit has saved (not after saving a tracker card's day). */
+  onSubmitted?: () => void;
   note?: ReactNode;
   after?: ReactNode;
 }) {
@@ -82,6 +84,7 @@ export function ExerciseResponseBox({
       readAt={read.at}
       reload={load}
       onProblem={onProblem}
+      onSubmitted={onSubmitted}
       note={note}
       after={after}
     />
@@ -130,7 +133,7 @@ const UNSAVED = "\u0000unsaved";
 const keyOf = (v: ResponseValue) => (typeof v === "string" ? v : JSON.stringify(v));
 
 function ResponseField({
-  jk, today, deviceId, card, todayId, entry, carried, readAt, reload, onProblem, note, after,
+  jk, today, deviceId, card, todayId, entry, carried, readAt, reload, onProblem, onSubmitted, note, after,
 }: {
   jk: JournalKey;
   today: ISODate;
@@ -144,6 +147,7 @@ function ResponseField({
   readAt: number;
   reload: () => Promise<void>;
   onProblem: (p: string) => void;
+  onSubmitted?: () => void;
   note?: ReactNode;
   after?: ReactNode;
 }) {
@@ -238,6 +242,7 @@ function ResponseField({
     try {
       await enqueue(() => (log ? logExerciseEntry : submitExerciseEntry)(jk, today, deviceId, ref, v, todayId));
       onProblem("");
+      if (!log) onSubmitted?.();
     } catch {
       if (saved.current === k) saved.current = before === k ? UNSAVED : before;
       onProblem(SAVE_PROBLEM); // what she wrote stays

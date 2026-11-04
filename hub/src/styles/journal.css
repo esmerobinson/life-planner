@@ -358,6 +358,23 @@ a.journal-tab.is-selected {
   margin: 0;
 }
 
+/* The one card on the page, with the short "saved" line above it; the tab scrolls back here. */
+.exercise-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+  scroll-margin-top: 12px;
+}
+
+.exercise-stage p {
+  margin: 0;
+}
+
+.exercise-back {
+  align-self: flex-start;
+}
+
 .exercise-boxed {
   background: var(--row);
   border-radius: var(--radius-tile);
