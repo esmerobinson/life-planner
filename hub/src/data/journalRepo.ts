@@ -74,6 +74,15 @@ async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: FileRow
 }
 
 const rowsOn = (date: ISODate) => db.journal.where("date").equals(date).toArray();
+
+/**
+ * A row already here under this id that this key can't open (another key's, or damaged).
+ * Such a row is never written over (bug #20): the write skips it or refuses.
+ */
+async function wontOpen<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey, id: string, kind: K): Promise<boolean> {
+  const row = await db.journal.get(id);
+  return !!row && (await openRow(jk, row, kind)).state !== "ok";
+}
 const suffixOf = (row: JournalRow) => row.id.slice(`${row.kind}:${row.date}:`.length);
 
 // ---- morning pages -----------------------------------------------------------------------
@@ -163,6 +172,7 @@ export async function listJournalledDays(): Promise<Set<ISODate>> {
 
 /** Autosaves this device's draft for the day (sealed). Only this device writes it. */
 export async function saveMorningDraft(jk: JournalKey, date: ISODate, deviceId: string, text: string): Promise<void> {
+  if (await wontOpen(jk, journalId("draft", date, deviceId), "draft")) throw new Error(CANT_OPEN); // never written over
   await write(jk, [await seal(jk, "draft", date, deviceId, { v: 1, text })]);
 }
 
@@ -173,8 +183,10 @@ export async function saveMorningDraft(jk: JournalKey, date: ISODate, deviceId: 
 export async function finishMorningPage(jk: JournalKey, date: ISODate, deviceId: string, text: string): Promise<string> {
   const pageId = crypto.randomUUID();
   const page = await seal(jk, "page", date, pageId, { v: 1, text, at: Date.now() });
-  const draft = await seal(jk, "draft", date, deviceId, { v: 1, text: "" });
-  await write(jk, [page, draft]);
+  // A draft row this key can't open is kept as it is (bug #20); the page is still saved.
+  const keep = await wontOpen(jk, journalId("draft", date, deviceId), "draft");
+  const draft = keep ? [] : [await seal(jk, "draft", date, deviceId, { v: 1, text: "" })];
+  await write(jk, [page, ...draft]);
   return page.id;
 }
 
@@ -396,6 +408,7 @@ export async function readPromptSettings(jk: JournalKey): Promise<string[] | nul
 }
 
 export async function savePromptSettings(jk: JournalKey, active: string[], today: ISODate): Promise<void> {
+  if (await wontOpen(jk, "settings", "settings")) throw new Error(CANT_OPEN); // never written over (bug #20)
   await write(jk, [await seal(jk, "settings", today, undefined, { v: 1, active: [...new Set(active)] })]);
 }
 

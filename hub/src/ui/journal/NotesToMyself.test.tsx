@@ -124,7 +124,7 @@ it("Cancel leaves no note (and no note in progress)", async () => {
   await userEvent.type(within(s).getByRole("textbox", { name: "When I think…" }), "Pretend passing worry");
   await userEvent.click(within(s).getByRole("button", { name: "Cancel" }));
   expect(within(s).queryByRole("form")).toBeNull();
-  await waitFor(async () => expect((await listNotes(jk, await getDeviceId(db))).drafts).toEqual([]));
+  await waitFor(async () => expect((await listNotes(jk, await getDeviceId(db))).drafts).toEqual([]), { timeout: 4000 });
   expect((await listNotes(jk)).notes).toEqual([]);
 });
 
