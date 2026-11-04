@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { leftReadingList, MOVED_TO_READING_LIST, useRowUndo, useSessionsUndo } from "./undoSessions";
+import { CHANGED_TO_BOOK, leftReadingList, MOVED_TO_READING_LIST, useRowUndo, useSessionsUndo } from "./undoSessions";
 import {
   archiveItem, changeToProject, deleteItem, getItem, itemToGoal, makeBook, moveTo, removeFromToday, setMilestone, unBook,
   updateItem,
@@ -91,10 +91,9 @@ export function MoveToMenu({
         // A project's archived copy keeps its sessions when it becomes a goal.
         if (c.to === "goal") await itemToGoal(itemId, areaId ?? "admin", today);
         else if (c.to === "book") before.row = await makeBook(itemId, today);
-        else if (leavesList) {
-          await unBook(itemId, c.to === "idea" ? "idea" : "task", today);
-          if (c.to === "project") await changeToProject(itemId, today);
-        } else if (c.to === "project") await changeToProject(itemId, today);
+        // One write: the book's fields are put away (not lost), to-do fields come back.
+        else if (leavesList) await unBook(itemId, c.to === "idea" ? "idea" : c.to === "project" ? "project" : "task", today);
+        else if (c.to === "project") await changeToProject(itemId, today);
         // An idea has no due date, repeat, day on Today or sessions; remove them explicitly (as the Inbox does).
         else if (c.to === "idea") {
           await updateItem(
@@ -113,9 +112,8 @@ export function MoveToMenu({
     close(!ok); // the clicked choice is gone; on failure keep focus somewhere sensible
     if (ok && c.kind === "become" && before.row) {
       if (c.to === "book") {
-        // Undo when it moved from another area (Esme's brief), or lost a project's sessions.
-        if (before.row.areaId !== BOOK_AREA) offerRowUndo(MOVED_TO_READING_LIST, before.row);
-        else if (before.row.sessions) offerRowUndo("Changed to a book, without its sessions", before.row);
+        // Always Undo (fix round 1, I-5); the line says when it also moved from another area.
+        offerRowUndo(before.row.areaId !== BOOK_AREA ? MOVED_TO_READING_LIST : CHANGED_TO_BOOK, before.row);
       } else if (leavesList && c.to !== "goal") offerRowUndo(leftReadingList(c.to), before.row);
       else if (dropsSessions) offerUndo(c.to === "idea" ? "idea" : "task", before.row);
     }
@@ -163,7 +161,8 @@ export function MoveToMenu({
               <hr />
             </>
           )}
-          {!untyped && !book && GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id !== areaId).map((a) => (
+          {/* A book lives under Mind: no areas, except Mind for a book an older device moved away (M-4). */}
+          {!untyped && GOAL_AREAS_BY_SIDEBAR.filter((a) => a.id !== areaId && (!book || a.id === BOOK_AREA)).map((a) => (
             <button key={a.id} type="button" onClick={() => void pick({ kind: "area", areaId: a.id }, close)}>
               {a.label}
             </button>

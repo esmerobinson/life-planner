@@ -64,6 +64,13 @@ export interface Item {
   finishedOn?: ISODate;
   /** One http(s) address for the book (a library or shop page), at most 2000 characters. */
   link?: string;
+  /**
+   * Fields put away by Change to, so nothing is lost and changing back restores them
+   * (fix round 1, I-3/I-5): a to-do's due date, repeat, day pin, hide, milestone flag and done
+   * date while it is a book; a book's status, author, pages, page, finished date and link while
+   * it is a to-do or an idea. Never shown. An older app version keeps it as it is.
+   */
+  stash?: ItemStash;
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
@@ -72,6 +79,15 @@ export interface Item {
    * (data/changeTracking.ts). Optional only so older backups still load.
    */
   updatedAt?: number;
+}
+
+/** The to-do-only fields a book keeps put away. */
+export type TaskStash = Partial<Pick<Item, "due" | "recur" | "pinnedDate" | "hiddenOn" | "milestone" | "completedAt">>;
+/** The book fields a to-do or idea keeps put away. */
+export type BookStash = Partial<Pick<Item, "bookStatus" | "author" | "pages" | "pageAt" | "finishedOn" | "link">>;
+export interface ItemStash {
+  task?: TaskStash;
+  book?: BookStash;
 }
 
 /** One session of a project to-do. Unnamed sessions are called "Session 3" by their place. */

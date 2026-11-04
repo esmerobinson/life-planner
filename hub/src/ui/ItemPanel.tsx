@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isActive } from "../domain/goalCounts";
-import { getItem, saveItemNotes, setBookStatus, updateItem } from "../data/repo";
-import { leftReadingList, MOVED_TO_READING_LIST, useRowUndo, useSessionsUndo } from "./undoSessions";
-import { BOOK_AREA, BOOK_FIELDS, BOOK_LIMITS, BOOK_STATUSES, BOOK_STATUS_LABEL, bookLine, isBook, isWebLink } from "../domain/books";
+import { getItem, makeBook, saveItemNotes, setBookStatus, unBook, updateItem } from "../data/repo";
+import { CHANGED_TO_BOOK, leftReadingList, MOVED_TO_READING_LIST, useRowUndo, useSessionsUndo } from "./undoSessions";
+import { BOOK_AREA, BOOK_LIMITS, BOOK_STATUSES, BOOK_STATUS_LABEL, bookLine, isBook, isWebLink } from "../domain/books";
 import { ProgressBar } from "./ProgressBar";
 import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
@@ -165,17 +165,35 @@ export function ItemPanel({
       }
       Object.assign(patch, book.patch);
     }
-    if (toBook) {
-      // As Change to → Book: an idea under Mind (no due date, repeat, day on Today, sessions or flag).
-      Object.assign(patch, {
-        kind: "idea", areaId: BOOK_AREA, bookStatus: item.bookStatus ?? "want",
-        due: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, sessions: undefined, milestone: undefined,
-      });
-    } else if (fromBook) {
-      // Off the reading list: every book field goes (Undo keeps the whole row).
-      for (const k of BOOK_FIELDS) (patch as Record<string, unknown>)[k] = undefined;
+    if (toBook || fromBook) {
+      // As the arrow menu's Change to: makeBook / unBook put the fields the new type doesn't
+      // show away (nothing is lost) and bring back what was put away; then what was typed here.
+      if (fromBook && f.areaId !== was.areaId) patch.areaId = f.areaId;
+      if (fromBook && f.kind !== "idea") {
+        if (f.due !== was.due) patch.due = f.due || undefined;
+        if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
+      }
+      setBusy(true);
+      const before: { row?: Item } = {};
+      try {
+        await write(async () => {
+          before.row = await getItem(item.id);
+          if (toBook) await makeBook(item.id, today);
+          else await unBook(item.id, f.kind === "project" ? "project" : f.kind === "task" ? "task" : "idea", today);
+          if (Object.keys(patch).length) await updateItem(item.id, patch, today);
+        });
+        const row = before.row;
+        if (row && toBook) offerRowUndo(row.areaId !== BOOK_AREA ? MOVED_TO_READING_LIST : CHANGED_TO_BOOK, row);
+        else if (row) offerRowUndo(leftReadingList(f.kind === "book" ? "idea" : f.kind), row);
+        setEditing(false);
+      } catch {
+        // The save message shows; stay in Edit mode with the changes.
+      } finally {
+        setBusy(false);
+      }
+      return;
     }
-    if (!inbox && f.kind !== was.kind && !toBook) {
+    if (!inbox && f.kind !== was.kind) {
       // Project <-> to-do: the sessions come or go (a project does not repeat); an idea has none.
       // A done to-do made a project is open again: a project is done only when its sessions are (I-1).
       if (f.kind === "project") {
@@ -207,16 +225,11 @@ export function ItemPanel({
     const before: { row?: Item } = {};
     try {
       await write(async () => {
-        if (dropsSessions || toBook || fromBook) before.row = await getItem(item.id);
+        if (dropsSessions) before.row = await getItem(item.id);
         await updateItem(item.id, patch, today);
       });
       const row = before.row;
-      if (row && toBook) {
-        // Undo when it moved from another area (as the arrow menu's Change to → Book), or lost sessions.
-        if (row.areaId !== BOOK_AREA) offerRowUndo(MOVED_TO_READING_LIST, row);
-        else if (row.sessions) offerRowUndo("Changed to a book, without its sessions", row);
-      } else if (row && fromBook) offerRowUndo(leftReadingList(f.kind === "book" ? "idea" : f.kind), row);
-      else if (dropsSessions && row) offerUndo(f.kind === "idea" ? "idea" : "task", row);
+      if (dropsSessions && row) offerUndo(f.kind === "idea" ? "idea" : "task", row);
       setEditing(false);
     } catch {
       // The save message shows; stay in Edit mode with the changes.

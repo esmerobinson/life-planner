@@ -98,21 +98,56 @@ describe("making and changing books (repo)", () => {
     expect(r.author).toBeUndefined();
   });
 
-  it("makeBook: a to-do in Art becomes a Want to read book under Mind; returns the row as it was", async () => {
+  it("makeBook: a to-do in Art becomes a Want to read book under Mind; its to-do fields are put away, not lost", async () => {
     const t = await createItem(
-      { kind: "task", title: "Pretend graphic novel", areaId: "art", priority: 1, due: "2026-11-20", recur: undefined, pinnedDate: TODAY, notes: "Pretend notes" },
+      {
+        kind: "task", title: "Pretend graphic novel", areaId: "art", priority: 1, due: "2026-11-20", recur: ["mon"], pinnedDate: TODAY,
+        hiddenOn: "2026-11-03", milestone: true, goalId: "g-pretend", notes: "Pretend notes",
+      },
       "2026-10-01",
     );
     const was = await makeBook(t.id, TODAY);
     expect(was?.areaId).toBe("art");
     const b = (await db.items.get(t.id))!;
     expect(b).toMatchObject({ kind: "idea", areaId: "mind", bookStatus: "want", notes: "Pretend notes", touchedAt: TODAY });
-    expect(b.due).toBeUndefined();
-    expect(b.pinnedDate).toBeUndefined();
+    for (const k of ["due", "recur", "pinnedDate", "hiddenOn", "milestone"] as const) expect(b[k]).toBeUndefined();
+    expect(b.stash?.task).toEqual({ due: "2026-11-20", recur: ["mon"], pinnedDate: TODAY, hiddenOn: "2026-11-03", milestone: true });
     expect(validItem(b)).toBe(true);
+
+    // Back to a to-do: the due date, repeat, day, hide and flag come back; the book's fields are put away.
+    await unBook(t.id, "task", TODAY);
+    const back = (await db.items.get(t.id))!;
+    expect(back).toMatchObject({ kind: "task", due: "2026-11-20", recur: ["mon"], pinnedDate: TODAY, hiddenOn: "2026-11-03", milestone: true });
+    expect(back.bookStatus).toBeUndefined();
+    expect(back.stash?.task).toBeUndefined();
+    expect(back.stash?.book).toEqual({ bookStatus: "want" });
+    expect(validItem(back)).toBe(true);
   });
 
-  it("makeBook keeps an existing status (a book stays as it is) and drops a project's sessions", async () => {
+  it("a done to-do changed to a Book is a Read book (finished the day it was done), shown, and comes back done", async () => {
+    const t = await createItem({ kind: "task", title: "Pretend finished novel", areaId: "mind", priority: 2 }, "2026-10-01");
+    await db.items.update(t.id, { status: "done", completedAt: "2026-10-20" });
+    await makeBook(t.id, TODAY);
+    const b = (await db.items.get(t.id))!;
+    expect(b).toMatchObject({ kind: "idea", status: "open", bookStatus: "read", finishedOn: "2026-10-20" });
+    expect(b.completedAt).toBeUndefined();
+    expect(isBook(b)).toBe(true);
+    expect(validItem(b)).toBe(true);
+    await unBook(t.id, "task", TODAY);
+    expect((await db.items.get(t.id))!).toMatchObject({ kind: "task", status: "done", completedAt: "2026-10-20" });
+  });
+
+  it("the stash is checked like the fields themselves", () => {
+    expect(validItem(row({ stash: { task: { due: "2026-11-20", recur: ["mon"], milestone: true } } }))).toBe(true);
+    expect(validItem(row({ stash: { book: { bookStatus: "read", author: "A", pages: 10, pageAt: 10, finishedOn: "2026-10-01", link: "https://x.test" } } }))).toBe(true);
+    expect(validItem(row({ stash: { task: { due: "2026-02-30" } } }))).toBe(false);
+    expect(validItem(row({ stash: { task: { title: "x" } } }))).toBe(false);
+    expect(validItem(row({ stash: { book: { author: "" } } }))).toBe(false);
+    expect(validItem(row({ stash: { other: {} } }))).toBe(false);
+    expect(validItem(row({ stash: "no" }))).toBe(false);
+  });
+
+  it("makeBook keeps an existing status (a book stays as it is) and drops a project's sessions (Undo covers them)", async () => {
     const p = await createItem(
       { kind: "task", title: "Pretend reading project", areaId: "mind", priority: 2, due: "2026-12-01", sessions: [{ id: "s1" }] },
       "2026-10-01",
@@ -164,22 +199,51 @@ describe("making and changing books (repo)", () => {
     });
   });
 
-  it("emptying the Bin leaves a content-free tombstone (no author, link or pages)", async () => {
+  it("emptying the Bin leaves a content-free tombstone (no author, link, pages or stash)", async () => {
     const b = await createBook({ title: "Pretend novel", author: "Pretend Author", bookStatus: "read" }, TODAY);
     await updateBook(b.id, { link: "https://example.test/pretend", pages: 10 }, TODAY);
+    await unBook(b.id, "idea", TODAY);
     await deleteItem(b.id, TODAY);
     await emptyBin(TODAY);
     const t = (await db.items.get(b.id))!;
     expect(t.status).toBe("purged");
-    for (const k of ["bookStatus", "author", "pages", "pageAt", "finishedOn", "link"] as const) expect(t[k]).toBeUndefined();
+    for (const k of ["bookStatus", "author", "pages", "pageAt", "finishedOn", "link", "stash"] as const) expect(t[k]).toBeUndefined();
   });
 
-  it("unBook: back to a plain idea (or a to-do), every book field gone", async () => {
-    const b = await createBook({ title: "Pretend novel", author: "Pretend Author", bookStatus: "read" }, TODAY);
+  it("unBook keeps the book's fields put away; Change to → Book brings every one back (idea round trip)", async () => {
+    const b = await createBook({ title: "Pretend novel", author: "Pretend Author", bookStatus: "read" }, "2026-10-25");
     await updateBook(b.id, { pages: 200, pageAt: 200, link: "https://example.test" }, TODAY);
-    await unBook(b.id, "task", TODAY);
-    const t = (await db.items.get(b.id))!;
-    expect(t.kind).toBe("task");
-    for (const k of ["bookStatus", "author", "pages", "pageAt", "finishedOn", "link"] as const) expect(t[k]).toBeUndefined();
+    await unBook(b.id, "idea", TODAY);
+    const idea = (await db.items.get(b.id))!;
+    expect(idea.kind).toBe("idea");
+    expect(isBook(idea)).toBe(false);
+    for (const k of ["bookStatus", "author", "pages", "pageAt", "finishedOn", "link"] as const) expect(idea[k]).toBeUndefined();
+    expect(idea.stash?.book).toEqual({
+      bookStatus: "read", author: "Pretend Author", pages: 200, pageAt: 200, finishedOn: "2026-10-25", link: "https://example.test",
+    });
+    expect(validItem(idea)).toBe(true);
+    await makeBook(b.id, TODAY);
+    const again = (await db.items.get(b.id))!;
+    expect(again).toMatchObject({
+      kind: "idea", bookStatus: "read", author: "Pretend Author", pages: 200, pageAt: 200, finishedOn: "2026-10-25", link: "https://example.test",
+    });
+    expect(again.stash).toBeUndefined();
+  });
+
+  it("unBook to a project: sessions, no repeat, the book put away, in one write", async () => {
+    const b = await createBook({ title: "Pretend novel", author: "Pretend Author", bookStatus: "reading" }, TODAY);
+    await unBook(b.id, "project", TODAY);
+    const p = (await db.items.get(b.id))!;
+    expect(p.kind).toBe("task");
+    expect(p.sessions?.length).toBe(4);
+    expect(p.stash?.book).toMatchObject({ bookStatus: "reading", author: "Pretend Author" });
+    expect(validItem(p)).toBe(true);
+  });
+
+  it("a book an older device moved to another area comes home to Mind on Change to → Book", async () => {
+    const b = await createBook({ title: "Pretend novel", bookStatus: "want" }, TODAY);
+    await db.items.update(b.id, { areaId: "art" });
+    await makeBook(b.id, TODAY);
+    expect((await db.items.get(b.id))!.areaId).toBe("mind");
   });
 });

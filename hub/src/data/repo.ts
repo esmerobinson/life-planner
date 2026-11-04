@@ -11,7 +11,7 @@ import {
   nextSessionIndex, withSessions,
 } from "../domain/projects";
 import { SUGGESTED_GOALS, suggestedGoalRow } from "../domain/suggestedGoals";
-import { BOOK_AREA, BOOK_FIELDS, BOOK_LIMITS, isWebLink } from "../domain/books";
+import { BOOK_AREA, BOOK_FIELDS, BOOK_LIMITS, isBook, isWebLink } from "../domain/books";
 export * from "./journalRepo";
 import {
   AREA_IDS, type AreaId, type BookStatus, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
@@ -1047,18 +1047,66 @@ export async function createBook(
   );
 }
 
+const TASK_STASH_FIELDS = ["due", "recur", "pinnedDate", "hiddenOn", "milestone", "completedAt"] as const;
+
+/** Moves `keys` that are set on `row` into a plain object (removing them from `row`). */
+function takeFields<K extends keyof Item>(row: Item, keys: readonly K[]): Partial<Pick<Item, K>> {
+  const out: Partial<Pick<Item, K>> = {};
+  for (const k of keys) {
+    if (row[k] === undefined) continue;
+    out[k] = row[k];
+    delete row[k];
+  }
+  return out;
+}
+
+/** Copies `keys` from `from` onto `row` where the row has none (fields on the row win). */
+function putBack<K extends keyof Item>(row: Item, from: Partial<Pick<Item, K>>, keys: readonly K[]): void {
+  for (const k of keys) if (row[k] === undefined && from[k] !== undefined) Object.assign(row, { [k]: from[k] });
+}
+
+/** The row with `part` of its stash replaced (`fields` empty: that part removed; nothing left: no stash). */
+function withStash(row: Item, part: "task" | "book", fields: Record<string, unknown> | undefined): Item {
+  const stash = { ...row.stash };
+  if (fields && Object.keys(fields).length) (stash as Record<string, unknown>)[part] = fields;
+  else delete stash[part];
+  const next: Item = { ...row };
+  if (Object.keys(stash).length) next.stash = stash;
+  else delete next.stash;
+  return next;
+}
+
 /**
- * "Change to → Book": the item becomes an idea on the reading list under Mind (as Change to →
- * Idea, it loses any due date, repeat, day on Today, sessions and milestone flag; its title,
- * notes and goal stay). A book keeps its status; anything else starts as Want to read.
- * Returns the row as it was (for Undo), or undefined when there was nothing to change.
+ * "Change to → Book": the item becomes an idea on the reading list under Mind. A to-do's due
+ * date, repeat, day on Today, hide, milestone flag and done date are put away in its stash
+ * (fix round 1, I-5: Change to → To-do brings them back); a project's sessions go (Undo keeps
+ * them). Book fields put away earlier come back (I-3). A done to-do is a Read book finished the
+ * day it was done (I-4); a book keeps its status; anything else starts as Want to read. A book
+ * an older device moved to another area comes home to Mind. Returns the row as it was (for
+ * Undo), or undefined when there was nothing to change.
  */
 export async function makeBook(id: string, today: ISODate): Promise<Item | undefined> {
   return db.transaction("rw", db.items, async () => {
     const item = await db.items.get(id);
     if (!item || BINNED.includes(item.status)) return undefined;
-    const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, sessions: _s, milestone: _m, ...rest } = item;
-    await db.items.put({ ...rest, kind: "idea", areaId: BOOK_AREA, bookStatus: item.bookStatus ?? "want", touchedAt: today });
+    let next: Item = { ...item, kind: "idea", areaId: BOOK_AREA, touchedAt: today };
+    delete next.sessions;
+    if (!isBook(item)) {
+      const wasDone = item.status === "done";
+      const doneOn = item.completedAt;
+      const task = takeFields(next, TASK_STASH_FIELDS);
+      if (wasDone) next.status = "open"; // a book is on the list; Read says it's finished
+      next = withStash(next, "task", { ...item.stash?.task, ...task });
+      // Book fields put away earlier come back; any still on the row (an older device) win.
+      putBack(next, item.stash?.book ?? {}, BOOK_FIELDS);
+      next = withStash(next, "book", undefined);
+      if (wasDone) {
+        next.bookStatus = "read";
+        next.finishedOn = doneOn ?? today;
+      }
+      next.bookStatus ??= "want";
+    }
+    await db.items.put(next);
     return item;
   });
 }
@@ -1084,13 +1132,30 @@ export async function updateBook(id: string, patch: BookPatch, today: ISODate): 
   });
 }
 
-/** A book stops being one: a plain idea (or a to-do), with every book field removed. */
-export async function unBook(id: string, kind: Item["kind"], today: ISODate): Promise<void> {
+/**
+ * A book stops being one (fix round 1, I-3: nothing is deleted): its status, author, pages,
+ * page, finished date and link are put away in the stash, so Change to → Book brings them
+ * back. To a to-do, the to-do fields it had before it was a book come back (done again if it
+ * was done). To a project, in the same write: a to-do with unnamed sessions and no repeat.
+ */
+export async function unBook(id: string, to: Item["kind"] | "project", today: ISODate): Promise<void> {
   await db.transaction("rw", db.items, async () => {
     const item = await db.items.get(id);
     if (!item) return;
-    const next: Item = { ...item, kind, touchedAt: today };
-    for (const k of BOOK_FIELDS) delete next[k];
+    let next: Item = { ...item, kind: to === "idea" ? "idea" : "task", touchedAt: today };
+    const book = takeFields(next, BOOK_FIELDS);
+    next = withStash(next, "book", { ...item.stash?.book, ...book });
+    if (to !== "idea") {
+      putBack(next, item.stash?.task ?? {}, TASK_STASH_FIELDS);
+      next = withStash(next, "task", undefined);
+      if (next.completedAt && to === "task") next.status = "done";
+    }
+    if (to === "project") {
+      delete next.recur; // a project does not repeat
+      delete next.completedAt;
+      next.status = "open";
+      next.sessions = item.sessions ?? newSessions(DEFAULT_SESSIONS);
+    }
     await db.items.put(next);
   });
 }

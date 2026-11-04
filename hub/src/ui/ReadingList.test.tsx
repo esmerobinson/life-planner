@@ -86,7 +86,7 @@ describe("Change to → Book", () => {
     });
   });
 
-  it("a to-do already in Mind becomes a book with no Undo line (nothing moved)", async () => {
+  it("a to-do already in Mind becomes a book with Undo too; its due date is put away, and Change to → To-do brings it back", async () => {
     const t = await createItem({ kind: "task", title: "Pretend borrow a novel", areaId: "mind", priority: 2, due: "2026-11-10" }, "2026-10-01");
     renderApp("/area/mind", TODAY);
     await userEvent.click(await screen.findByRole("button", { name: "Move to: Pretend borrow a novel" }));
@@ -94,7 +94,29 @@ describe("Change to → Book", () => {
     await vi.waitFor(async () => expect((await db.items.get(t.id))!).toMatchObject({ kind: "idea", bookStatus: "want" }));
     expect((await db.items.get(t.id))!.due).toBeUndefined();
     expect(within(await readingList()).getByText("Pretend borrow a novel")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeInTheDocument();
+    expect(screen.getByText(/^Changed to a book/)).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Move to: Pretend borrow a novel" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Change to" })).getByRole("button", { name: "To-do" }));
+    await vi.waitFor(async () => expect((await db.items.get(t.id))!).toMatchObject({ kind: "task", due: "2026-11-10" }));
+    expect((await db.items.get(t.id))!.bookStatus).toBeUndefined();
+  });
+
+  it("a done to-do changed to a Book shows under Read on the reading list, finished the day it was done", async () => {
+    const t = await createItem({ kind: "task", title: "Pretend finished novel", areaId: "art", priority: 2 }, "2026-10-01");
+    await db.items.update(t.id, { status: "done", completedAt: "2026-10-20" });
+    const first = renderApp(`/area/art?open=${t.id}`, TODAY);
+    const panel = within(await screen.findByRole("complementary", { name: "Pretend finished novel" }));
+    await userEvent.click(panel.getByRole("button", { name: "Edit" }));
+    await userEvent.selectOptions(panel.getByLabelText("Type"), "book");
+    await userEvent.click(panel.getByRole("button", { name: "Done" }));
+    await vi.waitFor(async () => expect((await db.items.get(t.id))!).toMatchObject({ status: "open", bookStatus: "read", finishedOn: "2026-10-20" }));
+    first.unmount();
+    renderApp("/area/mind", TODAY);
+    const strip = within(await readingList()).getByRole("listitem");
+    expect(within(strip).getByText("Pretend finished novel")).toBeInTheDocument();
+    expect(within(strip).getByText("Read", { selector: ".book-pill" })).toBeInTheDocument();
   });
 
   it("a book's menu has no areas (books live under Mind); Change to → Idea makes it a plain idea, with Undo", async () => {
@@ -109,6 +131,20 @@ describe("Change to → Book", () => {
     expect((await db.items.get(want.id))!.author).toBeUndefined();
     await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
     await vi.waitFor(async () => expect((await db.items.get(want.id))!).toMatchObject({ bookStatus: "want", author: "Pretend Author B" }));
+  });
+
+  it("Book → Idea → Book (no Undo) brings the author back: nothing is deleted", async () => {
+    const { want } = await pretendBooks();
+    renderApp("/area/mind", TODAY);
+    await userEvent.click(await screen.findByRole("button", { name: "Move to: Pretend Quiet Hours" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Change to" })).getByRole("button", { name: "Idea" }));
+    await vi.waitFor(async () => expect((await db.items.get(want.id))!.bookStatus).toBeUndefined());
+    // Wait for the strip to move from the reading list to the plain ideas.
+    const ideas = await screen.findByRole("list", { name: "Ideas" });
+    await userEvent.click(await within(ideas).findByRole("button", { name: "Move to: Pretend Quiet Hours" }));
+    await userEvent.click(within(screen.getByRole("group", { name: "Change to" })).getByRole("button", { name: "Book" }));
+    await vi.waitFor(async () => expect((await db.items.get(want.id))!).toMatchObject({ bookStatus: "want", author: "Pretend Author B" }));
+    expect(within(await readingList()).getByText(/Pretend Author B/)).toBeInTheDocument();
   });
 });
 

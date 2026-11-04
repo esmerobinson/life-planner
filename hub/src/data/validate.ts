@@ -70,6 +70,7 @@ export function validItem(r: unknown): r is Item {
     (r.sessions === undefined || validSessions(r.sessions)) &&
     // Reading list fields (shape only, any kind: an older device may change a book to a to-do).
     validBookFields(r) &&
+    validStash(r.stash) &&
     // An emptied-from-the-Bin tombstone carries no content.
     (r.status !== "purged" ||
       (r.title === "" && r.notes === undefined && r.tags === undefined && r.sessions === undefined &&
@@ -96,6 +97,34 @@ function validBookFields(r: Record<string, unknown>): boolean {
     optDate(r.finishedOn) &&
     (r.link === undefined || (isStr(r.link) && r.link.length <= BOOK_LIMITS.link && isWebLink(r.link)))
   );
+}
+
+const TASK_STASH_KEYS = new Set(["due", "recur", "pinnedDate", "hiddenOn", "milestone", "completedAt"]);
+const BOOK_STASH_KEYS = new Set(["bookStatus", "author", "pages", "pageAt", "finishedOn", "link"]);
+
+/**
+ * Absent, or the fields Change to put away (types.ts ItemStash): `task` holds only a to-do's
+ * due date, repeat, day pin, hide, milestone flag and done date; `book` only a book's fields;
+ * each checked as the field itself is.
+ */
+function validStash(v: unknown): boolean {
+  if (v === undefined) return true;
+  if (!isObj(v) || !Object.keys(v).every((k) => k === "task" || k === "book")) return false;
+  const t = v.task;
+  if (
+    t !== undefined &&
+    !(
+      isObj(t) &&
+      Object.keys(t).every((k) => TASK_STASH_KEYS.has(k)) &&
+      optDate(t.due) && optDate(t.pinnedDate) && optDate(t.hiddenOn) && optDate(t.completedAt) &&
+      (t.recur === undefined || (Array.isArray(t.recur) && t.recur.every((d) => WEEKDAY_LIST.includes(d as string)))) &&
+      (t.milestone === undefined || typeof t.milestone === "boolean")
+    )
+  ) {
+    return false;
+  }
+  const b = v.book;
+  return b === undefined || (isObj(b) && Object.keys(b).every((k) => BOOK_STASH_KEYS.has(k)) && validBookFields(b));
 }
 
 const SESSION_KEYS = new Set(["id", "title", "details", "doneOn", "plannedFor"]);

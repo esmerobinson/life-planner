@@ -46,6 +46,9 @@ export function useRowUndo(today: ISODate) {
 /** The Undo line's words after "Change to → Book" moved something from another area. */
 export const MOVED_TO_READING_LIST = "Moved to Mind's reading list";
 
+/** The Undo line's words after "Change to → Book" in Mind (fields it doesn't show are put away). */
+export const CHANGED_TO_BOOK = "Changed to a book";
+
 /** The Undo line's words after a book stopped being one. */
 export const leftReadingList = (to: "task" | "idea" | "project") =>
   `Changed to ${to === "idea" ? "an idea" : to === "project" ? "a project" : "a to-do"}, off the reading list`;
