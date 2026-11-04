@@ -14,7 +14,7 @@ import { exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows"
 import { Streak } from "../Streak";
 import { LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { CardExample, ExerciseResponseBox } from "./ExerciseResponseBox";
-import { OtherVersions, ResponseView } from "./ResponseView";
+import { cardTitle, OtherVersions, ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
 
 /** Under today's card once it is done. */
@@ -27,9 +27,9 @@ export const CARDS_SYNCING = "Your cards are still syncing…";
 /** Beside Submit on today's card (the approved mockup). */
 export const SUBMIT_TICKS = "Submitting ticks today's exercise.";
 export const NEXT_ONE = "Do the next one →";
-/** Above the next card once one is submitted. */
-export const savedLine = (card: ExerciseCard) =>
-  `${card.day !== null && !card.optional ? `Day ${card.day}` : "That card"} saved. Here's the next one if you'd like to keep going.`;
+/** Above the next card once one is submitted: which card, by its book and title (never a bare "Day N"). */
+export const savedLine = (card: ExerciseCard, book = "") =>
+  `${card.optional ? card.theme : cardTitle(card, book, true)} saved. Here's the next one if you'd like to keep going.`;
 /** When the card just submitted was the last one not done. */
 export const ALL_DONE_LINE = "That's every card for now. Lovely work.";
 export const SEE_WHAT_YOU_WROTE = "See what you wrote";
@@ -233,7 +233,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
           <div ref={stage} className="exercise-stage">
             {saved && (
               <p className="journal-muted exercise-saved" role="status">
-                {finished ? ALL_DONE_LINE : savedLine(saved)}{" "}
+                {finished ? ALL_DONE_LINE : savedLine(saved, titles.get(saved.track))}{" "}
                 <button type="button" className="quiet-link" onClick={() => setReveal((r) => ({ id: saved.id, n: (r?.n ?? 0) + 1 }))}>
                   {SEE_WHAT_YOU_WROTE}
                 </button>
@@ -452,7 +452,7 @@ const isFor = (c: ExerciseCard, e: ExerciseResponse) => c.id === e.id && (!c.leg
 
 /**
  * Past exercises (journal polish brief §2): her responses, today's too, newest first, each
- * "Day N · Theme · <date>". Opening one shows the card (from the stored set; if the set was
+ * "<date> · <book> · Day N · Theme" (cardTitle). Opening one shows the card (from the stored set; if the set was
  * replaced and the card is gone, just the theme stored with the response) and her response.
  * These are readable any time.
  */
@@ -474,10 +474,10 @@ function PastExercises({ past, cards }: { past: ExerciseResponse[]; cards: Exerc
 
 function PastExercise({ entry, card }: { entry: ExerciseResponse; card: ExerciseCard | null }) {
   const [open, setOpen] = useState(false);
-  const name = entry.day !== null ? `Day ${entry.day} · ${entry.theme}` : entry.theme;
+  const book = useContext(TrackTitles).get(card?.track ?? "");
   return (
     <details onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>{`${name} · ${longDate(entry.date)}`}</summary>
+      <summary>{`${longDate(entry.date)} · ${cardTitle(entry, book, card !== null)}`}</summary>
       {open && (
         <div className="exercise-card exercise-boxed">
           {card && <CardBody card={card} />}
@@ -614,6 +614,7 @@ function OneCard({
 }) {
   const [open, setOpen] = useState(false);
   const el = useRef<HTMLDetailsElement>(null);
+  const book = useContext(TrackTitles).get(card.track);
   useEffect(() => {
     if (reveal === 0 || !el.current) return;
     el.current.open = true;
@@ -622,7 +623,7 @@ function OneCard({
   return (
     <details ref={el} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>
-        <span>{card.optional ? `${card.theme} (optional reading)` : `Day ${card.day} · ${card.theme}`}</span>
+        <span>{card.optional ? `${card.theme} (optional reading)` : cardTitle(card, book, true)}</span>
         {done && (
           <span className="exercise-mark" role="img" aria-label="done">
             {" "}✓
