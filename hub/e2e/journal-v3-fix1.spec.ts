@@ -160,9 +160,21 @@ for (const width of [1280, 390]) {
         await repo.saveNote(jk, today, "pretend-phone-device", { ...note, steady: "Pretend: he stays, even when it's hard" }, { id, seen });
       });
       const s = page.getByRole("region", { name: "Notes to myself" });
-      await expect(s.getByText(/^Another version \(from .+\)$/).first()).toBeVisible();
+      await expect(s.getByText(/^Another version \(from .+\)/).first()).toBeVisible();
       await noSidewaysScroll(page);
       await shoot(page, `fix1-note-another-version-${width}`);
+      // Fix round 2 (R-I1, #22): editing the version shown keeps the other one in view, and after Save.
+      await s.getByRole("button", { name: "Edit: He's going to leave" }).click();
+      const form = s.getByRole("form", { name: "Your note" });
+      // In the editor's strip itself, not only in To read today.
+      await expect(s.getByRole("group", { name: "Fear of being left" }).getByText("Pretend: he came back every time, and he said so")).toBeVisible();
+      await noSidewaysScroll(page);
+      await shoot(page, `fix2-note-editing-with-other-version-${width}`);
+      await form.getByRole("textbox", { name: "What I know when I'm steady…" }).fill("Pretend: he stays, even when it's hard. I know it.");
+      await form.getByRole("button", { name: "Save" }).click();
+      await expect(s.getByRole("form")).toHaveCount(0);
+      await expect(s.getByRole("group", { name: "Fear of being left" }).getByText("Pretend: he came back every time, and he said so")).toBeVisible();
+      await expect(s.getByText("Pretend: he stays, even when it's hard. I know it.").first()).toBeVisible();
     });
 
     test("an unfinished morning page from days ago is offered back", async ({ page }) => {
