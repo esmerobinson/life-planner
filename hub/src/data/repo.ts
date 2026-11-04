@@ -767,13 +767,20 @@ export async function updateItems(
  * Stop repeating: the item stays in its area as a one-off to-do, done or not exactly as it
  * was, with its done days kept. The days it repeated on are put away in its stash (types.ts
  * ItemStash) so Repeat again, or Undo, brings them back. Does nothing to an item that does not repeat.
+ * One exception: an open habit ticked today (today is in its done days) becomes a DONE one-off,
+ * completed today, so it moves to Done today instead of reappearing open.
  */
 export async function stopRepeating(id: string, today: ISODate): Promise<void> {
   await db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item || !item.recur?.length || (item.status !== "open" && item.status !== "done")) return;
     const { recur, ...rest } = item;
-    await db.items.put({ ...withStash(rest, "task", { ...item.stash?.task, recur }), touchedAt: today });
+    const tickedToday = item.status === "open" && item.doneDates?.includes(today) === true;
+    await db.items.put({
+      ...withStash(rest, "task", { ...item.stash?.task, recur }),
+      ...(tickedToday ? { status: "done" as const, completedAt: today } : {}),
+      touchedAt: today,
+    });
   });
 }
 
@@ -784,7 +791,10 @@ export async function repeatAgain(id: string, today: ISODate): Promise<void> {
     const parked = item?.stash?.task?.recur;
     if (!item || item.recur?.length || !parked?.length || (item.status !== "open" && item.status !== "done")) return;
     const { recur: _drop, ...task } = item.stash!.task!;
-    await db.items.put({ ...withStash({ ...item, recur: parked }, "task", task), touchedAt: today });
+    // A repeating item is never "done" (its ticks are its done days), so a done one-off opens again.
+    const { completedAt: _c, ...open } = item;
+    const base: Item = item.status === "done" ? { ...open, status: "open" } : item;
+    await db.items.put({ ...withStash({ ...base, recur: parked }, "task", task), touchedAt: today });
   });
 }
 

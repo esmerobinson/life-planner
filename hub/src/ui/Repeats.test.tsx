@@ -70,6 +70,19 @@ describe("the panel of a repeating item", () => {
     expect((await db.items.get(h.id))!.stash).toBeUndefined();
   });
 
+  it("stopping a habit ticked today moves it to Done today in its area; Undo puts the open habit back", async () => {
+    const h = await mk("Pretend stretch", "body", ["mon", "wed", "fri"]);
+    await tickItem(h.id, TODAY);
+    const panel = await openPanel(h.id);
+    await userEvent.click(within(panel).getByRole("button", { name: "Stop repeating" }));
+    await vi.waitFor(async () => expect(await db.items.get(h.id)).toMatchObject({ status: "done", completedAt: TODAY }));
+    expect(await screen.findByText("Done (1)")).toBeInTheDocument();
+    expect(await within(panel).findByRole("button", { name: "Repeat again" })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await vi.waitFor(async () => expect(await db.items.get(h.id)).toMatchObject({ status: "open", recur: ["mon", "wed", "fri"] }));
+    expect((await db.items.get(h.id))!.completedAt).toBeUndefined();
+  });
+
   it("Repeat again brings the days back", async () => {
     const h = await mk("Pretend stretch", "body", ["tue"], { stash: undefined });
     const panel = await openPanel(h.id);

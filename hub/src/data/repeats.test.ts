@@ -25,18 +25,49 @@ async function stretch(extra: Record<string, unknown> = {}) {
 }
 
 describe("stopRepeating", () => {
-  it("clears the repeat, parks the days in the stash, and keeps every other field and the history", async () => {
-    const h = await stretch({ goalId: "g1", notes: "pretend notes" });
+  it("not ticked today: clears the repeat, parks the days in the stash, stays an open one-off with every other field and the history", async () => {
+    const h = await stretch({ goalId: "g1", notes: "pretend notes", doneDates: ["2026-11-02"] });
     await stopRepeating(h.id, TODAY);
     const got = (await db.items.get(h.id))!;
     expect(got.recur).toBeUndefined();
     expect(got.stash).toEqual({ task: { recur: ["mon", "wed", "fri"] } });
     expect(got).toMatchObject({
-      status: "open", areaId: "body", kind: "task", doneDates: ["2026-11-02", "2026-11-04"], goalId: "g1", notes: "pretend notes",
+      status: "open", areaId: "body", kind: "task", doneDates: ["2026-11-02"], goalId: "g1", notes: "pretend notes",
       touchedAt: TODAY,
     });
+    expect(got.completedAt).toBeUndefined();
     expect(isHabit(got)).toBe(false);
     expect(validItem(got)).toBe(true);
+  });
+
+  it("ticked today: becomes a DONE one-off completed today (so it moves to Done today), history kept", async () => {
+    const h = await stretch({ goalId: "g1" }); // done days include today
+    await stopRepeating(h.id, TODAY);
+    const got = (await db.items.get(h.id))!;
+    expect(got).toMatchObject({
+      status: "done", completedAt: TODAY, areaId: "body", doneDates: ["2026-11-02", "2026-11-04"], goalId: "g1",
+      stash: { task: { recur: ["mon", "wed", "fri"] } },
+    });
+    expect(got.recur).toBeUndefined();
+    expect(validItem(got)).toBe(true);
+  });
+
+  it("ticked today, stopped, then Undo: exactly the open habit it was; Repeat again reopens it with today still ticked", async () => {
+    const h = await stretch();
+    const before = (await getItem(h.id))!;
+    await stopRepeating(h.id, TODAY);
+    await putItemBack(before, TODAY);
+    const back = (await db.items.get(h.id))!;
+    expect(back).toMatchObject({ status: "open", recur: ["mon", "wed", "fri"], doneDates: ["2026-11-02", "2026-11-04"] });
+    expect(back.completedAt).toBeUndefined();
+    expect(back.stash).toBeUndefined();
+
+    await stopRepeating(h.id, TODAY);
+    await repeatAgain(h.id, TODAY);
+    const again = (await db.items.get(h.id))!;
+    expect(again).toMatchObject({ status: "open", recur: ["mon", "wed", "fri"], doneDates: ["2026-11-02", "2026-11-04"] });
+    expect(again.completedAt).toBeUndefined();
+    expect(again.stash).toBeUndefined();
   });
 
   it("leaves a done item done (with its completion date)", async () => {
