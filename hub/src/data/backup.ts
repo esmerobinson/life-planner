@@ -2,7 +2,7 @@ import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
-import type { FileRow, Goal, ISODate, Item, JournalRow } from "../domain/types";
+import { JOURNAL_KINDS, type FileRow, type Goal, type ISODate, type Item, type JournalRow } from "../domain/types";
 import { isObj, isStr, sealedJournalShape, validFile, validGoal, validItem, validJournal } from "./validate";
 
 export { validFile, validGoal, validItem, validJournal };
@@ -52,35 +52,42 @@ export function parseBackup(raw: unknown): BackupFile {
     }
   }
   if (!isObj(data) || data.app !== "life-hub" || data.schema !== 1) throw new Error(INVALID_BACKUP);
+  if (!isStr(data.exportedOn) || !isValidISODate(data.exportedOn) || !Array.isArray(data.items) || !Array.isArray(data.goals)) {
+    throw new Error(INVALID_BACKUP);
+  }
+  // Damaged (re-review m5d): repeated ids, a picture that isn't one, a journal row that isn't
+  // sealed, or one of a kind this version knows that doesn't check out.
+  const known = (r: JournalRow) => (JOURNAL_KINDS as readonly string[]).includes(r.kind);
   if (
-    !isStr(data.exportedOn) ||
-    !isValidISODate(data.exportedOn) ||
-    !Array.isArray(data.items) ||
-    !Array.isArray(data.goals) ||
-    !data.items.every(validItem) ||
-    !data.goals.every(validGoal) ||
     hasDuplicateIds(data.items as Item[]) ||
     hasDuplicateIds(data.goals as Goal[]) ||
     (data.files !== undefined &&
       (!Array.isArray(data.files) || !data.files.every(validFile) || hasDuplicateIds(data.files as FileRow[]))) ||
     (data.journal !== undefined &&
-      // A journal kind only a later version knows is kept as it is (sealed), never "damaged".
-      (!Array.isArray(data.journal) || !data.journal.every(sealedJournalShape) || hasDuplicateIds(data.journal as JournalRow[])))
+      (!Array.isArray(data.journal) ||
+        !data.journal.every((r) => sealedJournalShape(r) && (!known(r) || validJournal(r))) ||
+        hasDuplicateIds(data.journal as JournalRow[])))
   ) {
-    // Our own file, with something this version can't read: most likely made by a newer one.
-    throw new Error(NEWER_BACKUP);
+    throw new Error(INVALID_BACKUP);
   }
+  // A task or goal this version can't read (a new area, say): most likely made by a newer one.
+  // A journal kind only a later version knows is kept as it is (sealed), never "damaged".
+  if (!data.items.every(validItem) || !data.goals.every(validGoal)) throw new Error(NEWER_BACKUP);
   return data as unknown as BackupFile;
 }
 
 export async function exportBackup(today: ISODate): Promise<BackupFile> {
   return db.transaction("r", [db.items, db.goals, db.files, db.journal, db.quarantine], async () => {
-    const journal = await db.journal.toArray();
-    const have = new Set(journal.map((r) => r.id));
-    // Journal rows this version can't read yet are in the backup too, as they arrived (review I3).
+    const journal = new Map((await db.journal.toArray()).map((r) => [r.id, r] as const));
+    // Journal rows this version can't read yet are in the backup too, as they arrived (review
+    // I3), and a held copy newer than the one here takes its place (re-review m5b).
     const held = (await db.quarantine.where("[table+id]").between(["journal", ""], ["journal", "\uffff"]).toArray())
       .map((q): unknown => ({ ...q.data, id: q.id, updatedAt: q.updatedAt }))
-      .filter((r): r is JournalRow => sealedJournalShape(r) && !have.has(r.id));
+      .filter((r): r is JournalRow => sealedJournalShape(r));
+    for (const r of held) {
+      const here = journal.get(r.id);
+      if (!here || (r.updatedAt ?? 0) > (here.updatedAt ?? 0)) journal.set(r.id, r);
+    }
     return {
       app: "life-hub" as const,
       schema: 1 as const,
@@ -88,7 +95,7 @@ export async function exportBackup(today: ISODate): Promise<BackupFile> {
       items: await db.items.toArray(),
       goals: await db.goals.toArray(),
       files: await db.files.toArray(),
-      journal: [...journal, ...held],
+      journal: [...journal.values()],
     };
   });
 }

@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import { db } from "./db";
-import { exportBackup, NEWER_BACKUP, restoreBackup } from "./backup";
+import { exportBackup, INVALID_BACKUP, restoreBackup } from "./backup";
 import { addPicture, deleteGoal, deleteItem, emptyBin, getFile, saveGoalNotes } from "./repo";
 import { MAX_FILE_DATA, MAX_GOAL_NOTES, MAX_NOTES_TEXT, validFile, validGoal, validItem } from "./validate";
 import { pictureLine } from "../domain/page";
@@ -133,9 +133,9 @@ describe("backup with pictures", () => {
 
   it("a damaged picture makes the whole file refused", async () => {
     const backup = { app: "life-hub", schema: 1, exportedOn: today, items: [item("x")], goals: [], files: [file("f", { mime: "x" })] };
-    await expect(restoreBackup(backup, "merge")).rejects.toThrow(NEWER_BACKUP); // our own file, a part this version can't read
+    await expect(restoreBackup(backup, "merge")).rejects.toThrow(INVALID_BACKUP); // damaged, not newer (re-review m5d)
     const dup = { app: "life-hub", schema: 1, exportedOn: today, items: [], goals: [], files: [file("f"), file("f")] };
-    await expect(restoreBackup(dup, "merge")).rejects.toThrow(NEWER_BACKUP);
+    await expect(restoreBackup(dup, "merge")).rejects.toThrow(INVALID_BACKUP);
     expect(await db.items.count()).toBe(0);
   });
 });

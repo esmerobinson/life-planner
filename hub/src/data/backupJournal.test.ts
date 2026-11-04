@@ -73,7 +73,7 @@ it("a backup with a journal kind this version doesn't know restores: those rows 
 it("an unknown kind with something typed in clear (not sealed) is still refused", async () => {
   const file = await roundTrip();
   file.journal.push({ ...future(), text: "Pretend plaintext" });
-  expect(() => parseBackup(file)).toThrow(NEWER_BACKUP);
+  expect(() => parseBackup(file)).toThrow(INVALID_BACKUP);
 });
 
 it("a file from a newer version this one can't read says so; a file that isn't a backup says that, kindly", async () => {
@@ -85,3 +85,20 @@ it("a file from a newer version this one can't read says so; a file that isn't a
   expect(INVALID_BACKUP).not.toMatch(/damaged/);
   expect(INVALID_BACKUP).toMatch(/not an Esmeworld backup/); // the Backup page's own test reads this
 });
+
+it("a held copy newer than the row here goes into the backup instead (re-review m5b)", async () => {
+  const id = await saveNote(jk, DAY, ME, NOTE);
+  const here = (await db.journal.where("kind").equals("note").first())!;
+  const newer = { ...here, iv: toBase64(new Uint8Array(12).fill(1)), updatedAt: (here.updatedAt ?? 0) + 1000 };
+  await db.quarantine.put({ table: "journal", id: here.id, updatedAt: newer.updatedAt, data: newer, reason: "pretend", cursor: 1 });
+  const file = await roundTrip();
+  expect(file.journal.filter((r: { id: string }) => r.id === here.id)).toEqual([newer]);
+  expect(id).toBeTruthy();
+});
+
+it("a damaged picture or a repeated id is called damaged, not newer (re-review m5d)", async () => {
+  const file = await roundTrip();
+  expect(() => parseBackup({ ...file, journal: [...file.journal, file.journal[0]] })).toThrow(INVALID_BACKUP);
+  expect(() => parseBackup({ ...file, files: [{ id: "pretend" }] })).toThrow(INVALID_BACKUP);
+});
+
