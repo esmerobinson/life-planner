@@ -43,8 +43,9 @@ export function AppShell() {
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
   const unsorted = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
   const look = needsALook(items, today);
-  // Unsorted items are excluded from needsALook, so nothing is counted twice.
-  const inboxCount = unsorted + look.overdue.length + look.dueSoon.length + look.stale.length;
+  // An unsorted item with a deadline is in both: count it once.
+  const lookCount = [...look.overdue, ...look.dueSoon, ...look.stale].filter((i) => i.areaId !== "inbox").length;
+  const inboxCount = unsorted + lookCount;
   const inboxLabel = inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox";
   const phone = usePhone();
   const location = useLocation();

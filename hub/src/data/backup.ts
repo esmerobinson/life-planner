@@ -2,8 +2,8 @@ import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
-import type { FileRow, Goal, ISODate, Item, JournalRow } from "../domain/types";
-import { isObj, isStr, validFile, validGoal, validItem, validJournal } from "./validate";
+import { JOURNAL_KINDS, type FileRow, type Goal, type ISODate, type Item, type JournalRow } from "../domain/types";
+import { isObj, isStr, sealedJournalShape, validFile, validGoal, validItem, validJournal } from "./validate";
 import { validFarm, type FarmRow } from "../farm/state";
 
 export { validFile, validGoal, validItem, validJournal };
@@ -25,9 +25,16 @@ export interface BackupFile {
   farm?: FarmRow[];
 }
 
-/** The one message for any file that is not a usable backup. */
+/** For a file that isn't a backup this app can read at all. */
 export const INVALID_BACKUP =
-  "That file is not an Esmeworld backup, or it is damaged. Nothing was changed.";
+  "That file is not an Esmeworld backup, or it couldn't be read. Nothing has changed: everything is just as it was.";
+
+/**
+ * For an Esmeworld backup with something in it this version can't read: almost always a backup
+ * made by a newer version (review I3). Honest for a damaged one too.
+ */
+export const NEWER_BACKUP =
+  "Part of that backup can't be read by this version of Esmeworld. If the app has an update waiting, update it, then try again. Nothing has changed.";
 
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
@@ -47,47 +54,62 @@ export function parseBackup(raw: unknown): BackupFile {
       throw new Error(INVALID_BACKUP);
     }
   }
+  if (!isObj(data) || data.app !== "life-hub" || data.schema !== 1) throw new Error(INVALID_BACKUP);
+  if (!isStr(data.exportedOn) || !isValidISODate(data.exportedOn) || !Array.isArray(data.items) || !Array.isArray(data.goals)) {
+    throw new Error(INVALID_BACKUP);
+  }
+  // Damaged (re-review m5d): repeated ids, a picture that isn't one, a journal row that isn't
+  // sealed, or one of a kind this version knows that doesn't check out.
+  const known = (r: JournalRow) => (JOURNAL_KINDS as readonly string[]).includes(r.kind);
   if (
-    !isObj(data) ||
-    data.app !== "life-hub" ||
-    data.schema !== 1 ||
-    !isStr(data.exportedOn) ||
-    !isValidISODate(data.exportedOn) ||
-    !Array.isArray(data.items) ||
-    !Array.isArray(data.goals) ||
-    !data.items.every(validItem) ||
-    !data.goals.every(validGoal) ||
     hasDuplicateIds(data.items as Item[]) ||
     hasDuplicateIds(data.goals as Goal[]) ||
     (data.files !== undefined &&
       (!Array.isArray(data.files) || !data.files.every(validFile) || hasDuplicateIds(data.files as FileRow[]))) ||
     (data.journal !== undefined &&
-      (!Array.isArray(data.journal) || !data.journal.every(validJournal) || hasDuplicateIds(data.journal as JournalRow[]))) ||
+      (!Array.isArray(data.journal) ||
+        !data.journal.every((r) => sealedJournalShape(r) && (!known(r) || validJournal(r))) ||
+        hasDuplicateIds(data.journal as JournalRow[]))) ||
     (data.farm !== undefined &&
       (!Array.isArray(data.farm) || !data.farm.every(validFarm) || hasDuplicateIds(data.farm as FarmRow[])))
   ) {
     throw new Error(INVALID_BACKUP);
   }
+  // A task or goal this version can't read (a new area, say): most likely made by a newer one.
+  // A journal kind only a later version knows is kept as it is (sealed), never "damaged".
+  if (!data.items.every(validItem) || !data.goals.every(validGoal)) throw new Error(NEWER_BACKUP);
   return data as unknown as BackupFile;
 }
 
 export async function exportBackup(today: ISODate): Promise<BackupFile> {
-  return db.transaction("r", [db.items, db.goals, db.files, db.journal, db.farm], async () => ({
-    app: "life-hub" as const,
-    schema: 1 as const,
-    exportedOn: today,
-    items: await db.items.toArray(),
-    goals: await db.goals.toArray(),
-    files: await db.files.toArray(),
-    journal: await db.journal.toArray(),
-    farm: await db.farm.toArray(),
-  }));
+  return db.transaction("r", [db.items, db.goals, db.files, db.journal, db.farm, db.quarantine], async () => {
+    const journal = new Map((await db.journal.toArray()).map((r) => [r.id, r] as const));
+    // Journal rows this version can't read yet are in the backup too, as they arrived (review
+    // I3), and a held copy newer than the one here takes its place (re-review m5b).
+    const held = (await db.quarantine.where("[table+id]").between(["journal", ""], ["journal", "\uffff"]).toArray())
+      .map((q): unknown => ({ ...q.data, id: q.id, updatedAt: q.updatedAt }))
+      .filter((r): r is JournalRow => sealedJournalShape(r));
+    for (const r of held) {
+      const here = journal.get(r.id);
+      if (!here || (r.updatedAt ?? 0) > (here.updatedAt ?? 0)) journal.set(r.id, r);
+    }
+    return {
+      app: "life-hub" as const,
+      schema: 1 as const,
+      exportedOn: today,
+      items: await db.items.toArray(),
+      goals: await db.goals.toArray(),
+      files: await db.files.toArray(),
+      journal: [...journal.values()],
+      farm: await db.farm.toArray(),
+    };
+  });
 }
 
 export async function restoreBackup(
   raw: unknown,
   mode: "merge" | "replace",
-): Promise<{ addedItems: number; addedGoals: number; skipped: number }> {
+): Promise<{ addedItems: number; addedGoals: number; skipped: number; kept?: number }> {
   const file = parseBackup(raw); // nothing is written until every row has passed
   try {
     // Holding the sync lock: no sync run is in flight while the restore writes.
@@ -100,7 +122,10 @@ export async function restoreBackup(
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
-  return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.farm, db.syncMeta], async () => {
+  // Journal rows of a kind this version doesn't know wait in quarantine, applied after the update.
+  const known = (file.journal ?? []).filter(validJournal);
+  const later = (file.journal ?? []).filter((r) => !validJournal(r));
+  return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.farm, db.syncMeta, db.quarantine], async () => {
     // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
     // a copy the server already has, edited since on another device, wins over them.
     keepOwnStamps();
@@ -123,9 +148,10 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       await db.files.bulkAdd(file.files ?? []);
-      await db.journal.bulkAdd(file.journal ?? []);
+      await db.journal.bulkAdd(known);
       await db.farm.bulkAdd(file.farm ?? []);
-      return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0 };
+      await holdForLater(later);
+      return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0, ...keptCount(later) };
     }
     const haveItems = new Set(await db.items.toCollection().primaryKeys());
     const haveGoals = new Set(await db.goals.toCollection().primaryKeys());
@@ -138,10 +164,11 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     await db.files.bulkAdd((file.files ?? []).filter((f) => !haveFiles.has(f.id)));
     // Journal entries: only the missing ones (an entry already here is this device's own copy).
     const haveJournal = new Set(await db.journal.toCollection().primaryKeys());
-    await db.journal.bulkAdd((file.journal ?? []).filter((j) => !haveJournal.has(j.id)));
+    await db.journal.bulkAdd(known.filter((j) => !haveJournal.has(j.id)));
     // The farm: only the missing facts (a row already here is this device's own, or newer).
     const haveFarm = new Set(await db.farm.toCollection().primaryKeys());
     await db.farm.bulkAdd((file.farm ?? []).filter((f) => !haveFarm.has(f.id)));
+    await holdForLater(later);
     const fileVisible = file.items.filter(notPurged).length;
     const addedVisible = newItems.filter(notPurged).length;
     const fileGoalsVisible = file.goals.filter(notPurged).length;
@@ -150,6 +177,23 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       addedItems: addedVisible,
       addedGoals: addedGoalsVisible,
       skipped: fileVisible - addedVisible + (fileGoalsVisible - addedGoalsVisible),
+      ...keptCount(later),
     };
   });
+}
+
+/** How many rows wait for a newer version (said only when there are some). */
+const keptCount = (later: JournalRow[]) => (later.length ? { kept: later.length } : {});
+
+/** Rows only a newer version reads, kept in quarantine (a newer copy already held stays). */
+async function holdForLater(rows: JournalRow[]) {
+  for (const r of rows) {
+    const updatedAt = typeof r.updatedAt === "number" ? r.updatedAt : 0;
+    const held = await db.quarantine.get(["journal", r.id]);
+    if (held && held.updatedAt > updatedAt) continue;
+    await db.quarantine.put({
+      table: "journal", id: r.id, updatedAt, data: r as unknown as Record<string, unknown>,
+      reason: "From a backup: a later version of the app reads it.", cursor: 0,
+    });
+  }
 }

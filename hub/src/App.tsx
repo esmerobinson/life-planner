@@ -11,6 +11,7 @@ import { BinPage } from "./ui/BinPage";
 import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
 import { RemindersPage } from "./ui/RemindersPage";
+import { RepeatingPage } from "./ui/RepeatingPage";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
 import { FarmPage, PopInDemo } from "./farm/FarmPage";
@@ -59,6 +60,10 @@ function JournalRoute() {
   return <JournalPage today={useShellToday()} />;
 }
 
+function RepeatingRoute() {
+  return <RepeatingPage today={useShellToday()} />;
+}
+
 function BackupRoute() {
   return <BackupPage today={useShellToday()} />;
 }
@@ -101,6 +106,7 @@ export function AppRoutes() {
           {/* The monthly pop-in's demo: development builds only (review M8; StickerPopIn is unit-tested). */}
           {import.meta.env.DEV && <Route path="/farm/popin-demo" element={<PopInDemo />} />}
           <Route path="/reminders" element={<RemindersPage />} />
+          <Route path="/repeating" element={<RepeatingRoute />} />
         </Route>
       </Routes>
   );

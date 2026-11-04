@@ -11,6 +11,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_KINDS, FAKE_CARD_FILE_TRACKS } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { cardLines, openAllChapters } from "../../test/chapterMap";
 import { SAVE_TODAY } from "./ExerciseResponseBox";
 
 // The exercise tab with two books (tracks) and with the newer part kinds (table, scale,
@@ -56,18 +57,20 @@ describe("two books", () => {
     expect(within(next).getByText("Pretend second workbook · Chapter 1 · Pretend chapter")).toBeInTheDocument();
   });
 
-  it("All cards: grouped by book, then chapter", async () => {
+  it("See all chapters: a pill per book, then its chapters and their cards", async () => {
     renderApp("/journal/exercise", TODAY);
     const s = await section();
     await todayCard();
-    await userEvent.click(within(s).getByText("All cards"));
-    const list = within(s).getByRole("list", { name: "All cards" });
-    const lines = [...list.children].map((li) => (li.getAttribute("role") === "presentation" ? `# ${li.textContent}` : li.querySelector("summary > span")!.textContent));
-    expect(lines).toEqual([
-      "# Pretend first workbook", "# Chapter 1 · Pretend chapter", "Day 1 · Pretend first one", "Day 2 · Pretend first two",
-      "# Chapter 2 · Pretend later chapter", "Day 3 · Pretend first three",
-      "# Pretend second workbook", "# Chapter 1 · Pretend chapter", "Day 1 · Pretend second one", "Day 2 · Pretend second two",
-    ]);
+    const map = await openAllChapters(s);
+    expect(within(map).getAllByRole("button", { pressed: true }).concat(within(map).getAllByRole("button", { pressed: false })).map((b) => b.textContent))
+      .toEqual(["Pretend first workbook", "Pretend second workbook"]);
+    const titles = () => [...map.querySelectorAll(".wb-ch-title")].map((t) => t.textContent);
+    expect(titles()).toEqual(["1 · Pretend chapter", "2 · Pretend later chapter"]);
+    expect(cardLines(map)).toEqual(["Day 1 · Pretend first one", "Day 2 · Pretend first two", "Day 3 · Pretend first three"]);
+    await userEvent.click(within(map).getByRole("button", { name: "Pretend second workbook" }));
+    expect(titles()).toEqual(["1 · Pretend chapter"]);
+    for (const t of within(map).queryAllByRole("button", { expanded: false })) await userEvent.click(t);
+    expect(cardLines(map)).toEqual(["Day 1 · Pretend second one", "Day 2 · Pretend second two"]);
   });
 
   it("Read back shows the book", async () => {
@@ -85,7 +88,7 @@ describe("newer part kinds", () => {
     renderApp("/journal/exercise", TODAY);
     const card = await todayCard();
     expect(await within(card).findByText("Table")).toHaveClass("chip", "exercise-format");
-    const table = within(card).getByRole("table");
+    const table = await within(card).findByRole("table");
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Feeling", "Set off by"]);
     const submit = await within(card).findByRole("button", { name: "Submit" });
     for (const [label, w] of [["Feeling, row 1", "Pretend calm"], ["Set off by, row 1", "Pretend tea"], ["Feeling, row 2", "Pretend fizz"]]) {

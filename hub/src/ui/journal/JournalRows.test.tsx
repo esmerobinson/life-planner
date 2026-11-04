@@ -159,14 +159,19 @@ describe("Home Journal rows", () => {
     expect(within(exercise).getByText("Day 1 · Pretend weather")).toHaveClass("strip-meta");
   });
 
-  it("a streak of 0 with nothing this week shows nothing", async () => {
+  it("a streak of 0 with nothing this week still shows the week's bars, all empty, and 0 (Esme, 2026-11-04)", async () => {
     await confirmedDevice(db, jk);
     await finishMorningPage(jk, "2026-10-20", OTHER_DEVICE, "Pretend old page");
     renderApp("/", TODAY);
     const morning = await row("Morning pages");
-    await waitFor(() => expect(screen.getByRole("list", { name: "Journal" })).toBeInTheDocument());
-    expect(morning.querySelector(".streak")).toBeNull();
     expect(await within(morning).findByRole("checkbox")).toHaveAttribute("aria-checked", "false");
+    for (const title of ["Mental health exercise", "Morning pages", "Daily check-in"]) {
+      const r = await row(title);
+      await waitFor(() => expect(r.querySelectorAll(".streak .streak-day")).toHaveLength(7));
+      expect(r.querySelectorAll(".streak-day.on")).toHaveLength(0);
+      expect(r.querySelector(".streak-n")).toHaveTextContent("0");
+      expect(r.textContent).not.toMatch(/missed/i);
+    }
   });
 
   it("a streak of 0 still shows this week's bars when a day this week was done", async () => {
@@ -244,6 +249,9 @@ describe("Mind's Habits box holds the Journal rows", () => {
     expect(tick(morning)).toHaveAttribute("aria-checked", "true");
     expect(tick(morning)).toHaveAttribute("aria-disabled", "true");
     expect(within(items[3]!).getByText("November · session 1 of 30")).toBeInTheDocument(); // checked in on the 1st
+    // The same week's bars as on Home and the Journal tabs (Esme, 2026-11-04), on all three.
+    for (const li of items.slice(1)) expect(li.querySelectorAll(".streak .streak-day")).toHaveLength(7);
+    expect(morning.querySelectorAll(".streak-day.on").length).toBeGreaterThan(0);
     await userEvent.click(within(morning).getByRole("button", { name: "Morning pages" }));
     await waitFor(() => expect(currentUrl).toBe("/journal/morning"));
   });
@@ -269,7 +277,7 @@ describe("Journal tabs", () => {
     await waitFor(() => expect(currentUrl).toBe("/journal/exercise"));
     const nav = await tabs();
     const links = within(nav).getAllByRole("link");
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/journal/exercise", "/journal/morning", "/journal/check-in", "/journal/read-back"]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/journal/exercise", "/journal/morning", "/journal/check-in", "/journal/read-back", "/journal/notes"]);
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveClass("journal-tab", "is-selected");
     await waitFor(() => expect(links[1]!.querySelector(".tick-auto.is-done")).not.toBeNull());
@@ -278,8 +286,21 @@ describe("Journal tabs", () => {
     expect(links[2]!.querySelector(".tick-auto.is-done")).toBeNull(); // half way through today
     expect(links[2]!.querySelector(".tick-auto")).not.toBeNull();
     expect(links[3]!.querySelector(".tick-auto")).toBeNull(); // Read back has no tick
+    expect(links[4]!.querySelector(".tick-auto, .tick-auto-space, .streak")).toBeNull(); // nor Notes to myself
     expect(within(links[1]!).getByText("3 days in a row")).toBeInTheDocument();
     expect(nav.querySelector(".journal-star")).toBeNull();
+  });
+
+  it("all three ticking tabs always show the week's bars, at 0 too", async () => {
+    await confirmedDevice(db, jk);
+    renderApp("/journal", TODAY);
+    const nav = await tabs();
+    for (const name of [/Mental health exercise/, /Morning pages/, /Daily check-in/]) {
+      const link = within(nav).getByRole("link", { name });
+      await waitFor(() => expect(link.querySelectorAll(".streak .streak-day")).toHaveLength(7));
+      expect(link.querySelectorAll(".streak-day.on")).toHaveLength(0);
+      expect(link.querySelector(".streak-n")).toHaveTextContent("0");
+    }
   });
 
   it("finishing today's check-in ticks its tab by itself", async () => {

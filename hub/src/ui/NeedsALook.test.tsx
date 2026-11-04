@@ -68,8 +68,9 @@ describe("Inbox: To sort and Needs a look", () => {
     expect(screen.getByText("Nothing waiting in the inbox.")).toBeInTheDocument();
   });
 
-  it("does not list unsorted inbox items under Needs a look", async () => {
-    await seed("Loose", { areaId: "inbox", due: "2026-10-01" });
+  it("does not list undated unsorted inbox items under Needs a look (a deadline does: bug #8)", async () => {
+    const loose = await seed("Loose", { areaId: "inbox" });
+    await db.items.update(loose.id, { touchedAt: "2026-01-01" });
     render(<InboxPage today={TODAY} />);
     await screen.findByText("Loose", { selector: ".strip-title" });
     expect(screen.getByText("Nothing needs a look.")).toBeInTheDocument();
@@ -132,6 +133,14 @@ describe("Inbox pill count", () => {
     expect(await screen.findByRole("link", { name: "Inbox (4)" })).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Late" }));
     expect(await screen.findByRole("link", { name: "Inbox (3)" })).toBeInTheDocument();
+  });
+
+  it("counts an unsorted item with a deadline once (it is To sort and Overdue: bug #8)", async () => {
+    const t = todayISO();
+    await seed("Loose and late", { areaId: "inbox", due: addDays(t, -2) }, t);
+    shell(t);
+    expect(await screen.findByRole("link", { name: "Inbox (1)" })).toBeInTheDocument();
+    expect(within(await screen.findByRole("list", { name: "Overdue" })).getByText("Loose and late")).toBeInTheDocument();
   });
 
   it("drops after changing a date from the page", async () => {

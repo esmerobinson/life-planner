@@ -111,15 +111,21 @@ describe("nothing is dropped when the card changes shape (re-imported cards)", (
   });
 });
 
-describe("Read back: one entry per card per day", () => {
-  it("the same card's rows under its earlier (day and theme) key and its id on one day are one entry, nothing lost", async () => {
+describe("Read back: one entry per card per day, by the card's full id", () => {
+  it("an earlier (version 1, day-keyed) row is never folded into an id'd card, even with the same day and theme", async () => {
     const legacyCard = { id: "day-1", day: 1, theme: CARD.theme, legacy: true };
     await db.journal.put(await theirs(DAY, PHONE, { text: "Pretend from the old cards", submittedAt: clock, at: clock }, legacyCard));
     await submitExerciseEntry(jk, DAY, ME, CARD, LONG);
     const { entries } = await listExerciseEntries(jk, "2026-11-05");
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ text: LONG, submitted: true });
-    expect(entries[0]!.others.map((o) => o.text)).toEqual(["Pretend from the old cards"]);
+    expect(entries.map((e) => [e.id, e.text]).sort()).toEqual([["day-1", "Pretend from the old cards"], [CARD.id, LONG]]);
+  });
+
+  it("two books' Day 1 cards on one day are two entries", async () => {
+    const other = { id: "dbt-pretend-001", day: 1, theme: "Pretend costs", legacy: false };
+    await submitExerciseEntry(jk, DAY, ME, CARD, LONG);
+    await submitExerciseEntry(jk, DAY, ME, other, "Pretend other book");
+    const { entries } = await listExerciseEntries(jk, "2026-11-05");
+    expect(entries.map((e) => [e.id, e.text]).sort()).toEqual([[other.id, "Pretend other book"], [CARD.id, LONG]]);
   });
 
   it("different days stay different entries", async () => {

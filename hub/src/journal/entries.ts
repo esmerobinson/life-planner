@@ -33,6 +33,11 @@ export interface AnswerEntry {
   answer: string | null;
   done: boolean;
   at: number;
+  /**
+   * She cleared this answer on purpose with Edit (bug #30): unlike a skipped or empty one, it
+   * can win over an older answer from another device. Never set by Skip.
+   */
+  cleared?: true;
 }
 
 /** The day's questions, written by the first device to open the check-in that day. */
@@ -120,7 +125,7 @@ export type StarsEntry = { v: 1; marks: { day: number; on: boolean; at: number }
  * is null until Submit; `at` is the last save (an autosave after Submit leaves `submittedAt`).
  * Version 1 is a version 1 card's (by day and theme); version 2 also keeps the card's id.
  */
-export type ExerciseResponseEntry =
+export type ExerciseResponseEntry = (
   | { v: 1; day: number; theme: string; text: string; submittedAt: number | null; at: number }
   | {
       v: 2;
@@ -132,13 +137,48 @@ export type ExerciseResponseEntry =
       parts?: PartAnswer[];
       submittedAt: number | null;
       at: number;
-    };
+    }
+) & {
+  /** Saved by "Edit" on a submitted answer (its own row; the one it changed stays, review I4). */
+  edit?: true;
+};
 
 /** One part's answer as stored. */
 export interface PartAnswer {
   prompt: string;
   kind: PartKind;
   answer: PartValue;
+}
+
+/**
+ * One note to herself (journal v3, "Notes to myself"): the thought that comes up in a hard
+ * moment and her own steady answer, perhaps a memory or evidence and a skill to try. `prompt`
+ * is the starter prompt it answers (null: her own thought). Deleted: every field emptied (the
+ * row stays, as sync never hard-deletes).
+ */
+export interface NoteEntry {
+  v: 1;
+  prompt: string | null;
+  thought: string;
+  steady: string;
+  memory: string;
+  skill: string;
+  createdAt: number;
+  at: number;
+  deleted?: true;
+  /** This version's own random id (absent on the earliest notes: its row id and time stand in). */
+  vid?: string;
+  /** The versions she had in front of her when she wrote this one (by vid): it is written over them. */
+  seen?: string[];
+  /** This device's note in progress, not saved yet (its own row). */
+  draft?: true;
+}
+
+/** One device's "I read this today" ticks for a day: the notes' row ids. */
+export interface NoteReadEntry {
+  v: 1;
+  ids: string[];
+  at: number;
 }
 
 /** The earlier one-row-per-day morning shape (read and split; never written). */
@@ -175,7 +215,8 @@ export const ENTRY_CHECK = {
   photo: (v: unknown): v is PhotoEntry => isObj(v) && v.v === 1 && isStr(v.fileId) && num(v.at),
   draft: (v: unknown): v is DraftEntry => isObj(v) && v.v === 1 && isStr(v.text),
   answer: (v: unknown): v is AnswerEntry =>
-    isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at),
+    isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at) &&
+    (v.cleared === undefined || (v.cleared === true && v.answer === null)),
   set: (v: unknown): v is SetEntry => isObj(v) && v.v === 1 && strList(v.prompts) && num(v.at),
   settings: (v: unknown): v is SettingsEntry => isObj(v) && v.v === 1 && strList(v.active),
   cards: (v: unknown): v is CardsRow =>
@@ -196,10 +237,16 @@ export const ENTRY_CHECK = {
     isObj(v) && (v.v === 1 || v.v === 2) && Array.isArray(v.marks) &&
     v.marks.every((m) => isObj(m) && (v.v === 1 ? cardDay(m.day) : cardId(m.id)) && typeof m.on === "boolean" && num(m.at)),
   "exercise-entry": (v: unknown): v is ExerciseResponseEntry =>
-    isObj(v) && isStr(v.theme) && isStr(v.text) && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) &&
+    isObj(v) && (v.edit === undefined || v.edit === true) && isStr(v.theme) && isStr(v.text) && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) &&
     (v.v === 1
       ? cardDay(v.day)
       : v.v === 2 && cardId(v.id) && (v.day === null || cardDay(v.day)) && (v.parts === undefined || partAnswers(v.parts))),
+  note: (v: unknown): v is NoteEntry =>
+    isObj(v) && v.v === 1 && (v.prompt === null || isStr(v.prompt)) && isStr(v.thought) && isStr(v.steady) &&
+    isStr(v.memory) && isStr(v.skill) && num(v.createdAt) && num(v.at) && (v.deleted === undefined || v.deleted === true) &&
+    (v.vid === undefined || (isStr(v.vid) && v.vid.length <= 64)) && (v.seen === undefined || (strList(v.seen) && (v.seen as string[]).length <= 64)) &&
+    (v.draft === undefined || v.draft === true),
+  "note-read": (v: unknown): v is NoteReadEntry => isObj(v) && v.v === 1 && strList(v.ids) && num(v.at),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&
     (v.draft === undefined || isStr(v.draft)) && strList(v.photos),

@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT, MAX_MONTH_GOALS, MAX_MONTH_LOG, MAX_MONTH_TARGET, MAX_MONTH_TITLE } from "./validate";
+import { newId } from "../domain/ids";
 import { pictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
 import { plannedFromLastMonth } from "../domain/goalCounts";
@@ -24,7 +25,7 @@ export async function createItem(
 ): Promise<Item> {
   const item: Item = {
     ...input,
-    id: crypto.randomUUID(),
+    id: newId(),
     status: "open",
     links: input.links ?? [],
     createdAt: today,
@@ -49,7 +50,7 @@ export async function createGoal(
   const { milestones = [], ...rest } = input;
   const goal: Goal = {
     ...rest,
-    id: crypto.randomUUID(),
+    id: newId(),
     milestones: [],
     createdAt: today,
   };
@@ -171,7 +172,7 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
     if (!item) throw new Error("that item does not exist");
     if (item.status !== "open") throw new Error("only an open item can become a goal");
     const goal: Goal = {
-      id: crypto.randomUUID(),
+      id: newId(),
       title: item.title,
       areaId: area,
       kind: "practice",
@@ -244,8 +245,11 @@ export async function untickItem(id: string, today: ISODate): Promise<void> {
       await db.items.put({ ...rest, ...(left ? { doneDates: left } : {}), touchedAt: today });
       return;
     }
-    const { completedAt: _drop, ...rest } = item;
-    await db.items.put({ ...rest, status: "open", touchedAt: today });
+    // A one-off that was a habit (Stop repeating) may keep its completion day among its done
+    // days (a habit ticked that day): unticking takes it off there too, so nothing counts it.
+    const { completedAt, doneDates, ...rest } = item;
+    const left = completedAt ? withoutDoneDate(doneDates, completedAt) : doneDates;
+    await db.items.put({ ...rest, ...(left ? { doneDates: left } : {}), status: "open", touchedAt: today });
   });
 }
 
@@ -515,8 +519,15 @@ export async function restoreItem(id: string, today: ISODate): Promise<void> {
 const BINNED: readonly Item["status"][] = ["deleted", "purged"];
 
 /**
- * Items for every list and count in the app. Never returns Bin rows (deleted or purged);
- * without a status it returns open and done items.
+ * Oldest first: by the day made, then by id (new ids sort by when they were made, domain/ids.ts),
+ * so every list (and search) has the same order on every device and every reload.
+ */
+const oldestFirst = <T extends { createdAt: string; id: string }>(a: T, b: T) =>
+  a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+
+/**
+ * Items for every list and count in the app, oldest first. Never returns Bin rows (deleted or
+ * purged); without a status it returns open and done items.
  */
 export async function listItems(
   filter: {
@@ -527,19 +538,21 @@ export async function listItems(
   } = {},
 ): Promise<Item[]> {
   const all = await db.items.toArray();
-  return all.filter(
-    (i) =>
-      !BINNED.includes(i.status) &&
-      (filter.status ? i.status === filter.status : i.status !== "archived") &&
-      (!filter.areaId || i.areaId === filter.areaId) &&
-      (!filter.goalId || i.goalId === filter.goalId) &&
-      (!filter.kind || i.kind === filter.kind),
-  );
+  return all
+    .filter(
+      (i) =>
+        !BINNED.includes(i.status) &&
+        (filter.status ? i.status === filter.status : i.status !== "archived") &&
+        (!filter.areaId || i.areaId === filter.areaId) &&
+        (!filter.goalId || i.goalId === filter.goalId) &&
+        (!filter.kind || i.kind === filter.kind),
+    )
+    .sort(oldestFirst);
 }
 
-/** Live goals, for every list, picker and count. Bin goals (deleted or purged) never appear. */
+/** Live goals, oldest first, for every list, picker and count. Bin goals (deleted or purged) never appear. */
 export async function listGoals(): Promise<Goal[]> {
-  return (await db.goals.toArray()).filter((g) => g.status === undefined);
+  return (await db.goals.toArray()).filter((g) => g.status === undefined).sort(oldestFirst);
 }
 
 /** Flags a task as one of its goal's milestones, or unflags it (the field is then removed). */
@@ -760,6 +773,41 @@ export async function updateItems(
       if (patch.due !== undefined) changes.due = patch.due;
       await db.items.update(id, { ...changes, touchedAt: today });
     }
+  });
+}
+
+/**
+ * Stop repeating: the item stays in its area as a one-off to-do, done or not exactly as it
+ * was, with its done days kept. The days it repeated on are put away in its stash (types.ts
+ * ItemStash) so Repeat again, or Undo, brings them back. Does nothing to an item that does not repeat.
+ * One exception: an open habit ticked today (today is in its done days) becomes a DONE one-off,
+ * completed today, so it moves to Done today instead of reappearing open.
+ */
+export async function stopRepeating(id: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
+    const item = await db.items.get(id);
+    if (!item || !item.recur?.length || (item.status !== "open" && item.status !== "done")) return;
+    const { recur, ...rest } = item;
+    const tickedToday = item.status === "open" && item.doneDates?.includes(today) === true;
+    await db.items.put({
+      ...withStash(rest, "task", { ...item.stash?.task, recur }),
+      ...(tickedToday ? { status: "done" as const, completedAt: today } : {}),
+      touchedAt: today,
+    });
+  });
+}
+
+/** Repeat again: the days Stop repeating put away come back. Does nothing when none are put away. */
+export async function repeatAgain(id: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
+    const item = await db.items.get(id);
+    const parked = item?.stash?.task?.recur;
+    if (!item || item.recur?.length || !parked?.length || (item.status !== "open" && item.status !== "done")) return;
+    const { recur: _drop, ...task } = item.stash!.task!;
+    // A repeating item is never "done" (its ticks are its done days), so a done one-off opens again.
+    const { completedAt: _c, ...open } = item;
+    const base: Item = item.status === "done" ? { ...open, status: "open" } : item;
+    await db.items.put({ ...withStash({ ...base, recur: parked }, "task", task), touchedAt: today });
   });
 }
 

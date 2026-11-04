@@ -55,7 +55,7 @@ it("a writing box under the card (after Try this and the book line, as in the mo
   expect(submit).toBeDisabled(); // nothing written yet
 });
 
-it("Submit seals the response and marks today's card done; reloaded it shows 'Saved' with the text, editable, and Submit again updates the row", async () => {
+it("Submit seals the response and marks today's card done; reloaded, the next card shows in its place (the answer only in See what you wrote)", async () => {
   const first = renderApp("/journal", TODAY);
   const card = await todayCard();
   await userEvent.type(await box(), "Pretend cloud, floating");
@@ -67,18 +67,10 @@ it("Submit seals the response and marks today's card done; reloaded it shows 'Sa
   expect(JSON.stringify(await db.journal.toArray())).not.toContain("floating");
   first.unmount();
   renderApp("/journal", TODAY);
-  const again = await todayCard();
-  // The text stays, editable.
-  const b = await box();
-  await waitFor(() => expect(b).toHaveValue("Pretend cloud, floating"));
-  expect(await within(again).findByText("Saved")).toBeInTheDocument();
-  expect(within(again).queryByRole("button", { name: "Submit" })).toBeNull();
-  await userEvent.type(b, " away");
-  expect(within(again).queryByText("Saved")).toBeNull();
-  await userEvent.click(within(again).getByRole("button", { name: "Submit" }));
-  await waitFor(async () =>
-    expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating away", saved: true }),
-  );
+  const s = await section();
+  await within(s).findByRole("article", { name: "Next card: Day 2" });
+  expect(within(s).getAllByRole("article")).toHaveLength(1);
+  expect(within(s).queryByDisplayValue("Pretend cloud, floating")).toBeNull();
   // One submitted row (drafts have their own row, apart, so they never write over it).
   expect(await db.journal.where("kind").equals("exercise-entry").filter((r) => !r.id.endsWith("-draft")).count()).toBe(1);
 });
@@ -138,7 +130,7 @@ it("another device's newer response shows in the box while nothing is being type
 });
 
 describe("Past exercises", () => {
-  it("newest first as 'Day N · Theme · <date>'; opening one shows the card and her response", async () => {
+  it("newest first as '<date> · Day N · Theme'; opening one shows the card and her response", async () => {
     const device = await getDeviceId(db);
     await submitExerciseEntry(jk, "2026-10-27", device, CARD1, "Pretend first response");
     await submitExerciseEntry(jk, "2026-10-29", device, legacy(2, "The fictional kettle"), "Pretend kettle response");
@@ -148,8 +140,8 @@ describe("Past exercises", () => {
     const list = within(s).getByRole("list", { name: "Past exercises" });
     const items = within(list).getAllByRole("listitem");
     expect(items.map((i) => i.querySelector("summary")!.textContent)).toEqual([
-      "Day 2 · The fictional kettle · Thursday 29 October",
-      "Day 1 · Pretend weather · Tuesday 27 October",
+      "Thursday 29 October · Day 2 · The fictional kettle",
+      "Tuesday 27 October · Day 1 · Pretend weather",
     ]);
     await userEvent.click(within(items[0]!).getByText(/Day 2 · The fictional kettle/));
     expect(within(items[0]!).getByText(/a kettle whistles before it boils over/)).toBeInTheDocument();
@@ -167,11 +159,12 @@ describe("Past exercises", () => {
     await userEvent.click(await within(s).findByText("Past exercises"));
     const items = within(within(s).getByRole("list", { name: "Past exercises" })).getAllByRole("listitem");
     // Day 2 is in the set now, but as another card: not shown as this one.
-    await userEvent.click(within(items[0]!).getByText(/Day 2 · An older pretend theme/));
+    // Said plainly as an earlier card (Esme, 2026-11-04), never passed off as the set's Day 2.
+    await userEvent.click(within(items[0]!).getByText("Thursday 29 October · Earlier card (day 2) · An older pretend theme"));
     expect(within(items[0]!).getByText("Pretend replaced response")).toBeInTheDocument();
     expect(within(items[0]!).queryByText(/kettle/)).toBeNull();
     expect(within(items[0]!).queryByText("Learn")).toBeNull();
-    await userEvent.click(within(items[1]!).getByText(/Day 9 · A pretend card from an old set/));
+    await userEvent.click(within(items[1]!).getByText(/Earlier card \(day 9\) · A pretend card from an old set/));
     expect(within(items[1]!).getByText("Pretend old response")).toBeInTheDocument();
   });
 

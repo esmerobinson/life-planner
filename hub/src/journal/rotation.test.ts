@@ -32,6 +32,10 @@ describe("rotation", () => {
   it("is morning before 14:00 and evening from 14:00", () => {
     expect(flavourAt(13)).toBe("morning");
     expect(flavourAt(14)).toBe("evening");
+    // Her day runs 3am to 3am: after midnight it is still the evening before (bug #17).
+    expect(flavourAt(1)).toBe("evening");
+    expect(flavourAt(2)).toBe("evening");
+    expect(flavourAt(3)).toBe("morning");
   });
 
   it("is deterministic for a day (every device shows the same three)", () => {
@@ -90,6 +94,59 @@ describe("rotation", () => {
       expect(counts.get(id)).toBeLessThan(60);
     }
     expect(counts.get("S3") ?? 0).toBe(0);
+  });
+
+  describe("a skipped question goes back into circulation (Esme, 2026-11-04)", () => {
+    // Morning: M1 M2 (noticing), D3 D6 (skill), K5 + more kindness ones are on.
+    const active = ["M1", "M2", "M4", "D3", "D6", "K2", "K4", "K5"];
+
+    it("comes up first in its slot on the next check-in, still three questions in slot order", () => {
+      const date = "2026-11-04";
+      const base = pickPrompts({ date, hour: 8, active, history: [] });
+      // Yesterday D6 was asked and skipped (no answer); the other two were answered.
+      const skippedD6 = [{ date: "2026-11-03", prompts: ["M2", "D6", "K4"], answered: new Set(["M2", "K4"]) }];
+      const three = pickPrompts({ date, hour: 8, active, history: skippedD6 });
+      expect(three).toHaveLength(3);
+      expect(three[1]).toBe("D6");
+      expect(three.map(slotOf)).toEqual(["noticing", "skill", "kindness"]);
+      // The same on every device, whatever order things arrive in.
+      expect(pickPrompts({ date, hour: 8, active: [...active].reverse(), history: [...skippedD6] })).toEqual(three);
+      // Answered, it would have waited out the no-repeat window instead.
+      const answered = [{ date: "2026-11-03", prompts: ["M2", "D6", "K4"], answered: new Set(["M2", "D6", "K4"]) }];
+      expect(pickPrompts({ date, hour: 8, active, history: answered })).not.toContain("D6");
+      expect(base).toHaveLength(3);
+    });
+
+    it("the oldest skip comes first when two in a slot were skipped", () => {
+      const history = [
+        { date: "2026-11-01", prompts: ["M1", "D3", "K2"], answered: new Set(["M1", "K2"]) },
+        { date: "2026-11-02", prompts: ["M4", "D6", "K5"], answered: new Set(["M4", "K5"]) },
+      ];
+      expect(pickPrompts({ date: "2026-11-04", hour: 8, active, history })[1]).toBe("D3");
+    });
+
+    it("a question not reached (the check-in left half done) counts as missed too", () => {
+      const history = [{ date: "2026-11-03", prompts: ["M2", "D6", "K4"], answered: new Set(["M2"]) }];
+      const three = pickPrompts({ date: "2026-11-04", hour: 8, active, history });
+      expect(three[1]).toBe("D6");
+      expect(three[2]).toBe("K4");
+    });
+
+    it("skipped again straight after coming back: back to normal circulation (no nagging)", () => {
+      const history = [
+        { date: "2026-11-02", prompts: ["M2", "D6", "K4"], answered: new Set(["M2", "K4"]) },
+        { date: "2026-11-03", prompts: ["M1", "D6", "K5"], answered: new Set(["M1", "K5"]) },
+      ];
+      expect(pickPrompts({ date: "2026-11-04", hour: 8, active, history })[1]).toBe("D3");
+    });
+
+    it("waits for a check-in at its time of day", () => {
+      // M6 is an evening question, skipped last evening: a morning check-in doesn't ask it.
+      const history = [{ date: "2026-11-03", prompts: ["M6", "D3", "K4"], answered: new Set(["D3", "K4"]) }];
+      const on = [...active, "M6"];
+      expect(pickPrompts({ date: "2026-11-04", hour: 8, active: on, history })).not.toContain("M6");
+      expect(pickPrompts({ date: "2026-11-04", hour: 20, active: on, history })[0]).toBe("M6");
+    });
   });
 
   it("falls back to other prompts when a slot is switched off, and to fewer when few are on", () => {

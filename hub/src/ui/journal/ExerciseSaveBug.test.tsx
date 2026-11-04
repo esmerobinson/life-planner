@@ -77,7 +77,7 @@ describe("a text card: type a long answer, Submit at once", () => {
     const s = await section();
     await userEvent.click(within(s).getByText("Past exercises"));
     const past = within(s).getByRole("list", { name: "Past exercises" });
-    await userEvent.click(within(past).getByText("Day 1 · Pretend weather · Wednesday 4 November"));
+    await userEvent.click(within(past).getByText("Wednesday 4 November · Day 1 · Pretend weather"));
     expect(within(past).getByText((_, el) => el?.tagName === "P" && el.textContent === LONG)).toBeInTheDocument();
 
     // "See what you wrote" opens the card's review with it.

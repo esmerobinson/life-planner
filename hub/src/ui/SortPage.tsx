@@ -10,6 +10,7 @@ import { UndoLine } from "./DeleteButton";
 import { inboxOrder, inboxSource } from "./inboxSource";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
+import { useHiddenFlush } from "./useDraft";
 import { useHubData } from "./useHubData";
 
 const tileOf = (navId: string) => NAV.find((n) => n.id === navId)!;
@@ -233,6 +234,9 @@ function SortCard({
     },
     [],
   );
+
+  // The app going to the background or the tab closing (no blur or unmount on a phone): save.
+  useHiddenFlush(() => void saveNotes());
 
   // Auto-grow the notes box to fit its text.
   useLayoutEffect(() => {

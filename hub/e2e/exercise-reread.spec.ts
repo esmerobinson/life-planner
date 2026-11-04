@@ -45,12 +45,14 @@ test("type a long answer, Submit at once, and reread it word for word", async ({
   // Past exercises lists today's answer, exactly.
   await s.getByText("Past exercises", { exact: true }).click();
   const past = s.getByRole("list", { name: "Past exercises" });
-  await past.getByText(/^Day 1 · Pretend weather · /).click();
+  await past.getByText(/ · Day 1 · Pretend weather$/).click(); // the date first, then the card
   await expect(past.locator(".journal-past-answer")).toHaveText(LONG);
 
   // See what you wrote: the card's own review.
   await s.getByRole("button", { name: "See what you wrote" }).click();
   await expect(s.getByRole("list", { name: "Your responses" }).locator(".journal-past-answer")).toHaveText(LONG);
+  // journal-v3: the review is in the chapter map pop-up; close it before going on.
+  await page.locator(".choose-top").getByRole("button", { name: "Done" }).click();
 
   // Read back, and again after a reload.
   for (const reload of [false, true]) {

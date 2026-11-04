@@ -232,10 +232,15 @@ export interface FileRow {
  * - "exercise-entry" `exercise-entry:<date>:<cardKey>:<deviceId>` one device's written response to
  *                                          a day's card (journal polish brief; cardKey is an opaque HMAC)
  * - "morning" / "checkin" `${kind}:<date>` the earlier one-row-per-day shape: read (split), never written
+ * - "note"     `note:<date>:<uuid>`        one note to herself (journal v3), rewritten whole on edit
+ * - "note-read" `note-read:<date>:<deviceId>` one device's "I read this today" ticks for a day
+ *
+ * An app version that doesn't know a kind refuses the row (validJournal), so sync keeps it in
+ * quarantine until an update can read it: never stored, never fatal.
  */
 export const JOURNAL_KINDS = [
   "page", "photo", "draft", "answer", "set", "settings", "verifier", "morning", "checkin", "cards", "exercise", "stars",
-  "exercise-entry",
+  "exercise-entry", "note", "note-read",
 ] as const;
 export type JournalKind = (typeof JOURNAL_KINDS)[number];
 

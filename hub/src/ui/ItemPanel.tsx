@@ -4,6 +4,7 @@ import { getItem, makeBook, saveItemNotes, setBookStatus, unBook, updateItem } f
 import { CHANGED_TO_BOOK, leftReadingList, MOVED_TO_READING_LIST, useRowUndo, useSessionsUndo } from "./undoSessions";
 import { BOOK_AREA, BOOK_LIMITS, BOOK_STATUSES, BOOK_STATUS_LABEL, bookLine, isBook, isWebLink } from "../domain/books";
 import { ProgressBar } from "./ProgressBar";
+import { RepeatBox } from "./RepeatBox";
 import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
 import { dayLabel } from "../domain/display";
@@ -268,6 +269,7 @@ export function ItemPanel({
       <TitleBox value={title.value} onChange={title.set} onBlur={title.flush} />
       {saveError && <p className="form-message">{saveError}</p>}
       {fieldError && <p className="form-message">{fieldError}</p>}
+      <RepeatBox item={item} today={today} onChanged={onChanged} />
       <div className="peek-props">
         {!inbox && (
           <>

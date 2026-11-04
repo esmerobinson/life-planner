@@ -7,8 +7,26 @@ export const NOT_ANSWERED = "Not answered";
 export const UNSENT_DRAFT = "Unsent draft";
 /** Over another submitted version of the same card on the same day (another device's). */
 export const ALSO_SUBMITTED = "Also submitted";
+/** Over the answer she changed with "Edit" (review I4): it stays, under her new one. */
+export const EARLIER_VERSION = "Earlier version";
 /** On a card whose parts changed since she answered: what she wrote then, read-only. */
 export const EARLIER_ANSWER = "Your earlier answer (the card has changed since)";
+
+/**
+ * A card's or a response's title wherever it is listed: its book (when the set names books),
+ * "Day N" and its theme, e.g. "Pretend DBT book · Day 1 · Pretend costs". Two books are each
+ * numbered from Day 1, so a bare "Day 1" could be either (Esme, 2026-11-04: "day two doesnt
+ * show as this one"). A response from the earliest (version 1) cards that no card in the set
+ * matches says so, rather than passing for another book's Day N.
+ */
+export function cardTitle(
+  e: { id: string; day: number | null; theme: string },
+  book: string | undefined,
+  inSet: boolean,
+): string {
+  if (!inSet && e.day !== null && e.id === `day-${e.day}`) return `Earlier card (day ${e.day}) · ${e.theme}`;
+  return [book ?? "", e.day !== null ? `Day ${e.day}` : "", e.theme].filter(Boolean).join(" · ");
+}
 
 /**
  * A response to an exercise card, read-only (Past exercises, All cards, Read back): the one
@@ -43,7 +61,7 @@ export function OtherVersions({ others }: { others: ResponseVersion[] }) {
     <>
       {others.map((o, i) => (
         <div key={i}>
-          <p className="journal-muted">{`${o.submitted ? ALSO_SUBMITTED : UNSENT_DRAFT} · ${when(o.at)}`}</p>
+          <p className="journal-muted">{`${o.earlier ? EARLIER_VERSION : o.submitted ? ALSO_SUBMITTED : UNSENT_DRAFT} · ${whenWritten(o.at)}`}</p>
           <ResponseView text={o.text} parts={o.parts} />
         </div>
       ))}
@@ -51,7 +69,8 @@ export function OtherVersions({ others }: { others: ResponseVersion[] }) {
   );
 }
 
-const when = (at: number) => {
+/** When a version was written: "Wednesday 4 November, 9:15 pm" (this device's clock). */
+export const whenWritten = (at: number) => {
   const d = new Date(at);
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return `${longDate(day)}, ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;

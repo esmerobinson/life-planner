@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { exportBackup, INVALID_BACKUP, RESTORE_FAILED, restoreBackup } from "../data/backup";
+import { exportBackup, INVALID_BACKUP, NEWER_BACKUP, RESTORE_FAILED, restoreBackup } from "../data/backup";
+import { backupParts, NotJsonError, readBackupJson } from "../data/backupParts";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import type { ISODate } from "../domain/types";
 import { ImportPanel } from "./ImportPanel";
@@ -24,7 +25,8 @@ export function BackupPage({ today }: { today: ISODate }) {
   const shell = useContext(ShellContext);
   const [ownStatus, setOwnStatus] = useState<PersistenceStatus | null>(null);
   const persistence = shell?.persistence ?? ownStatus;
-  const [text, setText] = useState<string | null>(null);
+  /** The chosen file, read (`data` is null when it is not JSON: restoring it says it is damaged). */
+  const [chosen, setChosen] = useState<{ data: unknown } | null>(null);
   const [fileName, setFileName] = useState("");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const [confirmed, setConfirmed] = useState(false);
@@ -60,7 +62,8 @@ export function BackupPage({ today }: { today: ISODate }) {
     setError("");
     try {
       const file = await exportBackup(today);
-      const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
+      // In pieces, never one string: a browser cannot make a string as long as many photos.
+      const blob = new Blob(backupParts(file), { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -88,17 +91,23 @@ export function BackupPage({ today }: { today: ISODate }) {
     setConfirmed(false);
     if (!file) return;
     try {
-      setText(await file.text());
+      // Read in pieces for the same reason (one row at a time); a broken file is kept as
+      // "not JSON" so Restore says it is damaged, as before.
+      const data = await readBackupJson(file).catch((e: unknown) => {
+        if (e instanceof NotJsonError) return null;
+        throw e;
+      });
+      setChosen({ data });
       setFileName(file.name);
     } catch {
-      setText(null);
+      setChosen(null);
       setFileName("");
       setError("That file could not be read.");
     }
   }
 
   async function restore() {
-    if (inFlight.current || text === null) return;
+    if (inFlight.current || chosen === null) return;
     if (mode === "replace" && !confirmed) return;
     inFlight.current = true;
     setBusy(true);
@@ -106,7 +115,7 @@ export function BackupPage({ today }: { today: ISODate }) {
     setError("");
     let done = false;
     try {
-      const r = await restoreBackup(text, mode);
+      const r = await restoreBackup(chosen.data, mode);
       done = true;
       setMessage(
         `Added ${r.addedItems} ${r.addedItems === 1 ? "task" : "tasks"} and ${r.addedGoals} ${
@@ -115,7 +124,7 @@ export function BackupPage({ today }: { today: ISODate }) {
       );
       setConfirmed(false);
     } catch (err) {
-      const known = [INVALID_BACKUP, WAITING_FIRST_SYNC, REPLACE_OFF_WHILE_SYNCING];
+      const known = [INVALID_BACKUP, NEWER_BACKUP, WAITING_FIRST_SYNC, REPLACE_OFF_WHILE_SYNCING];
       setError(err instanceof Error && known.includes(err.message) ? err.message : RESTORE_FAILED);
     } finally {
       inFlight.current = false;
@@ -178,7 +187,7 @@ export function BackupPage({ today }: { today: ISODate }) {
 
       {!replacing && (
         <div className="form-actions">
-          <button type="button" disabled={busy || text === null || mergeOff} onClick={() => void restore()}>
+          <button type="button" disabled={busy || chosen === null || mergeOff} onClick={() => void restore()}>
             Merge
           </button>
         </div>
@@ -198,7 +207,7 @@ export function BackupPage({ today }: { today: ISODate }) {
             I understand replace removes what is here now
           </label>
           <div className="form-actions">
-            <button type="button" disabled={busy || text === null || !confirmed} onClick={() => void restore()}>
+            <button type="button" disabled={busy || chosen === null || !confirmed} onClick={() => void restore()}>
               Replace
             </button>
           </div>

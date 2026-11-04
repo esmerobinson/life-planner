@@ -39,8 +39,10 @@ describe("journal.css", () => {
     expect(code).toMatch(/\.journal-answer\.exercise-response \{[^}]*font-size: max\(16px, 1em\)/);
   });
 
-  it("Journal v2 tabs: the mockup's big pills (16px, 12px 18px, --row; selected mint and bold), scrolling sideways when narrow", () => {
-    expect(code).toMatch(/\.journal-tabs \{[^}]*overflow-x: auto/);
+  it("Journal v2 tabs: the mockup's big pills (16px, 12px 18px, --row; selected mint and bold); never scrolling sideways, stacked when narrow", () => {
+    expect(code).not.toMatch(/\.journal-tabs \{[^}]*overflow-x: auto/);
+    expect(code).toMatch(/\.journal-tabs\.is-stacked \{[^}]*flex-direction: column/);
+    expect(code).toMatch(/\.journal-tabs\.is-stacked a\.journal-tab \{[^}]*white-space: normal/);
     expect(code).toMatch(/a\.journal-tab \{[^}]*border-radius: 14px;[^}]*padding: 12px 18px;[^}]*background: var\(--row\);[^}]*font-size: 16px/);
     expect(code).toMatch(/a\.journal-tab\.is-selected \{[^}]*background: var\(--mint\);[^}]*font-weight: 700/);
     expect(code).toMatch(/\.journal-tab \.tick-auto,[^{]*\{[^}]*width: 18px;[^}]*height: 18px;[^}]*border-radius: 6px/);
@@ -56,6 +58,15 @@ describe("journal.css", () => {
     expect(streak).toMatch(/\.streak-day\.on \{[^}]*background: var\(--bar-fill\)/);
     expect(streak).toMatch(/\.journal-row \.streak-day:not\(\.on\)[^{]*\{[^}]*background: var\(--panel\)/);
     expect(streak).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  });
+
+  it("workbook bars and chapter map: the approved mockup's values (2A + 2C)", () => {
+    expect(code).toMatch(/\.wb-bars \{[^}]*flex-direction: column;[^}]*gap: 12px/);
+    expect(code).toMatch(/button\.wb-bar \{[^}]*gap: 6px;[^}]*padding: 0;[^}]*background: none/);
+    expect(code).toMatch(/\.wb-ch \{[^}]*background: var\(--row\);[^}]*border-radius: var\(--radius-tile\);[^}]*padding: 10px 12px/);
+    expect(code).toMatch(/button\.wb-dot \{[^}]*width: 9px;[^}]*height: 9px;[^}]*border-radius: 50%;[^}]*background: var\(--track\)/);
+    expect(code).toMatch(/button\.wb-dot\.on \{[^}]*background: var\(--bar-fill\)/);
+    expect(code).toMatch(/button\.wb-dot\.now \{[^}]*outline: 2px solid var\(--journal-violet\);[^}]*outline-offset: 1px/);
   });
 
   it("exercise cards: the Day chip is the Journal violet; the star is drawn in --text on no background", () => {

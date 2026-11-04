@@ -4,7 +4,7 @@ import { db, HubDB } from "./db";
 import { exportBackup, INVALID_BACKUP, parseBackup, restoreBackup } from "./backup";
 import {
   addMorningPhoto, CANT_OPEN, currentStep, ensureCheckinSet, finishMorningPage, listCheckinDays, listMorningDone,
-  listReadBack, morningOpensOn, NOT_CONFIRMED, openJournalPhoto, readCheckinDay, readMorningDay, readMorningPage,
+  listReadBack, morningOpensOn, moveAnswerOn, NOT_CONFIRMED, openJournalPhoto, readCheckinDay, readMorningDay, readMorningPage,
   readPromptSettings, saveAnswer, saveMorningDraft, savePromptSettings, getFile,
 } from "./repo";
 import { journalId, validFile, validJournal } from "./validate";
@@ -219,6 +219,30 @@ describe("check-in (a set row plus one row per answer)", () => {
     await saveAnswer(jk, DAY, "M1", ME, "Pretend mac edit", true); // she edits on the Mac
     expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend mac edit" });
     expect(await db.journal.where("kind").equals("answer").count()).toBe(2);
+  });
+
+  it("moving on with nothing new typed keeps this device's own saved answer (never blanks it)", async () => {
+    await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
+    await saveAnswer(jk, DAY, "M1", ME, "Pretend autosaved words", false); // autosave, then she comes back later
+    await moveAnswerOn(jk, DAY, "M1", ME);
+    expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend autosaved words", done: true });
+  });
+
+  it("moving on with nothing typed here never copies another device's answer into this device's row", async () => {
+    await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
+    await saveAnswer(jk, DAY, "M1", "device-phone-01", "Pretend phone answer", false);
+    await moveAnswerOn(jk, DAY, "M1", ME); // the Mac moves on without typing
+    const rows = await db.journal.where("kind").equals("answer").toArray();
+    const mine = rows.find((r) => r.id.endsWith(`:${ME}`))!;
+    const o = await openJson(jk.key, mine, journalAad(mine.id));
+    expect(o).toMatchObject({ answer: null, done: true });
+    expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: "Pretend phone answer", done: true });
+  });
+
+  it("moving on with nothing typed anywhere just marks it moved past", async () => {
+    await ensureCheckinSet(jk, DAY, ["M1", "D3", "K2"]);
+    await moveAnswerOn(jk, DAY, "M1", ME);
+    expect((await readCheckinDay(jk, DAY)).answers.get("M1")).toMatchObject({ answer: null, done: true });
   });
 
   it("answers to prompts outside the set (another device's set) are kept and shown after it", async () => {

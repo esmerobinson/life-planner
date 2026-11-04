@@ -22,7 +22,7 @@ import {
   type JournalKey,
 } from "../journal/crypto";
 import {
-  ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type PartAnswer,
+  ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type NoteEntry, type PartAnswer,
 } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import {
@@ -74,6 +74,15 @@ async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: FileRow
 }
 
 const rowsOn = (date: ISODate) => db.journal.where("date").equals(date).toArray();
+
+/**
+ * A row already here under this id that this key can't open (another key's, or damaged).
+ * Such a row is never written over (bug #20): the write skips it or refuses.
+ */
+async function wontOpen<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey, id: string, kind: K): Promise<boolean> {
+  const row = await db.journal.get(id);
+  return !!row && (await openRow(jk, row, kind)).state !== "ok";
+}
 const suffixOf = (row: JournalRow) => row.id.slice(`${row.kind}:${row.date}:`.length);
 
 // ---- morning pages -----------------------------------------------------------------------
@@ -121,6 +130,21 @@ export async function readMorningDay(jk: JournalKey, date: ISODate, deviceId: st
 }
 
 /**
+ * This device's newest unfinished morning page before `before` (a draft with words that "I'm
+ * done" never emptied), or null. Never hidden however old (bug #6): the page offers it back.
+ */
+export async function latestMorningDraft(jk: JournalKey, before: ISODate, deviceId: string): Promise<{ date: ISODate; text: string } | null> {
+  const rows = await db.journal.where("kind").anyOf("draft", "morning").toArray();
+  const dates = [...new Set(rows.filter((r) => r.date < before && (r.kind === "morning" || suffixOf(r) === deviceId)).map((r) => r.date))];
+  dates.sort((a, b) => b.localeCompare(a));
+  for (const date of dates) {
+    const day = await readMorningDay(jk, date, deviceId);
+    if (day.draft.trim() !== "") return { date, text: day.draft };
+  }
+  return null;
+}
+
+/**
  * The days with a morning page or photo (for the star calendar and the streak). Page and
  * photo rows count by their clear kind and date, readable here or not: a star means she did
  * it. Only rows of the earlier one-row-per-day shape are opened (to see if they were done).
@@ -148,6 +172,7 @@ export async function listJournalledDays(): Promise<Set<ISODate>> {
 
 /** Autosaves this device's draft for the day (sealed). Only this device writes it. */
 export async function saveMorningDraft(jk: JournalKey, date: ISODate, deviceId: string, text: string): Promise<void> {
+  if (await wontOpen(jk, journalId("draft", date, deviceId), "draft")) throw new Error(CANT_OPEN); // never written over
   await write(jk, [await seal(jk, "draft", date, deviceId, { v: 1, text })]);
 }
 
@@ -158,8 +183,10 @@ export async function saveMorningDraft(jk: JournalKey, date: ISODate, deviceId: 
 export async function finishMorningPage(jk: JournalKey, date: ISODate, deviceId: string, text: string): Promise<string> {
   const pageId = crypto.randomUUID();
   const page = await seal(jk, "page", date, pageId, { v: 1, text, at: Date.now() });
-  const draft = await seal(jk, "draft", date, deviceId, { v: 1, text: "" });
-  await write(jk, [page, draft]);
+  // A draft row this key can't open is kept as it is (bug #20); the page is still saved.
+  const keep = await wontOpen(jk, journalId("draft", date, deviceId), "draft");
+  const draft = keep ? [] : [await seal(jk, "draft", date, deviceId, { v: 1, text: "" })];
+  await write(jk, [page, ...draft]);
   return page.id;
 }
 
@@ -245,17 +272,24 @@ export interface CheckinAnswer {
   answer: string | null;
   done: boolean;
   at: number;
+  /** Cleared on purpose with Edit (bug #30). */
+  cleared?: boolean;
 }
 
+/**
+ * The day's answer to a question from every device's rows: the newest answer with words, or
+ * the newest she cleared on purpose (Edit, bug #30). A skipped or empty one never erases
+ * another device's words.
+ */
 function mergeAnswer(prev: CheckinAnswer | undefined, next: CheckinAnswer): CheckinAnswer {
   if (!prev) return next;
+  const counts = (x: CheckinAnswer) => x.answer !== null || x.cleared === true;
   const pick = (a: CheckinAnswer, b: CheckinAnswer) => {
-    if (a.answer === null) return b.answer === null ? (a.at >= b.at ? a : b) : b;
-    if (b.answer === null) return a;
+    if (counts(a) !== counts(b)) return counts(a) ? a : b;
     return a.at >= b.at ? a : b;
   };
   const best = pick(prev, next);
-  return { answer: best.answer, done: prev.done || next.done, at: Math.max(prev.at, next.at) };
+  return { answer: best.answer, done: prev.done || next.done, at: Math.max(prev.at, next.at), ...(best.cleared ? { cleared: true } : {}) };
 }
 
 export interface CheckinDay {
@@ -284,7 +318,7 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
       const o = await openRow(jk, row, "answer");
       if (o.state === "ok") {
         const e = o.entry;
-        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), { answer: e.answer, done: e.done, at: e.at }));
+        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), { answer: e.answer, done: e.done, at: e.at, ...(e.cleared ? { cleared: true } : {}) }));
       } else unreadable++;
     } else if (row.kind === "checkin") {
       const o = await openRow(jk, row, "checkin");
@@ -305,6 +339,14 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
     .sort((a, b) => a[1].at - b[1].at)
     .map(([p]) => p);
   return { date, prompts: [...base, ...extra], hasSet: set !== null || legacy !== null, answers, unreadable };
+}
+
+/**
+ * The questions she wrote an answer to that day, in order. Skipped ones (and ones never
+ * reached) aren't kept for looking back at (Esme, 2026-11-04); they go back into circulation.
+ */
+export function answeredPrompts(day: CheckinDay): string[] {
+  return day.prompts.filter((p) => (day.answers.get(p)?.answer ?? "").trim() !== "");
 }
 
 /** The first question not yet moved past (Next / Skip), or -1 once every one is. */
@@ -334,9 +376,64 @@ export async function saveAnswer(
   deviceId: string,
   answer: string | null,
   done: boolean,
+  /**
+   * A finished check-in's Edit: `session` writes this Edit's own new row
+   * (`<promptKey>:<deviceId>-e<session>`), never over an earlier one (bug #24), and an emptied
+   * answer is saved as cleared on purpose (bug #30).
+   */
+  edit?: { session: string; seenAt?: number },
 ): Promise<void> {
-  const entry: AnswerEntry = { v: 1, prompt, answer: answer && answer.trim() ? answer : null, done, at: Date.now() };
-  await write(jk, [await seal(jk, "answer", date, `${await promptKey(jk, prompt)}:${deviceId}`, entry)]);
+  const text = answer && answer.trim() ? answer : null;
+  const pk = await promptKey(jk, prompt);
+  // An Edit is always newer than the answer she had in front of her (`seenAt`; without it, every
+  // answer here now), whatever this device's clock says (bug #32: a phone's clock ahead never
+  // wins over her change here). Words that arrive from elsewhere while she edits can still be newer.
+  const before = edit ? (edit.seenAt !== undefined ? [edit.seenAt] : (await answersTo(jk, date, pk)).map((e) => e.at)) : [];
+  const at = Math.max(Date.now(), ...before.map((t) => t + 1));
+  const entry: AnswerEntry = { v: 1, prompt, answer: text, done, at, ...(edit && text === null ? { cleared: true as const } : {}) };
+  const suffix = edit ? `${pk}:${deviceId}-e${edit.session}` : await ownAnswerSuffix(jk, date, prompt, deviceId);
+  await write(jk, [await seal(jk, "answer", date, suffix, entry)]);
+}
+
+/** Every answer row to one question on a day (any device) that opens here. */
+async function answersTo(jk: JournalKey, date: ISODate, pk: string): Promise<AnswerEntry[]> {
+  const prefix = `answer:${date}:${pk}:`;
+  const out: AnswerEntry[] = [];
+  for (const row of (await rowsOn(date)).filter((r) => r.kind === "answer" && r.id.startsWith(prefix))) {
+    const o = await openRow(jk, row, "answer");
+    if (o.state === "ok") out.push(o.entry);
+  }
+  return out;
+}
+
+/**
+ * This device's answer row for a question: `<promptKey>:<deviceId>`, or, when that row is here
+ * and won't open (damaged), `<promptKey>:<deviceId>-2` beside it: the row that won't open is
+ * never written over (bug #20, re-review m4), and she can still answer and move on.
+ */
+async function ownAnswerSuffix(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<string> {
+  const pk = await promptKey(jk, prompt);
+  for (const device of [deviceId, `${deviceId}-2`]) {
+    if (!(await wontOpen(jk, journalId("answer", date, `${pk}:${device}`), "answer"))) return `${pk}:${device}`;
+  }
+  throw new Error(CANT_OPEN);
+}
+
+/**
+ * Next / Skip on a box with nothing new typed: marks this device's row moved past and keeps
+ * whatever answer that row already holds (typed here earlier), with the time it was typed.
+ * Never copies another device's answer, never blanks this device's own one, and never makes
+ * its words look newer than they are.
+ */
+export async function moveAnswerOn(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<void> {
+  const suffix = await ownAnswerSuffix(jk, date, prompt, deviceId);
+  const own = await db.journal.get(journalId("answer", date, suffix));
+  if (!own) return saveAnswer(jk, date, prompt, deviceId, null, true); // nothing here: an empty answer never wins
+  const o = await openRow(jk, own, "answer");
+  if (o.state !== "ok") throw new Error("That answer could not be read, so it was left as it is.");
+  // Only "moved past" changes: the words keep the time they were written, so they never look
+  // newer than an answer (or a clear) made since on another device (bug #33).
+  await write(jk, [await seal(jk, "answer", date, suffix, { ...o.entry, done: true })]);
 }
 
 /** Every day with a check-in, newest first. */
@@ -357,6 +454,7 @@ export async function readPromptSettings(jk: JournalKey): Promise<string[] | nul
 }
 
 export async function savePromptSettings(jk: JournalKey, active: string[], today: ISODate): Promise<void> {
+  if (await wontOpen(jk, "settings", "settings")) throw new Error(CANT_OPEN); // never written over (bug #20)
   await write(jk, [await seal(jk, "settings", today, undefined, { v: 1, active: [...new Set(active)] })]);
 }
 
@@ -606,6 +704,8 @@ export interface ResponseVersion {
   at: number;
   /** Exactly what was submitted (not a draft typed after). */
   submitted: boolean;
+  /** Submitted before the one shown, which is her edit of it (review I4: "Earlier version"). */
+  earlier?: boolean;
 }
 
 const ENTRY_PREFIX = "exercise-entry:";
@@ -625,6 +725,19 @@ async function entryRowId(jk: JournalKey, date: ISODate, card: ExerciseCardRef, 
 const DRAFT_SUFFIX = "-draft";
 const draftRowId = (jk: JournalKey, date: ISODate, card: ExerciseCardRef, deviceId: string) =>
   entryRowId(jk, date, card, `${deviceId}${DRAFT_SUFFIX}`);
+/**
+ * An edit of a submitted answer (review I4) is a NEW submitted row (`…:<deviceId>-e<time>`), so
+ * the one it replaces stays, shown as "Earlier version". Earlier code groups it with the rest.
+ */
+const EDIT_ROW = /-e[0-9a-z]+$/;
+/** The device a submitted row came from (an edit row's own suffix taken off). */
+const baseDevice = (e: ExerciseResponseEntry) => (e.edit ? deviceOf(e).replace(EDIT_ROW, "") : deviceOf(e));
+/** Each opened response's row id (to tell this device's draft and an edit apart). */
+const rowOf = new WeakMap<ExerciseResponseEntry, string>();
+const deviceOf = (e: ExerciseResponseEntry) => {
+  const id = rowOf.get(e) ?? "";
+  return id.slice(id.lastIndexOf(":") + 1);
+};
 
 export type { PartAnswer };
 
@@ -730,19 +843,30 @@ const contentKey = (r: ExerciseResponseEntry) => JSON.stringify([r.text, partsOf
  *   typed last; "Saved" only while that is what was last submitted.
  * Every other version with something written is in `others`: nothing is hidden.
  */
-function mergeResponses(date: ISODate, rows: ExerciseResponseEntry[], mode: "read" | "edit" = "read"): ExerciseResponse | null {
+function mergeResponses(
+  date: ISODate, rows: ExerciseResponseEntry[], mode: "read" | "edit" = "read", deviceId?: string,
+): ExerciseResponse | null {
   if (rows.length === 0) return null;
   const newest = (list: ExerciseResponseEntry[]) => list.reduce((a, b) => (b.at > a.at ? b : a));
   const filled = rows.filter((r) => hasContent({ text: r.text, parts: partsOf(r) }));
   const sent = filled.filter(isSubmitted);
   const lastSent = sent.length ? newest(sent) : null;
-  const best = mode === "read" && lastSent ? lastSent : newest(filled.length ? filled : rows);
+  // The box (edit): this device's own draft when it is the newest row, even emptied (bug #19:
+  // she cleared her answer to rewrite it, and the old words must not come back).
+  const own = deviceId === undefined ? undefined : rows.find((r) => deviceOf(r) === `${deviceId}${DRAFT_SUFFIX}`);
+  const ownLast = mode === "edit" && own && newest(rows) === own ? own : null;
+  const best = ownLast ?? (mode === "read" && lastSent ? lastSent : newest(filled.length ? filled : rows));
+  // Her edit (flagged in the sealed entry, never guessed from a device id: re-review m1).
+  const edited = best.edit === true && isSubmitted(best);
   const seen = new Set([contentKey(best)]);
   const others: ResponseVersion[] = [];
   for (const r of [...filled].sort((a, b) => b.at - a.at)) {
     if (seen.has(contentKey(r))) continue;
     seen.add(contentKey(r));
-    others.push({ text: r.text, parts: partsOf(r), at: r.at, submitted: isSubmitted(r) });
+    // "Earlier version" is only this device's own answer that the edit changed; another
+    // device's stays "Also submitted" (re-review m1).
+    const earlier = edited && isSubmitted(r) && r.at < best.at && baseDevice(r) === baseDevice(best);
+    others.push({ text: r.text, parts: partsOf(r), at: r.at, submitted: isSubmitted(r), ...(earlier ? { earlier } : {}) });
   }
   return {
     date, id: best.v === 2 ? best.id : legacyCardId(best.day), day: best.day, theme: best.theme, text: best.text,
@@ -764,6 +888,7 @@ async function openResponses(jk: JournalKey, rows: JournalRow[]) {
       unreadable++;
       continue;
     }
+    rowOf.set(o.entry, row.id);
     const group = row.id.slice(0, row.id.lastIndexOf(":"));
     const g = groups.get(group) ?? { date: row.date, entries: [] };
     g.entries.push(o.entry);
@@ -772,15 +897,19 @@ async function openResponses(jk: JournalKey, rows: JournalRow[]) {
   return { groups: [...groups.values()], unreadable };
 }
 
-/** A day's response to one card, from every device's row. */
+/**
+ * A day's response to one card, from every device's row, as the box opens it. With `deviceId`,
+ * this device's own draft shows when it is the newest row, even emptied.
+ */
 export async function readExerciseEntry(
   jk: JournalKey,
   date: ISODate,
   card: ExerciseCardRef,
+  deviceId?: string,
 ): Promise<{ entry: ExerciseResponse | null; unreadable: number }> {
   const prefix = `${ENTRY_PREFIX}${date}:${await cardKey(jk, card)}:`;
   const { groups, unreadable } = await openResponses(jk, (await rowsOn(date)).filter((r) => r.id.startsWith(prefix)));
-  return { entry: groups[0] ? mergeResponses(date, groups[0].entries, "edit") : null, unreadable };
+  return { entry: groups[0] ? mergeResponses(date, groups[0].entries, "edit", deviceId) : null, unreadable };
 }
 
 /** This device's own response row for the card, opened (never written over if it won't open). */
@@ -802,11 +931,30 @@ export async function saveExerciseDraft(
   deviceId: string,
   card: ExerciseCardRef,
   value: ResponseValue,
+  /** The earlier day her words in the box came from (bug #9): once they're kept here, that day's draft is emptied. */
+  carriedFrom?: ISODate,
 ): Promise<void> {
   const id = await draftRowId(jk, date, card, deviceId);
   const prev = await ownResponse(jk, id);
   const entry = responseEntry(card, value, null, Date.now(), prev);
-  await write(jk, [await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), entry)]);
+  const row = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), entry);
+  await write(jk, [row, ...(await carriedDraftEmptied(jk, card, deviceId, value, carriedFrom))]);
+}
+
+/**
+ * A draft carried into today's box from an earlier day (bug #9: an unsent answer stays in the
+ * box until she submits or clears it), emptied once her words are in today's row, so Read back
+ * doesn't list the card twice. Only this device's own row, and only while today's has words.
+ */
+async function carriedDraftEmptied(
+  jk: JournalKey, card: ExerciseCardRef, deviceId: string, value: ResponseValue, from: ISODate | undefined,
+): Promise<JournalRow[]> {
+  if (!from || !hasContent(typeof value === "string" ? { text: value } : { text: "", parts: value })) return [];
+  const id = await draftRowId(jk, from, card, deviceId);
+  const prev = await ownResponse(jk, id).catch(() => null); // one that won't open is never written over
+  if (!prev || !hasContent({ text: prev.text, parts: partsOf(prev) })) return [];
+  const empty = responseEntry(card, typeof value === "string" ? "" : [], null, Date.now());
+  return [await seal(jk, "exercise-entry", from, id.slice(`${ENTRY_PREFIX}${from}:`.length), empty)];
 }
 
 /**
@@ -821,17 +969,44 @@ export async function submitExerciseEntry(
   card: ExerciseCardRef,
   value: ResponseValue,
   todayId: string = card.id,
+  carriedFrom?: ISODate,
 ): Promise<void> {
   if (!responseComplete(value)) throw new Error("There is nothing to submit yet.");
   const id = await entryRowId(jk, date, card, deviceId);
   const prev = await ownResponse(jk, id);
+  const carried = await carriedDraftEmptied(jk, card, deviceId, value, carriedFrom);
   await oneAtATime(async () => {
     const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, true);
     const at = Date.now();
     const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at, prev));
     const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
-    await write(jk, [response, mark]);
+    await write(jk, [response, mark, ...carried]);
   });
+}
+
+/**
+ * Saves a change to a submitted answer (review I4: "Edit" on today's answer): a NEW submitted
+ * row, so the answer it changes stays, shown under it as "Earlier version". The card stays done.
+ * What the answer held that the card no longer has a place for is kept, as on every save.
+ */
+export async function saveExerciseEdit(
+  jk: JournalKey,
+  date: ISODate,
+  deviceId: string,
+  card: ExerciseCardRef,
+  value: ResponseValue,
+): Promise<void> {
+  if (!responseComplete(value)) throw new Error("There is nothing to save yet.");
+  const prefix = `${ENTRY_PREFIX}${date}:${await cardKey(jk, card)}:`;
+  const { groups } = await openResponses(jk, (await rowsOn(date)).filter((r) => r.id.startsWith(prefix)));
+  const all = groups[0]?.entries ?? [];
+  const sent = all.filter(isSubmitted);
+  const prev = sent.length ? sent.reduce((a, b) => (b.at > a.at ? b : a)) : null;
+  // Always newer than every version it was made over, whatever this device's clock says.
+  const at = Math.max(Date.now(), ...all.map((e) => e.at + 1));
+  const id = await entryRowId(jk, date, card, `${deviceId}-e${at.toString(36)}`);
+  const entry = { ...responseEntry(card, value, at, at, prev), edit: true as const };
+  await write(jk, [await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), entry)]);
 }
 
 /**
@@ -885,12 +1060,13 @@ export async function readLatestExerciseEntry(jk: JournalKey, date: ISODate, car
 export async function listExerciseEntries(jk: JournalKey, before: ISODate): Promise<{ entries: ExerciseResponse[]; unreadable: number }> {
   const rows = (await db.journal.where("kind").equals("exercise-entry").toArray()).filter((r) => r.date < before);
   const { groups, unreadable } = await openResponses(jk, rows);
-  // One entry per card and day: the same card's rows under its earlier (day and theme) key and
-  // under its id, on one day, read as one (Esme, 2026-11-04: "theres repeats in the read back").
+  // One entry per card and day, by the card's full id (a version 1 row by its own day and theme,
+  // apart from every id'd card): never by day number alone, since two books each have a Day 1
+  // (Esme, 2026-11-04).
   const byCard = new Map<string, { date: ISODate; entries: ExerciseResponseEntry[] }>();
   for (const g of groups) {
     const e = g.entries[0]!;
-    const k = JSON.stringify([g.date, e.day ?? (e.v === 2 ? e.id : ""), e.theme]);
+    const k = JSON.stringify(e.v === 2 ? [g.date, "id", e.id] : [g.date, "v1", e.day, e.theme]);
     const have = byCard.get(k);
     if (have) have.entries.push(...g.entries);
     else byCard.set(k, { date: g.date, entries: [...g.entries] });
@@ -900,6 +1076,267 @@ export async function listExerciseEntries(jk: JournalKey, before: ISODate): Prom
     .filter(hasContent)
     .sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at);
   return { entries, unreadable };
+}
+
+// ---- notes to myself (journal v3) ----------------------------------------------------------
+//
+// A note is a group of rows `note:<date>:<nid>_<deviceId>_<vid>`, one row per VERSION (review
+// I1, R-I1): a save always writes a new row, so no device ever writes over anything, not even its
+// own earlier words. The note's id is `note:<date>:<nid>` (the day it was first written and a
+// random key). Each version has its own random id and names the version she was changing
+// (`seen`), so it replaces that one only: never by clocks, which differ between devices, and
+// never another version she didn't have open. The view shows the newest, and every version not
+// replaced as "another version", each of which she can change or let go of on its own.
+// Her note while she writes it is that device's draft row, `…_<deviceId>_draft` (review I2).
+
+const NOTE_DRAFT = "_draft";
+
+/** One version of a note (one row). */
+export interface NoteVersion {
+  /** This version's id: what changing or deleting it replaces. */
+  vid: string;
+  prompt: string | null;
+  thought: string;
+  steady: string;
+  memory: string;
+  skill: string;
+  at: number;
+}
+
+/** One note as the page sees it (`id` is the note's id, not a row's). Always readable: no lock applies. */
+export interface Note extends NoteVersion {
+  id: string;
+  /** The day it was first written (in its id). */
+  date: ISODate;
+  createdAt: number;
+  /** The version shown (by id): what an edit of it opened now replaces (never the others). */
+  seen: string[];
+  /** Other versions with different words, written without seeing this one (newest first). */
+  others: NoteVersion[];
+}
+
+/** This device's note in progress (an edit, or a new note not saved yet). */
+export interface NoteDraft {
+  id: string;
+  date: ISODate;
+  fields: NoteFields;
+  /** The versions she started from (none: a new note). */
+  seen: string[];
+  at: number;
+}
+
+/** What she typed for a note. */
+export type NoteFields = Pick<Note, "prompt" | "thought" | "steady" | "memory" | "skill">;
+
+/** A new note's id (`note:<today>:<16 hex>`), made when she starts it so its draft has a home. */
+export function newNoteId(today: ISODate): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return journalId("note", today, [...bytes].map((b) => b.toString(16).padStart(2, "0")).join(""));
+}
+
+/**
+ * A note row's note id, device and whether it is a draft: `<nid>_<deviceId>_<vid>` (a version),
+ * `<nid>_<deviceId>_draft`, or `<nid>_<deviceId>` (round 1's one row per device). An earlier
+ * single-row note is its own note.
+ */
+function noteRowParts(row: JournalRow): { id: string; device: string; draft: boolean } {
+  const [nid, device, tail] = suffixOf(row).split("_");
+  if (device === undefined) return { id: row.id, device: "", draft: false };
+  return { id: `note:${row.date}:${nid}`, device, draft: `_${tail}` === NOTE_DRAFT };
+}
+const noteRowId = (id: string, deviceId: string, draft = false) => `${id}_${deviceId}${draft ? NOTE_DRAFT : ""}`;
+/** A version's own row: never written again (the vid is 8 hex here, so the id fits SUFFIX). */
+const versionRowId = (id: string, deviceId: string, vid: string) => `${id}_${deviceId}_${vid}`;
+const noteDate = (id: string) => id.slice("note:".length, "note:".length + 10);
+const filled = (f: Pick<NoteFields, "thought" | "steady" | "memory" | "skill">) =>
+  [f.thought, f.steady, f.memory, f.skill].some((x) => x.trim() !== "");
+const noteKey = (v: NoteVersion) => JSON.stringify([v.prompt, v.thought, v.steady, v.memory, v.skill]);
+/** A version's id (the earliest notes had none: their row and time stand in). */
+const vidOf = (rowId: string, e: NoteEntry) => e.vid ?? `${rowId}@${e.at}`;
+const newVid = () => [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, "0")).join("");
+const versionOf = (e: NoteEntry, vid: string): NoteVersion => ({ vid, prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill, at: e.at });
+
+/**
+ * Every note (deleted ones left out), oldest first, how many rows wouldn't open here, and this
+ * device's notes in progress. A note's versions merge: those no later version was written over
+ * are its heads; the newest head with words shows, the others with different words under it.
+ * It is gone only when every head is a delete (a delete never takes words it didn't see).
+ */
+export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ notes: Note[]; unreadable: number; drafts: NoteDraft[] }> {
+  const groups = new Map<string, { date: ISODate; versions: { e: NoteEntry; vid: string }[] }>();
+  const drafts: NoteDraft[] = [];
+  let unreadable = 0;
+  for (const row of await db.journal.where("kind").equals("note").toArray()) {
+    const o = await openRow(jk, row, "note");
+    if (o.state !== "ok") {
+      unreadable++;
+      continue;
+    }
+    const part = noteRowParts(row);
+    const e = o.entry;
+    if (part.draft) {
+      if (part.device === deviceId && filled(e)) {
+        drafts.push({ id: part.id, date: row.date, fields: { prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill }, seen: e.seen ?? [], at: e.at });
+      }
+      continue;
+    }
+    const g = groups.get(part.id) ?? { date: row.date, versions: [] };
+    g.versions.push({ e, vid: vidOf(row.id, e) });
+    groups.set(part.id, g);
+  }
+  const notes: Note[] = [];
+  for (const [id, { date, versions }] of groups) {
+    const heads = versions.filter((v) => !versions.some((w) => w !== v && (w.e.seen ?? []).includes(v.vid)));
+    const live = heads.filter((v) => !v.e.deleted).sort((a, b) => b.e.at - a.e.at);
+    if (live.length === 0) continue;
+    const shown = versionOf(live[0]!.e, live[0]!.vid);
+    const seen = new Set([noteKey(shown)]);
+    const others: NoteVersion[] = [];
+    for (const v of live.slice(1).map((h) => versionOf(h.e, h.vid))) {
+      if (seen.has(noteKey(v))) continue;
+      seen.add(noteKey(v));
+      others.push(v);
+    }
+    notes.push({
+      ...shown, id, date, others,
+      createdAt: Math.min(...versions.map((v) => v.e.createdAt)),
+      seen: [shown.vid],
+    });
+  }
+  notes.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  drafts.sort((a, b) => b.at - a.at);
+  return { notes, unreadable, drafts };
+}
+
+/** A note's rows here, opened. This device's draft row that won't open is never written over. */
+async function noteRows(jk: JournalKey, id: string, deviceId: string) {
+  const rows = (await db.journal.where("date").equals(noteDate(id)).toArray()).filter(
+    (r) => r.kind === "note" && (r.id === id || r.id.startsWith(`${id}_`)),
+  );
+  const versions: NoteEntry[] = [];
+  for (const row of rows) {
+    const o = await openRow(jk, row, "note");
+    const part = noteRowParts(row);
+    if (o.state !== "ok") {
+      if (part.draft && part.device === deviceId) throw new Error(CANT_OPEN);
+      continue;
+    }
+    if (!part.draft) versions.push(o.entry);
+  }
+  const draft = rows.find((r) => r.id === noteRowId(id, deviceId, true));
+  return { versions, hasDraft: draft !== undefined };
+}
+
+/** This device's draft row for a note, emptied (only when there is one). */
+async function clearedNoteDraft(jk: JournalKey, id: string, deviceId: string, hasDraft: boolean): Promise<JournalRow[]> {
+  if (!hasDraft) return [];
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: 0, at: Date.now(), draft: true };
+  return [await seal(jk, "note", noteDate(id), noteRowId(id, deviceId, true).slice(`note:${noteDate(id)}:`.length), empty)];
+}
+
+/**
+ * Saves a note: this device's version of it (a new note with `id` from newNoteId, or one she
+ * edited), written over `seen` (the versions she had in front of her; none for a new note),
+ * and this device's draft of it emptied, in one transaction. The thought and her answer must
+ * have words.
+ */
+export async function saveNote(
+  jk: JournalKey, today: ISODate, deviceId: string, fields: NoteFields, opts: { id?: string; seen?: string[] } = {},
+): Promise<string> {
+  if (!fields.thought.trim() || !fields.steady.trim()) throw new Error("A note needs the thought and your answer.");
+  const id = opts.id ?? newNoteId(today);
+  const { versions, hasDraft } = await noteRows(jk, id, deviceId);
+  const at = Date.now();
+  const vid = newVid();
+  const entry = {
+    v: 1, prompt: fields.prompt, thought: fields.thought, steady: fields.steady, memory: fields.memory, skill: fields.skill,
+    createdAt: versions.length ? Math.min(...versions.map((v) => v.createdAt)) : at, at, vid, seen: opts.seen ?? [],
+  };
+  const date = noteDate(id);
+  const row = await seal(jk, "note", date, versionRowId(id, deviceId, vid).slice(`note:${date}:`.length), entry);
+  await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft))]);
+  return id;
+}
+
+/** Autosaves this device's note in progress (sealed). Only this device writes it. */
+export async function saveNoteDraft(jk: JournalKey, deviceId: string, id: string, fields: NoteFields, seen: string[]): Promise<void> {
+  await noteRows(jk, id, deviceId); // this device's rows that won't open stop it here
+  const date = noteDate(id);
+  const at = Date.now();
+  const entry = { v: 1, prompt: fields.prompt, thought: fields.thought, steady: fields.steady, memory: fields.memory, skill: fields.skill, createdAt: at, at, seen, draft: true };
+  await write(jk, [await seal(jk, "note", date, noteRowId(id, deviceId, true).slice(`note:${date}:`.length), entry)]);
+}
+
+/** Cancel: this device's note in progress is let go (its draft row emptied). */
+export async function clearNoteDraft(jk: JournalKey, deviceId: string, id: string): Promise<void> {
+  const { hasDraft } = await noteRows(jk, id, deviceId);
+  const rows = await clearedNoteDraft(jk, id, deviceId, hasDraft);
+  if (rows.length) await write(jk, rows);
+}
+
+/** Deletes the version(s) in `seen` (a new row saying so, nothing in it): any other version stays. */
+export async function deleteNote(jk: JournalKey, deviceId: string, id: string, seen: string[]): Promise<void> {
+  const { versions, hasDraft } = await noteRows(jk, id, deviceId);
+  if (versions.length === 0) throw new Error("That note isn't here.");
+  const at = Date.now();
+  const vid = newVid();
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: Math.min(...versions.map((v) => v.createdAt)), at, vid, seen, deleted: true };
+  const date = noteDate(id);
+  const row = await seal(jk, "note", date, versionRowId(id, deviceId, vid).slice(`note:${date}:`.length), empty);
+  await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft))]);
+}
+
+/** Which notes were read on which day, from every device's "I read this today" rows. */
+export interface NoteReads {
+  /** The notes read each day (any device). */
+  byDay: Map<ISODate, Set<string>>;
+  /** Each note's last day read (any device). */
+  lastRead: Map<string, ISODate>;
+  /** The notes read on a day (any device). */
+  readOn: (date: ISODate) => Set<string>;
+  /** The notes one device ticked on a day (its own tick box). */
+  ownOn: (date: ISODate, deviceId: string) => Set<string>;
+}
+
+export async function listNoteReads(jk: JournalKey): Promise<NoteReads> {
+  const byDay = new Map<ISODate, Set<string>>();
+  const lastRead = new Map<string, ISODate>();
+  const own = new Map<string, Set<string>>();
+  for (const row of await db.journal.where("kind").equals("note-read").toArray()) {
+    const o = await openRow(jk, row, "note-read");
+    if (o.state !== "ok") continue;
+    own.set(row.id, new Set(o.entry.ids));
+    const day = byDay.get(row.date) ?? new Set<string>();
+    for (const id of o.entry.ids) {
+      day.add(id);
+      if ((lastRead.get(id) ?? "") < row.date) lastRead.set(id, row.date);
+    }
+    byDay.set(row.date, day);
+  }
+  return {
+    byDay, lastRead, readOn: (date) => new Set(byDay.get(date) ?? []),
+    ownOn: (date, deviceId) => new Set(own.get(journalId("note-read", date, deviceId)) ?? []),
+  };
+}
+
+/** Ticks (or unticks) "I read this today" for a note, on this device's own row for the day. */
+export function setNoteRead(jk: JournalKey, today: ISODate, deviceId: string, noteId: string, on: boolean): Promise<void> {
+  // Read, changed and written one at a time (review M2: two quick ticks never lose one).
+  return oneAtATime(() => writeNoteRead(jk, today, deviceId, noteId, on));
+}
+
+async function writeNoteRead(jk: JournalKey, today: ISODate, deviceId: string, noteId: string, on: boolean): Promise<void> {
+  const id = journalId("note-read", today, deviceId);
+  const existing = await db.journal.get(id);
+  let ids: string[] = [];
+  if (existing) {
+    const o = await openRow(jk, existing, "note-read");
+    if (o.state !== "ok") throw new Error(CANT_OPEN); // never written over
+    ids = o.entry.ids;
+  }
+  ids = ids.filter((x) => x !== noteId);
+  if (on) ids.push(noteId);
+  await write(jk, [await seal(jk, "note-read", today, deviceId, { v: 1, ids, at: Date.now() })]);
 }
 
 /** Stars or un-stars a card (by id) in this device's own stars row (only this device writes it). */

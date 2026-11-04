@@ -133,7 +133,7 @@ describe("backup with pictures", () => {
 
   it("a damaged picture makes the whole file refused", async () => {
     const backup = { app: "life-hub", schema: 1, exportedOn: today, items: [item("x")], goals: [], files: [file("f", { mime: "x" })] };
-    await expect(restoreBackup(backup, "merge")).rejects.toThrow(INVALID_BACKUP);
+    await expect(restoreBackup(backup, "merge")).rejects.toThrow(INVALID_BACKUP); // damaged, not newer (re-review m5d)
     const dup = { app: "life-hub", schema: 1, exportedOn: today, items: [], goals: [], files: [file("f"), file("f")] };
     await expect(restoreBackup(dup, "merge")).rejects.toThrow(INVALID_BACKUP);
     expect(await db.items.count()).toBe(0);

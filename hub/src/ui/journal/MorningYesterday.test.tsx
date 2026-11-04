@@ -144,3 +144,22 @@ it("Back to today leaves the draft as it was and keeps what was typed in today's
   expect(screen.getByText(YESTERDAY_SAVED)).toBeInTheDocument();
   expect(screen.getByRole("button", OPEN)).toBeInTheDocument();
 });
+
+describe("an older unfinished page (bug #6: never hidden, however old)", () => {
+  it("two days ago: the line names its day; it opens and I'm done files it there; then the next older one shows", async () => {
+    const device = await getDeviceId(db);
+    await saveMorningDraft(jk, "2026-10-28", device, "Pretend oldest unfinished words");
+    await saveMorningDraft(jk, "2026-10-31", device, "Pretend Saturday unfinished words");
+    renderApp("/journal/morning", TODAY);
+    expect(await screen.findByText(/^Your unfinished page from .+ is saved\.$/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open that page" }));
+    expect(screen.getByText(/^Finishing the page from /)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Pretend Saturday unfinished words")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "I'm done" }));
+    await waitFor(async () => expect((await readMorningDay(jk, "2026-10-31", device)).pages).toBe(1));
+    // The one before it is still offered.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open that page" })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Open that page" }));
+    expect(screen.getByDisplayValue("Pretend oldest unfinished words")).toBeInTheDocument();
+  });
+});
