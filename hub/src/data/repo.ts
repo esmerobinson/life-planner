@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT, MAX_MONTH_GOALS, MAX_MONTH_LOG, MAX_MONTH_TARGET, MAX_MONTH_TITLE } from "./validate";
+import { newId } from "../domain/ids";
 import { pictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
 import { plannedFromLastMonth } from "../domain/goalCounts";
@@ -24,7 +25,7 @@ export async function createItem(
 ): Promise<Item> {
   const item: Item = {
     ...input,
-    id: crypto.randomUUID(),
+    id: newId(),
     status: "open",
     links: input.links ?? [],
     createdAt: today,
@@ -49,7 +50,7 @@ export async function createGoal(
   const { milestones = [], ...rest } = input;
   const goal: Goal = {
     ...rest,
-    id: crypto.randomUUID(),
+    id: newId(),
     milestones: [],
     createdAt: today,
   };
@@ -171,7 +172,7 @@ export async function itemToGoal(itemId: string, areaId: AreaId, today: ISODate)
     if (!item) throw new Error("that item does not exist");
     if (item.status !== "open") throw new Error("only an open item can become a goal");
     const goal: Goal = {
-      id: crypto.randomUUID(),
+      id: newId(),
       title: item.title,
       areaId: area,
       kind: "practice",
