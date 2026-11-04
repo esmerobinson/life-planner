@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../../data/db";
-import { importExerciseCards, saveExerciseMark } from "../../data/repo";
+import { cardRef, importExerciseCards, saveExerciseMark, submitExerciseEntry } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
 import { checkCardFile } from "../../journal/exercise";
 import { getDeviceId } from "../../sync/engine";
@@ -82,18 +82,20 @@ it("tapping a bar opens the chapter map on that book: a row per chapter, done/to
   const map = await screen.findByRole("dialog", { name: "Your workbooks" });
   expect(within(map).getByRole("button", { name: "DBT" })).toHaveAttribute("aria-pressed", "true");
   expect(within(map).getByRole("button", { name: "BPD" })).toHaveAttribute("aria-pressed", "false");
-  const rows = within(map).getAllByRole("listitem");
+  const chapters = () => within(within(map).getByRole("list", { name: /chapters$/ })).getAllByRole("listitem");
+  const rows = chapters();
   expect(rows.map((r) => r.querySelector(".wb-ch-title")?.textContent)).toEqual(["1 · Pretend hilltop", "2 · Pretend valley"]);
   expect(rows.map((r) => r.querySelector(".wb-ch-n")?.textContent)).toEqual(["1 / 1", "0 / 2"]);
-  const dots = within(rows[1]!).getAllByRole("button");
+  const dots = [...rows[1]!.querySelectorAll("button.wb-dot")];
   expect(dots.map((d) => d.getAttribute("aria-label"))).toEqual([
     "Card 2 · Pretend second-book two · up next", "Card 3 · Pretend second-book three",
   ]);
   expect(dots[0]).toHaveClass("wb-dot", "now");
-  expect(within(rows[0]!).getByRole("button")).toHaveClass("wb-dot", "on");
-  // The other book.
+  expect(rows[0]!.querySelector("button.wb-dot")).toHaveClass("wb-dot", "on");
+  // The other book (with its optional reading first).
   await userEvent.click(within(map).getByRole("button", { name: "BPD" }));
-  expect(within(map).getAllByRole("listitem").map((r) => r.querySelector(".wb-ch-n")?.textContent)).toEqual(["1 / 2", "0 / 2"]);
+  expect(chapters().map((r) => r.querySelector(".wb-ch-n")?.textContent)).toEqual(["1 / 2", "0 / 2"]);
+  expect(within(within(map).getByRole("list", { name: "Optional reading" })).getByRole("button", { name: "Pretend introduction (optional reading)" })).toBeInTheDocument();
   // Done closes it; focus goes back.
   await userEvent.click(within(map).getByRole("button", { name: "Done" }));
   expect(screen.queryByRole("dialog")).toBeNull();
@@ -111,27 +113,41 @@ it("Chapter map opens it too; Escape closes it", async () => {
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-it("tapping a done card's dot opens what she wrote; a dot not done opens the card to read", async () => {
+it("a chapter opens to its cards; a card opens in the pop-up (what she wrote if done), with a way back", async () => {
   await confirmedDevice(db, jk);
   await importExerciseCards(jk, BOOKS, "2026-10-01");
-  await someDone();
+  const me = await getDeviceId(db);
+  await submitExerciseEntry(jk, "2026-11-02", me, cardRef(BOOKS.cards.find((c) => c.id === "b-001")!), "Pretend meadow answer");
   renderApp("/journal/exercise", TODAY);
   const s = await section();
-  await userEvent.click(await within(s).findByRole("button", { name: /^BPD workbook/ }));
-  let map = await screen.findByRole("dialog", { name: "Your workbooks" });
-  await userEvent.click(within(map).getByRole("button", { name: "Day 1 · Pretend first-book one · done" }));
-  expect(screen.queryByRole("dialog")).toBeNull();
-  const all = within(s).getByText("All cards", { selector: "summary" }).closest("details")!;
-  await waitFor(() => expect(all).toHaveAttribute("open"));
-  const opened = await waitFor(() => {
-    const d = [...all.querySelectorAll("details")].find((x) => x.open);
-    expect(d).toBeTruthy();
-    return d!;
-  });
-  expect(within(opened).getByText("Day 1 · Pretend first-book one")).toBeInTheDocument();
-
-  await userEvent.click(within(s).getByRole("button", { name: "Chapter map" }));
-  map = await screen.findByRole("dialog", { name: "Your workbooks" });
+  await userEvent.click(await within(s).findByRole("button", { name: "See all chapters" }));
+  const map = await screen.findByRole("dialog", { name: "Your workbooks" });
+  const toggle = within(map).getByRole("button", { name: "1 · Pretend meadow" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(within(map).queryByRole("list", { name: "Chapter 1 cards" })).toBeNull();
+  await userEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const cards = within(within(map).getByRole("list", { name: "Chapter 1 cards" })).getAllByRole("button");
+  expect(cards.map((c) => c.textContent)).toEqual(["Day 1 · Pretend first-book one ✓", "Day 2 · Pretend first-book two"]);
+  await userEvent.click(cards[0]!);
+  expect(within(map).getByText("Pretend first-book one")).toBeInTheDocument();
+  expect(within(within(map).getByRole("list", { name: "Your responses" })).getByText("Pretend meadow answer")).toBeInTheDocument();
+  await userEvent.click(within(map).getByRole("button", { name: "← All chapters" }));
+  // A dot not done opens the card to read.
   await userEvent.click(within(map).getByRole("button", { name: "Day 4 · Pretend first-book four" }));
-  await waitFor(() => expect([...all.querySelectorAll("details")].find((x) => x.open && x.textContent?.includes("Pretend first-book four"))).toBeTruthy());
+  expect(within(map).getByText("A made-up note for Pretend first-book four.")).toBeInTheDocument();
+  expect(within(map).queryByRole("list", { name: "Your responses" })).toBeNull();
+});
+
+it("See what you wrote (after a Submit) opens that card's review in the pop-up", async () => {
+  await confirmedDevice(db, jk);
+  await importExerciseCards(jk, BOOKS, "2026-10-01");
+  renderApp("/journal/exercise", TODAY);
+  const s = await section();
+  const today = await within(s).findByRole("article", { name: "Today's card" });
+  await userEvent.type(await within(today).findByRole("textbox", { name: "Your response" }), "Pretend first answer");
+  await userEvent.click(within(today).getByRole("button", { name: "Submit" }));
+  await userEvent.click(await within(s).findByRole("button", { name: "See what you wrote" }));
+  const map = await screen.findByRole("dialog", { name: "Your workbooks" });
+  expect(within(within(map).getByRole("list", { name: "Your responses" })).getByText("Pretend first answer")).toBeInTheDocument();
 });

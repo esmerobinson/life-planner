@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
-import { pageDate } from "./helpers";
+import { openCardInMap, pageDate } from "./helpers";
 
 /* Journal v2 end to end, with a lived-in FICTIONAL journal: the rows on Home, on Today (their
    own Journal section under the to-dos) and in Mind's Habits box; then every Journal tab (the
@@ -112,14 +112,13 @@ async function walk(page: Page, w: number) {
   await next.scrollIntoViewIfNeeded();
   await noSidewaysScroll(page);
   await shot("exercise-next-one-read-more");
-  await ex.getByText("All cards", { exact: true }).click();
-  const day1 = ex.getByRole("list", { name: "All cards" }).getByRole("listitem").nth(1);
-  await day1.getByText("Day 1 · Pretend weather").click();
+  const day1 = await openCardInMap(page, ex, "Day 1 · Pretend weather");
   await day1.getByText("Read more").click();
   await expect(day1.getByRole("link", { name: "Pretend Cloud Society: About clouds" })).toBeVisible();
   await expect(day1.getByRole("list", { name: "Your responses" }).getByText(/one small grey cloud/)).toBeVisible();
   await noSidewaysScroll(page);
   await shot("exercise-all-cards-read-more");
+  await day1.locator(".choose-top").getByRole("button", { name: "Done" }).click();
 
   // Morning pages.
   await page.getByRole("link", { name: /Morning pages/ }).click();

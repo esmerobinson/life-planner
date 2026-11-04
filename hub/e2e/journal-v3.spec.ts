@@ -75,13 +75,22 @@ for (const width of [1280, 390]) {
       await bpd.click();
       const map = page.getByRole("dialog", { name: "Your workbooks" });
       await expect(map.getByRole("button", { name: "BPD" })).toHaveAttribute("aria-pressed", "true");
-      await expect(map.locator(".wb-ch")).toHaveCount(2);
+      await expect(map.getByRole("list", { name: "BPD workbook chapters" }).locator(":scope > .wb-ch")).toHaveCount(2);
       await expect(map.getByRole("button", { name: "Day 2 · Pretend first-book two · up next" })).toBeVisible();
       await noSidewaysScroll(page);
       await shoot(page, `v3-chapter-map-${width}`);
       await map.getByRole("button", { name: "Day 1 · Pretend first-book one · done" }).click();
-      await expect(map).toHaveCount(0);
-      await expect(s.getByRole("list", { name: "Your responses" }).getByText("Pretend: a made-up answer")).toBeVisible();
+      await expect(map.getByRole("list", { name: "Your responses" }).getByText("Pretend: a made-up answer")).toBeVisible();
+      await noSidewaysScroll(page);
+      await shoot(page, `v3-chapter-map-card-${width}`);
+      await map.getByRole("button", { name: "← All chapters" }).click();
+      await map.getByRole("button", { name: "2 · Pretend river" }).click();
+      await expect(map.getByRole("list", { name: "Chapter 2 cards" }).getByRole("button")).toHaveCount(2);
+      await shoot(page, `v3-chapter-map-open-${width}`);
+      await map.locator(".choose-top").getByRole("button", { name: "Done" }).click();
+      // Nothing long on the tab: one "See all chapters" control, no All cards list.
+      await expect(s.getByText("All cards", { exact: true })).toHaveCount(0);
+      await expect(s.getByRole("button", { name: "See all chapters" })).toBeVisible();
     });
 
     test("Notes to myself: write, reread today, Hard moment", async ({ page }) => {

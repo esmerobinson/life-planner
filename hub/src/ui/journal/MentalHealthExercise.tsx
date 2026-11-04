@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseProgress,
   recordExerciseShown, setExerciseStar, type CardsState, type ExerciseProgress, type ExerciseResponse,
@@ -6,7 +7,7 @@ import {
 import { addDays } from "../../domain/dates";
 import type { JournalKey } from "../../journal/crypto";
 import {
-  chapterLine, INVALID_CARD_FILE, moreParagraphs, parseCardFile, planExercise, replacingRestarts, sequence, upNext,
+  chapterLine, INVALID_CARD_FILE, moreParagraphs, parseCardFile, planExercise, replacingRestarts,
   type CardSet, type ExerciseCard,
 } from "../../journal/exercise";
 import type { ISODate } from "../../domain/types";
@@ -34,8 +35,12 @@ export const savedLine = (card: ExerciseCard) =>
 export const ALL_DONE_LINE = "That's every card for now. Lovely work.";
 export const SEE_WHAT_YOU_WROTE = "See what you wrote";
 const SAVE_PROBLEM = "That didn't save. Try again.";
-/** In All cards, over a card's own responses. */
+/** Over a card's own responses (a card opened from the chapter map). */
 export const YOUR_RESPONSES = "Your responses";
+/** The one control for every card (Esme, 2026-11-04: not a long list on the tab). */
+export const SEE_ALL_CHAPTERS = "See all chapters";
+/** How many past exercises the tab lists before "See all" (Read back). */
+const PAST_ON_TAB = 3;
 const READ_PROBLEM = "The exercise cards couldn't be read. Try again.";
 /** Each book's title by track id (a set with one untitled book: none shown). */
 const TrackTitles = createContext<ReadonlyMap<string, string>>(new Map());
@@ -50,12 +55,12 @@ const MAX_FILE_BYTES = 16 * 1024 * 1024;
  * shown it stays today's card all day, done or not. Submit is the only way to finish a card.
  * After it, the card is replaced in place by the next one not yet done (never stacked below),
  * with a short line above it; "Do the next one →" does the same without submitting. One card is
- * on the page at a time, and what she wrote stays reachable under Read back and All cards.
+ * on the page at a time, and what she wrote stays reachable under Read back and "See all chapters" (the chapter map pop-up).
  */
 export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; today: ISODate; deviceId: string }) {
   const [cards, setCards] = useState<CardsState | null>(null);
   const [progress, setProgress] = useState<ExerciseProgress | null>(null);
-  // Every response (today's too), newest first: Past exercises and each card under All cards.
+  // Every response (today's too), newest first: Past exercises and each card in the chapter map.
   const [responses, setResponses] = useState<ExerciseResponse[]>([]);
   const [problem, setProblem] = useState("");
   const [asking, setAsking] = useState<CardSet | null>(null);
@@ -66,10 +71,8 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   // Just submitted: waiting for the saved state to be read back, then the line above the next card.
   const [waiting, setWaiting] = useState<string | null>(null);
   const [saved, setSaved] = useState<ExerciseCard | null>(null);
-  // Opens a card's review under All cards (the "See what you wrote" link).
-  const [reveal, setReveal] = useState<{ id: string; n: number } | null>(null);
-  // The chapter map pop-up, open on this book (null: closed).
-  const [mapOf, setMapOf] = useState<string | null>(null);
+  // The chapter map pop-up, open on this book (and perhaps straight on one card; null: closed).
+  const [mapOf, setMapOf] = useState<{ book: string; card: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const scrollUp = useRef(false);
@@ -240,16 +243,23 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       {progress && progress.unreadable > 0 && set && <p className="journal-muted">{CANT_OPEN}</p>}
       {plan && (
         <>
-          <WorkbookBars books={books} onOpen={setMapOf} />
-          {mapOf && (
+          <WorkbookBars books={books} onOpen={(book) => setMapOf({ book, card: null })} />
+          {mapOf && set && (
             <ChapterMap
               books={books}
-              start={mapOf}
+              optional={set.cards.filter((c) => c.optional)}
+              start={mapOf.book}
+              startCard={mapOf.card}
               onClose={() => setMapOf(null)}
-              onPick={(id) => {
-                setMapOf(null);
-                setReveal((r) => ({ id, n: (r?.n ?? 0) + 1 }));
-              }}
+              renderCard={(c) => (
+                <CardReview
+                  card={c}
+                  responses={responses.filter((e) => isFor(c, e))}
+                  starred={starred.has(c.id)}
+                  busy={busy}
+                  onStar={star}
+                />
+              )}
             />
           )}
           <ImportPill label="Update cards" fileLabel="Exercise card file (update)" busy={busy} onFile={(f) => void chosen(f)} />
@@ -257,7 +267,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
             {savedCard && (
               <p className="journal-muted exercise-saved" role="status">
                 {finished ? ALL_DONE_LINE : savedLine(savedCard)}{" "}
-                <button type="button" className="quiet-link" onClick={() => setReveal((r) => ({ id: savedCard.id, n: (r?.n ?? 0) + 1 }))}>
+                <button type="button" className="quiet-link" onClick={() => setMapOf({ book: savedCard.track, card: savedCard.id })}>
                   {SEE_WHAT_YOU_WROTE}
                 </button>
               </p>
@@ -300,17 +310,12 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
         </>
       )}
       <PastExercises past={responses.filter((e) => e.date < today)} cards={set?.cards ?? []} />
-      {plan && set && (
-        <AllCards
-          set={set}
-          responses={responses}
-          done={plan.doneThisRound}
-          starred={starred}
-          busy={busy}
-          onStar={star}
-          onFile={(f) => void chosen(f)}
-          reveal={reveal}
-        />
+      {plan && books.length > 0 && (
+        <div className="btn-group">
+          <button type="button" className="btn-secondary" onClick={() => setMapOf({ book: books[0]!.id, card: null })}>
+            {SEE_ALL_CHAPTERS}
+          </button>
+        </div>
       )}
       {asking && (
         <div className="btn-group">
@@ -479,16 +484,24 @@ const isFor = (c: ExerciseCard, e: ExerciseResponse) => c.id === e.id && (!c.leg
  */
 function PastExercises({ past, cards }: { past: ExerciseResponse[]; cards: ExerciseCard[] }) {
   if (past.length === 0) return null;
+  // Short on the tab (Esme, 2026-11-04): the latest few; Read back has every one.
   return (
     <details className="journal-fold">
       <summary>Past exercises</summary>
       <ul className="journal-past" aria-label="Past exercises">
-        {past.map((e) => (
+        {past.slice(0, PAST_ON_TAB).map((e) => (
           <li key={`${e.date}|${e.id}|${e.theme}`}>
             <PastExercise entry={e} card={cards.find((c) => isFor(c, e)) ?? null} />
           </li>
         ))}
       </ul>
+      {past.length > PAST_ON_TAB && (
+        <p>
+          <Link to="/journal/read-back">
+            See all
+          </Link>
+        </p>
+      )}
     </details>
   );
 }
@@ -541,149 +554,46 @@ function StarToggle({ on, disabled, onToggle }: { on: boolean; disabled: boolean
 }
 
 /**
- * Every card, each opening to read: optional cards first ("Introduction (optional reading)"),
- * then the daily cards grouped by book, then chapter ("Day N · Theme", done this round,
- * starred). A card she has answered lists her responses under it (date and answers, read-only,
- * newest first). Import lives here too.
+ * One card to read (in the chapter map pop-up): its head, Learn and Try this, Read more, the
+ * examples and the star, then her responses under it (date and answers, read-only, newest
+ * first). The same content All cards showed, now opened from the pop-up.
  */
-function AllCards({
-  set, responses, done, starred, busy, onStar, onFile, reveal,
-}: {
-  set: CardSet;
-  responses: ExerciseResponse[];
-  done: ReadonlySet<string>;
-  starred: ReadonlySet<string>;
-  busy: boolean;
-  onStar: (id: string, on: boolean) => void;
-  onFile: (f: File) => void;
-  reveal: { id: string; n: number } | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const fold = useRef<HTMLDetailsElement>(null);
-  // "See what you wrote": the fold opens (and the card in it, below).
-  useEffect(() => {
-    if (reveal && fold.current) fold.current.open = true;
-  }, [reveal]);
-  return (
-    <details ref={fold} className="journal-fold" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>All cards</summary>
-      {open && (
-        <>
-          <ul className="journal-past" aria-label="All cards">
-            {grouped(set).map((g) =>
-              g.kind === "head" ? (
-                <li key={g.key} role="presentation" className={g.book ? "exercise-group-book" : "exercise-group-chapter journal-muted"}>
-                  {g.book ? <h3 className="exercise-label">{g.text}</h3> : g.text}
-                </li>
-              ) : (
-                <li key={g.card.id}>
-                  <OneCard
-                    card={g.card}
-                    responses={responses.filter((e) => isFor(g.card, e))}
-                    done={done.has(g.card.id)}
-                    starred={starred.has(g.card.id)}
-                    busy={busy}
-                    onStar={onStar}
-                    reveal={reveal?.id === g.card.id ? reveal.n : 0}
-                  />
-                </li>
-              ),
-            )}
-          </ul>
-          <div className="exercise-reimport">
-            <ImportPill busy={busy} onFile={onFile} />
-          </div>
-        </>
-      )}
-    </details>
-  );
-}
-
-type Group = { kind: "head"; key: string; text: string; book: boolean } | { kind: "card"; card: ExerciseCard };
-
-/** All cards in order with their group headings: optional ones, then each book (titled) and its chapters. */
-function grouped(set: CardSet): Group[] {
-  const out: Group[] = set.cards.filter((c) => c.optional).map((card) => ({ kind: "card", card }));
-  const seq = sequence(set.cards);
-  for (const t of set.tracks) {
-    const mine = seq.filter((c) => c.track === t.id);
-    if (mine.length === 0) continue;
-    if (t.title) out.push({ kind: "head", key: `book|${t.id}`, text: t.title, book: true });
-    let chapter: string | null = null;
-    for (const card of mine) {
-      const line = chapterLine(card);
-      if (line && line !== chapter) out.push({ kind: "head", key: `ch|${t.id}|${card.id}`, text: line, book: false });
-      chapter = line;
-      out.push({ kind: "card", card });
-    }
-  }
-  return out;
-}
-
-function OneCard({
-  card, responses, done, starred, busy, onStar, reveal,
+function CardReview({
+  card, responses, starred, busy, onStar,
 }: {
   card: ExerciseCard;
   responses: ExerciseResponse[];
-  done: boolean;
   starred: boolean;
   busy: boolean;
   onStar: (id: string, on: boolean) => void;
-  /** Counts up each time "See what you wrote" asks for this card (0: not asked). */
-  reveal: number;
 }) {
-  const [open, setOpen] = useState(false);
-  const el = useRef<HTMLDetailsElement>(null);
-  useEffect(() => {
-    if (reveal === 0 || !el.current) return;
-    el.current.open = true;
-    el.current.scrollIntoView?.({ block: "start" });
-  }, [reveal]);
   return (
-    <details ref={el} onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>
-        <span>{card.optional ? `${card.theme} (optional reading)` : `Day ${card.day} · ${card.theme}`}</span>
-        {done && (
-          <span className="exercise-mark" role="img" aria-label="done">
-            {" "}✓
-          </span>
-        )}
-        {starred && (
-          <span className="exercise-mark">
-            {" "}
-            <StarGlyph on label="starred" />
-          </span>
-        )}
-      </summary>
-      {open && (
-        <div className="exercise-card exercise-boxed">
-          <CardHead card={card} />
-          <CardBody card={card} />
-          <ReadMore card={card} />
-          <CardExample card={card} />
-          {!card.optional && (
-            <div className="exercise-actions">
-              <StarToggle on={starred} disabled={busy} onToggle={(on) => onStar(card.id, on)} />
-            </div>
-          )}
-          {responses.length > 0 && (
-            <div>
-              <h3 className="exercise-label">{YOUR_RESPONSES}</h3>
-              <ul className="journal-past" aria-label={YOUR_RESPONSES}>
-                {responses.map((e) => (
-                  <li key={e.date}>
-                    <p>
-                      <b>{longDate(e.date)}</b>
-                      {!e.submitted && <span className="journal-muted"> · Not submitted</span>}
-                    </p>
-                    <ResponseView text={e.text} parts={e.parts} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+    <div className="exercise-card exercise-boxed">
+      <CardHead card={card} />
+      <CardBody card={card} />
+      <ReadMore card={card} />
+      <CardExample card={card} />
+      {!card.optional && (
+        <div className="exercise-actions">
+          <StarToggle on={starred} disabled={busy} onToggle={(on) => onStar(card.id, on)} />
         </div>
       )}
-    </details>
+      {responses.length > 0 && (
+        <div>
+          <h3 className="exercise-label">{YOUR_RESPONSES}</h3>
+          <ul className="journal-past" aria-label={YOUR_RESPONSES}>
+            {responses.map((e) => (
+              <li key={e.date}>
+                <p>
+                  <b>{longDate(e.date)}</b>
+                  {!e.submitted && <span className="journal-muted"> · Not submitted</span>}
+                </p>
+                <ResponseView text={e.text} parts={e.parts} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }

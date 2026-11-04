@@ -891,6 +891,34 @@ button.wb-bar:focus-visible .wb-name {
   overflow-wrap: anywhere;
 }
 
+/* A chapter's title opens it to its cards (Esme, 2026-11-04, "See all chapters"): drawn as the
+   plain title, underlined on hover like the 2A bars; its cards are small quiet links under the
+   dots. Builder's call, not yet seen by Esme. */
+button.wb-ch-toggle {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.wb-ch-toggle:hover,
+button.wb-ch-toggle:focus-visible {
+  text-decoration: underline;
+}
+
+.wb-ch-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .wb-ch-n {
   font-size: 13px;
   opacity: 0.8;
