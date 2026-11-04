@@ -22,13 +22,13 @@ function setPhone(matches: boolean) {
 
 const nav = () => screen.findByRole("navigation", { name: "Journal parts" });
 
-it("on the phone the tabs stack (full-width rows), every tab listed", async () => {
+it("on the phone the tabs stack (full-width rows), every tab listed, Notes to myself last", async () => {
   setPhone(true);
   renderApp("/journal", "2026-11-04");
   const tabs = await nav();
   expect(tabs).toHaveClass("journal-tabs", "is-stacked");
   expect(within(tabs).getAllByRole("link").map((l) => l.querySelector(".journal-tab-label")?.textContent)).toEqual([
-    "Mental health exercise", "Morning pages", "Daily check-in", "Read back",
+    "Mental health exercise", "Morning pages", "Daily check-in", "Read back", "Notes to myself",
   ]);
 });
 

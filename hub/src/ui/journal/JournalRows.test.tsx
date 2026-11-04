@@ -266,7 +266,7 @@ describe("Journal tabs", () => {
     await waitFor(() => expect(currentUrl).toBe("/journal/exercise"));
     const nav = await tabs();
     const links = within(nav).getAllByRole("link");
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/journal/exercise", "/journal/morning", "/journal/check-in", "/journal/read-back"]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/journal/exercise", "/journal/morning", "/journal/check-in", "/journal/read-back", "/journal/notes"]);
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveClass("journal-tab", "is-selected");
     await waitFor(() => expect(links[1]!.querySelector(".tick-auto.is-done")).not.toBeNull());
@@ -275,6 +275,7 @@ describe("Journal tabs", () => {
     expect(links[2]!.querySelector(".tick-auto.is-done")).toBeNull(); // half way through today
     expect(links[2]!.querySelector(".tick-auto")).not.toBeNull();
     expect(links[3]!.querySelector(".tick-auto")).toBeNull(); // Read back has no tick
+    expect(links[4]!.querySelector(".tick-auto, .tick-auto-space, .streak")).toBeNull(); // nor Notes to myself
     expect(within(links[1]!).getByText("3 days in a row")).toBeInTheDocument();
     expect(nav.querySelector(".journal-star")).toBeNull();
   });

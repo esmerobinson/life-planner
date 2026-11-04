@@ -912,6 +912,86 @@ button.wb-dot.now {
   outline-offset: 1px;
 }
 
+/* ---- Notes to myself and "Hard moment" (journal v3). Only existing pieces: the page's
+   title row holds the Hard moment button (the normal pill) on the right; groups are the
+   exercise label over task strips (--row, tile radius); a note's labels are the strips' small
+   line; "I read this today" is the task tick box; the editor is the form fields and the
+   check-in answer box; Hard moment opens the Choose goals pop-up (full screen on the phone).
+   Builder's call, not yet seen by Esme: that arrangement and the spacing (the page's own 8px /
+   --gap-stack steps). ---- */
+.journal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.journal-head > h1 {
+  margin: 0;
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+}
+
+.notes-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.notes-group .strip-list,
+.notes-hard-list {
+  margin: 0;
+}
+
+.notes-body p {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.notes-body .strip-meta + .strip-title,
+.notes-body .strip-meta + p {
+  margin-top: 2px;
+}
+
+.notes-body .strip-title + .strip-meta {
+  margin-top: 8px;
+}
+
+.notes-today {
+  align-items: start;
+}
+
+.notes-read-label {
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.notes-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notes-editor .form-field {
+  margin: 0;
+}
+
+.notes-editor textarea {
+  width: 100%;
+}
+
+.notes-hard-list {
+  margin-top: var(--gap-stack);
+}
+
 /* Morning pages: "Add photo instead" left, "I'm done" right (the mockup's row). */
 .journal-write-actions {
   justify-content: space-between;

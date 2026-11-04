@@ -908,6 +908,8 @@ export async function deleteNote(jk: JournalKey, id: string): Promise<void> {
 
 /** Which notes were read on which day, from every device's "I read this today" rows. */
 export interface NoteReads {
+  /** The notes read each day (any device). */
+  byDay: Map<ISODate, Set<string>>;
   /** Each note's last day read (any device). */
   lastRead: Map<string, ISODate>;
   /** The notes read on a day (any device). */
@@ -927,7 +929,7 @@ export async function listNoteReads(jk: JournalKey): Promise<NoteReads> {
     }
     byDay.set(row.date, day);
   }
-  return { lastRead, readOn: (date) => new Set(byDay.get(date) ?? []) };
+  return { byDay, lastRead, readOn: (date) => new Set(byDay.get(date) ?? []) };
 }
 
 /** Ticks (or unticks) "I read this today" for a note, on this device's own row for the day. */

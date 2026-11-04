@@ -16,7 +16,8 @@ import { loadTimeout } from "./loadTimeout";
 import { MentalHealthExercise } from "./MentalHealthExercise";
 import { MorningPages } from "./MorningPages";
 import { ReadBack } from "./ReadBack";
-import { JOURNAL_TABS, TAB_FOR_HASH, tabPath, type JournalTabId } from "./tabs";
+import { JOURNAL_TABS, TAB_FOR_HASH, tabPath, ticks, type JournalTabId, type TickingTabId } from "./tabs";
+import { HARD_MOMENT, HardMomentView, NotesToMyself } from "./NotesToMyself";
 import { useJournalKey } from "./useJournalKey";
 import { useJournalRows } from "./useJournalRows";
 import { useTabsStacked } from "./useTabsFit";
@@ -39,8 +40,9 @@ const isTab = (t: string | undefined): t is JournalTabId => JOURNAL_TABS.some((x
 
 /**
  * The Journal (journal brief; Journal v2): big tabs, in her order: Mental health exercise ·
- * Morning pages · Daily check-in · Read back, each at its own address (`/journal` opens the
- * exercise). Each of the first three shows a small read-only tick when that part is done
+ * Morning pages · Daily check-in · Read back · Notes to myself, each at its own address (`/journal`
+ * opens the exercise); stacked when they don't fit in a row. Once the journal is open, "Hard
+ * moment" (top right, every tab) opens her notes to herself at once. Each of the first three shows a small read-only tick when that part is done
  * today, and its streak. Everything here is end-to-end encrypted. Only a CONFIRMED key shows
  * or writes entries; without one the page shows "Unlock journal" (or "Checking your
  * passphrase with sync…", or a can't-open line with Try again) above the tabs. Synced entries
@@ -55,6 +57,8 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
   const asked = useRef(false);
   const tabsRef = useRef<HTMLElement>(null);
   const stacked = useTabsStacked(tabsRef, usePhone());
+  // "Hard moment": her notes, open over the page.
+  const [hard, setHard] = useState(false);
 
   // A candidate key is confirmed by a successful sync: ask for one (once per visit).
   useEffect(() => {
@@ -77,14 +81,22 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
     if (keyProblem) view.retry();
     if (device.state === "error") device.retry();
   };
-  const status: Record<Exclude<JournalTabId, "read-back">, RowStatus | null> =
+  const status: Record<TickingTabId, RowStatus | null> =
     rows.state === "ok" ? { exercise: rows.exercise, morning: rows.morning, "check-in": rows.checkin } : { exercise: null, morning: null, "check-in": null };
   const unknown: TickState = loading || rows.state === "loading" ? "loading" : "locked";
   const current = JOURNAL_TABS.find((t) => t.id === tab)!;
 
   return (
     <div className="journal-page">
-      <h1>Journal</h1>
+      <div className="journal-head">
+        <h1>Journal</h1>
+        {open && (
+          <button type="button" className="journal-hard-moment" onClick={() => setHard(true)}>
+            {HARD_MOMENT}
+          </button>
+        )}
+      </div>
+      {open && hard && <HardMomentView jk={open.jk} onClose={() => setHard(false)} />}
       {loading ? (
         <p className="journal-muted" role="status">
           {LOADING_LINE}
@@ -114,7 +126,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
       <nav ref={tabsRef} className={stacked ? "journal-tabs is-stacked" : "journal-tabs"} aria-label="Journal parts">
         {JOURNAL_TABS.map((t) => {
           const selected = t.id === tab;
-          const s = t.id === "read-back" ? undefined : status[t.id];
+          const s = ticks(t.id) ? status[t.id] : undefined;
           return (
             <Link
               key={t.id}
@@ -122,7 +134,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
               className={selected ? "journal-tab is-selected" : "journal-tab"}
               aria-current={selected ? "page" : undefined}
             >
-              {t.id !== "read-back" && (
+              {ticks(t.id) && (
                 <ReadOnlyTick state={open && s ? (s.done ? "done" : "todo") : unknown} title={t.title} inLink />
               )}
               <span className="journal-tab-label">{t.title}</span>
@@ -140,6 +152,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
+          {tab === "notes" && <NotesToMyself jk={open.jk} today={today} deviceId={open.deviceId} />}
         </section>
       )}
     </div>
