@@ -85,18 +85,58 @@ it("the later outfit choice wins on both devices", async () => {
   expect((await mac.farm.get("outfit:bap"))).toMatchObject({ item: "H4" });
 });
 
-it("before the server knows the farm table, only the farm rows wait (stuck); everything else syncs", async () => {
-  // A Worker without "farm" in TABLES answers 400 bad_change for a farm change.
-  const server = new FakeSyncServer(TOKEN, { reject: (c) => (c.table === "farm" ? "bad_change" : undefined) });
-  const mac = await device();
-  await mac.farm.put(seenRow("hi", "2026-11-04"));
-  await mac.items.add({
-    id: "a", kind: "task", title: "Pretend", links: [], areaId: "art", priority: 2, status: "open", createdAt: "2026-11-04", touchedAt: "2026-11-04",
+describe("before the server knows the farm table (review I1)", () => {
+  const pretendTask = (id: string) => ({
+    id, kind: "task" as const, title: "Pretend", links: [], areaId: "art" as const, priority: 2 as const, status: "open" as const,
+    createdAt: "2026-11-04", touchedAt: "2026-11-04",
   });
-  await syncOnce({ db: mac, fetch: server.fetch });
-  expect(server.data("items", "a")).toBeTruthy();
-  expect(await mac.pending.get(["farm", "seen:hi"])).toMatchObject({ stuck: true });
-  expect(await mac.farm.get("seen:hi")).toBeTruthy(); // kept here
+
+  it("one probe, then the farm rows wait (held, not stuck) and every other row syncs; once the server takes the table, they go", async () => {
+    // A Worker without "farm" in TABLES answers 400 bad_change for any farm change.
+    let knowsFarm = false;
+    const server = new FakeSyncServer(TOKEN, { reject: (c) => (c.table === "farm" && !knowsFarm ? "bad_change" : undefined) });
+    let requests = 0;
+    const counted: typeof fetch = (input, init) => {
+      requests++;
+      return server.fetch(input as string, init as RequestInit);
+    };
+    const mac = await device();
+    // 150 farm rows (more than a week of stickers) and two to-dos, all pending at once.
+    await mac.farm.bulkPut(Array.from({ length: 150 }, (_, i) => seenRow(`pretend-${i}`, "2026-11-04")));
+    await mac.items.bulkAdd([pretendTask("a"), pretendTask("b")]);
+
+    const first = await syncOnce({ db: mac, fetch: counted });
+    expect(first.kind).toBe("ok");
+    expect(server.data("items", "a")).toBeTruthy();
+    expect(server.data("items", "b")).toBeTruthy();
+    expect(requests).toBeLessThanOrEqual(3); // the probe and the batch, never row by row
+    expect(await mac.pending.where("table").equals("farm").count()).toBe(150);
+    expect(await mac.pending.filter((p) => p.stuck === true).count()).toBe(0);
+
+    // Next run: one probe again, still nothing stuck.
+    requests = 0;
+    expect((await syncOnce({ db: mac, fetch: counted })).kind).toBe("ok");
+    expect(requests).toBeLessThanOrEqual(2);
+
+    // The Worker is deployed: the next run's probe goes through and so does everything else.
+    knowsFarm = true;
+    expect((await syncOnce({ db: mac, fetch: counted })).kind).toBe("ok");
+    expect(await mac.pending.count()).toBe(0);
+    expect(server.data("farm", "seen:pretend-149")).toBeTruthy();
+  });
+
+  it("once the server has taken the table, a single bad farm row is just that row (stuck), not the table", async () => {
+    let refuse = "";
+    const server = new FakeSyncServer(TOKEN, { reject: (c) => (c.table === "farm" && c.id === refuse ? "bad_change" : undefined) });
+    const mac = await device();
+    await mac.farm.put(seenRow("hi", "2026-11-04"));
+    await syncOnce({ db: mac, fetch: server.fetch }); // accepted: the table is known now
+    refuse = "seen:door";
+    await mac.farm.bulkPut([seenRow("door", "2026-11-05"), seenRow("steps", "2026-11-05")]);
+    await syncOnce({ db: mac, fetch: server.fetch });
+    expect(server.data("farm", "seen:steps")).toBeTruthy();
+    expect(await mac.pending.get(["farm", "seen:door"])).toMatchObject({ stuck: true });
+  });
 });
 
 it("farm rows an older version kept in quarantine apply once this version runs", async () => {

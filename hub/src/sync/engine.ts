@@ -87,7 +87,18 @@ export type MetaKey =
   /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
   | "tokenVersion"
   /** The exact token the server last accepted in a whole run (confirms a journal key). */
-  | "acceptedToken";
+  | "acceptedToken"
+  /** Newer tables (NEWER_TABLES) the server at `serverUrl` has accepted a row of. */
+  | "acceptedTables";
+
+/**
+ * Tables added after the sync server first shipped: a server not yet updated refuses their rows
+ * (400 bad_change). Until a run shows the server takes one, a single probe row is sent first; if
+ * it is refused, that table's rows wait here for the next run (never marked stuck), and every
+ * other table syncs as usual. Without this, each refused row would be split out one by one
+ * (farm review I1: 120 rows hit the round cap and stopped other rows syncing).
+ */
+export const NEWER_TABLES: readonly SyncTable[] = ["farm"];
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -215,13 +226,27 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   /** Halves of a batch the server refused with 400, being narrowed down to the culprit(s). */
   const probes: Batch[] = [];
   let finished = false;
+  // Newer tables this server hasn't taken yet: one probe row each, first (NEWER_TABLES).
+  const knownTables = await getMeta<{ url: string; tables: string[] }>(db, "acceptedTables");
+  const acceptedTables = new Set(knownTables?.url === serverUrl ? knownTables.tables : []);
+  const heldTables = new Set<string>();
+  const tableProbes = NEWER_TABLES.filter((t) => !acceptedTables.has(t));
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const probing = probes.length > 0;
-    let batch: Batch;
-    if (probing) batch = probes.shift()!;
-    else {
-      const built = await buildBatch(db, deviceId, cursor, attempted);
+    let batch: Batch | null = null;
+    let tableProbe: SyncTable | null = null;
+    while (probes.length === 0 && tableProbes.length > 0 && tableProbe === null) {
+      const t = tableProbes.shift()!;
+      const one = await buildBatch(db, deviceId, cursor, attempted, heldTables, t);
+      if (one.changes.length > 0) {
+        tableProbe = t;
+        batch = one;
+      }
+    }
+    const probing = probes.length > 0 || tableProbe !== null;
+    if (batch === null && probes.length > 0) batch = probes.shift()!;
+    else if (batch === null) {
+      const built = await buildBatch(db, deviceId, cursor, attempted, heldTables);
       for (const k of built.held) attempted.add(k);
       held += built.held.length;
       batch = built;
@@ -275,6 +300,11 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
         hasMore = false;
         continue;
       }
+      if (res.status === 400 && code === "bad_change" && tableProbe !== null) {
+        // This server doesn't take the table yet: its rows wait here (not stuck) for a later run.
+        heldTables.add(tableProbe);
+        continue;
+      }
       if (res.status === 400 && code === "bad_change" && !badChangeRetried && !probing) {
         badChangeRetried = true; // a wrong clock: re-stamp far-future changes, retry once
         await restampFarFuture(db);
@@ -312,6 +342,10 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
     }
 
     received += await applyReply(db, batch.changes, batch.pendingVersions, reply);
+    if (tableProbe !== null) {
+      acceptedTables.add(tableProbe);
+      await setMeta(db, "acceptedTables", { url: serverUrl, tables: [...acceptedTables] });
+    }
     for (const c of batch.changes) attempted.add(keyOf(c.table, c.id));
     sent += batch.changes.length;
     cursor = reply.cursor;
@@ -346,8 +380,18 @@ async function markStuck(db: HubDB, keys: { key: string; table: SyncTable; id: s
   });
 }
 
-/** Pending changes not yet attempted in this run, within the count and size limits. */
-async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted: Set<string>) {
+/**
+ * Pending changes not yet attempted in this run, within the count and size limits, leaving out
+ * tables the server doesn't take yet. With `only`, a single change of that table (a probe).
+ */
+async function buildBatch(
+  db: HubDB,
+  deviceId: string,
+  cursor: number,
+  attempted: Set<string>,
+  heldTables: ReadonlySet<string> = new Set(),
+  only?: SyncTable,
+) {
   return db.transaction("rw", [...syncTables(db), db.pending], async () => {
     const changes: WireChange[] = [];
     /** The pending entry's updatedAt when the request was built, per key. */
@@ -355,9 +399,11 @@ async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted
     const held: string[] = [];
     const base = utf8Length(JSON.stringify({ deviceId, cursor, changes: [] }));
     let bytes = base;
-    for (const p of await db.pending.toArray()) {
+    const pending = only ? await db.pending.where("[table+id]").between([only, ""], [only, "￿"]).toArray() : await db.pending.toArray();
+    for (const p of pending) {
       const key = keyOf(p.table, p.id);
-      if (attempted.has(key) || p.stuck) continue;
+      if (attempted.has(key) || p.stuck || heldTables.has(p.table)) continue;
+      if (only && changes.length >= 1) break;
       const row = (await db.table(p.table).get(p.id)) as { updatedAt?: number } | undefined;
       if (!row) {
         await db.pending.delete([p.table, p.id]); // the row is gone (e.g. replaced by a restore)
