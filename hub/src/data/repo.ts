@@ -245,8 +245,11 @@ export async function untickItem(id: string, today: ISODate): Promise<void> {
       await db.items.put({ ...rest, ...(left ? { doneDates: left } : {}), touchedAt: today });
       return;
     }
-    const { completedAt: _drop, ...rest } = item;
-    await db.items.put({ ...rest, status: "open", touchedAt: today });
+    // A one-off that was a habit (Stop repeating) may keep its completion day among its done
+    // days (a habit ticked that day): unticking takes it off there too, so nothing counts it.
+    const { completedAt, doneDates, ...rest } = item;
+    const left = completedAt ? withoutDoneDate(doneDates, completedAt) : doneDates;
+    await db.items.put({ ...rest, ...(left ? { doneDates: left } : {}), status: "open", touchedAt: today });
   });
 }
 
