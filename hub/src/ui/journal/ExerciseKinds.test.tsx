@@ -88,7 +88,7 @@ describe("newer part kinds", () => {
     renderApp("/journal/exercise", TODAY);
     const card = await todayCard();
     expect(await within(card).findByText("Table")).toHaveClass("chip", "exercise-format");
-    const table = within(card).getByRole("table");
+    const table = await within(card).findByRole("table");
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Feeling", "Set off by"]);
     const submit = await within(card).findByRole("button", { name: "Submit" });
     for (const [label, w] of [["Feeling, row 1", "Pretend calm"], ["Set off by, row 1", "Pretend tea"], ["Feeling, row 2", "Pretend fizz"]]) {

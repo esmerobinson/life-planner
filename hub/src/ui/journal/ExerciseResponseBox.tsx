@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { AutoGrowTextarea, useAutoGrow } from "../useAutoGrow";
 import {
   cardRef, logExerciseEntry, readExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable, saveExerciseDraft,
-  submitExerciseEntry, trackerNewInput, type ExerciseResponse, type PartAnswer, type ResponseValue,
+  saveExerciseEdit, submitExerciseEntry, trackerNewInput, type ExerciseResponse, type PartAnswer, type ResponseValue,
 } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
 import { emptyPart, hasTracker, trackerDaysFilled, type CardPart, type ExerciseCard, type PartValue } from "../../journal/exercise";
@@ -20,6 +20,8 @@ const MAX_CHECKLIST_NOTE_TEXT = 500;
 const RATINGS =[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 /** Saving a tracker card's day without finishing it. */
 export const SAVE_TODAY = "Save today's entry";
+/** Saving a change to today's submitted answer (review I4). */
+export const SAVE_EDIT = "Save";
 
 /**
  * Her response to a card (journal polish brief §1; Journal v2). A card without parts: the
@@ -38,7 +40,7 @@ export const SAVE_TODAY = "Save today's entry";
  * comes in while nothing typed here is waiting.
  */
 export function ExerciseResponseBox({
-  jk, today, deviceId, card, todayId, onProblem, onSubmitted, note, after,
+  jk, today, deviceId, card, todayId, onProblem, onSubmitted, note, after, edit = false,
 }: {
   jk: JournalKey;
   today: ISODate;
@@ -46,31 +48,41 @@ export function ExerciseResponseBox({
   card: ExerciseCard;
   todayId: string;
   onProblem: (p: string) => void;
-  /** After Submit has saved (not after saving a tracker card's day). */
+  /** After Submit has saved (not after saving a tracker card's day); in `edit`, after Save. */
   onSubmitted?: () => void;
   note?: ReactNode;
   after?: ReactNode;
+  /** Changing today's submitted answer (review I4): Save writes a new version, the earlier one kept. */
+  edit?: boolean;
 }) {
   // The same card keeps the same reference across renders.
   const ref = useMemo(() => cardRef(card), [card.id, card.day, card.theme, card.legacy]);
-  const [read, setRead] = useState<{ entry: ExerciseResponse | null; carried: PartAnswer[] | null; at: number } | undefined>(undefined);
+  const [read, setRead] = useState<
+    { entry: ExerciseResponse | null; carried: PartAnswer[] | null; from: ISODate | undefined; at: number } | undefined
+  >(undefined);
   const latestRead = useRef(0);
   const tracker = hasTracker(card);
   const load = useCallback(async () => {
     const id = ++latestRead.current;
     const at = tick();
     try {
-      const r = await readExerciseEntry(jk, today, ref);
+      // Both at once, so the box opens as quickly as before.
+      const [r, latest] = await Promise.all([readExerciseEntry(jk, today, ref, deviceId), readLatestExerciseEntry(jk, today, ref)]);
       let e = r.entry;
+      let from: ISODate | undefined;
       // A tracker card: today's box starts from the last day she saved, and only what is new
-      // since then can be saved for today (review I2).
-      const prev = tracker ? await readLatestExerciseEntry(jk, today, ref) : null;
-      if (!e && prev) e = { ...prev, date: today, saved: false, submitted: false };
-      if (id === latestRead.current) setRead({ entry: e, carried: prev?.parts ?? null, at });
+      // since then can be saved for today (review I2). Any card: words she typed on an earlier
+      // day and never submitted stay in the box until she submits or clears them (bug #9).
+      const prev = e ? null : latest;
+      if (!e && prev && (tracker || !prev.submitted)) {
+        e = { ...prev, date: today, saved: false, submitted: false };
+        if (!prev.submitted) from = prev.date;
+      }
+      if (id === latestRead.current) setRead({ entry: e, carried: tracker ? (latest?.parts ?? null) : null, from, at });
     } catch {
       if (id === latestRead.current) onProblem(SAVE_PROBLEM);
     }
-  }, [jk, today, ref, tracker, onProblem]);
+  }, [jk, today, ref, tracker, deviceId, onProblem]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
   if (read === undefined) return null; // the box opens once what is stored is known
@@ -83,6 +95,8 @@ export function ExerciseResponseBox({
       todayId={todayId}
       entry={read.entry}
       carried={read.carried}
+      carriedFrom={read.from}
+      edit={edit}
       readAt={read.at}
       reload={load}
       onProblem={onProblem}
@@ -162,7 +176,7 @@ const UNSAVED = "\u0000unsaved";
 const keyOf = (v: ResponseValue) => (typeof v === "string" ? v : JSON.stringify(v));
 
 function ResponseField({
-  jk, today, deviceId, card, todayId, entry, carried, readAt, reload, onProblem, onSubmitted, note, after,
+  jk, today, deviceId, card, todayId, entry, carried, carriedFrom, edit, readAt, reload, onProblem, onSubmitted, note, after,
 }: {
   jk: JournalKey;
   today: ISODate;
@@ -172,6 +186,9 @@ function ResponseField({
   entry: ExerciseResponse | null;
   /** A tracker card's days carried forward from an earlier day (null: none). */
   carried: PartAnswer[] | null;
+  /** The earlier day an unsent answer in the box came from (bug #9). */
+  carriedFrom: ISODate | undefined;
+  edit: boolean;
   /** When the read behind `entry` started (tick). */
   readAt: number;
   reload: () => Promise<void>;
@@ -196,6 +213,9 @@ function ResponseField({
   // (or while one is in flight) is older than what is here, and is never taken.
   const pending = useRef(0);
   const landedAt = useRef(0);
+  // She has typed in this box: from then on it is hers until she submits (review I4b: a card
+  // finished on another device meanwhile never takes her words away).
+  const typed = useRef(false);
 
   // One save at a time, in order: a draft never lands after the Submit that followed it. Once
   // it lands, what is stored is read again.
@@ -216,7 +236,7 @@ function ResponseField({
   // A newer stored response (another device, or this one read back): take it while nothing typed waits.
   useEffect(() => {
     const fresh = pending.current === 0 && readAt > landedAt.current;
-    if (fresh && keyOf(latest.current) === saved.current && storedKey !== saved.current) {
+    if (fresh && !typed.current && keyOf(latest.current) === saved.current && storedKey !== saved.current) {
       latest.current = stored;
       saved.current = storedKey;
       setValue(stored);
@@ -233,16 +253,17 @@ function ResponseField({
     const k = keyOf(v);
     if (k === saved.current) return;
     saved.current = k;
-    void enqueue(() => saveExerciseDraft(jk, today, deviceId, ref, v)).catch(() => {
+    void enqueue(() => saveExerciseDraft(jk, today, deviceId, ref, v, carriedFrom)).catch(() => {
       if (saved.current === k) saved.current = UNSAVED; // the next save tries again
       onProblem(SAVE_PROBLEM);
     });
-  }, [jk, today, deviceId, ref, enqueue, onProblem]);
+  }, [jk, today, deviceId, ref, enqueue, onProblem, carriedFrom]);
 
   useEffect(() => () => saveNow(), [saveNow]);
   useHiddenFlush(saveNow);
 
   function change(v: ResponseValue) {
+    typed.current = true;
     latest.current = v;
     setValue(v);
     if (timer.current) clearTimeout(timer.current);
@@ -267,7 +288,14 @@ function ResponseField({
     const k = keyOf(v);
     saved.current = k;
     try {
-      await enqueue(() => (log ? logExerciseEntry : submitExerciseEntry)(jk, today, deviceId, ref, v, todayId));
+      await enqueue(() =>
+        edit
+          ? saveExerciseEdit(jk, today, deviceId, ref, v)
+          : log
+            ? logExerciseEntry(jk, today, deviceId, ref, v, todayId)
+            : submitExerciseEntry(jk, today, deviceId, ref, v, todayId, carriedFrom),
+      );
+      typed.current = false;
       onProblem("");
       if (!log) onSubmitted?.();
     } catch {
@@ -309,7 +337,11 @@ function ResponseField({
       <div className="exercise-response-row">
         {note ?? <span />}
         <div className="btn-group exercise-response-actions">
-          {showSaved ? (
+          {edit ? (
+            <button type="button" disabled={busy || showSaved || !responseComplete(value)} onClick={() => void submit()}>
+              {SAVE_EDIT}
+            </button>
+          ) : showSaved ? (
             <p className="journal-muted" role="status">
               Saved
             </p>

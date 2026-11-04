@@ -44,6 +44,10 @@ const PAST_ON_TAB = 3;
 const READ_PROBLEM = "The exercise cards couldn't be read. Try again.";
 /** Each book's title by track id (a set with one untitled book: none shown). */
 const TrackTitles = createContext<ReadonlyMap<string, string>>(new Map());
+/** What "Edit" on today's answer needs (review I4). */
+const EditContext = createContext<{ jk: JournalKey; today: ISODate; deviceId: string; onProblem: (p: string) => void } | null>(null);
+/** On today's submitted answer: change it (a new version; the earlier one stays). */
+export const EDIT_ANSWER = "Edit";
 
 /** A card file bigger than this isn't read at all (the real set is about 90 KB). */
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -234,7 +238,9 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const restarts = asking && progress ? replacingRestarts(progress.marks, asking) : false;
   const titles = useMemo(() => new Map((set?.tracks ?? []).filter((t) => t.title).map((t) => [t.id, t.title])), [set]);
 
+  const editing = useMemo(() => ({ jk, today, deviceId, onProblem: setProblem }), [jk, today, deviceId]);
   return (
+    <EditContext.Provider value={editing}>
     <TrackTitles.Provider value={titles}>
       {cards === null && <LoadLine guard={guard} />}
       {cards?.state === "none" && (
@@ -363,6 +369,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
       )}
       {problem && <p role="alert">{problem}</p>}
     </TrackTitles.Provider>
+    </EditContext.Provider>
   );
 }
 
@@ -534,13 +541,55 @@ function PastExercise({ entry, card }: { entry: ExerciseResponse; card: Exercise
           {card && <CardBody card={card} />}
           <div>
             <h3 className="exercise-label">Your response</h3>
-            <ResponseView text={entry.text} parts={entry.parts} />
+            <Answer entry={entry} card={card} />
             {!entry.submitted && <p className="journal-muted">Not submitted</p>}
-            <OtherVersions others={entry.others} />
           </div>
         </div>
       )}
     </details>
+  );
+}
+
+/**
+ * One day's answer, read-only, with its other versions under it. Today's submitted answer has
+ * "Edit" (review I4): the answer box opens on it, and Save keeps a new version, the one it
+ * changes staying below as "Earlier version".
+ */
+function Answer({ entry, card }: { entry: ExerciseResponse; card: ExerciseCard | null }) {
+  const ctx = useContext(EditContext);
+  const [editing, setEditing] = useState(false);
+  const canEdit = !!ctx && !!card && entry.date === ctx.today && entry.submitted;
+  if (editing && ctx && card) {
+    return (
+      <ExerciseResponseBox
+        jk={ctx.jk}
+        today={ctx.today}
+        deviceId={ctx.deviceId}
+        card={card}
+        todayId={card.id}
+        onProblem={ctx.onProblem}
+        onSubmitted={() => setEditing(false)}
+        edit
+        after={
+          <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        }
+      />
+    );
+  }
+  return (
+    <>
+      <ResponseView text={entry.text} parts={entry.parts} />
+      {canEdit && (
+        <p>
+          <button type="button" className="quiet-link" onClick={() => setEditing(true)}>
+            {EDIT_ANSWER}
+          </button>
+        </p>
+      )}
+      <OtherVersions others={entry.others} />
+    </>
   );
 }
 
@@ -606,8 +655,7 @@ function CardReview({
                   <b>{longDate(e.date)}</b>
                   {!e.submitted && <span className="journal-muted"> · Not submitted</span>}
                 </p>
-                <ResponseView text={e.text} parts={e.parts} />
-                <OtherVersions others={e.others} />
+                <Answer entry={e} card={card} />
               </li>
             ))}
           </ul>
