@@ -3,6 +3,7 @@ import { askNotifyPermission, hasNativeReminders, notifyPermission, type NotifyP
 import {
   DEFAULT_REMINDER_SETTINGS, type MonthlyWhen, type ReminderKind, type ReminderSettings, type ReviewWeekday,
 } from "../reminders/schedule";
+import { rescheduleReminders } from "../reminders/scheduler";
 import { loadReminderSettings, saveReminderSettings } from "../reminders/settings";
 import { usePhone } from "./usePhone";
 
@@ -54,6 +55,8 @@ export function RemindersPage() {
     if (p === "not-determined" && !asked.current) {
       asked.current = true;
       p = await askNotifyPermission();
+      // Just allowed: the reminders that were waiting for it go to the Mac now.
+      if (p === "authorized") void rescheduleReminders();
     }
     setPermission(p);
   }, [place]);
@@ -90,7 +93,7 @@ export function RemindersPage() {
 
   const now = new Date();
   const lastMonth = MONTHS[(now.getMonth() + 11) % 12];
-  const where = place === "mac" ? "on this Mac" : place === "phone" ? "on this phone" : "";
+  const where = place === "mac" ? "on this Mac" : "";
 
   return (
     <section className="reminders-page">

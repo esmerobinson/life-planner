@@ -99,6 +99,8 @@ describe("Reminders page (4A, a simple list)", () => {
     await waitFor(() => expect(actions(mac)).toContain("requestPermission"));
     expect(actions(mac).filter((a) => a === "requestPermission")).toHaveLength(1);
     expect(await screen.findByText(/the Mac asks once/)).toBeInTheDocument();
+    // Allowed: the schedule goes to the Mac straight away.
+    await waitFor(() => expect(actions(mac)).toContain("schedule"));
   });
 
   it("never asks again once the Mac has an answer, and says how to turn them back on", async () => {
