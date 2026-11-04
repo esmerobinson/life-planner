@@ -68,6 +68,12 @@
   white-space: normal;
 }
 
+/* Stacked, the three parts' week bars line up at the right edge (Esme, 2026-11-04: "the same
+   weekly progress UI across all three"). */
+.journal-tabs.is-stacked a.journal-tab .streak {
+  margin-left: auto;
+}
+
 a.journal-tab {
   flex: none;
   display: flex;

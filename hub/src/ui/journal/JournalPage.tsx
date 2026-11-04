@@ -138,7 +138,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
                 <ReadOnlyTick state={open && s ? (s.done ? "done" : "todo") : unknown} title={t.title} inLink />
               )}
               <span className="journal-tab-label">{t.title}</span>
-              {open && s && <Streak n={s.streak} week={s.week} />}
+              {open && s && <Streak n={s.streak} week={s.week} always />}
             </Link>
           );
         })}

@@ -56,7 +56,7 @@ export function JournalRows({ today }: { today: ISODate }) {
           title={r.title}
           tick={r.tick}
           meta={r.meta}
-          right={r.status && <Streak n={r.status.streak} week={r.status.week} />}
+          right={r.status && <Streak n={r.status.streak} week={r.status.week} always />}
           onOpen={() => navigate(tabPath(r.tab))}
         />
       ))}
@@ -93,10 +93,14 @@ export function JournalHabitRows({ today }: { today: ISODate }) {
             right={
               r.status &&
               text && (
-                <div className="habit-session">
-                  <div className="habit-count">{text}</div>
-                  <ProgressBar ratio={r.status.month / planned} label={text} />
-                </div>
+                <>
+                  {/* The same week as on Home and the Journal tabs (Esme, 2026-11-04). */}
+                  <Streak n={r.status.streak} week={r.status.week} always />
+                  <div className="habit-session">
+                    <div className="habit-count">{text}</div>
+                    <ProgressBar ratio={r.status.month / planned} label={text} />
+                  </div>
+                </>
               )
             }
             onOpen={() => navigate(tabPath(r.tab))}
