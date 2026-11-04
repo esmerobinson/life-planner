@@ -85,6 +85,20 @@ it("the later outfit choice wins on both devices", async () => {
   expect((await mac.farm.get("outfit:bap"))).toMatchObject({ item: "H4" });
 });
 
+it("before the server knows the farm table, only the farm rows wait (stuck); everything else syncs", async () => {
+  // A Worker without "farm" in TABLES answers 400 bad_change for a farm change.
+  const server = new FakeSyncServer(TOKEN, { reject: (c) => (c.table === "farm" ? "bad_change" : undefined) });
+  const mac = await device();
+  await mac.farm.put(seenRow("hi", "2026-11-04"));
+  await mac.items.add({
+    id: "a", kind: "task", title: "Pretend", links: [], areaId: "art", priority: 2, status: "open", createdAt: "2026-11-04", touchedAt: "2026-11-04",
+  });
+  await syncOnce({ db: mac, fetch: server.fetch });
+  expect(server.data("items", "a")).toBeTruthy();
+  expect(await mac.pending.get(["farm", "seen:hi"])).toMatchObject({ stuck: true });
+  expect(await mac.farm.get("seen:hi")).toBeTruthy(); // kept here
+});
+
 it("farm rows an older version kept in quarantine apply once this version runs", async () => {
   // An app version from before the farm skips the table and keeps its rows in quarantine
   // (unknownTables.test.ts); after updating, the next sync applies them.
