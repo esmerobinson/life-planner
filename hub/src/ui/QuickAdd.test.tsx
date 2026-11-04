@@ -206,7 +206,7 @@ describe("QuickAdd: Project (3A)", () => {
   it("Type has a fourth choice, Project, after To-do", () => {
     render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
     const names = Array.from(screen.getByLabelText("Type").querySelectorAll("option")).map((o) => o.textContent);
-    expect(names).toEqual(["To-do", "Project", "Idea", "Goal"]);
+    expect(names).toEqual(["To-do", "Project", "Idea", "Book", "Goal"]);
   });
 
   it("Project swaps Due and Repeats for Sessions (4) and Deadline, and saves a project to-do", async () => {

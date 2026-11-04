@@ -74,7 +74,8 @@ describe("Journal daily counts exactly the days the Journal rows tick (fix round
     await finishMorningPage(jk, TODAY, OTHER, "Pretend page");
     renderApp("/", TODAY);
     await vi.waitFor(async () => expect(await counted()).toMatch("1 / 30 this month"), { timeout: 5000 });
-    expect(await rowTick("Morning pages")).toBe("true");
+    // The row loads on its own read: wait for its tick rather than reading it at once.
+    await vi.waitFor(async () => expect(await rowTick("Morning pages")).toBe("true"), { timeout: 5000 });
   });
 
   it("a half-typed autosave or a lone Skip doesn't count (the check-in isn't finished)", async () => {

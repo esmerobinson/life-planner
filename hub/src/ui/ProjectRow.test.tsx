@@ -114,7 +114,7 @@ describe("Change to → Project (the arrow menu)", () => {
     const row = await rowOf("Pretend mural");
     await userEvent.click(within(row).getByRole("button", { name: "Move to: Pretend mural" }));
     const change = within(row).getByRole("group", { name: "Change to" });
-    expect(within(change).getAllByRole("button").map((b) => b.textContent)).toEqual(["Project", "Idea", "Goal"]);
+    expect(within(change).getAllByRole("button").map((b) => b.textContent)).toEqual(["Project", "Idea", "Book", "Goal"]);
     await userEvent.click(within(change).getByRole("button", { name: "Project" }));
     await vi.waitFor(async () => expect((await db.items.get(t.id))!.sessions).toHaveLength(4));
     expect(await db.items.get(t.id)).toMatchObject({ due: "2026-11-09", notes: "Pretend notes", kind: "task" });
@@ -126,7 +126,7 @@ describe("Change to → Project (the arrow menu)", () => {
     const row = await rowOf();
     await userEvent.click(within(row).getByRole("button", { name: "Move to: Pretend street scene" }));
     const change = within(row).getByRole("group", { name: "Change to" });
-    expect(within(change).getAllByRole("button").map((b) => b.textContent)).toEqual(["To-do", "Idea", "Goal"]);
+    expect(within(change).getAllByRole("button").map((b) => b.textContent)).toEqual(["To-do", "Idea", "Book", "Goal"]);
     await userEvent.click(within(change).getByRole("button", { name: "To-do" }));
     await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions).toBeUndefined());
   });
@@ -168,6 +168,6 @@ describe("Change to → Project (the arrow menu)", () => {
     const row = await rowOf("Pretend idea", "Ideas");
     await userEvent.click(within(row).getByRole("button", { name: "Move to: Pretend idea" }));
     const change = within(row).getByRole("group", { name: "Change to" });
-    expect(within(change).getAllByRole("button").map((b) => b.textContent)).toEqual(["To-do", "Project", "Goal"]);
+    expect(within(change).getAllByRole("button").map((b) => b.textContent)).toEqual(["To-do", "Project", "Book", "Goal"]);
   });
 });

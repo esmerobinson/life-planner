@@ -5,7 +5,7 @@ import { usePhone } from "./usePhone";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import { needsALook } from "../domain/attention";
 import { todayISO } from "../domain/dates";
-import { AddDefaultsContext, BASE_ADD_DEFAULTS, type AddDefaults } from "./addContext";
+import { AddDefaultsContext, BASE_ADD_DEFAULTS, OpenAddContext, type AddDefaults } from "./addContext";
 import { AddButton } from "./AddButton";
 import { UndoLine } from "./DeleteButton";
 import { ShellUndoContext, type UndoNote } from "./undoContext";
@@ -18,6 +18,7 @@ import { db } from "../data/db";
 import { migrateMilestones } from "../data/migrateMilestones";
 import { PanelProvider } from "./panelContext";
 import { SidePanel } from "./SidePanel";
+import { isSearchShortcut, SearchDialog } from "./SearchDialog";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
 import { useReminderScheduler } from "../reminders/scheduler";
@@ -108,22 +109,47 @@ export function AppShell() {
     await changed();
   }, [undoNote, changed]);
 
+  // "+ Add a book" (and the like): Add opens pre-set as asked, not as the page says.
+  const [addOverride, setAddOverride] = useState<AddDefaults | null>(null);
   const toggleAdd = useCallback((open: boolean) => {
     if (open) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
+    setAddOverride(null);
     setAdding(open);
   }, []);
+  const openAddWith = useCallback((d: AddDefaults) => {
+    setAddOpened((n) => n + 1);
+    setAddOverride(d);
+    setAdding(true);
+  }, []);
+
+  // ⌘K search (3A): ⌘K on a Mac, Ctrl+K elsewhere, from any page; the phone's 🔍 too.
+  const [searching, setSearching] = useState(false);
+  const openSearch = useCallback(() => {
+    setAdding(false); // one pop-up at a time
+    setSearching(true);
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isSearchShortcut(e)) return;
+      e.preventDefault();
+      openSearch();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [openSearch]);
 
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
 
   return (
     <ShellContext.Provider value={ctx}>
       <AddDefaultsContext.Provider value={setAddDefaults}>
+      <OpenAddContext.Provider value={openAddWith}>
       <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
-          {phone && <PhoneTopBar inboxLabel={inboxLabel} />}
+          {phone && <PhoneTopBar inboxLabel={inboxLabel} onSearch={openSearch} />}
           <UpdatePrompt />
           <DbClosedNotice db={db} />
           {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import.
@@ -135,6 +161,9 @@ export function AppShell() {
           )}
           <Outlet />
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
+          {searching && (
+            <SearchDialog items={items} goals={goals} today={today} phone={phone} onClose={() => setSearching(false)} />
+          )}
           {/* Only while there is something to undo: an always-there status region would be a
               second "status" on pages that have their own. */}
           {undoNote && (
@@ -148,11 +177,14 @@ export function AppShell() {
                 key={addOpened}
                 today={today}
                 autoFocus
-                defaults={addDefaults ?? BASE_ADD_DEFAULTS}
+                defaults={addOverride ?? addDefaults ?? BASE_ADD_DEFAULTS}
                 // A click outside, Escape or the button keep what was typed for the next open (I-5);
-                // Cancel and a successful add start afresh.
-                initial={addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
+                // Cancel and a successful add start afresh. Opened as asked ("+ Add a book"): fresh.
+                initial={!addOverride && addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
                 onDraft={(d) => {
+                  // A fresh form opened as asked ("+ Add a book") must not wipe a draft kept from
+                  // before until something is typed in it (review M-12).
+                  if (addOverride && !draftHasContent(d)) return;
                   addDraft.current = d;
                 }}
                 onCancel={() => {
@@ -171,6 +203,7 @@ export function AppShell() {
       </div>
       </PanelProvider>
       </ShellUndoContext.Provider>
+      </OpenAddContext.Provider>
       </AddDefaultsContext.Provider>
     </ShellContext.Provider>
   );
