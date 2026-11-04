@@ -18,6 +18,7 @@ import { db } from "../data/db";
 import { migrateMilestones } from "../data/migrateMilestones";
 import { PanelProvider } from "./panelContext";
 import { SidePanel } from "./SidePanel";
+import { isSearchShortcut, SearchDialog } from "./SearchDialog";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
 
@@ -116,6 +117,22 @@ export function AppShell() {
     setAdding(true);
   }, []);
 
+  // ⌘K search (3A): ⌘K on a Mac, Ctrl+K elsewhere, from any page; the phone's 🔍 too.
+  const [searching, setSearching] = useState(false);
+  const openSearch = useCallback(() => {
+    setAdding(false); // one pop-up at a time
+    setSearching(true);
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isSearchShortcut(e)) return;
+      e.preventDefault();
+      openSearch();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [openSearch]);
+
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
 
   return (
@@ -127,7 +144,7 @@ export function AppShell() {
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
-          {phone && <PhoneTopBar inboxLabel={inboxLabel} />}
+          {phone && <PhoneTopBar inboxLabel={inboxLabel} onSearch={openSearch} />}
           <UpdatePrompt />
           <DbClosedNotice db={db} />
           {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import.
@@ -139,6 +156,9 @@ export function AppShell() {
           )}
           <Outlet />
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
+          {searching && (
+            <SearchDialog items={items} goals={goals} today={today} phone={phone} onClose={() => setSearching(false)} />
+          )}
           {/* Only while there is something to undo: an always-there status region would be a
               second "status" on pages that have their own. */}
           {undoNote && (

@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NAV } from "./areas";
+import { SEARCH_GLYPH } from "./SearchDialog";
 
 /** Pages whose title the phone top bar shows (the page's own h1 is then kept for screen readers only). */
 const TITLES: Record<string, string> = {
@@ -26,7 +27,7 @@ export function phoneTitle(pathname: string): string | null {
  * every other page, a round back arrow, the page title and the Inbox pill. Back goes to
  * the previous page in this app's history, or Home when the app was opened on this page.
  */
-export function PhoneTopBar({ inboxLabel }: { inboxLabel: string }) {
+export function PhoneTopBar({ inboxLabel, onSearch }: { inboxLabel: string; onSearch?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const home = location.pathname === "/";
@@ -53,6 +54,12 @@ export function PhoneTopBar({ inboxLabel }: { inboxLabel: string }) {
         <p className="phone-title" aria-hidden="true">
           {title ?? ""}
         </p>
+      )}
+      {/* Search (3A on the phone): the round back-arrow button's look with the magnifier in it. */}
+      {onSearch && (
+        <button type="button" className="phone-back phone-search" aria-label="Search" title="Search" onClick={onSearch}>
+          {SEARCH_GLYPH}
+        </button>
       )}
       <Link to="/inbox" className="btn-secondary shell-inbox">
         {inboxLabel}
