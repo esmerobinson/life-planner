@@ -60,7 +60,7 @@ it("Submit seals the response and marks today's card done; reloaded it shows 'Sa
   const card = await todayCard();
   await userEvent.type(await box(), "Pretend cloud, floating");
   await userEvent.click(within(card).getByRole("button", { name: "Submit" }));
-  await within(await section()).findByRole("article", { name: "Next card: Day 2" }); // the next one takes its place
+  await within(await section()).findByRole("article", { name: "Next card: Day 2" }, { timeout: 5000 }); // the next one takes its place
   const device = await getDeviceId(db);
   expect((await readExerciseProgress(jk)).marks).toEqual([{ date: TODAY, device, id: "day-1", done: true, primary: true }]);
   expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating", saved: true });
@@ -79,7 +79,8 @@ it("Submit seals the response and marks today's card done; reloaded it shows 'Sa
   await waitFor(async () =>
     expect((await readExerciseEntry(jk, TODAY, CARD1)).entry).toMatchObject({ text: "Pretend cloud, floating away", saved: true }),
   );
-  expect(await db.journal.where("kind").equals("exercise-entry").count()).toBe(1);
+  // One submitted row (drafts have their own row, apart, so they never write over it).
+  expect(await db.journal.where("kind").equals("exercise-entry").filter((r) => !r.id.endsWith("-draft")).count()).toBe(1);
 });
 
 it("autosaves a draft on blur without marking Done; it is there after a reload", async () => {

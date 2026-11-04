@@ -14,7 +14,7 @@ import { exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows"
 import { Streak } from "../Streak";
 import { LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { CardExample, ExerciseResponseBox } from "./ExerciseResponseBox";
-import { ResponseView } from "./ResponseView";
+import { OtherVersions, ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
 
 /** Under today's card once it is done. */
@@ -165,6 +165,8 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   // Once a submit is read back as done, the card gives way to the next one not done (or a gentle line).
   useEffect(() => {
     if (!waiting || !plan || !plan.doneToday.has(waiting)) return;
+    // She has already moved to another card (Do the next one, Back): she stays where she is.
+    if (shown?.id !== waiting) return setWaiting(null);
     const after = plan.queue.find((c) => c.id !== waiting && !plan.doneToday.has(c.id)) ?? null;
     setWaiting(null);
     setSaved(byId.get(waiting) ?? null);
@@ -275,7 +277,8 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
           </div>
         </>
       )}
-      <PastExercises past={responses.filter((e) => e.date < today)} cards={set?.cards ?? []} />
+      {/* Today's too (Esme, 2026-11-04: "I submitted … but cant see it in past exercises"). */}
+      <PastExercises past={responses} cards={set?.cards ?? []} />
       {plan && set && (
         <AllCards
           set={set}
@@ -448,7 +451,7 @@ function ReadMore({ card }: { card: ExerciseCard }) {
 const isFor = (c: ExerciseCard, e: ExerciseResponse) => c.id === e.id && (!c.legacy || c.theme === e.theme);
 
 /**
- * Past exercises (journal polish brief §2): earlier days' responses, newest first, each
+ * Past exercises (journal polish brief §2): her responses, today's too, newest first, each
  * "Day N · Theme · <date>". Opening one shows the card (from the stored set; if the set was
  * replaced and the card is gone, just the theme stored with the response) and her response.
  * These are readable any time.
@@ -482,6 +485,7 @@ function PastExercise({ entry, card }: { entry: ExerciseResponse; card: Exercise
             <h3 className="exercise-label">Your response</h3>
             <ResponseView text={entry.text} parts={entry.parts} />
             {!entry.submitted && <p className="journal-muted">Not submitted</p>}
+            <OtherVersions others={entry.others} />
           </div>
         </div>
       )}
@@ -653,6 +657,7 @@ function OneCard({
                       {!e.submitted && <span className="journal-muted"> · Not submitted</span>}
                     </p>
                     <ResponseView text={e.text} parts={e.parts} />
+                    <OtherVersions others={e.others} />
                   </li>
                 ))}
               </ul>
