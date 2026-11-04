@@ -81,6 +81,21 @@ for (const width of [1280, 390]) {
       }
     });
 
+    test("the farm's pixel barn icon is pixel art at a whole-number scale (sidebar, or the phone's Home grid)", async ({ page }) => {
+      await page.goto("/");
+      const icon = page.locator(phone ? ".phone-app-tile img.pixel-icon" : ".sidebar-tile img.pixel-icon");
+      await expect(icon).toHaveCount(1);
+      const p = await icon.evaluate(async (el) => {
+        const img = el as HTMLImageElement;
+        await img.decode();
+        const s = getComputedStyle(img);
+        return { rendering: s.imageRendering, scale: parseFloat(s.width) / img.naturalWidth, h: parseFloat(s.height) / img.naturalHeight };
+      });
+      expect(p.rendering).toBe("pixelated");
+      expect(p.scale).toBe(phone ? 2 : 1);
+      expect(p.h).toBe(p.scale);
+    });
+
     test("open the book, turn to the beds, place a ready sticker on the farm", async ({ page }) => {
       await startedFarm(page);
       await page.goto("/farm");
@@ -111,7 +126,8 @@ for (const width of [1280, 390]) {
       await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "0");
       await page.locator('.farm-zone-hit[data-zone="meadow"]').dispatchEvent("click");
       await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "3");
-      await expect(page.locator(".farm-scene")).toHaveAttribute("data-highlight", phone ? "meadow" : "meadow barnyard");
+      // The 16-page book (fix round 1): the Meadow fills both pages of its spread.
+      await expect(page.locator(".farm-scene")).toHaveAttribute("data-highlight", "meadow");
     });
 
     test("with reduced motion, every animation shows its end frame", async ({ page }) => {
