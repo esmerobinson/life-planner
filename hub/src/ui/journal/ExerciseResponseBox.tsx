@@ -40,7 +40,7 @@ export const SAVE_EDIT = "Save";
  * comes in while nothing typed here is waiting.
  */
 export function ExerciseResponseBox({
-  jk, today, deviceId, card, todayId, onProblem, onSubmitted, note, after, edit = false,
+  jk, today, deviceId, card, todayId, onProblem, onSubmitted, note, after, edit = false, cancelTo, onCancel,
 }: {
   jk: JournalKey;
   today: ISODate;
@@ -54,6 +54,12 @@ export function ExerciseResponseBox({
   after?: ReactNode;
   /** Changing today's submitted answer (review I4): Save writes a new version, the earlier one kept. */
   edit?: boolean;
+  /**
+   * Edit only: Cancel puts this device's draft back to this (the answer shown), so what she
+   * typed and cancelled never comes back (bug #28); then `onCancel`.
+   */
+  cancelTo?: ResponseValue;
+  onCancel?: () => void;
 }) {
   // The same card keeps the same reference across renders.
   const ref = useMemo(() => cardRef(card), [card.id, card.day, card.theme, card.legacy]);
@@ -97,6 +103,8 @@ export function ExerciseResponseBox({
       carried={read.carried}
       carriedFrom={read.from}
       edit={edit}
+      cancelTo={cancelTo}
+      onCancel={onCancel}
       readAt={read.at}
       reload={load}
       onProblem={onProblem}
@@ -176,7 +184,7 @@ const UNSAVED = "\u0000unsaved";
 const keyOf = (v: ResponseValue) => (typeof v === "string" ? v : JSON.stringify(v));
 
 function ResponseField({
-  jk, today, deviceId, card, todayId, entry, carried, carriedFrom, edit, readAt, reload, onProblem, onSubmitted, note, after,
+  jk, today, deviceId, card, todayId, entry, carried, carriedFrom, edit, cancelTo, onCancel, readAt, reload, onProblem, onSubmitted, note, after,
 }: {
   jk: JournalKey;
   today: ISODate;
@@ -189,6 +197,8 @@ function ResponseField({
   /** The earlier day an unsent answer in the box came from (bug #9). */
   carriedFrom: ISODate | undefined;
   edit: boolean;
+  cancelTo?: ResponseValue;
+  onCancel?: () => void;
   /** When the read behind `entry` started (tick). */
   readAt: number;
   reload: () => Promise<void>;
@@ -216,6 +226,8 @@ function ResponseField({
   // She has typed in this box: from then on it is hers until she submits (review I4b: a card
   // finished on another device meanwhile never takes her words away).
   const typed = useRef(false);
+  // Cancelled: nothing more is kept as a draft.
+  const closed = useRef(false);
 
   // One save at a time, in order: a draft never lands after the Submit that followed it. Once
   // it lands, what is stored is read again.
@@ -249,6 +261,7 @@ function ResponseField({
   const saveNow = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
+    if (closed.current) return;
     const v = latest.current;
     const k = keyOf(v);
     if (k === saved.current) return;
@@ -306,6 +319,18 @@ function ResponseField({
     }
   }
 
+  /** Edit's Cancel: her draft goes back to the answer shown, so the cancelled words never return. */
+  async function cancel() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    closed.current = true;
+    onCancel?.(); // the box closes at once; the draft is put back after any save still landing
+    const back = cancelTo;
+    if (back !== undefined && (saved.current !== storedKey || keyOf(latest.current) !== storedKey || keyOf(back) !== storedKey)) {
+      await enqueue(() => saveExerciseDraft(jk, today, deviceId, ref, back)).catch(() => onProblem(SAVE_PROBLEM));
+    }
+  }
+
   const showSaved = entry?.saved === true && keyOf(value) === storedKey;
   return (
     <div className="exercise-response-wrap">
@@ -338,9 +363,16 @@ function ResponseField({
         {note ?? <span />}
         <div className="btn-group exercise-response-actions">
           {edit ? (
-            <button type="button" disabled={busy || showSaved || !responseComplete(value)} onClick={() => void submit()}>
-              {SAVE_EDIT}
-            </button>
+            <>
+              <button type="button" disabled={busy || showSaved || !responseComplete(value)} onClick={() => void submit()}>
+                {SAVE_EDIT}
+              </button>
+              {onCancel && (
+                <button type="button" className="btn-secondary" disabled={busy} onClick={() => void cancel()}>
+                  Cancel
+                </button>
+              )}
+            </>
           ) : showSaved ? (
             <p className="journal-muted" role="status">
               Saved

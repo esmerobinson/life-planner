@@ -563,18 +563,16 @@ function Answer({ entry, card }: { entry: ExerciseResponse; card: ExerciseCard |
     return (
       <ExerciseResponseBox
         jk={ctx.jk}
-        today={ctx.today}
+        // The answer's own day, even if 3am passes while she edits (bug #29).
+        today={entry.date}
         deviceId={ctx.deviceId}
         card={card}
         todayId={card.id}
         onProblem={ctx.onProblem}
         onSubmitted={() => setEditing(false)}
         edit
-        after={
-          <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>
-            Cancel
-          </button>
-        }
+        cancelTo={entry.parts ?? entry.text}
+        onCancel={() => setEditing(false)}
       />
     );
   }
