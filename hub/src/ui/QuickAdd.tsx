@@ -85,6 +85,8 @@ export function QuickAdd({
   const [sessionCount, setSessionCount] = useState(initial?.sessionCount ?? String(DEFAULT_SESSIONS));
   const [author, setAuthor] = useState(initial?.author ?? "");
   const [bookStatus, setBookStatus] = useState<BookStatus>(initial?.bookStatus ?? "want");
+  /** The area chosen before Type was set to Book (which shows Mind). */
+  const areaBeforeBook = useRef<AreaId>(initial?.areaId ?? defaults.areaId);
   const draftRef = useRef(onDraft);
   draftRef.current = onDraft;
   useEffect(() => {
@@ -123,14 +125,19 @@ export function QuickAdd({
   }
 
   function changeType(next: FormType) {
+    // Leaving Book puts back the area it had before Book set it to Mind (review M-11).
+    const from = type === "book" ? areaBeforeBook.current : areaId;
     setType(next);
-    if (next === "goal") {
-      setAreaId((a) => goalArea(a));
-      setGoalId("");
-    }
-    // Books always live under Mind.
     if (next === "book") {
+      // Books always live under Mind.
+      if (type !== "book") areaBeforeBook.current = areaId;
       setAreaId(BOOK_AREA);
+      setGoalId("");
+      return;
+    }
+    if (type === "book") setAreaId(from);
+    if (next === "goal") {
+      setAreaId(goalArea(from));
       setGoalId("");
     }
   }

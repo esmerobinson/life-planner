@@ -167,6 +167,31 @@ describe("Adding a book", () => {
     });
   });
 
+  it("Type back from Book puts the area back to where it was (not left on Mind)", async () => {
+    renderApp("/area/art", TODAY);
+    await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    const form = within(screen.getByRole("dialog", { name: "Add" }));
+    expect(form.getByLabelText("Area")).toHaveValue("art");
+    await userEvent.selectOptions(form.getByLabelText("Type"), "book");
+    expect(form.getByLabelText("Area")).toHaveValue("mind");
+    await userEvent.selectOptions(form.getByLabelText("Type"), "task");
+    expect(form.getByLabelText("Area")).toHaveValue("art");
+  });
+
+  it("+ Add a book doesn't lose a to-do half typed in Add", async () => {
+    await pretendBooks();
+    renderApp("/area/mind", TODAY);
+    await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    await userEvent.type(within(screen.getByRole("dialog", { name: "Add" })).getByLabelText("Title"), "Pretend half-typed to-do");
+    await userEvent.click(within(await readingList()).getByRole("button", { name: "+ Add a book" }));
+    const bookForm = within(screen.getByRole("dialog", { name: "Add" }));
+    expect(bookForm.getByLabelText("Type")).toHaveValue("book");
+    expect(bookForm.getByLabelText("Title")).toHaveValue("");
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(within(screen.getByRole("dialog", { name: "Add" })).getByLabelText("Title")).toHaveValue("Pretend half-typed to-do");
+  });
+
   it("+ Add a book opens the Add form set to Book", async () => {
     await pretendBooks();
     renderApp("/area/mind", TODAY);

@@ -177,6 +177,9 @@ export function AppShell() {
                 // Cancel and a successful add start afresh. Opened as asked ("+ Add a book"): fresh.
                 initial={!addOverride && addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
                 onDraft={(d) => {
+                  // A fresh form opened as asked ("+ Add a book") must not wipe a draft kept from
+                  // before until something is typed in it (review M-12).
+                  if (addOverride && !draftHasContent(d)) return;
                   addDraft.current = d;
                 }}
                 onCancel={() => {
