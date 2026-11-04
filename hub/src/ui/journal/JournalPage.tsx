@@ -19,6 +19,8 @@ import { ReadBack } from "./ReadBack";
 import { JOURNAL_TABS, TAB_FOR_HASH, tabPath, type JournalTabId } from "./tabs";
 import { useJournalKey } from "./useJournalKey";
 import { useJournalRows } from "./useJournalRows";
+import { useTabsStacked } from "./useTabsFit";
+import { usePhone } from "../usePhone";
 
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
@@ -51,6 +53,8 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
   const device = useDeviceId();
   const rows = useJournalRows(today);
   const asked = useRef(false);
+  const tabsRef = useRef<HTMLElement>(null);
+  const stacked = useTabsStacked(tabsRef, usePhone());
 
   // A candidate key is confirmed by a successful sync: ask for one (once per visit).
   useEffect(() => {
@@ -107,7 +111,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
       ) : view.state === "unreadable" ? (
         <UnlockJournal again />
       ) : null}
-      <nav className="journal-tabs" aria-label="Journal parts">
+      <nav ref={tabsRef} className={stacked ? "journal-tabs is-stacked" : "journal-tabs"} aria-label="Journal parts">
         {JOURNAL_TABS.map((t) => {
           const selected = t.id === tab;
           const s = t.id === "read-back" ? undefined : status[t.id];

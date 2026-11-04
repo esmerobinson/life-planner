@@ -39,8 +39,10 @@ describe("journal.css", () => {
     expect(code).toMatch(/\.journal-answer\.exercise-response \{[^}]*font-size: max\(16px, 1em\)/);
   });
 
-  it("Journal v2 tabs: the mockup's big pills (16px, 12px 18px, --row; selected mint and bold), scrolling sideways when narrow", () => {
-    expect(code).toMatch(/\.journal-tabs \{[^}]*overflow-x: auto/);
+  it("Journal v2 tabs: the mockup's big pills (16px, 12px 18px, --row; selected mint and bold); never scrolling sideways, stacked when narrow", () => {
+    expect(code).not.toMatch(/\.journal-tabs \{[^}]*overflow-x: auto/);
+    expect(code).toMatch(/\.journal-tabs\.is-stacked \{[^}]*flex-direction: column/);
+    expect(code).toMatch(/\.journal-tabs\.is-stacked a\.journal-tab \{[^}]*white-space: normal/);
     expect(code).toMatch(/a\.journal-tab \{[^}]*border-radius: 14px;[^}]*padding: 12px 18px;[^}]*background: var\(--row\);[^}]*font-size: 16px/);
     expect(code).toMatch(/a\.journal-tab\.is-selected \{[^}]*background: var\(--mint\);[^}]*font-weight: 700/);
     expect(code).toMatch(/\.journal-tab \.tick-auto,[^{]*\{[^}]*width: 18px;[^}]*height: 18px;[^}]*border-radius: 6px/);

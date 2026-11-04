@@ -46,15 +46,23 @@
 
 /* ---- Journal v2 tabs (the approved mockup-journal-v2.html): big pills in a row, 16px text,
    12px x 18px padding, 14px radius, --row; the selected tab is Map mint and bold. Each holds
-   the rows' read-only tick at the mockup's 18px (6px radius) and the streak. On a narrow
-   screen the row scrolls sideways instead of overflowing the page. ---- */
+   the rows' read-only tick at the mockup's 18px (6px radius) and the streak. They never
+   scroll sideways (journal v3, Esme 2026-11-04): on the phone, and whenever they don't fit in
+   one row (JournalPage measures), they stack as full-width rows with the same styling. ---- */
 .journal-tabs {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
   min-width: 0;
-  /* Its screen-reader-only text (position: absolute) stays inside the scrolling row. */
+  /* Its screen-reader-only text (position: absolute) stays inside the row. */
   position: relative;
+}
+
+.journal-tabs.is-stacked {
+  flex-direction: column;
+}
+
+.journal-tabs.is-stacked a.journal-tab {
+  white-space: normal;
 }
 
 a.journal-tab {
