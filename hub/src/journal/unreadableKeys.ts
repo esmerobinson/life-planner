@@ -15,7 +15,7 @@
 import type { HubDB } from "../data/db";
 
 /** The syncMeta rows that hold CryptoKeys (same names as keyStore's constants). */
-export const KEY_ROWS = ["journalKey", "journalCandidate", "journalRetired"] as const;
+export const KEY_ROWS = ["journalKey", "journalCandidate", "journalRetired", "journalDeviceWrap", "journalPendingWrap"] as const;
 /** syncMeta: `true` when a confirmed key was stored here but couldn't be read and was removed. */
 export const JOURNAL_KEY_LOST_META = "journalKeyLost";
 

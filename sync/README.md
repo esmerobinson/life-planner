@@ -156,4 +156,22 @@ TOKEN=$(node -e "import('$SYNC/shared/token.ts').then(async m => console.log(awa
     - Optional rehearsal that touches nothing: add `--dry-run`; it prints only the hash length, 64.
     - Then `unset TOKEN`.
 
-To change the passphrase later, run the helper again; every device then needs the new passphrase.
+### Changing the passphrase later
+
+Your journal keeps working through a passphrase change, as long as you do it in this order:
+
+1. Run the helper again (`node "$SYNC/tools/set-passphrase.mjs"`) and type the new passphrase.
+   From now on, sync on every device stops until it gets the new passphrase.
+2. **First**, on a device where the journal is already open (the Mac), type the new passphrase on
+   the Sync page and press Save. Once it has synced, the journal can be opened with the new
+   passphrase too. If that device asks "Type your old passphrase once", type the old passphrase
+   there (this only happens once, on devices set up before this was possible).
+3. **Then** type the new passphrase on the Sync page of each other device. Their journals open
+   with it.
+
+The old passphrase still opens the journal, on any device. Changing the passphrase stops it
+working for sync, not for the journal. (The journal's own key never changes; each new passphrase
+gets a locked copy of it, stored with your other synced data, that only that passphrase opens.)
+
+If you type the new passphrase on another device first, that's fine: its journal opens by itself
+once step 2 has been done somewhere.

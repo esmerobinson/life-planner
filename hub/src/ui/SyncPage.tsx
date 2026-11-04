@@ -6,6 +6,7 @@ import { deriveToken } from "../sync/token";
 import { confirmJournalKey, saveJournalKeyFromSync } from "../journal/keyStore";
 import { MAX_PAIRING_PASSPHRASE } from "../pairing/pairingText";
 import { PairingCode, ScanPairingCode, TOO_LONG } from "./Pairing";
+import { OldPassphrasePrompt } from "./journal/OldPassphrasePrompt";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
@@ -211,6 +212,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
           </button>
         </div>
       </form>
+      <OldPassphrasePrompt db={controller.db} />
 
       <h2>Pair a device</h2>
       <p>Set up another device without typing: show a pairing code here, then scan it on the other device.</p>

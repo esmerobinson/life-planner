@@ -191,7 +191,11 @@ describe("unlock journal", () => {
     await saveSyncSettings(d, { serverUrl: SERVER, token });
     await syncOnce({ db: d, fetch: server.fetch });
     expect(await unlockJournal(d, TYPO)).toBe("wrong");
-    expect(await unlockJournal(d, PASS)).toBe("ok"); // accepted already: confirmed at once
+    // Accepted BEFORE it was typed: that acceptance may be stale (bug #4), so the next sync decides.
+    expect(await unlockJournal(d, PASS)).toBe("checking");
+    expect(await d.journal.get(VERIFIER_ID)).toBeUndefined();
+    await syncOnce({ db: d, fetch: server.fetch });
+    expect(await confirmJournalKey(d)).toBe("confirmed");
     expect(await d.journal.get(VERIFIER_ID)).toBeTruthy();
   });
 
