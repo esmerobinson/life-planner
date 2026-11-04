@@ -1,20 +1,13 @@
 import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { tickItem, untickItem } from "../data/repo";
-import { pickToday, tickedOffToday, withTickedOff } from "../domain/triage";
-import { monthlyProgress } from "../domain/progress";
-import type { Goal, ISODate, Item } from "../domain/types";
-import { isActive } from "../domain/goalCounts";
+import { tickedOffToday, todayList } from "../domain/triage";
+import type { ISODate, Item } from "../domain/types";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { DoneSection } from "./DoneSection";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow } from "./TaskRow";
 import { useHubData } from "./useHubData";
-
-/** Completions this month per goal id, as pickToday expects. */
-function thisMonthDoneFor(goals: Goal[], items: Item[], today: ISODate): Record<string, number> {
-  return Object.fromEntries(goals.map((g) => [g.id, monthlyProgress(g, items, today)?.done ?? 0]));
-}
 
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
@@ -48,10 +41,7 @@ export function TodayPanel({
   // Habits and started projects ticked today stay, crossed out, at the bottom of their list;
   // a to-do done today moves to the "Done today" dropdown.
   // Inactive goals don't count (goals redesign).
-  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => {
-    const active = goals.filter(isActive);
-    return withTickedOff(pickToday(items, active, today, thisMonthDoneFor(active, items, today)), items, today);
-  }, [items, goals, today]);
+  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => todayList(items, goals, today), [items, goals, today]);
 
   async function tick(id: string): Promise<boolean> {
     if (!(await attempt(() => tickItem(id, today)))) return false;

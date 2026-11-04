@@ -121,7 +121,8 @@ export function FarmProvider({ items, goals, today, children }: { items: Item[];
   const queue = useMemo(() => momentQueue(derived, state.seen, state.placed, onJournal), [derived, state, onJournal]);
 
   // Today's list finished: not derivable later, so it is noted when seen (once the farm has started).
-  const finished = state.start !== null && todayListFinished(items, goals, today);
+  const started = state.start !== null;
+  const finished = useMemo(() => started && todayListFinished(items, goals, today), [started, items, goals, today]);
   const noted = state.todayDone.includes(today);
   useEffect(() => {
     if (finished && !noted) void repo.recordTodayDone(today).catch(() => undefined);

@@ -1,4 +1,5 @@
 import type { Item } from "../domain/types";
+import { todayList } from "../domain/triage";
 import { STICKERS, stickersIn } from "./catalogue";
 import type { Counters } from "./earning";
 import {
@@ -119,5 +120,30 @@ describe("Today's list finished", () => {
     expect(todayListFinished([t({ pinnedDate: T, status: "done", completedAt: T })], [], T)).toBe(true);
     expect(todayListFinished([t({ pinnedDate: T, status: "done", completedAt: T }), t({ pinnedDate: T })], [], T)).toBe(false);
     expect(todayListFinished([t({ recur: ["wed"], doneDates: [T] })], [], T)).toBe(true); // 4 Nov 2026 is a Wednesday
+  });
+
+  it("a backlog: the list as it stood at the start of the day counts, not the refills (review C1)", () => {
+    // Fictional: 10 open to-dos and a habit for today. Home shows 4 picks; ticking one refills it.
+    let items: Item[] = [...Array.from({ length: 10 }, () => t({})), t({ recur: ["wed"] })];
+    const startOfDay = todayList(items, [], T);
+    const onList = [...startOfDay.rhythm, ...startOfDay.picks].map((i) => i.id);
+    expect(onList).toHaveLength(5);
+    // She ticks them one by one; Home refills the picks from the backlog as she goes.
+    for (const id of onList) {
+      expect(todayListFinished(items, [], T)).toBe(false);
+      items = items.map((i) =>
+        i.id !== id ? i : i.recur ? { ...i, doneDates: [T] } : { ...i, status: "done" as const, completedAt: T },
+      );
+    }
+    // Every item that was on the list this morning is ticked: finished, though new picks now show.
+    expect(todayList(items, [], T).picks.some((i) => i.status === "open")).toBe(true);
+    expect(todayListFinished(items, [], T)).toBe(true);
+  });
+
+  it("ticking things that weren't on the list doesn't finish it", () => {
+    const items: Item[] = Array.from({ length: 10 }, () => t({}));
+    const onList = new Set(todayList(items, [], T).picks.map((i) => i.id));
+    const ticked = items.map((i) => (onList.has(i.id) ? i : { ...i, status: "done" as const, completedAt: T }));
+    expect(todayListFinished(ticked, [], T)).toBe(false);
   });
 });

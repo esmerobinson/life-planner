@@ -3,9 +3,7 @@
 // beds grow by to-dos; placed stickers sit at their one fixed spot. Values come from the art
 // pack's manifest and game design v2; anything that is a guess is marked PLACEHOLDER.
 
-import { monthlyProgress } from "../domain/progress";
-import { pickToday, tickedOffToday, withTickedOff } from "../domain/triage";
-import { isActive } from "../domain/goalCounts";
+import { tickedOffToday, todayList } from "../domain/triage";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { GROUPS, MANIFEST, STICKERS, STICKER_BY_KEY, asset, stickersIn, type BookPage } from "./catalogue";
 import type { Counters } from "./earning";
@@ -208,13 +206,36 @@ export const bookIndex = (key: string): number => STICKER_BY_KEY.get(key)?.index
 // ---- Today's list finished -------------------------------------------------------------------
 
 /**
- * Today's list is finished: everything on it (the rhythm and the picks) is ticked off, and at
- * least one thing was. The same lists Today shows.
+ * The items as they stood at the start of the day: today's ticks undone (a to-do done today is
+ * open, a habit's or a project's session today is taken off). The rows are never changed.
+ */
+export function atDayStart(items: readonly Item[], today: ISODate): Item[] {
+  return items.map((it) => {
+    let out = it;
+    if (it.doneDates?.includes(today)) out = { ...out, doneDates: it.doneDates.filter((d) => d !== today) };
+    if (it.sessions?.some((s) => s.doneOn === today)) {
+      out = { ...out, sessions: it.sessions.map((s) => (s.doneOn === today ? { ...s, doneOn: undefined } : s)) };
+    }
+    if (it.status === "done" && it.completedAt === today) {
+      const { completedAt: _c, ...rest } = out;
+      out = { ...rest, status: "open" };
+    }
+    return out;
+  });
+}
+
+/**
+ * Today's list is finished (review C1): every item on the list as Home showed it at the start
+ * of the day (before today's ticks) is ticked off. Home refills its picks from the backlog as
+ * she ticks, so the live list would almost never be empty; the morning's list is what counts.
  */
 export function todayListFinished(items: Item[], goals: Goal[], today: ISODate): boolean {
-  const active = goals.filter(isActive);
-  const done = Object.fromEntries(active.map((g) => [g.id, monthlyProgress(g, items, today)?.done ?? 0]));
-  const { rhythm, picks, doneToday } = withTickedOff(pickToday(items, active, today, done), items, today);
-  const listed = [...rhythm, ...picks];
-  return listed.length + doneToday.length > 0 && listed.every((it) => tickedOffToday(it, today));
+  const morning = todayList(atDayStart(items, today), goals, today);
+  const listed = [...morning.rhythm, ...morning.picks];
+  if (listed.length === 0) return false;
+  const now = new Map(items.map((it) => [it.id, it]));
+  return listed.every((it) => {
+    const current = now.get(it.id);
+    return current !== undefined && tickedOffToday(current, today);
+  });
 }

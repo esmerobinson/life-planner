@@ -1,5 +1,6 @@
 import type { Goal, ISODate, Item } from "./types";
 import { daysBetween, weekdayOf } from "./dates";
+import { monthlyProgress } from "./progress";
 import { doneToday, isHabit } from "./habits";
 import { doneTodayIndex, isProject, plannedToday } from "./projects";
 
@@ -134,4 +135,18 @@ export function pickToday(
   }
 
   return { rhythm, picks, alsoDue };
+}
+
+/**
+ * Today's list exactly as Home shows it (TodayPanel; the farm reads it too): the picks from
+ * the active goals' pace, with what was ticked off today kept as withTickedOff says.
+ */
+export function todayList(
+  items: Item[],
+  goals: Goal[],
+  today: ISODate,
+): { rhythm: Item[]; picks: Item[]; alsoDue: Item[]; doneToday: Item[] } {
+  const active = goals.filter((g) => g.active !== false); // inactive goals don't count (goals redesign)
+  const done = Object.fromEntries(active.map((g) => [g.id, monthlyProgress(g, items, today)?.done ?? 0]));
+  return withTickedOff(pickToday(items, active, today, done), items, today);
 }
