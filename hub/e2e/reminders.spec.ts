@@ -67,6 +67,25 @@ test.describe("Reminders", () => {
     await page.getByRole("button", { name: "Monthly review: Off" }).click();
     await page.getByLabel("Morning pages time").fill("07:15");
     await expect(page.getByRole("button", { name: "Monthly review: On" })).toBeVisible();
+    // Saved on this device (syncMeta) before reloading.
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const db: IDBDatabase = await new Promise((res, rej) => {
+            const r = indexedDB.open("life-hub");
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+          });
+          const row = await new Promise<{ value?: { monthly?: { on?: boolean }; morning?: { time?: string } } } | undefined>((res, rej) => {
+            const g = db.transaction("syncMeta").objectStore("syncMeta").get("reminders");
+            g.onsuccess = () => res(g.result);
+            g.onerror = () => rej(g.error);
+          });
+          db.close();
+          return `${row?.value?.monthly?.on} ${row?.value?.morning?.time}`;
+        }),
+      )
+      .toBe("true 07:15");
     await page.reload();
     await expect(page.getByRole("button", { name: "Monthly review: On" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByLabel("Morning pages time")).toHaveValue("07:15");
