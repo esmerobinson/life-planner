@@ -204,7 +204,7 @@ export function remindersOn(input: Omit<ScheduleInput, "now" | "days">, day: ISO
         const list = names(dueTomorrow.map((it) => it.title));
         parts.push(today.length > 0 ? `Due tomorrow: ${list}` : list);
       }
-      out.push({ id: `todos:${day}`, at: at(s.todos.time), title, body: parts.join(" · "), path: "/today" });
+      out.push({ id: `todos:${day}`, at: at(s.todos.time), title, body: parts.join(" · "), path: "/" });
     }
   }
 
@@ -217,7 +217,7 @@ export function remindersOn(input: Omit<ScheduleInput, "now" | "days">, day: ISO
         at: at(s.session.time),
         title: it.title,
         body: `Session ${idx + 1} of ${it.sessions!.length} is planned for today.`,
-        path: "/today",
+        path: "/",
       });
     }
   }

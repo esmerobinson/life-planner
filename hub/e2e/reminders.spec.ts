@@ -100,13 +100,13 @@ test.describe("Reminders", () => {
     await page.reload();
 
     await expect.poll(async () => (await lastSent(page))?.find((r) => r.id === `todos:${TODAY}`)).toEqual({
-      id: `todos:${TODAY}`, at: `${TODAY}T09:00`, title: "1 to-do today", body: "Pretend errand", path: "/today",
+      id: `todos:${TODAY}`, at: `${TODAY}T09:00`, title: "1 to-do today", body: "Pretend errand", path: "/",
     });
     const first = (await lastSent(page))!;
     expect(first[0]).toMatchObject({ id: `morning:${TODAY}`, at: `${TODAY}T08:30`, path: "/journal/morning" });
 
-    // Tick it on Today (an in-app move, so the recorder keeps its list).
-    await page.locator(".sidebar").getByRole("link", { name: "Today" }).click();
+    // Tick it on Home (Today is Home now; an in-app move, so the recorder keeps its list).
+    await page.locator(".sidebar").getByRole("link", { name: "Home" }).click();
     await page.getByRole("checkbox", { name: "Mark done: Pretend errand" }).click();
     await expect
       .poll(async () => (await lastSent(page))?.some((r) => r.id === `todos:${TODAY}`), { timeout: 10_000 })

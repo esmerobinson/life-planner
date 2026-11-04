@@ -156,7 +156,7 @@ describe("to-dos and deadlines", () => {
       at: "2026-11-04T09:00",
       title: "3 to-dos today",
       body: "Finish the pretend draft, Book the pretend dentist and 1 more",
-      path: "/today",
+      path: "/",
     });
     expect(out.map((r) => r.id)).toEqual(["todos:2026-11-04", "todos:2026-11-06"]);
     expect(out[1]).toMatchObject({ title: "1 to-do today", body: "Later thing" });
@@ -232,7 +232,7 @@ describe("project sessions", () => {
         at: "2026-11-04T10:00",
         title: "Pretend film project",
         body: "Session 3 of 4 is planned for today.",
-        path: "/today",
+        path: "/",
       },
     ]);
   });
