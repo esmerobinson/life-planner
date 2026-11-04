@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { AutoGrowTextarea, useAutoGrow } from "../useAutoGrow";
 import {
   cardRef, logExerciseEntry, readExerciseEntry, readLatestExerciseEntry, responseComplete, responseLoggable, saveExerciseDraft,
   submitExerciseEntry, trackerNewInput, type ExerciseResponse, type PartAnswer, type ResponseValue,
@@ -193,13 +194,8 @@ function ResponseField({
     }
   }, [stored, storedKey, readAt]);
 
-  // The single box grows with the text (at least its six rows).
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    el.style.height = "auto";
-    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  // The single box grows with the text (at least its six rows, at most most of the window).
+  useAutoGrow(box, value);
 
   const saveNow = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -302,7 +298,7 @@ function PartInput({ part, value, onChange }: { part: CardPart; value: PartValue
     return (
       <label className="exercise-part">
         <span className="exercise-label">{part.prompt}</span>
-        <textarea className="journal-answer exercise-part-text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} />
+        <AutoGrowTextarea className="journal-answer exercise-part-text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} />
       </label>
     );
   }
@@ -349,7 +345,7 @@ function PartInput({ part, value, onChange }: { part: CardPart; value: PartValue
                   )}
                   {step}
                 </span>
-                <textarea
+                <AutoGrowTextarea
                   className="journal-answer exercise-chain-box"
                   rows={2}
                   value={links[j] ?? ""}
@@ -426,8 +422,8 @@ function ChecklistInput({ part, value, onChange }: { part: CardPart; value: Part
               ))}
             </div>
             {part.note && (
-              <input
-                type="text"
+              <AutoGrowTextarea
+                rows={1}
                 className="exercise-check-note"
                 aria-label={`${part.items![i]}, note`}
                 placeholder={part.note}

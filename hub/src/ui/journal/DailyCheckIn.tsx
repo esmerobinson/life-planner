@@ -8,6 +8,7 @@ import { PROMPTS, PROMPT_BY_ID, STARTER_IDS, workbookPage } from "../../journal/
 import { pickPrompts } from "../../journal/rotation";
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
+import { AutoGrowTextarea } from "../useAutoGrow";
 import { DoneBox, LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { useDbChanges } from "./useJournalKey";
 
@@ -201,7 +202,7 @@ function Question({
         ))}
       </div>
       <QuestionText id={prompt} />
-      <textarea
+      <AutoGrowTextarea
         className="journal-answer"
         aria-label="Your answer"
         placeholder="Anything you like…"
@@ -258,7 +259,7 @@ function CheckedIn({
 function EditableAnswer({ stored, onSave }: { stored: string; onSave: (text: string) => Promise<void> }) {
   const draft = useDraft(stored, onSave, AUTOSAVE_MS);
   return (
-    <textarea
+    <AutoGrowTextarea
       className="journal-answer"
       aria-label="Your answer"
       placeholder="Anything you like…"

@@ -141,7 +141,7 @@ it("a note can be edited, and deleted after a second tap", async () => {
   expect(within(s).getByText("Delete this note?")).toBeInTheDocument();
   await userEvent.click(within(s).getByRole("button", { name: "Delete it" }));
   await waitFor(async () => expect((await listNotes(jk)).notes).toHaveLength(0));
-  expect(within(s).queryByText("Pretend new answer")).toBeNull();
+  await waitFor(() => expect(within(s).queryByText("Pretend new answer")).toBeNull());
 });
 
 it("no notes yet: no reread box at the top", async () => {

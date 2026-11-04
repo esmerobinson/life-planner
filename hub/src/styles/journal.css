@@ -751,9 +751,13 @@ input.exercise-list-line {
   overflow-wrap: anywhere;
 }
 
-input.exercise-check-note {
+/* A checklist note is a one-line box that grows downwards as she writes (2026-11-04: "text
+   boxes should get bigger downwards"), so it is a textarea drawn exactly as the input was. */
+.exercise-check-note {
+  display: block;
   width: 100%;
   box-sizing: border-box;
+  resize: none;
   margin-top: var(--gap-label); /* + the item's 4px gap = 8px, a form's field-to-field */
 }
 
@@ -784,6 +788,7 @@ input.exercise-check-note {
    what sits on them to --row, so nothing vanishes into its background (as Read more does). */
 .exercise-boxed .journal-answer,
 .exercise-boxed .exercise-parts input,
+.exercise-boxed .exercise-check-note,
 .exercise-boxed .exercise-table th,
 .exercise-boxed .exercise-tracker-day,
 .exercise-boxed .chip.exercise-format {

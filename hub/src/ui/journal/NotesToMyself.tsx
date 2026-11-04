@@ -7,6 +7,7 @@ import { NOTE_GROUPS, todaysNotes } from "../../journal/notes";
 import { LOADING_LINE, LoadLine, useLoadGuard } from "./bits";
 import { JournalSheet } from "./JournalSheet";
 import { useDbChanges } from "./useJournalKey";
+import { AutoGrowTextarea } from "../useAutoGrow";
 
 /** The button at the top of the Journal (every tab). */
 export const HARD_MOMENT = "Hard moment";
@@ -272,19 +273,19 @@ function NoteEditor({
     >
       <label className="form-field">
         <span className="form-label">{THOUGHT}</span>
-        <textarea rows={2} value={thought} onChange={(e) => setThought(e.target.value)} />
+        <AutoGrowTextarea rows={2} value={thought} onChange={(e) => setThought(e.target.value)} />
       </label>
       <label className="form-field">
         <span className="form-label">{STEADY}</span>
-        <textarea className="journal-answer" rows={4} value={steady} onChange={(e) => setSteady(e.target.value)} autoFocus />
+        <AutoGrowTextarea className="journal-answer" rows={4} value={steady} onChange={(e) => setSteady(e.target.value)} autoFocus />
       </label>
       <label className="form-field">
         <span className="form-label">{`${MEMORY} (optional)`}</span>
-        <textarea rows={2} value={memory} onChange={(e) => setMemory(e.target.value)} />
+        <AutoGrowTextarea rows={2} value={memory} onChange={(e) => setMemory(e.target.value)} />
       </label>
       <label className="form-field">
         <span className="form-label">{`${SKILL} (optional)`}</span>
-        <textarea rows={2} value={skill} onChange={(e) => setSkill(e.target.value)} />
+        <AutoGrowTextarea rows={2} value={skill} onChange={(e) => setSkill(e.target.value)} />
       </label>
       {asking && onDelete ? (
         <div className="btn-group">
