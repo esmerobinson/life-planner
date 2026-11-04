@@ -158,3 +158,56 @@ for (const [width, height] of [[1280, 900], [390, 844]] as const) {
     });
   });
 }
+
+/* Review M6: the first-device path (no verifier anywhere yet). Unlock waits on "Checking your
+   passphrase with sync…" (an acceptance recorded before the key was typed never counts, bug
+   #4), then a fresh acceptance from a sync that finished after it opens the journal. */
+async function firstDeviceUnlock(page: Page, prefix: string) {
+  await page.goto("/");
+  await expect(page.getByText("Nothing planned for today.").first()).toBeVisible();
+  await page.evaluate(
+    async ({ old, address }) => {
+      const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
+      const engine = await at("/src/sync/engine.ts");
+      const token = await at("/src/sync/token.ts");
+      const { db } = await at("/src/data/db.ts");
+      await engine.saveSyncSettings(db, { serverUrl: address, token: await token.deriveToken(old) });
+      // A first sync accepted it long ago (before the key was typed): that must not count.
+      await db.syncMeta.bulkPut([
+        { key: "acceptedToken", value: (await db.syncMeta.get("token")).value },
+        { key: "acceptedSeq", value: 1 },
+      ]);
+    },
+    { old: OLD, address: ADDRESS },
+  );
+  await page.goto("/journal");
+  await page.getByLabel("Sync passphrase").fill(OLD);
+  await page.getByRole("button", { name: "Unlock" }).click();
+  await expect(page.getByText("Checking your passphrase with sync…")).toBeVisible();
+  await noSidewaysScroll(page);
+  await shoot(page, `${prefix}-first-device-checking`);
+  // The page's own sync can't reach the made-up address: a sync that finishes now accepts it.
+  await page.evaluate(async () => {
+    const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
+    const { db } = await at("/src/data/db.ts");
+    await db.syncMeta.put({ key: "acceptedSeq", value: ((await db.syncMeta.get("acceptedSeq"))?.value ?? 0) + 1 });
+  });
+  await expect(page.getByText("Add your exercise cards")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Checking your passphrase with sync…")).toHaveCount(0);
+  const kinds = await page.evaluate(async () => {
+    const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
+    const { db } = await at("/src/data/db.ts");
+    return (await db.journal.toArray()).map((r: { kind: string }) => r.kind);
+  });
+  expect(kinds).toContain("verifier"); // this device wrote the journal's check row
+}
+
+for (const [width, height] of [[1280, 900], [390, 844]] as const) {
+  test.describe(`first device at ${width}px`, () => {
+    test.use({ viewport: { width, height } });
+    test("Unlock waits for a fresh sync, then opens (rule (b))", async ({ page }) => {
+      test.setTimeout(60_000);
+      await firstDeviceUnlock(page, `rekey-${width}`);
+    });
+  });
+}
