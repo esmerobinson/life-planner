@@ -14,6 +14,20 @@ export function isHabit(it: Item): boolean {
   return it.kind === "task" && (it.recur?.length ?? 0) > 0;
 }
 
+/**
+ * Listed on the Repeating page: a recurring to-do that is open or done (so also one still
+ * waiting in the Inbox from an older import). Archived and Bin items are not listed anywhere.
+ */
+export function isRepeating(it: Item): boolean {
+  return isHabit(it) && (it.status === "open" || it.status === "done");
+}
+
+/** The days a to-do used to repeat on (put away by Stop repeating), when it no longer repeats. */
+export function stoppedRepeat(it: Item): Weekday[] | undefined {
+  const days = it.stash?.task?.recur;
+  return !isHabit(it) && days && days.length > 0 ? days : undefined;
+}
+
 /** Ticked for today: today is in its done log. */
 export function doneToday(it: Item, today: ISODate): boolean {
   return it.doneDates?.includes(today) ?? false;
@@ -66,6 +80,8 @@ export const HABIT_WORDS = {
   doneForToday: "Done for today",
   /** The right-hand count: "October · session 20 of 28". */
   session: (today: ISODate, done: number, planned: number) => `${monthName(today)} · session ${done} of ${planned}`,
+  /** The panel's line: "Repeats Mondays, Wednesdays and Fridays" (the area follows it). */
+  repeatsLine: (recur: Weekday[] | undefined) => `Repeats ${HABIT_WORDS.schedule(recur)}`,
   /** The schedule line: "every day", "every day but Sunday", "Mondays", "Mondays and Thursdays". */
   schedule(recur: Weekday[] | undefined): string {
     const days = ORDER.filter((d) => recur?.includes(d));

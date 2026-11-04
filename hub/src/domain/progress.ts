@@ -13,7 +13,10 @@ export const isSortedTask = (it: Item) => it.kind === "task" && it.areaId !== "i
 /** Every tick-off of one task: its completion, or each session of a habit (round 3). */
 export function tickOffDates(it: Item): ISODate[] {
   if (isHabit(it) && it.status === "open") return [...new Set(it.doneDates ?? [])];
-  return it.status === "done" && it.completedAt ? [it.completedAt] : [];
+  // A to-do that stopped repeating keeps the days it was ticked as a habit (its history).
+  const days = it.status === "done" && it.completedAt ? [it.completedAt] : [];
+  if (it.status === "open" || it.status === "done") days.push(...(it.doneDates ?? []));
+  return [...new Set(days)];
 }
 
 /** Completion dates of tasks attached to this goal (habit sessions count one each). */

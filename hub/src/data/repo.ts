@@ -763,6 +763,31 @@ export async function updateItems(
   });
 }
 
+/**
+ * Stop repeating: the item stays in its area as a one-off to-do, done or not exactly as it
+ * was, with its done days kept. The days it repeated on are put away in its stash (types.ts
+ * ItemStash) so Repeat again, or Undo, brings them back. Does nothing to an item that does not repeat.
+ */
+export async function stopRepeating(id: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
+    const item = await db.items.get(id);
+    if (!item || !item.recur?.length || (item.status !== "open" && item.status !== "done")) return;
+    const { recur, ...rest } = item;
+    await db.items.put({ ...withStash(rest, "task", { ...item.stash?.task, recur }), touchedAt: today });
+  });
+}
+
+/** Repeat again: the days Stop repeating put away come back. Does nothing when none are put away. */
+export async function repeatAgain(id: string, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, db.syncMeta, async () => {
+    const item = await db.items.get(id);
+    const parked = item?.stash?.task?.recur;
+    if (!item || item.recur?.length || !parked?.length || (item.status !== "open" && item.status !== "done")) return;
+    const { recur: _drop, ...task } = item.stash!.task!;
+    await db.items.put({ ...withStash({ ...item, recur: parked }, "task", task), touchedAt: today });
+  });
+}
+
 /** Delete: the item goes to the Bin (restorable from the Bin page). */
 export async function deleteItem(id: string, today: ISODate): Promise<void> {
   await db.transaction("rw", db.items, async () => {
