@@ -345,7 +345,7 @@ function CardBody({ card }: { card: ExerciseCard }) {
       </div>
       {(card.book || card.skill || card.session) && (
         <div className="exercise-meta">
-          {card.book && <p className="journal-muted exercise-text">{`In your book: ${card.book}`}</p>}
+          {card.book && <p className="journal-muted exercise-text">In your book: <PromptText text={card.book} /></p>}
           {card.skill && <p className="journal-muted exercise-text">{card.skill}</p>}
           {card.session && <p className="journal-muted">Good one to bring to a session</p>}
         </div>
@@ -367,7 +367,9 @@ function ReadMore({ card }: { card: ExerciseCard }) {
       <summary>Read more</summary>
       <div className="exercise-more-box">
         {paras.map((p, i) => (
-          <p key={i}>{p}</p>
+          <p key={i}>
+            <PromptText text={p} />
+          </p>
         ))}
         {card.sources.length > 0 && (
           <p className="journal-muted">

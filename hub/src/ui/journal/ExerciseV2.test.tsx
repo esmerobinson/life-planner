@@ -8,7 +8,7 @@ import {
 import type { JournalKey } from "../../journal/crypto";
 import { parseCardFile } from "../../journal/exercise";
 import { getDeviceId } from "../../sync/engine";
-import { FAKE_CARD_TEXT_V2 } from "../../test/exerciseCards";
+import { FAKE_CARD_FILE_V2, FAKE_CARD_TEXT_V2 } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
 
@@ -186,4 +186,32 @@ it("cards whose chunks haven't all arrived yet: 'Your cards are still syncing…
   expect(screen.queryByRole("article", { name: "Today's card" })).toBeNull();
   // Never a dead end (review M2): she can import her file here too.
   expect(within(await section()).getByRole("button", { name: "Import" })).toBeEnabled();
+});
+
+it("stars around a title become italics in the book line and Read more; a lone star stays text", async () => {
+  const card0 = FAKE_CARD_FILE_V2.cards[1]!;
+  const starred = parseCardFile(JSON.stringify({
+    app: "esmeworld", kind: "exercise-cards", version: 2, source: "A pretend workbook (test fixture)",
+    cards: [{
+      ...card0,
+      book: "*Pretend Handbook 101*, p. 4 * and so on",
+      more: "From *Made-Up Book* (Pat & Sam), ch. 3: a made-up line.\n\nA lone * star stays.",
+    }],
+  }))!;
+  expect(starred).toBeTruthy();
+  await db.journal.clear();
+  await confirmedDevice(db, jk);
+  await importExerciseCards(jk, starred, "2026-10-01");
+  renderApp("/journal/exercise", TODAY);
+  const card = await todayCard();
+  const book = await within(card).findByText(/In your book:/);
+  expect(book.querySelector("em")).toHaveTextContent("Pretend Handbook 101");
+  expect(book.textContent).toBe("In your book: Pretend Handbook 101, p. 4 * and so on");
+  await userEvent.click(within(card).getByText("Read more"));
+  const more = within(card).getByText("Read more").closest("details")!;
+  const first = within(more).getByText(/ch\. 3/);
+  expect(first.querySelector("em")?.outerHTML).toBe("<em>Made-Up Book</em>");
+  expect(first.textContent).toBe("From Made-Up Book (Pat & Sam), ch. 3: a made-up line.");
+  expect(within(more).getByText(/A lone/).textContent).toBe("A lone * star stays.");
+  expect(more.querySelectorAll("em")).toHaveLength(1);
 });
