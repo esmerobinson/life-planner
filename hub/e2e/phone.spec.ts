@@ -101,7 +101,6 @@ async function seedPretendWorld(page: Page) {
 /** Every route. */
 const ROUTES = [
   ["home", "/"],
-  ["today", "/today"],
   ["goals", "/goals"],
   ["goal-panel", "/goals?open=g2"],
   ["task-panel", "/area/art?open=t2"],
@@ -168,7 +167,7 @@ for (const width of [360, 390, 430]) {
 
     test("open menus and the Add form do not scroll sideways", async ({ page }) => {
       await seedPretendWorld(page);
-      await page.goto("/today");
+      await page.goto("/");
       // The Add sheet (1C) covers the page, so it is checked on its own and closed first.
       await page.getByRole("button", { name: "Add", exact: true }).click();
       await expect(page.getByRole("dialog", { name: "Add" })).toBeVisible();
@@ -198,7 +197,7 @@ test.describe("phone layout at 390px", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Esmeworld" })).toBeVisible();
     await expect(page.locator(".phone-top").getByRole("link", { name: /^Inbox \(\d+\)$/ })).toBeVisible();
     const apps = page.getByRole("navigation", { name: "Main" }).getByRole("link");
-    await expect(apps).toHaveCount(12);
+    await expect(apps).toHaveCount(11); // no Today: Home is the Today page (2026-11-04)
     const tile = await apps.first().locator(".phone-app-tile").boundingBox();
     expect(tile?.width).toBe(62);
     expect(tile?.height).toBe(62);
@@ -226,9 +225,9 @@ test.describe("phone layout at 390px", () => {
   });
 
   test("fields are at least 16px (no iOS zoom on focus) on Sync, Goals and the Add form", async ({ page }) => {
-    for (const path of ["/sync", "/goals", "/today"]) {
+    for (const path of ["/sync", "/goals", "/"]) {
       await page.goto(path);
-      if (path === "/today") await page.getByRole("button", { name: "Add" }).click();
+      if (path === "/") await page.getByRole("button", { name: "Add" }).click();
       const fields = page.locator(".app-content").locator("input:not([type=checkbox]):not([type=file]), textarea, select");
       expect(await fields.count()).toBeGreaterThan(0);
       const sizes = await fields.evaluateAll((els) => els.map((e) => parseFloat(getComputedStyle(e).fontSize)));

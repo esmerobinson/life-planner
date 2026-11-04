@@ -85,7 +85,7 @@ describe("a project on Today", () => {
     await project([{ id: "a", doneOn: "2026-10-30" }, { id: "b", title: "Market stalls", plannedFor: TODAY }, { id: "c" }], {
       due: "2026-11-20",
     });
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     const row = await rowOf("Pretend street scene", "Today");
     expect(within(row).getByText("Session 2 of 3 today · Market stalls")).toBeInTheDocument();
     expect(within(row).getByText("Due Fri 20 Nov")).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("a project on Today", () => {
 
   it("ticked today, it stays crossed out with the session done today; unticking brings it back", async () => {
     const p = await project([{ id: "a" }, { id: "b" }], { due: "2026-11-04" });
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     await userEvent.click(within(await rowOf("Pretend street scene", "Today")).getByRole("checkbox", { name: "Log a session: Pretend street scene" }));
     await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions![0].doneOn).toBe(TODAY));
     const row = await rowOf("Pretend street scene", "Today");
@@ -156,7 +156,7 @@ describe("Change to → Project (the arrow menu)", () => {
   it("a to-do done today sits in 'Done today' as a plain done strip, with no Move to menu (M-8)", async () => {
     const t = await createItem({ kind: "task", title: "Pretend done today", areaId: "art", priority: 2 }, MADE);
     await db.items.update(t.id, { status: "done", completedAt: TODAY });
-    renderApp("/today", TODAY);
+    renderApp("/", TODAY);
     const fold = (await screen.findByText("Done today (1)")).closest("details")!;
     expect(within(fold).getByText("Pretend done today")).toBeInTheDocument();
     expect(within(fold).queryByRole("button", { name: "Move to: Pretend done today" })).toBeNull();

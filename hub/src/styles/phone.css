@@ -132,22 +132,19 @@ button.phone-back::before {
   height: auto;
 }
 
+/* Phone Home's "Today" (Home spacing, 2026-11-04): spaced as every section heading (tokens.css
+   h2: --gap-section above, under the app grid; --gap-stack under, to the green rows). The size
+   is unchanged. Was 14px / 8px, off the spacing scale. */
 .phone-home .today-panel h2 {
   font-size: 16px;
   font-weight: 700;
-  margin: 14px 0 8px;
+  margin: var(--gap-section) 0 var(--gap-stack);
 }
 
-/* Spacing pass: the Journal heading under the app grid had no space above it (it sat on the
-   grid's labels). It takes the Today heading's section-line spacing, so the two sections of
-   phone Home start the same way. Its size is unchanged (a question for Esme). */
-.phone-home .journal-card-home h2 {
-  margin: 14px 0 8px;
-}
-
+/* The footer links: a section gap under the list (was 20px, off the scale). */
 .phone-footer {
-  margin-top: 20px;
+  margin-top: var(--gap-section);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: var(--space-2) var(--space-4);
 }

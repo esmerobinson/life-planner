@@ -3,10 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { db } from "../data/db";
-import { createGoal, createItem, deleteGoal, setGoalOnHome, tickItem } from "../data/repo";
+import { addSuggestedGoal, createGoal, createItem, deleteGoal, setGoalOnHome, tickItem } from "../data/repo";
 import { AppShell } from "./AppShell";
 import type { Goal } from "../domain/types";
 import { HomePage, homeGoals } from "./HomePage";
+import { currentUrl, renderApp } from "../test/renderApp";
 import { Route, Routes, useLocation } from "react-router-dom";
 
 const TODAY = "2026-10-27";
@@ -30,7 +31,7 @@ function renderHome() {
 }
 
 describe("HomePage", () => {
-  it("home shows Today picks, the journal card with its two buttons, and a bar per goal with a target", async () => {
+  it("home shows Today picks, the Journal rows, and a bar per goal with a target", async () => {
     const goal = await createGoal({ title: "Write more", areaId: "writing", kind: "practice", monthlyTarget: 10 }, TODAY);
     for (let i = 0; i < 3; i++) {
       const it = await createItem({ kind: "task", title: `Finished ${i}`, areaId: "writing", priority: 3, goalId: goal.id }, TODAY);
@@ -63,7 +64,7 @@ describe("HomePage", () => {
     spy.mockRestore();
   });
 
-  it("the desktop Journal card's Daily check-in button opens the check-in", async () => {
+  it("the Daily check-in row opens the check-in", async () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
@@ -76,7 +77,7 @@ describe("HomePage", () => {
     expect(await screen.findByText("At /journal/check-in")).toBeInTheDocument();
   });
 
-  it("the desktop Journal card's Morning pages button opens morning pages", async () => {
+  it("the Morning pages row opens morning pages", async () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <Routes>
@@ -87,6 +88,41 @@ describe("HomePage", () => {
     );
     await userEvent.click(await screen.findByRole("button", { name: "Morning pages" }));
     expect(await screen.findByText("At /journal/morning")).toBeInTheDocument();
+  });
+
+  it("Today's list starts with the three Journal rows (mint strips), before the to-dos; no separate Journal section", async () => {
+    await createItem({ kind: "task", title: "Pick alpha", areaId: "body", priority: 3, due: TODAY }, TODAY);
+    renderHome();
+    const pick = await screen.findByText("Pick alpha");
+    const heading = screen.getByRole("heading", { level: 1, name: "Today" });
+    const journal = screen.getByRole("list", { name: "Journal" });
+    const rows = within(journal).getAllByRole("listitem");
+    expect(rows.map((li) => within(li).getByRole("button").textContent)).toEqual([
+      "Mental health exercise", "Morning pages", "Daily check-in",
+    ]);
+    for (const r of rows) expect(r).toHaveClass("strip", "journal-row");
+    const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(heading, journal)).toBe(true);
+    expect(follows(journal, pick)).toBe(true);
+    // The first strip under the heading is the exercise.
+    expect(heading.closest("section")!.querySelector(".strip")).toBe(rows[0]);
+    expect(screen.queryByRole("heading", { name: "Journal" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Journal" })).toBeNull();
+  });
+
+  it("daily goals chosen for Home are not green rows: they show in the Goals column only", async () => {
+    await addSuggestedGoal("suggested-bpd-practice", TODAY);
+    await addSuggestedGoal("suggested-journal-daily", TODAY);
+    renderHome();
+    const column = await screen.findByRole("complementary", { name: "Goals this month" });
+    expect(await within(column).findByRole("link", { name: "BPD practice every day" })).toBeInTheDocument();
+    expect(within(column).getByRole("link", { name: "Journal daily" })).toBeInTheDocument();
+    await screen.findByText("Nothing planned for today.");
+    expect(screen.queryByRole("list", { name: "Daily goals" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "BPD practice every day" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Journal daily" })).toBeNull();
+    const green = [...document.querySelectorAll(".journal-row .strip-title")].map((t) => t.textContent);
+    expect(green).toEqual(["Mental health exercise", "Morning pages", "Daily check-in"]);
   });
 
   it("goals without a target are not listed as bars", async () => {
@@ -225,5 +261,25 @@ describe("HomePage", () => {
     await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Open goal task" }));
     const updated = await screen.findByRole("progressbar", { name: /4\/10/ });
     expect(updated).toHaveAttribute("aria-valuenow", "40");
+  });
+});
+
+describe("no Today page (Esme, 2026-11-04: \"today page is a little redundant with the existence of home\")", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("/today goes Home (old links and notifications still work)", async () => {
+    renderApp("/today", TODAY);
+    expect(await screen.findByRole("complementary", { name: "Goals this month" })).toBeInTheDocument();
+    expect(currentUrl).toBe("/");
+    expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeInTheDocument();
+  });
+
+  it("keeps what the link asked for: /today?open=<id> opens it on Home", async () => {
+    const it = await createItem({ kind: "task", title: "Pretend linked errand", areaId: "admin", priority: 2 }, TODAY);
+    renderApp(`/today?open=${it.id}`, TODAY);
+    expect(await screen.findByRole("complementary", { name: "Pretend linked errand" })).toBeInTheDocument();
+    expect(currentUrl).toBe(`/?open=${it.id}`);
   });
 });

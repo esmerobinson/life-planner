@@ -142,7 +142,7 @@ test.describe("desktop 1280", () => {
     await expect(page.getByRole("link", { name: "Open pin on Pinterest" })).toHaveCount(PIN_COUNT);
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect.poll(() => asked.length).toBe(2);
-    await page.goto("/today");
+    await page.goto("/");
     await page.goto("/vision");
     await expect(page.getByRole("link", { name: "Open pin on Pinterest" })).toHaveCount(PIN_COUNT);
     expect(asked).toHaveLength(2);

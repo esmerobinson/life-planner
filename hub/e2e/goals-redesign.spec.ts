@@ -214,7 +214,7 @@ test.describe("desktop (1280px)", () => {
     await shoot(page, "goal-panel-daily-1280");
   });
 
-  test("Home: mini colour-band cards beside Today, the BPD mint row on top of Today, the Choose goals pop-up", async ({ page }) => {
+  test("Home: mini colour-band cards beside Today (the daily goals as cards, not rows), the Choose goals pop-up", async ({ page }) => {
     await seedGoals(page);
     await page.goto("/");
     const column = page.getByRole("complementary", { name: "Goals this month" });
@@ -225,17 +225,12 @@ test.describe("desktop (1280px)", () => {
     const gap = await page.evaluate(() => document.querySelector(".home-goals")!.getBoundingClientRect().left - document.querySelector(".home-centre")!.getBoundingClientRect().right);
     expect(gap).toBeGreaterThanOrEqual(32);
 
-    const rows = page.getByRole("list", { name: "Daily goals" });
-    await expect(rows.getByRole("button", { name: "BPD practice every day" })).toBeVisible();
-    await expect(rows.getByRole("checkbox", { name: "BPD practice every day done today" })).toHaveAttribute("aria-checked", "true");
-    await expect(rows.getByRole("checkbox", { name: "Journal daily done today" })).toHaveAttribute("aria-checked", "true");
-    // Above the to-dos.
-    const above = await page.evaluate(() => {
-      const r = document.querySelector('[aria-label="Daily goals"]')!.getBoundingClientRect().bottom;
-      const t = [...document.querySelectorAll(".today-panel .strip")].find((e) => e.textContent!.includes("Water the pretend fern"))!;
-      return r <= t.getBoundingClientRect().top;
-    });
-    expect(above).toBe(true);
+    // Her daily goals are cards in the column only (Esme, 2026-11-04): the green rows at the
+    // top of Today are the three Journal tasks.
+    await expect(page.getByRole("list", { name: "Daily goals" })).toHaveCount(0);
+    await expect(page.locator(".today-panel .journal-row .strip-title")).toHaveText(["Mental health exercise", "Morning pages", "Daily check-in"]);
+    const bpdCard = column.locator(".goal-mini", { has: page.getByRole("link", { name: "BPD practice every day" }) });
+    await expect(bpdCard.getByTitle("1 day in a row")).toBeAttached();
     await shoot(page, "home-1280");
 
     await column.getByRole("button", { name: "Choose goals" }).click();
@@ -303,7 +298,7 @@ test.describe("phone (390px)", () => {
     await shoot(page, "goal-panel-390");
 
     await page.goto("/");
-    await expect(page.getByRole("list", { name: "Daily goals" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Journal" })).toBeVisible();
     await noSideways(page);
     await shoot(page, "home-390");
   });

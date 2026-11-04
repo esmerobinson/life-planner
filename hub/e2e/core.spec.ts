@@ -13,7 +13,9 @@ test("first run, import, file, tick, move, persist and backup round trip", async
   await test.step("first run: calm empty states", async () => {
     // Calm empty states.
     await expectCalm(page, "Nothing planned for today.");
+    // No Today page (2026-11-04): /today goes Home, as old links and notifications do.
     await page.goto("/today");
+    await expect(page).toHaveURL(/\/$/);
     await expectCalm(page, "Nothing planned for today.");
     await page.goto("/goals");
     await expectCalm(page, "No goals yet.");
@@ -81,7 +83,7 @@ test("first run, import, file, tick, move, persist and backup round trip", async
 
   await test.step("tick, Done and Undo", async () => {
     // Today shows the overdue pick; tick it.
-    await page.goto("/today");
+    await page.goto("/");
     const row = page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" });
     await expect(row).toBeVisible();
     await expect(row.getByText(/· 3 days late$/)).toBeVisible();
@@ -104,7 +106,7 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(ticked).toBeChecked();
     await ticked.click();
     await expect(page.getByText("Done (0)", { exact: true })).toBeVisible();
-    await page.goto("/today");
+    await page.goto("/");
     await expect(page.getByRole("checkbox", { name: "Mark done: Overdue pretend errand" })).not.toBeChecked();
   });
 
@@ -141,7 +143,7 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     // When the clock reads tomorrow, the pinned item is back on Today.
     const tomorrow = await pageDate(page, 1);
     await page.clock.setFixedTime(new Date(`${tomorrow}T12:00:00`));
-    await page.goto("/today");
+    await page.goto("/");
     await expect(page.getByRole("listitem").filter({ hasText: "Overdue pretend errand" })).toBeVisible();
     // The remaining steps deliberately run on the fake "tomorrow" clock.
   });

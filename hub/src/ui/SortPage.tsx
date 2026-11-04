@@ -4,7 +4,7 @@ import {
   archiveItem, deleteItem, fileItem, getItem, putItemBack, saveItemNotes, type SortType,
 } from "../data/repo";
 import type { AreaId, ISODate, Item } from "../domain/types";
-import { GOAL_AREAS_BY_SIDEBAR, NAV } from "./areas";
+import { GOAL_AREAS_BY_SIDEBAR, NAV, TODO_TILE } from "./areas";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { UndoLine } from "./DeleteButton";
 import { inboxOrder, inboxSource } from "./inboxSource";
@@ -14,11 +14,11 @@ import { useHubData } from "./useHubData";
 
 const tileOf = (navId: string) => NAV.find((n) => n.id === navId)!;
 
-/** Step 1's three types (VISUAL-LANGUAGE.md, "Chosen layout for the sort card"): Today, Vision board and Goals tiles. */
-const TYPES: { type: SortType; label: string; nav: string }[] = [
-  { type: "task", label: "To-do", nav: "today" },
-  { type: "idea", label: "Idea", nav: "vision" },
-  { type: "goal", label: "Goal", nav: "goals" },
+/** Step 1's three types (VISUAL-LANGUAGE.md, "Chosen layout for the sort card"): the To-do (old Today), Vision board and Goals tiles. */
+const TYPES: { type: SortType; label: string; tile: { icon: string; tile: string } }[] = [
+  { type: "task", label: "To-do", tile: TODO_TILE },
+  { type: "idea", label: "Idea", tile: tileOf("vision") },
+  { type: "goal", label: "Goal", tile: tileOf("goals") },
 ];
 const typeLabel = (t: SortType) => TYPES.find((x) => x.type === t)!.label;
 
@@ -299,7 +299,7 @@ function SortCard({
           </div>
           <div className="sort-types" role="group" aria-labelledby="sort-q-type">
             {TYPES.map((t, i) => {
-              const n = tileOf(t.nav);
+              const n = t.tile;
               return (
                 <button key={t.type} ref={i === 0 ? firstOfStep : undefined} type="button" className="sort-type" onClick={() => setChosen(t.type)}>
                   <span className="sort-tile" style={{ background: n.tile }}>
