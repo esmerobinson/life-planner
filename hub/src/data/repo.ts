@@ -11,9 +11,10 @@ import {
   nextSessionIndex, withSessions,
 } from "../domain/projects";
 import { SUGGESTED_GOALS, suggestedGoalRow } from "../domain/suggestedGoals";
+import { BOOK_AREA, BOOK_FIELDS, BOOK_LIMITS, isWebLink } from "../domain/books";
 export * from "./journalRepo";
 import {
-  AREA_IDS, type AreaId, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
+  AREA_IDS, type AreaId, type BookStatus, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
   type Session,
 } from "../domain/types";
 
@@ -975,4 +976,121 @@ export async function addPicture(
     id, mime: picture.mime, data: picture.data, width: picture.width, height: picture.height, createdAt: today,
   });
   return id;
+}
+
+// ---- reading list (books are ideas under Mind) ---------------------------------------------
+
+/** The book fields the panel's Edit may change. Blank text (or undefined) removes a field. */
+export interface BookPatch {
+  author?: string | undefined;
+  pages?: number | undefined;
+  pageAt?: number | undefined;
+  link?: string | undefined;
+}
+
+/** Applies a BookPatch to a row (throws on a value the validator would refuse). */
+function withBookPatch(row: Item, patch: BookPatch): Item {
+  const next: Item = { ...row };
+  if ("author" in patch) {
+    const a = (patch.author ?? "").trim();
+    if (a.length > BOOK_LIMITS.author) throw new Error(`An author is at most ${BOOK_LIMITS.author} characters.`);
+    if (a) next.author = a;
+    else delete next.author;
+  }
+  if ("link" in patch) {
+    const l = (patch.link ?? "").trim();
+    if (l && (l.length > BOOK_LIMITS.link || !isWebLink(l))) throw new Error("A link starts with https:// (or http://).");
+    if (l) next.link = l;
+    else delete next.link;
+  }
+  for (const key of ["pages", "pageAt"] as const) {
+    if (!(key in patch)) continue;
+    const n = patch[key];
+    if (n === undefined) {
+      delete next[key];
+      continue;
+    }
+    const min = key === "pages" ? 1 : 0;
+    if (!Number.isInteger(n) || n < min || n > BOOK_LIMITS.pages) {
+      throw new Error(key === "pages" ? "Pages is a whole number, 1 or more." : "The page is a whole number, 0 or more.");
+    }
+    next[key] = n;
+  }
+  // The page reached is never past the last page (fewer pages pull it back).
+  if (next.pages !== undefined && next.pageAt !== undefined && next.pageAt > next.pages) next.pageAt = next.pages;
+  return next;
+}
+
+/** A new book on the reading list: an idea under Mind. Read sets finishedOn to today. */
+export async function createBook(
+  input: { title: string; bookStatus: BookStatus; author?: string; notes?: string },
+  today: ISODate,
+): Promise<Item> {
+  const title = input.title.trim();
+  if (!title) throw new Error("a book needs a title");
+  const checked = withBookPatch(
+    { id: "", kind: "idea", title, links: [], areaId: BOOK_AREA, priority: 2, status: "open", createdAt: today, touchedAt: today },
+    { author: input.author },
+  );
+  return createItem(
+    {
+      kind: "idea",
+      title,
+      areaId: BOOK_AREA,
+      priority: 2,
+      bookStatus: input.bookStatus,
+      ...(checked.author ? { author: checked.author } : {}),
+      ...(input.bookStatus === "read" ? { finishedOn: today } : {}),
+      ...(input.notes?.trim() ? { notes: input.notes } : {}),
+    },
+    today,
+  );
+}
+
+/**
+ * "Change to → Book": the item becomes an idea on the reading list under Mind (as Change to →
+ * Idea, it loses any due date, repeat, day on Today, sessions and milestone flag; its title,
+ * notes and goal stay). A book keeps its status; anything else starts as Want to read.
+ * Returns the row as it was (for Undo), or undefined when there was nothing to change.
+ */
+export async function makeBook(id: string, today: ISODate): Promise<Item | undefined> {
+  return db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item || BINNED.includes(item.status)) return undefined;
+    const { due: _d, recur: _r, pinnedDate: _p, hiddenOn: _h, sessions: _s, milestone: _m, ...rest } = item;
+    await db.items.put({ ...rest, kind: "idea", areaId: BOOK_AREA, bookStatus: item.bookStatus ?? "want", touchedAt: today });
+    return item;
+  });
+}
+
+/** A book's status. Marking it Read sets finishedOn (today, unless it was already Read); leaving Read clears it. */
+export async function setBookStatus(id: string, status: BookStatus, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { finishedOn, ...rest } = item;
+    const next: Item = { ...rest, bookStatus: status, touchedAt: today };
+    if (status === "read") next.finishedOn = item.bookStatus === "read" && finishedOn ? finishedOn : today;
+    await db.items.put(next);
+  });
+}
+
+/** Edits a book's author, pages, page reached and link (only the keys present). */
+export async function updateBook(id: string, patch: BookPatch, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) throw new Error("that book does not exist");
+    await db.items.put({ ...withBookPatch(item, patch), touchedAt: today });
+  });
+}
+
+/** A book stops being one: a plain idea (or a to-do), with every book field removed. */
+export async function unBook(id: string, kind: Item["kind"], today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const next: Item = { ...item, kind, touchedAt: today };
+    for (const k of BOOK_FIELDS) delete next[k];
+    await db.items.put(next);
+  });
 }

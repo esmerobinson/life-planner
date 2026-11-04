@@ -6,7 +6,8 @@
 import { isValidISODate } from "../domain/dates";
 import { MAX_DONE_DATES } from "../domain/habits";
 import { MAX_SESSION_DETAILS, MAX_SESSION_TITLE, MAX_SESSIONS, MIN_SESSIONS } from "../domain/projects";
-import { AREA_IDS, COUNT_SOURCE_KINDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
+import { BOOK_LIMITS, isWebLink } from "../domain/books";
+import { AREA_IDS, BOOK_STATUSES, COUNT_SOURCE_KINDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 
 /** The longest goal why / cadence text (characters). */
 export const MAX_GOAL_TEXT = 4000;
@@ -67,10 +68,33 @@ export function validItem(r: unknown): r is Item {
     // repeat) is domain/projects.ts isProject: an older app version may turn a project into an
     // idea and keep its sessions, and that row must still apply here (fix round 1, I-3).
     (r.sessions === undefined || validSessions(r.sessions)) &&
+    // Reading list fields (shape only, any kind: an older device may change a book to a to-do).
+    validBookFields(r) &&
     // An emptied-from-the-Bin tombstone carries no content.
     (r.status !== "purged" ||
       (r.title === "" && r.notes === undefined && r.tags === undefined && r.sessions === undefined &&
         (r.links as unknown[]).length === 0))
+  );
+}
+
+const BOOK_STATUS_LIST: readonly string[] = BOOK_STATUSES;
+const pageCount = (v: unknown, min: number) =>
+  typeof v === "number" && Number.isInteger(v) && v >= min && v <= BOOK_LIMITS.pages;
+
+/**
+ * A book's fields, each optional: a status, a non-empty author within its cap, whole page
+ * numbers (the page reached never past the page count), a real finished date, and an http(s)
+ * link within its cap.
+ */
+function validBookFields(r: Record<string, unknown>): boolean {
+  return (
+    (r.bookStatus === undefined || BOOK_STATUS_LIST.includes(r.bookStatus as string)) &&
+    (r.author === undefined || (isStr(r.author) && r.author !== "" && r.author.length <= BOOK_LIMITS.author)) &&
+    (r.pages === undefined || pageCount(r.pages, 1)) &&
+    (r.pageAt === undefined || pageCount(r.pageAt, 0)) &&
+    (r.pages === undefined || r.pageAt === undefined || (r.pageAt as number) <= (r.pages as number)) &&
+    optDate(r.finishedOn) &&
+    (r.link === undefined || (isStr(r.link) && r.link.length <= BOOK_LIMITS.link && isWebLink(r.link)))
   );
 }
 

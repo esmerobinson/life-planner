@@ -10,6 +10,9 @@ export type Weekday = (typeof WEEKDAYS)[number];
 export const SOURCE_KINDS = ["backlog", "manual", "gtasks", "obsidian"] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 export type ISODate = string;
+/** A book's place on the reading list: Want to read, Reading, Read. */
+export const BOOK_STATUSES = ["want", "reading", "read"] as const;
+export type BookStatus = (typeof BOOK_STATUSES)[number];
 
 export interface Item {
   id: string;
@@ -45,6 +48,22 @@ export interface Item {
    * projects.ts). Only on `kind: "task"`, never with `recur`. Its deadline is `due`.
    */
   sessions?: Session[];
+  /**
+   * Reading list (2026-11-04): an idea with a `bookStatus` is a book (domain/books.ts). Books
+   * live under Mind. Every book field is optional; an older app version keeps them as they are
+   * (it spreads rows when it writes them) and its validator ignores them.
+   */
+  bookStatus?: BookStatus;
+  /** The book's author, at most 200 characters. */
+  author?: string;
+  /** How many pages the book has (1–100,000). */
+  pages?: number;
+  /** The page reached (0–100,000; never past `pages`). */
+  pageAt?: number;
+  /** The day it was marked Read. */
+  finishedOn?: ISODate;
+  /** One http(s) address for the book (a library or shop page), at most 2000 characters. */
+  link?: string;
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
