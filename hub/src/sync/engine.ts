@@ -22,7 +22,7 @@ import { pictureIds } from "../domain/page";
 import type { FileRow, Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
-import { retireCandidateForToken } from "../journal/keyStore";
+import { retireCandidateForToken, writeAcceptedKeyWrap } from "../journal/keyStore";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
 /** The deployed sync server. The Sync page offers it when no address is saved (still editable). */
@@ -87,7 +87,11 @@ export type MetaKey =
   /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
   | "tokenVersion"
   /** The exact token the server last accepted in a whole run (confirms a journal key). */
-  | "acceptedToken";
+  | "acceptedToken"
+  /** How many runs ended with the token accepted (a counter, never a clock: bug #4). */
+  | "acceptedSeq"
+  /** `acceptedSeq` when the current token was saved (a Save's journal key needs a later acceptance). */
+  | "tokenSeq";
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -127,6 +131,7 @@ async function saveUnderLock(db: HubDB, serverUrl: string, token: string): Promi
     await setMeta(db, "serverUrl", serverUrl);
     await setMeta(db, "token", token);
     await setMeta(db, "tokenVersion", ((await getMeta<number>(db, "tokenVersion")) ?? 0) + 1);
+    await setMeta(db, "tokenSeq", (await getMeta<number>(db, "acceptedSeq")) ?? 0);
     await db.syncMeta.delete("needsPassphrase");
   });
 }
@@ -192,7 +197,15 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 /** Runs a whole sync. Never throws for network or server problems; returns what happened. */
 export async function syncOnce(env: SyncEnv): Promise<SyncOutcome> {
   // One run at a time per database, across tabs too (and never during a restore).
-  return withSyncLock(env.db, () => run(env));
+  return withSyncLock(env.db, async () => {
+    const outcome = await run(env);
+    // The server has just accepted this token: a new passphrase saved here may now get its
+    // journal keywrap row (journal/keyStore.ts). One more run sends it straight away.
+    if (outcome.kind !== "ok" || !(await writeAcceptedKeyWrap(env.db).catch(() => false))) return outcome;
+    const more = await run(env);
+    if (more.kind !== "ok") return more;
+    return { kind: "ok", sent: outcome.sent + more.sent, received: outcome.received + more.received, held: more.held };
+  });
 }
 
 async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
@@ -322,11 +335,13 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   }
   // The loop ran out while there was still work: say so rather than loop on.
   if (!finished) return { kind: "error", message: STOPPED_EARLY_MESSAGE };
-  // The server accepted this token for a whole run: remember it (the journal key candidate
-  // made with exactly this token may now be confirmed, journal/keyStore.ts).
+  // The server accepted this token for a whole run: remember it, and count the run (the
+  // journal key candidate made with exactly this token before this run may now be confirmed,
+  // journal/keyStore.ts; an acceptance from before the candidate never counts, bug #4).
   await db.transaction("rw", db.syncMeta, async () => {
     if ((await getMeta<string>(db, "token")) === token && (await getMeta<number>(db, "tokenVersion")) === tokenVersion) {
       await setMeta(db, "acceptedToken", token);
+      await setMeta(db, "acceptedSeq", ((await getMeta<number>(db, "acceptedSeq")) ?? 0) + 1);
     }
   });
   return { kind: "ok", sent, received, held };

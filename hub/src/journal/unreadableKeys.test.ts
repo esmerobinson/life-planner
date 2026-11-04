@@ -1,7 +1,10 @@
 import "fake-indexeddb/auto";
 import { afterEach, describe, expect, it } from "vitest";
 import { HubDB } from "../data/db";
-import { JOURNAL_CANDIDATE_META, JOURNAL_KEY_META, JOURNAL_RETIRED_META, journalKeyUnreadable, unlockJournal } from "./keyStore";
+import {
+  JOURNAL_CANDIDATE_META, JOURNAL_DEVICE_WRAP_META, JOURNAL_KEY_META, JOURNAL_PENDING_WRAP_META, JOURNAL_RETIRED_META, journalKeyUnreadable,
+  unlockJournal,
+} from "./keyStore";
 import { deriveToken } from "../sync/token";
 import { JOURNAL_KEY_LOST_META, KEY_ROWS, checkRowRaw, dropUnreadableKeys, type RowCheck } from "./unreadableKeys";
 
@@ -21,8 +24,10 @@ afterEach(async () => {
 });
 
 describe("unreadable journal keys (WebKit: a CryptoKey stored under another master key)", () => {
-  it("names the same three rows the key store uses", () => {
-    expect([...KEY_ROWS].sort()).toEqual([JOURNAL_CANDIDATE_META, JOURNAL_KEY_META, JOURNAL_RETIRED_META].sort());
+  it("names every row the key store keeps a CryptoKey in (the re-key adds the device wrap key and the pending wrap)", () => {
+    expect([...KEY_ROWS].sort()).toEqual(
+      [JOURNAL_CANDIDATE_META, JOURNAL_KEY_META, JOURNAL_RETIRED_META, JOURNAL_DEVICE_WRAP_META, JOURNAL_PENDING_WRAP_META].sort(),
+    );
   });
 
   it("removes only the rows that can't be read, without reading them, and remembers a lost confirmed key", async () => {

@@ -14,13 +14,32 @@
 //
 // Keys are non-extractable CryptoKeys stored as objects in syncMeta (IndexedDB holds them;
 // syncMeta is never synced and never in a backup). The passphrase is never stored or logged.
+//
+// Changing the sync passphrase (bugs #3, #4; journal-rekey brief). The journal key never
+// changes: it is made from the journal SECRET S (crypto.ts), the bits of the FIRST passphrase.
+// - Every key confirmed here from a typed passphrase also keeps this device's copy of S,
+//   sealed with a device-only, non-extractable "device wrap key" (never synced, never backed up).
+// - Sync page Save also keeps the passphrase's key-wrap key (KEK) as a "pending wrap", bound to
+//   its sync token. Once the server has accepted exactly that token in a sync that finished
+//   after it was saved, a device whose confirmed key opens the verifier writes the synced row
+//   `keywrap:<kekFp>`: S sealed with that KEK. A refused (typo'd) token never gets one.
+// - A candidate that doesn't open the verifier is confirmed from its passphrase's keywrap row
+//   when one opens and the S inside opens the verifier (rule (a) through the wrap).
+// - Rule (b) needs an acceptance that is FRESH: from a sync that finished after the candidate
+//   was made (for a Save: after its token was saved). A remembered older acceptance can't
+//   confirm a key the server has since stopped accepting (bug #4).
+// - A confirmed key that can't open the synced verifier (another key won) stops sealing: it is
+//   retired and the device goes back to "locked", so the repair pass re-seals its rows later.
 
 import type { HubDB } from "../data/db";
 import { validJournal } from "../data/validate";
 import type { JournalRow } from "../domain/types";
 import { deriveToken } from "../sync/token";
 import { JOURNAL_KEY_LOST_META } from "./unreadableKeys";
-import { deriveJournalKeyAndFp, fileAad, journalAad, openBytes, openJson, sealBytes, sealJson, type JournalKey } from "./crypto";
+import {
+  deriveJournalSecret, deriveKeyWrapKey, fileAad, fromBase64, generateDeviceWrapKey, journalAad, journalKeyFromSecret, openBytes,
+  openJson, SECRET_BYTES, sealBytes, sealJson, toBase64, type JournalKey, type KeyWrapKey, type Sealed,
+} from "./crypto";
 
 /** syncMeta: the confirmed key `{key, mac, fp, id}`. */
 export const JOURNAL_KEY_META = "journalKey";
@@ -30,6 +49,24 @@ export const JOURNAL_CANDIDATE_META = "journalCandidate";
 export const JOURNAL_RETIRED_META = "journalRetired";
 /** syncMeta (written by the sync engine): the exact token the server last accepted in a whole run. */
 export const ACCEPTED_TOKEN_META = "acceptedToken";
+/**
+ * syncMeta (written by the sync engine): counts runs that ended with the token accepted. A
+ * counter, not a clock time, so a device clock set back can't make an old acceptance look new.
+ */
+export const ACCEPTED_SEQ_META = "acceptedSeq";
+/** syncMeta (written by the sync engine): `acceptedSeq` when the current token was saved. */
+export const TOKEN_SEQ_META = "tokenSeq";
+/** syncMeta: this device's own key that seals its copy of S. Non-extractable; never leaves. */
+export const JOURNAL_DEVICE_WRAP_META = "journalDeviceWrap";
+/** syncMeta: the KEK of a passphrase saved on the Sync page, waiting to be written as a wrap. */
+export const JOURNAL_PENDING_WRAP_META = "journalPendingWrap";
+
+/** The synced row kind holding S sealed with one passphrase's KEK. */
+export const KEYWRAP_KIND = "keywrap";
+/** A keywrap row's id: `keywrap:<kekFp>`. */
+export const keyWrapId = (kekFp: string) => `${KEYWRAP_KIND}:${kekFp}`;
+/** What this device's copy of S is bound to (the journal key it makes). */
+const deviceAad = (fp: string) => `device-secret|${fp}`;
 
 /** The verifier row's id and the value sealed in it. */
 export const VERIFIER_ID = "verifier";
@@ -40,6 +77,11 @@ const MAX_RETIRED = 5;
 export interface StoredJournalKey extends JournalKey {
   /** A random id per stored key, so the UI can tell a replaced key from the same one re-read. */
   id: string;
+  /**
+   * This device's copy of S, sealed with the device wrap key. Absent on a key confirmed by an
+   * app version before the re-key update (or when it was made without a passphrase).
+   */
+  s?: Sealed;
 }
 
 export interface StoredCandidate extends StoredJournalKey {
@@ -49,7 +91,34 @@ export interface StoredCandidate extends StoredJournalKey {
    * token, so a second Save finishing in another order can never confirm the wrong key.
    */
   token: string | null;
+  /**
+   * `acceptedSeq` when it was made (for a Save: when its token was saved). Rule (b) needs a
+   * later acceptance. Absent on a candidate stored before the re-key update: counts as 0.
+   */
+  seq?: number;
+  /** Its passphrase's KEK and fingerprint, to look for that passphrase's keywrap row. */
+  kek?: CryptoKey;
+  kekFp?: string;
 }
+
+/** A Sync page passphrase's KEK, waiting for the server to accept its token (brief point 4). */
+interface PendingWrap {
+  kek: CryptoKey;
+  kekFp: string;
+  /** The journal fingerprint the passphrase itself makes (equal to the journal's: no wrap needed). */
+  fp: string;
+  token: string;
+  /** `acceptedSeq` when its token was saved: only a later acceptance counts. */
+  seq: number;
+  id: string;
+}
+
+const isCryptoKey = (v: unknown): v is CryptoKey => !!v && typeof v === "object" && "algorithm" in (v as object);
+
+const isPendingWrap = (v: unknown): v is PendingWrap =>
+  !!v && typeof v === "object" && isCryptoKey((v as PendingWrap).kek) && typeof (v as PendingWrap).kekFp === "string" &&
+  typeof (v as PendingWrap).fp === "string" && typeof (v as PendingWrap).token === "string" &&
+  typeof (v as PendingWrap).seq === "number" && typeof (v as PendingWrap).id === "string";
 
 const isKey = (v: unknown): v is StoredJournalKey =>
   !!v && typeof v === "object" && typeof (v as StoredJournalKey).key === "object" &&
@@ -110,6 +179,18 @@ async function loadRetired(db: HubDB): Promise<JournalKey[]> {
   return Array.isArray(v) ? v.filter(isKey).map((k) => ({ key: k.key, mac: k.mac, fp: k.fp })) : [];
 }
 
+async function loadPendingWrap(db: HubDB): Promise<PendingWrap | undefined> {
+  const v = await meta<PendingWrap>(db, JOURNAL_PENDING_WRAP_META);
+  return isPendingWrap(v) ? v : undefined;
+}
+
+/** Adds a key to the retired list (never seals; the repair pass only), inside the caller's transaction. */
+async function retireKeyIn(db: HubDB, k: JournalKey): Promise<void> {
+  const retired = (await loadRetired(db)).filter((r) => r.fp !== k.fp);
+  retired.unshift({ key: k.key, mac: k.mac, fp: k.fp });
+  await db.syncMeta.put({ key: JOURNAL_RETIRED_META, value: retired.slice(0, MAX_RETIRED) });
+}
+
 /** Moves the candidate (if any) to the retired list, inside the caller's transaction. */
 async function retireCandidateIn(db: HubDB): Promise<void> {
   const c = await loadCandidate(db);
@@ -117,37 +198,125 @@ async function retireCandidateIn(db: HubDB): Promise<void> {
   if (!c) return;
   const confirmed = await loadJournalKeyInfo(db);
   if (confirmed?.fp === c.fp) return; // the same key as the confirmed one: nothing to keep
-  const retired = (await loadRetired(db)).filter((k) => k.fp !== c.fp);
-  retired.unshift({ key: c.key, mac: c.mac, fp: c.fp });
-  await db.syncMeta.put({ key: JOURNAL_RETIRED_META, value: retired.slice(0, MAX_RETIRED) });
+  await retireKeyIn(db, c);
 }
 
 /**
  * The sync engine, on a refused passphrase (401) for `token`: the candidate made with that
- * passphrase is retired. A confirmed key is never touched. Runs inside the engine's syncMeta
- * transaction.
+ * passphrase is retired, and its pending wrap dropped (a refused passphrase never gets a
+ * wrap). A confirmed key is never touched. Runs inside the engine's syncMeta transaction.
  */
 export async function retireCandidateForToken(db: HubDB, token: string): Promise<void> {
   const c = await loadCandidate(db);
   if (c && c.token === token) await retireCandidateIn(db);
+  if ((await loadPendingWrap(db))?.token === token) await db.syncMeta.delete(JOURNAL_PENDING_WRAP_META);
 }
+
+/** This device's wrap key for its copy of S (made once, here only). */
+async function deviceWrapKey(db: HubDB): Promise<CryptoKey> {
+  const have = await meta<CryptoKey>(db, JOURNAL_DEVICE_WRAP_META);
+  if (isCryptoKey(have)) return have;
+  const fresh = await generateDeviceWrapKey();
+  return db.transaction("rw", db.syncMeta, async () => {
+    const now = await meta<CryptoKey>(db, JOURNAL_DEVICE_WRAP_META);
+    if (isCryptoKey(now)) return now;
+    await db.syncMeta.put({ key: JOURNAL_DEVICE_WRAP_META, value: fresh });
+    return fresh;
+  });
+}
+
+/** S sealed for this device only. */
+async function sealForDevice(db: HubDB, s: Uint8Array, fp: string): Promise<Sealed> {
+  return sealBytes(await deviceWrapKey(db), s, deviceAad(fp));
+}
+
+/**
+ * This device's copy of S for a stored key, checked to make exactly that key; undefined when
+ * there is none (a key confirmed before the update) or it can't be opened (e.g. the device
+ * wrap key was lost). The caller wipes it after use.
+ */
+async function deviceSecret(db: HubDB, k: StoredJournalKey): Promise<Uint8Array | undefined> {
+  if (!k.s) return undefined;
+  const wrap = await meta<CryptoKey>(db, JOURNAL_DEVICE_WRAP_META);
+  if (!isCryptoKey(wrap)) return undefined;
+  try {
+    const s = await openBytes(wrap, k.s, deviceAad(k.fp));
+    if (s.length === SECRET_BYTES && (await journalKeyFromSecret(s)).fp === k.fp) return s;
+    s.fill(0);
+  } catch {
+    /* none usable */
+  }
+  return undefined;
+}
+
+/** A passphrase turned into its journal key and S (one PBKDF2). */
+async function fromPassphrase(passphrase: string): Promise<{ jk: JournalKey; s: Uint8Array }> {
+  const s = await deriveJournalSecret(passphrase);
+  return { jk: await journalKeyFromSecret(s), s };
+}
+
+/**
+ * The keywrap row for a KEK, opened: S and the journal key it makes. Undefined when there is
+ * no such row, it doesn't open with this KEK, or what's inside doesn't hold together.
+ */
+async function openWrap(db: HubDB, kek: CryptoKey, kekFp: string): Promise<{ jk: JournalKey; s: Uint8Array } | undefined> {
+  const row = await db.journal.get(keyWrapId(kekFp));
+  if (!row || row.kind !== KEYWRAP_KIND) return undefined;
+  try {
+    const v = await openJson<{ v?: unknown; s?: unknown; fp?: unknown }>(kek, row, journalAad(row.id));
+    if (v?.v !== 1 || typeof v.s !== "string" || typeof v.fp !== "string") return undefined;
+    const s = fromBase64(v.s);
+    if (s.length !== SECRET_BYTES) return undefined;
+    const jk = await journalKeyFromSecret(s);
+    if (jk.fp !== v.fp) {
+      s.fill(0);
+      return undefined;
+    }
+    return { jk, s };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Which acceptance a new candidate needs to beat (see StoredCandidate.seq). */
+type Fresh = "since-token-saved" | "from-now";
 
 /**
  * Stores a candidate. One bound to a sync token is stored only while that token is still the
  * device's sync token: a slower, older Save (another passphrase) finishing late is dropped.
+ * A Save's candidate (`kek` given) also stores its passphrase's pending wrap.
  */
-async function storeCandidate(db: HubDB, jk: JournalKey, token: string | null): Promise<boolean> {
+async function storeCandidate(
+  db: HubDB,
+  m: { jk: JournalKey; s?: Uint8Array; kek?: KeyWrapKey },
+  token: string | null,
+  fresh: Fresh = "from-now",
+): Promise<boolean> {
+  const sealed = m.s ? await sealForDevice(db, m.s, m.jk.fp) : undefined;
   return db.transaction("rw", db.syncMeta, async () => {
     if (token !== null && (await meta<string>(db, "token")) !== token) return false;
     await retireCandidateIn(db); // a superseded candidate is kept for repair, never used
     await db.syncMeta.delete(JOURNAL_KEY_LOST_META); // she typed the passphrase again
-    const value: StoredCandidate = { key: jk.key, mac: jk.mac, fp: jk.fp, token, id: crypto.randomUUID() };
+    const accepted = (await meta<number>(db, ACCEPTED_SEQ_META)) ?? 0;
+    const tokenSeq = await meta<number>(db, TOKEN_SEQ_META);
+    const seq = fresh === "since-token-saved" && typeof tokenSeq === "number" ? Math.min(tokenSeq, accepted) : accepted;
+    const value: StoredCandidate = {
+      key: m.jk.key, mac: m.jk.mac, fp: m.jk.fp, token, id: crypto.randomUUID(), seq,
+      ...(sealed ? { s: sealed } : {}),
+      ...(m.kek ? { kek: m.kek.key, kekFp: m.kek.fp } : {}),
+    };
     await db.syncMeta.put({ key: JOURNAL_CANDIDATE_META, value });
+    if (m.kek && token !== null) {
+      const pending: PendingWrap = { kek: m.kek.key, kekFp: m.kek.fp, fp: m.jk.fp, token, seq, id: crypto.randomUUID() };
+      await db.syncMeta.put({ key: JOURNAL_PENDING_WRAP_META, value: pending });
+    }
     return true;
   });
 }
 
-const asStored = (c: StoredCandidate): StoredJournalKey => ({ key: c.key, mac: c.mac, fp: c.fp, id: c.id });
+const asStored = (c: StoredCandidate): StoredJournalKey => ({
+  key: c.key, mac: c.mac, fp: c.fp, id: c.id, ...(c.s ? { s: c.s } : {}),
+});
 
 async function opensVerifier(jk: JournalKey, row: JournalRow): Promise<boolean> {
   try {
@@ -165,16 +334,46 @@ async function sealedVerifier(jk: JournalKey, date: string): Promise<JournalRow>
 
 const todayStamp = () => new Date().toISOString().slice(0, 10);
 
+/** The server accepted exactly `token` in a sync that finished after `seq`, and it is still the token here. */
+async function freshlyAccepted(db: HubDB, token: string | null, seq: number | undefined): Promise<boolean> {
+  if (token === null) return false;
+  return (
+    (await meta<string>(db, "token")) === token &&
+    (await meta<string>(db, ACCEPTED_TOKEN_META)) === token &&
+    ((await meta<number>(db, ACCEPTED_SEQ_META)) ?? 0) > (seq ?? 0)
+  );
+}
+
+/** Makes `k` the confirmed key, keeping an existing copy of S for the same key if `k` has none. In a transaction. */
+async function confirmIn(db: HubDB, k: StoredJournalKey): Promise<void> {
+  const before = await loadJournalKeyInfo(db);
+  const s = k.s ?? (before?.fp === k.fp ? before.s : undefined);
+  await db.syncMeta.put({ key: JOURNAL_KEY_META, value: { key: k.key, mac: k.mac, fp: k.fp, id: k.id, ...(s ? { s } : {}) } });
+}
+
 export type JournalKeyState = "confirmed" | "checking" | "locked";
 
 /**
- * Tries to confirm the candidate (rules (a) and (b) above), writes the verifier when this
- * device is the first, and runs the repair pass. Safe to call any time (on the Journal page,
- * after Save, after a sync). Returns where this device now stands.
+ * Tries to confirm the candidate (rules (a) and (b) above, and (a) through a keywrap row),
+ * writes the verifier when this device is the first, writes a pending wrap the server has
+ * accepted, and runs the repair pass. Safe to call any time (on the Journal page, after Save,
+ * after a sync). Returns where this device now stands.
  */
 export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
   let confirmed = await loadJournalKeyInfo(db);
   let verifier = await db.journal.get(VERIFIER_ID);
+  // Another key's verifier won (bug #4): this key stops sealing. Its rows stay as they are;
+  // kept as retired, the repair pass re-seals them once the right key is confirmed here.
+  if (confirmed && verifier && !(await opensVerifier(confirmed, verifier))) {
+    const was = confirmed;
+    const seen = verifier;
+    await db.transaction("rw", db.journal, db.syncMeta, async () => {
+      if ((await loadJournalKeyInfo(db))?.id !== was.id || (await db.journal.get(VERIFIER_ID))?.updatedAt !== seen.updatedAt) return;
+      await retireKeyIn(db, was);
+      await db.syncMeta.delete(JOURNAL_KEY_META);
+    });
+    confirmed = await loadJournalKeyInfo(db);
+  }
   // A confirmed key with no verifier anywhere here (e.g. after a Replace restore): put it back.
   if (confirmed && !verifier) {
     const row = await sealedVerifier(confirmed, todayStamp());
@@ -186,53 +385,187 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
   const c = await loadCandidate(db);
   if (c) {
     if (verifier) {
-      const ok = await opensVerifier(c, verifier);
+      let found: StoredJournalKey | undefined;
+      if (await opensVerifier(c, verifier)) found = asStored(c);
+      else if (c.kek && c.kekFp) found = await keyFromWrap(db, c.kek, c.kekFp, verifier);
       await db.transaction("rw", db.syncMeta, async () => {
         if ((await loadCandidate(db))?.id !== c.id) return;
-        if (ok) {
-          await db.syncMeta.put({ key: JOURNAL_KEY_META, value: asStored(c) });
+        if (found) {
+          await confirmIn(db, found);
           await db.syncMeta.delete(JOURNAL_CANDIDATE_META);
+          // The candidate's own key (when it came through a wrap) never sealed anything: dropped.
         } else {
-          await retireCandidateIn(db); // a typo, or a passphrase other than the journal's
+          await retireCandidateIn(db); // a typo, or a passphrase with no wrap (yet)
         }
       });
     } else if (!confirmed) {
       const token = await meta<string>(db, "token");
-      const accepted = await meta<string>(db, ACCEPTED_TOKEN_META);
       if (!token || c.token === null || token !== c.token) {
         // Its passphrase's token is gone (refused) or replaced: it can never be confirmed.
         await db.transaction("rw", db.syncMeta, async () => {
           if ((await loadCandidate(db))?.id === c.id) await retireCandidateIn(db);
         });
-      } else if (accepted === c.token) {
-        // The server accepted this passphrase and no device has a verifier: this one writes it.
+      } else if (await freshlyAccepted(db, c.token, c.seq)) {
+        // The server accepted this passphrase (in a sync after it was typed) and no device has
+        // a verifier: this one writes it.
         const row = await sealedVerifier(c, todayStamp());
         await db.transaction("rw", db.journal, db.syncMeta, async () => {
           if ((await loadCandidate(db))?.id !== c.id || (await db.journal.get(VERIFIER_ID))) return;
-          if ((await meta<string>(db, ACCEPTED_TOKEN_META)) !== c.token || (await meta<string>(db, "token")) !== c.token) return;
-          await db.syncMeta.put({ key: JOURNAL_KEY_META, value: asStored(c) });
+          if (!(await freshlyAccepted(db, c.token, c.seq))) return;
+          await confirmIn(db, asStored(c));
           await db.syncMeta.delete(JOURNAL_CANDIDATE_META);
           await db.journal.put(row);
         });
       }
     }
   }
+  // A Sync page passphrase whose candidate was retired before its wrap arrived (she typed the
+  // new passphrase here before on a device where the journal was open): the wrap opens it now.
+  const pending = await loadPendingWrap(db);
+  if (!(await loadJournalKeyInfo(db)) && verifier && pending) {
+    const found = await keyFromWrap(db, pending.kek, pending.kekFp, verifier);
+    if (found) {
+      await db.transaction("rw", db.syncMeta, async () => {
+        if ((await loadJournalKeyInfo(db)) || (await loadPendingWrap(db))?.id !== pending.id) return;
+        await confirmIn(db, found);
+      });
+    }
+  }
   confirmed = await loadJournalKeyInfo(db);
   if (confirmed) {
+    await writeAcceptedKeyWrap(db);
     await repairJournal(db);
     return "confirmed";
   }
   return (await loadCandidate(db)) ? "checking" : "locked";
 }
 
+/** The journal key from a KEK's keywrap row, if its S opens the verifier, with this device's copy of S. */
+async function keyFromWrap(db: HubDB, kek: CryptoKey, kekFp: string, verifier: JournalRow): Promise<StoredJournalKey | undefined> {
+  const w = await openWrap(db, kek, kekFp);
+  if (!w) return undefined;
+  try {
+    if (!(await opensVerifier(w.jk, verifier))) return undefined; // another journal's secret: ignored
+    return { ...w.jk, id: crypto.randomUUID(), s: await sealForDevice(db, w.s, w.jk.fp) };
+  } finally {
+    w.s.fill(0);
+  }
+}
+
+/**
+ * Writes the keywrap row for the pending wrap, when the server has freshly accepted its token
+ * and this device's confirmed key (which opens the verifier) has its copy of S. Drops the
+ * pending wrap once nothing is left to do. Called after every sync that ends "ok" and by
+ * confirmJournalKey. True when it wrote a row (the engine then syncs again to send it).
+ */
+export async function writeAcceptedKeyWrap(db: HubDB): Promise<boolean> {
+  const p = await loadPendingWrap(db);
+  const confirmed = await loadJournalKeyInfo(db);
+  if (!p || !confirmed) return false;
+  const drop = () =>
+    db.transaction("rw", db.syncMeta, async () => {
+      if ((await loadPendingWrap(db))?.id === p.id) await db.syncMeta.delete(JOURNAL_PENDING_WRAP_META);
+    });
+  if (p.fp === confirmed.fp) {
+    await drop(); // the journal's own passphrase: it opens the journal without a wrap
+    return false;
+  }
+  if (!(await freshlyAccepted(db, p.token, p.seq))) return false;
+  const verifier = await db.journal.get(VERIFIER_ID);
+  if (!verifier || !(await opensVerifier(confirmed, verifier))) return false;
+  const id = keyWrapId(p.kekFp);
+  const existing = await db.journal.get(id);
+  if (existing) {
+    const w = await openWrap(db, p.kek, p.kekFp);
+    w?.s.fill(0);
+    // Already there (another device wrote it), or a row this KEK can't open: never written over.
+    if (!w || w.jk.fp === confirmed.fp) {
+      await drop();
+      return false;
+    }
+  }
+  const s = await deviceSecret(db, confirmed);
+  if (!s) return false; // a key from before the update: the old passphrase is asked for once
+  let row: JournalRow;
+  try {
+    row = { id, kind: KEYWRAP_KIND, date: todayStamp(), fp: p.kekFp, ...(await sealJson(p.kek, { v: 1, s: toBase64(s), fp: confirmed.fp }, journalAad(id))) };
+  } finally {
+    s.fill(0);
+  }
+  if (!validJournal(row)) return false;
+  return db.transaction("rw", db.journal, db.syncMeta, async () => {
+    if ((await loadPendingWrap(db))?.id !== p.id) return false;
+    if ((await loadJournalKeyInfo(db))?.fp !== confirmed.fp) return false; // only the confirmed key's S
+    if ((await db.journal.get(id))?.updatedAt !== existing?.updatedAt) return false; // changed meanwhile
+    await db.journal.put(row);
+    await db.syncMeta.delete(JOURNAL_PENDING_WRAP_META);
+    return true;
+  });
+}
+
+/**
+ * True when the server has accepted a new passphrase saved here, but this device's journal key
+ * was confirmed before the re-key update, so it has no copy of S to write that passphrase's
+ * wrap: the Sync page and Journal ask once for the old passphrase (brief point 5).
+ */
+export async function journalNeedsOldPassphrase(db: HubDB): Promise<boolean> {
+  const p = await loadPendingWrap(db);
+  const confirmed = await loadJournalKeyInfo(db);
+  if (!p || !confirmed || p.fp === confirmed.fp) return false;
+  if (!(await freshlyAccepted(db, p.token, p.seq))) return false;
+  if (await db.journal.get(keyWrapId(p.kekFp))) return false;
+  const s = await deviceSecret(db, confirmed);
+  s?.fill(0);
+  return !s;
+}
+
+/**
+ * The old-passphrase prompt: a passphrase that gives this device's confirmed journal key
+ * (the journal's first passphrase, or any passphrase with a wrap here) stores this device's
+ * copy of S and writes the pending wrap. "wrong" for anything else; nothing changes then.
+ */
+export async function giveOldPassphrase(db: HubDB, passphrase: string): Promise<"ok" | "wrong"> {
+  const confirmed = await loadJournalKeyInfo(db);
+  if (!passphrase || !confirmed) return "wrong";
+  const m = await fromPassphrase(passphrase);
+  let s: Uint8Array | undefined = m.s;
+  if (m.jk.fp !== confirmed.fp) {
+    m.s.fill(0);
+    const kek = await deriveKeyWrapKey(passphrase);
+    const w = await openWrap(db, kek.key, kek.fp);
+    s = w && w.jk.fp === confirmed.fp ? w.s : (w?.s.fill(0), undefined);
+  }
+  if (!s) return "wrong";
+  let sealed: Sealed;
+  try {
+    sealed = await sealForDevice(db, s, confirmed.fp);
+  } finally {
+    s.fill(0);
+  }
+  const stored = await db.transaction("rw", db.syncMeta, async () => {
+    const now = await loadJournalKeyInfo(db);
+    if (now?.id !== confirmed.id) return false;
+    await db.syncMeta.put({ key: JOURNAL_KEY_META, value: { ...now, s: sealed } });
+    return true;
+  });
+  if (!stored) return "wrong";
+  await writeAcceptedKeyWrap(db);
+  return "ok";
+}
+
 /**
  * Sync page Save: the passphrase was just turned into the sync token and saved. The journal
- * key from it is stored only as a candidate; it is confirmed by the verifier, or by the
- * server accepting the token (a later sync), never by being typed.
+ * key from it is stored only as a candidate; it is confirmed by the verifier (directly or
+ * through its keywrap row), or by the server accepting the token (a later sync), never by
+ * being typed. Its KEK waits as the pending wrap.
  */
 export async function saveJournalKeyFromSync(db: HubDB, passphrase: string): Promise<JournalKeyState> {
-  const [jk, token] = await Promise.all([deriveJournalKeyAndFp(passphrase), deriveToken(passphrase)]);
-  await storeCandidate(db, jk, token);
+  const [m, kek, token] = await Promise.all([fromPassphrase(passphrase), deriveKeyWrapKey(passphrase), deriveToken(passphrase)]);
+  try {
+    await storeCandidate(db, { ...m, kek }, token, "since-token-saved");
+  } finally {
+    m.s.fill(0);
+  }
   return confirmJournalKey(db);
 }
 
@@ -240,27 +573,43 @@ export type UnlockResult = "ok" | "checking" | "wrong" | "no-sync" | "sync-uncon
 
 /**
  * "Unlock journal".
- * - A verifier is here: the passphrase must open it (nothing else counts).
+ * - A verifier is here: the passphrase must open it, directly or through its keywrap row
+ *   (a passphrase she changed to). Nothing else counts.
  * - No verifier yet, a sync token here: the passphrase must give that token. If the server
  *   has not accepted that token yet, a mismatch may mean the Sync page has the typo, so it
  *   says so ("sync-unconfirmed") instead of "wrong". A match is a candidate until the server
- *   accepts the token ("checking").
+ *   accepts the token in a later sync ("checking").
  * - Neither: "no-sync" (set up sync first).
  */
 export async function unlockJournal(db: HubDB, passphrase: string): Promise<UnlockResult> {
   if (!passphrase) return "wrong";
   const verifier = await db.journal.get(VERIFIER_ID);
   if (verifier) {
-    const jk = await deriveJournalKeyAndFp(passphrase);
-    if (!(await opensVerifier(jk, verifier))) return "wrong";
-    await storeCandidate(db, jk, null);
+    let m: { jk: JournalKey; s: Uint8Array } | undefined = await fromPassphrase(passphrase);
+    if (!(await opensVerifier(m.jk, verifier))) {
+      m.s.fill(0);
+      const kek = await deriveKeyWrapKey(passphrase);
+      m = await openWrap(db, kek.key, kek.fp);
+      if (m && !(await opensVerifier(m.jk, verifier))) m = (m.s.fill(0), undefined);
+    }
+    if (!m) return "wrong";
+    try {
+      await storeCandidate(db, m, null);
+    } finally {
+      m.s.fill(0);
+    }
     return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "wrong";
   }
   const token = await meta<string>(db, "token");
   if (typeof token !== "string" || !token) return "no-sync";
   const typed = await deriveToken(passphrase);
   if (typed !== token) return (await meta<string>(db, ACCEPTED_TOKEN_META)) === token ? "wrong" : "sync-unconfirmed";
-  if (!(await storeCandidate(db, await deriveJournalKeyAndFp(passphrase), typed))) return "wrong";
+  const m = await fromPassphrase(passphrase);
+  try {
+    if (!(await storeCandidate(db, m, typed))) return "wrong";
+  } finally {
+    m.s.fill(0);
+  }
   return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "checking";
 }
 
@@ -277,6 +626,7 @@ export async function repairJournal(db: HubDB): Promise<number> {
   const byFp = new Map(retired.map((k) => [k.fp, k]));
   let fixed = 0;
   for (const row of await db.journal.toArray()) {
+    if (row.kind === KEYWRAP_KIND) continue; // sealed with a KEK, never a journal key
     const old = row.fp && row.fp !== confirmed.fp ? byFp.get(row.fp) : undefined;
     if (!old) continue;
     try {
