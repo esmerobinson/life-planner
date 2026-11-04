@@ -141,6 +141,30 @@ for (const width of [1280, 390]) {
       await shoot(page, `fix1-note-draft-back-${width}`);
     });
 
+    test("a note written on two devices without seeing each other: the newest, the other below", async ({ page }) => {
+      await unlocked(page, "/journal/notes");
+      await expect(page.getByRole("region", { name: "Notes to myself" })).toBeVisible();
+      await page.evaluate(async () => {
+        const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+        const repo = await at("/src/data/repo.ts");
+        const keys = await at("/src/journal/keyStore.ts");
+        const dates = await at("/src/domain/dates.ts");
+        const { db } = await at("/src/data/db.ts");
+        const jk = await keys.loadJournalKey(db);
+        const today = dates.todayISO();
+        const note = { prompt: "He's going to leave", thought: "He's going to leave", memory: "", skill: "" };
+        const id = await repo.saveNote(jk, today, "pretend-mac-device", { ...note, steady: "Pretend: he came back every time" });
+        const seen = (await repo.listNotes(jk)).notes[0].seen;
+        await repo.saveNote(jk, today, "pretend-mac-device", { ...note, steady: "Pretend: he came back every time, and he said so" }, { id, seen });
+        await new Promise((r) => setTimeout(r, 20));
+        await repo.saveNote(jk, today, "pretend-phone-device", { ...note, steady: "Pretend: he stays, even when it's hard" }, { id, seen });
+      });
+      const s = page.getByRole("region", { name: "Notes to myself" });
+      await expect(s.getByText(/^Another version \(from .+\)$/).first()).toBeVisible();
+      await noSidewaysScroll(page);
+      await shoot(page, `fix1-note-another-version-${width}`);
+    });
+
     test("an unfinished morning page from days ago is offered back", async ({ page }) => {
       await unlocked(page, "/journal/morning");
       await expect(page.getByLabel("Today's morning page")).toBeVisible();
