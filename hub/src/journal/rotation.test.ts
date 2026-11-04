@@ -32,6 +32,10 @@ describe("rotation", () => {
   it("is morning before 14:00 and evening from 14:00", () => {
     expect(flavourAt(13)).toBe("morning");
     expect(flavourAt(14)).toBe("evening");
+    // Her day runs 3am to 3am: after midnight it is still the evening before (bug #17).
+    expect(flavourAt(1)).toBe("evening");
+    expect(flavourAt(2)).toBe("evening");
+    expect(flavourAt(3)).toBe("morning");
   });
 
   it("is deterministic for a day (every device shows the same three)", () => {

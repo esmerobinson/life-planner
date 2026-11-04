@@ -5,7 +5,8 @@
 // - Her own starters S1–S4 may take any slot, each roughly twice a week (a day is "theirs"
 //   with chance 2 in 7, decided by the date). They are meant to recur, so the no-repeat
 //   window below does not apply to them.
-// - Time of day picks the flavour: before 14:00 "morning" + "any", after that "evening" + "any".
+// - Time of day picks the flavour: 3am to 14:00 "morning" + "any", after that (and after midnight,
+//   still the day before until 3am) "evening" + "any".
 // - No prompt is repeated within REPEAT_WINDOW_DAYS days of the stored history when the slot
 //   has another choice; otherwise the least recently asked one is used.
 // - A question she missed (skipped, or never reached) goes back into circulation (2026-11-04):
@@ -15,7 +16,7 @@
 //   every device (choices are seeded by the date). Once a day's check-in is started its
 //   prompts are stored in the entry, so a device never changes them afterwards.
 
-import { addDays } from "../domain/dates";
+import { addDays, DAY_ENDS_AT_HOUR } from "../domain/dates";
 import type { ISODate } from "../domain/types";
 import { PROMPT_BY_ID, type PromptWhen } from "./prompts";
 
@@ -37,8 +38,12 @@ export function slotOf(id: string): Slot | "own" {
   return "skill"; // D*, other E*, I*
 }
 
+/**
+ * Morning from the start of her day (3am, DAY_ENDS_AT_HOUR) until 14:00, evening after. The
+ * hours after midnight and before 3am still belong to the day before: evening (bug #17).
+ */
 export function flavourAt(hour: number): Exclude<PromptWhen, "any"> {
-  return hour < EVENING_FROM_HOUR ? "morning" : "evening";
+  return hour >= DAY_ENDS_AT_HOUR && hour < EVENING_FROM_HOUR ? "morning" : "evening";
 }
 
 /** FNV-1a: a small, stable string hash (the same on every device). */

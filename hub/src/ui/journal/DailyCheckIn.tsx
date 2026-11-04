@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   answeredPrompts, CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, moveAnswerOn, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
@@ -12,6 +13,11 @@ import { AutoGrowTextarea } from "../useAutoGrow";
 import { DoneBox, LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { useDbChanges } from "./useJournalKey";
 
+/** On a finished check-in: the answers back into boxes, then read-only again. */
+export const EDIT_ANSWERS = "Edit";
+export const SAVE_ANSWERS = "Save";
+/** How many past check-ins the tab lists before "See all" (Read back). */
+const PAST_ON_TAB = 3;
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
 export const CHECKED_IN_LINE = "Kind to yourself today? That counts.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
@@ -232,37 +238,73 @@ function Question({
   );
 }
 
-/** "Checked in for today", then today's questions and answers, still editable. */
+/**
+ * Once today's check-in is finished (Esme, 2026-11-04: "i should just see a completed check in
+ * with my answers, maybe an option to edit"): "Checked in for today", then each question she
+ * answered with her answer as it is, read-only (a skipped one isn't shown). "Edit" turns them
+ * back into boxes (each saved as she types, as before); Save shows them read-only again.
+ */
 function CheckedIn({
   jk, day, deviceId, onProblem,
 }: { jk: JournalKey; day: CheckinDay; deviceId: string; onProblem: (p: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  // What she just saved here, shown at once (the day is re-read a moment later).
+  const [mine, setMine] = useState<Record<string, string>>({});
+  const answered = answeredPrompts(day);
+  const answerOf = (id: string) => mine[id] ?? day.answers.get(id)?.answer ?? "";
   return (
     <>
       <DoneBox title="Checked in for today" line={CHECKED_IN_LINE} />
       <ol className="journal-answers">
-        {day.prompts.map((id) => (
+        {answered.map((id) => (
           <li key={id}>
             <QuestionText id={id} />
-            <EditableAnswer
-              stored={day.answers.get(id)?.answer ?? ""}
-              onSave={async (text) => {
-                try {
-                  await saveAnswer(jk, day.date, id, deviceId, text, true); // this device's own row
-                } catch (err) {
-                  onProblem(SAVE_PROBLEM);
-                  throw err;
-                }
-              }}
-            />
+            {editing ? (
+              <EditableAnswer
+                stored={answerOf(id)}
+                onSave={async (text) => {
+                  setMine((m) => ({ ...m, [id]: text }));
+                  try {
+                    await saveAnswer(jk, day.date, id, deviceId, text, true); // this device's own row
+                  } catch (err) {
+                    onProblem(SAVE_PROBLEM);
+                    throw err;
+                  }
+                }}
+              />
+            ) : (
+              <p className="journal-past-answer">
+                <output aria-label="Your answer" aria-live="off">
+                  {answerOf(id)}
+                </output>
+              </p>
+            )}
           </li>
         ))}
       </ol>
+      {answered.length > 0 && (
+        <div className="btn-group">
+          {editing ? (
+            <button type="button" onClick={() => setEditing(false)}>
+              {SAVE_ANSWERS}
+            </button>
+          ) : (
+            <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
+              {EDIT_ANSWERS}
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }
 
 function EditableAnswer({ stored, onSave }: { stored: string; onSave: (text: string) => Promise<void> }) {
   const draft = useDraft(stored, onSave, AUTOSAVE_MS);
+  // Save (or anything else) taking the boxes away: what is typed is saved first.
+  const flush = useRef(draft.flush);
+  flush.current = draft.flush;
+  useEffect(() => () => flush.current(), []);
   return (
     <AutoGrowTextarea
       className="journal-answer"
@@ -276,7 +318,8 @@ function EditableAnswer({ stored, onSave }: { stored: string; onSave: (text: str
 }
 
 /**
- * Past check-ins, newest first; each opens the questions she answered (these may be reread).
+ * Past check-ins, newest first (the latest few; "See all" opens Read back); each opens the
+ * questions she answered (these may be reread).
  * Skipped questions aren't shown, and a day with nothing answered isn't listed (Esme,
  * 2026-11-04): those questions come round again instead.
  */
@@ -287,7 +330,7 @@ function PastCheckIns({ past }: { past: CheckinDay[] }) {
     <details className="journal-fold">
       <summary>Past check-ins</summary>
       <ul className="journal-past">
-        {days.map((c) => (
+        {days.slice(0, PAST_ON_TAB).map((c) => (
           <li key={c.date}>
             <details>
               <summary>{longDate(c.date)}</summary>
@@ -304,6 +347,11 @@ function PastCheckIns({ past }: { past: CheckinDay[] }) {
           </li>
         ))}
       </ul>
+      {days.length > PAST_ON_TAB && (
+        <p>
+          <Link to="/journal/read-back">See all</Link>
+        </p>
+      )}
     </details>
   );
 }
