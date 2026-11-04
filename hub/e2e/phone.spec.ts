@@ -121,6 +121,7 @@ const ROUTES = [
   ["bin", "/bin"],
   ["backup", "/backup"],
   ["sync", "/sync"],
+  ["farm", "/farm"],
 ] as const;
 
 /** The page's width, or the open side panel's (it scrolls on its own, over the page). */

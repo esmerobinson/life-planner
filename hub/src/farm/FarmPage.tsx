@@ -93,7 +93,7 @@ export function FarmPage() {
           farmRef.current?.scrollIntoView?.({ block: "nearest" });
         }}
       />
-      <div ref={farmRef}>
+      <div ref={farmRef} className="farm-scene-wrap">
         <FarmScene
           view={view}
           phone={phone}

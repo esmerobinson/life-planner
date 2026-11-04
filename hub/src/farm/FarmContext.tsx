@@ -52,8 +52,18 @@ export function useFarm(): FarmView | null {
   return useContext(FarmContext);
 }
 
-/** The journal's facts while it opens here (null while locked; never blocks the farm). */
-function useJournalFacts(): JournalFacts | null {
+/**
+ * After a journal change, the farm re-reads the journal once things settle (a technical
+ * debounce, not a motion timing): typing a page autosaves its draft often, and re-opening the
+ * journal on every keystroke would be wasted work.
+ */
+const JOURNAL_RELOAD_MS = 2000;
+
+/**
+ * The journal's facts while it opens here (null while locked; never blocks the farm). Only read
+ * once the farm has started (`on`).
+ */
+function useJournalFacts(on: boolean): JournalFacts | null {
   const [facts, setFacts] = useState<JournalFacts | null>(null);
   const latest = useRef(0);
   const load = useCallback(async () => {
@@ -68,18 +78,23 @@ function useJournalFacts(): JournalFacts | null {
     if (id === latest.current) setFacts(next);
   }, []);
   useEffect(() => {
+    if (!on) return;
     void load();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const onMutated = (parts: Record<string, unknown> | undefined) => {
       const keys = Object.keys(parts ?? {});
-      if (keys.length === 0 || keys.some(touchesJournal)) void load();
+      if (keys.length > 0 && !keys.some(touchesJournal)) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => void load(), JOURNAL_RELOAD_MS);
     };
     Dexie.on.storagemutated.subscribe(onMutated);
     return () => {
       latest.current++;
+      clearTimeout(timer);
       Dexie.on.storagemutated.unsubscribe(onMutated);
     };
-  }, [load]);
-  return facts;
+  }, [load, on]);
+  return on ? facts : null;
 }
 
 export function FarmProvider({ items, goals, today, children }: { items: Item[]; goals: Goal[]; today: ISODate; children: ReactNode }) {
@@ -89,7 +104,7 @@ export function FarmProvider({ items, goals, today, children }: { items: Item[];
     return () => sub.unsubscribe();
   }, []);
   const state = useMemo(() => (rows ? farmState(rows) : EMPTY_FARM), [rows]);
-  const journal = useJournalFacts();
+  const journal = useJournalFacts(state.start !== null);
   const location = useLocation();
   const onJournal = location.pathname === "/journal" || location.pathname.startsWith("/journal/");
 
