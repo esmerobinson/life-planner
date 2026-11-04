@@ -5,6 +5,7 @@ import { AREA_CHOICES, GOAL_AREAS_MIND_FIRST } from "./areas";
 import { ShellContext } from "./shellContext";
 import { StripTitle } from "./TaskRow";
 import { useHubData } from "./useHubData";
+import { usePhone } from "./usePhone";
 import { useRepeatActions } from "./useRepeatActions";
 
 /** Every repeating item by area: Mind first, then the sidebar's order, and the Inbox (older imports) last. */
@@ -32,6 +33,7 @@ export function RepeatingPage({ today }: { today: ISODate }) {
     await shell?.refresh();
   });
   const groups = repeatGroups(items);
+  const phone = usePhone();
 
   return (
     <section className="repeating-page">
@@ -52,7 +54,8 @@ export function RepeatingPage({ today }: { today: ISODate }) {
                   <StripTitle item={it} />
                   <div className="strip-meta">{HABIT_WORDS.schedule(it.recur)}</div>
                 </div>
-                <div className="strip-actions">
+                {/* On a phone the buttons take the strip's second line (its tray), so the title keeps its width. */}
+                <div className={phone ? "strip-tray" : "strip-actions"}>
                   <button type="button" className="btn-secondary" aria-label={`Stop repeating: ${it.title}`} onClick={() => void actions.stop(it)}>
                     Stop repeating
                   </button>
