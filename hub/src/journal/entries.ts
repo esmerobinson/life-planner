@@ -120,7 +120,7 @@ export type StarsEntry = { v: 1; marks: { day: number; on: boolean; at: number }
  * is null until Submit; `at` is the last save (an autosave after Submit leaves `submittedAt`).
  * Version 1 is a version 1 card's (by day and theme); version 2 also keeps the card's id.
  */
-export type ExerciseResponseEntry =
+export type ExerciseResponseEntry = (
   | { v: 1; day: number; theme: string; text: string; submittedAt: number | null; at: number }
   | {
       v: 2;
@@ -132,7 +132,11 @@ export type ExerciseResponseEntry =
       parts?: PartAnswer[];
       submittedAt: number | null;
       at: number;
-    };
+    }
+) & {
+  /** Saved by "Edit" on a submitted answer (its own row; the one it changed stays, review I4). */
+  edit?: true;
+};
 
 /** One part's answer as stored. */
 export interface PartAnswer {
@@ -227,7 +231,7 @@ export const ENTRY_CHECK = {
     isObj(v) && (v.v === 1 || v.v === 2) && Array.isArray(v.marks) &&
     v.marks.every((m) => isObj(m) && (v.v === 1 ? cardDay(m.day) : cardId(m.id)) && typeof m.on === "boolean" && num(m.at)),
   "exercise-entry": (v: unknown): v is ExerciseResponseEntry =>
-    isObj(v) && isStr(v.theme) && isStr(v.text) && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) &&
+    isObj(v) && (v.edit === undefined || v.edit === true) && isStr(v.theme) && isStr(v.text) && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) &&
     (v.v === 1
       ? cardDay(v.day)
       : v.v === 2 && cardId(v.id) && (v.day === null || cardDay(v.day)) && (v.parts === undefined || partAnswers(v.parts))),

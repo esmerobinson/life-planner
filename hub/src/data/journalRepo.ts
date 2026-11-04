@@ -697,6 +697,8 @@ const draftRowId = (jk: JournalKey, date: ISODate, card: ExerciseCardRef, device
  * the one it replaces stays, shown as "Earlier version". Earlier code groups it with the rest.
  */
 const EDIT_ROW = /-e[0-9a-z]+$/;
+/** The device a submitted row came from (an edit row's own suffix taken off). */
+const baseDevice = (e: ExerciseResponseEntry) => (e.edit ? deviceOf(e).replace(EDIT_ROW, "") : deviceOf(e));
 /** Each opened response's row id (to tell this device's draft and an edit apart). */
 const rowOf = new WeakMap<ExerciseResponseEntry, string>();
 const deviceOf = (e: ExerciseResponseEntry) => {
@@ -821,13 +823,16 @@ function mergeResponses(
   const own = deviceId === undefined ? undefined : rows.find((r) => deviceOf(r) === `${deviceId}${DRAFT_SUFFIX}`);
   const ownLast = mode === "edit" && own && newest(rows) === own ? own : null;
   const best = ownLast ?? (mode === "read" && lastSent ? lastSent : newest(filled.length ? filled : rows));
-  const edited = EDIT_ROW.test(deviceOf(best)) && isSubmitted(best);
+  // Her edit (flagged in the sealed entry, never guessed from a device id: re-review m1).
+  const edited = best.edit === true && isSubmitted(best);
   const seen = new Set([contentKey(best)]);
   const others: ResponseVersion[] = [];
   for (const r of [...filled].sort((a, b) => b.at - a.at)) {
     if (seen.has(contentKey(r))) continue;
     seen.add(contentKey(r));
-    const earlier = edited && isSubmitted(r) && r.at < best.at;
+    // "Earlier version" is only this device's own answer that the edit changed; another
+    // device's stays "Also submitted" (re-review m1).
+    const earlier = edited && isSubmitted(r) && r.at < best.at && baseDevice(r) === baseDevice(best);
     others.push({ text: r.text, parts: partsOf(r), at: r.at, submitted: isSubmitted(r), ...(earlier ? { earlier } : {}) });
   }
   return {
@@ -967,7 +972,8 @@ export async function saveExerciseEdit(
   // Always newer than every version it was made over, whatever this device's clock says.
   const at = Math.max(Date.now(), ...all.map((e) => e.at + 1));
   const id = await entryRowId(jk, date, card, `${deviceId}-e${at.toString(36)}`);
-  await write(jk, [await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at, prev))]);
+  const entry = { ...responseEntry(card, value, at, at, prev), edit: true as const };
+  await write(jk, [await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), entry)]);
 }
 
 /**
