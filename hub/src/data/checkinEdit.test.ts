@@ -51,3 +51,20 @@ it("Skip, Next with nothing typed, or an empty box never erases another device's
   await saveAnswer(jk, DAY, "M1", ME, "", true);
   expect((await readCheckinDay(jk, DAY)).answers.get("M1")?.answer).toBe("Pretend phone words");
 });
+
+it("an Edit is newer than the answer she had in front of her, whatever this device's clock says (bug #32)", async () => {
+  clock = 1_800_000_600_000; // the phone's clock, ten minutes ahead
+  await saveAnswer(jk, DAY, "M1", PHONE, "Pretend phone words", true);
+  const seenAt = (await readCheckinDay(jk, DAY)).answers.get("M1")!.at;
+  clock = 1_800_000_000_000; // the Mac's clock
+  await saveAnswer(jk, DAY, "M1", ME, "Pretend phone words, changed on the Mac", true, { session: "ddd4", seenAt });
+  expect((await readCheckinDay(jk, DAY)).answers.get("M1")?.answer).toBe("Pretend phone words, changed on the Mac");
+});
+
+it("Skip with nothing new typed keeps the time its words were typed (bug #33)", async () => {
+  await saveAnswer(jk, DAY, "M1", PHONE, "Pretend first thought on the phone", false);
+  await saveAnswer(jk, DAY, "M1", ME, "Pretend proper answer on the Mac", true);
+  await moveAnswerOn(jk, DAY, "M1", PHONE);
+  const day = await readCheckinDay(jk, DAY);
+  expect(day.answers.get("M1")).toMatchObject({ answer: "Pretend proper answer on the Mac", done: true });
+});
