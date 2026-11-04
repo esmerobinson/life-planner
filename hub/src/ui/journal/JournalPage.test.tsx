@@ -339,7 +339,45 @@ describe("daily check-in", () => {
     expect(days.map((d) => d.textContent)).toEqual(["Tuesday 27 October", "Tuesday 20 October"]);
     await userEvent.click(days[0]!);
     expect(await screen.findByText("Pretend newer")).toBeInTheDocument();
-    expect(screen.getByText("Skipped")).toBeInTheDocument();
+    // The skipped question isn't shown at all.
+    expect(screen.queryByText("Skipped")).toBeNull();
+    const day = days[0]!.closest("details")!;
+    expect(within(day).getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("past check-ins and Read back leave out skipped questions; a day of only skips isn't listed", async () => {
+    await unlocked();
+    await ensureCheckinSet(jk, "2026-10-20", ["E3", "K2"]);
+    await saveAnswer(jk, "2026-10-20", "E3", "device-phone-01", null, true); // skipped
+    await saveAnswer(jk, "2026-10-20", "K2", "device-phone-01", "   ", true); // left empty
+    await ensureCheckinSet(jk, "2026-10-27", ["K4", "K2"]);
+    await saveAnswer(jk, "2026-10-27", "K4", "device-phone-01", "Pretend kept answer", true);
+    await saveAnswer(jk, "2026-10-27", "K2", "device-phone-01", null, true);
+    const view = renderApp("/journal/check-in", TODAY);
+    await userEvent.click(await screen.findByText("Past check-ins"));
+    expect(screen.queryByText("Tuesday 20 October")).toBeNull();
+    expect(screen.getByText("Tuesday 27 October")).toBeInTheDocument();
+    view.unmount();
+    renderApp("/journal/read-back", TODAY);
+    const list = await screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
+    expect(within(list).queryByText(/20 October · Check-in/)).toBeNull();
+    await userEvent.click(within(list).getByText(/27 October · Check-in/));
+    expect(within(list).getByText("Pretend kept answer")).toBeInTheDocument();
+    expect(within(list).queryByText("Skipped")).toBeNull();
+    expect(within(within(list).getByText(/27 October · Check-in/).closest("details")!).getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("a question skipped yesterday comes back first in its slot today", async () => {
+    await unlocked();
+    // Yesterday: three asked, the skill one (D3) skipped.
+    await ensureCheckinSet(jk, "2026-10-27", ["M4", "D3", "K2"]);
+    await saveAnswer(jk, "2026-10-27", "M4", "device-phone-01", "Pretend noticing", true);
+    await saveAnswer(jk, "2026-10-27", "D3", "device-phone-01", null, true);
+    await saveAnswer(jk, "2026-10-27", "K2", "device-phone-01", "Pretend kindness", true);
+    renderApp("/journal/check-in", TODAY);
+    await waitFor(async () => expect((await readCheckinDay(jk, TODAY)).prompts).toHaveLength(3));
+    const today = await readCheckinDay(jk, TODAY);
+    expect(today.prompts[1]).toBe("D3");
   });
 
   it("Choose questions: the whole bank with the starters ticked; a choice is saved, sealed and synced", async () => {

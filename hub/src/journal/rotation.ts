@@ -8,6 +8,9 @@
 // - Time of day picks the flavour: before 14:00 "morning" + "any", after that "evening" + "any".
 // - No prompt is repeated within REPEAT_WINDOW_DAYS days of the stored history when the slot
 //   has another choice; otherwise the least recently asked one is used.
+// - A question she missed (skipped, or never reached) goes back into circulation (2026-11-04):
+//   the missed day doesn't count as asked, and it comes first in its slot at the next check-in
+//   at its time of day (still three questions). Missed twice running: normal circulation.
 // - Deterministic: the same date, flavour, active list and history give the same three on
 //   every device (choices are seeded by the date). Once a day's check-in is started its
 //   prompts are stored in the entry, so a device never changes them afterwards.
@@ -56,8 +59,38 @@ export interface RotationInput {
   hour: number;
   /** The prompt ids switched on (Choose questions). */
   active: readonly string[];
-  /** Earlier check-ins (any order); days on or after `date` are ignored. */
-  history: readonly { date: ISODate; prompts: readonly string[] }[];
+  /**
+   * Earlier check-ins (any order); days on or after `date` are ignored. `answered`: the
+   * questions she wrote an answer to that day (absent: all of them). A question asked but not
+   * answered (skipped, or not reached) was missed.
+   */
+  history: readonly { date: ISODate; prompts: readonly string[]; answered?: ReadonlySet<string> }[];
+}
+
+/**
+ * The questions owed another turn (Esme, 2026-11-04: "add those questions back in circulation
+ * if I miss one"): the last time each was asked she missed it, and the time before that (if
+ * any) she answered it, so a question skipped twice running goes back to normal circulation
+ * rather than coming back every day. Each with the day it was missed.
+ */
+export function owedPrompts(date: ISODate, history: RotationInput["history"]): Map<string, ISODate> {
+  const asked = new Map<string, { date: ISODate; answered: boolean }[]>();
+  for (const h of history) {
+    if (h.date >= date) continue;
+    for (const id of h.prompts) {
+      const list = asked.get(id) ?? [];
+      list.push({ date: h.date, answered: !h.answered || h.answered.has(id) });
+      asked.set(id, list);
+    }
+  }
+  const owed = new Map<string, ISODate>();
+  for (const [id, list] of asked) {
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    const last = list[list.length - 1]!;
+    const before = list[list.length - 2];
+    if (!last.answered && (!before || before.answered)) owed.set(id, last.date);
+  }
+  return owed;
 }
 
 /** The day's prompts (three when the active list allows), in slot order. */
@@ -68,19 +101,25 @@ export function pickPrompts({ date, hour, active, history }: RotationInput): str
     return !!p && (p.when === "any" || p.when === flavour);
   };
   const on = [...new Set(active)].filter((id) => PROMPT_BY_ID.has(id)).sort();
-  // When each prompt was last asked before today.
+  // When each prompt was last asked AND answered before today (a missed one isn't "recent").
   const lastAsked = new Map<string, ISODate>();
   for (const h of history) {
     if (h.date >= date) continue;
-    for (const id of h.prompts) if ((lastAsked.get(id) ?? "") < h.date) lastAsked.set(id, h.date);
+    for (const id of h.prompts) {
+      if (h.answered && !h.answered.has(id)) continue;
+      if ((lastAsked.get(id) ?? "") < h.date) lastAsked.set(id, h.date);
+    }
   }
   const windowStart = addDays(date, -REPEAT_WINDOW_DAYS);
   const recent = (id: string) => (lastAsked.get(id) ?? "") > windowStart;
+  // Missed last time: first in its slot today (oldest miss first), at its time of day.
+  const owed = owedPrompts(date, history);
+  const byOwed = (a: string, b: string) => owed.get(a)!.localeCompare(owed.get(b)!) || a.localeCompare(b);
 
   const chosen: (string | undefined)[] = [undefined, undefined, undefined];
-  // Her own starters due today take a slot each (a seeded slot, else the next free one).
+  // Her own starters due today (or owed a turn) take a slot each (a seeded slot, else the next free one).
   const ownDue = on.filter(
-    (id) => slotOf(id) === "own" && fits(id) && hash(`${date}|own|${id}`) % 7 < OWN_DAYS_PER_WEEK,
+    (id) => slotOf(id) === "own" && fits(id) && (owed.has(id) || hash(`${date}|own|${id}`) % 7 < OWN_DAYS_PER_WEEK),
   );
   for (const id of ownDue) {
     const start = hash(`${date}|slot|${id}`) % 3;
@@ -107,7 +146,10 @@ export function pickPrompts({ date, hour, active, history }: RotationInput): str
     if (chosen[s]) return;
     const taken = (id: string) => chosen.includes(id);
     const seed = `${date}|${slot}`;
+    const missed = on.filter((id) => slotOf(id) === slot && fits(id) && !taken(id) && owed.has(id)).sort(byOwed);
     chosen[s] =
+      // A question missed last time comes back first…
+      missed[0] ??
       // The slot's own prompts for this time of day…
       choose(on.filter((id) => slotOf(id) === slot && fits(id) && !taken(id)), seed) ??
       // …else any other prompt for this time of day (she may have switched a whole slot off)…

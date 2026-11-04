@@ -307,6 +307,14 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
   return { date, prompts: [...base, ...extra], hasSet: set !== null || legacy !== null, answers, unreadable };
 }
 
+/**
+ * The questions she wrote an answer to that day, in order. Skipped ones (and ones never
+ * reached) aren't kept for looking back at (Esme, 2026-11-04); they go back into circulation.
+ */
+export function answeredPrompts(day: CheckinDay): string[] {
+  return day.prompts.filter((p) => (day.answers.get(p)?.answer ?? "").trim() !== "");
+}
+
 /** The first question not yet moved past (Next / Skip), or -1 once every one is. */
 export function currentStep(day: CheckinDay): number {
   return day.prompts.findIndex((p) => !day.answers.get(p)?.done);

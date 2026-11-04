@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CANT_OPEN, listCheckinDays, listExerciseEntries, listReadBack, morningOpensOn, readExerciseCards, readMorningPage,
+  answeredPrompts, CANT_OPEN, listCheckinDays, listExerciseEntries, listReadBack, morningOpensOn, readExerciseCards, readMorningPage,
   type CheckinDay, type ExerciseResponse, type MorningText,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
@@ -54,7 +54,8 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
       const list: Item[] = [
         ...exercises.entries.map((entry): Item => ({ kind: "exercise", date: entry.date, entry, book: books.get(entry.id) ?? "" })),
         ...checkins
-          .filter((d) => [...d.answers.values()].some((a) => a.answer !== null || a.done))
+          // Only what she answered: a day of skips isn't listed (Esme, 2026-11-04).
+          .filter((d) => answeredPrompts(d).length > 0)
           .map((day): Item => ({ kind: "checkin", date: day.date, day })),
         ...pages.map((p): Item => {
           const n = (pageCount.get(p.date) ?? 0) + 1;
@@ -111,15 +112,12 @@ function ReadBackItem({ jk, item, today }: { jk: JournalKey; item: Item; today: 
       <details>
         <summary>{`${date} · Check-in`}</summary>
         <ol className="journal-answers">
-          {item.day.prompts.map((id) => {
-            const a = item.day.answers.get(id)?.answer ?? null;
-            return (
-              <li key={id}>
-                <QuestionText id={id} />
-                <p className="journal-past-answer">{a ?? <span className="journal-muted">Skipped</span>}</p>
-              </li>
-            );
-          })}
+          {answeredPrompts(item.day).map((id) => (
+            <li key={id}>
+              <QuestionText id={id} />
+              <p className="journal-past-answer">{item.day.answers.get(id)!.answer}</p>
+            </li>
+          ))}
         </ol>
       </details>
     );

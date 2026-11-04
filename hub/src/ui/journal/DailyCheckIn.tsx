@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, readCheckinDay, readPromptSettings, saveAnswer,
+  answeredPrompts, CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
 } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
@@ -49,7 +49,9 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
         // This device is the first to open today's check-in: pick and store the questions
         // (once; a reload meanwhile waits for that same write).
         if (ensuring.current?.date !== today) {
-          const history = all.filter((d) => d.date < today).map((d) => ({ date: d.date, prompts: d.prompts }));
+          const history = all
+            .filter((d) => d.date < today)
+            .map((d) => ({ date: d.date, prompts: d.prompts, answered: new Set(answeredPrompts(d)) }));
           const prompts = pickPrompts({ date: today, hour: new Date().getHours(), active: ids, history });
           ensuring.current = {
             date: today,
@@ -270,27 +272,29 @@ function EditableAnswer({ stored, onSave }: { stored: string; onSave: (text: str
   );
 }
 
-/** Past check-ins, newest first; each opens its questions and answers (these may be reread). */
+/**
+ * Past check-ins, newest first; each opens the questions she answered (these may be reread).
+ * Skipped questions aren't shown, and a day with nothing answered isn't listed (Esme,
+ * 2026-11-04): those questions come round again instead.
+ */
 function PastCheckIns({ past }: { past: CheckinDay[] }) {
-  if (past.length === 0) return null;
+  const days = past.filter((c) => answeredPrompts(c).length > 0 || c.unreadable > 0);
+  if (days.length === 0) return null;
   return (
     <details className="journal-fold">
       <summary>Past check-ins</summary>
       <ul className="journal-past">
-        {past.map((c) => (
+        {days.map((c) => (
           <li key={c.date}>
             <details>
               <summary>{longDate(c.date)}</summary>
               <ol className="journal-answers">
-                {c.prompts.map((id) => {
-                  const a = c.answers.get(id)?.answer ?? null;
-                  return (
-                    <li key={id}>
-                      <QuestionText id={id} />
-                      <p className="journal-past-answer">{a ?? <span className="journal-muted">Skipped</span>}</p>
-                    </li>
-                  );
-                })}
+                {answeredPrompts(c).map((id) => (
+                  <li key={id}>
+                    <QuestionText id={id} />
+                    <p className="journal-past-answer">{c.answers.get(id)!.answer}</p>
+                  </li>
+                ))}
               </ol>
               {c.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
             </details>
