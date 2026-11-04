@@ -157,6 +157,12 @@ export interface NoteEntry {
   createdAt: number;
   at: number;
   deleted?: true;
+  /** This version's own random id (absent on the earliest notes: its row id and time stand in). */
+  vid?: string;
+  /** The versions she had in front of her when she wrote this one (by vid): it is written over them. */
+  seen?: string[];
+  /** This device's note in progress, not saved yet (its own row). */
+  draft?: true;
 }
 
 /** One device's "I read this today" ticks for a day: the notes' row ids. */
@@ -227,7 +233,9 @@ export const ENTRY_CHECK = {
       : v.v === 2 && cardId(v.id) && (v.day === null || cardDay(v.day)) && (v.parts === undefined || partAnswers(v.parts))),
   note: (v: unknown): v is NoteEntry =>
     isObj(v) && v.v === 1 && (v.prompt === null || isStr(v.prompt)) && isStr(v.thought) && isStr(v.steady) &&
-    isStr(v.memory) && isStr(v.skill) && num(v.createdAt) && num(v.at) && (v.deleted === undefined || v.deleted === true),
+    isStr(v.memory) && isStr(v.skill) && num(v.createdAt) && num(v.at) && (v.deleted === undefined || v.deleted === true) &&
+    (v.vid === undefined || (isStr(v.vid) && v.vid.length <= 64)) && (v.seen === undefined || (strList(v.seen) && (v.seen as string[]).length <= 64)) &&
+    (v.draft === undefined || v.draft === true),
   "note-read": (v: unknown): v is NoteReadEntry => isObj(v) && v.v === 1 && strList(v.ids) && num(v.at),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&

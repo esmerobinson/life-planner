@@ -22,7 +22,7 @@ import {
   type JournalKey,
 } from "../journal/crypto";
 import {
-  ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type PartAnswer,
+  ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type NoteEntry, type PartAnswer,
 } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import {
@@ -928,27 +928,86 @@ export async function listExerciseEntries(jk: JournalKey, before: ISODate): Prom
 }
 
 // ---- notes to myself (journal v3) ----------------------------------------------------------
+//
+// A note is a group of rows `note:<date>:<nid>_<deviceId>`, one VERSION per device (review I1):
+// each device writes only its own, so two devices can never overwrite each other's words. The
+// note's id is `note:<date>:<nid>` (the day it was first written and a random key). Each version
+// has its own random id and names the versions she had in front of her (`seen`), so a version is
+// written over only by one made having seen it: never by clocks, which differ between devices.
+// The view shows the newest, and any version written without seeing it as "another version".
+// Her note while she writes it is that device's draft row, `…_<deviceId>_draft` (review I2).
 
-/** One note as the page sees it (`id` is its row id). Always readable: no lock applies. */
-export interface Note {
-  id: string;
-  /** The day it was first written (in its row id). */
-  date: ISODate;
+const NOTE_DRAFT = "_draft";
+
+/** One version of a note (one device's row). */
+export interface NoteVersion {
   prompt: string | null;
   thought: string;
   steady: string;
   memory: string;
   skill: string;
+  at: number;
+}
+
+/** One note as the page sees it (`id` is the note's id, not a row's). Always readable: no lock applies. */
+export interface Note extends NoteVersion {
+  id: string;
+  /** The day it was first written (in its id). */
+  date: ISODate;
   createdAt: number;
+  /** Every version of it here now (by id): what an edit opened now is written over. */
+  seen: string[];
+  /** Other versions with different words, written without seeing this one (newest first). */
+  others: NoteVersion[];
+}
+
+/** This device's note in progress (an edit, or a new note not saved yet). */
+export interface NoteDraft {
+  id: string;
+  date: ISODate;
+  fields: NoteFields;
+  /** The versions she started from (none: a new note). */
+  seen: string[];
   at: number;
 }
 
 /** What she typed for a note. */
 export type NoteFields = Pick<Note, "prompt" | "thought" | "steady" | "memory" | "skill">;
 
-/** Every note (deleted ones left out), oldest first, and how many rows wouldn't open here. */
-export async function listNotes(jk: JournalKey): Promise<{ notes: Note[]; unreadable: number }> {
-  const notes: Note[] = [];
+/** A new note's id (`note:<today>:<16 hex>`), made when she starts it so its draft has a home. */
+export function newNoteId(today: ISODate): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return journalId("note", today, [...bytes].map((b) => b.toString(16).padStart(2, "0")).join(""));
+}
+
+/** A note row's note id, device and whether it is a draft (an earlier single-row note is its own note). */
+function noteRowParts(row: JournalRow): { id: string; device: string; draft: boolean } {
+  const rest = suffixOf(row);
+  const i = rest.indexOf("_");
+  if (i < 0) return { id: row.id, device: "", draft: false };
+  const tail = rest.slice(i + 1);
+  const draft = tail.endsWith(NOTE_DRAFT);
+  return { id: `note:${row.date}:${rest.slice(0, i)}`, device: draft ? tail.slice(0, -NOTE_DRAFT.length) : tail, draft };
+}
+const noteRowId = (id: string, deviceId: string, draft = false) => `${id}_${deviceId}${draft ? NOTE_DRAFT : ""}`;
+const noteDate = (id: string) => id.slice("note:".length, "note:".length + 10);
+const filled = (f: Pick<NoteFields, "thought" | "steady" | "memory" | "skill">) =>
+  [f.thought, f.steady, f.memory, f.skill].some((x) => x.trim() !== "");
+const noteKey = (v: NoteVersion) => JSON.stringify([v.prompt, v.thought, v.steady, v.memory, v.skill]);
+/** A version's id (the earliest notes had none: their row and time stand in). */
+const vidOf = (rowId: string, e: NoteEntry) => e.vid ?? `${rowId}@${e.at}`;
+const newVid = () => [...crypto.getRandomValues(new Uint8Array(8))].map((b) => b.toString(16).padStart(2, "0")).join("");
+const versionOf = (e: NoteEntry): NoteVersion => ({ prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill, at: e.at });
+
+/**
+ * Every note (deleted ones left out), oldest first, how many rows wouldn't open here, and this
+ * device's notes in progress. A note's versions merge: those no later version was written over
+ * are its heads; the newest head with words shows, the others with different words under it.
+ * It is gone only when every head is a delete (a delete never takes words it didn't see).
+ */
+export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ notes: Note[]; unreadable: number; drafts: NoteDraft[] }> {
+  const groups = new Map<string, { date: ISODate; versions: { e: NoteEntry; vid: string }[] }>();
+  const drafts: NoteDraft[] = [];
   let unreadable = 0;
   for (const row of await db.journal.where("kind").equals("note").toArray()) {
     const o = await openRow(jk, row, "note");
@@ -956,47 +1015,117 @@ export async function listNotes(jk: JournalKey): Promise<{ notes: Note[]; unread
       unreadable++;
       continue;
     }
+    const part = noteRowParts(row);
     const e = o.entry;
-    if (e.deleted) continue;
-    notes.push({ id: row.id, date: row.date, prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill, createdAt: e.createdAt, at: e.at });
+    if (part.draft) {
+      if (part.device === deviceId && filled(e)) {
+        drafts.push({ id: part.id, date: row.date, fields: { prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill }, seen: e.seen ?? [], at: e.at });
+      }
+      continue;
+    }
+    const g = groups.get(part.id) ?? { date: row.date, versions: [] };
+    g.versions.push({ e, vid: vidOf(row.id, e) });
+    groups.set(part.id, g);
+  }
+  const notes: Note[] = [];
+  for (const [id, { date, versions }] of groups) {
+    const heads = versions.filter((v) => !versions.some((w) => w !== v && (w.e.seen ?? []).includes(v.vid)));
+    const live = heads.map((v) => v.e).filter((v) => !v.deleted).sort((a, b) => b.at - a.at);
+    if (live.length === 0) continue;
+    const shown = versionOf(live[0]!);
+    const seen = new Set([noteKey(shown)]);
+    const others: NoteVersion[] = [];
+    for (const v of live.slice(1).map(versionOf)) {
+      if (seen.has(noteKey(v))) continue;
+      seen.add(noteKey(v));
+      others.push(v);
+    }
+    notes.push({
+      ...shown, id, date, others,
+      createdAt: Math.min(...versions.map((v) => v.e.createdAt)),
+      seen: versions.map((v) => v.vid),
+    });
   }
   notes.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
-  return { notes, unreadable };
+  drafts.sort((a, b) => b.at - a.at);
+  return { notes, unreadable, drafts };
 }
 
-/** A note's row, opened (never written over if it won't open here). */
-async function ownNote(jk: JournalKey, id: string) {
-  const row = await db.journal.get(id);
-  if (!row || row.kind !== "note") throw new Error("That note isn't here.");
-  const o = await openRow(jk, row, "note");
-  if (o.state !== "ok") throw new Error(CANT_OPEN);
-  return { row, entry: o.entry };
+/** A note's rows here, opened. This device's own row that won't open is never written over. */
+async function noteRows(jk: JournalKey, id: string, deviceId: string) {
+  const rows = (await db.journal.where("date").equals(noteDate(id)).toArray()).filter(
+    (r) => r.kind === "note" && (r.id === id || r.id.startsWith(`${id}_`)),
+  );
+  const versions: NoteEntry[] = [];
+  for (const row of rows) {
+    const o = await openRow(jk, row, "note");
+    const part = noteRowParts(row);
+    const mine = part.device === deviceId;
+    if (o.state !== "ok") {
+      if (mine) throw new Error(CANT_OPEN);
+      continue;
+    }
+    if (!part.draft) versions.push(o.entry);
+  }
+  const draft = rows.find((r) => r.id === noteRowId(id, deviceId, true));
+  return { versions, hasDraft: draft !== undefined };
+}
+
+/** This device's draft row for a note, emptied (only when there is one). */
+async function clearedNoteDraft(jk: JournalKey, id: string, deviceId: string, hasDraft: boolean): Promise<JournalRow[]> {
+  if (!hasDraft) return [];
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: 0, at: Date.now(), draft: true };
+  return [await seal(jk, "note", noteDate(id), noteRowId(id, deviceId, true).slice(`note:${noteDate(id)}:`.length), empty)];
 }
 
 /**
- * Saves a note: a new row `note:<today>:<uuid>`, or (with `id`) the same row rewritten whole,
- * keeping its day and when it was first written. The thought and her answer must have words.
+ * Saves a note: this device's version of it (a new note with `id` from newNoteId, or one she
+ * edited), written over `seen` (the versions she had in front of her; none for a new note),
+ * and this device's draft of it emptied, in one transaction. The thought and her answer must
+ * have words.
  */
-export async function saveNote(jk: JournalKey, today: ISODate, fields: NoteFields, id?: string): Promise<string> {
+export async function saveNote(
+  jk: JournalKey, today: ISODate, deviceId: string, fields: NoteFields, opts: { id?: string; seen?: string[] } = {},
+): Promise<string> {
   if (!fields.thought.trim() || !fields.steady.trim()) throw new Error("A note needs the thought and your answer.");
+  const id = opts.id ?? newNoteId(today);
+  const { versions, hasDraft } = await noteRows(jk, id, deviceId);
   const at = Date.now();
-  const prev = id ? await ownNote(jk, id) : null;
-  const date = prev?.row.date ?? today;
-  const suffix = prev ? prev.row.id.slice(`note:${date}:`.length) : crypto.randomUUID();
   const entry = {
     v: 1, prompt: fields.prompt, thought: fields.thought, steady: fields.steady, memory: fields.memory, skill: fields.skill,
-    createdAt: prev?.entry.createdAt ?? at, at,
+    createdAt: versions.length ? Math.min(...versions.map((v) => v.createdAt)) : at, at, vid: newVid(), seen: opts.seen ?? [],
   };
-  const row = await seal(jk, "note", date, suffix, entry);
-  await write(jk, [row]);
-  return row.id;
+  const date = noteDate(id);
+  const row = await seal(jk, "note", date, noteRowId(id, deviceId).slice(`note:${date}:`.length), entry);
+  await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft))]);
+  return id;
 }
 
-/** Deletes a note: its row is rewritten with nothing in it. */
-export async function deleteNote(jk: JournalKey, id: string): Promise<void> {
-  const { row, entry } = await ownNote(jk, id);
-  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: entry.createdAt, at: Date.now(), deleted: true };
-  await write(jk, [await seal(jk, "note", row.date, row.id.slice(`note:${row.date}:`.length), empty)]);
+/** Autosaves this device's note in progress (sealed). Only this device writes it. */
+export async function saveNoteDraft(jk: JournalKey, deviceId: string, id: string, fields: NoteFields, seen: string[]): Promise<void> {
+  await noteRows(jk, id, deviceId); // this device's rows that won't open stop it here
+  const date = noteDate(id);
+  const at = Date.now();
+  const entry = { v: 1, prompt: fields.prompt, thought: fields.thought, steady: fields.steady, memory: fields.memory, skill: fields.skill, createdAt: at, at, seen, draft: true };
+  await write(jk, [await seal(jk, "note", date, noteRowId(id, deviceId, true).slice(`note:${date}:`.length), entry)]);
+}
+
+/** Cancel: this device's note in progress is let go (its draft row emptied). */
+export async function clearNoteDraft(jk: JournalKey, deviceId: string, id: string): Promise<void> {
+  const { hasDraft } = await noteRows(jk, id, deviceId);
+  const rows = await clearedNoteDraft(jk, id, deviceId, hasDraft);
+  if (rows.length) await write(jk, rows);
+}
+
+/** Deletes a note: this device's version says so (nothing in it), written over `seen` (only what she saw goes). */
+export async function deleteNote(jk: JournalKey, deviceId: string, id: string, seen: string[]): Promise<void> {
+  const { versions, hasDraft } = await noteRows(jk, id, deviceId);
+  if (versions.length === 0) throw new Error("That note isn't here.");
+  const at = Date.now();
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: Math.min(...versions.map((v) => v.createdAt)), at, vid: newVid(), seen, deleted: true };
+  const date = noteDate(id);
+  const row = await seal(jk, "note", date, noteRowId(id, deviceId).slice(`note:${date}:`.length), empty);
+  await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft))]);
 }
 
 /** Which notes were read on which day, from every device's "I read this today" rows. */
@@ -1007,14 +1136,18 @@ export interface NoteReads {
   lastRead: Map<string, ISODate>;
   /** The notes read on a day (any device). */
   readOn: (date: ISODate) => Set<string>;
+  /** The notes one device ticked on a day (its own tick box). */
+  ownOn: (date: ISODate, deviceId: string) => Set<string>;
 }
 
 export async function listNoteReads(jk: JournalKey): Promise<NoteReads> {
   const byDay = new Map<ISODate, Set<string>>();
   const lastRead = new Map<string, ISODate>();
+  const own = new Map<string, Set<string>>();
   for (const row of await db.journal.where("kind").equals("note-read").toArray()) {
     const o = await openRow(jk, row, "note-read");
     if (o.state !== "ok") continue;
+    own.set(row.id, new Set(o.entry.ids));
     const day = byDay.get(row.date) ?? new Set<string>();
     for (const id of o.entry.ids) {
       day.add(id);
@@ -1022,11 +1155,19 @@ export async function listNoteReads(jk: JournalKey): Promise<NoteReads> {
     }
     byDay.set(row.date, day);
   }
-  return { byDay, lastRead, readOn: (date) => new Set(byDay.get(date) ?? []) };
+  return {
+    byDay, lastRead, readOn: (date) => new Set(byDay.get(date) ?? []),
+    ownOn: (date, deviceId) => new Set(own.get(journalId("note-read", date, deviceId)) ?? []),
+  };
 }
 
 /** Ticks (or unticks) "I read this today" for a note, on this device's own row for the day. */
-export async function setNoteRead(jk: JournalKey, today: ISODate, deviceId: string, noteId: string, on: boolean): Promise<void> {
+export function setNoteRead(jk: JournalKey, today: ISODate, deviceId: string, noteId: string, on: boolean): Promise<void> {
+  // Read, changed and written one at a time (review M2: two quick ticks never lose one).
+  return oneAtATime(() => writeNoteRead(jk, today, deviceId, noteId, on));
+}
+
+async function writeNoteRead(jk: JournalKey, today: ISODate, deviceId: string, noteId: string, on: boolean): Promise<void> {
   const id = journalId("note-read", today, deviceId);
   const existing = await db.journal.get(id);
   let ids: string[] = [];

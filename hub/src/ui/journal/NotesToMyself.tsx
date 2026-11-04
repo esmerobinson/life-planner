@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { CANT_OPEN, deleteNote, listNoteReads, listNotes, saveNote, setNoteRead, type Note, type NoteFields } from "../../data/repo";
+import {
+  CANT_OPEN, clearNoteDraft, deleteNote, listNoteReads, listNotes, newNoteId, saveNote, saveNoteDraft, setNoteRead,
+  type Note, type NoteDraft, type NoteFields, type NoteReads, type NoteVersion,
+} from "../../data/repo";
 import type { ISODate } from "../../domain/types";
 import type { JournalKey } from "../../journal/crypto";
 import { NOTE_GROUPS, todaysNotes } from "../../journal/notes";
@@ -8,6 +11,8 @@ import { LOADING_LINE, LoadLine, useLoadGuard } from "./bits";
 import { JournalSheet } from "./JournalSheet";
 import { useDbChanges } from "./useJournalKey";
 import { AutoGrowTextarea } from "../useAutoGrow";
+import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
+import { whenWritten } from "./ResponseView";
 
 /** The button at the top of the Journal (every tab). */
 export const HARD_MOMENT = "Hard moment";
@@ -20,8 +25,18 @@ const SKILL = "A skill to try";
 const SAVE_PROBLEM = "That didn't save. Try again.";
 const ALL_PROMPTS = new Set(NOTE_GROUPS.flatMap((g) => g.prompts));
 
-/** What is open in the editor: a new note (for a prompt, or her own thought) or one to change. */
-type Editing = { id: string | null; prompt: string | null };
+/** Over another version of a note, read-only, so nothing she wrote is lost (review I1). */
+export const anotherVersion = (at: number) => `Another version (from ${whenWritten(at)})`;
+/** Over her open note when another device deleted it while she was writing (review I2). */
+export const DELETED_ELSEWHERE = "This note was deleted on another device. Save it to keep it.";
+
+/**
+ * What is open in the editor: a note to change, or a new one (its id made when she starts, so
+ * what she types is kept as this device's draft), with what she started from.
+ */
+type Editing = { id: string; prompt: string | null; isNew: boolean; seen: string[]; start: NoteFields };
+
+const fieldsOf = (n: NoteFields): NoteFields => ({ prompt: n.prompt, thought: n.thought, steady: n.steady, memory: n.memory, skill: n.skill });
 
 /**
  * Notes to myself (journal v3; her partner's idea): while steady, she writes her own answers to
@@ -29,37 +44,57 @@ type Editing = { id: string | null; prompt: string | null };
  * today (a gentle "I read this today" tick: no streak, no count), then the nine groups of
  * starter prompts (prompts only; every answer is hers), each with "+ Write your answer", then
  * her own thoughts and "+ My own thought". Every note is sealed like the rest of the journal
- * and always readable. This tab never ticks and isn't a Home or Today row.
+ * and always readable. This tab never ticks and isn't a Home or Today row. A note she is
+ * writing is kept as she types (this device's draft) and opens again where she left it.
  */
 export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: ISODate; deviceId: string }) {
   const [notes, setNotes] = useState<Note[] | null>(null);
-  const [byDay, setByDay] = useState<Map<ISODate, Set<string>>>(new Map());
+  const [drafts, setDrafts] = useState<NoteDraft[]>([]);
+  const [reads, setReads] = useState<NoteReads | null>(null);
   const [unreadable, setUnreadable] = useState(0);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [problem, setProblem] = useState("");
   // A tick shows at once; a failed save puts it back.
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
   const guardFail = useRef<() => void>(() => undefined);
+  const reopened = useRef(false);
+  // What she has typed in each open editor, so an editor that moves (its note deleted on another
+  // device) opens again with every word.
+  const typed = useRef(new Map<string, NoteFields>());
 
   const load = useCallback(async () => {
     try {
-      const [n, r] = await Promise.all([listNotes(jk), listNoteReads(jk)]);
+      const [n, r] = await Promise.all([listNotes(jk, deviceId), listNoteReads(jk)]);
       setNotes(n.notes);
+      setDrafts(n.drafts);
       setUnreadable(n.unreadable);
-      setByDay(r.byDay);
+      setReads(r);
       setTicked({});
     } catch {
       guardFail.current();
     }
-  }, [jk]);
+  }, [jk, deviceId]);
   useEffect(() => void load(), [load]);
   useDbChanges(() => void load());
   // Never blank: "Loading…", then the can't-open line and Try again.
   const guard = useLoadGuard(notes === null, load);
   guardFail.current = guard.fail;
 
+  // Back on the tab (a reload, another tab, the phone closing the app): her note in progress
+  // opens again with what she had typed.
+  useEffect(() => {
+    if (notes === null || reopened.current) return;
+    reopened.current = true;
+    const d = drafts[0];
+    if (!d || editing) return;
+    const note = notes.find((n) => n.id === d.id);
+    setEditing({ id: d.id, prompt: note ? note.prompt : d.fields.prompt, isNew: !note, seen: d.seen, start: d.fields });
+  }, [notes, drafts, editing]);
+
+  const byDay = reads?.byDay ?? new Map<ISODate, Set<string>>();
   const today2 = useMemo(() => (notes ? todaysNotes(notes, byDay, today) : []), [notes, byDay, today]);
-  const readToday = byDay.get(today) ?? new Set<string>();
+  // The box shows this device's own tick (review M1: an untick here sticks).
+  const readHere = reads?.ownOn(today, deviceId) ?? new Set<string>();
 
   async function tick(n: Note, on: boolean) {
     setTicked((t) => ({ ...t, [n.id]: on }));
@@ -75,14 +110,34 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
     }
   }
 
-  async function save(fields: NoteFields, id: string | null) {
-    await saveNote(jk, today, fields, id ?? undefined);
+  /** Opens the editor for a note, or a new one (her draft of it, if she has one). */
+  function edit(note: Note | null, prompt: string | null) {
+    if (note) {
+      const d = drafts.find((x) => x.id === note.id);
+      return setEditing({ id: note.id, prompt: note.prompt, isNew: false, seen: d ? d.seen : note.seen, start: d ? d.fields : fieldsOf(note) });
+    }
+    const known = new Set(notes?.map((n) => n.id));
+    const own = (p: string | null) => p === null || !ALL_PROMPTS.has(p);
+    const d = drafts.find((x) => !known.has(x.id) && (prompt === null ? own(x.fields.prompt) : x.fields.prompt === prompt));
+    if (d) return setEditing({ id: d.id, prompt, isNew: true, seen: d.seen, start: d.fields });
+    setEditing({ id: newNoteId(today), prompt, isNew: true, seen: [], start: { prompt, thought: prompt ?? "", steady: "", memory: "", skill: "" } });
+  }
+
+  async function save(e: Editing, fields: NoteFields) {
+    await saveNote(jk, today, deviceId, fields, { id: e.id, seen: e.seen });
+    typed.current.delete(e.id);
     setEditing(null);
     setProblem("");
     await load();
   }
-  async function remove(id: string) {
-    await deleteNote(jk, id);
+  async function cancel(e: Editing) {
+    typed.current.delete(e.id);
+    setEditing(null);
+    await clearNoteDraft(jk, deviceId, e.id).catch(() => undefined);
+  }
+  async function remove(e: Editing) {
+    await deleteNote(jk, deviceId, e.id, e.seen);
+    typed.current.delete(e.id);
     setEditing(null);
     setProblem("");
     await load();
@@ -90,32 +145,43 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
 
   if (notes === null) return <LoadLine guard={guard} />;
 
-  const editor = (e: Editing, note: Note | null) => (
-    <li key={`editor|${e.id ?? e.prompt ?? "own"}`}>
+  const editor = (e: Editing, gone = false) => (
+    <li key={`editor|${e.id}`}>
+      {gone && <p className="journal-muted">{DELETED_ELSEWHERE}</p>}
       <NoteEditor
-        note={note}
-        prompt={e.prompt}
-        onCancel={() => setEditing(null)}
-        onSave={(f) => save(f, e.id)}
-        onDelete={note ? () => remove(note.id) : undefined}
+        key={e.id}
+        jk={jk}
+        deviceId={deviceId}
+        editing={e}
+        start={typed.current.get(e.id) ?? e.start}
+        onTyped={(f) => typed.current.set(e.id, f)}
+        onCancel={() => void cancel(e)}
+        onSave={(f) => save(e, f)}
+        onDelete={!e.isNew && !gone ? () => remove(e) : undefined}
         onProblem={setProblem}
       />
     </li>
   );
   const card = (n: Note) =>
     editing?.id === n.id ? (
-      editor(editing, n)
+      editor(editing)
     ) : (
       <li key={n.id} className="strip no-tick notes-card">
-        <NoteBody note={n} />
+        <div>
+          <NoteBody note={n} />
+          <OtherNoteVersions note={n} />
+        </div>
         <div className="strip-actions">
-          <button type="button" className="quiet-link" aria-label={`Edit: ${n.thought}`} onClick={() => setEditing({ id: n.id, prompt: n.prompt })}>
+          <button type="button" className="quiet-link" aria-label={`Edit: ${n.thought}`} onClick={() => edit(n, n.prompt)}>
             Edit
           </button>
         </div>
       </li>
     );
   const own = notes.filter((n) => n.prompt === null || !ALL_PROMPTS.has(n.prompt));
+  // A note deleted on another device while she was changing it here: her editor stays open.
+  const orphan = editing && !editing.isNew && !notes.some((n) => n.id === editing.id) ? editing : null;
+  const newOwn = editing && editing.isNew && (editing.prompt === null || !ALL_PROMPTS.has(editing.prompt)) ? editing : null;
 
   return (
     <div className="notes">
@@ -124,7 +190,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
       {today2.length > 0 && (
         <Group title="To read today">
           {today2.map((n) => (
-            <TodayNote key={n.id} note={n} read={ticked[n.id] ?? readToday.has(n.id)} onTick={(on) => void tick(n, on)} />
+            <TodayNote key={n.id} note={n} read={ticked[n.id] ?? readHere.has(n.id)} onTick={(on) => void tick(n, on)} />
           ))}
         </Group>
       )}
@@ -132,7 +198,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
         <Group key={g.id} title={g.title}>
           {g.prompts.flatMap((p) => {
             const mine = notes.filter((n) => n.prompt === p);
-            if (editing && editing.id === null && editing.prompt === p) return [...mine.map(card), editor(editing, null)];
+            if (editing && editing.isNew && editing.prompt === p) return [...mine.map(card), editor(editing)];
             if (mine.length > 0) return mine.map(card);
             return [
               <li key={p} className="strip no-tick notes-prompt">
@@ -140,12 +206,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
                   <div className="strip-title">{p}</div>
                 </div>
                 <div className="strip-actions">
-                  <button
-                    type="button"
-                    className="quiet-link"
-                    aria-label={`+ Write your answer: ${p}`}
-                    onClick={() => setEditing({ id: null, prompt: p })}
-                  >
+                  <button type="button" className="quiet-link" aria-label={`+ Write your answer: ${p}`} onClick={() => edit(null, p)}>
                     + Write your answer
                   </button>
                 </div>
@@ -155,18 +216,34 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
         </Group>
       ))}
       <Group title="My own thoughts">
+        {orphan && editor(orphan, true)}
         {own.map(card)}
-        {editing && editing.id === null && editing.prompt === null && editor(editing, null)}
+        {newOwn && editor(newOwn)}
       </Group>
-      {!(editing && editing.id === null && editing.prompt === null) && (
+      {!newOwn && (
         <div className="btn-group">
-          <button type="button" className="quiet-link" onClick={() => setEditing({ id: null, prompt: null })}>
+          <button type="button" className="quiet-link" onClick={() => edit(null, null)}>
             + My own thought
           </button>
         </div>
       )}
       {problem && <p role="alert">{problem}</p>}
     </div>
+  );
+}
+
+/** Other versions of a note (written on another device without seeing this one), read-only. */
+function OtherNoteVersions({ note }: { note: Note }) {
+  if (note.others.length === 0) return null;
+  return (
+    <>
+      {note.others.map((o) => (
+        <div key={o.at}>
+          <p className="journal-muted">{anotherVersion(o.at)}</p>
+          <NoteBody note={o} />
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -185,7 +262,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /** A note's words: the thought, her steady answer, and the memory and skill if she wrote them. */
-function NoteBody({ note }: { note: Note }) {
+function NoteBody({ note }: { note: NoteVersion }) {
   return (
     <div className="strip-body notes-body">
       <div className="strip-meta">{THOUGHT}</div>
@@ -232,30 +309,73 @@ function TodayNote({ note, read, onTick }: { note: Note; read: boolean; onTick: 
   );
 }
 
-/** Writing or changing a note: the thought (a prompt's words to start), her answer, and the two optional boxes. */
+/**
+ * Writing or changing a note: the thought (a prompt's words to start), her answer, and the two
+ * optional boxes. What she types is kept as this device's draft after a pause, on leaving a
+ * box, when the app is hidden and when the editor goes away (review I2).
+ */
 function NoteEditor({
-  note, prompt, onSave, onCancel, onDelete, onProblem,
+  jk, deviceId, editing, start, onTyped, onSave, onCancel, onDelete, onProblem,
 }: {
-  note: Note | null;
-  prompt: string | null;
+  jk: JournalKey;
+  deviceId: string;
+  editing: Editing;
+  start: NoteFields;
+  onTyped: (f: NoteFields) => void;
   onSave: (f: NoteFields) => Promise<void>;
   onCancel: () => void;
   onDelete?: () => Promise<void>;
   onProblem: (p: string) => void;
 }) {
-  const [thought, setThought] = useState(note?.thought ?? prompt ?? "");
-  const [steady, setSteady] = useState(note?.steady ?? "");
-  const [memory, setMemory] = useState(note?.memory ?? "");
-  const [skill, setSkill] = useState(note?.skill ?? "");
+  const [f, setF] = useState<NoteFields>(start);
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
-  const ready = thought.trim() !== "" && steady.trim() !== "";
+  const ready = f.thought.trim() !== "" && f.steady.trim() !== "";
+  const latest = useRef(f);
+  const saved = useRef(JSON.stringify(editing.start));
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  // Saved, cancelled or deleted: nothing more is kept as a draft.
+  const closed = useRef(false);
 
-  async function run(fn: () => Promise<void>) {
+  const flush = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (closed.current) return;
+    const v = latest.current;
+    const k = JSON.stringify(v);
+    if (k === saved.current) return;
+    saved.current = k;
+    queue.current = queue.current
+      .then(() => saveNoteDraft(jk, deviceId, editing.id, v, editing.seen))
+      .catch(() => {
+        if (saved.current === k) saved.current = "";
+        onProblem(SAVE_PROBLEM);
+      });
+  }, [jk, deviceId, editing.id, editing.seen, onProblem]);
+  useEffect(() => () => flush(), [flush]);
+  useHiddenFlush(flush);
+
+  function set(part: Partial<NoteFields>) {
+    const next = { ...latest.current, ...part };
+    latest.current = next;
+    setF(next);
+    onTyped(next);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(flush, AUTOSAVE_MS);
+  }
+
+  /** Saving, cancelling or deleting: the draft stops, and waits for one in flight to land first. */
+  async function close(fn: () => Promise<void> | void) {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    closed.current = true;
     setBusy(true);
     try {
+      await queue.current;
       await fn();
     } catch {
+      closed.current = false; // still hers: keep keeping it
       onProblem(SAVE_PROBLEM);
     } finally {
       setBusy(false);
@@ -266,31 +386,32 @@ function NoteEditor({
     <form
       className="notes-editor"
       aria-label="Your note"
+      onBlur={flush}
       onSubmit={(e) => {
         e.preventDefault();
-        if (ready) void run(() => onSave({ prompt: note ? note.prompt : prompt, thought, steady, memory, skill }));
+        if (ready) void close(() => onSave(latest.current));
       }}
     >
       <label className="form-field">
         <span className="form-label">{THOUGHT}</span>
-        <AutoGrowTextarea rows={2} value={thought} onChange={(e) => setThought(e.target.value)} />
+        <AutoGrowTextarea rows={2} value={f.thought} onChange={(e) => set({ thought: e.target.value })} />
       </label>
       <label className="form-field">
         <span className="form-label">{STEADY}</span>
-        <AutoGrowTextarea className="journal-answer" rows={4} value={steady} onChange={(e) => setSteady(e.target.value)} autoFocus />
+        <AutoGrowTextarea className="journal-answer" rows={4} value={f.steady} onChange={(e) => set({ steady: e.target.value })} autoFocus />
       </label>
       <label className="form-field">
         <span className="form-label">{`${MEMORY} (optional)`}</span>
-        <AutoGrowTextarea rows={2} value={memory} onChange={(e) => setMemory(e.target.value)} />
+        <AutoGrowTextarea rows={2} value={f.memory} onChange={(e) => set({ memory: e.target.value })} />
       </label>
       <label className="form-field">
         <span className="form-label">{`${SKILL} (optional)`}</span>
-        <AutoGrowTextarea rows={2} value={skill} onChange={(e) => setSkill(e.target.value)} />
+        <AutoGrowTextarea rows={2} value={f.skill} onChange={(e) => set({ skill: e.target.value })} />
       </label>
       {asking && onDelete ? (
         <div className="btn-group">
           <p>Delete this note?</p>
-          <button type="button" disabled={busy} onClick={() => void run(onDelete)}>
+          <button type="button" disabled={busy} onClick={() => void close(onDelete)}>
             Delete it
           </button>
           <button type="button" className="btn-secondary" onClick={() => setAsking(false)}>
@@ -302,7 +423,7 @@ function NoteEditor({
           <button type="submit" disabled={busy || !ready}>
             Save
           </button>
-          <button type="button" className="btn-secondary" onClick={onCancel}>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void close(onCancel)}>
             Cancel
           </button>
           {onDelete && (
@@ -322,11 +443,16 @@ function NoteEditor({
  */
 export function HardMomentView({ jk, onClose }: { jk: JournalKey; onClose: () => void }) {
   const [notes, setNotes] = useState<Note[] | null>(null);
+  const [unreadable, setUnreadable] = useState(0);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let alive = true;
     listNotes(jk).then(
-      (r) => alive && setNotes(r.notes),
+      (r) => {
+        if (!alive) return;
+        setNotes(r.notes);
+        setUnreadable(r.unreadable);
+      },
       () => alive && setFailed(true),
     );
     return () => {
@@ -335,6 +461,7 @@ export function HardMomentView({ jk, onClose }: { jk: JournalKey; onClose: () =>
   }, [jk]);
   return (
     <JournalSheet title="Notes to myself" line="Written by you, when you felt steady." onClose={onClose} className="notes-hard">
+      {unreadable > 0 && !failed && <p className="journal-muted">{CANT_OPEN}</p>}
       {failed ? (
         <p>{CANT_OPEN}</p>
       ) : notes === null ? (

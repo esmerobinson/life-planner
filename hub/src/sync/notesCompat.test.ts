@@ -72,15 +72,16 @@ it("this version: a note and its read tick sync to another device, sealed, and o
   await saveSyncSettings(db, { serverUrl: SERVER, token: TOKEN });
   await confirmedDevice(db, jk);
   const server = new FakeSyncServer(TOKEN);
-  const id = await saveNote(jk, DAY, { prompt: null, thought: "Pretend synced thought", steady: "Pretend synced answer", memory: "", skill: "" });
+  const id = await saveNote(jk, DAY, "device-mac-0001", { prompt: null, thought: "Pretend synced thought", steady: "Pretend synced answer", memory: "", skill: "" });
   await setNoteRead(jk, DAY, "device-mac-0001", id, true);
+  const rid = `${id}_device-mac-0001`; // the Mac's own version of the note
   expect((await syncOnce({ db, fetch: server.fetch })).kind).toBe("ok");
   const phone = await device();
   expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");
-  const row = (await phone.journal.get(id))!;
+  const row = (await phone.journal.get(rid))!;
   expect(row).toMatchObject({ kind: "note", fp: jk.fp });
   expect(JSON.stringify(row)).not.toContain("Pretend");
-  expect(await openJson(jk.key, row, journalAad(id))).toMatchObject({ thought: "Pretend synced thought", steady: "Pretend synced answer" });
+  expect(await openJson(jk.key, row, journalAad(rid))).toMatchObject({ thought: "Pretend synced thought", steady: "Pretend synced answer" });
   expect(await phone.journal.get(`note-read:${DAY}:device-mac-0001`)).toBeTruthy();
 });
 

@@ -59,7 +59,7 @@ export function OtherVersions({ others }: { others: ResponseVersion[] }) {
     <>
       {others.map((o, i) => (
         <div key={i}>
-          <p className="journal-muted">{`${o.submitted ? ALSO_SUBMITTED : UNSENT_DRAFT} · ${when(o.at)}`}</p>
+          <p className="journal-muted">{`${o.submitted ? ALSO_SUBMITTED : UNSENT_DRAFT} · ${whenWritten(o.at)}`}</p>
           <ResponseView text={o.text} parts={o.parts} />
         </div>
       ))}
@@ -67,7 +67,8 @@ export function OtherVersions({ others }: { others: ResponseVersion[] }) {
   );
 }
 
-const when = (at: number) => {
+/** When a version was written: "Wednesday 4 November, 9:15 pm" (this device's clock). */
+export const whenWritten = (at: number) => {
   const d = new Date(at);
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return `${longDate(day)}, ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;

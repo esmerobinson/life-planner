@@ -2,11 +2,13 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../../data/db";
-import { listNoteReads, listNotes, saveNote } from "../../data/repo";
+import { deleteNote, listNoteReads, listNotes, saveNote, setNoteRead } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
 import { NOTE_GROUPS } from "../../journal/notes";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { getDeviceId } from "../../sync/engine";
+import { DELETED_ELSEWHERE } from "./NotesToMyself";
 
 // Notes to myself (journal v3): a Journal tab where, while steady, she writes her own answers
 // to the thoughts that come up in hard moments; one or two come up to reread each day; "Hard
@@ -27,6 +29,8 @@ afterEach(() => {
 });
 
 const section = () => screen.findByRole("region", { name: "Notes to myself" });
+/** Another of her devices (the notes it wrote arrive by sync). */
+const OTHER = "device-phone-01";
 const fields = { prompt: null, memory: "", skill: "" };
 
 it("locked: the tab is there but no notes and no Hard moment button", async () => {
@@ -40,7 +44,7 @@ it("locked: the tab is there but no notes and no Hard moment button", async () =
 
 it("the tab never ticks and shows no streak; it isn't a row on Home", async () => {
   await confirmedDevice(db, jk);
-  await saveNote(jk, TODAY, { ...fields, thought: "Pretend thought", steady: "Pretend answer" });
+  await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend thought", steady: "Pretend answer" });
   const view = renderApp("/journal/notes", TODAY);
   await section();
   const tab = screen.getByRole("link", { name: "Notes to myself" });
@@ -82,6 +86,7 @@ it("+ Write your answer: the thought is filled in, the answer is hers; Save keep
   await userEvent.type(within(form).getByRole("textbox", { name: "A memory or evidence (optional)" }), "Pretend walk by the made-up river");
   await userEvent.type(within(form).getByRole("textbox", { name: "A skill to try (optional)" }), "Pretend skill");
   await userEvent.click(within(form).getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(within(s).queryByRole("form")).toBeNull());
   const group = within(s).getByRole("group", { name: "Why bother" });
   expect(await within(group).findByText("Pretend: the small steps added up last spring")).toBeInTheDocument();
   expect(within(group).getByText("Pretend walk by the made-up river")).toBeInTheDocument();
@@ -104,25 +109,112 @@ it("+ My own thought: an empty thought to fill; it shows under My own thoughts",
   await userEvent.type(within(form).getByRole("textbox", { name: "When I think…" }), "Pretend own worry");
   await userEvent.type(within(form).getByRole("textbox", { name: "What I know when I'm steady…" }), "Pretend own answer");
   await userEvent.click(within(form).getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(within(s).queryByRole("form")).toBeNull());
   const own = within(s).getByRole("group", { name: "My own thoughts" });
   expect(await within(own).findByText("Pretend own worry")).toBeInTheDocument();
   expect(within(own).getByText("Pretend own answer")).toBeInTheDocument();
   expect((await listNotes(jk)).notes[0]).toMatchObject({ prompt: null });
 });
 
-it("Cancel leaves nothing written", async () => {
+it("Cancel leaves no note (and no note in progress)", async () => {
   await confirmedDevice(db, jk);
   renderApp("/journal/notes", TODAY);
   const s = await section();
   await userEvent.click(await within(s).findByRole("button", { name: "+ My own thought" }));
+  await userEvent.type(within(s).getByRole("textbox", { name: "When I think…" }), "Pretend passing worry");
   await userEvent.click(within(s).getByRole("button", { name: "Cancel" }));
   expect(within(s).queryByRole("form")).toBeNull();
-  expect(await db.journal.where("kind").equals("note").count()).toBe(0);
+  await waitFor(async () => expect((await listNotes(jk, await getDeviceId(db))).drafts).toEqual([]));
+  expect((await listNotes(jk)).notes).toEqual([]);
+});
+
+describe("a note in progress is never lost (review I2)", () => {
+  it("typed, then another tab and back: the editor opens again with her words", async () => {
+    await confirmedDevice(db, jk);
+    renderApp("/journal/notes", TODAY);
+    const s = await section();
+    await userEvent.click(await within(s).findByRole("button", { name: "+ Write your answer: I'm too much" }));
+    await userEvent.type(within(s).getByRole("textbox", { name: "What I know when I'm steady…" }), "Pretend: people stayed");
+    await userEvent.click(screen.getByRole("link", { name: /Daily check-in/ })); // the tab goes away
+    await screen.findByRole("region", { name: "Daily check-in" });
+    await userEvent.click(screen.getByRole("link", { name: "Notes to myself" }));
+    const back = await section();
+    const form = await within(back).findByRole("form", { name: "Your note" });
+    expect(within(form).getByRole("textbox", { name: "What I know when I'm steady…" })).toHaveValue("Pretend: people stayed");
+    expect(within(form).getByRole("textbox", { name: "When I think…" })).toHaveValue("I'm too much");
+    expect(JSON.stringify(await db.journal.toArray())).not.toContain("people stayed"); // kept sealed
+    // Saved, it is a note under its prompt and nothing is left in progress.
+    await userEvent.click(within(form).getByRole("button", { name: "Save" }));
+    expect(await within(within(back).getByRole("group", { name: "Self-worth" })).findByText("Pretend: people stayed")).toBeInTheDocument();
+    await waitFor(async () => expect((await listNotes(jk, await getDeviceId(db))).drafts).toEqual([]));
+  });
+
+  it("an edit typed, then the app closed (page hidden) and opened again: her words are there", async () => {
+    await confirmedDevice(db, jk);
+    await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend old thought", steady: "Pretend old answer" });
+    const view = renderApp("/journal/notes", TODAY);
+    const s = await section();
+    await userEvent.click(await within(s).findByRole("button", { name: "Edit: Pretend old thought" }));
+    const answer = within(s).getByRole("textbox", { name: "What I know when I'm steady…" });
+    await userEvent.type(answer, ", and more pretend words");
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    await waitFor(async () => expect((await listNotes(jk, await getDeviceId(db))).drafts).toHaveLength(1));
+    view.unmount(); // iOS ends the app
+    renderApp("/journal/notes", TODAY);
+    const form = await within(await section()).findByRole("form", { name: "Your note" });
+    expect(within(form).getByRole("textbox", { name: "What I know when I'm steady…" })).toHaveValue("Pretend old answer, and more pretend words");
+  });
+
+  it("the note deleted on another device while she writes: the editor stays, and Save keeps it", async () => {
+    await confirmedDevice(db, jk);
+    const id = await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend old thought", steady: "Pretend old answer" });
+    renderApp("/journal/notes", TODAY);
+    const s = await section();
+    await userEvent.click(await within(s).findByRole("button", { name: "Edit: Pretend old thought" }));
+    const answer = within(s).getByRole("textbox", { name: "What I know when I'm steady…" });
+    await userEvent.type(answer, " kept");
+    await deleteNote(jk, OTHER, id, (await listNotes(jk)).notes[0]!.seen);
+    expect(await within(s).findByText(DELETED_ELSEWHERE)).toBeInTheDocument();
+    const form = within(s).getByRole("form", { name: "Your note" });
+    expect(within(form).getByRole("textbox", { name: "What I know when I'm steady…" })).toHaveValue("Pretend old answer kept");
+    await userEvent.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(async () => expect((await listNotes(jk)).notes).toEqual([expect.objectContaining({ steady: "Pretend old answer kept" })]));
+  });
+});
+
+it("two devices' versions written apart: the newest shows, the other below as another version (review I1)", async () => {
+  await confirmedDevice(db, jk);
+  const id = await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend thought", steady: "Pretend first words" });
+  const base = (await listNotes(jk)).notes[0]!.seen;
+  await saveNote(jk, TODAY, "device-ipad-001", { ...fields, thought: "Pretend thought", steady: "Pretend iPad words" }, { id, seen: base });
+  await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend thought", steady: "Pretend phone words" }, { id, seen: base });
+  renderApp("/journal/notes", TODAY);
+  const own = await within(await section()).findByRole("group", { name: "My own thoughts" });
+  expect(await within(own).findByText("Pretend phone words")).toBeInTheDocument();
+  expect(within(own).getByText(/^Another version \(from .+\)$/)).toBeInTheDocument();
+  expect(within(own).getByText("Pretend iPad words")).toBeInTheDocument();
+});
+
+it("the tick shows this device's own: unticked here, it stays unticked (review M1)", async () => {
+  await confirmedDevice(db, jk);
+  const id = await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend thought", steady: "Pretend words" });
+  await setNoteRead(jk, TODAY, OTHER, id, true); // ticked on the phone
+  renderApp("/journal/notes", TODAY);
+  const top = await within(await section()).findByRole("group", { name: "To read today" });
+  const box = await within(top).findByRole("checkbox", { name: /^I read this today/ });
+  expect(box).not.toBeChecked();
+  await userEvent.click(box);
+  await waitFor(() => expect(box).toBeChecked());
+  await userEvent.click(box);
+  await waitFor(async () => expect((await listNoteReads(jk)).ownOn(TODAY, await getDeviceId(db)).size).toBe(0));
+  expect(box).not.toBeChecked();
 });
 
 it("a note can be edited, and deleted after a second tap", async () => {
   await confirmedDevice(db, jk);
-  await saveNote(jk, TODAY, { ...fields, thought: "Pretend old thought", steady: "Pretend old answer" });
+  await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend old thought", steady: "Pretend old answer" });
   renderApp("/journal/notes", TODAY);
   const s = await section();
   const own = await within(s).findByRole("group", { name: "My own thoughts" });
@@ -133,6 +225,7 @@ it("a note can be edited, and deleted after a second tap", async () => {
   await userEvent.clear(answer);
   await userEvent.type(answer, "Pretend new answer");
   await userEvent.click(within(form).getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(within(s).queryByRole("form")).toBeNull());
   expect(await within(own).findByText("Pretend new answer")).toBeInTheDocument();
   expect((await listNotes(jk)).notes).toHaveLength(1);
 
@@ -154,7 +247,7 @@ it("no notes yet: no reread box at the top", async () => {
 
 it("at the top, one or two of her notes to reread, with a gentle 'I read this today' tick (no streak, no count)", async () => {
   await confirmedDevice(db, jk);
-  for (const w of ["one", "two", "three"]) await saveNote(jk, TODAY, { ...fields, thought: `Pretend thought ${w}`, steady: `Pretend answer ${w}` });
+  for (const w of ["one", "two", "three"]) await saveNote(jk, TODAY, OTHER, { ...fields, thought: `Pretend thought ${w}`, steady: `Pretend answer ${w}` });
   renderApp("/journal/notes", TODAY);
   const s = await section();
   const top = await within(s).findByRole("group", { name: "To read today" });
@@ -175,8 +268,8 @@ it("at the top, one or two of her notes to reread, with a gentle 'I read this to
 describe("Hard moment", () => {
   it("is on every Journal tab and opens her notes straight away in a calm full view", async () => {
     await confirmedDevice(db, jk);
-    await saveNote(jk, TODAY, { ...fields, prompt: "He's going to leave", thought: "He's going to leave", steady: "Pretend: he came back every time", memory: "Pretend memory of a pretend trip" });
-    await saveNote(jk, TODAY, { ...fields, thought: "Pretend own worry", steady: "Pretend own answer" });
+    await saveNote(jk, TODAY, OTHER, { ...fields, prompt: "He's going to leave", thought: "He's going to leave", steady: "Pretend: he came back every time", memory: "Pretend memory of a pretend trip" });
+    await saveNote(jk, TODAY, OTHER, { ...fields, thought: "Pretend own worry", steady: "Pretend own answer" });
     for (const path of ["/journal/exercise", "/journal/morning", "/journal/check-in", "/journal/read-back", "/journal/notes"]) {
       const view = renderApp(path, TODAY);
       expect(await screen.findByRole("button", { name: "Hard moment" })).toBeInTheDocument();
