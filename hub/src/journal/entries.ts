@@ -141,6 +141,31 @@ export interface PartAnswer {
   answer: PartValue;
 }
 
+/**
+ * One note to herself (journal v3, "Notes to myself"): the thought that comes up in a hard
+ * moment and her own steady answer, perhaps a memory or evidence and a skill to try. `prompt`
+ * is the starter prompt it answers (null: her own thought). Deleted: every field emptied (the
+ * row stays, as sync never hard-deletes).
+ */
+export interface NoteEntry {
+  v: 1;
+  prompt: string | null;
+  thought: string;
+  steady: string;
+  memory: string;
+  skill: string;
+  createdAt: number;
+  at: number;
+  deleted?: true;
+}
+
+/** One device's "I read this today" ticks for a day: the notes' row ids. */
+export interface NoteReadEntry {
+  v: 1;
+  ids: string[];
+  at: number;
+}
+
 /** The earlier one-row-per-day morning shape (read and split; never written). */
 export interface LegacyMorningEntry {
   v: 1;
@@ -200,6 +225,10 @@ export const ENTRY_CHECK = {
     (v.v === 1
       ? cardDay(v.day)
       : v.v === 2 && cardId(v.id) && (v.day === null || cardDay(v.day)) && (v.parts === undefined || partAnswers(v.parts))),
+  note: (v: unknown): v is NoteEntry =>
+    isObj(v) && v.v === 1 && (v.prompt === null || isStr(v.prompt)) && isStr(v.thought) && isStr(v.steady) &&
+    isStr(v.memory) && isStr(v.skill) && num(v.createdAt) && num(v.at) && (v.deleted === undefined || v.deleted === true),
+  "note-read": (v: unknown): v is NoteReadEntry => isObj(v) && v.v === 1 && strList(v.ids) && num(v.at),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&
     (v.draft === undefined || isStr(v.draft)) && strList(v.photos),

@@ -834,6 +834,117 @@ export async function listExerciseEntries(jk: JournalKey, before: ISODate): Prom
   return { entries, unreadable };
 }
 
+// ---- notes to myself (journal v3) ----------------------------------------------------------
+
+/** One note as the page sees it (`id` is its row id). Always readable: no lock applies. */
+export interface Note {
+  id: string;
+  /** The day it was first written (in its row id). */
+  date: ISODate;
+  prompt: string | null;
+  thought: string;
+  steady: string;
+  memory: string;
+  skill: string;
+  createdAt: number;
+  at: number;
+}
+
+/** What she typed for a note. */
+export type NoteFields = Pick<Note, "prompt" | "thought" | "steady" | "memory" | "skill">;
+
+/** Every note (deleted ones left out), oldest first, and how many rows wouldn't open here. */
+export async function listNotes(jk: JournalKey): Promise<{ notes: Note[]; unreadable: number }> {
+  const notes: Note[] = [];
+  let unreadable = 0;
+  for (const row of await db.journal.where("kind").equals("note").toArray()) {
+    const o = await openRow(jk, row, "note");
+    if (o.state !== "ok") {
+      unreadable++;
+      continue;
+    }
+    const e = o.entry;
+    if (e.deleted) continue;
+    notes.push({ id: row.id, date: row.date, prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill, createdAt: e.createdAt, at: e.at });
+  }
+  notes.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  return { notes, unreadable };
+}
+
+/** A note's row, opened (never written over if it won't open here). */
+async function ownNote(jk: JournalKey, id: string) {
+  const row = await db.journal.get(id);
+  if (!row || row.kind !== "note") throw new Error("That note isn't here.");
+  const o = await openRow(jk, row, "note");
+  if (o.state !== "ok") throw new Error(CANT_OPEN);
+  return { row, entry: o.entry };
+}
+
+/**
+ * Saves a note: a new row `note:<today>:<uuid>`, or (with `id`) the same row rewritten whole,
+ * keeping its day and when it was first written. The thought and her answer must have words.
+ */
+export async function saveNote(jk: JournalKey, today: ISODate, fields: NoteFields, id?: string): Promise<string> {
+  if (!fields.thought.trim() || !fields.steady.trim()) throw new Error("A note needs the thought and your answer.");
+  const at = Date.now();
+  const prev = id ? await ownNote(jk, id) : null;
+  const date = prev?.row.date ?? today;
+  const suffix = prev ? prev.row.id.slice(`note:${date}:`.length) : crypto.randomUUID();
+  const entry = {
+    v: 1, prompt: fields.prompt, thought: fields.thought, steady: fields.steady, memory: fields.memory, skill: fields.skill,
+    createdAt: prev?.entry.createdAt ?? at, at,
+  };
+  const row = await seal(jk, "note", date, suffix, entry);
+  await write(jk, [row]);
+  return row.id;
+}
+
+/** Deletes a note: its row is rewritten with nothing in it. */
+export async function deleteNote(jk: JournalKey, id: string): Promise<void> {
+  const { row, entry } = await ownNote(jk, id);
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: entry.createdAt, at: Date.now(), deleted: true };
+  await write(jk, [await seal(jk, "note", row.date, row.id.slice(`note:${row.date}:`.length), empty)]);
+}
+
+/** Which notes were read on which day, from every device's "I read this today" rows. */
+export interface NoteReads {
+  /** Each note's last day read (any device). */
+  lastRead: Map<string, ISODate>;
+  /** The notes read on a day (any device). */
+  readOn: (date: ISODate) => Set<string>;
+}
+
+export async function listNoteReads(jk: JournalKey): Promise<NoteReads> {
+  const byDay = new Map<ISODate, Set<string>>();
+  const lastRead = new Map<string, ISODate>();
+  for (const row of await db.journal.where("kind").equals("note-read").toArray()) {
+    const o = await openRow(jk, row, "note-read");
+    if (o.state !== "ok") continue;
+    const day = byDay.get(row.date) ?? new Set<string>();
+    for (const id of o.entry.ids) {
+      day.add(id);
+      if ((lastRead.get(id) ?? "") < row.date) lastRead.set(id, row.date);
+    }
+    byDay.set(row.date, day);
+  }
+  return { lastRead, readOn: (date) => new Set(byDay.get(date) ?? []) };
+}
+
+/** Ticks (or unticks) "I read this today" for a note, on this device's own row for the day. */
+export async function setNoteRead(jk: JournalKey, today: ISODate, deviceId: string, noteId: string, on: boolean): Promise<void> {
+  const id = journalId("note-read", today, deviceId);
+  const existing = await db.journal.get(id);
+  let ids: string[] = [];
+  if (existing) {
+    const o = await openRow(jk, existing, "note-read");
+    if (o.state !== "ok") throw new Error(CANT_OPEN); // never written over
+    ids = o.entry.ids;
+  }
+  ids = ids.filter((x) => x !== noteId);
+  if (on) ids.push(noteId);
+  await write(jk, [await seal(jk, "note-read", today, deviceId, { v: 1, ids, at: Date.now() })]);
+}
+
 /** Stars or un-stars a card (by id) in this device's own stars row (only this device writes it). */
 export async function setExerciseStar(jk: JournalKey, today: ISODate, deviceId: string, cardId: string, on: boolean): Promise<void> {
   const id = journalId("stars", today, deviceId);

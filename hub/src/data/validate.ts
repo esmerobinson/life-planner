@@ -274,7 +274,7 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
 function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
   if (kind === "stars") return id.startsWith("stars:") && SUFFIX.test(id.slice("stars:".length));
   if (kind === "cards") return id === "cards" || CARDS_CHUNK.test(id);
-  if (["page", "photo", "draft", "answer", "exercise", "exercise-entry"].includes(kind)) {
+  if (["page", "photo", "draft", "answer", "exercise", "exercise-entry", "note", "note-read"].includes(kind)) {
     const prefix = `${kind}:${date}:`;
     if (!id.startsWith(prefix)) return false;
     const rest = id.slice(prefix.length);
