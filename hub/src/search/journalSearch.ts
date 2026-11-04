@@ -29,9 +29,14 @@ function partText(parts: PartAnswer[] | null): string {
  * context), exercise responses up to today, and morning pages old enough for Read back. Rows
  * this key can't open are skipped by the repo, each on its own.
  */
-export async function loadJournalDocs(jk: JournalKey, today: ISODate): Promise<JournalDoc[]> {
+export async function loadJournalDocs(jk: JournalKey, today: ISODate, signal?: AbortSignal): Promise<JournalDoc[]> {
+  // Search closed (or the key changed): stop opening entries at the next step.
+  const check = () => signal?.throwIfAborted();
+  check();
   const docs: JournalDoc[] = [];
-  for (const day of await listCheckinDays(jk)) {
+  const days = await listCheckinDays(jk);
+  check();
+  for (const day of days) {
     for (const [prompt, a] of day.answers) {
       if (!a.answer?.trim()) continue;
       docs.push({
@@ -45,6 +50,7 @@ export async function loadJournalDocs(jk: JournalKey, today: ISODate): Promise<J
     }
   }
   const { entries } = await listExerciseEntries(jk, addDays(today, 1));
+  check();
   for (const e of entries) {
     const text = [e.text.trim(), partText(e.parts)].filter(Boolean).join(" · ");
     if (!text) continue;
@@ -59,6 +65,7 @@ export async function loadJournalDocs(jk: JournalKey, today: ISODate): Promise<J
   // The lock is checked on the row's clear date BEFORE anything is opened.
   for (const page of await listReadBack()) {
     if (morningLocked(page.date, today)) continue;
+    check();
     const m = await readMorningPage(jk, page.id, today);
     if (m.state === "ok" && m.text.trim()) {
       docs.push({ id: `morning:${page.id}`, kind: "morning", date: page.date, title: "Morning pages", text: m.text });

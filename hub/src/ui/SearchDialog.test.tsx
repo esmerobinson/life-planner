@@ -4,6 +4,7 @@ import { vi } from "vitest";
 import { db } from "../data/db";
 import { createBook, createGoal, createItem, ensureCheckinSet, finishMorningPage, saveAnswer } from "../data/repo";
 import { confirmedDevice, keyFor } from "../test/journalKey";
+import { JOURNAL_CANDIDATE_META, JOURNAL_KEY_META } from "../journal/keyStore";
 import { currentUrl, renderApp } from "../test/renderApp";
 
 // ⌘K search (option 3A): a pop-up over any page; on the phone the 🔍 in the top bar opens it
@@ -69,7 +70,7 @@ describe("⌘K search", () => {
     for (const g of ["Ideas", "Books", "Goals", "Notes"]) expect(dialog.getByRole("group", { name: g })).toBeInTheDocument();
     expect(within(dialog.getByRole("group", { name: "Books" })).getByText(/Lena/)).toBeInTheDocument();
     // Locked journal: the quiet line.
-    expect(dialog.getByText("Journal results appear when your journal is unlocked.")).toBeInTheDocument();
+    expect(await dialog.findByText("Journal results appear when your journal is unlocked.")).toBeInTheDocument();
   });
 
   it("↑ ↓ move the highlight; Enter opens the item's side panel and closes search", async () => {
@@ -110,6 +111,52 @@ describe("⌘K search", () => {
     await vi.waitFor(() => expect(currentUrl).toBe(`/?open=${todo.id}`));
   });
 
+  it("a click on a heading, the hint or the padding keeps focus in the box: Escape, arrows and Tab still work (I-2)", async () => {
+    await pretend();
+    renderApp("/", TODAY);
+    const sheet = await openSearch();
+    const dialog = within(sheet);
+    const input = dialog.getByRole("combobox", { name: "Search" });
+    await userEvent.type(input, "market");
+    await dialog.findByRole("group", { name: "To-dos" });
+    await userEvent.click(dialog.getByText("To-dos"));
+    expect(input).toHaveFocus();
+    await userEvent.click(dialog.getByText(/to move/));
+    expect(input).toHaveFocus();
+    await userEvent.click(sheet);
+    expect(input).toHaveFocus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(dialog.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
+    // Even if focus does land on the sheet itself, the keys are heard there.
+    sheet.focus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
+  });
+
+  it("past 8 rows a group offers See all N", async () => {
+    for (let i = 0; i < 11; i++) await createItem({ kind: "task", title: `Pretend lantern errand ${i}`, areaId: "art", priority: 2 }, "2026-10-01");
+    renderApp("/", TODAY);
+    const dialog = within(await openSearch());
+    await userEvent.type(dialog.getByRole("combobox", { name: "Search" }), "lantern");
+    const todos = await dialog.findByRole("group", { name: "To-dos" });
+    expect(within(todos).getAllByRole("option")).toHaveLength(8);
+    await userEvent.click(within(todos).getByRole("button", { name: "See all 11" }));
+    expect(within(todos).getAllByRole("option")).toHaveLength(11);
+    expect(within(todos).queryByRole("button", { name: /See all/ })).toBeNull();
+    expect(dialog.getByRole("combobox", { name: "Search" })).toHaveFocus();
+  });
+
+  it("Enter while an input method is composing does not open anything", async () => {
+    await pretend();
+    renderApp("/", TODAY);
+    const dialog = within(await openSearch());
+    const input = dialog.getByRole("combobox", { name: "Search" });
+    await userEvent.type(input, "stall");
+    await dialog.findByRole("option", { name: /Draw the pretend market stall/ });
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(screen.getByRole("dialog", { name: "Search" })).toBeInTheDocument();
+  });
+
   it("no match says so", async () => {
     await pretend();
     renderApp("/", TODAY);
@@ -135,6 +182,49 @@ describe("⌘K search: the journal", () => {
     expect(dialog.queryByText("Journal results appear when your journal is unlocked.")).toBeNull();
     await userEvent.keyboard("{Enter}");
     await vi.waitFor(() => expect(currentUrl).toBe("/journal/check-in"));
+  });
+});
+
+describe("⌘K search: the journal is opened only when needed, and follows the key", () => {
+  it("nothing is decrypted until something is typed", async () => {
+    const jk = await keyFor("fake-journal-search-ui");
+    await confirmedDevice(db, jk);
+    await ensureCheckinSet(jk, "2026-10-22", ["M10"]);
+    await saveAnswer(jk, "2026-10-22", "M10", "device-pretend-01", "The pretend lantern festival", true);
+    const decrypt = vi.spyOn(crypto.subtle, "decrypt");
+    renderApp("/area/art", TODAY);
+    await screen.findByRole("button", { name: "Add" });
+    await new Promise((r) => setTimeout(r, 200));
+    decrypt.mockClear(); // only what search itself opens counts
+    const dialog = within(await openSearch());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(decrypt).not.toHaveBeenCalled();
+    await userEvent.type(dialog.getByRole("combobox", { name: "Search" }), "lantern");
+    expect(await dialog.findByRole("option", { name: /pretend lantern festival/ })).toBeInTheDocument();
+    expect(decrypt).toHaveBeenCalled();
+  });
+
+  it("a passphrase still being checked (no confirmed key) shows the locked line", async () => {
+    const jk = await keyFor("fake-journal-search-ui");
+    await db.syncMeta.put({ key: JOURNAL_CANDIDATE_META, value: { key: jk.key, mac: jk.mac, fp: jk.fp, id: "pretend-candidate" } });
+    renderApp("/", TODAY);
+    const dialog = within(await openSearch());
+    await userEvent.type(dialog.getByRole("combobox", { name: "Search" }), "lantern");
+    expect(await dialog.findByText("Journal results appear when your journal is unlocked.")).toBeInTheDocument();
+  });
+
+  it("if the key goes while search is open, the journal results go with it", async () => {
+    const jk = await keyFor("fake-journal-search-ui");
+    await confirmedDevice(db, jk);
+    await ensureCheckinSet(jk, "2026-10-22", ["M10"]);
+    await saveAnswer(jk, "2026-10-22", "M10", "device-pretend-01", "The pretend lantern festival", true);
+    renderApp("/", TODAY);
+    const dialog = within(await openSearch());
+    await userEvent.type(dialog.getByRole("combobox", { name: "Search" }), "lantern");
+    await dialog.findByRole("option", { name: /pretend lantern festival/ });
+    await db.syncMeta.delete(JOURNAL_KEY_META);
+    expect(await dialog.findByText("Journal results appear when your journal is unlocked.")).toBeInTheDocument();
+    expect(dialog.queryByRole("option", { name: /pretend lantern festival/ })).toBeNull();
   });
 });
 

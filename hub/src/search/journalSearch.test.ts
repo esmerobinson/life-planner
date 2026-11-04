@@ -46,6 +46,38 @@ describe("loadJournalDocs", () => {
     expect(hits.map((h) => h.meta)).toEqual(["Wed 4 Nov", "Thu 22 Oct", "Mon 19 Oct", "Fri 2 Oct"]);
   });
 
+  it("the 28-day line: a page dated 28 days back opens, 27 days back never does", async () => {
+    await finishMorningPage(jk, "2026-10-07", ME, "Pretend page twenty-eight days old"); // opens on 11-04
+    await finishMorningPage(jk, "2026-10-08", ME, "Pretend page twenty-seven days old"); // opens on 11-05
+    const docs = await loadJournalDocs(jk, TODAY);
+    expect(docs.map((d) => d.date)).toEqual(["2026-10-07"]);
+  });
+
+  it("before 3am the shell's day is still yesterday: a page that opens today stays locked", async () => {
+    await finishMorningPage(jk, "2026-10-07", ME, "Pretend page");
+    expect(await loadJournalDocs(jk, "2026-11-03")).toEqual([]);
+  });
+
+  it("a locked page is never even decrypted", async () => {
+    await finishMorningPage(jk, "2026-10-30", ME, "A pretend page that must stay sealed");
+    await finishMorningPage(jk, "2026-10-08", ME, "Another pretend sealed page");
+    const decrypt = vi.spyOn(crypto.subtle, "decrypt");
+    const docs = await loadJournalDocs(jk, TODAY);
+    expect(docs).toEqual([]);
+    expect(decrypt).not.toHaveBeenCalled();
+  });
+
+  it("stops opening entries once the search closes (aborted)", async () => {
+    await ensureCheckinSet(jk, "2026-10-22", ["M10"]);
+    await saveAnswer(jk, "2026-10-22", "M10", ME, "Pretend answer", true);
+    await finishMorningPage(jk, "2026-10-01", ME, "Pretend old page");
+    const stop = new AbortController();
+    stop.abort();
+    const decrypt = vi.spyOn(crypto.subtle, "decrypt");
+    await expect(loadJournalDocs(jk, TODAY, stop.signal)).rejects.toThrow();
+    expect(decrypt).not.toHaveBeenCalled();
+  });
+
   it("writes nothing while loading (no index on disk)", async () => {
     await ensureCheckinSet(jk, "2026-10-22", ["M10"]);
     await saveAnswer(jk, "2026-10-22", "M10", ME, "Pretend answer", true);

@@ -12,11 +12,29 @@
    the magnifier glyph, the "↵" beside the highlighted result and the hint line. Undecided, so
    magenta: the tile beside an Inbox result (the Inbox has no tile colour or icon). */
 
+/* Fix round 1 (I-1, a composition fix for Esme to confirm): the pop-up's top edge sits at a
+   fixed 10vh from the top of the window and the results grow downward, so the box never
+   moves while she types (centred, it jumped with every change in the results). */
+.choose-shade.search-shade {
+  place-items: start center;
+  padding-top: 10vh;
+}
+
 .search-sheet {
   width: min(560px, 100%);
+  max-height: calc(90vh - 16px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.is-phone .choose-shade.search-shade {
+  padding: 0;
+}
+
+button.quiet-link.search-all {
+  align-self: flex-start;
+  padding: 0 2px;
 }
 
 /* The app's soft field (controls.css, mockup A), which doesn't list type="search" yet. */

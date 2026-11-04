@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { NAV } from "./areas";
-import { SEARCH_GLYPH } from "./SearchDialog";
+import { SEARCH_GLYPH } from "./SearchGlyph";
 
 /** Pages whose title the phone top bar shows (the page's own h1 is then kept for screen readers only). */
 const TITLES: Record<string, string> = {

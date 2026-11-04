@@ -8,6 +8,7 @@ import {
   buildIndex, GROUP_CAP, GROUP_LABEL, highlight, queryWords, searchIndex, searchJournal, type Hit, type JournalDoc, type ResultGroup,
 } from "../search/search";
 import { NAV } from "./areas";
+import { useDbChanges } from "./journal/useJournalKey";
 import { usePanel } from "./panelContext";
 
 /** Typing settles this long before the results update (a technical wait, not a look or motion). */
@@ -20,17 +21,14 @@ export function isSearchShortcut(e: KeyboardEvent | globalThis.KeyboardEvent): b
   return mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
 }
 
-/** The magnifier, line-drawn like the calendar and arrow icons (the search mockup's glyph). */
-export const SEARCH_GLYPH = (
-  <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-    <circle cx="7" cy="7" r="4.5" />
-    <path d="M10.5 10.5L14 14" />
-  </svg>
-);
-
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-type JournalState = { state: "loading" } | { state: "locked" } | { state: "error" } | { state: "ok"; docs: JournalDoc[] };
+type JournalState =
+  | { state: "idle" }
+  | { state: "loading" }
+  | { state: "locked" }
+  | { state: "error" }
+  | { state: "ok"; docs: JournalDoc[] };
 
 /** Bold runs for the query words (the mockup's <mark>: bold, no colour). */
 function Marked({ text, words }: { text: string; words: string[] }) {
@@ -61,8 +59,9 @@ function ResultTile({ tile }: { tile: string }) {
  * the shade) closes it and focus goes back.
  *
  * Journal entries show only while the journal is unlocked (this device's confirmed key): they
- * are opened when search opens, kept in this component's memory only, and dropped when it
- * closes. Morning pages under 28 days old are never opened.
+ * are opened once she first types something, kept in this component's memory only, and dropped
+ * when it closes (an opening still under way is aborted) or the key changes. Morning pages under
+ * 28 days old are never opened. Past GROUP_CAP rows a group offers "See all N".
  */
 export function SearchDialog({
   items, goals, today, phone, onClose,
@@ -72,7 +71,14 @@ export function SearchDialog({
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
-  const [journal, setJournal] = useState<JournalState>({ state: "loading" });
+  const [journal, setJournal] = useState<JournalState>({ state: "idle" });
+  // The journal is opened only once she types something (review M-1), then kept for this open.
+  const [journalWanted, setJournalWanted] = useState(false);
+  const [journalRun, setJournalRun] = useState(0);
+  /** The fingerprint the journal was opened with (null: locked; undefined: not looked yet). */
+  const openedWith = useRef<string | null | undefined>(undefined);
+  // Groups opened with "See all N" (for this query).
+  const [all, setAll] = useState<ReadonlySet<string>>(new Set());
   const sheet = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const opener = useRef<Element | null>(null);
@@ -86,35 +92,60 @@ export function SearchDialog({
     };
   }, []);
 
-  // The journal, opened once per search (in memory only; nothing is written).
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      const jk = await loadJournalKey(db);
-      if (!jk) return { state: "locked" } as const;
-      return { state: "ok", docs: await loadJournalDocs(jk, today) } as const;
-    })().then(
-      (s) => live && setJournal(s),
-      () => live && setJournal({ state: "error" }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [today]);
-
   useEffect(() => {
     const t = setTimeout(() => setQuery(text), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [text]);
 
-  const index = useMemo(() => buildIndex(items, goals, today), [items, goals, today]);
   const words = useMemo(() => queryWords(query), [query]);
-  const groups: ResultGroup[] = useMemo(() => searchIndex(index, query), [index, query]);
+  useEffect(() => {
+    if (words.length) setJournalWanted(true);
+  }, [words]);
+
+  // The journal, opened with the confirmed key, in memory only (nothing is written). Closing
+  // search (or a key change) aborts an opening still under way, so nothing more is decrypted.
+  useEffect(() => {
+    if (!journalWanted) return;
+    const stop = new AbortController();
+    setJournal({ state: "loading" });
+    (async () => {
+      const jk = await loadJournalKey(db);
+      openedWith.current = jk?.fp ?? null;
+      if (!jk) return { state: "locked" } as const;
+      return { state: "ok", docs: await loadJournalDocs(jk, today, stop.signal) } as const;
+    })().then(
+      (s) => !stop.signal.aborted && setJournal(s),
+      () => !stop.signal.aborted && setJournal({ state: "error" }),
+    );
+    return () => stop.abort();
+  }, [journalWanted, today, journalRun]);
+
+  // The key changed while search is open (sync confirmed another, or it was removed): drop
+  // what was opened with the old one at once, and look again (review M-2).
+  useDbChanges(() => {
+    if (openedWith.current === undefined) return;
+    void loadJournalKey(db).then(
+      (jk) => {
+        if ((jk?.fp ?? null) === openedWith.current) return;
+        openedWith.current = undefined;
+        setJournal({ state: "loading" });
+        setJournalRun((n) => n + 1);
+      },
+      () => {},
+    );
+  });
+
+  const index = useMemo(() => buildIndex(items, goals, today), [items, goals, today]);
+  useEffect(() => setAll(new Set()), [query]);
+  const groups: ResultGroup[] = useMemo(
+    () => searchIndex(index, query, GROUP_CAP, (g) => (all.has(g) ? Infinity : GROUP_CAP)),
+    [index, query, all],
+  );
   const journalHits = useMemo(() => {
     if (journal.state !== "ok") return null;
     const hits = searchJournal(journal.docs, query, today);
-    return { total: hits.length, hits: hits.slice(0, GROUP_CAP) };
-  }, [journal, query, today]);
+    return { total: hits.length, hits: all.has("journal") ? hits : hits.slice(0, GROUP_CAP) };
+  }, [journal, query, today, all]);
   const flat: Hit[] = useMemo(() => [...groups.flatMap((g) => g.hits), ...(journalHits?.hits ?? [])], [groups, journalHits]);
   useEffect(() => setSel(0), [query]);
   const selected = flat.length ? flat[Math.min(sel, flat.length - 1)] : undefined;
@@ -147,6 +178,7 @@ export function SearchDialog({
       return;
     }
     if (e.key === "Enter" && e.target === input.current) {
+      if (e.nativeEvent.isComposing) return; // an input method is still choosing characters
       e.preventDefault();
       if (query === text) {
         if (selected) open(selected);
@@ -160,10 +192,10 @@ export function SearchDialog({
       return;
     }
     if (e.key !== "Tab" || !sheet.current) return;
-    const all = [...sheet.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-    if (all.length === 0) return;
-    const first = all[0]!;
-    const last = all[all.length - 1]!;
+    const focusable = [...sheet.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+    if (focusable.length === 0) return;
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
     if (e.shiftKey && document.activeElement === first) {
       e.preventDefault();
       last.focus();
@@ -204,13 +236,24 @@ export function SearchDialog({
     );
   };
 
-  const group = (id: string, label: string, count: number | null, body: ReactNode) => (
+  const group = (id: string, label: string, count: number | null, body: ReactNode, shown = 0) => (
     <div key={id} role="group" aria-labelledby={`search-group-${id}`} className="search-group">
       <div className="search-group-h">
         <span id={`search-group-${id}`}>{label}</span>
         {count !== null && <span aria-hidden="true">{count}</span>}
       </div>
       {body}
+      {count !== null && count > shown && (
+        // Past the cap (review M-7): the rest of this group, in place. Focus stays in the box.
+        <button
+          type="button"
+          className="quiet-link search-all"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setAll((s) => new Set(s).add(id))}
+        >
+          {`See all ${count}`}
+        </button>
+      )}
     </div>
   );
 
@@ -248,7 +291,13 @@ export function SearchDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Search"
+        // Focusable itself, so keys are still heard here if focus ever lands on it (I-2)…
+        tabIndex={-1}
         onKeyDown={onKey}
+        // …and a click on anything that isn't a control keeps focus in the box (I-2).
+        onMouseDown={(e) => {
+          if (!(e.target as HTMLElement).closest("input, button, a")) e.preventDefault();
+        }}
       >
         {phone ? (
           <div className="search-top">
@@ -266,7 +315,7 @@ export function SearchDialog({
           ) : (
             <>
               {nothing && <p className="search-muted">{`Nothing matches "${query.trim()}".`}</p>}
-              {groups.map((g) => group(g.group, GROUP_LABEL[g.group], g.total, g.hits.map(option)))}
+              {groups.map((g) => group(g.group, GROUP_LABEL[g.group], g.total, g.hits.map(option), g.hits.length))}
               {group(
                 "journal",
                 GROUP_LABEL.journal,
@@ -280,6 +329,7 @@ export function SearchDialog({
                   {journalHits && (journalHits.hits.length ? journalHits.hits.map(option) : <p className="search-muted">No journal entries match.</p>)}
                   <p className="search-muted">Morning pages from the last 4 weeks are never searched.</p>
                 </>,
+                journalHits?.hits.length ?? 0,
               )}
             </>
           )}

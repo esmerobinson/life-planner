@@ -94,6 +94,20 @@ for (const width of [1280, 390]) {
       await noSideways(page);
       await shoot(page, `search-${width}`);
 
+      // I-1: the box stays put as the results change (anchored at the top, results grow down).
+      const topNow = async () => (await box.boundingBox())!.y;
+      const withResults = await topNow();
+      await box.fill("zzzz-nothing");
+      await expect(dialog.getByText('Nothing matches "zzzz-nothing".')).toBeVisible();
+      expect(await topNow()).toBe(withResults);
+      await box.fill("market");
+      await expect(dialog.getByRole("group", { name: "To-dos" })).toBeVisible();
+      expect(await topNow()).toBe(withResults);
+
+      // I-2: a click on a heading keeps focus in the box; the arrows still work.
+      await dialog.getByText("To-dos", { exact: true }).click();
+      await expect(box).toBeFocused();
+
       const options = dialog.getByRole("option");
       await expect(options.first()).toHaveAttribute("aria-selected", "true");
       await page.keyboard.press("ArrowDown");

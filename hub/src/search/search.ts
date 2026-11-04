@@ -113,7 +113,8 @@ function itemDoc(it: Item, today: ISODate): Doc {
   } else {
     group = "todos";
     noun = "to-do";
-    meta = `To-do · ${area}${it.due ? ` · Due ${dayLabel(it.due, today)}` : ""}${done}`;
+    // An Inbox item has no type until it is sorted: just "Inbox".
+    meta = it.areaId === "inbox" ? "Inbox" : `To-do · ${area}${it.due ? ` · Due ${dayLabel(it.due, today)}` : ""}${done}`;
   }
   const notes = plainNotes(it.notes ?? "");
   return {
@@ -146,36 +147,37 @@ const allIn = (words: string[], texts: string[]) => words.every((w) => texts.som
  * The results for `query`: a doc whose title (or author / session titles) holds every word is
  * in its type's group; one that needs its page notes for some word is in Notes. Within a group,
  * titles that start with the first word come first, then the rest as they were. Each group
- * keeps its first `cap` results and counts the rest.
+ * keeps its first `cap` results (Infinity for "See all") and counts the rest; only the rows
+ * kept get a second line cut for them.
  */
-export function searchIndex(index: Doc[], query: string, cap = GROUP_CAP): ResultGroup[] {
+export function searchIndex(index: Doc[], query: string, cap = GROUP_CAP, capFor?: (g: Group) => number): ResultGroup[] {
   const words = queryWords(query);
   if (!words.length) return [];
-  const found = new Map<Group, { hit: Hit; rank: number }[]>();
+  const found = new Map<Group, { d: Doc; rank: number; i: number }[]>();
   for (const d of index) {
     let group: Group;
-    let sub: string | undefined;
-    if (allIn(words, [d.lowTitle, ...d.lowExtra])) {
-      group = d.group;
-      // A session (or author) that matched shows as the second line.
-      const extraHit = d.extra.find((_, i) => words.some((w) => d.lowExtra[i].includes(w)));
-      sub = d.group === "books" ? d.extra[0] : extraHit;
-    } else if (d.lowNotes && allIn(words, [d.lowTitle, ...d.lowExtra, d.lowNotes])) {
-      group = "notes";
-      sub = snippet(d.notes, words);
-    } else continue;
-    const meta = group === "notes" ? `Note on a${d.noun === "idea" ? "n" : ""} ${d.noun} · ${d.areaLabel}` : d.meta;
-    const rank = d.lowTitle.startsWith(words[0]) ? 0 : 1;
+    if (allIn(words, [d.lowTitle, ...d.lowExtra])) group = d.group;
+    else if (d.lowNotes && allIn(words, [d.lowTitle, ...d.lowExtra, d.lowNotes])) group = "notes";
+    else continue;
     const list = found.get(group) ?? [];
-    list.push({ hit: { id: d.id, title: d.title, ...(sub ? { sub } : {}), meta, tile: d.tile, open: { panel: d.id } }, rank });
+    list.push({ d, rank: d.lowTitle.startsWith(words[0]) ? 0 : 1, i: list.length });
     found.set(group, list);
   }
   return GROUPS.flatMap((g) => {
     const list = found.get(g);
     if (!list) return [];
-    const sorted = list.map((x, i) => ({ ...x, i })).sort((a, b) => a.rank - b.rank || a.i - b.i);
-    return [{ group: g, total: list.length, hits: sorted.slice(0, cap).map((x) => x.hit) }];
+    const kept = list.sort((a, b) => a.rank - b.rank || a.i - b.i).slice(0, capFor?.(g) ?? cap);
+    return [{ group: g, total: list.length, hits: kept.map(({ d }) => toHit(d, g, words)) }];
   });
+}
+
+/** One kept result, with its second line: the author, the session that matched, or the words around a note match. */
+function toHit(d: Doc, group: Group, words: string[]): Hit {
+  let sub: string | undefined;
+  if (group === "notes") sub = snippet(d.notes, words);
+  else sub = d.group === "books" ? d.extra[0] : d.extra.find((_, i) => words.some((w) => d.lowExtra[i].includes(w)));
+  const meta = group === "notes" ? `Note on a${d.noun === "idea" ? "n" : ""} ${d.noun} · ${d.areaLabel}` : d.meta;
+  return { id: d.id, title: d.title, ...(sub ? { sub } : {}), meta, tile: d.tile, open: { panel: d.id } };
 }
 
 /** Text in bold and plain runs: every match of every word, overlaps merged. */
@@ -234,6 +236,20 @@ const JOURNAL_PATH: Record<JournalDoc["kind"], string> = {
   morning: "/journal/read-back",
 };
 
+/**
+ * Each entry's searchable text, lowercased once (review M-3). Held only as long as the entry
+ * object itself (the search pop-up's memory): a WeakMap never keeps it alive.
+ */
+const lowered = new WeakMap<JournalDoc, string>();
+function lowJournal(d: JournalDoc): string {
+  let low = lowered.get(d);
+  if (low === undefined) {
+    low = `${d.title}\n${d.text}`.toLowerCase();
+    lowered.set(d, low);
+  }
+  return low;
+}
+
 /** True when a morning page dated `date` is still locked on `today` (the 28 days). */
 export const morningLocked = (date: ISODate, today: ISODate) => today < addDays(date, MORNING_LOCK_DAYS);
 
@@ -246,7 +262,7 @@ export function searchJournal(docs: JournalDoc[], query: string, today: ISODate)
   if (!words.length) return [];
   return docs
     .filter((d) => !(d.kind === "morning" && morningLocked(d.date, today)))
-    .filter((d) => allIn(words, [d.text.toLowerCase(), d.title.toLowerCase()]))
+    .filter((d) => allIn(words, [lowJournal(d)]))
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((d) => ({
       id: d.id,

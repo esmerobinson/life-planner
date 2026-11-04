@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Goal, Item } from "../domain/types";
 import { buildIndex, highlight, queryWords, searchIndex, searchJournal, snippet, type JournalDoc } from "./search";
 
@@ -67,7 +67,7 @@ describe("searching items, books, projects, goals and notes", () => {
       "Draw the pretend market stall", "Ask about the pretend market", "Pretend market done long ago",
     ]);
     expect(todos.hits[0].meta).toBe("To-do · Art · Due Fri 6 Nov");
-    expect(todos.hits[1].meta).toBe("To-do · Inbox");
+    expect(todos.hits[1].meta).toBe("Inbox");
     expect(todos.hits[2].meta).toBe("To-do · Art · Done");
   });
 
@@ -101,17 +101,27 @@ describe("searching items, books, projects, goals and notes", () => {
     expect(g.hits[0]).toMatchObject({ meta: "Goal · Art · By 12 Dec", open: { panel: goals[0].id } });
   });
 
-  it("caps each group (the total is still counted) and stays fast with 1,000 items", () => {
+  it("caps each group (the total is still counted); with 1,000 items a query does no per-item text work", () => {
     const many = Array.from({ length: 1000 }, (_, i) =>
-      item({ title: `Pretend market errand ${i}`, notes: `Pretend notes ${i} `.repeat(40) }),
+      item({ title: `Pretend errand ${i}`, notes: `Pretend market notes ${i} `.repeat(40) }),
     );
     const big = buildIndex(many, [], TODAY);
-    const t0 = performance.now();
+    // Deterministic, not a stopwatch: texts are lowercased once when the index is built, and a
+    // snippet is cut only for the rows shown (8), never for all 1,000 matches.
+    const lower = vi.spyOn(String.prototype, "toLowerCase");
     const r = searchIndex(big, "market errand", 8);
-    const ms = performance.now() - t0;
-    expect(r[0].total).toBe(1000);
+    const calls = lower.mock.calls.length;
+    lower.mockRestore();
+    expect(r[0]).toMatchObject({ group: "notes", total: 1000 });
     expect(r[0].hits).toHaveLength(8);
-    expect(ms).toBeLessThan(50);
+    expect(calls).toBeLessThanOrEqual(1 + 8);
+    // `cap` Infinity is "See all": every match.
+    expect(searchIndex(big, "market errand", Infinity)[0].hits).toHaveLength(1000);
+  });
+
+  it("an Inbox item is just Inbox (it has no type until it is sorted)", () => {
+    const r = searchIndex(index, "ask about");
+    expect(r[0].hits[0].meta).toBe("Inbox");
   });
 });
 
@@ -129,6 +139,15 @@ describe("searching the journal (decrypted, in memory)", () => {
     expect(hits[0].sub).toContain("pretend market was crowded");
     expect(hits[1].open).toEqual({ path: "/journal/exercise" });
     expect(hits[2].open).toEqual({ path: "/journal/read-back" });
+  });
+
+  it("lowercases each entry once, not on every keystroke", () => {
+    searchJournal(docs, "market", TODAY); // first search prepares the entries
+    const lower = vi.spyOn(String.prototype, "toLowerCase");
+    searchJournal(docs, "market", TODAY);
+    const calls = lower.mock.calls.length;
+    lower.mockRestore();
+    expect(calls).toBeLessThanOrEqual(1 + docs.length); // the query, and one snippet per hit
   });
 
   it("never returns a morning page under 28 days old, even if one slipped into the list", () => {
