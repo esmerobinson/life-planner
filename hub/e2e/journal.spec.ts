@@ -25,7 +25,10 @@ async function syncSetUp(page: Page) {
     const { db } = await at("/src/data/db.ts");
     await engine.saveSyncSettings(db, { serverUrl: "https://sync.example.test", token: await token.deriveToken(pass) });
     // The made-up address never answers: record the token as accepted, as a real first sync would.
-    await db.syncMeta.put({ key: "acceptedToken", value: (await db.syncMeta.get("token")).value });
+    // The journal was set up on another device: its check row is here (an acceptance
+    // recorded before the key is typed no longer confirms it, bug #4).
+    const jkey = await at("/src/test/journalKey.ts");
+    await db.journal.put(await jkey.verifierRow(await jkey.keyFor(pass)));
   }, PASS);
 }
 
