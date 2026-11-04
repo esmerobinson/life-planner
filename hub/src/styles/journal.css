@@ -53,6 +53,9 @@
   display: flex;
   gap: 8px;
   min-width: 0;
+  /* Its tabs never widen the page: the row takes the column's width and JournalPage stacks
+     the tabs when they don't fit in it (not a look). */
+  contain: inline-size;
   /* Its screen-reader-only text (position: absolute) stays inside the row. */
   position: relative;
 }

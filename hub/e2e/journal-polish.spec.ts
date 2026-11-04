@@ -98,7 +98,7 @@ for (const width of [1280, 1920]) {
       // The unlock card, then the tabs (Journal v2; 2026-11-02: never a blank page).
       expect(w.cards).toHaveLength(1);
       for (const c of w.cards) expect(Math.abs(c - w.column)).toBeLessThanOrEqual(1);
-      await expect(page.getByRole("navigation", { name: "Journal parts" }).getByRole("link")).toHaveCount(4);
+      await expect(page.getByRole("navigation", { name: "Journal parts" }).getByRole("link")).toHaveCount(5);
       await noSidewaysScroll(page);
     });
 
