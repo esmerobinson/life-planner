@@ -52,7 +52,7 @@ export interface FakeRequestLog {
 }
 
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
-const TABLES = new Set(["items", "goals", "files", "journal"]);
+const TABLES = new Set(["items", "goals", "files", "journal", "farm"]);
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
 const MAX_CHANGES = 2000;
 const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;

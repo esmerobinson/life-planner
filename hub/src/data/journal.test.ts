@@ -279,7 +279,7 @@ describe("database v5", () => {
     old.close();
     const now = new HubDB(name);
     await now.open();
-    expect(now.verno).toBe(5);
+    expect(now.verno).toBeGreaterThanOrEqual(5); // later versions add tables on top (v6: farm)
     expect(await now.items.get("kept")).toMatchObject({ title: "Pretend kept", updatedAt: 5 });
     expect(await now.journal.count()).toBe(0);
     now.close();

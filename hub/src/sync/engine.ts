@@ -21,6 +21,7 @@ import { carrySessionTicks, forgetAcceptedTicks, restampTicks } from "../data/se
 import type { Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
+import { validFarm } from "../farm/state";
 import { retireCandidateForToken } from "../journal/keyStore";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
@@ -179,7 +180,7 @@ export async function stopSyncing(db: HubDB): Promise<void> {
 
 /** The row check for each synced table (the same one every local write passes). */
 const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = {
-  items: validItem, goals: validGoal, files: validFile, journal: validJournal,
+  items: validItem, goals: validGoal, files: validFile, journal: validJournal, farm: validFarm,
 };
 /** A table this build syncs (a later build may add more; their rows are skipped here). */
 const isSyncTable = (t: unknown): t is SyncTable => (SYNC_TABLES as readonly unknown[]).includes(t);
