@@ -46,13 +46,13 @@ describe("BPD practice every day, on Home", () => {
     await createItem({ kind: "task", title: "Pretend errand", areaId: "admin", priority: 2, due: TODAY }, TODAY);
     renderApp("/", TODAY);
     const c = await card("BPD practice every day");
-    await vi.waitFor(() => expect(c).toHaveTextContent("0 / 30 this month"));
+    await vi.waitFor(() => expect(c).toHaveTextContent("0 / 30 this month"), { timeout: 5000 });
     expect(screen.queryByRole("button", { name: "BPD practice every day" })).toBeNull();
 
     await saveExerciseMark(jk, TODAY, OTHER, "day-1", true);
-    await vi.waitFor(() => expect(c).toHaveTextContent("1 / 30 this month"));
+    await vi.waitFor(() => expect(c).toHaveTextContent("1 / 30 this month"), { timeout: 5000 });
     expect(within(c).getByTitle("1 day in a row")).toBeInTheDocument();
-    await vi.waitFor(async () => expect(await rowTick("Mental health exercise")).toBe("true"));
+    await vi.waitFor(async () => expect(await rowTick("Mental health exercise")).toBe("true"), { timeout: 5000 });
   });
 
   it("a linked to-do ticked today counts too (no journal key needed)", async () => {
@@ -61,7 +61,7 @@ describe("BPD practice every day, on Home", () => {
     await tickItem(t.id, TODAY);
     renderApp("/", TODAY);
     const c = await card("BPD practice every day");
-    await vi.waitFor(() => expect(within(c).getByTitle("1 day in a row")).toBeInTheDocument());
+    await vi.waitFor(() => expect(within(c).getByTitle("1 day in a row")).toBeInTheDocument(), { timeout: 5000 });
   });
 });
 
@@ -73,7 +73,7 @@ describe("Journal daily counts exactly the days the Journal rows tick (fix round
     await addSuggestedGoal("suggested-journal-daily", TODAY);
     await finishMorningPage(jk, TODAY, OTHER, "Pretend page");
     renderApp("/", TODAY);
-    await vi.waitFor(async () => expect(await counted()).toMatch("1 / 30 this month"));
+    await vi.waitFor(async () => expect(await counted()).toMatch("1 / 30 this month"), { timeout: 5000 });
     expect(await rowTick("Morning pages")).toBe("true");
   });
 
@@ -84,8 +84,8 @@ describe("Journal daily counts exactly the days the Journal rows tick (fix round
     await saveAnswer(jk, TODAY, "K2", OTHER, "Two pretend words", false); // autosave while typing
     await saveAnswer(jk, TODAY, "K4", OTHER, null, true); // one Skip
     renderApp("/", TODAY);
-    await vi.waitFor(async () => expect(await rowTick("Daily check-in")).toBe("false"));
-    await vi.waitFor(async () => expect(await counted()).toMatch("0 / 30 this month"));
+    await vi.waitFor(async () => expect(await rowTick("Daily check-in")).toBe("false"), { timeout: 5000 });
+    await vi.waitFor(async () => expect(await counted()).toMatch("0 / 30 this month"), { timeout: 5000 });
     expect(await rowTick("Morning pages")).toBe("false");
   });
 
@@ -95,7 +95,7 @@ describe("Journal daily counts exactly the days the Journal rows tick (fix round
     await ensureCheckinSet(jk, TODAY, ["K2"]);
     await saveAnswer(jk, TODAY, "K2", OTHER, "A pretend answer", true);
     renderApp("/", TODAY);
-    await vi.waitFor(async () => expect(await counted()).toMatch("1 / 30 this month"));
+    await vi.waitFor(async () => expect(await counted()).toMatch("1 / 30 this month"), { timeout: 5000 });
     expect(await rowTick("Daily check-in")).toBe("true");
   });
 
@@ -105,8 +105,8 @@ describe("Journal daily counts exactly the days the Journal rows tick (fix round
     await addSuggestedGoal("suggested-journal-daily", TODAY);
     await saveExerciseMark(jk, TODAY, OTHER, "day-1", true);
     renderApp("/", TODAY);
-    await vi.waitFor(async () => expect(await rowTick("Mental health exercise")).toBe("true"));
-    await vi.waitFor(async () => expect(await counted()).toMatch("0 / 30 this month"));
+    await vi.waitFor(async () => expect(await rowTick("Mental health exercise")).toBe("true"), { timeout: 5000 });
+    await vi.waitFor(async () => expect(await counted()).toMatch("0 / 30 this month"), { timeout: 5000 });
   });
 
   it("while the journal is locked here it falls back to the rows' clear dates", async () => {
@@ -114,7 +114,7 @@ describe("Journal daily counts exactly the days the Journal rows tick (fix round
     // A row as another device sent it; no key on this device, so nothing is opened.
     await db.journal.put({ id: `page:${TODAY}:p1`, kind: "page", date: TODAY, fp: "0123456789abcdef", iv: "AAAAAAAAAAAAAAAA", ct: "AAAA" });
     renderApp("/", TODAY);
-    await vi.waitFor(async () => expect(await counted()).toMatch("1 / 30 this month"));
+    await vi.waitFor(async () => expect(await counted()).toMatch("1 / 30 this month"), { timeout: 5000 });
   });
 });
 

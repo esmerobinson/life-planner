@@ -82,19 +82,14 @@ describe("the Add form opens pre-set from where Add was pressed", () => {
     expect(preset(await openAdd())).toEqual({ type: "goal", area: "mind" });
   });
 
-  it("Today: a to-do (not pinned, as Today's Add never pinned)", async () => {
-    renderApp("/today", TODAY);
+  it("Home: a to-do in the inbox (not pinned, as the old Today page's Add never pinned)", async () => {
+    renderApp("/", TODAY);
     const f = await openAdd();
     expect(preset(f)).toEqual({ type: "task", area: "inbox" });
     await userEvent.type(f.getByLabelText("Title"), "Pretend errand");
     await userEvent.click(f.getByRole("button", { name: "Add item" }));
     await vi.waitFor(async () => expect(await db.items.count()).toBe(1));
     expect((await db.items.toArray())[0]).not.toHaveProperty("pinnedDate");
-  });
-
-  it("Home: a to-do", async () => {
-    renderApp("/", TODAY);
-    expect(preset(await openAdd())).toEqual({ type: "task", area: "inbox" });
   });
 
   it("both can still be changed; reopening on another page takes that page's defaults", async () => {

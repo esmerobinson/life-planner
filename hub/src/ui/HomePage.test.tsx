@@ -7,6 +7,7 @@ import { addSuggestedGoal, createGoal, createItem, deleteGoal, setGoalOnHome, ti
 import { AppShell } from "./AppShell";
 import type { Goal } from "../domain/types";
 import { HomePage, homeGoals } from "./HomePage";
+import { currentUrl, renderApp } from "../test/renderApp";
 import { Route, Routes, useLocation } from "react-router-dom";
 
 const TODAY = "2026-10-27";
@@ -260,5 +261,25 @@ describe("HomePage", () => {
     await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Open goal task" }));
     const updated = await screen.findByRole("progressbar", { name: /4\/10/ });
     expect(updated).toHaveAttribute("aria-valuenow", "40");
+  });
+});
+
+describe("no Today page (Esme, 2026-11-04: \"today page is a little redundant with the existence of home\")", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("/today goes Home (old links and notifications still work)", async () => {
+    renderApp("/today", TODAY);
+    expect(await screen.findByRole("complementary", { name: "Goals this month" })).toBeInTheDocument();
+    expect(currentUrl).toBe("/");
+    expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeInTheDocument();
+  });
+
+  it("keeps what the link asked for: /today?open=<id> opens it on Home", async () => {
+    const it = await createItem({ kind: "task", title: "Pretend linked errand", areaId: "admin", priority: 2 }, TODAY);
+    renderApp(`/today?open=${it.id}`, TODAY);
+    expect(await screen.findByRole("complementary", { name: "Pretend linked errand" })).toBeInTheDocument();
+    expect(currentUrl).toBe(`/?open=${it.id}`);
   });
 });

@@ -47,7 +47,7 @@ describe("AppShell", () => {
     expect(await db.items.toArray()).toEqual([expect.objectContaining({ title: "A pretend step", milestone: true, goalId: "g" })]);
   });
 
-  it("quick-add on /today shows a task due today in the Today list", async () => {
+  it("quick-add shows a task due today in the Today list", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 27, 12, 0));
     renderShell(<TodayRoute />);
