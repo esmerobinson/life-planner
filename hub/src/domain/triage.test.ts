@@ -102,9 +102,21 @@ describe("pickToday", () => {
     expect(ids(pickToday([h, y], [], TUE, {}).picks)).toEqual(["y"]);
   });
 
-  it("inbox, ideas, done and archived items never picked", () => {
+  it("inbox items are picked only by their own day or deadline (bug #8)", () => {
     const items = [
-      item({ id: "inbox", areaId: "inbox", due: TUE }),
+      item({ id: "inbox-p1", areaId: "inbox", priority: 1 }),
+      item({ id: "inbox-p2", areaId: "inbox", priority: 2 }),
+      item({ id: "inbox-recur", areaId: "inbox", recur: ["tue"] }),
+      item({ id: "inbox-due", areaId: "inbox", due: TUE }),
+      item({ id: "inbox-pin", areaId: "inbox", pinnedDate: TUE }),
+    ];
+    const out = pickToday(items, [], TUE, {});
+    expect(ids([...out.picks, ...out.alsoDue, ...out.rhythm])).toEqual(["inbox-pin", "inbox-due"]);
+  });
+
+  it("undated inbox, ideas, done and archived items never picked", () => {
+    const items = [
+      item({ id: "inbox", areaId: "inbox", priority: 1 }),
       item({ id: "idea", kind: "idea", due: TUE }),
       item({ id: "done", status: "done", due: TUE }),
       item({ id: "arch", status: "archived", due: TUE }),

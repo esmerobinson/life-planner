@@ -4,7 +4,8 @@ import { groupGoalTasks, monthlyProgress, overallProgress, tickedOff } from "./p
 import { pickToday } from "./triage";
 import type { Goal, Item } from "./types";
 
-// Bin rows (deleted, purged) and unsorted Inbox items are never counted as to-dos.
+// Bin rows (deleted, purged) and unsorted Inbox items are never counted as to-dos (an Inbox
+// item's own day or deadline does count for Today and Needs a look: bug #8, below).
 
 const today = "2026-10-28"; // a Wednesday
 const goal: Goal = {
@@ -22,7 +23,8 @@ const binned: Item[] = [
   item("purged", { status: "purged", title: "", goalId: undefined, due: today }),
 ];
 const unsorted: Item[] = [
-  item("inbox-task", { areaId: "inbox", due: today, pinnedDate: today }),
+  item("inbox-task", { areaId: "inbox", recur: ["wed"] }),
+  item("inbox-priority", { areaId: "inbox", touchedAt: "2026-01-01" }),
   item("inbox-done", { areaId: "inbox", status: "done", completedAt: today }),
 ];
 
@@ -37,6 +39,16 @@ describe("Bin rows and unsorted Inbox items are not counted anywhere", () => {
   it("needs a look", () => {
     const l = needsALook(all, today);
     expect([...l.overdue, ...l.dueSoon, ...l.stale]).toEqual([]);
+  });
+
+  it("an Inbox item's own day or deadline counts for Today and Needs a look (bug #8)", () => {
+    const pinned = item("inbox-pinned", { areaId: "inbox", pinnedDate: today });
+    const late = item("inbox-late", { areaId: "inbox", due: "2026-10-20" });
+    const t = pickToday([...all, pinned, late], [goal], today, {});
+    expect([...t.rhythm, ...t.picks, ...t.alsoDue].map((i) => i.id)).toEqual(["inbox-pinned", "inbox-late"]);
+    const l = needsALook([...all, pinned, late], today);
+    expect(l.overdue.map((i) => i.id)).toEqual(["inbox-late"]);
+    expect([...l.dueSoon, ...l.stale]).toEqual([]);
   });
 
   it("the month count and goal progress", () => {
