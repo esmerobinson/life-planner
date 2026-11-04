@@ -121,8 +121,9 @@ async function walkThrough(page: Page, prefix: string) {
   const third = section(page).getByRole("article", { name: "Next card: Day 3" });
   await expect(third).toBeVisible();
   await expect(section(page).getByRole("article")).toHaveCount(1);
-  await expect(section(page).getByText(/Day 2 saved\. Here's the next one if you'd like to keep going\./)).toBeVisible();
-  await expect(section(page).getByText("Pretend weather")).toHaveCount(0);
+  await expect(section(page).getByText(/Day 2 · The fictional kettle saved\. Here's the next one if you'd like to keep going\./)).toBeVisible();
+  // The finished card is never on the page (Past exercises lists today's answer too, by name).
+  await expect(section(page).getByRole("article").getByText("Pretend weather")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
   await noSidewaysScroll(page);
   await shoot(page, `${prefix}-reloaded-next-card`);
