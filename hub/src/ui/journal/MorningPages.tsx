@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  addMorningPhoto, CANT_OPEN, finishMorningPage, listMorningDone, openJournalPhoto, readMorningDay, saveMorningDraft,
+  addMorningPhoto, CANT_OPEN, finishMorningPage, latestMorningDraft, listMorningDone, openJournalPhoto, readMorningDay, saveMorningDraft,
   type MorningDay,
 } from "../../data/repo";
 import { monthGrid, shiftMonth } from "../../journal/calendar";
@@ -26,6 +26,8 @@ export const KEEP_GOING = "Keep going if you can — 1,000 is about three pages.
 const SAVE_PROBLEM = "That didn't save. Try again.";
 /** Over the box when yesterday's words were left unfinished (review I1: kept as yesterday's draft). */
 export const YESTERDAY_SAVED = "Yesterday's unfinished page is saved.";
+/** Over the box when an older page was left unfinished (bug #6: never hidden, however old). */
+export const olderSaved = (label: string) => `Your unfinished page from ${label} is saved.`;
 const fmt = (n: number) => n.toLocaleString("en-GB");
 
 type Props = { jk: JournalKey; today: ISODate; deviceId: string };
@@ -40,13 +42,16 @@ type Props = { jk: JournalKey; today: ISODate; deviceId: string };
 export function MorningPages({ jk, today, deviceId }: Props) {
   const [done, setDone] = useState<Set<ISODate> | null>(null);
   const [day, setDay] = useState<MorningDay | null>(null);
-  const [yesterdayDraft, setYesterdayDraft] = useState("");
+  // This device's newest page left unfinished on an earlier day (yesterday's, or older).
+  const [unfinished, setUnfinished] = useState<{ date: ISODate; text: string } | null>(null);
   // Yesterday's page opened for finishing: the day it was started (fixed, even if midnight
   // passes) and, in lateText, its words as they are typed (the box is re-made when the day
   // is re-read, and must come back with them).
   const [finishing, setFinishing] = useState<{ date: ISODate } | null>(null);
   const lateText = useRef("");
   const [month, setMonth] = useState(today.slice(0, 7));
+  // Left open past 3am into a new month, the calendar moves with the box (bug #18).
+  useEffect(() => setMonth(today.slice(0, 7)), [today]);
   const [problem, setProblem] = useState("");
   const [adding, setAdding] = useState(false);
   // A finished page starts a fresh box (a later page that day is a page of its own).
@@ -61,12 +66,12 @@ export function MorningPages({ jk, today, deviceId }: Props) {
       const [d, t, y] = await Promise.all([
         listMorningDone(jk),
         readMorningDay(jk, today, deviceId),
-        readMorningDay(jk, addDays(today, -1), deviceId),
+        latestMorningDraft(jk, today, deviceId),
       ]);
       if (id !== latest.current) return;
       setDone(d);
       setDay(t);
-      setYesterdayDraft(y.draft);
+      setUnfinished(y);
     } catch {
       if (id === latest.current) guardFail.current();
     }
@@ -117,18 +122,20 @@ export function MorningPages({ jk, today, deviceId }: Props) {
           ))}
         </ul>
       )}
-      {yesterdayDraft.trim() !== "" && !finishing && (
+      {unfinished && !finishing && (
         <div className="btn-group">
-          <p className="journal-muted">{YESTERDAY_SAVED}</p>
+          <p className="journal-muted">
+            {unfinished.date === addDays(today, -1) ? YESTERDAY_SAVED : olderSaved(dayLabel(unfinished.date, today))}
+          </p>
           <button
             type="button"
             className="btn-secondary"
             onClick={() => {
-              lateText.current = yesterdayDraft;
-              setFinishing({ date: addDays(today, -1) });
+              lateText.current = unfinished.text;
+              setFinishing({ date: unfinished.date });
             }}
           >
-            Open yesterday's page
+            {unfinished.date === addDays(today, -1) ? "Open yesterday's page" : "Open that page"}
           </button>
         </div>
       )}

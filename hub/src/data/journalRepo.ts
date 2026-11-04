@@ -121,6 +121,21 @@ export async function readMorningDay(jk: JournalKey, date: ISODate, deviceId: st
 }
 
 /**
+ * This device's newest unfinished morning page before `before` (a draft with words that "I'm
+ * done" never emptied), or null. Never hidden however old (bug #6): the page offers it back.
+ */
+export async function latestMorningDraft(jk: JournalKey, before: ISODate, deviceId: string): Promise<{ date: ISODate; text: string } | null> {
+  const rows = await db.journal.where("kind").anyOf("draft", "morning").toArray();
+  const dates = [...new Set(rows.filter((r) => r.date < before && (r.kind === "morning" || suffixOf(r) === deviceId)).map((r) => r.date))];
+  dates.sort((a, b) => b.localeCompare(a));
+  for (const date of dates) {
+    const day = await readMorningDay(jk, date, deviceId);
+    if (day.draft.trim() !== "") return { date, text: day.draft };
+  }
+  return null;
+}
+
+/**
  * The days with a morning page or photo (for the star calendar and the streak). Page and
  * photo rows count by their clear kind and date, readable here or not: a star means she did
  * it. Only rows of the earlier one-row-per-day shape are opened (to see if they were done).
