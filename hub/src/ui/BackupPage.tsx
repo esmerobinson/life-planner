@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { exportBackup, INVALID_BACKUP, RESTORE_FAILED, restoreBackup } from "../data/backup";
+import { exportBackup, INVALID_BACKUP, NEWER_BACKUP, RESTORE_FAILED, restoreBackup } from "../data/backup";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
 import type { ISODate } from "../domain/types";
 import { ImportPanel } from "./ImportPanel";
@@ -115,7 +115,7 @@ export function BackupPage({ today }: { today: ISODate }) {
       );
       setConfirmed(false);
     } catch (err) {
-      const known = [INVALID_BACKUP, WAITING_FIRST_SYNC, REPLACE_OFF_WHILE_SYNCING];
+      const known = [INVALID_BACKUP, NEWER_BACKUP, WAITING_FIRST_SYNC, REPLACE_OFF_WHILE_SYNCING];
       setError(err instanceof Error && known.includes(err.message) ? err.message : RESTORE_FAILED);
     } finally {
       inFlight.current = false;

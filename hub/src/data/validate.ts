@@ -347,6 +347,25 @@ function validJournalId(kind: JournalRow["kind"], date: string, id: string): boo
  * mistake) makes the row invalid, so it is never stored or sent. Every new row carries the
  * fingerprint of the key that sealed it; only the earlier one-row-per-day shape may lack it.
  */
+/**
+ * A journal row of any kind, even one only a later app version knows: the sealed shape alone
+ * (its id, kind and day, the key fingerprint, iv and ciphertext; nothing typed in clear). A
+ * backup keeps such rows as they are, for after the update (review I3).
+ */
+export function sealedJournalShape(r: unknown): r is JournalRow {
+  return (
+    isObj(r) &&
+    Object.keys(r).every((k) => JOURNAL_KEYS.has(k)) &&
+    isStr(r.kind) && /^[a-z][a-z0-9-]{0,31}$/.test(r.kind) &&
+    isStr(r.date) && (r.date === "" || isValidISODate(r.date)) &&
+    isStr(r.id) && r.id.length >= r.kind.length && r.id.length <= 256 && r.id.startsWith(r.kind) &&
+    (r.fp === undefined || validFp(r.fp)) &&
+    validIv(r.iv) &&
+    isStr(r.ct) && r.ct !== "" && r.ct.length <= MAX_JOURNAL_CT && r.ct.length % 4 === 0 && BASE64.test(r.ct) &&
+    optStamp(r.updatedAt)
+  );
+}
+
 export function validJournal(r: unknown): r is JournalRow {
   return (
     isObj(r) &&

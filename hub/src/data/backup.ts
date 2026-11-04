@@ -3,7 +3,7 @@ import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
 import type { FileRow, Goal, ISODate, Item, JournalRow } from "../domain/types";
-import { isObj, isStr, validFile, validGoal, validItem, validJournal } from "./validate";
+import { isObj, isStr, sealedJournalShape, validFile, validGoal, validItem, validJournal } from "./validate";
 
 export { validFile, validGoal, validItem, validJournal };
 
@@ -22,9 +22,16 @@ export interface BackupFile {
   journal?: JournalRow[];
 }
 
-/** The one message for any file that is not a usable backup. */
+/** For a file that isn't a backup this app can read at all. */
 export const INVALID_BACKUP =
-  "That file is not an Esmeworld backup, or it is damaged. Nothing was changed.";
+  "That file is not an Esmeworld backup, or it couldn't be read. Nothing has changed: everything is just as it was.";
+
+/**
+ * For an Esmeworld backup with something in it this version can't read: almost always a backup
+ * made by a newer version (review I3). Honest for a damaged one too.
+ */
+export const NEWER_BACKUP =
+  "Part of that backup can't be read by this version of Esmeworld. If the app has an update waiting, update it, then try again. Nothing has changed.";
 
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
@@ -44,10 +51,8 @@ export function parseBackup(raw: unknown): BackupFile {
       throw new Error(INVALID_BACKUP);
     }
   }
+  if (!isObj(data) || data.app !== "life-hub" || data.schema !== 1) throw new Error(INVALID_BACKUP);
   if (
-    !isObj(data) ||
-    data.app !== "life-hub" ||
-    data.schema !== 1 ||
     !isStr(data.exportedOn) ||
     !isValidISODate(data.exportedOn) ||
     !Array.isArray(data.items) ||
@@ -59,29 +64,39 @@ export function parseBackup(raw: unknown): BackupFile {
     (data.files !== undefined &&
       (!Array.isArray(data.files) || !data.files.every(validFile) || hasDuplicateIds(data.files as FileRow[]))) ||
     (data.journal !== undefined &&
-      (!Array.isArray(data.journal) || !data.journal.every(validJournal) || hasDuplicateIds(data.journal as JournalRow[])))
+      // A journal kind only a later version knows is kept as it is (sealed), never "damaged".
+      (!Array.isArray(data.journal) || !data.journal.every(sealedJournalShape) || hasDuplicateIds(data.journal as JournalRow[])))
   ) {
-    throw new Error(INVALID_BACKUP);
+    // Our own file, with something this version can't read: most likely made by a newer one.
+    throw new Error(NEWER_BACKUP);
   }
   return data as unknown as BackupFile;
 }
 
 export async function exportBackup(today: ISODate): Promise<BackupFile> {
-  return db.transaction("r", [db.items, db.goals, db.files, db.journal], async () => ({
-    app: "life-hub" as const,
-    schema: 1 as const,
-    exportedOn: today,
-    items: await db.items.toArray(),
-    goals: await db.goals.toArray(),
-    files: await db.files.toArray(),
-    journal: await db.journal.toArray(),
-  }));
+  return db.transaction("r", [db.items, db.goals, db.files, db.journal, db.quarantine], async () => {
+    const journal = await db.journal.toArray();
+    const have = new Set(journal.map((r) => r.id));
+    // Journal rows this version can't read yet are in the backup too, as they arrived (review I3).
+    const held = (await db.quarantine.where("[table+id]").between(["journal", ""], ["journal", "\uffff"]).toArray())
+      .map((q): unknown => ({ ...q.data, id: q.id, updatedAt: q.updatedAt }))
+      .filter((r): r is JournalRow => sealedJournalShape(r) && !have.has(r.id));
+    return {
+      app: "life-hub" as const,
+      schema: 1 as const,
+      exportedOn: today,
+      items: await db.items.toArray(),
+      goals: await db.goals.toArray(),
+      files: await db.files.toArray(),
+      journal: [...journal, ...held],
+    };
+  });
 }
 
 export async function restoreBackup(
   raw: unknown,
   mode: "merge" | "replace",
-): Promise<{ addedItems: number; addedGoals: number; skipped: number }> {
+): Promise<{ addedItems: number; addedGoals: number; skipped: number; kept?: number }> {
   const file = parseBackup(raw); // nothing is written until every row has passed
   try {
     // Holding the sync lock: no sync run is in flight while the restore writes.
@@ -94,7 +109,10 @@ export async function restoreBackup(
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
-  return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.syncMeta], async () => {
+  // Journal rows of a kind this version doesn't know wait in quarantine, applied after the update.
+  const known = (file.journal ?? []).filter(validJournal);
+  const later = (file.journal ?? []).filter((r) => !validJournal(r));
+  return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.syncMeta, db.quarantine], async () => {
     // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
     // a copy the server already has, edited since on another device, wins over them.
     keepOwnStamps();
@@ -114,8 +132,9 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       await db.files.bulkAdd(file.files ?? []);
-      await db.journal.bulkAdd(file.journal ?? []);
-      return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0 };
+      await db.journal.bulkAdd(known);
+      await holdForLater(later);
+      return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0, ...keptCount(later) };
     }
     const haveItems = new Set(await db.items.toCollection().primaryKeys());
     const haveGoals = new Set(await db.goals.toCollection().primaryKeys());
@@ -128,7 +147,8 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     await db.files.bulkAdd((file.files ?? []).filter((f) => !haveFiles.has(f.id)));
     // Journal entries: only the missing ones (an entry already here is this device's own copy).
     const haveJournal = new Set(await db.journal.toCollection().primaryKeys());
-    await db.journal.bulkAdd((file.journal ?? []).filter((j) => !haveJournal.has(j.id)));
+    await db.journal.bulkAdd(known.filter((j) => !haveJournal.has(j.id)));
+    await holdForLater(later);
     const fileVisible = file.items.filter(notPurged).length;
     const addedVisible = newItems.filter(notPurged).length;
     const fileGoalsVisible = file.goals.filter(notPurged).length;
@@ -137,6 +157,23 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       addedItems: addedVisible,
       addedGoals: addedGoalsVisible,
       skipped: fileVisible - addedVisible + (fileGoalsVisible - addedGoalsVisible),
+      ...keptCount(later),
     };
   });
+}
+
+/** How many rows wait for a newer version (said only when there are some). */
+const keptCount = (later: JournalRow[]) => (later.length ? { kept: later.length } : {});
+
+/** Rows only a newer version reads, kept in quarantine (a newer copy already held stays). */
+async function holdForLater(rows: JournalRow[]) {
+  for (const r of rows) {
+    const updatedAt = typeof r.updatedAt === "number" ? r.updatedAt : 0;
+    const held = await db.quarantine.get(["journal", r.id]);
+    if (held && held.updatedAt > updatedAt) continue;
+    await db.quarantine.put({
+      table: "journal", id: r.id, updatedAt, data: r as unknown as Record<string, unknown>,
+      reason: "From a backup: a later version of the app reads it.", cursor: 0,
+    });
+  }
 }

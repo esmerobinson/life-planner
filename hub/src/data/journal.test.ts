@@ -1,7 +1,7 @@
 import Dexie from "dexie";
 import { vi } from "vitest";
 import { db, HubDB } from "./db";
-import { exportBackup, INVALID_BACKUP, parseBackup, restoreBackup } from "./backup";
+import { exportBackup, NEWER_BACKUP, parseBackup, restoreBackup } from "./backup";
 import {
   addMorningPhoto, CANT_OPEN, currentStep, ensureCheckinSet, finishMorningPage, listCheckinDays, listMorningDone,
   listReadBack, morningOpensOn, moveAnswerOn, NOT_CONFIRMED, openJournalPhoto, readCheckinDay, readMorningDay, readMorningPage,
@@ -283,7 +283,7 @@ describe("backup with the journal", () => {
     await restoreBackup(exported, "replace");
     expect((await readMorningDay(jk, DAY, ME)).done).toBe(true);
     const bad = { ...exported, journal: [{ ...exported.journal[0], text: "Pretend" }] };
-    expect(() => parseBackup(bad)).toThrow(INVALID_BACKUP);
+    expect(() => parseBackup(bad)).toThrow(NEWER_BACKUP);
   });
 });
 
