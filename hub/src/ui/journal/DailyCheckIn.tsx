@@ -251,8 +251,12 @@ function CheckedIn({
   // clearing one to rewrite it never takes its box away (re-review m2).
   const [editingIds, setEditingIds] = useState<string[] | null>(null);
   const editing = editingIds !== null;
-  // What she just saved here, shown at once (the day is re-read a moment later).
+  // This Edit's own rows (a new version each time she edits; bug #24).
+  const [session, setSession] = useState("");
+  // What she just saved here, shown at once until the day is read again; then the day's merged
+  // answer, newest from any device, shows (bug #23).
   const [mine, setMine] = useState<Record<string, string>>({});
+  useEffect(() => setMine({}), [day]);
   const answerOf = (id: string) => mine[id] ?? day.answers.get(id)?.answer ?? "";
   const answered = editingIds ?? day.prompts.filter((id) => answerOf(id).trim() !== "");
   return (
@@ -268,7 +272,7 @@ function CheckedIn({
                 onSave={async (text) => {
                   setMine((m) => ({ ...m, [id]: text }));
                   try {
-                    await saveAnswer(jk, day.date, id, deviceId, text, true); // this device's own row
+                    await saveAnswer(jk, day.date, id, deviceId, text, true, { session }); // this Edit's own row
                   } catch (err) {
                     onProblem(SAVE_PROBLEM);
                     throw err;
@@ -292,7 +296,14 @@ function CheckedIn({
               {SAVE_ANSWERS}
             </button>
           ) : (
-            <button type="button" className="btn-secondary" onClick={() => setEditingIds(answered)}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setSession(Date.now().toString(36));
+                setEditingIds(answered);
+              }}
+            >
               {EDIT_ANSWERS}
             </button>
           )}

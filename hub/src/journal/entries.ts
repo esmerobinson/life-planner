@@ -33,6 +33,11 @@ export interface AnswerEntry {
   answer: string | null;
   done: boolean;
   at: number;
+  /**
+   * She cleared this answer on purpose with Edit (bug #30): unlike a skipped or empty one, it
+   * can win over an older answer from another device. Never set by Skip.
+   */
+  cleared?: true;
 }
 
 /** The day's questions, written by the first device to open the check-in that day. */
@@ -210,7 +215,8 @@ export const ENTRY_CHECK = {
   photo: (v: unknown): v is PhotoEntry => isObj(v) && v.v === 1 && isStr(v.fileId) && num(v.at),
   draft: (v: unknown): v is DraftEntry => isObj(v) && v.v === 1 && isStr(v.text),
   answer: (v: unknown): v is AnswerEntry =>
-    isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at),
+    isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at) &&
+    (v.cleared === undefined || (v.cleared === true && v.answer === null)),
   set: (v: unknown): v is SetEntry => isObj(v) && v.v === 1 && strList(v.prompts) && num(v.at),
   settings: (v: unknown): v is SettingsEntry => isObj(v) && v.v === 1 && strList(v.active),
   cards: (v: unknown): v is CardsRow =>

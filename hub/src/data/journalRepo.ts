@@ -272,17 +272,24 @@ export interface CheckinAnswer {
   answer: string | null;
   done: boolean;
   at: number;
+  /** Cleared on purpose with Edit (bug #30). */
+  cleared?: boolean;
 }
 
+/**
+ * The day's answer to a question from every device's rows: the newest answer with words, or
+ * the newest she cleared on purpose (Edit, bug #30). A skipped or empty one never erases
+ * another device's words.
+ */
 function mergeAnswer(prev: CheckinAnswer | undefined, next: CheckinAnswer): CheckinAnswer {
   if (!prev) return next;
+  const counts = (x: CheckinAnswer) => x.answer !== null || x.cleared === true;
   const pick = (a: CheckinAnswer, b: CheckinAnswer) => {
-    if (a.answer === null) return b.answer === null ? (a.at >= b.at ? a : b) : b;
-    if (b.answer === null) return a;
+    if (counts(a) !== counts(b)) return counts(a) ? a : b;
     return a.at >= b.at ? a : b;
   };
   const best = pick(prev, next);
-  return { answer: best.answer, done: prev.done || next.done, at: Math.max(prev.at, next.at) };
+  return { answer: best.answer, done: prev.done || next.done, at: Math.max(prev.at, next.at), ...(best.cleared ? { cleared: true } : {}) };
 }
 
 export interface CheckinDay {
@@ -311,7 +318,7 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
       const o = await openRow(jk, row, "answer");
       if (o.state === "ok") {
         const e = o.entry;
-        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), { answer: e.answer, done: e.done, at: e.at }));
+        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), { answer: e.answer, done: e.done, at: e.at, ...(e.cleared ? { cleared: true } : {}) }));
       } else unreadable++;
     } else if (row.kind === "checkin") {
       const o = await openRow(jk, row, "checkin");
@@ -369,9 +376,17 @@ export async function saveAnswer(
   deviceId: string,
   answer: string | null,
   done: boolean,
+  /**
+   * A finished check-in's Edit: `session` writes this Edit's own new row
+   * (`<promptKey>:<deviceId>-e<session>`), never over an earlier one (bug #24), and an emptied
+   * answer is saved as cleared on purpose (bug #30).
+   */
+  edit?: { session: string },
 ): Promise<void> {
-  const entry: AnswerEntry = { v: 1, prompt, answer: answer && answer.trim() ? answer : null, done, at: Date.now() };
-  await write(jk, [await seal(jk, "answer", date, await ownAnswerSuffix(jk, date, prompt, deviceId), entry)]);
+  const text = answer && answer.trim() ? answer : null;
+  const entry: AnswerEntry = { v: 1, prompt, answer: text, done, at: Date.now(), ...(edit && text === null ? { cleared: true as const } : {}) };
+  const suffix = edit ? `${await promptKey(jk, prompt)}:${deviceId}-e${edit.session}` : await ownAnswerSuffix(jk, date, prompt, deviceId);
+  await write(jk, [await seal(jk, "answer", date, suffix, entry)]);
 }
 
 /**
