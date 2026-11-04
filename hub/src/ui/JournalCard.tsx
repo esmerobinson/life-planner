@@ -36,33 +36,31 @@ function rowFacts(view: JournalRowsView): RowFacts[] {
 }
 
 /**
- * The Journal section on Home and on Today (VISUAL-LANGUAGE.md "Journal rows (2026-11-02)";
- * Journal v2): the mental health exercise, Morning pages and Daily check-in as mint strips
- * exactly like task strips. Each tick ticks itself when that part is done today (never by
- * hand); the streak is on the right. Tapping a row opens that Journal tab. Locked or not set
- * up here: the rows still show, with an empty box that says it isn't available and no
- * streaks, and open the Journal (to unlock). While loading: no boxes yet, so nothing pops
- * from unticked to ticked.
+ * The green rows at the top of Home's Today list (VISUAL-LANGUAGE.md "Journal rows
+ * (2026-11-02)" and "Home (2026-11-04)"): the mental health exercise, Morning pages and Daily
+ * check-in as mint strips exactly like task strips, daily recurring tasks. Each tick ticks
+ * itself when that part is done today (never by hand); the streak is on the right. Tapping a
+ * row opens that Journal tab. Locked or not set up here: the rows still show, with an empty
+ * box that says it isn't available and no streaks, and open the Journal (to unlock). While
+ * loading: no boxes yet, so nothing pops from unticked to ticked. No heading of their own:
+ * they sit under Today's.
  */
-export function JournalCard({ today }: { today: ISODate }) {
+export function JournalRows({ today }: { today: ISODate }) {
   const navigate = useNavigate();
   const rows = rowFacts(useJournalRows(today));
   return (
-    <section className="journal-card-home" aria-label="Journal">
-      <h2>Journal</h2>
-      <ul className="strip-list journal-rows">
-        {rows.map((r) => (
-          <JournalRow
-            key={r.tab}
-            title={r.title}
-            tick={r.tick}
-            meta={r.meta}
-            right={r.status && <Streak n={r.status.streak} week={r.status.week} />}
-            onOpen={() => navigate(tabPath(r.tab))}
-          />
-        ))}
-      </ul>
-    </section>
+    <ul className="strip-list journal-rows" aria-label="Journal">
+      {rows.map((r) => (
+        <JournalRow
+          key={r.tab}
+          title={r.title}
+          tick={r.tick}
+          meta={r.meta}
+          right={r.status && <Streak n={r.status.streak} week={r.status.week} />}
+          onOpen={() => navigate(tabPath(r.tab))}
+        />
+      ))}
+    </ul>
   );
 }
 

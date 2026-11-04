@@ -70,7 +70,7 @@ async function walk(page: Page, w: number) {
 
   // Home: the three mint rows, the exercise first.
   await page.goto("/");
-  const journal = page.getByRole("region", { name: "Journal" });
+  const journal = page.getByRole("list", { name: "Journal" });
   await expect(journal.locator("li.journal-row .strip-title")).toHaveText(["Mental health exercise", "Morning pages", "Daily check-in"]);
   await expect(journal.getByText("Day 2 · The fictional kettle")).toBeVisible();
   await expect(journal.locator("li.journal-row").nth(1).locator(".streak-n")).toHaveText("4");
@@ -80,7 +80,7 @@ async function walk(page: Page, w: number) {
   // Today: a Journal section under the to-dos.
   await page.goto("/today");
   await expect(page.getByText("Water the pretend fern")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Journal" }).locator("li.journal-row")).toHaveCount(3);
+  await expect(page.getByRole("list", { name: "Journal" }).locator("li.journal-row")).toHaveCount(3);
   await noSidewaysScroll(page);
   await shot("today");
 

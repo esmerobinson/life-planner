@@ -12,7 +12,7 @@ import { BinPage } from "./ui/BinPage";
 import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
 import { TodayPanel } from "./ui/TodayPanel";
-import { JournalCard } from "./ui/JournalCard";
+import { JournalRows } from "./ui/JournalCard";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
 
@@ -20,11 +20,9 @@ function TodayRoute() {
   // Today's Add opens as a to-do. It never pinned to today, so it still does not.
   useAddDefaults("task", "inbox");
   const today = useShellToday();
-  // Journal v2: the Journal rows get their own section, under the to-dos.
   return (
     <div className="today-page">
-      <TodayPanel today={today} />
-      <JournalCard today={today} />
+      <TodayPanel today={today} lead={<JournalRows today={today} />} />
     </div>
   );
 }

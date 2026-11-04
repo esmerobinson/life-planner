@@ -113,20 +113,23 @@ describe("phone layout (below 700px)", () => {
     expect(screen.getByTestId("nav-type")).toHaveTextContent("REPLACE");
   });
 
-  it("Home shows the Journal card under the app grid and above Today", async () => {
+  it("Home: under the app grid, Today's list starts with the Journal rows; no separate Journal section", async () => {
+    await createItem({ kind: "task", title: "Phone pick", areaId: "body", priority: 3, due: todayISO() }, todayISO());
     renderAt(["/"]);
-    await screen.findByText("Nothing planned for today.");
+    const pick = await screen.findByText("Phone pick");
     const grid = screen.getByRole("navigation", { name: "Main" });
-    const journal = screen.getByRole("region", { name: "Journal" });
     const today = screen.getByRole("heading", { level: 2, name: "Today" });
+    const journal = screen.getByRole("list", { name: "Journal" });
     expect(within(journal).getByRole("button", { name: "Morning pages" })).toBeEnabled();
     expect(within(journal).getByRole("button", { name: "Daily check-in" })).toBeEnabled();
     const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(follows(grid, journal)).toBe(true);
-    expect(follows(journal, today)).toBe(true);
+    expect(follows(grid, today)).toBe(true);
+    expect(follows(today, journal)).toBe(true);
+    expect(follows(journal, pick)).toBe(true);
+    expect(screen.queryByRole("heading", { name: "Journal" })).toBeNull();
   });
 
-  it("the phone Home card's buttons open the Journal's two parts", async () => {
+  it("the phone Home rows open the Journal's parts", async () => {
     setPhone(true);
     const first = renderAt(["/"]);
     await userEvent.click(await screen.findByRole("button", { name: "Morning pages" }));

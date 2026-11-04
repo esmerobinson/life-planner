@@ -49,7 +49,7 @@ function renderHomeWithJournalSpy() {
   );
 }
 
-const card = () => screen.findByRole("region", { name: "Journal" });
+const card = () => screen.findByRole("list", { name: "Journal" });
 const row = async (title: string) => (await screen.findByRole("button", { name: title })).closest("li")!;
 const tick = (el: HTMLElement) => within(el).getByRole("checkbox");
 
@@ -164,7 +164,7 @@ describe("Home Journal rows", () => {
     await finishMorningPage(jk, "2026-10-20", OTHER_DEVICE, "Pretend old page");
     renderApp("/", TODAY);
     const morning = await row("Morning pages");
-    await waitFor(() => expect(screen.getByRole("region", { name: "Journal" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("list", { name: "Journal" })).toBeInTheDocument());
     expect(morning.querySelector(".streak")).toBeNull();
     expect(await within(morning).findByRole("checkbox")).toHaveAttribute("aria-checked", "false");
   });
@@ -206,13 +206,16 @@ describe("Home Journal rows", () => {
   });
 });
 
-describe("Today: a Journal section under the to-dos", () => {
-  it("the same three rows, after the Today list", async () => {
+describe("Home: the rows lead Today's list (Esme, 2026-11-04)", () => {
+  it("the three rows come straight after the Today heading, before the to-dos", async () => {
     await someDone();
-    renderApp("/today", TODAY);
+    await createItem({ kind: "task", title: "Pretend errand", areaId: "admin", priority: 2, due: TODAY }, TODAY);
+    renderApp("/", TODAY);
     const c = await card();
     const today = screen.getByRole("heading", { level: 1, name: "Today" });
+    const errand = await screen.findByText("Pretend errand");
     expect(today.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(c.compareDocumentPosition(errand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(c).getAllByRole("listitem").map((li) => within(li).getByRole("button").textContent)).toEqual([
       "Mental health exercise", "Morning pages", "Daily check-in",
     ]);

@@ -1,13 +1,11 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { tickItem, untickItem } from "../data/repo";
 import { pickToday, tickedOffToday, withTickedOff } from "../domain/triage";
 import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { isActive } from "../domain/goalCounts";
 import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
-import { DailyGoalRows } from "./DailyGoalRows";
 import { DoneSection } from "./DoneSection";
-import { useGoalSources } from "./useGoalSources";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow } from "./TaskRow";
@@ -20,8 +18,15 @@ function thisMonthDoneFor(goals: Goal[], items: Item[], today: ISODate): Record<
 
 const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
-/** `headingLevel` 2 when the panel sits under another page title (the phone Home). */
-export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headingLevel?: 1 | 2 }) {
+/**
+ * Today's list, on Home (there is no separate Today page since 2026-11-04). `lead` comes first
+ * under the heading, as its own group (Home: the three Journal rows). `headingLevel` 2 when the
+ * panel sits under another page title (the phone Home). The heading and everything under it
+ * are two boxes (the heading and .today-body), so Home can line the list up with its goals.
+ */
+export function TodayPanel({
+  today, headingLevel = 1, lead,
+}: { today: ISODate; headingLevel?: 1 | 2; lead?: ReactNode }) {
   const Heading = headingLevel === 2 ? "h2" : "h1";
   const { items, goals, refresh, loaded, error } = useHubData(today);
   const [celebrating, setCelebrating] = useState(false);
@@ -47,7 +52,6 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
     const active = goals.filter(isActive);
     return withTickedOff(pickToday(items, active, today, thisMonthDoneFor(active, items, today)), items, today);
   }, [items, goals, today]);
-  const sources = useGoalSources(items);
 
   async function tick(id: string): Promise<boolean> {
     if (!(await attempt(() => tickItem(id, today)))) return false;
@@ -79,7 +83,9 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
     return (
       <section className="today-panel">
         <Heading>Today</Heading>
-        <p>{error}</p>
+        <div className="today-body">
+          <p>{error}</p>
+        </div>
       </section>
     );
   }
@@ -89,21 +95,23 @@ export function TodayPanel({ today, headingLevel = 1 }: { today: ISODate; headin
   return (
     <section className="today-panel">
       <Heading>Today</Heading>
-      {celebrating && <CelebrationPlaceholder />}
-      {saveError && <p className="form-message">{saveError}</p>}
-      <DailyGoalRows goals={goals} today={today} view={sources} onChanged={changed} />
-      {empty && <p>Nothing planned for today.</p>}
-      {rhythm.length > 0 && (
-        <ul aria-label="Rhythm" className="strip-list">{rhythm.map(row)}</ul>
-      )}
-      {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
-      {doneToday.length > 0 && <DoneSection title="Done today" items={doneToday} today={today} onUndo={untick} />}
-      {alsoDue.length > 0 && (
-        <details>
-          <summary>Also due</summary>
-          <ul aria-label="Also due" className="strip-list">{alsoDue.map(row)}</ul>
-        </details>
-      )}
+      <div className="today-body">
+        {lead}
+        {celebrating && <CelebrationPlaceholder />}
+        {saveError && <p className="form-message">{saveError}</p>}
+        {empty && <p>Nothing planned for today.</p>}
+        {rhythm.length > 0 && (
+          <ul aria-label="Rhythm" className="strip-list">{rhythm.map(row)}</ul>
+        )}
+        {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
+        {doneToday.length > 0 && <DoneSection title="Done today" items={doneToday} today={today} onUndo={untick} />}
+        {alsoDue.length > 0 && (
+          <details>
+            <summary>Also due</summary>
+            <ul aria-label="Also due" className="strip-list">{alsoDue.map(row)}</ul>
+          </details>
+        )}
+      </div>
     </section>
   );
 }

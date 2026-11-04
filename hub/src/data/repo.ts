@@ -2,7 +2,7 @@ import { db } from "./db";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT, MAX_MONTH_GOALS, MAX_MONTH_LOG, MAX_MONTH_TARGET, MAX_MONTH_TITLE } from "./validate";
 import { pictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
-import { daysInMonth, plannedFromLastMonth } from "../domain/goalCounts";
+import { plannedFromLastMonth } from "../domain/goalCounts";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
 import { milestoneTask } from "../domain/milestones";
 import { noteSessionTicks } from "./sessionTicks";
@@ -707,38 +707,6 @@ export async function planMonth(goalId: string, today: ISODate): Promise<void> {
   await editMonthGoals(goalId, (list, goal) => {
     const plan = plannedFromLastMonth({ ...goal, monthGoals: list }, today, () => crypto.randomUUID());
     return plan.length ? [...list, ...plan] : null;
-  });
-}
-
-/** The title of the count a daily goal's Home tick makes when the month has none to log on. */
-export const DAILY_COUNT_TITLE = "Days";
-
-/**
- * A daily goal without automatic sources: its Home row's tick logs today on this month's
- * first count (unticking takes today off). With no count this month yet, last month's are
- * planned first; with none at all, a count of every day this month is made.
- */
-export async function tickDailyGoal(goalId: string, today: ISODate, on: boolean): Promise<void> {
-  await editMonthGoals(goalId, (list, goal) => {
-    const month = monthOf(today);
-    let next = list;
-    if (on && !next.some((m) => m.month === month && m.kind === "count")) {
-      const plan = plannedFromLastMonth({ ...goal, monthGoals: next }, today, () => crypto.randomUUID());
-      next = plan.length
-        ? [...next, ...plan]
-        : [...next, { id: crypto.randomUUID(), month, kind: "count", title: DAILY_COUNT_TITLE, target: daysInMonth(month) }];
-    }
-    const first = next.find((m) => m.month === month && m.kind === "count");
-    if (!first) return null;
-    const has = first.log?.includes(today) ?? false;
-    if (on === has) return next === list ? null : next;
-    return next.map((m) => {
-      if (m !== first) return m;
-      if (on) return { ...m, log: [...(m.log ?? []), today] };
-      const { log, ...rest } = m;
-      const left = (log ?? []).filter((d) => d !== today);
-      return left.length ? { ...rest, log: left } : rest;
-    });
   });
 }
 

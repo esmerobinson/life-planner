@@ -228,7 +228,7 @@ describe("Home's Journal rows", () => {
     await confirmedDevice(db, jk);
     vi.spyOn(keyStore, "loadJournalKey").mockImplementation(() => never());
     renderHome();
-    const card = await screen.findByRole("region", { name: "Journal" });
+    const card = await screen.findByRole("list", { name: "Journal" });
     await waitFor(() => expect(within(card).getAllByRole("img", { name: "Not available until the journal is unlocked" })).toHaveLength(3));
   });
 
@@ -236,7 +236,7 @@ describe("Home's Journal rows", () => {
     await confirmedDevice(db, jk);
     vi.spyOn(repo, "listMorningDone").mockRejectedValue(new Error("pretend"));
     renderHome();
-    const card = await screen.findByRole("region", { name: "Journal" });
+    const card = await screen.findByRole("list", { name: "Journal" });
     await waitFor(() => expect(within(card).getAllByRole("img", { name: "Not available until the journal is unlocked" })).toHaveLength(3));
     for (const t of SECTIONS) expect(within(card).getByRole("button", { name: t })).toBeInTheDocument();
   });

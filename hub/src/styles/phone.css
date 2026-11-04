@@ -138,13 +138,6 @@ button.phone-back::before {
   margin: 14px 0 8px;
 }
 
-/* Spacing pass: the Journal heading under the app grid had no space above it (it sat on the
-   grid's labels). It takes the Today heading's section-line spacing, so the two sections of
-   phone Home start the same way. Its size is unchanged (a question for Esme). */
-.phone-home .journal-card-home h2 {
-  margin: 14px 0 8px;
-}
-
 .phone-footer {
   margin-top: 20px;
   display: flex;
