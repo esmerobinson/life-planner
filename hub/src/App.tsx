@@ -11,6 +11,7 @@ import { InboxPage } from "./ui/InboxPage";
 import { BinPage } from "./ui/BinPage";
 import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
+import { RemindersPage } from "./ui/RemindersPage";
 import { TodayPanel } from "./ui/TodayPanel";
 import { JournalCard } from "./ui/JournalCard";
 import { VisionPage } from "./ui/VisionPage";
@@ -102,6 +103,7 @@ export function AppRoutes() {
           <Route path="/bin" element={<BinRoute />} />
           <Route path="/backup" element={<BackupRoute />} />
           <Route path="/sync" element={<SyncPage />} />
+          <Route path="/reminders" element={<RemindersPage />} />
         </Route>
       </Routes>
   );

@@ -20,6 +20,8 @@ import { PanelProvider } from "./panelContext";
 import { SidePanel } from "./SidePanel";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
+import { useReminderScheduler } from "../reminders/scheduler";
+import { useNativeNavigate } from "../reminders/nativeNavigate";
 
 /** How often the shell re-reads the clock (a technical check, not a motion timing). */
 const CLOCK_CHECK_MS = 60_000;
@@ -43,6 +45,9 @@ export function AppShell() {
   const inboxLabel = inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox";
   const phone = usePhone();
   const location = useLocation();
+  // The Mac app's reminders follow every change (does nothing elsewhere).
+  useReminderScheduler();
+  useNativeNavigate();
 
   // Ask the browser once, on start, to keep this data.
   useEffect(() => {

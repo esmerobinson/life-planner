@@ -1,0 +1,101 @@
+/* Reminders (2026-11-04, Esme's pick 4A "a simple list"; mockup reviews-search.html part 4).
+   Every value is the mockup's, which took them from the app: rows split by 2px lines in the
+   row colour (the menus' divider), the existing soft On / Off pill (controls.css
+   button[aria-pressed]), times in the normal field look a bit smaller (14px), the off rows'
+   name and sample at 0.6 opacity, and the strips' small line (.strip-meta) for the sample. */
+
+.rem-intro {
+  margin: var(--space-2) 0 0;
+  line-height: 1.45;
+}
+
+/* Notes (phone / browser, permission, a failed save): plain text like the intro. */
+.rem-note {
+  margin: var(--space-2) 0 0;
+  line-height: 1.45;
+}
+
+.rem-list {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+}
+
+.rem-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 14px 0;
+  border-top: 2px solid var(--row);
+}
+
+.rem-row:last-child {
+  border-bottom: 2px solid var(--row);
+}
+
+.rem-row.off .rem-name,
+.rem-row.off .strip-meta {
+  opacity: 0.6;
+}
+
+.rem-name {
+  font-weight: 700;
+}
+
+.rem-when {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.rem-when input[type="time"],
+.rem-when select {
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--row);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.rem-extra {
+  grid-column: 1 / -1;
+  font-size: 13px;
+}
+
+.rem-row > button {
+  justify-self: end;
+}
+
+/* The mockup's small muted line under the list. */
+.rem-foot {
+  margin: 14px 0 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+/* Phone: the time moves under the name (mockup 4A, phone). */
+.is-phone .rem-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.is-phone .rem-row > button {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.is-phone .rem-when {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-content: flex-start;
+}
+
+/* iOS Safari zooms into any field under 16px (phone.css). */
+.is-phone .rem-when input[type="time"],
+.is-phone .rem-when select {
+  font-size: max(16px, 1em);
+}

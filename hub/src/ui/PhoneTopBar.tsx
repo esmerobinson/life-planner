@@ -5,6 +5,7 @@ import { NAV } from "./areas";
 const TITLES: Record<string, string> = {
   ...Object.fromEntries(NAV.filter((n) => n.path !== "/").map((n) => [n.path, n.label])),
   "/inbox": "Inbox",
+  "/reminders": "Reminders",
   "/backup": "Backup",
   "/sync": "Sync",
   "/bin": "Bin",
