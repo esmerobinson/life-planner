@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Goal, Item } from "../domain/types";
-import { buildIndex, highlight, queryWords, searchIndex, searchJournal, snippet, type JournalDoc } from "./search";
+import { buildIndex, fold, highlight, queryWords, searchIndex, searchJournal, snippet, type JournalDoc } from "./search";
 
 // ⌘K search (option 3A): the pure part. Fictional data only.
 const TODAY = "2026-11-04";
@@ -39,6 +39,30 @@ describe("query words and highlighting", () => {
     expect(s).toContain("pretend market hall");
     expect(s.length).toBeLessThan(120);
     expect(snippet("short market note", ["market"])).toBe("short market note");
+  });
+});
+
+describe("accents and apostrophes (bug #10)", () => {
+  it("folds letters one for one: no accents, curly apostrophes and quotes straight", () => {
+    expect(fold("Café Crème NAÏVE")).toBe("cafe creme naive");
+    expect(fold("Mum’s “book”")).toBe(`mum's "book"`);
+    expect(fold("Cafe\u0301")).toBe("cafe"); // an accent typed as its own mark
+    expect(fold("İstanbul").length).toBe("İstanbul".length);
+    expect(queryWords("CAFÉ mum’s")).toEqual(["cafe", "mum's"]);
+  });
+
+  it("bolds the matched letters of the original text and finds notes snippets", () => {
+    expect(highlight("Mum’s Café", ["cafe", "mum's"])).toEqual([
+      { text: "Mum’s", bold: true },
+      { text: " ", bold: false },
+      { text: "Café", bold: true },
+    ]);
+    expect(snippet("Pretend notes about the café", ["cafe"])).toBe("Pretend notes about the café");
+  });
+
+  it("finds a journal entry whatever the accents", () => {
+    const doc: JournalDoc = { id: "j", kind: "checkin", date: "2026-10-01", title: "Pretend check-in", text: "Went to the café" };
+    expect(searchJournal([doc], "cafe", "2026-11-04").map((h) => h.id)).toEqual(["j"]);
   });
 });
 

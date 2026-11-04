@@ -67,9 +67,39 @@ interface Doc {
 
 const areaName = (id: string) => (id === "inbox" ? "Inbox" : (AREA_CHOICES.find((a) => a.id === id)?.label ?? id));
 
-/** Query words: lowercased, split on spaces, each once. */
+/** Apostrophes and quote marks a phone keyboard (or a pasted text) may use for ' and ". */
+const APOSTROPHES = new Set(["\u2018", "\u2019", "\u201A", "\u201B", "\u02BC", "\u2032", "\uFF07"]);
+const QUOTES = new Set(["\u201C", "\u201D", "\u201E", "\u201F", "\u2033", "\uFF02"]);
+const folded = new Map<string, string>();
+
+/**
+ * Text as search compares it: lowercased, without accents, curly apostrophes and quotes as
+ * straight ones ("Café" and "cafe", "Mum’s" and "mum's" match). One character in, one out
+ * (so a match can be bolded in the original text), except a lone accent mark, which goes.
+ */
+export function fold(text: string): string {
+  if (/^[\x00-\x7f]*$/.test(text)) return text.toLowerCase();
+  let out = "";
+  for (const ch of text) {
+    let f = folded.get(ch);
+    if (f === undefined) {
+      if (APOSTROPHES.has(ch)) f = "'";
+      else if (QUOTES.has(ch)) f = '"';
+      else {
+        f = ch.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+        // A letter that only changes length when lowercased: just lowercased (never two letters for one).
+        if (f.length > ch.length) f = ch.toLowerCase().length === ch.length ? ch.toLowerCase() : ch;
+      }
+      folded.set(ch, f);
+    }
+    out += f;
+  }
+  return out;
+}
+
+/** Query words: folded (see fold), split on spaces, each once. */
 export function queryWords(q: string): string[] {
-  return [...new Set(q.toLowerCase().split(/\s+/).filter(Boolean))];
+  return [...new Set(fold(q).split(/\s+/).filter(Boolean))];
 }
 
 /** A page's text as plain words: no picture markup, heading or checklist marks. */
@@ -119,7 +149,7 @@ function itemDoc(it: Item, today: ISODate): Doc {
   const notes = plainNotes(it.notes ?? "");
   return {
     id: it.id, group, noun, title: it.title, extra, notes, meta, tile: it.areaId, areaLabel: area,
-    lowTitle: it.title.toLowerCase(), lowExtra: extra.map((e) => e.toLowerCase()), lowNotes: notes.toLowerCase(),
+    lowTitle: fold(it.title), lowExtra: extra.map(fold), lowNotes: fold(notes),
   };
 }
 
@@ -129,7 +159,7 @@ function goalDoc(g: Goal, today: ISODate): Doc {
   return {
     id: g.id, group: "goals", noun: "goal", title: g.title, extra: [], notes, tile: g.areaId, areaLabel: area,
     meta: `Goal · ${area}${g.deadline ? ` · By ${shortDate(g.deadline, today)}` : ""}`,
-    lowTitle: g.title.toLowerCase(), lowExtra: [], lowNotes: notes.toLowerCase(),
+    lowTitle: fold(g.title), lowExtra: [], lowNotes: fold(notes),
   };
 }
 
@@ -182,8 +212,8 @@ function toHit(d: Doc, group: Group, words: string[]): Hit {
 
 /** Text in bold and plain runs: every match of every word, overlaps merged. */
 export function highlight(text: string, words: string[]): { text: string; bold: boolean }[] {
-  const low = text.toLowerCase();
-  // Lowercasing can change the length of a few characters; then nothing is bolded rather than the wrong letters.
+  const low = fold(text);
+  // Folding can change the length (a lone accent mark); then nothing is bolded rather than the wrong letters.
   if (low.length !== text.length || !words.length) return [{ text, bold: false }];
   const marks = new Array<boolean>(text.length).fill(false);
   for (const w of words) {
@@ -200,7 +230,9 @@ export function highlight(text: string, words: string[]): { text: string; bold: 
 
 /** Up to about `radius` characters either side of the first match, cut at spaces, with "…" where cut. */
 export function snippet(text: string, words: string[], radius = 40): string {
-  const low = text.toLowerCase();
+  const folded = fold(text);
+  // Positions found in the folded text are only used when they line up with the original.
+  const low = folded.length === text.length ? folded : text.toLowerCase();
   const at = Math.min(...words.map((w) => low.indexOf(w)).filter((i) => i >= 0));
   if (!Number.isFinite(at) || text.length <= radius * 2) return text.length <= radius * 2 ? text : `${text.slice(0, radius * 2)}…`;
   let start = Math.max(0, at - radius);
@@ -244,7 +276,7 @@ const lowered = new WeakMap<JournalDoc, string>();
 function lowJournal(d: JournalDoc): string {
   let low = lowered.get(d);
   if (low === undefined) {
-    low = `${d.title}\n${d.text}`.toLowerCase();
+    low = fold(`${d.title}\n${d.text}`);
     lowered.set(d, low);
   }
   return low;
