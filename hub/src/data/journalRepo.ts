@@ -26,7 +26,7 @@ import {
 } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import {
-  legacyCardId, mergeStars, readStoredSet, storedCards, storedTracks, tableUpTo, type CardSet, type ExerciseCard, type ExerciseMark, type StarMark,
+  legacyCardId, MAX_PARTS, mergeStars, readStoredSet, storedCards, storedTracks, tableUpTo, type CardSet, type ExerciseCard, type ExerciseMark, type StarMark,
 } from "../journal/exercise";
 import type { FileRow, ISODate, JournalKind, JournalRow } from "../domain/types";
 
@@ -591,6 +591,21 @@ export interface ExerciseResponse {
   saved: boolean;
   /** Submitted on some device at least once (a draft only, if not). */
   submitted: boolean;
+  /**
+   * Every other version of it with something written (another device's, an unsent draft, the
+   * card's earlier key), newest first, so nothing she wrote is ever hidden. A version with the
+   * same words as the one shown is left out.
+   */
+  others: ResponseVersion[];
+}
+
+/** One stored version of a response (one row). */
+export interface ResponseVersion {
+  text: string;
+  parts: PartAnswer[] | null;
+  at: number;
+  /** Exactly what was submitted (not a draft typed after). */
+  submitted: boolean;
 }
 
 const ENTRY_PREFIX = "exercise-entry:";
@@ -601,6 +616,15 @@ const cardKey = (jk: JournalKey, card: ExerciseCardRef) =>
 async function entryRowId(jk: JournalKey, date: ISODate, card: ExerciseCardRef, deviceId: string): Promise<string> {
   return journalId("exercise-entry", date, `${await cardKey(jk, card)}:${deviceId}`);
 }
+
+/**
+ * This device's drafts of a card go in their own row (`…:<deviceId>-draft`), never in the row
+ * Submit writes, so an autosave can't overwrite what she submitted (Esme, 2026-11-04). Earlier
+ * code still reads it: it groups it with the card's other rows, like another device's.
+ */
+const DRAFT_SUFFIX = "-draft";
+const draftRowId = (jk: JournalKey, date: ISODate, card: ExerciseCardRef, deviceId: string) =>
+  entryRowId(jk, date, card, `${deviceId}${DRAFT_SUFFIX}`);
 
 export type { PartAnswer };
 
@@ -672,26 +696,60 @@ const hasContent = (e: { text: string; parts?: PartAnswer[] | null }) => e.text.
 export const responseComplete = (value: ResponseValue): boolean =>
   typeof value === "string" ? value.trim() !== "" : value.length > 0 && value.every(answerFilled);
 
-/** The entry sealed for a card's response: a version 1 card keeps the earlier shape. */
-function responseEntry(card: ExerciseCardRef, value: ResponseValue, submittedAt: number | null, at: number): ExerciseResponseEntry {
-  const text = typeof value === "string" ? value : "";
+/**
+ * The entry sealed for a card's response: a version 1 card keeps the earlier shape. `prev` is
+ * the row being written over: whatever it holds that the new value has no place for (a part the
+ * re-imported card no longer has, or its one text once the card has parts) is kept in the new
+ * row, so a write never drops anything she wrote.
+ */
+function responseEntry(
+  card: ExerciseCardRef, value: ResponseValue, submittedAt: number | null, at: number, prev: ExerciseResponseEntry | null = null,
+): ExerciseResponseEntry {
+  let text = typeof value === "string" ? value : "";
+  let parts = typeof value === "string" ? undefined : value;
+  if (prev && parts) {
+    if (text.trim() === "" && prev.text.trim() !== "") text = prev.text;
+    const now = parts;
+    const kept = prev.v === 2 ? (prev.parts ?? []).filter((p) => partStarted(p) && !now.some((a) => a.prompt === p.prompt && a.kind === p.kind)) : [];
+    if (kept.length) parts = [...now, ...kept].slice(0, MAX_PARTS);
+  }
   if (card.legacy) return { v: 1, day: card.day!, theme: card.theme, text, submittedAt, at };
-  return {
-    v: 2, id: card.id, day: card.day, theme: card.theme, text, ...(typeof value === "string" ? {} : { parts: value }), submittedAt, at,
-  };
+  return { v: 2, id: card.id, day: card.day, theme: card.theme, text, ...(parts ? { parts } : {}), submittedAt, at };
 }
 
-/** The newest non-empty of one card's rows (each device writes its own), as the check-in merges answers. */
-function mergeResponses(date: ISODate, rows: ExerciseResponseEntry[]): ExerciseResponse | null {
+/** A row holds exactly what was submitted (not a draft typed after a submit). */
+const isSubmitted = (r: ExerciseResponseEntry) => r.submittedAt !== null && r.submittedAt === r.at;
+const partsOf = (r: ExerciseResponseEntry) => (r.v === 2 ? (r.parts ?? null) : null);
+const contentKey = (r: ExerciseResponseEntry) => JSON.stringify([r.text, partsOf(r)]);
+
+/**
+ * One card's rows on one day (each device writes its own, and its drafts apart), merged.
+ * - "read" (Read back, Past exercises, All cards): the newest SUBMITTED response shows; only
+ *   with none, the newest draft. A draft never hides a submitted response (Esme, 2026-11-04).
+ * - "edit" (the response box): the newest with anything written, so the box opens on what she
+ *   typed last; "Saved" only while that is what was last submitted.
+ * Every other version with something written is in `others`: nothing is hidden.
+ */
+function mergeResponses(date: ISODate, rows: ExerciseResponseEntry[], mode: "read" | "edit" = "read"): ExerciseResponse | null {
   if (rows.length === 0) return null;
   const newest = (list: ExerciseResponseEntry[]) => list.reduce((a, b) => (b.at > a.at ? b : a));
-  const filled = rows.filter((r) => hasContent({ text: r.text, parts: r.v === 2 ? r.parts : null }));
-  const best = newest(filled.length ? filled : rows);
+  const filled = rows.filter((r) => hasContent({ text: r.text, parts: partsOf(r) }));
+  const sent = filled.filter(isSubmitted);
+  const lastSent = sent.length ? newest(sent) : null;
+  const best = mode === "read" && lastSent ? lastSent : newest(filled.length ? filled : rows);
+  const seen = new Set([contentKey(best)]);
+  const others: ResponseVersion[] = [];
+  for (const r of [...filled].sort((a, b) => b.at - a.at)) {
+    if (seen.has(contentKey(r))) continue;
+    seen.add(contentKey(r));
+    others.push({ text: r.text, parts: partsOf(r), at: r.at, submitted: isSubmitted(r) });
+  }
   return {
     date, id: best.v === 2 ? best.id : legacyCardId(best.day), day: best.day, theme: best.theme, text: best.text,
-    parts: best.v === 2 ? (best.parts ?? null) : null, at: best.at,
-    saved: best.submittedAt !== null && best.submittedAt === best.at,
+    parts: partsOf(best), at: best.at,
+    saved: isSubmitted(best) || (lastSent !== null && contentKey(lastSent) === contentKey(best)),
     submitted: rows.some((r) => r.submittedAt !== null),
+    others,
   };
 }
 
@@ -722,7 +780,7 @@ export async function readExerciseEntry(
 ): Promise<{ entry: ExerciseResponse | null; unreadable: number }> {
   const prefix = `${ENTRY_PREFIX}${date}:${await cardKey(jk, card)}:`;
   const { groups, unreadable } = await openResponses(jk, (await rowsOn(date)).filter((r) => r.id.startsWith(prefix)));
-  return { entry: groups[0] ? mergeResponses(date, groups[0].entries) : null, unreadable };
+  return { entry: groups[0] ? mergeResponses(date, groups[0].entries, "edit") : null, unreadable };
 }
 
 /** This device's own response row for the card, opened (never written over if it won't open). */
@@ -745,9 +803,9 @@ export async function saveExerciseDraft(
   card: ExerciseCardRef,
   value: ResponseValue,
 ): Promise<void> {
-  const id = await entryRowId(jk, date, card, deviceId);
+  const id = await draftRowId(jk, date, card, deviceId);
   const prev = await ownResponse(jk, id);
-  const entry = responseEntry(card, value, prev?.submittedAt ?? null, Date.now());
+  const entry = responseEntry(card, value, null, Date.now(), prev);
   await write(jk, [await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), entry)]);
 }
 
@@ -766,11 +824,11 @@ export async function submitExerciseEntry(
 ): Promise<void> {
   if (!responseComplete(value)) throw new Error("There is nothing to submit yet.");
   const id = await entryRowId(jk, date, card, deviceId);
-  await ownResponse(jk, id);
+  const prev = await ownResponse(jk, id);
   await oneAtATime(async () => {
     const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, true);
     const at = Date.now();
-    const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
+    const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at, prev));
     const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
     await write(jk, [response, mark]);
   });
@@ -793,11 +851,11 @@ export async function logExerciseEntry(
   const carried = await readLatestExerciseEntry(jk, date, card);
   if (!trackerNewInput(value, carried?.parts)) throw new Error("There is nothing new to save yet.");
   const id = await entryRowId(jk, date, card, deviceId);
-  await ownResponse(jk, id);
+  const prev = await ownResponse(jk, id);
   await oneAtATime(async () => {
     const marks = marked(await ownMarks(jk, date, deviceId), todayId, card.id, false, true);
     const at = Date.now();
-    const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at));
+    const response = await seal(jk, "exercise-entry", date, id.slice(`${ENTRY_PREFIX}${date}:`.length), responseEntry(card, value, at, at, prev));
     const mark = await seal(jk, "exercise", date, deviceId, { ...marks, at });
     await write(jk, [response, mark]);
   });
@@ -816,7 +874,7 @@ export async function readLatestExerciseEntry(jk: JournalKey, date: ISODate, car
     (r) => r.date < date && r.date > lastDone && r.id.includes(key),
   );
   const { groups } = await openResponses(jk, rows);
-  const all = groups.map((g) => mergeResponses(g.date, g.entries)!).sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at);
+  const all = groups.map((g) => mergeResponses(g.date, g.entries, "edit")!).sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at);
   return all[0] ?? null;
 }
 
@@ -827,7 +885,17 @@ export async function readLatestExerciseEntry(jk: JournalKey, date: ISODate, car
 export async function listExerciseEntries(jk: JournalKey, before: ISODate): Promise<{ entries: ExerciseResponse[]; unreadable: number }> {
   const rows = (await db.journal.where("kind").equals("exercise-entry").toArray()).filter((r) => r.date < before);
   const { groups, unreadable } = await openResponses(jk, rows);
-  const entries = groups
+  // One entry per card and day: the same card's rows under its earlier (day and theme) key and
+  // under its id, on one day, read as one (Esme, 2026-11-04: "theres repeats in the read back").
+  const byCard = new Map<string, { date: ISODate; entries: ExerciseResponseEntry[] }>();
+  for (const g of groups) {
+    const e = g.entries[0]!;
+    const k = JSON.stringify([g.date, e.day ?? (e.v === 2 ? e.id : ""), e.theme]);
+    const have = byCard.get(k);
+    if (have) have.entries.push(...g.entries);
+    else byCard.set(k, { date: g.date, entries: [...g.entries] });
+  }
+  const entries = [...byCard.values()]
     .map((g) => mergeResponses(g.date, g.entries)!)
     .filter(hasContent)
     .sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at);

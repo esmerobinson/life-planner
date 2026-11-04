@@ -145,7 +145,7 @@ describe("Sidebar footer", () => {
       </MemoryRouter>,
     );
     const footer = document.querySelector(".sidebar-footer") as HTMLElement;
-    expect(within(footer).getAllByRole("link").map((l) => l.textContent)).toEqual(["Backup", "Sync", "Bin"]);
+    expect(within(footer).getAllByRole("link").map((l) => l.textContent)).toEqual(["Reminders", "Backup", "Sync", "Bin"]);
     expect(within(footer).getByRole("link", { name: "Bin" })).toHaveAttribute("href", "/bin");
   });
 });

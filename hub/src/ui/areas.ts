@@ -25,7 +25,6 @@ export type NavEntry = {
 
 export const NAV: NavEntry[] = [
   { id: "home", label: "Home", path: "/", icon: home, tile: "#9eb4e6", group: 1 },
-  { id: "today", label: "Today", path: "/today", icon: today, tile: "#e8dd6e", group: 1 },
   { id: "goals", label: "Goals", path: "/goals", icon: goals, tile: "#98c293", group: 1 },
   { id: "admin", label: "Admin", path: "/area/admin", icon: admin, tile: "#90825b", group: 1 },
   { id: "mind", label: "Mind", path: "/area/mind", icon: mind, tile: "#a3d5c2", group: 2 },
@@ -40,6 +39,13 @@ export const NAV: NavEntry[] = [
   // Esme's Farm: the one entry point for the game. The tile colour is undecided (magenta placeholder).
   { id: "farm", label: "Esme's Farm", path: "/farm", icon: farmIcon, tile: "#ff00ff", group: 3 },
 ];
+
+/**
+ * The To-do tile (the sort card's "What is it?" step, VISUAL-LANGUAGE.md "Chosen layout for
+ * the sort card"): the old Today page's sidebar tile, Nook Shopping yellow and the today icon.
+ * There is no Today page any more (2026-11-04: Home is it), so it is not in NAV.
+ */
+export const TODO_TILE = { icon: today, tile: "#e8dd6e" };
 
 /** Area choices for forms: every area in AREA_IDS order (the inbox first), labels from NAV. */
 export const AREA_CHOICES: { id: AreaId; label: string }[] = AREA_IDS.map((id) => ({

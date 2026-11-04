@@ -11,18 +11,19 @@ function renderAt(path: string) {
 }
 
 describe("Sidebar", () => {
-  it("lists the fourteen entries in order", () => {
+  it("lists the thirteen entries in order (no Today: Home is the Today page)", () => {
     renderAt("/");
     const labels = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link").map((a) => a.textContent?.trim());
     expect(labels).toEqual([
-      "Home", "Today", "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
+      "Home", "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
       "Tech projects", "Production", "Journal", "Vision board", "Esme's Farm",
     ]);
   });
 
-  it("links Today to /today", () => {
+  it("has no Today link (Esme, 2026-11-04: Home is the Today page)", () => {
     renderAt("/");
-    expect(screen.getByRole("link", { name: "Today" })).toHaveAttribute("href", "/today");
+    expect(screen.queryByRole("link", { name: "Today" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
   });
 
   it("marks only the active route with aria-current=page", () => {
@@ -35,7 +36,7 @@ describe("Sidebar", () => {
     renderAt("/");
     const groups = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("group");
     expect(groups).toHaveLength(3);
-    expect(within(groups[0]).getAllByRole("link")).toHaveLength(4);
+    expect(within(groups[0]).getAllByRole("link")).toHaveLength(3);
     expect(within(groups[1]).getAllByRole("link")).toHaveLength(7);
     expect(within(groups[2]).getAllByRole("link")).toHaveLength(3);
     expect(screen.getByRole("group", { name: "Overview" })).toBeInTheDocument();
@@ -43,7 +44,7 @@ describe("Sidebar", () => {
     expect(screen.getByRole("group", { name: "Reflect" })).toBeInTheDocument();
   });
 
-  it("has a quiet Backup link in the footer, outside the thirteen navigation items", () => {
+  it("has a quiet Backup link in the footer, outside the twelve navigation items", () => {
     renderAt("/backup");
     const main = screen.getByRole("navigation", { name: "Main" });
     expect(within(main).queryByRole("link", { name: "Backup" })).toBeNull();

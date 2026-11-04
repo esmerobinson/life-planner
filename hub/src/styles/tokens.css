@@ -199,10 +199,51 @@ body {
   row-gap: var(--space-6);
 }
 
-/* The goals column's heading lines up with Today's title at the top of the page. */
+/* Home's spacing (2026-11-04; Esme: the green rows sat too close under the "Today" heading and
+   too close to the to-dos). Only --space-* steps:
+   - a column heading to its first item: --space-5 (24px), both columns (the rest of the app
+     keeps --gap-stack, 16px, under a title);
+   - the green group (the three Journal rows) to the to-dos: --gap-section (32px);
+   - rows inside a group: --gap-rows (8px), as everywhere. */
+.home-page .today-panel > h1,
 .home-goals > h2 {
+  margin: 0 0 var(--space-5);
+}
+
+.today-body > :first-child,
+.home-goals-body > :first-child {
   margin-top: 0;
 }
+
+.today-body > .journal-rows {
+  margin-bottom: var(--gap-section);
+}
+
+/* Side by side, the two columns line up (VISUAL-LANGUAGE.md "Home"): their headings share a
+   baseline and their first items a top. The page is two grid rows (headings, then content);
+   each column passes them down (subgrid) to its heading and the box under it. */
+@media (min-width: 1000px) {
+  .home-page {
+    grid-template-rows: auto auto;
+    row-gap: 0;
+  }
+
+  .home-centre,
+  .home-centre > .today-panel,
+  .home-goals {
+    grid-row: span 2;
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .home-centre > .today-panel > h1,
+  .home-goals > h2 {
+    align-self: baseline;
+  }
+}
+
 /* Under 1000px wide the goals column goes below Today instead of squashing against it
    (2026-11-02), full width as in that mockup's narrow layout. */
 @media (max-width: 999.98px) {

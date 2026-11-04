@@ -137,9 +137,9 @@ for (const width of [1280, 390]) {
       expect(lastBottom).toBeLessThanOrEqual(fab.y);
     });
 
-    test("Today: Session 3 of 4 today · <title>, crossed out once ticked", async ({ page }) => {
+    test("Home's Today list: Session 3 of 4 today · <title>, crossed out once ticked", async ({ page }) => {
       await seed(page, { plannedToday: true });
-      await page.goto("/today");
+      await page.goto("/");
       const row = page.getByRole("list", { name: "Today" }).locator("li", { hasText: "Pretend street scene" });
       await expect(row.getByText("Session 3 of 4 today · Lighting and papel picado")).toBeVisible();
       await noSideways(page);

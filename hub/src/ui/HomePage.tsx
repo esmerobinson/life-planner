@@ -11,7 +11,7 @@ import { ShellContext } from "./shellContext";
 import { useGoalSources } from "./useGoalSources";
 import { FooterLinks } from "./Sidebar";
 import { usePhone } from "./usePhone";
-import { JournalCard } from "./JournalCard";
+import { JournalRows } from "./JournalCard";
 import { TodayPanel } from "./TodayPanel";
 import { useHubData } from "./useHubData";
 
@@ -22,9 +22,9 @@ export function HomePage({ today }: { today: ISODate }) {
 
 /**
  * Phone Home (mockup-phone.html tab A, VISUAL-LANGUAGE.md "Phone layout"): the app grid
- * of every sidebar destination except Home, the Journal card (Esme: on the first screen,
- * 2026-10-28), then Today's list, then the quiet footer
- * links (the sidebar's own list). The "Esmeworld" title is in the shell's top bar.
+ * of every sidebar destination except Home, then Today's list (the three Journal rows first,
+ * as on desktop), then the quiet footer links (the sidebar's own list). The "Esmeworld" title
+ * is in the shell's top bar.
  */
 function PhoneHome({ today }: { today: ISODate }) {
   return (
@@ -43,8 +43,7 @@ function PhoneHome({ today }: { today: ISODate }) {
           ))}
         </ul>
       </nav>
-      <JournalCard today={today} />
-      <TodayPanel today={today} headingLevel={2} />
+      <TodayPanel today={today} headingLevel={2} lead={<JournalRows today={today} />} />
       <nav aria-label="More" className="phone-footer">
         <FooterLinks />
       </nav>
@@ -83,32 +82,34 @@ function DesktopHome({ today }: { today: ISODate }) {
 
   return (
     <div className="home-page">
+      {/* Esme, 2026-11-04: Home is the Today page; its list starts with the Journal rows. */}
       <div className="home-centre">
-        <TodayPanel today={today} />
-        <JournalCard today={today} />
+        <TodayPanel today={today} lead={<JournalRows today={today} />} />
       </div>
       <aside className="home-goals" aria-label="Goals this month">
         <h2>Goals this month</h2>
-        {loaded && active.length === 0 && (
-          <p>
-            No monthly targets yet. <Link to="/goals">Go to goals</Link>
-          </p>
-        )}
-        {loaded && active.length > 0 && shown.goals.length === 0 && <p>Choose which goals show here.</p>}
-        {shown.goals.length > 0 && (
-          <ul className="goal-mini-list">
-            {shown.goals.map((g) => (
-              <GoalMiniCard key={g.id} goal={g} today={today} sources={sources} />
-            ))}
-          </ul>
-        )}
-        {loaded && active.length > 0 && (
-          <p className="home-choose">
-            <button type="button" className="quiet-link" aria-haspopup="dialog" onClick={() => setChoosing(true)}>
-              Choose goals
-            </button>
-          </p>
-        )}
+        <div className="home-goals-body">
+          {loaded && active.length === 0 && (
+            <p>
+              No monthly targets yet. <Link to="/goals">Go to goals</Link>
+            </p>
+          )}
+          {loaded && active.length > 0 && shown.goals.length === 0 && <p>Choose which goals show here.</p>}
+          {shown.goals.length > 0 && (
+            <ul className="goal-mini-list">
+              {shown.goals.map((g) => (
+                <GoalMiniCard key={g.id} goal={g} today={today} sources={sources} />
+              ))}
+            </ul>
+          )}
+          {loaded && active.length > 0 && (
+            <p className="home-choose">
+              <button type="button" className="quiet-link" aria-haspopup="dialog" onClick={() => setChoosing(true)}>
+                Choose goals
+              </button>
+            </p>
+          )}
+        </div>
       </aside>
       {choosing && (
         <ChooseGoalsSheet

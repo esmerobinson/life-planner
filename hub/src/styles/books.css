@@ -1,0 +1,76 @@
+/* Reading list (2026-11-04; Esme: "reading list should be within ideas as a sub category …
+   maybe with a book icon instead of the pink square"). Values from the mockup she chose from
+   (cards-progress-reading.html part 3): the status pill is the panel's small Close/Edit pill
+   shape in --track, the same grey for every status ("nothing is colour-coded by status"); a
+   Reading book's bar is the normal bar at 5px, 6px under its line; in the side panel the
+   status is the soft choice pills (green = chosen) at 14px, and the page bar 8px, 6px under.
+   The heading uses the Habits heading's icon row (icon, 6px, bold title).
+
+   The book is the sprite designer's 16×16 pixel book (round 1 icons.png, frame "bookicon"),
+   shown only at whole-number scales with pixelated scaling.
+
+   Calls made by the implementer (Esme may veto): the heading is a sub-heading inside Ideas
+   (h3 spacing), "+ Add a book" is the quiet link under the list (the mockup's), and in Edit
+   the page reached and the page count sit side by side as two number fields with "of". */
+
+img.pixel-icon {
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.reading-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.book-pill {
+  padding: 4px 12px;
+  font-size: 14px;
+  border-radius: 999px;
+  background: var(--track);
+  white-space: nowrap;
+}
+
+.book-bar {
+  margin-top: 6px;
+}
+
+.book-bar .progress-bar {
+  height: 5px;
+}
+
+button.quiet-link.reading-add {
+  padding: 2px 2px 0;
+}
+
+.book-status button[aria-pressed] {
+  padding: 4px 12px;
+  font-size: 14px;
+}
+
+.book-panel-bar {
+  display: block;
+  margin-top: 6px;
+}
+
+.book-panel-bar .progress-bar {
+  height: 8px;
+}
+
+.book-page-fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.book-page-fields input {
+  width: 7em;
+  min-width: 0;
+}
+
+.book-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

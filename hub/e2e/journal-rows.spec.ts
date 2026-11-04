@@ -64,7 +64,7 @@ async function pretendHistory(page: Page) {
   );
 }
 
-const journal = (page: Page) => page.getByRole("region", { name: "Journal" });
+const journal = (page: Page) => page.getByRole("list", { name: "Journal" });
 const row = (page: Page, title: string) => journal(page).locator("li.journal-row").filter({ hasText: title });
 
 async function noSidewaysScroll(page: Page) {
@@ -143,19 +143,6 @@ test.describe("at 1280px", () => {
   test("Home's three mint rows: ticks, streaks, tapping opens the tab", async ({ page }) => {
     test.setTimeout(120_000);
     await homeRows(page, "journalrows-1280");
-  });
-
-  test("clear space between the last Today strip and the Journal heading", async ({ page }) => {
-    await unlocked(page);
-    await pretendHistory(page);
-    await page.goto("/");
-    await expect(page.getByText("Post the made-up letter")).toBeVisible();
-    const lastStrip = page.locator(".today-panel .strip").last();
-    const lastBottom = await lastStrip.evaluate((el) => el.getBoundingClientRect().bottom);
-    const headTop = await journal(page).getByRole("heading", { name: "Journal" }).evaluate((el) => el.getBoundingClientRect().top);
-    // Was 16px (the list's own margin), then 36px; since the spacing pass (2026-11-03) it is the
-    // page section gap, --gap-section (32px), the same before every section heading.
-    expect(Math.round(headTop - lastBottom)).toBe(32);
   });
 
   test("locked: the rows still show, unticked, and open the Journal to unlock", async ({ page }) => {

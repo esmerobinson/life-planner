@@ -10,6 +10,9 @@ export type Weekday = (typeof WEEKDAYS)[number];
 export const SOURCE_KINDS = ["backlog", "manual", "gtasks", "obsidian"] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 export type ISODate = string;
+/** A book's place on the reading list: Want to read, Reading, Read. */
+export const BOOK_STATUSES = ["want", "reading", "read"] as const;
+export type BookStatus = (typeof BOOK_STATUSES)[number];
 
 export interface Item {
   id: string;
@@ -45,6 +48,29 @@ export interface Item {
    * projects.ts). Only on `kind: "task"`, never with `recur`. Its deadline is `due`.
    */
   sessions?: Session[];
+  /**
+   * Reading list (2026-11-04): an idea with a `bookStatus` is a book (domain/books.ts). Books
+   * live under Mind. Every book field is optional; an older app version keeps them as they are
+   * (it spreads rows when it writes them) and its validator ignores them.
+   */
+  bookStatus?: BookStatus;
+  /** The book's author, at most 200 characters. */
+  author?: string;
+  /** How many pages the book has (1–100,000). */
+  pages?: number;
+  /** The page reached (0–100,000; never past `pages`). */
+  pageAt?: number;
+  /** The day it was marked Read. */
+  finishedOn?: ISODate;
+  /** One http(s) address for the book (a library or shop page), at most 2000 characters. */
+  link?: string;
+  /**
+   * Fields put away by Change to, so nothing is lost and changing back restores them
+   * (fix round 1, I-3/I-5): a to-do's due date, repeat, day pin, hide, milestone flag and done
+   * date while it is a book; a book's status, author, pages, page, finished date and link while
+   * it is a to-do or an idea. Never shown. An older app version keeps it as it is.
+   */
+  stash?: ItemStash;
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
@@ -53,6 +79,15 @@ export interface Item {
    * (data/changeTracking.ts). Optional only so older backups still load.
    */
   updatedAt?: number;
+}
+
+/** The to-do-only fields a book keeps put away. */
+export type TaskStash = Partial<Pick<Item, "due" | "recur" | "pinnedDate" | "hiddenOn" | "milestone" | "completedAt">>;
+/** The book fields a to-do or idea keeps put away. */
+export type BookStash = Partial<Pick<Item, "bookStatus" | "author" | "pages" | "pageAt" | "finishedOn" | "link">>;
+export interface ItemStash {
+  task?: TaskStash;
+  book?: BookStash;
 }
 
 /** One session of a project to-do. Unnamed sessions are called "Session 3" by their place. */

@@ -2,7 +2,7 @@ import { db } from "./db";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT, MAX_MONTH_GOALS, MAX_MONTH_LOG, MAX_MONTH_TARGET, MAX_MONTH_TITLE } from "./validate";
 import { pictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
-import { daysInMonth, plannedFromLastMonth } from "../domain/goalCounts";
+import { plannedFromLastMonth } from "../domain/goalCounts";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
 import { milestoneTask } from "../domain/milestones";
 import { noteSessionTicks } from "./sessionTicks";
@@ -11,9 +11,10 @@ import {
   nextSessionIndex, withSessions,
 } from "../domain/projects";
 import { SUGGESTED_GOALS, suggestedGoalRow } from "../domain/suggestedGoals";
+import { BOOK_AREA, BOOK_FIELDS, BOOK_LIMITS, isBook, isWebLink } from "../domain/books";
 export * from "./journalRepo";
 import {
-  AREA_IDS, type AreaId, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
+  AREA_IDS, type AreaId, type BookStatus, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
   type Session,
 } from "../domain/types";
 
@@ -710,38 +711,6 @@ export async function planMonth(goalId: string, today: ISODate): Promise<void> {
   });
 }
 
-/** The title of the count a daily goal's Home tick makes when the month has none to log on. */
-export const DAILY_COUNT_TITLE = "Days";
-
-/**
- * A daily goal without automatic sources: its Home row's tick logs today on this month's
- * first count (unticking takes today off). With no count this month yet, last month's are
- * planned first; with none at all, a count of every day this month is made.
- */
-export async function tickDailyGoal(goalId: string, today: ISODate, on: boolean): Promise<void> {
-  await editMonthGoals(goalId, (list, goal) => {
-    const month = monthOf(today);
-    let next = list;
-    if (on && !next.some((m) => m.month === month && m.kind === "count")) {
-      const plan = plannedFromLastMonth({ ...goal, monthGoals: next }, today, () => crypto.randomUUID());
-      next = plan.length
-        ? [...next, ...plan]
-        : [...next, { id: crypto.randomUUID(), month, kind: "count", title: DAILY_COUNT_TITLE, target: daysInMonth(month) }];
-    }
-    const first = next.find((m) => m.month === month && m.kind === "count");
-    if (!first) return null;
-    const has = first.log?.includes(today) ?? false;
-    if (on === has) return next === list ? null : next;
-    return next.map((m) => {
-      if (m !== first) return m;
-      if (on) return { ...m, log: [...(m.log ?? []), today] };
-      const { log, ...rest } = m;
-      const left = (log ?? []).filter((d) => d !== today);
-      return left.length ? { ...rest, log: left } : rest;
-    });
-  });
-}
-
 /**
  * Adds one of the Suggested goals (only on her tap). Its id is fixed, so a second tap (or
  * another device's) changes nothing. One in the Bin is restored as it was (its monthly goals and
@@ -975,4 +944,186 @@ export async function addPicture(
     id, mime: picture.mime, data: picture.data, width: picture.width, height: picture.height, createdAt: today,
   });
   return id;
+}
+
+// ---- reading list (books are ideas under Mind) ---------------------------------------------
+
+/** The book fields the panel's Edit may change. Blank text (or undefined) removes a field. */
+export interface BookPatch {
+  author?: string | undefined;
+  pages?: number | undefined;
+  pageAt?: number | undefined;
+  link?: string | undefined;
+}
+
+/** Applies a BookPatch to a row (throws on a value the validator would refuse). */
+function withBookPatch(row: Item, patch: BookPatch): Item {
+  const next: Item = { ...row };
+  if ("author" in patch) {
+    const a = (patch.author ?? "").trim();
+    if (a.length > BOOK_LIMITS.author) throw new Error(`An author is at most ${BOOK_LIMITS.author} characters.`);
+    if (a) next.author = a;
+    else delete next.author;
+  }
+  if ("link" in patch) {
+    const l = (patch.link ?? "").trim();
+    if (l && (l.length > BOOK_LIMITS.link || !isWebLink(l))) throw new Error("A link starts with https:// (or http://).");
+    if (l) next.link = l;
+    else delete next.link;
+  }
+  for (const key of ["pages", "pageAt"] as const) {
+    if (!(key in patch)) continue;
+    const n = patch[key];
+    if (n === undefined) {
+      delete next[key];
+      continue;
+    }
+    const min = key === "pages" ? 1 : 0;
+    if (!Number.isInteger(n) || n < min || n > BOOK_LIMITS.pages) {
+      throw new Error(key === "pages" ? "Pages is a whole number, 1 or more." : "The page is a whole number, 0 or more.");
+    }
+    next[key] = n;
+  }
+  // The page reached is never past the last page (fewer pages pull it back).
+  if (next.pages !== undefined && next.pageAt !== undefined && next.pageAt > next.pages) next.pageAt = next.pages;
+  return next;
+}
+
+/** A new book on the reading list: an idea under Mind. Read sets finishedOn to today. */
+export async function createBook(
+  input: { title: string; bookStatus: BookStatus; author?: string; notes?: string },
+  today: ISODate,
+): Promise<Item> {
+  const title = input.title.trim();
+  if (!title) throw new Error("a book needs a title");
+  const checked = withBookPatch(
+    { id: "", kind: "idea", title, links: [], areaId: BOOK_AREA, priority: 2, status: "open", createdAt: today, touchedAt: today },
+    { author: input.author },
+  );
+  return createItem(
+    {
+      kind: "idea",
+      title,
+      areaId: BOOK_AREA,
+      priority: 2,
+      bookStatus: input.bookStatus,
+      ...(checked.author ? { author: checked.author } : {}),
+      ...(input.bookStatus === "read" ? { finishedOn: today } : {}),
+      ...(input.notes?.trim() ? { notes: input.notes } : {}),
+    },
+    today,
+  );
+}
+
+const TASK_STASH_FIELDS = ["due", "recur", "pinnedDate", "hiddenOn", "milestone", "completedAt"] as const;
+
+/** Moves `keys` that are set on `row` into a plain object (removing them from `row`). */
+function takeFields<K extends keyof Item>(row: Item, keys: readonly K[]): Partial<Pick<Item, K>> {
+  const out: Partial<Pick<Item, K>> = {};
+  for (const k of keys) {
+    if (row[k] === undefined) continue;
+    out[k] = row[k];
+    delete row[k];
+  }
+  return out;
+}
+
+/** Copies `keys` from `from` onto `row` where the row has none (fields on the row win). */
+function putBack<K extends keyof Item>(row: Item, from: Partial<Pick<Item, K>>, keys: readonly K[]): void {
+  for (const k of keys) if (row[k] === undefined && from[k] !== undefined) Object.assign(row, { [k]: from[k] });
+}
+
+/** The row with `part` of its stash replaced (`fields` empty: that part removed; nothing left: no stash). */
+function withStash(row: Item, part: "task" | "book", fields: Record<string, unknown> | undefined): Item {
+  const stash = { ...row.stash };
+  if (fields && Object.keys(fields).length) (stash as Record<string, unknown>)[part] = fields;
+  else delete stash[part];
+  const next: Item = { ...row };
+  if (Object.keys(stash).length) next.stash = stash;
+  else delete next.stash;
+  return next;
+}
+
+/**
+ * "Change to → Book": the item becomes an idea on the reading list under Mind. A to-do's due
+ * date, repeat, day on Today, hide, milestone flag and done date are put away in its stash
+ * (fix round 1, I-5: Change to → To-do brings them back); a project's sessions go (Undo keeps
+ * them). Book fields put away earlier come back (I-3). A done to-do is a Read book finished the
+ * day it was done (I-4); a book keeps its status; anything else starts as Want to read. A book
+ * an older device moved to another area comes home to Mind. Returns the row as it was (for
+ * Undo), or undefined when there was nothing to change.
+ */
+export async function makeBook(id: string, today: ISODate): Promise<Item | undefined> {
+  return db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item || BINNED.includes(item.status)) return undefined;
+    let next: Item = { ...item, kind: "idea", areaId: BOOK_AREA, touchedAt: today };
+    delete next.sessions;
+    if (!isBook(item)) {
+      const wasDone = item.status === "done";
+      const doneOn = item.completedAt;
+      const task = takeFields(next, TASK_STASH_FIELDS);
+      if (wasDone) next.status = "open"; // a book is on the list; Read says it's finished
+      next = withStash(next, "task", { ...item.stash?.task, ...task });
+      // Book fields put away earlier come back; any still on the row (an older device) win.
+      putBack(next, item.stash?.book ?? {}, BOOK_FIELDS);
+      next = withStash(next, "book", undefined);
+      if (wasDone) {
+        next.bookStatus = "read";
+        next.finishedOn = doneOn ?? today;
+      }
+      next.bookStatus ??= "want";
+    }
+    await db.items.put(next);
+    return item;
+  });
+}
+
+/** A book's status. Marking it Read sets finishedOn (today, unless it was already Read); leaving Read clears it. */
+export async function setBookStatus(id: string, status: BookStatus, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    const { finishedOn, ...rest } = item;
+    const next: Item = { ...rest, bookStatus: status, touchedAt: today };
+    if (status === "read") next.finishedOn = item.bookStatus === "read" && finishedOn ? finishedOn : today;
+    await db.items.put(next);
+  });
+}
+
+/** Edits a book's author, pages, page reached and link (only the keys present). */
+export async function updateBook(id: string, patch: BookPatch, today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) throw new Error("that book does not exist");
+    await db.items.put({ ...withBookPatch(item, patch), touchedAt: today });
+  });
+}
+
+/**
+ * A book stops being one (fix round 1, I-3: nothing is deleted): its status, author, pages,
+ * page, finished date and link are put away in the stash, so Change to → Book brings them
+ * back. To a to-do, the to-do fields it had before it was a book come back (done again if it
+ * was done). To a project, in the same write: a to-do with unnamed sessions and no repeat.
+ */
+export async function unBook(id: string, to: Item["kind"] | "project", today: ISODate): Promise<void> {
+  await db.transaction("rw", db.items, async () => {
+    const item = await db.items.get(id);
+    if (!item) return;
+    let next: Item = { ...item, kind: to === "idea" ? "idea" : "task", touchedAt: today };
+    const book = takeFields(next, BOOK_FIELDS);
+    next = withStash(next, "book", { ...item.stash?.book, ...book });
+    if (to !== "idea") {
+      putBack(next, item.stash?.task ?? {}, TASK_STASH_FIELDS);
+      next = withStash(next, "task", undefined);
+      if (next.completedAt && to === "task") next.status = "done";
+    }
+    if (to === "project") {
+      delete next.recur; // a project does not repeat
+      delete next.completedAt;
+      next.status = "open";
+      next.sessions = item.sessions ?? newSessions(DEFAULT_SESSIONS);
+    }
+    await db.items.put(next);
+  });
 }

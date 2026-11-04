@@ -192,10 +192,10 @@ describe("InboxPage", () => {
 
 function renderShell() {
   return rtlRender(
-    <MemoryRouter initialEntries={["/today"]}>
+    <MemoryRouter initialEntries={["/"]}>
       <Routes>
         <Route element={<AppShell />}>
-          <Route path="/today" element={<h1>Today page</h1>} />
+          <Route path="/" element={<h1>Home page</h1>} />
           <Route path="/inbox" element={<InboxPage today={TODAY} />} />
         </Route>
       </Routes>
@@ -220,7 +220,7 @@ describe("double actions and refresh", () => {
 describe("AppShell additions", () => {
   it("Inbox link is always in the shell; the count shows only when inbox items exist", async () => {
     const first = renderShell();
-    expect(await screen.findByText("Today page")).toBeInTheDocument();
+    expect(await screen.findByText("Home page")).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 50));
     const plain = screen.getByRole("link", { name: "Inbox" });
     expect(plain).toHaveAttribute("href", "/inbox");
@@ -254,12 +254,12 @@ describe("AppShell additions", () => {
     expect(screen.queryByRole("link", { name: /Inbox \(/ })).toBeNull();
   });
 
-  it("Sidebar still shows exactly fourteen items (no Inbox) with the shell rendered", async () => {
+  it("Sidebar still shows exactly thirteen items (no Inbox, no Today) with the shell rendered", async () => {
     await createItem({ kind: "task", title: "Loose end", areaId: "inbox", priority: 2 }, TODAY);
     renderShell();
     await screen.findByRole("link", { name: "Inbox (1)" });
     const nav = within(document.querySelector(".sidebar") as HTMLElement).getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(14);
+    expect(within(nav).getAllByRole("link")).toHaveLength(13);
     expect(within(nav).queryByText(/Inbox/)).toBeNull();
   });
 });
