@@ -3849,6 +3849,182 @@
     "h": 16
    },
    "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2800,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2816,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2832,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2848,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2864,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2880,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2896,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "bonus / Area cleared / area cleared",
+   "frame": {
+    "x": 2912,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 16,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 16,
+    "h": 16
+   },
+   "duration": 100
   }
  ],
  "meta": {
@@ -3857,7 +4033,7 @@
   "image": "stickers.png",
   "format": "RGBA8888",
   "size": {
-   "w": 2800,
+   "w": 2928,
    "h": 16
   },
   "scale": "1",
@@ -4041,6 +4217,13 @@
     "name": "lane:Hedgerow",
     "from": 163,
     "to": 174,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "bonus:Area cleared",
+    "from": 175,
+    "to": 182,
     "direction": "forward",
     "color": "#000000ff"
    }

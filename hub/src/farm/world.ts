@@ -6,7 +6,7 @@
 import { tickedOffToday, todayList } from "../domain/triage";
 import type { Goal, ISODate, Item } from "../domain/types";
 import rawSpots from "../assets/farm/sticker-spots.json";
-import { AREA_CLEARED, COLLECTION, GROUPS, MANIFEST, REPEATS, STICKERS, STICKER_BY_KEY, asset, stickersIn, type BookPage } from "./catalogue";
+import { COLLECTION, GROUPS, MANIFEST, REPEATS, STICKERS, STICKER_BY_KEY, asset, stickersIn, type BookPage } from "./catalogue";
 import { CHARACTERS, type CharacterId } from "./state";
 
 // ---- characters ----------------------------------------------------------------------------
@@ -131,16 +131,8 @@ export function bedStageEarned(area: string, earned: ReadonlySet<string>): numbe
 
 // ---- the book's spreads -----------------------------------------------------------------------
 
-/**
- * The book's pages from the pack; the bonus "Area cleared" gets a PLACEHOLDER slot on the back
- * endpaper (page 16, no slots of its own) until the sprite designer places it.
- */
-export const BONUS_SLOT = { page: 16, x: 48, y: 66 };
-export const PAGES: readonly BookPage[] = (asset("book-pages") as unknown as { pages: BookPage[] }).pages.map((p) =>
-  p.page === BONUS_SLOT.page
-    ? { ...p, slots: [...p.slots, { sticker: AREA_CLEARED.key, name: AREA_CLEARED.name, x: BONUS_SLOT.x, y: BONUS_SLOT.y, set: AREA_CLEARED.set, milestone: 1 }] }
-    : p,
-);
+/** The book's 16 pages from the pack (the last is the Bonus page). */
+export const PAGES: readonly BookPage[] = (asset("book-pages") as unknown as { pages: BookPage[] }).pages;
 
 export interface Spread { index: number; pages: [BookPage | null, BookPage | null]; zones: string[] }
 
@@ -150,7 +142,7 @@ export const SPREADS: readonly Spread[] = [
   ...Array.from({ length: PAGES.length / 2 }, (_, i) => {
     const l = PAGES[2 * i]!;
     const r = PAGES[2 * i + 1]!;
-    return { index: i + 1, pages: [l, r] as [BookPage, BookPage], zones: [...new Set([l.group, r.group])].filter((g): g is string => !!g) };
+    return { index: i + 1, pages: [l, r] as [BookPage, BookPage], zones: [...new Set([l.group, r.group])].filter((g): g is string => !!g && GROUPS.includes(g)) };
   }),
 ];
 

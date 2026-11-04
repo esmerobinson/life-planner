@@ -1,0 +1,112 @@
+{
+ "frames": [
+  {
+   "filename": "badge-count-examples 0.aseprite",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 40,
+    "h": 26
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 40,
+    "h": 26
+   },
+   "sourceSize": {
+    "w": 40,
+    "h": 26
+   },
+   "duration": 100
+  },
+  {
+   "filename": "badge-count-examples 1.aseprite",
+   "frame": {
+    "x": 40,
+    "y": 0,
+    "w": 40,
+    "h": 26
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 40,
+    "h": 26
+   },
+   "sourceSize": {
+    "w": 40,
+    "h": 26
+   },
+   "duration": 100
+  },
+  {
+   "filename": "badge-count-examples 2.aseprite",
+   "frame": {
+    "x": 80,
+    "y": 0,
+    "w": 40,
+    "h": 26
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 40,
+    "h": 26
+   },
+   "sourceSize": {
+    "w": 40,
+    "h": 26
+   },
+   "duration": 100
+  }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3",
+  "image": "badge-count-examples.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 120,
+   "h": 26
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "example-x2",
+    "from": 0,
+    "to": 0,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "example-x12",
+    "from": 1,
+    "to": 1,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "example-x100",
+    "from": 2,
+    "to": 2,
+    "direction": "forward",
+    "color": "#000000ff"
+   }
+  ],
+  "layers": [
+   {
+    "name": "Layer 1",
+    "opacity": 255,
+    "blendMode": "normal"
+   }
+  ],
+  "slices": []
+ }
+}

@@ -101,11 +101,12 @@ function habitMonths(h: Item, start: ISODate, today: ISODate): { month: string; 
 /**
  * "Area cleared" (Esme, 2026-11-04): for each area and each calendar month since the start that
  * has ENDED, every to-do due or planned in that month (from the start) was done by the month's
- * end. Areas with nothing due that month don't count. Returns how many (area, month) pairs, so
- * repeats are derived from the data (never stored increments: no double counting across devices).
+ * end. Areas with nothing due that month don't count. Returns, per area, how many months were
+ * cleared, so repeats are derived from the data (never stored increments: no double counting
+ * across devices).
  */
-export function areasCleared(items: readonly Item[], start: ISODate, today: ISODate): number {
-  let n = 0;
+export function areaClears(items: readonly Item[], start: ISODate, today: ISODate): Record<string, number> {
+  const out: Record<string, number> = {};
   for (const month of monthsBetween(start, today)) {
     const [y, m] = month.split("-").map(Number) as [number, number];
     const last = endOfMonth(y, m);
@@ -117,11 +118,15 @@ export function areasCleared(items: readonly Item[], start: ISODate, today: ISOD
       const due = items.filter(
         (it) => kept(it) && isSortedTask(it) && !isHabit(it) && it.areaId === area && (inMonth(it.due) || inMonth(it.pinnedDate)),
       );
-      if (due.length > 0 && due.every((it) => doneTodo(it) && it.completedAt! <= last)) n++;
+      if (due.length > 0 && due.every((it) => doneTodo(it) && it.completedAt! <= last)) out[area] = (out[area] ?? 0) + 1;
     }
   }
-  return n;
+  return out;
 }
+
+/** All areas' cleared months together. */
+export const areasCleared = (items: readonly Item[], start: ISODate, today: ISODate): number =>
+  Object.values(areaClears(items, start, today)).reduce((a, b) => a + b, 0);
 
 /** The month after "YYYY-MM". */
 const nextMonth = (m: string) => {
@@ -202,7 +207,8 @@ export function counters(input: EarningInput): Counters {
   }
   set("habit-months", goodMonths);
   set("habit-full-month", fullMonths);
-  set("area-cleared", areasCleared(items, start, today));
+  const clears = areaClears(items, start, today);
+  for (const area of AREA_IDS) if (area !== "inbox") set(`cleared:${area}`, clears[area] ?? 0);
   set("habit-run", longestRun);
   set("habit-after-week-off", habits.some((h) => gaps(days(h.doneDates ?? []), 7) > 0) ? 1 : 0);
 

@@ -34,10 +34,10 @@ const GROUP_SIZES = { beds: 56, meadow: 19, barnyard: 12, orchard: 9, glasshouse
 describe("the 170 stickers match game design v2", () => {
   it("175 stickers (v2's 170 and the five Seasons kept) in 10 groups", () => {
     expect(COLLECTION).toHaveLength(175);
-    expect(STICKERS.filter((s) => s.bonus).map((s) => s.key)).toEqual(["area-cleared"]); // outside the collection
+    expect(STICKERS.filter((s) => s.bonus)).toHaveLength(8); // Area cleared, one per area: outside the collection
     expect(GROUPS).toEqual(Object.keys(GROUP_SIZES));
     for (const [g, n] of Object.entries(GROUP_SIZES)) expect(stickersIn(g)).toHaveLength(n);
-    expect(new Set(STICKERS.map((s) => s.key)).size).toBe(176);
+    expect(new Set(STICKERS.map((s) => s.key)).size).toBe(183);
   });
 
   it.each(Object.entries(V2))("%s: source and milestones", (set, [source, milestones]) => {

@@ -375,7 +375,7 @@
    "duration": 100
   },
   {
-   "filename": "endpaper-back",
+   "filename": "page-16",
    "frame": {
     "x": 1972,
     "y": 0,
@@ -528,7 +528,7 @@
     "color": "#000000ff"
    },
    {
-    "name": "endpaper-back",
+    "name": "page-16",
     "from": 17,
     "to": 17,
     "direction": "forward",

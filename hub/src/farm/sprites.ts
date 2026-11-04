@@ -245,13 +245,29 @@ export function drawSticker(
   ctx.restore();
 }
 
+const BADGE = asset("badge-count") as unknown as {
+  height: number; left_w: number; right_w: number; text_offset: [number, number]; show_from: number;
+  slices: { left_cap: [number, number]; middle_column: number; right_cap: [number, number] };
+};
+
 /**
- * A repeat count ("×N" for Full month and Area cleared; Esme, 2026-11-04) at the bottom right of
- * a 16px sticker at (x, y), in the pixel font. The font has no "×", so it reads "X3" (PLACEHOLDER
- * glyph until the sprite designer adds one).
+ * The ×N badge (badge-count, Esme, 2026-11-04) on a repeatable sticker whose top-left is (x, y):
+ * the left cap (with its ×), the middle column repeated for the digits' width, the right cap; the
+ * digits in the pixel font; its bottom-right pixel at (x + 17, y + 17). Shown from ×2.
  */
-export function drawCount(ctx: CanvasRenderingContext2D, font: HTMLImageElement, n: number, x: number, y: number): void {
-  if (n < 2) return;
-  const text = `X${n}`;
-  drawText(ctx, font, text, x + 17 - textWidth(text), y + 12);
+export function drawBadge(ctx: CanvasRenderingContext2D, sheets: Sheets, n: number, x: number, y: number): void {
+  const img = sheets["badge-count"];
+  const font = sheets["font-small"];
+  if (n < BADGE.show_from || !img || !font) return;
+  const digits = String(n);
+  const tw = textWidth(digits);
+  const w = BADGE.left_w + tw + BADGE.right_w;
+  const left = Math.round(x) + 18 - w;
+  const top = Math.round(y) + 18 - BADGE.height;
+  const [l0] = BADGE.slices.left_cap;
+  const [r0] = BADGE.slices.right_cap;
+  ctx.drawImage(img, l0, 0, BADGE.left_w, BADGE.height, left, top, BADGE.left_w, BADGE.height);
+  for (let i = 0; i < tw; i++) ctx.drawImage(img, BADGE.slices.middle_column, 0, 1, BADGE.height, left + BADGE.left_w + i, top, 1, BADGE.height);
+  ctx.drawImage(img, r0, 0, BADGE.right_w, BADGE.height, left + BADGE.left_w + tw, top, BADGE.right_w, BADGE.height);
+  drawText(ctx, font, digits, left + BADGE.text_offset[0], top + BADGE.text_offset[1]);
 }

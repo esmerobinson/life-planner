@@ -7,12 +7,12 @@
 // manifest's highlight rule and the zone's outline is drawn on top.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { MANIFEST, STICKER_BY_KEY, asset } from "./catalogue";
+import { MANIFEST, REPEATS, STICKER_BY_KEY, asset } from "./catalogue";
 import type { FarmView } from "./FarmContext";
 import { useTicker } from "./hooks";
 import { IDLE_FRAME_MS, POP_FRAME_MS, reducedMotion } from "./motion";
 import {
-  PLACEHOLDER, ctx2d, dimColour, dimmedSheet, drawCharacter, drawCount, drawFrame, drawSticker, poseFrames, useSheets, type Sheets,
+  PLACEHOLDER, ctx2d, dimColour, dimmedSheet, drawBadge, drawCharacter, drawFrame, drawSticker, poseFrames, useSheets, type Sheets,
 } from "./sprites";
 import { CHARACTERS, type CharacterId } from "./state";
 import { ACCESSORIES, BED_ORDER, BED_POSITIONS, NAMES, SPOTS, bedStageEarned, repeatCount } from "./world";
@@ -23,7 +23,7 @@ export const FARM_H = BASE.frame[1];
 const MASKS = asset("farm-zone-masks") as unknown as { zones: string[]; bboxes: Record<string, [number, number, number, number]> };
 const DOOR = asset("farm-museum-door") as unknown as { position: [number, number]; frame: [number, number] };
 const SHEETS = [
-  "farm-base", "farm-zone-masks", "farm-zone-outlines", "farm-beds", "farm-museum-door", "stickers", "fx-sparkle", "font-small",
+  "farm-base", "farm-zone-masks", "farm-zone-outlines", "farm-beds", "farm-museum-door", "stickers", "fx-sparkle", "font-small", "badge-count",
   ...CHARACTERS.map((c) => `char-${c}`), ...CHARACTERS.map((c) => `acc-${c}`),
 ];
 
@@ -130,6 +130,8 @@ export function FarmScene({ view, phone, highlight, popKey, onZone, onCharacter 
   const [avail, setAvail] = useState(FARM_W * 2);
   const tick = useTicker(IDLE_FRAME_MS);
   const [pop, setPop] = useState<{ key: string; frame: number } | null>(null);
+  /** The repeatable placed sticker she's pointing at or tapped (its ×N badge shows). */
+  const [pointed, setPointed] = useState<string | null>(null);
   const scale = phone ? 2 : Math.max(1, Math.min(2, Math.floor(avail / FARM_W)));
 
   useLayoutEffect(() => {
@@ -190,9 +192,14 @@ export function FarmScene({ view, phone, highlight, popKey, onZone, onCharacter 
       const { spot, st, key } = p;
       things.push({
         z: spot.z,
+        draw: () => drawSticker(ctx, dimmed(spot.zone) ? dimSheets : stickerSheets, st, "sticker", spot.x, spot.y, spot.flip),
+      });
+      // The ×N badge only while she points at or taps that sticker (coordinator ruling: it would
+      // clutter the farm and cover the sign's bow), just above it (same z + 0.5).
+      if (key === pointed) things.push({ z: spot.z + 0.5, draw: () => drawBadge(ctx, sheets, repeatCount(key, view.counters), spot.x, spot.y) });
+      things.push({
+        z: spot.z,
         draw: () => {
-          drawSticker(ctx, dimmed(spot.zone) ? dimSheets : stickerSheets, st, "sticker", spot.x, spot.y, spot.flip);
-          drawCount(ctx, sheets["font-small"]!, repeatCount(key, view.counters), spot.x, spot.y);
           if (spot.placeholder) {
             // PLACEHOLDER SPOT (no designed position yet): an obviously wrong magenta mark.
             ctx.fillStyle = PLACEHOLDER;
@@ -216,7 +223,16 @@ export function FarmScene({ view, phone, highlight, popKey, onZone, onCharacter 
     }
     const spot = pop && SPOTS.get(pop.key);
     if (pop && spot && spot.scene === "farm") drawFrame(ctx, sheets["fx-sparkle"]!, 30, 30, pop.frame, spot.x + 8 - 15, spot.y + 8 - 15);
-  }, [sheets, layer, tick, placed, view.arrived, view.state.outfits, view.unlocked, view.counters, highlight, pop]);
+  }, [sheets, layer, tick, placed, view.arrived, view.state.outfits, view.unlocked, view.counters, highlight, pop, pointed]);
+
+  /** The placed repeatable sticker under the pointer (farm pixels), if any. */
+  const stickerAt = (e: React.PointerEvent<HTMLElement>): string | null => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - r.left) / scale;
+    const y = (e.clientY - r.top) / scale;
+    const hit = placed.filter(({ key, spot }) => REPEATS[key] && x >= spot.x && x < spot.x + 16 && y >= spot.y && y < spot.y + 16);
+    return hit.sort((a, b) => b.spot.z - a.spot.z)[0]?.key ?? null;
+  };
 
   // On the phone, pan to the highlighted part.
   useEffect(() => {
@@ -230,7 +246,13 @@ export function FarmScene({ view, phone, highlight, popKey, onZone, onCharacter 
 
   return (
     <div className="farm-scene" ref={scroller} data-awake={[...view.awake].sort().join(" ")} data-highlight={highlight.join(" ")}>
-      <div className="farm-scene-layer" style={{ width: FARM_W * scale, height: FARM_H * scale }}>
+      <div
+        className="farm-scene-layer"
+        style={{ width: FARM_W * scale, height: FARM_H * scale }}
+        onPointerMove={(e) => setPointed(stickerAt(e))}
+        onPointerDown={(e) => setPointed(stickerAt(e))}
+        onPointerLeave={() => setPointed(null)}
+      >
         <canvas ref={canvas} width={FARM_W} height={FARM_H} className="farm-px" style={{ width: FARM_W * scale, height: FARM_H * scale }}
           aria-label={`The farm. Awake: ${view.awake.size ? [...view.awake].join(", ") : "nothing yet"}.`} role="img" />
         {MASKS.zones.map((z) => {

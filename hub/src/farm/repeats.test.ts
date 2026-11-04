@@ -1,6 +1,6 @@
 import { addDays, weekdayOf } from "../domain/dates";
 import type { ISODate, Item } from "../domain/types";
-import { AREA_CLEARED, COLLECTION, STICKER_BY_KEY } from "./catalogue";
+import { COLLECTION, STICKERS, STICKER_BY_KEY } from "./catalogue";
 import { areasCleared, counters, derivedEarned, type EarningInput } from "./earning";
 import { arrivedAt, repeatCount } from "./world";
 
@@ -58,17 +58,24 @@ describe("Area cleared", () => {
     expect(areasCleared(items as unknown as Item[], START, "2026-06-15")).toBe(cleared);
   });
 
-  it("is one bonus sticker with ×N, outside the collection: it never adds to the 175 or brings anyone earlier", () => {
+  it("is eight bonus stickers, one per area, each with its own ×N; outside the 175, so they bring no one earlier", () => {
+    const bonus = STICKERS.filter((s) => s.bonus);
+    expect(bonus.map((s) => s.key)).toEqual(
+      ["mind", "writing", "art", "content", "body", "tech", "production", "admin"].map((a) => `cleared-${a}`),
+    );
+    expect(bonus.every((s) => s.group === "bonus" && s.rule.at === 1)).toBe(true);
+    expect(COLLECTION).toHaveLength(175);
     const items = [due("art", "2026-02-10", "2026-02-10"), due("art", "2026-03-10", "2026-03-10"), due("body", "2026-03-11", "2026-03-11")];
     const c = counters(input({ items }));
-    expect(derivedEarned(c)).toContain(AREA_CLEARED.key);
-    expect(repeatCount(AREA_CLEARED.key, c)).toBe(3);
-    expect(COLLECTION.some((s) => s.key === AREA_CLEARED.key)).toBe(false);
-    expect(STICKER_BY_KEY.get(AREA_CLEARED.key)?.placeholderArt).toBe(true);
     const earned = derivedEarned(c);
+    expect(earned).toEqual(expect.arrayContaining(["cleared-art", "cleared-body"]));
+    expect(earned).not.toContain("cleared-mind");
+    expect(repeatCount("cleared-art", c)).toBe(2);
+    expect(repeatCount("cleared-body", c)).toBe(1);
+    expect(STICKER_BY_KEY.get("cleared-art")?.name).toBe("Art: area cleared");
     const collected = COLLECTION.filter((s) => earned.includes(s.key)).length;
-    expect(collected).toBe(earned.length - 1); // Area cleared (and its ×3) isn't part of the count arrivals use
-    expect(arrivedAt(collected)).toEqual(arrivedAt(earned.filter((k) => k !== AREA_CLEARED.key).length));
+    expect(collected).toBe(earned.length - 2); // the two Area cleared aren't part of the count arrivals use
+    expect(arrivedAt(collected)).toEqual(arrivedAt(earned.filter((k) => !k.startsWith("cleared-")).length));
   });
 
   it("is derived, so the same data on two devices gives the same count (no increments stored)", () => {

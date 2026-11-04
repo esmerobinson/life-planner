@@ -544,7 +544,7 @@
     {
      "code": "A13",
      "name": "Golden crown",
-     "unlock": "170 stickers"
+     "unlock": "175 stickers (the whole collection)"
     }
    ]
   },
@@ -760,7 +760,7 @@
     {
      "code": "A13",
      "name": "Golden crown",
-     "unlock": "170 stickers"
+     "unlock": "175 stickers (the whole collection)"
     }
    ]
   },
@@ -976,7 +976,7 @@
     {
      "code": "A13",
      "name": "Golden crown",
-     "unlock": "170 stickers"
+     "unlock": "175 stickers (the whole collection)"
     }
    ]
   },
@@ -1192,7 +1192,7 @@
     {
      "code": "A13",
      "name": "Golden crown",
-     "unlock": "170 stickers"
+     "unlock": "175 stickers (the whole collection)"
     }
    ]
   },
@@ -1408,7 +1408,7 @@
     {
      "code": "A13",
      "name": "Golden crown",
-     "unlock": "170 stickers"
+     "unlock": "175 stickers (the whole collection)"
     }
    ]
   },
@@ -1624,7 +1624,7 @@
     {
      "code": "A13",
      "name": "Golden crown",
-     "unlock": "170 stickers"
+     "unlock": "175 stickers (the whole collection)"
     }
    ]
   },
@@ -1743,7 +1743,7 @@
      "to": 16
     },
     {
-     "name": "endpaper-back",
+     "name": "page-16",
      "from": 17,
      "to": 17
     }
@@ -3471,10 +3471,82 @@
     {
      "page": 16,
      "side": "right",
-     "group": null,
-     "slots": [],
-     "labels": [],
-     "note": "back endpaper"
+     "group": "bonus",
+     "slots": [
+      {
+       "sticker": "cleared-mind",
+       "name": "area cleared",
+       "x": 9,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-writing",
+       "name": "area cleared",
+       "x": 28,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-art",
+       "name": "area cleared",
+       "x": 47,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-content",
+       "name": "area cleared",
+       "x": 66,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-body",
+       "name": "area cleared",
+       "x": 85,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-tech",
+       "name": "area cleared",
+       "x": 9,
+       "y": 55,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-production",
+       "name": "area cleared",
+       "x": 28,
+       "y": 55,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-admin",
+       "name": "area cleared",
+       "x": 47,
+       "y": 55,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Area cleared",
+       "x": 10,
+       "y": 28,
+       "count_x": 71,
+       "earned_by": "every task due in that area done in a month (repeatable: xN badge)"
+      }
+     ]
     }
    ],
    "contents_rows": [
@@ -3486,68 +3558,75 @@
     },
     {
      "group": "meadow",
-     "y": 40,
+     "y": 39,
      "count_right_x": 102,
      "page": 5
     },
     {
      "group": "barnyard",
-     "y": 50,
+     "y": 48,
      "count_right_x": 102,
      "page": 7
     },
     {
      "group": "orchard",
-     "y": 60,
+     "y": 57,
      "count_right_x": 102,
      "page": 8
     },
     {
      "group": "glasshouse",
-     "y": 70,
+     "y": 66,
      "count_right_x": 102,
      "page": 9
     },
     {
      "group": "pond",
-     "y": 80,
+     "y": 75,
      "count_right_x": 102,
      "page": 10
     },
     {
      "group": "aquarium",
-     "y": 90,
+     "y": 84,
      "count_right_x": 102,
      "page": 11
     },
     {
      "group": "farmhouse",
-     "y": 100,
+     "y": 93,
      "count_right_x": 102,
      "page": 12
     },
     {
      "group": "museum",
-     "y": 110,
+     "y": 102,
      "count_right_x": 102,
      "page": 13
     },
     {
      "group": "lane",
-     "y": 120,
+     "y": 111,
      "count_right_x": 102,
      "page": 14
+    },
+    {
+     "group": "bonus",
+     "y": 120,
+     "count_right_x": 102,
+     "page": 16,
+     "count_format": "{n} (bonus, not in the total)"
     }
    ],
    "contents_total_plate": {
     "box": [
      24,
-     131,
+     130,
      88,
-     142
+     141
     ],
     "text_centre_x": 56,
-    "text_y": 135,
+    "text_y": 134,
     "colour": "#df7e6f",
     "format": "{n} OF 175",
     "font": "font-small",
@@ -4017,7 +4096,7 @@
     16,
     16
    ],
-   "frames": 175,
+   "frames": 183,
    "tags": [
     {
      "name": "beds:Mind bed",
@@ -4148,6 +4227,11 @@
      "name": "lane:Hedgerow",
      "from": 163,
      "to": 174
+    },
+    {
+     "name": "bonus:Area cleared",
+     "from": 175,
+     "to": 182
     }
    ],
    "display": "2x in the nook and monthly review (32 px); book scale in the book",
@@ -4161,7 +4245,9 @@
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 1,
@@ -4171,7 +4257,9 @@
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 2,
@@ -4181,7 +4269,9 @@
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 3,
@@ -4191,7 +4281,9 @@
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 4,
@@ -4201,7 +4293,9 @@
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 5,
@@ -4211,7 +4305,9 @@
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 6,
@@ -4221,7 +4317,9 @@
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 7,
@@ -4231,7 +4329,9 @@
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 8,
@@ -4241,7 +4341,9 @@
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 9,
@@ -4251,7 +4353,9 @@
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 10,
@@ -4261,7 +4365,9 @@
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 11,
@@ -4271,7 +4377,9 @@
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 12,
@@ -4281,7 +4389,9 @@
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 13,
@@ -4291,7 +4401,9 @@
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 14,
@@ -4301,7 +4413,9 @@
      "set": "Art bed",
      "earned_by": "to-dos in Art",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 15,
@@ -4311,7 +4425,9 @@
      "set": "Art bed",
      "earned_by": "to-dos in Art",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 16,
@@ -4321,7 +4437,9 @@
      "set": "Art bed",
      "earned_by": "to-dos in Art",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 17,
@@ -4331,7 +4449,9 @@
      "set": "Art bed",
      "earned_by": "to-dos in Art",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 18,
@@ -4341,7 +4461,9 @@
      "set": "Art bed",
      "earned_by": "to-dos in Art",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 19,
@@ -4351,7 +4473,9 @@
      "set": "Art bed",
      "earned_by": "to-dos in Art",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 20,
@@ -4361,7 +4485,9 @@
      "set": "Art bed",
      "earned_by": "to-dos in Art",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 21,
@@ -4371,7 +4497,9 @@
      "set": "Content bed",
      "earned_by": "to-dos in Content",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 22,
@@ -4381,7 +4509,9 @@
      "set": "Content bed",
      "earned_by": "to-dos in Content",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 23,
@@ -4391,7 +4521,9 @@
      "set": "Content bed",
      "earned_by": "to-dos in Content",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 24,
@@ -4401,7 +4533,9 @@
      "set": "Content bed",
      "earned_by": "to-dos in Content",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 25,
@@ -4411,7 +4545,9 @@
      "set": "Content bed",
      "earned_by": "to-dos in Content",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 26,
@@ -4421,7 +4557,9 @@
      "set": "Content bed",
      "earned_by": "to-dos in Content",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 27,
@@ -4431,7 +4569,9 @@
      "set": "Content bed",
      "earned_by": "to-dos in Content",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 28,
@@ -4441,7 +4581,9 @@
      "set": "Body bed",
      "earned_by": "to-dos in Body",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 29,
@@ -4451,7 +4593,9 @@
      "set": "Body bed",
      "earned_by": "to-dos in Body",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 30,
@@ -4461,7 +4605,9 @@
      "set": "Body bed",
      "earned_by": "to-dos in Body",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 31,
@@ -4471,7 +4617,9 @@
      "set": "Body bed",
      "earned_by": "to-dos in Body",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 32,
@@ -4481,7 +4629,9 @@
      "set": "Body bed",
      "earned_by": "to-dos in Body",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 33,
@@ -4491,7 +4641,9 @@
      "set": "Body bed",
      "earned_by": "to-dos in Body",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 34,
@@ -4501,7 +4653,9 @@
      "set": "Body bed",
      "earned_by": "to-dos in Body",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 35,
@@ -4511,7 +4665,9 @@
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 36,
@@ -4521,7 +4677,9 @@
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 37,
@@ -4531,7 +4689,9 @@
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 38,
@@ -4541,7 +4701,9 @@
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 39,
@@ -4551,7 +4713,9 @@
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 40,
@@ -4561,7 +4725,9 @@
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 41,
@@ -4571,7 +4737,9 @@
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 42,
@@ -4581,7 +4749,9 @@
      "set": "Production bed",
      "earned_by": "to-dos in Production",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 43,
@@ -4591,7 +4761,9 @@
      "set": "Production bed",
      "earned_by": "to-dos in Production",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 44,
@@ -4601,7 +4773,9 @@
      "set": "Production bed",
      "earned_by": "to-dos in Production",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 45,
@@ -4611,7 +4785,9 @@
      "set": "Production bed",
      "earned_by": "to-dos in Production",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 46,
@@ -4621,7 +4797,9 @@
      "set": "Production bed",
      "earned_by": "to-dos in Production",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 47,
@@ -4631,7 +4809,9 @@
      "set": "Production bed",
      "earned_by": "to-dos in Production",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 48,
@@ -4641,7 +4821,9 @@
      "set": "Production bed",
      "earned_by": "to-dos in Production",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 49,
@@ -4651,7 +4833,9 @@
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 50,
@@ -4661,7 +4845,9 @@
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 51,
@@ -4671,7 +4857,9 @@
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 52,
@@ -4681,7 +4869,9 @@
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 53,
@@ -4691,7 +4881,9 @@
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 54,
@@ -4701,7 +4893,9 @@
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 55,
@@ -4711,7 +4905,9 @@
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 56,
@@ -4721,7 +4917,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 57,
@@ -4731,7 +4929,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 58,
@@ -4741,7 +4941,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 5,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 59,
@@ -4751,7 +4953,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 60,
@@ -4761,7 +4965,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 15,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 61,
@@ -4771,7 +4977,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 62,
@@ -4781,7 +4989,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 40,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 63,
@@ -4791,7 +5001,9 @@
      "set": "Bee things",
      "earned_by": "days Today's list finished",
      "milestone": 60,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 64,
@@ -4801,7 +5013,9 @@
      "set": "Hedge flowers",
      "earned_by": "weeks with a habit ticked",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 65,
@@ -4811,7 +5025,9 @@
      "set": "Hedge flowers",
      "earned_by": "weeks with a habit ticked",
      "milestone": 4,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 66,
@@ -4821,7 +5037,9 @@
      "set": "Hedge flowers",
      "earned_by": "weeks with a habit ticked",
      "milestone": 8,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 67,
@@ -4831,7 +5049,9 @@
      "set": "Hedge flowers",
      "earned_by": "weeks with a habit ticked",
      "milestone": 12,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 68,
@@ -4841,7 +5061,9 @@
      "set": "Hedge flowers",
      "earned_by": "weeks with a habit ticked",
      "milestone": 26,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 69,
@@ -4851,7 +5073,9 @@
      "set": "Hedge flowers",
      "earned_by": "weeks with a habit ticked",
      "milestone": 52,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 70,
@@ -4861,7 +5085,9 @@
      "set": "Seasons kept",
      "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
      "milestone": "100% month",
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 71,
@@ -4871,7 +5097,9 @@
      "set": "Seasons kept",
      "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
      "milestone": "2 months 80%+",
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 72,
@@ -4881,7 +5109,9 @@
      "set": "Seasons kept",
      "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
      "milestone": "3 months 80%+",
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 73,
@@ -4891,7 +5121,9 @@
      "set": "Seasons kept",
      "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
      "milestone": "6 months 80%+",
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 74,
@@ -4901,7 +5133,9 @@
      "set": "Seasons kept",
      "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
      "milestone": "12 months 80%+",
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 75,
@@ -4911,7 +5145,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 76,
@@ -4921,7 +5157,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 10,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 77,
@@ -4931,7 +5169,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 25,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 78,
@@ -4941,7 +5181,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 50,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 79,
@@ -4951,7 +5193,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 100,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 80,
@@ -4961,7 +5205,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 150,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 81,
@@ -4971,7 +5217,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 200,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 82,
@@ -4981,7 +5229,9 @@
      "set": "Animals",
      "earned_by": "habit sessions",
      "milestone": 300,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 83,
@@ -4991,7 +5241,9 @@
      "set": "Barn things",
      "earned_by": "habit months finished",
      "milestone": 1,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 84,
@@ -5001,7 +5253,9 @@
      "set": "Barn things",
      "earned_by": "habit months finished",
      "milestone": 3,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 85,
@@ -5011,7 +5265,9 @@
      "set": "Barn things",
      "earned_by": "habit months finished",
      "milestone": 6,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 86,
@@ -5021,7 +5277,9 @@
      "set": "Barn things",
      "earned_by": "habit months finished",
      "milestone": 12,
-     "tier": "everyday"
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 87,
@@ -5031,7 +5289,9 @@
      "set": "Fruit trees",
      "earned_by": "monthly goals hit",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 88,
@@ -5041,7 +5301,9 @@
      "set": "Fruit trees",
      "earned_by": "monthly goals hit",
      "milestone": 2,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 89,
@@ -5051,7 +5313,9 @@
      "set": "Fruit trees",
      "earned_by": "monthly goals hit",
      "milestone": 4,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 90,
@@ -5061,7 +5325,9 @@
      "set": "Fruit trees",
      "earned_by": "monthly goals hit",
      "milestone": 6,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 91,
@@ -5071,7 +5337,9 @@
      "set": "Fruit trees",
      "earned_by": "monthly goals hit",
      "milestone": 9,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 92,
@@ -5081,7 +5349,9 @@
      "set": "Fruit trees",
      "earned_by": "monthly goals hit",
      "milestone": 12,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 93,
@@ -5091,7 +5361,9 @@
      "set": "Fruit trees",
      "earned_by": "monthly goals hit",
      "milestone": 18,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 94,
@@ -5101,7 +5373,9 @@
      "set": "Under the trees",
      "earned_by": "whole goals completed",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 95,
@@ -5111,7 +5385,9 @@
      "set": "Under the trees",
      "earned_by": "whole goals completed",
      "milestone": 3,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 96,
@@ -5121,7 +5397,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 97,
@@ -5131,7 +5409,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 3,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 98,
@@ -5141,7 +5421,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 5,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 99,
@@ -5151,7 +5433,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 10,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 100,
@@ -5161,7 +5445,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 15,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 101,
@@ -5171,7 +5457,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 25,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 102,
@@ -5181,7 +5469,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 40,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 103,
@@ -5191,7 +5481,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 50,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 104,
@@ -5201,7 +5493,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 75,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 105,
@@ -5211,7 +5505,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 100,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 106,
@@ -5221,7 +5517,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 150,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 107,
@@ -5231,7 +5529,9 @@
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
      "milestone": 200,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 108,
@@ -5241,7 +5541,9 @@
      "set": "Lily pads",
      "earned_by": "days checked in",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 109,
@@ -5251,7 +5553,9 @@
      "set": "Lily pads",
      "earned_by": "days checked in",
      "milestone": 5,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 110,
@@ -5261,7 +5565,9 @@
      "set": "Lily pads",
      "earned_by": "days checked in",
      "milestone": 10,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 111,
@@ -5271,7 +5577,9 @@
      "set": "Lily pads",
      "earned_by": "days checked in",
      "milestone": 25,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 112,
@@ -5281,7 +5589,9 @@
      "set": "Lily pads",
      "earned_by": "days checked in",
      "milestone": 50,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 113,
@@ -5291,7 +5601,9 @@
      "set": "Lily pads",
      "earned_by": "days checked in",
      "milestone": 75,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 114,
@@ -5301,7 +5613,9 @@
      "set": "Lily pads",
      "earned_by": "days checked in",
      "milestone": 100,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 115,
@@ -5311,7 +5625,9 @@
      "set": "Water's edge",
      "earned_by": "days with a mental health exercise (1/day)",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 116,
@@ -5321,7 +5637,9 @@
      "set": "Water's edge",
      "earned_by": "days with a mental health exercise (1/day)",
      "milestone": 3,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 117,
@@ -5331,7 +5649,9 @@
      "set": "Water's edge",
      "earned_by": "days with a mental health exercise (1/day)",
      "milestone": 5,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 118,
@@ -5341,7 +5661,9 @@
      "set": "Water's edge",
      "earned_by": "days with a mental health exercise (1/day)",
      "milestone": 10,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 119,
@@ -5351,7 +5673,9 @@
      "set": "Water's edge",
      "earned_by": "days with a mental health exercise (1/day)",
      "milestone": 25,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 120,
@@ -5361,7 +5685,9 @@
      "set": "Water's edge",
      "earned_by": "days with a mental health exercise (1/day)",
      "milestone": 50,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 121,
@@ -5371,7 +5697,9 @@
      "set": "Water's edge",
      "earned_by": "days with a mental health exercise (1/day)",
      "milestone": 75,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 122,
@@ -5381,7 +5709,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 123,
@@ -5391,7 +5721,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 3,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 124,
@@ -5401,7 +5733,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 6,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 125,
@@ -5411,7 +5745,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 10,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 126,
@@ -5421,7 +5757,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 15,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 127,
@@ -5431,7 +5769,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 20,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 128,
@@ -5441,7 +5781,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 25,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 129,
@@ -5451,7 +5793,9 @@
      "set": "Stream fish",
      "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
      "milestone": 30,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 130,
@@ -5461,7 +5805,9 @@
      "set": "Rare fish",
      "earned_by": "a whole workbook finished",
      "milestone": "DBT done",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 131,
@@ -5471,7 +5817,9 @@
      "set": "Rare fish",
      "earned_by": "a whole workbook finished",
      "milestone": "BPD done",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 132,
@@ -5481,7 +5829,9 @@
      "set": "Kitchen",
      "earned_by": "weekly reviews",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 133,
@@ -5491,7 +5841,9 @@
      "set": "Kitchen",
      "earned_by": "weekly reviews",
      "milestone": 4,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 134,
@@ -5501,7 +5853,9 @@
      "set": "Kitchen",
      "earned_by": "weekly reviews",
      "milestone": 8,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 135,
@@ -5511,7 +5865,9 @@
      "set": "Kitchen",
      "earned_by": "weekly reviews",
      "milestone": 12,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 136,
@@ -5521,7 +5877,9 @@
      "set": "Kitchen",
      "earned_by": "weekly reviews",
      "milestone": 26,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 137,
@@ -5531,7 +5889,9 @@
      "set": "Kitchen",
      "earned_by": "weekly reviews",
      "milestone": 52,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 138,
@@ -5541,7 +5901,9 @@
      "set": "Harvest table",
      "earned_by": "monthly reviews",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 139,
@@ -5551,7 +5913,9 @@
      "set": "Harvest table",
      "earned_by": "monthly reviews",
      "milestone": 3,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 140,
@@ -5561,7 +5925,9 @@
      "set": "Harvest table",
      "earned_by": "monthly reviews",
      "milestone": 6,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 141,
@@ -5571,7 +5937,9 @@
      "set": "Harvest table",
      "earned_by": "monthly reviews",
      "milestone": 9,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 142,
@@ -5581,7 +5949,9 @@
      "set": "Harvest table",
      "earned_by": "monthly reviews",
      "milestone": 12,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 143,
@@ -5591,7 +5961,9 @@
      "set": "Pressed and bound",
      "earned_by": "Reading-list books",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 144,
@@ -5601,7 +5973,9 @@
      "set": "Pressed and bound",
      "earned_by": "Reading-list books",
      "milestone": 3,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 145,
@@ -5611,7 +5985,9 @@
      "set": "Pressed and bound",
      "earned_by": "Reading-list books",
      "milestone": 6,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 146,
@@ -5621,7 +5997,9 @@
      "set": "Pressed and bound",
      "earned_by": "Reading-list books",
      "milestone": 10,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 147,
@@ -5631,7 +6009,9 @@
      "set": "Pressed and bound",
      "earned_by": "Reading-list books",
      "milestone": 15,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 148,
@@ -5641,7 +6021,9 @@
      "set": "Pressed and bound",
      "earned_by": "Reading-list books",
      "milestone": 20,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 149,
@@ -5651,7 +6033,9 @@
      "set": "Dug up",
      "earned_by": "projects finished",
      "milestone": 1,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 150,
@@ -5661,7 +6045,9 @@
      "set": "Dug up",
      "earned_by": "projects finished",
      "milestone": 2,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 151,
@@ -5671,7 +6057,9 @@
      "set": "Dug up",
      "earned_by": "projects finished",
      "milestone": 3,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 152,
@@ -5681,7 +6069,9 @@
      "set": "Dug up",
      "earned_by": "projects finished",
      "milestone": 5,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 153,
@@ -5691,7 +6081,9 @@
      "set": "Dug up",
      "earned_by": "projects finished",
      "milestone": 8,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 154,
@@ -5701,7 +6093,9 @@
      "set": "Dug up",
      "earned_by": "projects finished",
      "milestone": 12,
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 155,
@@ -5711,7 +6105,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "day one",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 156,
@@ -5721,7 +6117,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "3+ days away",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 157,
@@ -5731,7 +6129,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "3rd return",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 158,
@@ -5741,7 +6141,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "5th return",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 159,
@@ -5751,7 +6153,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "a late tick",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 160,
@@ -5761,7 +6165,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "short pages",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 161,
@@ -5771,7 +6177,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "check-in after a gap",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 162,
@@ -5781,7 +6189,9 @@
      "set": "Kind notes",
      "earned_by": "each once",
      "milestone": "habit again after a week off",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 163,
@@ -5791,7 +6201,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Jan",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 164,
@@ -5801,7 +6213,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Feb",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 165,
@@ -5811,7 +6225,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Mar",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 166,
@@ -5821,7 +6237,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Apr",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 167,
@@ -5831,7 +6249,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "May",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 168,
@@ -5841,7 +6261,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Jun",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 169,
@@ -5851,7 +6273,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Jul",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 170,
@@ -5861,7 +6285,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Aug",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 171,
@@ -5871,7 +6297,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Sep",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 172,
@@ -5881,7 +6309,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Oct",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 173,
@@ -5891,7 +6321,9 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Nov",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
     },
     {
      "index": 174,
@@ -5901,7 +6333,105 @@
      "set": "Hedgerow",
      "earned_by": "did anything that month",
      "milestone": "Dec",
-     "tier": "special"
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 175,
+     "key": "cleared-mind",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 176,
+     "key": "cleared-writing",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 177,
+     "key": "cleared-art",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 178,
+     "key": "cleared-content",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 179,
+     "key": "cleared-body",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 180,
+     "key": "cleared-tech",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 181,
+     "key": "cleared-production",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 182,
+     "key": "cleared-admin",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
     }
    ]
   },
@@ -5913,7 +6443,7 @@
     16,
     16
    ],
-   "frames": 175,
+   "frames": 183,
    "tags": [
     {
      "name": "beds:Mind bed",
@@ -6044,6 +6574,11 @@
      "name": "lane:Hedgerow",
      "from": 163,
      "to": 174
+    },
+    {
+     "name": "bonus:Area cleared",
+     "from": 175,
+     "to": 182
     }
    ],
    "display": "same as stickers",
@@ -6057,7 +6592,7 @@
     18,
     18
    ],
-   "frames": 175,
+   "frames": 183,
    "tags": [
     {
      "name": "beds:Mind bed",
@@ -6188,6 +6723,11 @@
      "name": "lane:Hedgerow",
      "from": 163,
      "to": 174
+    },
+    {
+     "name": "bonus:Area cleared",
+     "from": 175,
+     "to": 182
     }
    ],
    "display": "same as stickers",
@@ -6593,8 +7133,8 @@
   {
    "name": "sticker-spots",
    "json": "sticker-spots.json",
-   "frames": 175,
-   "notes": "Fixed farm / interior spot for every sticker, with z-order, layer and facing. No overlaps (checked); each farm spot lies inside its zone."
+   "frames": 183,
+   "notes": "175 collection stickers + 8 bonus. Fixed farm / interior spot for every sticker, with z-order, layer and facing. No overlaps (checked); each farm spot lies inside its zone."
   },
   {
    "name": "farm-preview",
@@ -6868,17 +7408,87 @@
    "notes": "The 'ready to place' corner: loop these two frames over a filled slot until she places the sticker on the farm herself (fixed spots)."
   },
   {
+   "name": "badge-count",
+   "png": "badge-count.png",
+   "json": "badge-count.json",
+   "frame": [
+    9,
+    7
+   ],
+   "frames": 1,
+   "tags": [
+    {
+     "name": "template",
+     "from": 0,
+     "to": 0
+    }
+   ],
+   "display": "same scale as the sticker it sits on",
+   "notes": "xN counter for repeatable (Bonus) stickers, shown from x2. Draw left cap, then the middle column repeated for the digits' width (font-small, ink, 1px gap between glyphs), then the right cap. Text at (left cap width, 1). Bottom-right pixel of the badge = (sticker x + 17, sticker y + 17), both in the book slot and on the farm; it draws above the sticker (farm: same z + 0.5).",
+   "height": 7,
+   "left_w": 6,
+   "right_w": 2,
+   "text_offset": [
+    6,
+    1
+   ],
+   "text_colour": "#3a412f",
+   "anchor": "bottom-right at sticker (x+17, y+17)",
+   "show_from": 2,
+   "slices": {
+    "left_cap": [
+     0,
+     5
+    ],
+    "middle_column": 6,
+    "right_cap": [
+     7,
+     8
+    ]
+   }
+  },
+  {
+   "name": "badge-count-examples",
+   "png": "badge-count-examples.png",
+   "json": "badge-count-examples.json",
+   "frame": [
+    40,
+    26
+   ],
+   "frames": 3,
+   "tags": [
+    {
+     "name": "example-x2",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "example-x12",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "example-x100",
+     "from": 2,
+     "to": 2
+    }
+   ],
+   "display": "reference only",
+   "notes": "x2, x12, x100 on the Body 'area cleared' sticker."
+  },
+  {
    "name": "esmes-farm-icon",
    "svg": "esmes-farm-icon.svg",
    "png_pixel_option": "esmes-farm-icon-pixel.png",
    "display": {
-    "sidebar": "svg at 20px on a 28px tile",
-    "phone_grid": "svg at 40px on a 62px tile",
-    "pixel_option": "24x24 png at 1x / 2x (48) with image-rendering: pixelated"
+    "sidebar": "pixel png at 1x (24px) centred on the 28px tile",
+    "phone_grid": "pixel png at 2x (48px) on the 62px tile",
+    "rule": "whole-number scale only, image-rendering: pixelated"
    },
+   "chosen": "pixel (Esme, 4 Nov)",
    "tile_colour": {
-    "proposed": "#e2cd5b",
-    "status": "needs Esme's OK (new role for roomyellow); coral #df7e6f was tried and fights the red barn"
+    "colour": "#e2cd5b",
+    "status": "chosen by Esme (yellow tile)"
    },
    "notes": "Sidebar style: 32 viewBox, ink #3a412f strokes 2.4, round caps/joins. Gambrel barn, cross-braced door, hay-loft window, sprout. Preview: mock-rows/farm-icon.html."
   }
@@ -7024,7 +7634,7 @@
    152
   ],
   "pages": 16,
-  "stickers": 175,
+  "stickers": 183,
   "groups": [
    "beds",
    "meadow",
@@ -7035,8 +7645,11 @@
    "aquarium",
    "farmhouse",
    "museum",
-   "lane"
-  ]
+   "lane",
+   "bonus"
+  ],
+  "total_for_completion": 175,
+  "bonus": "Bonus page (last): Area cleared x8, repeatable with the xN badge; not counted in the total or in accessory thresholds."
  },
  "decisions": "tmp/decisions-record.md (Game section, 2026-11-04)",
  "accessory_thresholds": {
@@ -7047,9 +7660,9 @@
   },
   "A13": {
    "name": "Golden crown",
-   "at_stickers": 170,
+   "at_stickers": 175,
    "all_characters": true,
-   "note": "Replaces any hat while worn (same head anchor). 170 = v2 threshold; the collection is now 175, so it could move to 175 if Esme wants it to mean everything."
+   "note": "The whole collection (Esme, 4 Nov). Bonus stickers do not count. Replaces any hat while worn (same head anchor)."
   }
  }
 }

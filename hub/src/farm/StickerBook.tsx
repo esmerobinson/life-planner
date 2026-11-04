@@ -4,11 +4,11 @@
 // not yet earned (the ghost; tap it for a gentle hint). Counts use the pixel font.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { COLLECTION, STICKER_BY_KEY, asset, hintFor, stickersIn } from "./catalogue";
+import { COLLECTION, STICKERS, STICKER_BY_KEY, asset, hintFor, stickersIn } from "./catalogue";
 import type { FarmView } from "./FarmContext";
 import { isTypingTarget, useTicker } from "./hooks";
 import { PEEL_FRAME_MS, POP_FRAME_MS, TURN_FRAME_MS, reducedMotion } from "./motion";
-import { ctx2d, drawCount, drawFrame, drawSticker, drawText, recolour, textWidth, useSheets, type Sheets } from "./sprites";
+import { ctx2d, drawBadge, drawFrame, drawSticker, drawText, recolour, textWidth, useSheets, type Sheets } from "./sprites";
 import { SPREADS, repeatCount, type Spread } from "./world";
 
 export const BOOK_W = 232;
@@ -20,7 +20,7 @@ const SLOT = 19;
 const PHONE_WINDOW = 120;
 
 const CONTENTS = (asset("book-pages") as unknown as { contents_rows: { group: string; y: number; count_right_x: number }[] }).contents_rows;
-const SHEETS = ["book-cover", "book-pages", "book-turn", "book-slot", "font-small", "stickers", "stickers-ghost", "fx-sparkle"];
+const SHEETS = ["book-cover", "book-pages", "book-turn", "book-slot", "font-small", "stickers", "stickers-ghost", "fx-sparkle", "badge-count"];
 const TURN = { open: [0, 1, 2], forward: [3, 4, 5], back: [6, 7, 8] };
 
 /** What the canvas shows. */
@@ -61,7 +61,11 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
   if (i === 0) {
     // The contents page: each group's count, right-aligned at the end of its row.
     for (const row of CONTENTS) {
-      const t = `${countIn(stickersIn(row.group), view.earnedSet)}/${stickersIn(row.group).length}`;
+      // The BONUS row: how many bonus stickers she has (count_format "{n}": not in the total).
+      const bonus = STICKERS.filter((x) => x.bonus && x.group === row.group);
+      const t = row.group === "bonus"
+        ? String(countIn(bonus, view.earnedSet))
+        : `${countIn(stickersIn(row.group), view.earnedSet)}/${stickersIn(row.group).length}`;
       drawText(ctx, font, t, PAGE_W + row.count_right_x - textWidth(t), row.y);
     }
     // The whole collection on its plate (bonus stickers and ×N counts never count).
@@ -73,7 +77,7 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
     if (!page) return;
     const ox = side * PAGE_W;
     for (const label of page.labels) {
-      const inSet = COLLECTION.filter((x) => x.set === label.set && x.group === page.group);
+      const inSet = STICKERS.filter((x) => x.set === label.set && x.group === page.group);
       drawText(ctx, font, `${countIn(inSet, view.earnedSet)}/${inSet.length}`, ox + label.count_x, label.y);
     }
     for (const slot of page.slots) {
@@ -86,7 +90,7 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
       } else {
         drawFrame(ctx, s["book-slot"]!, SLOT, SLOT, 1, x, slot.y);
         drawSticker(ctx, s, st, "sticker", x + 1, slot.y + 1);
-        drawCount(ctx, font, repeatCount(slot.sticker, view.counters), x + 1, slot.y + 1);
+        drawBadge(ctx, s, repeatCount(slot.sticker, view.counters), x + 1, slot.y + 1); // always in the book
         if (state === "ready") drawFrame(ctx, s["book-slot"]!, SLOT, SLOT, 2 + peel, x, slot.y);
       }
       if (sparkle?.key === slot.sticker) drawFrame(ctx, s["fx-sparkle"]!, 30, 30, sparkle.frame, x + 9 - 15, slot.y + 9 - 15);

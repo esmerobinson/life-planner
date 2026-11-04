@@ -99,10 +99,10 @@ describe("the book", () => {
 
 describe("spots", () => {
   it("every sticker has the designer's fixed spot: the farm (504x276) or a museum/aquarium interior", () => {
-    expect(SPOTS.size).toBe(176);
-    expect(SPOTS.get("area-cleared")).toMatchObject({ scene: "farm", placeholder: true }); // no designed spot yet
+    expect(SPOTS.size).toBe(183);
+    expect(SPOTS.get("cleared-mind")).toMatchObject({ scene: "farm", layer: "bed-sign", placeholder: false });
     for (const s of SPOTS.values()) {
-      if (s.zone !== "beds" || s.layer !== "ground" || !s.placeholder) expect(s.placeholder).toBe(false);
+      expect(s.placeholder).toBe(false);
       const [w, h] = s.scene === "farm" ? [504, 276] : [200, 96];
       expect(s.x).toBeGreaterThanOrEqual(0);
       expect(s.x + 16).toBeLessThanOrEqual(w);
