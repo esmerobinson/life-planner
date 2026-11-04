@@ -519,8 +519,15 @@ export async function restoreItem(id: string, today: ISODate): Promise<void> {
 const BINNED: readonly Item["status"][] = ["deleted", "purged"];
 
 /**
- * Items for every list and count in the app. Never returns Bin rows (deleted or purged);
- * without a status it returns open and done items.
+ * Oldest first: by the day made, then by id (new ids sort by when they were made, domain/ids.ts),
+ * so every list (and search) has the same order on every device and every reload.
+ */
+const oldestFirst = <T extends { createdAt: string; id: string }>(a: T, b: T) =>
+  a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+
+/**
+ * Items for every list and count in the app, oldest first. Never returns Bin rows (deleted or
+ * purged); without a status it returns open and done items.
  */
 export async function listItems(
   filter: {
@@ -531,19 +538,21 @@ export async function listItems(
   } = {},
 ): Promise<Item[]> {
   const all = await db.items.toArray();
-  return all.filter(
-    (i) =>
-      !BINNED.includes(i.status) &&
-      (filter.status ? i.status === filter.status : i.status !== "archived") &&
-      (!filter.areaId || i.areaId === filter.areaId) &&
-      (!filter.goalId || i.goalId === filter.goalId) &&
-      (!filter.kind || i.kind === filter.kind),
-  );
+  return all
+    .filter(
+      (i) =>
+        !BINNED.includes(i.status) &&
+        (filter.status ? i.status === filter.status : i.status !== "archived") &&
+        (!filter.areaId || i.areaId === filter.areaId) &&
+        (!filter.goalId || i.goalId === filter.goalId) &&
+        (!filter.kind || i.kind === filter.kind),
+    )
+    .sort(oldestFirst);
 }
 
-/** Live goals, for every list, picker and count. Bin goals (deleted or purged) never appear. */
+/** Live goals, oldest first, for every list, picker and count. Bin goals (deleted or purged) never appear. */
 export async function listGoals(): Promise<Goal[]> {
-  return (await db.goals.toArray()).filter((g) => g.status === undefined);
+  return (await db.goals.toArray()).filter((g) => g.status === undefined).sort(oldestFirst);
 }
 
 /** Flags a task as one of its goal's milestones, or unflags it (the field is then removed). */
