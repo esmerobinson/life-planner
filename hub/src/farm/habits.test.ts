@@ -110,6 +110,40 @@ describe("runs of good months", () => {
   });
 });
 
+describe("a habit's month counts from when it was made, up to when it was archived (Esme, 2026-11-04)", () => {
+  // March 2026's Mondays: 2, 9, 16, 23, 30.
+  it("a habit made mid-month is judged only on the Mondays since it was made", () => {
+    const h = task({ recur: ["mon"], createdAt: "2026-03-16", doneDates: ["2026-03-16", "2026-03-23", "2026-03-30"] });
+    expect(count({ items: [h] }, "habit-months")).toBe(1); // 3 of 3, not 3 of 5
+    expect(count({ items: [h] }, "habit-full-month")).toBe(1);
+  });
+
+  it("80% of the sessions since it was made, any order", () => {
+    // Made Tuesday 3 March: 4 Mondays left (9, 16, 23, 30); 3 of 4 is under 80%, 4 of 4 is a month.
+    const made = (doneDates: ISODate[]) => task({ recur: ["mon"], createdAt: "2026-03-03", doneDates });
+    expect(count({ items: [made(["2026-03-09", "2026-03-23", "2026-03-30"])] }, "habit-months")).toBe(0);
+    expect(count({ items: [made(["2026-03-09", "2026-03-16", "2026-03-23", "2026-03-30"])] }, "habit-months")).toBe(1);
+  });
+
+  it("an archived habit is judged up to the day it was archived (its last change: archiving sets it)", () => {
+    const h = task({ recur: ["mon"], status: "archived", touchedAt: "2026-03-17", doneDates: ["2026-03-02", "2026-03-09", "2026-03-16"] });
+    expect(count({ items: [h] }, "habit-months")).toBe(1); // 3 of 3 by the 17th, not 3 of 5
+    // Its later months ask nothing of it.
+    expect(count({ items: [h], today: "2026-06-30" }, "habit-months")).toBe(1);
+  });
+
+  it("an archived habit's end is never before its last tick", () => {
+    const h = task({ recur: ["mon"], status: "archived", touchedAt: "2026-03-01", doneDates: ["2026-03-02", "2026-03-09"] });
+    expect(count({ items: [h] }, "habit-months")).toBe(1); // up to the 9th: 2 of 2
+  });
+
+  it("the farm's start still counts first: nothing before it", () => {
+    const h = task({ recur: ["mon"], createdAt: "2025-12-01", doneDates: ["2026-03-16", "2026-03-23", "2026-03-30"] });
+    expect(count({ items: [h], start: "2026-03-10" }, "habit-months")).toBe(1); // 3 of 3 since the start
+    expect(count({ items: [h], start: "2026-03-01" }, "habit-months")).toBe(0); // 3 of 5
+  });
+});
+
 describe("nothing is ever taken away by archiving (review I3)", () => {
   it("an archived habit's sessions and an archived done to-do still count; binned ones don't", () => {
     const h = mondayHabit({ "2026-03": 1 }, { status: "archived" });

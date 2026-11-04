@@ -88,12 +88,32 @@ const doneTodo = (it: Item) =>
 /** A habit month counts at 80% of its planned sessions, in any order (Esme, 2026-11-04). */
 export const HABIT_MONTH_SHARE = 0.8;
 
-/** Each habit's months since the start: planned sessions and sessions done (any days of that month). */
+/**
+ * When an archived habit was archived. There's no archivedAt field: every archive (repo.ts) sets
+ * `touchedAt` to that day and nothing ticks an archived habit, so its `touchedAt` is the archive
+ * day or later; never before its last tick, so a session is never left outside its own month.
+ */
+function archivedOn(h: Item): ISODate | null {
+  if (h.status !== "archived") return null;
+  const last = [...(h.doneDates ?? [])].sort().pop();
+  return last !== undefined && last > h.touchedAt ? last : h.touchedAt;
+}
+
+/**
+ * Each habit's months since the start: planned sessions and sessions done (any days of that
+ * month). Planned sessions count from the latest of the month's start, the farm's start and the
+ * day the habit was made, up to the month's end or the day it was archived (Esme, 2026-11-04),
+ * so a habit made mid-month can count that month.
+ */
 function habitMonths(h: Item, start: ISODate, today: ISODate): { month: string; want: number; did: number }[] {
+  const made = h.createdAt;
+  const archived = archivedOn(h);
   return monthsBetween(start, today).map((month) => {
     const [y, m] = month.split("-").map(Number) as [number, number];
-    const from = `${month}-01` < start ? start : `${month}-01`;
-    const to = endOfMonth(y, m);
+    const from = [`${month}-01`, start, made].sort().pop()!;
+    const end = endOfMonth(y, m);
+    const to = archived !== null && archived < end ? archived : end;
+    if (from > to) return { month, want: 0, did: 0 };
     return { month, want: planned(h, from, to), did: new Set((h.doneDates ?? []).filter((d) => d >= from && d <= to)).size };
   });
 }
