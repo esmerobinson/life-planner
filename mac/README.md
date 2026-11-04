@@ -120,15 +120,18 @@ page's address, which is `esmeworld://app`.
   it. Then right-click > Inspect Element, or Safari > Develop.
 
 - Reminders (Reminders page, in the sidebar footer): the web app works out the
-  next 7 days of reminders and hands the whole list to the app
-  (`esmeworldReminders` message handler), which replaces every pending
-  Esmeworld notification with it. They are scheduled local notifications, so
-  they pop up with the app closed. macOS asks once whether Esmeworld may send
+  reminders ahead, soonest first, up to 60 (Apple keeps at most 64 per app),
+  and hands the whole list to the app (`esmeworldReminders` message handler),
+  which replaces every pending Esmeworld notification with it. They are
+  scheduled local notifications, so they pop up with the app closed, for as
+  far ahead as the page says ("planned up to …", usually weeks). Days are
+  Esme's 3am-to-3am days. macOS asks once whether Esmeworld may send
   notifications, when the Reminders page is first opened (never at launch).
   Clicking one opens Esmeworld on that page. A reminder for something already
   done that day drops out the next time the app recomputes (launch, any change
-  or sync, midnight): if it was done on the phone while the Mac app was not
-  running, the Mac may still remind once.
+  or sync, the 3am day change), and one already shown leaves Notification
+  Center: if it was done on the phone while the Mac app was not running, the
+  Mac may still remind once.
 
 The web app's offline service worker is bundled but has no job here (the files
 are already inside the app); its "new version" prompt will not appear in the Mac
@@ -176,13 +179,19 @@ be using the keychain.
 
 Reminders: it opens the Reminders page, checks the bridge answers (status, and
 a permission request that the self-test answers without ever asking, so no
-prompt appears), sends a pretend schedule and, only if notifications are
-already allowed for Esmeworld, checks the system holds exactly the valid ones
+prompt appears), sends a pretend probe schedule (2 valid entries among bad
+dates, a bad path and a non-object) and, only if notifications are already
+allowed for Esmeworld, checks the system holds exactly the 2
 (`getPendingNotificationRequests`); otherwise it prints
-`reminders.schedule=skipped`. The self-test binary has the same bundle id as
-the real app, so it shares its notification settings: its reminders use their
-own identifier prefix (`esmeworld-selftest.`), never touch yours, and are
-removed before it exits. It also checks a reminder's link opens its page.
+`reminders.schedule=skipped`. It also checks a malformed list is refused and
+a reminder's link opens its page. The self-test binary has the same bundle id
+as the real app, so it shares its notification settings and its 64 pending
+slots: its reminders use their own identifier prefix (`esmeworld-selftest.`)
+and never touch yours; the page's own scheduler is ignored during a self-test
+(only the 2-entry probe is ever scheduled, so yours keep their room); and the
+self-test's reminders are removed at the start (leftovers of a killed run)
+and at the end, through the bridge's queue, then checked to be 0. It never
+takes notification clicks (no delegate in self-test mode).
 
 Needs macOS 14 or later (the app itself still runs on macOS 13).
 
