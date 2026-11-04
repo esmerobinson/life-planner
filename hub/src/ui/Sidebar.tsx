@@ -17,6 +17,7 @@ export function FooterLinks() {
   const sync = useSyncState();
   return (
     <>
+      <NavLink to="/repeating">Repeating</NavLink>{" "}
       <NavLink to="/reminders">Reminders</NavLink>{" "}
       <NavLink to="/backup">Backup</NavLink>{" "}
       <NavLink to="/sync">{sync.status === "needs-passphrase" ? "Sync (needs passphrase)" : "Sync"}</NavLink>{" "}

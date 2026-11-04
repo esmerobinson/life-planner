@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { isActive } from "../domain/goalCounts";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { listItems, restoreItem, untickItem } from "../data/repo";
 import { doneToday, HABIT_WORDS, isHabit, sessions } from "../domain/habits";
 import type { ISODate, Item } from "../domain/types";
@@ -132,6 +132,9 @@ export function AreaPage({ today }: { today: ISODate }) {
             })}
             {journalHabits && <JournalHabitRows today={today} />}
           </ul>
+          <Link to="/repeating" className="quiet-link">
+            Manage repeats
+          </Link>
         </section>
       )}
       <div role="group" aria-label="Show" className="btn-group">

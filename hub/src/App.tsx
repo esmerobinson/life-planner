@@ -11,6 +11,7 @@ import { BinPage } from "./ui/BinPage";
 import { SortPage } from "./ui/SortPage";
 import { SyncPage } from "./ui/SyncPage";
 import { RemindersPage } from "./ui/RemindersPage";
+import { RepeatingPage } from "./ui/RepeatingPage";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
 
@@ -58,6 +59,10 @@ function JournalRoute() {
   return <JournalPage today={useShellToday()} />;
 }
 
+function RepeatingRoute() {
+  return <RepeatingPage today={useShellToday()} />;
+}
+
 function BackupRoute() {
   return <BackupPage today={useShellToday()} />;
 }
@@ -97,6 +102,7 @@ export function AppRoutes() {
           <Route path="/backup" element={<BackupRoute />} />
           <Route path="/sync" element={<SyncPage />} />
           <Route path="/reminders" element={<RemindersPage />} />
+          <Route path="/repeating" element={<RepeatingRoute />} />
         </Route>
       </Routes>
   );
