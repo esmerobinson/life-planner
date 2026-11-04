@@ -157,4 +157,17 @@ describe("a project's side panel", () => {
     await userEvent.click(within(sessionRows(panel)[2]).getByRole("button", { name: "Remove session" }));
     await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions!.map((s) => s.id)).toEqual(["a", "b", "d"]));
   });
+
+  it("Remove session offers Undo, which brings the session back with its title, details and day", async () => {
+    const { p, panel } = await openProject(FOUR);
+    const before = (await db.items.get(p.id))!;
+    await userEvent.click(within(sessionRows(panel)[2]).getByRole("button", { name: "Plan session 3" }));
+    await userEvent.click(within(sessionRows(panel)[2]).getByRole("button", { name: "Remove session" }));
+    await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions).toHaveLength(3));
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await vi.waitFor(async () => expect((await db.items.get(p.id))!.sessions).toHaveLength(4));
+    const back = (await db.items.get(p.id))!.sessions!;
+    expect(back).toEqual(before.sessions);
+    expect(back[2]).toMatchObject({ id: "c", title: "Lighting", details: "Warm dusk light", plannedFor: "2026-11-05" });
+  });
 });

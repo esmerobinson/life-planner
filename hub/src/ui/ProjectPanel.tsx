@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { addSession, removeSession, setSessionDone, updateSession } from "../data/repo";
+import { useSessionRemovedUndo } from "./undoSessions";
+import { addSession, getItem, removeSession, setSessionDone, updateSession } from "../data/repo";
 import { daysBetween, addDays } from "../domain/dates";
 import { dayLabel, nextMonday } from "../domain/display";
 import { countdown, doneCount, MAX_SESSION_DETAILS, MAX_SESSION_TITLE, MAX_SESSIONS } from "../domain/projects";
@@ -92,6 +93,7 @@ function SessionRow({
 }: { item: Item; session: Session; index: number; count: number; today: ISODate; write: Write; autoFocus: boolean }) {
   const n = index + 1;
   const done = s.doneOn !== undefined;
+  const offerUndo = useSessionRemovedUndo(today);
   const save = (patch: Parameters<typeof updateSession>[2]) => write(() => updateSession(item.id, s.id, patch, today));
   const title = useDraft(s.title ?? "", (t) => save({ title: t }));
   const meta = done
@@ -134,7 +136,14 @@ function SessionRow({
             today={today}
             canRemove={count > 1}
             plan={(date) => save({ plannedFor: date })}
-            remove={() => write(() => removeSession(item.id, s.id, today))}
+            remove={async () => {
+              const before: { row?: Item } = {};
+              await write(async () => {
+                before.row = await getItem(item.id);
+                await removeSession(item.id, s.id, today);
+              });
+              if (before.row) offerUndo(before.row);
+            }}
           />
         </div>
       )}
