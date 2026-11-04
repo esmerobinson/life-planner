@@ -342,7 +342,7 @@ const uniq = (v: unknown, i: number, a: unknown[]) => a.indexOf(v) === i;
 
 const PAGE_NAMES: Record<string, string> = {
   beds: "Vegetable beds", meadow: "Meadow", barnyard: "Barnyard", orchard: "Orchard", glasshouse: "Glasshouse", pond: "Pond",
-  aquarium: "Aquarium", farmhouse: "Farmhouse", museum: "Museum", lane: "Lane and gate",
+  aquarium: "Aquarium", farmhouse: "Farmhouse", museum: "Museum", lane: "Lane and gate", bonus: "Bonus",
 };
 export const pageName = (group: string): string => PAGE_NAMES[group] ?? group;
 
