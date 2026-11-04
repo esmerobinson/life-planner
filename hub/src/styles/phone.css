@@ -132,6 +132,14 @@ button.phone-back::before {
   height: auto;
 }
 
+/* Esme's Farm's pixel barn (24px pixel art) at a whole-number scale, never 60% (37px would
+   blur and make its pixels uneven): 2x, the whole scale nearest the other icons' 37px. The
+   size is the builder's call from that rule; Esme may choose 1x (24px) instead. */
+.phone-app-tile img.pixel-icon {
+  width: 48px;
+  height: 48px;
+}
+
 /* Phone Home's "Today" (Home spacing, 2026-11-04): spaced as every section heading (tokens.css
    h2: --gap-section above, under the app grid; --gap-stack under, to the green rows). The size
    is unchanged. Was 14px / 8px, off the spacing scale. */

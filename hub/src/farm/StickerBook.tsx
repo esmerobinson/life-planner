@@ -43,6 +43,13 @@ const countIn = (keys: { key: string }[], earned: ReadonlySet<string>) => keys.f
 const PLATE = (asset("book-pages") as unknown as {
   contents_total_plate: { text_centre_x: number; text_y: number; colour: string; format: string };
 }).contents_total_plate;
+
+/** The plate's text ("37 OF 175": the whole collection) and its top-left on the contents spread. */
+export function totalPlate(collected: number): { text: string; x: number; y: number } {
+  const text = PLATE.format.replace("{n}", String(collected)).replace(/\d+$/, String(COLLECTION.length));
+  return { text, x: PAGE_W + PLATE.text_centre_x - Math.floor(textWidth(text) / 2), y: PLATE.text_y };
+}
+
 const tinted = new WeakMap<object, HTMLCanvasElement>();
 function plateFont(font: HTMLImageElement): HTMLImageElement {
   let t = tinted.get(font);
@@ -69,8 +76,8 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
       drawText(ctx, font, t, PAGE_W + row.count_right_x - textWidth(t), row.y);
     }
     // The whole collection on its plate (bonus stickers and ×N counts never count).
-    const total = PLATE.format.replace("{n}", String(view.collected)).replace(/\d+$/, String(COLLECTION.length));
-    drawText(ctx, plateFont(font), total, PAGE_W + PLATE.text_centre_x - Math.floor(textWidth(total) / 2), PLATE.text_y);
+    const plate = totalPlate(view.collected);
+    drawText(ctx, plateFont(font), plate.text, plate.x, plate.y);
     return;
   }
   spread!.pages.forEach((page, side) => {

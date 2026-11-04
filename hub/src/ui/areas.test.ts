@@ -41,4 +41,12 @@ describe("areas", () => {
     expect(tile("production")).toBe("#d59770");
     expect(tile("admin")).toBe("#90825b");
   });
+
+  it("Esme's Farm is the pixel barn on the Room Sketch yellow tile, drawn as pixel art (Esme, 2026-11-04)", () => {
+    const farm = NAV.find((n) => n.id === "farm")!;
+    expect(farm.icon).toContain("esmes-farm-icon-pixel");
+    expect(farm.tile).toBe("#e2cd5b");
+    expect(farm.pixel).toBe(true);
+    expect(NAV.filter((n) => n.pixel).map((n) => n.id)).toEqual(["farm"]);
+  });
 });
