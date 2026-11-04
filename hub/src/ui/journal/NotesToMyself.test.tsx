@@ -145,6 +145,7 @@ describe("a note in progress is never lost (review I2)", () => {
     expect(JSON.stringify(await db.journal.toArray())).not.toContain("people stayed"); // kept sealed
     // Saved, it is a note under its prompt and nothing is left in progress.
     await userEvent.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(within(back).queryByRole("form")).toBeNull());
     expect(await within(within(back).getByRole("group", { name: "Self-worth" })).findByText("Pretend: people stayed")).toBeInTheDocument();
     await waitFor(async () => expect((await listNotes(jk, await getDeviceId(db))).drafts).toEqual([]));
   });
