@@ -1,25 +1,26 @@
 import type { Goal, ISODate, Item, Weekday } from "../domain/types";
-import { COLLECTION, GROUPS, STICKERS, STICKER_BY_KEY, hintFor, ruleOf, stickersIn } from "./catalogue";
+import { COLLECTION, GROUPS, STICKERS, STICKER_BY_KEY, asset, hintFor, ruleOf, stickersIn } from "./catalogue";
 import { allEarned, clipItems, counters, derivedEarned, workbookProgress, type EarningInput, type JournalFacts } from "./earning";
 
 // The v2 milestone table (tmp/game-design.md section 7), copied here by hand so the art pack's
-// manifest is checked against the design, not against itself.
+// manifest is checked against the design, not against itself. Pacing re-spaced by Esme on
+// 2026-11-04 (farm-brief-2026-11-04.md item 3): beds top at 60, Animals at 200, Glasshouse at 150.
 const V2: Record<string, [string, number[]]> = {
-  "Mind bed": ["todos:mind", [1, 3, 5, 10, 25, 50, 100]],
-  "Writing bed": ["todos:writing", [1, 3, 5, 10, 25, 50, 100]],
-  "Art bed": ["todos:art", [1, 3, 5, 10, 25, 50, 100]],
-  "Content bed": ["todos:content", [1, 3, 5, 10, 25, 50, 100]],
-  "Body bed": ["todos:body", [1, 3, 5, 10, 25, 50, 100]],
-  "Tech bed": ["todos:tech", [1, 3, 5, 10, 25, 50, 100]],
-  "Production bed": ["todos:production", [1, 3, 5, 10, 25, 50, 100]],
-  "Admin bed": ["todos:admin", [1, 3, 5, 10, 25, 50, 100]],
+  "Mind bed": ["todos:mind", [1, 3, 5, 10, 25, 40, 60]],
+  "Writing bed": ["todos:writing", [1, 3, 5, 10, 25, 40, 60]],
+  "Art bed": ["todos:art", [1, 3, 5, 10, 25, 40, 60]],
+  "Content bed": ["todos:content", [1, 3, 5, 10, 25, 40, 60]],
+  "Body bed": ["todos:body", [1, 3, 5, 10, 25, 40, 60]],
+  "Tech bed": ["todos:tech", [1, 3, 5, 10, 25, 40, 60]],
+  "Production bed": ["todos:production", [1, 3, 5, 10, 25, 40, 60]],
+  "Admin bed": ["todos:admin", [1, 3, 5, 10, 25, 40, 60]],
   "Bee things": ["today-finished", [1, 3, 5, 10, 15, 25, 40, 60]],
   "Hedge flowers": ["habit-weeks", [1, 4, 8, 12, 26, 52]],
-  Animals: ["habit-sessions", [1, 10, 25, 50, 100, 150, 200, 300]],
+  Animals: ["habit-sessions", [1, 10, 25, 50, 75, 100, 150, 200]],
   "Barn things": ["habit-months", [1, 3, 6, 12]],
   "Fruit trees": ["monthly-goals", [1, 2, 4, 6, 9, 12, 18]],
   "Under the trees": ["whole-goals", [1, 3]],
-  Glasshouse: ["morning-pages", [1, 3, 5, 10, 15, 25, 40, 50, 75, 100, 150, 200]],
+  Glasshouse: ["morning-pages", [1, 3, 5, 10, 15, 25, 40, 50, 75, 100, 125, 150]],
   "Lily pads": ["checkins", [1, 5, 10, 25, 50, 75, 100]],
   "Water's edge": ["exercise-days", [1, 3, 5, 10, 25, 50, 75]],
   "Stream fish": ["chapters", [1, 3, 6, 10, 15, 20, 25, 30]],
@@ -44,6 +45,17 @@ describe("the 170 stickers match game design v2", () => {
     const mine = STICKERS.filter((s) => s.set === set);
     expect(mine.map((s) => s.rule.source)).toEqual(milestones.map(() => source));
     expect(mine.map((s) => s.rule.at)).toEqual(milestones);
+    // The book's slots say the same (the pack keeps each milestone twice).
+    const slots = (asset("book-pages") as unknown as { pages: { slots: { sticker: string; milestone: number | string }[] }[] }).pages
+      .flatMap((p) => p.slots);
+    expect(mine.map((s) => slots.find((sl) => sl.sticker === s.key)?.milestone)).toEqual(milestones);
+  });
+
+  it("no two stickers of a set share a target (re-spaced pacing)", () => {
+    for (const set of new Set(STICKERS.map((s) => s.set))) {
+      const keyed = STICKERS.filter((s) => s.set === set).map((s) => `${s.rule.source} ${s.rule.at}`);
+      expect(new Set(keyed).size).toBe(keyed.length);
+    }
   });
 
   it.each([

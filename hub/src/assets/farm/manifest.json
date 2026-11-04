@@ -1802,7 +1802,7 @@
        "x": 13,
        "y": 55,
        "set": "Mind bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-mind",
@@ -1810,7 +1810,7 @@
        "x": 32,
        "y": 55,
        "set": "Mind bed",
-       "milestone": 100
+       "milestone": 60
       },
       {
        "sticker": "seeds-writing",
@@ -1858,7 +1858,7 @@
        "x": 13,
        "y": 105,
        "set": "Writing bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-writing",
@@ -1866,7 +1866,7 @@
        "x": 32,
        "y": 105,
        "set": "Writing bed",
-       "milestone": 100
+       "milestone": 60
       }
      ],
      "labels": [
@@ -1937,7 +1937,7 @@
        "x": 9,
        "y": 55,
        "set": "Art bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-art",
@@ -1945,7 +1945,7 @@
        "x": 28,
        "y": 55,
        "set": "Art bed",
-       "milestone": 100
+       "milestone": 60
       },
       {
        "sticker": "seeds-content",
@@ -1993,7 +1993,7 @@
        "x": 9,
        "y": 105,
        "set": "Content bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-content",
@@ -2001,7 +2001,7 @@
        "x": 28,
        "y": 105,
        "set": "Content bed",
-       "milestone": 100
+       "milestone": 60
       }
      ],
      "labels": [
@@ -2072,7 +2072,7 @@
        "x": 13,
        "y": 55,
        "set": "Body bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-body",
@@ -2080,7 +2080,7 @@
        "x": 32,
        "y": 55,
        "set": "Body bed",
-       "milestone": 100
+       "milestone": 60
       },
       {
        "sticker": "seeds-tech",
@@ -2128,7 +2128,7 @@
        "x": 13,
        "y": 105,
        "set": "Tech bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-tech",
@@ -2136,7 +2136,7 @@
        "x": 32,
        "y": 105,
        "set": "Tech bed",
-       "milestone": 100
+       "milestone": 60
       }
      ],
      "labels": [
@@ -2207,7 +2207,7 @@
        "x": 9,
        "y": 55,
        "set": "Production bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-production",
@@ -2215,7 +2215,7 @@
        "x": 28,
        "y": 55,
        "set": "Production bed",
-       "milestone": 100
+       "milestone": 60
       },
       {
        "sticker": "seeds-admin",
@@ -2263,7 +2263,7 @@
        "x": 9,
        "y": 105,
        "set": "Admin bed",
-       "milestone": 50
+       "milestone": 40
       },
       {
        "sticker": "prize-admin",
@@ -2271,7 +2271,7 @@
        "x": 28,
        "y": 105,
        "set": "Admin bed",
-       "milestone": 100
+       "milestone": 60
       }
      ],
      "labels": [
@@ -2525,7 +2525,7 @@
        "x": 89,
        "y": 36,
        "set": "Animals",
-       "milestone": 100
+       "milestone": 75
       },
       {
        "sticker": "milk-churn",
@@ -2533,7 +2533,7 @@
        "x": 13,
        "y": 55,
        "set": "Animals",
-       "milestone": 150
+       "milestone": 100
       },
       {
        "sticker": "sheep",
@@ -2541,7 +2541,7 @@
        "x": 32,
        "y": 55,
        "set": "Animals",
-       "milestone": 200
+       "milestone": 150
       },
       {
        "sticker": "lamb",
@@ -2549,7 +2549,7 @@
        "x": 51,
        "y": 55,
        "set": "Animals",
-       "milestone": 300
+       "milestone": 200
       },
       {
        "sticker": "haybale",
@@ -2787,7 +2787,7 @@
        "x": 13,
        "y": 74,
        "set": "Glasshouse",
-       "milestone": 150
+       "milestone": 125
       },
       {
        "sticker": "roof-vine",
@@ -2795,7 +2795,7 @@
        "x": 32,
        "y": 74,
        "set": "Glasshouse",
-       "milestone": 200
+       "milestone": 150
       }
      ],
      "labels": [
@@ -4304,7 +4304,7 @@
      "group": "beds",
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4316,7 +4316,7 @@
      "group": "beds",
      "set": "Mind bed",
      "earned_by": "to-dos in Mind",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4388,7 +4388,7 @@
      "group": "beds",
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4400,7 +4400,7 @@
      "group": "beds",
      "set": "Writing bed",
      "earned_by": "to-dos in Writing",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4472,7 +4472,7 @@
      "group": "beds",
      "set": "Art bed",
      "earned_by": "to-dos in Art",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4484,7 +4484,7 @@
      "group": "beds",
      "set": "Art bed",
      "earned_by": "to-dos in Art",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4556,7 +4556,7 @@
      "group": "beds",
      "set": "Content bed",
      "earned_by": "to-dos in Content",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4568,7 +4568,7 @@
      "group": "beds",
      "set": "Content bed",
      "earned_by": "to-dos in Content",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4640,7 +4640,7 @@
      "group": "beds",
      "set": "Body bed",
      "earned_by": "to-dos in Body",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4652,7 +4652,7 @@
      "group": "beds",
      "set": "Body bed",
      "earned_by": "to-dos in Body",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4724,7 +4724,7 @@
      "group": "beds",
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4736,7 +4736,7 @@
      "group": "beds",
      "set": "Tech bed",
      "earned_by": "to-dos in Tech",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4808,7 +4808,7 @@
      "group": "beds",
      "set": "Production bed",
      "earned_by": "to-dos in Production",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4820,7 +4820,7 @@
      "group": "beds",
      "set": "Production bed",
      "earned_by": "to-dos in Production",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4892,7 +4892,7 @@
      "group": "beds",
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
-     "milestone": 50,
+     "milestone": 40,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -4904,7 +4904,7 @@
      "group": "beds",
      "set": "Admin bed",
      "earned_by": "to-dos in Admin",
-     "milestone": 100,
+     "milestone": 60,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -5192,7 +5192,7 @@
      "group": "barnyard",
      "set": "Animals",
      "earned_by": "habit sessions",
-     "milestone": 100,
+     "milestone": 75,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -5204,7 +5204,7 @@
      "group": "barnyard",
      "set": "Animals",
      "earned_by": "habit sessions",
-     "milestone": 150,
+     "milestone": 100,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -5216,7 +5216,7 @@
      "group": "barnyard",
      "set": "Animals",
      "earned_by": "habit sessions",
-     "milestone": 200,
+     "milestone": 150,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -5228,7 +5228,7 @@
      "group": "barnyard",
      "set": "Animals",
      "earned_by": "habit sessions",
-     "milestone": 300,
+     "milestone": 200,
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false
@@ -5516,7 +5516,7 @@
      "group": "glasshouse",
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
-     "milestone": 150,
+     "milestone": 125,
      "tier": "special",
      "counts_toward_total": true,
      "repeatable": false
@@ -5528,7 +5528,7 @@
      "group": "glasshouse",
      "set": "Glasshouse",
      "earned_by": "mornings with morning pages",
-     "milestone": 200,
+     "milestone": 150,
      "tier": "special",
      "counts_toward_total": true,
      "repeatable": false
@@ -7054,7 +7054,7 @@
     }
    ],
    "display": "same as farm-base",
-   "notes": "8 beds x 6 stages (0 bare .. 5 full; stages at 1/5/10/25/50 to-dos in that area). Draw at bed_positions[area], under placed stickers. The sprout (3) and prize-crop (100) stickers stand in front of their bed; the critter (50) visits the bed (sticker-spots.json).",
+   "notes": "8 beds x 6 stages (0 bare .. 5 full; stages at 1/5/10/25/40 to-dos in that area; re-spaced 2026-11-04, was 50). Draw at bed_positions[area], under placed stickers. The sprout (3) and prize-crop (60) stickers stand in front of their bed; the critter (40) visits the bed (sticker-spots.json).",
    "bed_positions": {
     "Mind": [
      27,
@@ -7104,7 +7104,7 @@
     5,
     10,
     25,
-    50
+    40
    ]
   },
   {

@@ -223,7 +223,7 @@ export function hintFor(s: Sticker): string {
   if (source.startsWith("month:")) return `Anything at all in ${MONTH_NAMES[source.slice(6)]}`;
   const later = " (this part of the app is coming later)";
   switch (source) {
-    case "today-finished": return `Everything on the day's list on Home done, on ${plural(at, "day")}`;
+    case "today-finished": return `Everything on the morning's list on Home ticked or moved to another day, on ${plural(at, "day")}`;
     case "habit-weeks": return `${plural(at, "week")} with a habit ticked`;
     case "habit-sessions": return plural(at, "habit session");
     case "habit-months": return `${plural(at, "month")} with most of a habit's sessions done`;

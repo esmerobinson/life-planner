@@ -2,7 +2,7 @@ import { addDays, weekdayOf } from "../domain/dates";
 import type { ISODate, Item } from "../domain/types";
 import { COLLECTION, STICKERS, STICKER_BY_KEY } from "./catalogue";
 import { areasCleared, counters, derivedEarned, type EarningInput } from "./earning";
-import { arrivedAt, repeatCount } from "./world";
+import { arrivedAt, repeatCount, stickerTotals } from "./world";
 
 // Esme, 2026-11-04: "Full month" for EACH habit's first full month, and "Area cleared" every time
 // an area's to-dos due in a month are all done by its end. One sticker each in the book; repeats
@@ -58,7 +58,7 @@ describe("Area cleared", () => {
     expect(areasCleared(items as unknown as Item[], START, "2026-06-15")).toBe(cleared);
   });
 
-  it("is eight bonus stickers, one per area, each with its own ×N; outside the 175, so they bring no one earlier", () => {
+  it("is eight bonus stickers, one per area, each with its own ×N; outside the 175, but each counts once toward friends and hats", () => {
     const bonus = STICKERS.filter((s) => s.bonus);
     expect(bonus.map((s) => s.key)).toEqual(
       ["mind", "writing", "art", "content", "body", "tech", "production", "admin"].map((a) => `cleared-${a}`),
@@ -73,9 +73,10 @@ describe("Area cleared", () => {
     expect(repeatCount("cleared-art", c)).toBe(2);
     expect(repeatCount("cleared-body", c)).toBe(1);
     expect(STICKER_BY_KEY.get("cleared-art")?.name).toBe("Art: area cleared");
-    const collected = COLLECTION.filter((s) => earned.includes(s.key)).length;
-    expect(collected).toBe(earned.length - 2); // the two Area cleared aren't part of the count arrivals use
-    expect(arrivedAt(collected)).toEqual(arrivedAt(earned.filter((k) => !k.startsWith("cleared-")).length));
+    const totals = stickerTotals(new Set(earned));
+    expect(totals.collected).toBe(earned.length - 2); // the two Area cleared aren't in the 175
+    expect(totals.friends).toBe(earned.length); // each counts once toward arrivals and hats (Esme: "once"), not ×2
+    expect(arrivedAt(totals.friends, 1)).toEqual(arrivedAt(earned.length, 1));
   });
 
   it("is derived, so the same data on two devices gives the same count (no increments stored)", () => {

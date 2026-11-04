@@ -110,6 +110,43 @@ it("a character's Wardrobe: pick one unlocked accessory (synced)", async () => {
   await waitFor(async () => expect(await db.farm.get("outfit:bap")).toMatchObject({ item: "A1" }));
 });
 
+it("outfits: she picks, any time; a new unlock is offered, never put on for her (Esme, 2026-11-04)", async () => {
+  // Fictional: fifteen stickers seen, so the sun hat (5) and the neckerchief (15) are unlocked.
+  const keys = ["hi", "seeds-mind", "seeds-art", "seeds-body", "seeds-writing", "seeds-content", "seeds-tech", "seeds-production",
+    "seeds-admin", "sprout-mind", "sprout-art", "sprout-body", "daisy", "hen", "lilypad"];
+  await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), ...keys.map((k) => seenRow(k, "2026-11-03"))]);
+  renderApp("/farm", "2026-11-04");
+  const user = userEvent.setup();
+  await waitFor(async () => expect(await db.farm.get("arrived:bap")).toBeTruthy());
+  // Nothing is worn until she picks: no outfit is written for anyone.
+  await new Promise((r) => setTimeout(r, 300));
+  expect((await farmRows()).filter((r) => r.kind === "outfit")).toEqual([]);
+  await user.click(within(screen.getByLabelText("Who lives here")).getByRole("button", { name: "Bap" }));
+  const wardrobe = screen.getByRole("group", { name: "Wardrobe" });
+  expect(within(wardrobe).getByRole("button", { name: "Nothing" })).toHaveAttribute("aria-pressed", "true");
+  // She picks one, then another, then nothing: each time it's her choice, one at a time.
+  await user.click(within(wardrobe).getByRole("button", { name: "Straw sun hat" }));
+  await waitFor(async () => expect(await db.farm.get("outfit:bap")).toMatchObject({ item: "A1" }));
+  await user.click(within(wardrobe).getByRole("button", { name: "Neckerchief" }));
+  await waitFor(async () => expect(await db.farm.get("outfit:bap")).toMatchObject({ item: "A2" }));
+  expect(within(wardrobe).getByRole("button", { name: "Neckerchief" })).toHaveAttribute("aria-pressed", "true");
+  expect(within(wardrobe).getByRole("button", { name: "Straw sun hat" })).toHaveAttribute("aria-pressed", "false");
+  await user.click(within(wardrobe).getByRole("button", { name: "Nothing" }));
+  await waitFor(async () => expect(await db.farm.get("outfit:bap")).toMatchObject({ item: null }));
+  // Domino, never dressed by her, still wears nothing.
+  expect(await db.farm.get("outfit:domino")).toBeUndefined();
+});
+
+it("friends arrive by day too: with no stickers but Welcome, Duvet is there on day 120 (Esme, 2026-11-04)", async () => {
+  // Fictional: the farm started on 7 July 2026; 3 November is day 120.
+  await db.farm.put(startRow("dev-a", "2026-07-07"));
+  renderApp("/farm", "2026-11-03");
+  await waitFor(async () => expect(await db.farm.get("arrived:duvet")).toBeTruthy());
+  expect(within(screen.getByLabelText("Who lives here")).getAllByRole("button").map((b) => b.textContent)).toEqual(
+    ["Domino", "Bap", "Puddle", "Clover", "Crumpet", "Duvet"],
+  );
+});
+
 it("on the Journal, Bap (once arrived) takes the nook", async () => {
   await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), ...["hi", "seeds-mind", "seeds-art", "seeds-body", "daisy"].map((k) => seenRow(k, "2026-11-03"))]);
   renderApp("/journal/check-in", "2026-11-04");

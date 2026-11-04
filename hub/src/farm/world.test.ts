@@ -1,19 +1,40 @@
 import type { Item } from "../domain/types";
 import { todayList } from "../domain/triage";
-import { STICKERS, stickersIn } from "./catalogue";
+import { COLLECTION, STICKERS, STICKER_BY_KEY, hintFor, stickersIn } from "./catalogue";
 import {
-  ACCESSORIES, ARRIVES_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, momentQueue, nookHost, sleeping, spreadOf,
-  spreadOfSticker, todayListFinished, unlockedAccessories, wakeAt,
+  ACCESSORIES, ARRIVES_AT, BED_STAGE_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, farmDay, momentQueue, nookHost,
+  sleeping, spreadOf, spreadOfSticker, stickerTotals, todayListFinished, unlockedAccessories, wakeAt,
 } from "./world";
 import type { CharacterId } from "./state";
 
 describe("arrivals", () => {
   it("at 0, 5, 20, 45, 80 and 120 stickers", () => {
     expect(ARRIVES_AT).toEqual({ domino: 0, bap: 5, puddle: 20, clover: 45, crumpet: 80, duvet: 120 });
-    expect(arrivedAt(0)).toEqual(["domino"]);
-    expect(arrivedAt(4)).toEqual(["domino"]);
-    expect(arrivedAt(5)).toEqual(["domino", "bap"]);
-    expect(arrivedAt(170)).toHaveLength(6);
+    expect(arrivedAt(0, 1)).toEqual(["domino"]);
+    expect(arrivedAt(4, 1)).toEqual(["domino"]);
+    expect(arrivedAt(5, 1)).toEqual(["domino", "bap"]);
+    expect(arrivedAt(170, 1)).toHaveLength(6);
+  });
+
+  it("or on day N of the farm, whichever comes first (Esme, 2026-11-04): calendar days, the start is day 1", () => {
+    expect(farmDay("2026-11-04", "2026-11-04")).toBe(1);
+    expect(farmDay("2026-11-04", "2026-11-08")).toBe(5);
+    expect(farmDay("2026-11-04", "2027-03-03")).toBe(120); // days, not days active
+    expect(arrivedAt(0, 4)).toEqual(["domino"]);
+    expect(arrivedAt(0, 5)).toEqual(["domino", "bap"]);
+    expect(arrivedAt(0, 119)).not.toContain("duvet");
+    expect(arrivedAt(0, 120)).toEqual(["domino", "bap", "puddle", "clover", "crumpet", "duvet"]); // zero stickers, day 120
+    expect(arrivedAt(45, 21)).toEqual(["domino", "bap", "puddle", "clover"]); // stickers first
+    expect(arrivedAt(3, 45)).toEqual(["domino", "bap", "puddle", "clover"]); // days first
+  });
+});
+
+describe("sticker totals (Esme, 2026-11-04)", () => {
+  it("bonus stickers count once each toward friends and hats, never toward the 175", () => {
+    // Fictional: Welcome, a Mind seed, and Art cleared (×3 repeats change nothing: one sticker).
+    const t = stickerTotals(new Set(["hi", "seeds-mind", "cleared-art", "cleared-body"]));
+    expect(t).toEqual({ collected: 2, friends: 4 });
+    expect(arrivedAt(stickerTotals(new Set(["hi", "seeds-mind", "seeds-art", "cleared-art", "cleared-body"])).friends, 1)).toContain("bap");
   });
 });
 
@@ -53,10 +74,20 @@ describe("accessories", () => {
     expect(unlockedAccessories(5, new Set(), new Set())).toEqual(["A1"]);
     expect(unlockedAccessories(100, new Set(), new Set())).toEqual(["A1", "A2", "A3", "A4", "A5", "A6", "A7"]);
     expect(unlockedAccessories(130, new Set(), new Set())).toContain("A12");
-    expect(unlockedAccessories(174, new Set(), new Set())).not.toContain("A13"); // the crown is the whole collection (Esme)
-    expect(unlockedAccessories(175, new Set(), new Set())).toContain("A13");
+    // The crown is the whole collection (Esme): every one of the 175, bonus stickers aside.
+    const all = new Set(COLLECTION.map((s) => s.key));
+    expect(unlockedAccessories(175, new Set(), all)).toContain("A13");
+    const allButOne = new Set([...all].slice(1));
+    expect(unlockedAccessories(182, new Set(), new Set([...allButOne, ...STICKERS.filter((s) => s.bonus).map((s) => s.key)]))).not.toContain("A13");
     expect(unlockedAccessories(0, new Set(), hedgerow("nov"))).toEqual(["A9"]); // November leaf: autumn
     expect(unlockedAccessories(0, new Set(["pond", "museum"]), hedgerow("holly"))).toEqual(["A10", "H4", "H7"]);
+  });
+
+  it("wellies come with the Welcome back sticker, not weather (Esme, 2026-11-04)", () => {
+    expect(STICKER_BY_KEY.get("door")!.rule).toEqual({ source: "returns", at: 1 }); // Welcome back
+    expect(unlockedAccessories(0, new Set(), new Set())).not.toContain("A11");
+    expect(unlockedAccessories(0, new Set(), new Set(["door"]))).toEqual(["A11"]);
+    expect(ACCESSORIES.find((a) => a.code === "A11")!.unlock).not.toMatch(/rain/i);
   });
 });
 
@@ -69,7 +100,7 @@ describe("zones and beds", () => {
     expect([...awakeZones(half.slice(0, 4))]).toEqual([]);
   });
 
-  it.each([[0, 0], [1, 1], [4, 1], [5, 2], [10, 3], [25, 4], [49, 4], [50, 5], [300, 5]])("%i to-dos: stage %i", (n, stage) => {
+  it.each([[0, 0], [1, 1], [4, 1], [5, 2], [10, 3], [25, 4], [39, 4], [40, 5], [300, 5]])("%i to-dos: stage %i (the last at 40)", (n, stage) => {
     expect(bedStage(n)).toBe(stage);
   });
 
@@ -77,6 +108,8 @@ describe("zones and beds", () => {
     expect(bedStageEarned("Mind", new Set())).toBe(0);
     expect(bedStageEarned("Mind", new Set(["seeds-mind", "sprout-mind"]))).toBe(1); // the sprout (3) isn't a stage
     expect(bedStageEarned("Mind", new Set(["seeds-mind", "herbsprout", "chamomile", "herbbundle", "moth"]))).toBe(5);
+    expect(STICKER_BY_KEY.get("moth")!.rule.at).toBe(40); // the bed's last stage moved from 50 to 40
+    expect(BED_STAGE_AT).toEqual([1, 5, 10, 25, 40]);
     expect(bedStageEarned("Writing", new Set(["seeds-mind"]))).toBe(0);
   });
 });
@@ -153,6 +186,46 @@ describe("Today's list finished", () => {
     // Every item that was on the list this morning is ticked: finished, though new picks now show.
     expect(todayList(items, [], T).picks.some((i) => i.status === "open")).toBe(true);
     expect(todayListFinished(items, [], T)).toBe(true);
+  });
+
+  it("an item moved to a later day counts as off the list (rescheduling is never a failure; Esme, 2026-11-04)", () => {
+    const tomorrow = "2026-11-05";
+    // Fictional: 10 open to-dos; this morning's 4 picks. She ticks two and moves two on.
+    const items: Item[] = Array.from({ length: 10 }, () => t({ touchedAt: "2026-11-01" }));
+    const [a, b, c, d] = todayList(items, [], T).picks;
+    const after = items.map((i) => {
+      if (i.id === a!.id || i.id === b!.id) return { ...i, status: "done" as const, completedAt: T, touchedAt: T };
+      if (i.id === c!.id) return { ...i, pinnedDate: tomorrow, touchedAt: T }; // Do it on: Tomorrow
+      if (i.id === d!.id) return { ...i, hiddenOn: T, touchedAt: T }; // Remove from today
+      return i;
+    });
+    expect(todayListFinished(after, [], T)).toBe(true);
+    // Only one ticked and one still waiting: not yet.
+    const half = after.map((i) => (i.id === b!.id ? items.find((x) => x.id === b!.id)! : i));
+    expect(todayListFinished(half, [], T)).toBe(false);
+  });
+
+  it("a deadline moved past today counts as moved too", () => {
+    const items: Item[] = [t({ due: T, touchedAt: "2026-11-01" }), t({ pinnedDate: T, touchedAt: "2026-11-01" })];
+    const after = [{ ...items[0]!, due: "2026-11-20", touchedAt: T }, { ...items[1]!, status: "done" as const, completedAt: T, touchedAt: T }];
+    expect(todayListFinished(after, [], T)).toBe(true);
+  });
+
+  it("needs at least one thing ticked: moving everything on isn't a finished list", () => {
+    const items: Item[] = [t({ pinnedDate: T, touchedAt: "2026-11-01" }), t({ pinnedDate: T, touchedAt: "2026-11-01" })];
+    const moved = items.map((i) => ({ ...i, pinnedDate: "2026-11-06", touchedAt: T }));
+    expect(todayListFinished(moved, [], T)).toBe(false);
+    expect(todayListFinished([{ ...moved[0]!, pinnedDate: T, status: "done" as const, completedAt: T }, moved[1]!], [], T)).toBe(true);
+  });
+
+  it("a habit taken off today counts as moved; a habit ticked counts as ticked", () => {
+    const items: Item[] = [t({ recur: ["wed"], touchedAt: "2026-11-01" }), t({ recur: ["wed"], touchedAt: "2026-11-01" })];
+    const after = [{ ...items[0]!, hiddenOn: T, touchedAt: T }, { ...items[1]!, doneDates: [T], touchedAt: T }];
+    expect(todayListFinished(after, [], T)).toBe(true);
+  });
+
+  it("its hint says ticked or moved (placeholder wording)", () => {
+    expect(hintFor(STICKERS.find((s) => s.rule.source === "today-finished" && s.rule.at === 3)!)).toMatch(/ticked or moved/);
   });
 
   it("ticking things that weren't on the list doesn't finish it", () => {

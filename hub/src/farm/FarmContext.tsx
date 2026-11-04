@@ -8,12 +8,11 @@ import { useLocation } from "react-router-dom";
 import { db } from "../data/db";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { loadJournalKey } from "../journal/keyStore";
-import { COLLECTION } from "./catalogue";
 import { counters, allEarned, derivedEarned, type Counters, type JournalFacts } from "./earning";
 import * as repo from "./farmRepo";
 import { readJournalFacts } from "./journalFacts";
 import { EMPTY_FARM, farmState, type CharacterId, type FarmState } from "./state";
-import { arrivedAt, awakeZones, momentQueue, todayListFinished, unlockedAccessories } from "./world";
+import { arrivedAt, awakeZones, farmDay, momentQueue, stickerTotals, todayListFinished, unlockedAccessories } from "./world";
 
 export interface FarmView {
   /** The farm table has been read. */
@@ -25,7 +24,7 @@ export interface FarmView {
   /** Everything earned (book order): what the data earns, plus anything seen or placed. */
   earned: readonly string[];
   earnedSet: ReadonlySet<string>;
-  /** Collection stickers earned (of 175; bonus stickers and ×N counts never count). Arrivals and totals use it. */
+  /** Collection stickers earned (of 175; bonus stickers and ×N counts never count): the book's total and the crown. */
   collected: number;
   arrived: ReadonlySet<CharacterId>;
   awake: ReadonlySet<string>;
@@ -152,12 +151,14 @@ export function FarmProvider({ items: listItems, goals, today, children }: { ite
   const derived = useMemo(() => (c ? derivedEarned(c) : []), [c]);
   const earned = useMemo(() => (state.start ? allEarned(c, state.seen, state.placed) : []), [c, state]);
   const earnedSet = useMemo(() => new Set(earned), [earned]);
-  /** Collection stickers earned (bonus stickers and ×N counts never count towards it). */
-  const collected = useMemo(() => COLLECTION.filter((s) => earnedSet.has(s.key)).length, [earnedSet]);
+  // Of the 175 (the book's total, the crown), and for friends and hats: plus each bonus sticker once.
+  const { collected, friends } = useMemo(() => stickerTotals(earnedSet), [earnedSet]);
+  // Friends arrive at N stickers or on day N of the farm, whichever comes first (Esme, 2026-11-04).
   // Once moved in, a character stays (review M5), even if fewer stickers show on this device.
-  const arrived = useMemo(() => new Set([...arrivedAt(collected), ...state.arrived]), [collected, state.arrived]);
+  const day = state.start ? farmDay(state.start, today) : 1;
+  const arrived = useMemo(() => new Set([...arrivedAt(friends, day), ...state.arrived]), [friends, day, state.arrived]);
   const awake = useMemo(() => awakeZones(earned), [earned]);
-  const unlocked = useMemo(() => unlockedAccessories(collected, awake, earnedSet), [collected, awake, earnedSet]);
+  const unlocked = useMemo(() => unlockedAccessories(friends, awake, earnedSet), [friends, awake, earnedSet]);
   const queue = useMemo(() => momentQueue(derived, state.seen, state.placed, onJournal), [derived, state, onJournal]);
 
   // Today's list finished: not derivable later, so it is noted when seen (once the farm has started).
