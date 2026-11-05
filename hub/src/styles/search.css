@@ -9,8 +9,9 @@
    magnifier glyph (drawn like the calendar and arrow icons). Nothing animates.
 
    Not in VISUAL-LANGUAGE.md yet (from the chosen mockup, listed for Esme): the bold matches,
-   the magnifier glyph, the "↵" beside the highlighted result and the hint line. Undecided, so
-   magenta: the tile beside an Inbox result (the Inbox has no tile colour or icon). */
+   the magnifier glyph, the "↵" beside the highlighted result and the hint line. An Inbox
+   result's tile is the Inbox's own (Esme, 2026-11-05: pale stone with the tray icon,
+   areas.ts INBOX_TILE); a tile for anything unknown stays the magenta placeholder. */
 
 /* Fix round 1 (I-1, a composition fix for Esme to confirm): the pop-up's top edge sits at a
    fixed 10vh from the top of the window and the results grow downward, so the box never

@@ -11,6 +11,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_KINDS, FAKE_CARD_FILE_TRACKS } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { openReadBackPart } from "../../test/readBack";
 import { cardLines, openAllChapters } from "../../test/chapterMap";
 import { SAVE_TODAY } from "./ExerciseResponseBox";
 
@@ -76,8 +77,8 @@ describe("two books", () => {
   it("Read back shows the book", async () => {
     await submitExerciseEntry(jk, "2026-11-01", await getDeviceId(db), cardRef(TRACKS.cards[3]!), "Pretend second-book words");
     renderApp("/journal/read-back", TODAY);
-    const list = await screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
-    expect(within(list).getByText("Sunday 1 November · Exercise · Pretend second workbook · Day 1 · Pretend second one")).toBeInTheDocument();
+    const list = await openReadBackPart("Mental health exercise");
+    expect(within(list).getByText("Sunday 1 November · Pretend second workbook · Day 1 · Pretend second one")).toBeInTheDocument();
   });
 });
 

@@ -72,8 +72,8 @@ const daysInMonth = (today: ISODate): number => {
 
 /**
  * The same three rows inside Mind's Habits box (Journal v2), after her own Mind habits, in
- * the habit rows' format: "every day" under the title, and on the right "November · session N
- * of M" over the small bar (N = days done this month, M = days in the month). Read-only ticks;
+ * the habit rows' format: "every day" under the title, and on the right "N of M this month"
+ * over the small bar (N = days done this month, M = days in the month). Read-only ticks;
  * tapping a row opens that Journal tab. Locked or loading: no count.
  */
 export function JournalHabitRows({ today }: { today: ISODate }) {

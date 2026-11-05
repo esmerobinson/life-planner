@@ -29,8 +29,8 @@ describe("the Habits box on an area page", () => {
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
     expect(within(box).getByText("every day but Sunday")).toBeInTheDocument();
     expect(within(box).getByText("Mondays")).toBeInTheDocument();
-    expect(within(box).getByText("October · session 2 of 27")).toBeInTheDocument();
-    expect(within(box).getByText("October · session 0 of 4")).toBeInTheDocument();
+    expect(within(box).getByText("2 of 27 this month")).toBeInTheDocument();
+    expect(within(box).getByText("0 of 4 this month")).toBeInTheDocument();
     const todos = screen.getByRole("list", { name: "To-dos" });
     expect(within(todos).getByText("A normal to-do")).toBeInTheDocument();
     expect(within(todos).queryByText("Pretend book session")).toBeNull();
@@ -46,7 +46,7 @@ describe("the Habits box on an area page", () => {
     const row = within(box).getByRole("checkbox", { name: "Done: Pretend book session" }).closest("li")!;
     expect(row).toHaveClass("crossed");
     expect(within(row).getByRole("checkbox")).toBeChecked();
-    expect(within(box).getByText("October · session 1 of 27")).toBeInTheDocument();
+    expect(within(box).getByText("1 of 27 this month")).toBeInTheDocument();
     const got = (await db.items.get(h.id))!;
     expect(got.status).toBe("open");
     expect(got.doneDates).toEqual([TODAY]);

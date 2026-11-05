@@ -66,11 +66,12 @@ export function exerciseCardIdKey(jk: JournalKey, id: string): Promise<string> {
 async function pbkdf2Base(passphrase: string): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase.normalize("NFC")), "PBKDF2", false, [
     "deriveKey",
+    "deriveBits",
   ]);
 }
 
-const pbkdf2 = () => ({
-  name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(JOURNAL_SALT), iterations: JOURNAL_ITERATIONS,
+const pbkdf2 = (salt = JOURNAL_SALT) => ({
+  name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: JOURNAL_ITERATIONS,
 });
 
 /** Derives the journal key from the sync passphrase. Non-extractable; encrypt/decrypt only. */
@@ -92,6 +93,65 @@ export async function deriveJournalKeyAndFp(passphrase: string): Promise<Journal
   const mac = await crypto.subtle.deriveKey(pbkdf2(), base, { name: "HMAC", hash: "SHA-256", length: 256 }, false, ["sign"]);
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", mac, new TextEncoder().encode(FINGERPRINT_INPUT)));
   return { key, mac, fp: hex(sig.subarray(0, 8)) };
+}
+
+// ---- re-key (bugs #3, #4; journal-rekey brief) ------------------------------------------
+//
+// The journal key never changes when the sync passphrase does. Instead each passphrase gets a
+// synced "keywrap" row: the journal SECRET S (the 32 PBKDF2 bits the key above is made of)
+// sealed with that passphrase's KEY-WRAP key (KEK), derived like the journal key but with its
+// own salt, so KEK != journal key. On a device, S is kept sealed with a device-only,
+// non-extractable "device wrap key" (never synced, never in a backup).
+
+/** The KEK's PBKDF2 salt (same iterations as the journal key). */
+export const KEYWRAP_SALT = "esmeworld-keywrap-v1";
+/** The text the KEK fingerprint is an HMAC of. */
+export const KEYWRAP_FP_INPUT = "esmeworld-keywrap-fp";
+/** The journal secret's length in bytes (an AES-256 key). */
+export const SECRET_BYTES = 32;
+
+/** A passphrase's key-wrap key (AES-GCM, non-extractable) and its fingerprint (16 hex). */
+export interface KeyWrapKey {
+  key: CryptoKey;
+  fp: string;
+}
+
+async function bitsOf(passphrase: string, salt: string): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.deriveBits(pbkdf2(salt), await pbkdf2Base(passphrase), SECRET_BYTES * 8));
+}
+
+async function fingerprint(bits: Uint8Array, input: string): Promise<string> {
+  const mac = await crypto.subtle.importKey("raw", bits as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return hex(new Uint8Array(await crypto.subtle.sign("HMAC", mac, new TextEncoder().encode(input))).subarray(0, 8));
+}
+
+/** The journal secret S: exactly the bits `deriveJournalKeyAndFp` makes its keys from. */
+export function deriveJournalSecret(passphrase: string): Promise<Uint8Array> {
+  return bitsOf(passphrase, JOURNAL_SALT);
+}
+
+/** The journal key, HMAC twin and fingerprint from S (both keys non-extractable). */
+export async function journalKeyFromSecret(s: Uint8Array): Promise<JournalKey> {
+  const key = await crypto.subtle.importKey("raw", s as BufferSource, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  const mac = await crypto.subtle.importKey("raw", s as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", mac, new TextEncoder().encode(FINGERPRINT_INPUT)));
+  return { key, mac, fp: hex(sig.subarray(0, 8)) };
+}
+
+/** A passphrase's KEK (salt "esmeworld-keywrap-v1") and its fingerprint. The bits are dropped. */
+export async function deriveKeyWrapKey(passphrase: string): Promise<KeyWrapKey> {
+  const bits = await bitsOf(passphrase, KEYWRAP_SALT);
+  try {
+    const key = await crypto.subtle.importKey("raw", bits as BufferSource, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    return { key, fp: await fingerprint(bits, KEYWRAP_FP_INPUT) };
+  } finally {
+    bits.fill(0);
+  }
+}
+
+/** A fresh device-only key that seals this device's copy of S. Never extractable. */
+export function generateDeviceWrapKey(): Promise<CryptoKey> {
+  return crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]) as Promise<CryptoKey>;
 }
 
 /** Base64 of bytes (no prefix). */

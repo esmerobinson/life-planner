@@ -8,7 +8,8 @@ import { checkCardFile, INVALID_CARD_FILE } from "../../journal/exercise";
 import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE, FAKE_CARD_TEXT, FAKE_CARD_TEXT_V2 } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
-import { renderApp } from "../../test/renderApp";
+import { currentUrl, renderApp } from "../../test/renderApp";
+import { openReadBackPart } from "../../test/readBack";
 import { NOT_AVAILABLE } from "./JournalStrip";
 import { RESTARTS_LINE } from "./MentalHealthExercise";
 
@@ -159,8 +160,9 @@ it("the submitted card and its answers stay reachable: 'See what you wrote' (All
   expect(within(mine).getByText(PRETEND_WORDS)).toBeInTheDocument();
   // Read back lists it too.
   await userEvent.click(screen.getByRole("link", { name: "Read back" }));
-  await userEvent.click(await screen.findByText(/Exercise · Day 1 · Pretend weather/));
-  expect(await screen.findByText(PRETEND_WORDS)).toBeInTheDocument();
+  const part = await openReadBackPart("Mental health exercise");
+  await userEvent.click(await within(part).findByText(/· Day 1 · Pretend weather/));
+  expect(await within(part).findByText(PRETEND_WORDS)).toBeInTheDocument();
 });
 
 it("submitting the second card works too: it is replaced by the third, nothing unticks, both are kept", async () => {
@@ -365,7 +367,13 @@ it("Past exercises on the tab: the latest three, then See all (Read back)", asyn
   await userEvent.click(await within(s).findByText("Past exercises"));
   expect(within(within(s).getByRole("list", { name: "Past exercises" })).getAllByRole("listitem")).toHaveLength(3);
   await userEvent.click(within(s).getByRole("link", { name: "See all" }));
-  expect(await screen.findByRole("region", { name: "Read back" })).toBeInTheDocument();
+  // See all opens Read back straight on this part (no tiles), with every one of them.
+  const rb = await screen.findByRole("region", { name: "Read back" });
+  const part = await within(rb).findByRole("region", { name: "Mental health exercise" }, { timeout: 5000 });
+  expect(currentUrl).toBe("/journal/read-back?part=exercise");
+  expect(within(rb).queryByRole("button", { name: /^Daily check-in/ })).toBeNull();
+  expect(part.querySelectorAll(".journal-readback-list > li")).toHaveLength(4);
+  expect(within(part).getByRole("heading", { name: "October" })).toBeInTheDocument();
 });
 
 it("re-importing asks first: 'Replace your exercise cards?'; Cancel keeps them, Replace replaces", async () => {

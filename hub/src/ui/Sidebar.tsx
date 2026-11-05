@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { NavLink } from "react-router-dom";
 import { NAV } from "./areas";
 import { useSyncState } from "../sync";
@@ -34,7 +35,13 @@ export function Sidebar() {
         {GROUPS.map(({ group, name }) => (
           <div key={group} role="group" aria-label={name} className="sidebar-group">
             {NAV.filter((n) => n.group === group).map((n) => (
-              <NavLink key={n.id} to={n.path} end={n.path === "/"} className="sidebar-item">
+              <NavLink
+                key={n.id}
+                to={n.path}
+                end={n.path === "/"}
+                className="sidebar-item"
+                style={{ "--tile": n.tile } as CSSProperties}
+              >
                 <span className="sidebar-tile" style={{ background: n.tile }}>
                   <img src={n.icon} alt="" width={24} height={24} />
                 </span>

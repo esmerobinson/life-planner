@@ -250,7 +250,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
  * "Another version (from …)", and with `onEdit` its own Edit: changing or deleting one leaves
  * every other version as it is (R-I1).
  */
-function ReadOnlyVersions({ versions, onEdit }: { versions: NoteVersion[]; onEdit?: (v: NoteVersion) => void }) {
+export function ReadOnlyVersions({ versions, onEdit }: { versions: NoteVersion[]; onEdit?: (v: NoteVersion) => void }) {
   if (versions.length === 0) return null;
   return (
     <>
@@ -289,7 +289,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /** A note's words: the thought, her steady answer, and the memory and skill if she wrote them. */
-function NoteBody({ note }: { note: NoteVersion }) {
+export function NoteBody({ note }: { note: NoteVersion }) {
   return (
     <div className="strip-body notes-body">
       <div className="strip-meta">{THOUGHT}</div>
