@@ -227,7 +227,7 @@ async function holdForLater(rows: JournalRow[]) {
     if (held && held.updatedAt > updatedAt) continue;
     await db.quarantine.put({
       table: "journal", id: r.id, updatedAt, data: r as unknown as Record<string, unknown>,
-      reason: "From a backup: a later version of the app reads it.", cursor: 0,
+      reason: "From a backup: a later version of the app reads it.", cursor: 0, fromBackup: true,
     });
   }
 }
