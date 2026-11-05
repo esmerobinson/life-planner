@@ -176,7 +176,7 @@ for (const width of [1280, 1920]) {
       const items = s.getByRole("list", { name: "Past exercises" }).getByRole("listitem");
       // The latest 3 on the tab, then See all (journal v3: nothing long inline; Read back has every one).
       await expect(items).toHaveCount(3);
-      await expect(s.getByRole("link", { name: "See all" })).toHaveAttribute("href", "/journal/read-back");
+      await expect(s.getByRole("link", { name: "See all" })).toHaveAttribute("href", "/journal/read-back?part=exercise");
       // The date first, then the card (the day-1 and day-2 answers here are from the earliest,
       // day-keyed cards, so they say "Earlier card").
       await expect(items.nth(0).locator("summary")).toHaveText(/ · Day 4 · A pretend lighthouse$/);

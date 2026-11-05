@@ -128,7 +128,7 @@ it("Past check-ins: the latest few, then See all; Choose questions closed at the
   await screen.findByText("Checked in for today");
   const past = screen.getByText("Past check-ins").closest("details")!;
   expect(within(past).getAllByRole("listitem").filter((li) => li.parentElement?.classList.contains("journal-past"))).toHaveLength(3);
-  expect(within(past).getByRole("link", { name: "See all" })).toHaveAttribute("href", "/journal/read-back");
+  expect(within(past).getByRole("link", { name: "See all" })).toHaveAttribute("href", "/journal/read-back?part=check-in");
   const choose = screen.getByText("Choose questions").closest("details")!;
   expect(choose.open).toBe(false);
   expect(past.compareDocumentPosition(choose) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

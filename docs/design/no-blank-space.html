@@ -1,0 +1,206 @@
+<title>No Blank Space</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: four questions, each a row of small Mac-window sketches (the app at 1280 wide, drawn at
+   half size) that wrap to one column on a phone. Colours and radii are the app's own tokens;
+   system font because the app's font isn't chosen yet. Single light look: the app has no dark
+   mode yet. Example text is made up. */
+:root {
+  --page: #e2e8ff; --sidebar: #3a412f; --sidebar-item: #51553d; --sidebar-text: #e9e3d6;
+  --panel: #e9e3d6; --row: #e3ddcd; --track: #d4d1c3; --text: #3a412f; --muted: #6f735f;
+  --green: #98c293; --mint: #a3d5c2; --pink: #e6aeaf; --sky: #a6ced6; --orange: #e39876; --blue: #9eb4e6;
+  --white: #fbfaf6;
+  color-scheme: light;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+body { background: var(--page); color: var(--text); margin: 0; font-size: 15px; line-height: 1.45; }
+main { max-width: 1200px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 56px; }
+header h1 { margin: 0 0 8px; font-size: 28px; text-wrap: balance; }
+header p, .lede { margin: 0; max-width: 68ch; }
+header ul { margin: 12px 0 0; padding-left: 20px; max-width: 68ch; }
+section > h2 { margin: 0 0 6px; font-size: 21px; text-wrap: balance; }
+section > .lede { margin-bottom: 20px; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; align-items: start; }
+.opt { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.opt figcaption b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sidebar); color: var(--sidebar-text); font-size: 13px; margin-right: 4px; }
+.opt.now figcaption b { background: var(--track); color: var(--text); }
+.note { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* A Mac window sketch: half-size app */
+.win { display: flex; height: 300px; border-radius: 12px; overflow: hidden; border: 1px solid var(--track); background: var(--page); font-size: 9px; line-height: 1.3; }
+.win.tall { height: 400px; }
+.sb { width: 72px; flex: none; background: var(--sidebar); padding: 8px 6px; display: flex; flex-direction: column; gap: 4px; border-radius: 0 9px 9px 0; }
+.sb i { display: block; height: 14px; border-radius: 4px; background: var(--sidebar-item); }
+.sb i.cur { background: var(--green); }
+.sb i.cur.blue { background: var(--blue); }
+.content { flex: 1; min-width: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+.h { font-weight: 700; font-size: 14px; }
+.hs { font-weight: 700; font-size: 11px; margin-top: 4px; }
+.grid { display: grid; gap: 6px; }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g2 { grid-template-columns: repeat(2, 1fr); }
+.gfit { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
+.goal { background: var(--panel); border-radius: 7px; overflow: hidden; min-height: 54px; }
+.goal .band { padding: 4px 6px; font-weight: 700; }
+.goal .body { padding: 4px 6px; display: flex; flex-direction: column; gap: 3px; }
+.bar { height: 4px; border-radius: 3px; background: var(--track); }
+.bar i { display: block; height: 100%; width: 40%; border-radius: 3px; background: var(--green); }
+.mini { height: 10px; border-radius: 3px; background: var(--row); }
+.chip { display: inline-block; padding: 0 4px; border-radius: 6px; background: var(--row); font-size: 8px; }
+.strip { background: var(--row); border-radius: 4px; height: 16px; display: flex; align-items: center; gap: 4px; padding: 0 5px; }
+.strip::before { content: ""; width: 7px; height: 7px; border: 1px solid var(--text); border-radius: 2px; flex: none; }
+.strip.mint { background: var(--mint); }
+.strip span { flex: 1; }
+.cols { display: flex; gap: 10px; min-height: 0; flex: 1; }
+.cols > .main { flex: 7; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.cols > .side { flex: 3; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fill { flex: 1; }
+.sheet { background: var(--panel); border-radius: 9px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+.sheet.grow { flex: 1; }
+.p { height: 6px; border-radius: 3px; background: var(--track); }
+.p.short { width: 60%; }
+.field { height: 14px; border-radius: 4px; background: var(--white); border: 1px solid var(--track); }
+.field.narrow { width: 34%; }
+.pill { display: inline-block; height: 12px; width: 48px; border-radius: 99px; background: var(--track); }
+.tabrow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.tab { background: var(--mint); border-radius: 4px; padding: 4px; font-weight: 600; }
+.tab.read { background: var(--row); }
+.tab.cur { outline: 1.5px solid var(--text); }
+.writing { flex: 1; background: var(--white); border-radius: 6px; border: 1px solid var(--track); min-height: 60px; }
+.empty { flex: 1; border: 1px dashed var(--muted); border-radius: 6px; display: grid; place-items: center; color: var(--muted); font-size: 9px; opacity: .8; }
+.addgoal { border: 1.5px dashed var(--muted); background: transparent; border-radius: 7px; display: grid; place-items: center; color: var(--muted); min-height: 54px; }
+.vcenter { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+</style>
+
+<main>
+  <header>
+    <h1>Making every page feel full</h1>
+    <p>I screenshotted every page at Mac and phone size with made-up data. Most pages already use the full width. The blank space comes from four places, drawn below as small Mac windows. Pick a letter for each. The first option in each row, marked "now", is how it looks today.</p>
+    <p style="margin-top:10px">I'll also do this without asking, since it's plainly what "full" means: text boxes (Add to inbox, Sync, Backup) stretch to the full width instead of stopping at about a fifth of it.</p>
+  </header>
+
+  <!-- 1 GOALS -->
+  <section>
+    <h2>1 · Goals page: rows with empty slots</h2>
+    <p class="lede">Each area has its own row of up to 3 cards. An area with one goal (Art, Body) leaves two-thirds of its row empty.</p>
+    <div class="opts">
+      <figure class="opt now"><figcaption><b>·</b> Now</figcaption>
+        <div class="win"><div class="sb"><i></i><i class="cur"></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="h">Goals</div>
+          <div class="hs">Mind</div><div class="grid g3"><div class="goal"><div class="band" style="background:var(--mint)">BPD practice</div><div class="body"><div class="bar"><i></i></div></div></div><div class="goal"><div class="band" style="background:var(--mint)">Journal daily</div><div class="body"><div class="bar"><i></i></div></div></div><div class="empty">empty</div></div>
+          <div class="hs">Art</div><div class="grid g3"><div class="goal"><div class="band" style="background:var(--sky)">Landscape series</div><div class="body"><div class="bar"><i></i></div></div></div><div class="empty">empty</div><div class="empty">empty</div></div>
+          <div class="hs">Body</div><div class="grid g3"><div class="goal"><div class="band" style="background:var(--orange)">Stretching</div><div class="body"><div class="bar"><i></i></div></div></div><div class="empty">empty</div><div class="empty">empty</div></div>
+        </div></div>
+      </figure>
+      <figure class="opt"><figcaption><b>A</b> · Cards stretch to fill their row</figcaption>
+        <div class="win"><div class="sb"><i></i><i class="cur"></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="h">Goals</div>
+          <div class="hs">Mind</div><div class="grid gfit"><div class="goal"><div class="band" style="background:var(--mint)">BPD practice</div><div class="body"><div class="bar"><i></i></div></div></div><div class="goal"><div class="band" style="background:var(--mint)">Journal daily</div><div class="body"><div class="bar"><i></i></div></div></div></div>
+          <div class="hs">Art</div><div class="grid"><div class="goal"><div class="band" style="background:var(--sky)">Landscape series</div><div class="body"><div class="bar"><i></i></div></div></div></div>
+          <div class="hs">Body</div><div class="grid"><div class="goal"><div class="band" style="background:var(--orange)">Stretching</div><div class="body"><div class="bar"><i></i></div></div></div></div>
+        </div></div>
+        <p class="note">Still grouped by area. One goal takes the whole row, two share it half and half.</p>
+      </figure>
+      <figure class="opt"><figcaption><b>B</b> · One grid, area on each card</figcaption>
+        <div class="win"><div class="sb"><i></i><i class="cur"></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="h">Goals</div>
+          <div class="grid g3">
+            <div class="goal"><div class="band" style="background:var(--mint)">BPD practice</div><div class="body"><span class="chip">Mind</span><div class="bar"><i></i></div></div></div>
+            <div class="goal"><div class="band" style="background:var(--mint)">Journal daily</div><div class="body"><span class="chip">Mind</span><div class="bar"><i></i></div></div></div>
+            <div class="goal"><div class="band" style="background:var(--pink)">Write pages</div><div class="body"><span class="chip">Writing</span><div class="bar"><i></i></div></div></div>
+            <div class="goal"><div class="band" style="background:var(--pink)">Short story</div><div class="body"><span class="chip">Writing</span><div class="bar"><i></i></div></div></div>
+            <div class="goal"><div class="band" style="background:var(--sky)">Landscape series</div><div class="body"><span class="chip">Art</span><div class="bar"><i></i></div></div></div>
+            <div class="goal"><div class="band" style="background:var(--orange)">Stretching</div><div class="body"><span class="chip">Body</span><div class="bar"><i></i></div></div></div>
+          </div>
+        </div></div>
+        <p class="note">No area headings. All goals flow 3 across, in the same order (Mind first), each with a small area label. Gaps only in the very last row.</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 2 HOME -->
+  <section>
+    <h2>2 · Home: the goals column stops early</h2>
+    <p class="lede">Today runs down the page, but "Goals this month" ends after three cards, leaving an empty block under it.</p>
+    <div class="opts">
+      <figure class="opt now"><figcaption><b>·</b> Now</figcaption>
+        <div class="win"><div class="sb"><i class="cur blue"></i><i></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="cols"><div class="main"><div class="h">Today</div><div class="strip mint"><span>Mental health exercise</span></div><div class="strip mint"><span>Morning pages</span></div><div class="strip mint"><span>Daily check-in</span></div><div style="height:6px"></div><div class="strip"><span>Breathing practice</span></div><div class="strip"><span>Draft the essay</span></div><div class="strip"><span>Water the fern</span></div><div class="strip"><span>Therapy worksheet</span></div><div class="strip"><span>Read a chapter</span></div></div>
+          <div class="side"><div class="h" style="font-size:11px">Goals this month</div><div class="goal" style="min-height:30px"><div class="band" style="background:var(--mint)">BPD practice</div></div><div class="goal" style="min-height:30px"><div class="band" style="background:var(--mint)">Journal daily</div></div><div class="goal" style="min-height:30px"><div class="band" style="background:var(--pink)">Write pages</div></div><div class="empty">empty</div></div></div>
+        </div></div>
+      </figure>
+      <figure class="opt"><figcaption><b>A</b> · Goals panel runs the full height</figcaption>
+        <div class="win"><div class="sb"><i class="cur blue"></i><i></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="cols"><div class="main"><div class="h">Today</div><div class="strip mint"><span>Mental health exercise</span></div><div class="strip mint"><span>Morning pages</span></div><div class="strip mint"><span>Daily check-in</span></div><div style="height:6px"></div><div class="strip"><span>Breathing practice</span></div><div class="strip"><span>Draft the essay</span></div><div class="strip"><span>Water the fern</span></div><div class="strip"><span>Therapy worksheet</span></div><div class="strip"><span>Read a chapter</span></div></div>
+          <div class="side"><div class="sheet grow"><div class="h" style="font-size:11px">Goals this month</div><div class="goal" style="min-height:30px;background:var(--row)"><div class="band" style="background:var(--mint)">BPD practice</div></div><div class="goal" style="min-height:30px;background:var(--row)"><div class="band" style="background:var(--mint)">Journal daily</div></div><div class="goal" style="min-height:30px;background:var(--row)"><div class="band" style="background:var(--pink)">Write pages</div></div></div></div></div>
+        </div></div>
+        <p class="note">The goals sit on a cream panel that reaches down as far as Today does, so the column is never bare.</p>
+      </figure>
+      <figure class="opt"><figcaption><b>B</b> · Goal cards share out the height</figcaption>
+        <div class="win"><div class="sb"><i class="cur blue"></i><i></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="cols"><div class="main"><div class="h">Today</div><div class="strip mint"><span>Mental health exercise</span></div><div class="strip mint"><span>Morning pages</span></div><div class="strip mint"><span>Daily check-in</span></div><div style="height:6px"></div><div class="strip"><span>Breathing practice</span></div><div class="strip"><span>Draft the essay</span></div><div class="strip"><span>Water the fern</span></div><div class="strip"><span>Therapy worksheet</span></div><div class="strip"><span>Read a chapter</span></div></div>
+          <div class="side"><div class="h" style="font-size:11px">Goals this month</div><div class="goal fill"><div class="band" style="background:var(--mint)">BPD practice</div><div class="body"><div class="bar"><i></i></div><div class="mini"></div></div></div><div class="goal fill"><div class="band" style="background:var(--mint)">Journal daily</div><div class="body"><div class="bar"><i></i></div><div class="mini"></div></div></div><div class="goal fill"><div class="band" style="background:var(--pink)">Write pages</div><div class="body"><div class="bar"><i></i></div><div class="mini"></div></div></div></div></div>
+        </div></div>
+        <p class="note">Each goal card grows taller, so together they end where Today ends. With more room they show a little more (like this week's progress).</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 3 SHORT PAGES -->
+  <section>
+    <h2>3 · Short pages that stop high up</h2>
+    <p class="lede">Bin, Sync, Backup, Repeating and Sort one by one have little on them, so half the window is bare page below.</p>
+    <div class="opts">
+      <figure class="opt now"><figcaption><b>·</b> Now</figcaption>
+        <div class="win"><div class="sb"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="h">Bin</div><div class="strip"><span>Old idea</span></div><div class="strip"><span>Duplicate to-do</span></div><div class="strip"><span>Test note</span></div><div class="empty">empty</div>
+        </div></div>
+      </figure>
+      <figure class="opt"><figcaption><b>A</b> · A cream sheet to the bottom</figcaption>
+        <div class="win"><div class="sb"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="sheet grow"><div class="h">Bin</div><div class="strip"><span>Old idea</span></div><div class="strip"><span>Duplicate to-do</span></div><div class="strip"><span>Test note</span></div></div>
+        </div></div>
+        <p class="note">On a short page, the page sits on a cream sheet that always reaches the bottom of the window. Sort one by one's card fills the width too.</p>
+      </figure>
+      <figure class="opt"><figcaption><b>B</b> · Centred in the window</figcaption>
+        <div class="win"><div class="sb"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="content">
+          <div class="vcenter"><div class="h">Bin</div><div class="strip"><span>Old idea</span></div><div class="strip"><span>Duplicate to-do</span></div><div class="strip"><span>Test note</span></div></div>
+        </div></div>
+        <p class="note">A short page sits in the middle of the window, so the space is shared above and below instead of all at the bottom.</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 4 JOURNAL TABS -->
+  <section>
+    <h2>4 · Journal tabs on the Mac</h2>
+    <p class="lede">On the Mac the five Journal tabs stack as five wide rows, each mostly empty. You chose "stack vertically, never scroll sideways". That still applies on the phone.</p>
+    <div class="opts">
+      <figure class="opt now"><figcaption><b>·</b> Now</figcaption>
+        <div class="win"><div class="sb"><i></i><i></i><i></i><i></i><i></i><i class="cur" style="background:#9285c5"></i></div><div class="content">
+          <div class="h">Journal</div>
+          <div class="tab cur">Mental health exercise</div><div class="tab">Morning pages</div><div class="tab">Daily check-in</div><div class="tab read">Read back</div><div class="tab read">Notes to myself</div>
+          <div class="writing"></div>
+        </div></div>
+      </figure>
+      <figure class="opt"><figcaption><b>A</b> · One row across on the Mac</figcaption>
+        <div class="win"><div class="sb"><i></i><i></i><i></i><i></i><i></i><i class="cur" style="background:#9285c5"></i></div><div class="content">
+          <div class="h">Journal</div>
+          <div class="tabrow"><div class="tab cur">Mental health</div><div class="tab">Morning pages</div><div class="tab">Daily check-in</div><div class="tab read">Read back</div><div class="tab read">Notes to myself</div></div>
+          <div class="writing"></div>
+        </div></div>
+        <p class="note">On the Mac, the five tabs sit side by side and fill the width. The exercise gets more room below. On the phone they still stack, and nothing ever scrolls sideways.</p>
+      </figure>
+      <figure class="opt"><figcaption><b>B</b> · Two columns on the Mac</figcaption>
+        <div class="win"><div class="sb"><i></i><i></i><i></i><i></i><i></i><i class="cur" style="background:#9285c5"></i></div><div class="content">
+          <div class="h">Journal</div>
+          <div class="grid g2"><div class="tab cur">Mental health exercise</div><div class="tab">Morning pages</div><div class="tab">Daily check-in</div><div class="tab read">Read back</div><div class="tab read" style="grid-column:span 2">Notes to myself</div></div>
+          <div class="writing"></div>
+        </div></div>
+        <p class="note">Tabs in two columns: half the height of now, still easy to read.</p>
+      </figure>
+    </div>
+  </section>
+</main>

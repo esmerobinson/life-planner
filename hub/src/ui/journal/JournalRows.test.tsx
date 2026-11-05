@@ -232,7 +232,7 @@ describe("Home: the rows lead Today's list (Esme, 2026-11-04)", () => {
 });
 
 describe("Mind's Habits box holds the Journal rows", () => {
-  it("after her own Mind habits, in the habit format: 'every day', 'November · session N of 30', read-only ticks", async () => {
+  it("after her own Mind habits, in the habit format: 'every day', 'N of 30 this month', read-only ticks", async () => {
     await someDone();
     await createItem({ kind: "task", title: "Pretend habit", areaId: "mind", priority: 2, recur: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] }, TODAY);
     renderApp("/area/mind", TODAY);
@@ -245,10 +245,10 @@ describe("Mind's Habits box holds the Journal rows", () => {
     const morning = items[2]!;
     expect(morning).toHaveClass("journal-row");
     expect(within(morning).getByText("every day")).toHaveClass("strip-meta");
-    await waitFor(() => expect(within(morning).getByText("November · session 2 of 30")).toBeInTheDocument());
+    await waitFor(() => expect(within(morning).getByText("2 of 30 this month")).toBeInTheDocument());
     expect(tick(morning)).toHaveAttribute("aria-checked", "true");
     expect(tick(morning)).toHaveAttribute("aria-disabled", "true");
-    expect(within(items[3]!).getByText("November · session 1 of 30")).toBeInTheDocument(); // checked in on the 1st
+    expect(within(items[3]!).getByText("1 of 30 this month")).toBeInTheDocument(); // checked in on the 1st
     // The same week's bars as on Home and the Journal tabs (Esme, 2026-11-04), on all three.
     for (const li of items.slice(1)) expect(li.querySelectorAll(".streak .streak-day")).toHaveLength(7);
     expect(morning.querySelectorAll(".streak-day.on").length).toBeGreaterThan(0);
