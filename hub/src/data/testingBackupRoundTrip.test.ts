@@ -56,7 +56,7 @@ async function journalRows(): Promise<{ rows: JournalRow[]; photo: FileRow }> {
   const suffix: Record<string, string | undefined> = {
     page: "11111111-1111-4111-8111-111111111111", photo: "photo1", draft: dev, answer: `abcdef012345:${dev}`,
     exercise: dev, stars: dev, "exercise-entry": `0123456789ab:${dev}`, cards: undefined,
-    note: "22222222-2222-4222-8222-222222222222", "note-read": dev,
+    note: "22222222-2222-4222-8222-222222222222", "note-read": dev, keywrap: "0123456789abcdef",
   };
   const rows: JournalRow[] = [];
   for (const kind of JOURNAL_KINDS) {
