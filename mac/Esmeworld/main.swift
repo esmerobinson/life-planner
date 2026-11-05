@@ -480,6 +480,85 @@ final class RemindersBridge: NSObject, WKScriptMessageHandlerWithReply {
     }
 }
 
+// MARK: - New versions under a running app (bug #39)
+
+/// mac/build.sh --install swaps a whole new bundle in under a running Esmeworld. Its files
+/// then sit at the same path, so the running app keeps old code in memory but would serve
+/// NEW files to its old page. The build writes two ids into Info.plist: a hash of the web
+/// files (EsmeworldWebBuild) and of the compiled app (EsmeworldShellBuild). The app compares
+/// the ids on disk with the ones it is running: a new web build means "save, then reload the
+/// page"; a new app build means "save, then quit and reopen". Never mid-typing: see
+/// AppDelegate.checkForNewVersion.
+struct BuildID: Equatable {
+    let web: String
+    let shell: String
+}
+
+enum AppVersion {
+    static let webKey = "EsmeworldWebBuild"
+    static let shellKey = "EsmeworldShellBuild"
+    /// Posted by mac/build.sh --install (object: the installed bundle's path) so a running
+    /// app looks at once instead of at its next check.
+    static let installedNotification = Notification.Name("world.esme.esmeworld.newVersionInstalled")
+    /// How often a running app looks at the bundle on disk anyway.
+    static let checkInterval: TimeInterval = 120
+    /// While a new version waits (she is typing), how soon to look again.
+    static let retryInterval: TimeInterval = 10
+    /// In front, the page reloads only after this long with nothing typed (ms).
+    static let idleBeforeReloadMs = 30_000
+
+    /// The bundle's Info.plist on disk now (after a swap: the new one). The self-test points
+    /// this at a copy it can change.
+    static var infoPlistURL = Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")
+
+    static func ids(_ info: [String: Any]?) -> BuildID? {
+        guard let web = info?[webKey] as? String, let shell = info?[shellKey] as? String,
+              !web.isEmpty, !shell.isEmpty else { return nil }
+        return BuildID(web: web, shell: shell)
+    }
+
+    /// What this process is running (read once at launch, before any install can swap it).
+    static let launched: BuildID? = ids(Bundle.main.infoDictionary)
+
+    static func onDisk() -> BuildID? {
+        ids(NSDictionary(contentsOf: infoPlistURL) as? [String: Any])
+    }
+
+    enum Action: String { case none, reload, relaunch }
+
+    /// Unknown ids (an old build without them, an unreadable file mid-swap) never act.
+    static func decide(launched: BuildID?, page: String?, disk: BuildID?) -> Action {
+        guard let launched, let disk else { return .none }
+        if disk.shell != launched.shell { return .relaunch }
+        if disk.web != (page ?? launched.web) { return .reload }
+        return .none
+    }
+
+    /// What the running app is on, for mac/build.sh to report. The self-test has its own file.
+    static var statusURL: URL {
+        WebCryptoMasterKey.directory.appendingPathComponent(isSelfTest ? "running-build-selftest.json" : "running-build.json")
+    }
+
+    /// state: "current" (on the version on disk) or "waiting" (a new one is on disk and is
+    /// taken as soon as she stops typing). Best effort: a failure here changes nothing else.
+    static func writeStatus(state: String, reason: String = "", page: String?, disk: BuildID?) {
+        let status: [String: Any] = [
+            "pid": Int(ProcessInfo.processInfo.processIdentifier),
+            "web": page ?? "",
+            "shell": launched?.shell ?? "",
+            "diskWeb": disk?.web ?? "",
+            "diskShell": disk?.shell ?? "",
+            "state": state,
+            "reason": reason,
+            "at": ISO8601DateFormatter().string(from: Date()),
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: status, options: [.sortedKeys]) else { return }
+        try? FileManager.default.createDirectory(at: WebCryptoMasterKey.directory, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
+        try? data.write(to: statusURL, options: .atomic)
+    }
+}
+
 // MARK: - App
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
@@ -505,6 +584,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     private var selfTestDownloadDir: URL?
     private var downloadDestinations: [ObjectIdentifier: URL] = [:]
 
+    // New versions (see AppVersion).
+    /// The web build the page in the window was loaded from (set when a load commits).
+    private(set) var pageWebBuild: String?
+    private var versionTimer: Timer?
+    private var versionRetry: DispatchWorkItem?
+    private var versionCheckRunning = false
+    /// Set once the page has been flushed for quitting (relaunch or ⌘Q), so it is done once.
+    private var flushedForQuit = false
+    /// Self-test only: behave as if the window were in front (the self-test app never is).
+    var selfTestPretendInFront = false
+    private var selfTestCommits = 0
+    static let relaunchPathKey = "EsmeworldRelaunchPath"
+    static let relaunchInBackgroundKey = "EsmeworldRelaunchInBackground"
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Before launch finishes, so a reminder click that launched the app reaches us. Never in
         // the self-test: a click on one of her reminders must not go to its hidden window.
@@ -520,7 +613,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             NSApp.setActivationPolicy(.accessory)
             Task { @MainActor in
                 // Watchdog: never hang the build.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 45) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 75) {
                     say("FAIL watchdog timeout")
                     exit(1)
                 }
@@ -535,6 +628,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                     exit(1)
                 }
                 self.setUpWindow(dataStore: store)
+                self.startWatchingForNewVersions()
                 await self.runSelfTest()
             }
             return
@@ -545,12 +639,190 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         loadMasterKey()
         setUpWindow(dataStore: WKWebsiteDataStore.default())
 
+        // Reopened by itself onto a new version (relaunchOntoNewVersion): back to the same
+        // page, and left behind her other windows if she was in another app.
+        let defaults = UserDefaults.standard
+        let relaunchPath = defaults.string(forKey: Self.relaunchPathKey)
+        let relaunchedInBackground = defaults.bool(forKey: Self.relaunchInBackgroundKey)
+        defaults.removeObject(forKey: Self.relaunchPathKey)
+        defaults.removeObject(forKey: Self.relaunchInBackgroundKey)
+        if launchPath == nil { launchPath = relaunchPath }
+
         // Restores the saved size and position if there is one.
         window.setFrameAutosaveName("EsmeworldMainWindow")
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if relaunchedInBackground && launchPath == relaunchPath {
+            window.orderBack(nil)
+        } else {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
         webView.load(URLRequest(url: launchPath.flatMap(Self.appURL) ?? kStartURL))
         launchPath = nil
+        startWatchingForNewVersions()
+    }
+
+    // MARK: New versions (bug #39; see AppVersion)
+
+    /// Looks when she comes back to the app, when she leaves it, every few minutes, and when
+    /// mac/build.sh --install says it has just installed one.
+    func startWatchingForNewVersions() {
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(newVersionInstalled(_:)), name: AppVersion.installedNotification,
+            object: nil, suspensionBehavior: .deliverImmediately)
+        if !isSelfTest {
+            versionTimer = Timer.scheduledTimer(withTimeInterval: AppVersion.checkInterval, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.checkForNewVersion("timer") }
+            }
+        }
+    }
+
+    @objc func newVersionInstalled(_ note: Notification) {
+        // Only an install of this very bundle (the self-test's build is elsewhere).
+        guard let path = note.object as? String,
+              URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+                == Bundle.main.bundleURL.standardizedFileURL.resolvingSymlinksInPath().path
+        else { return }
+        MainActor.assumeIsolated { checkForNewVersion("installed") }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        if !isSelfTest { checkForNewVersion("active") }
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        // She has gone to another app: nothing can be typed here, the safest moment.
+        if !isSelfTest { checkForNewVersion("inactive") }
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        if !isSelfTest { checkForNewVersion("minimized") }
+    }
+
+    /// Nothing can be typed into the window: another app is in front, or it is hidden or minimized.
+    private var windowIsBehind: Bool {
+        if isSelfTest { return !selfTestPretendInFront }
+        return !NSApp.isActive || NSApp.isHidden || !window.isVisible || window.isMiniaturized
+    }
+
+    /// If the bundle on disk is newer than what is running: save the page (the same saves as
+    /// switching away), then reload it from the new files, or quit and reopen for a new app
+    /// build. In front, only after 30 s with nothing typed; otherwise it tries again shortly.
+    @MainActor
+    func checkForNewVersion(_ why: String) {
+        guard webView != nil, !versionCheckRunning, !flushedForQuit else { return }
+        let disk = AppVersion.onDisk()
+        let action = AppVersion.decide(launched: AppVersion.launched, page: pageWebBuild, disk: disk)
+        if isSelfTest { say("version.check why=\(why) action=\(action.rawValue)") }
+        guard action != .none else {
+            versionRetry?.cancel()
+            versionRetry = nil
+            return
+        }
+        versionCheckRunning = true
+        let behind = windowIsBehind
+        prepareForReload(minIdleMs: behind ? 0 : AppVersion.idleBeforeReloadMs, pageMayBeOld: behind) { [weak self] ready, reason in
+            guard let self else { return }
+            self.versionCheckRunning = false
+            if isSelfTest { say("version.prepare ready=\(ready) reason=\(reason)") }
+            guard ready else {
+                AppVersion.writeStatus(state: "waiting", reason: reason, page: self.pageWebBuild, disk: disk)
+                self.scheduleVersionRetry()
+                return
+            }
+            self.versionRetry?.cancel()
+            self.versionRetry = nil
+            switch action {
+            case .reload: self.reloadOntoNewVersion()
+            case .relaunch: self.relaunchOntoNewVersion(inBackground: behind)
+            case .none: break
+            }
+        }
+    }
+
+    private func scheduleVersionRetry() {
+        versionRetry?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.checkForNewVersion("retry") }
+        }
+        versionRetry = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + AppVersion.retryInterval, execute: work)
+    }
+
+    /// Asks the page to save everything and say when it has landed (window.esmeworldPrepareReload,
+    /// hub/src/native/appUpdate.ts). A page from before that hook gets the "page hidden" event its
+    /// saves listen for, then a moment for them to land; that is only done when nothing can be
+    /// typed (`pageMayBeOld`), since such a page can't tell whether she is typing.
+    private func prepareForReload(minIdleMs: Int, pageMayBeOld: Bool, done: @escaping @MainActor (Bool, String) -> Void) {
+        guard webView.url != nil else { done(true, ""); return } // an error page: nothing to save
+        var answered = false
+        let answer: @MainActor (Bool, String) -> Void = { ready, reason in
+            if answered { return }
+            answered = true
+            done(ready, reason)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { answer(false, "no answer from the page") }
+        webView.callAsyncJavaScript("""
+            const prepare = window.esmeworldPrepareReload;
+            if (typeof prepare === "function") return JSON.stringify(await prepare(minIdleMs));
+            if (!pageMayBeOld) return JSON.stringify({ ready: false, reason: "old page; waiting until the window is behind" });
+            Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+            try { document.dispatchEvent(new Event("visibilitychange")); } finally { delete document.visibilityState; }
+            await new Promise((r) => setTimeout(r, 2000));
+            return JSON.stringify({ ready: true, reason: "" });
+            """, arguments: ["minIdleMs": minIdleMs, "pageMayBeOld": pageMayBeOld], in: nil, in: .page
+        ) { result in
+            guard case .success(let raw) = result, let text = raw as? String, let data = text.data(using: .utf8),
+                  let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            else { answer(false, "the page did not answer"); return }
+            answer(obj["ready"] as? Bool == true, obj["reason"] as? String ?? "")
+        }
+    }
+
+    private func reloadOntoNewVersion() {
+        if isSelfTest { say("version.reload") }
+        // From the files on disk, not from any cache; the same page she was on.
+        if webView.url == nil { webView.load(URLRequest(url: kStartURL)) } else { webView.reloadFromOrigin() }
+    }
+
+    /// The app itself changed: a small shell waits for this process to end, then opens the
+    /// installed app again (in the background if she was elsewhere), on the same page.
+    private func relaunchOntoNewVersion(inBackground: Bool) {
+        if isSelfTest { return } // never: the self-test only checks the decision
+        let path = webView.url.flatMap { $0.scheme == kScheme ? $0.path : nil } ?? "/"
+        UserDefaults.standard.set(path, forKey: Self.relaunchPathKey)
+        UserDefaults.standard.set(inBackground, forKey: Self.relaunchInBackgroundKey)
+        let reopen = Process()
+        reopen.executableURL = URL(fileURLWithPath: "/bin/sh")
+        reopen.arguments = ["-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; exec /usr/bin/open \(inBackground ? "-g " : "")\"$2\"",
+                            "esmeworld-relaunch", String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath]
+        do {
+            try reopen.run()
+        } catch {
+            UserDefaults.standard.removeObject(forKey: Self.relaunchPathKey)
+            UserDefaults.standard.removeObject(forKey: Self.relaunchInBackgroundKey)
+            FileHandle.standardError.write(Data("Esmeworld: can't reopen itself: \(error.localizedDescription)\n".utf8))
+            return
+        }
+        flushedForQuit = true // just saved by prepareForReload
+        NSApp.terminate(nil)
+    }
+
+    /// Quitting (⌘Q, the Quit menu, a relaunch, or closing the window): the page saves first.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isSelfTest, !flushedForQuit, let webView, webView.url != nil else { return .terminateNow }
+        flushedForQuit = true
+        var answered = false
+        let finish = {
+            if answered { return }
+            answered = true
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { finish() }
+        webView.callAsyncJavaScript(
+            "const f = window.esmeworldFlush; if (typeof f === 'function') await f(); return true;",
+            arguments: [:], in: nil, in: .page
+        ) { _ in finish() }
+        return .terminateLater
     }
 
     /// esmeworld://app<path> for an app path ("/today"), or nil.
@@ -763,7 +1035,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         download.delegate = self
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        selfTestCommits += 1
+        // A new page is in: it came from the files on disk now (the scheme handler reads them per request).
+        pageWebBuild = AppVersion.onDisk()?.web ?? AppVersion.launched?.web
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        let disk = AppVersion.onDisk()
+        if AppVersion.decide(launched: AppVersion.launched, page: pageWebBuild, disk: disk) == .none {
+            AppVersion.writeStatus(state: "current", page: pageWebBuild, disk: disk)
+        } else {
+            // Swapped while loading: get onto it as usual.
+            DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.checkForNewVersion("loaded") } }
+        }
         loadWaiter?.resume()
         loadWaiter = nil
     }
@@ -1150,6 +1435,157 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
     }
 
+    private func waitUntil(seconds: Double, _ cond: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if cond() { return true }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return cond()
+    }
+
+    private func readStatus() -> [String: Any] {
+        guard let data = try? Data(contentsOf: AppVersion.statusURL),
+              let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    /// Never touches the bundle: the app is pointed at a copy of its Info.plist, which the test
+    /// changes as an install would. Never relaunches (only that decision is checked).
+    @MainActor
+    private func runVersionSelfTest(_ check: (Bool, String) -> Void) async {
+        let realPlist = AppVersion.infoPlistURL
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("esmeworld-selftest-version-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            AppVersion.infoPlistURL = realPlist
+            selfTestPretendInFront = false
+            try? FileManager.default.removeItem(at: dir)
+        }
+        do {
+            let launched = AppVersion.launched
+            say("version.launched web=\(launched?.web ?? "nil") app=\(launched?.shell ?? "nil") page=\(pageWebBuild ?? "nil")")
+            check(launched != nil, "build ids in Info.plist")
+            check(AppVersion.onDisk() == launched, "build ids on disk match the running app")
+            check(pageWebBuild != nil && pageWebBuild == launched?.web, "the page's build is recorded")
+
+            let a = BuildID(web: "w1", shell: "s1")
+            let decisions: [(AppVersion.Action, AppVersion.Action, String)] = [
+                (AppVersion.decide(launched: a, page: "w1", disk: a), .none, "same"),
+                (AppVersion.decide(launched: a, page: nil, disk: a), .none, "same, no page yet"),
+                (AppVersion.decide(launched: a, page: "w1", disk: BuildID(web: "w2", shell: "s1")), .reload, "new web"),
+                (AppVersion.decide(launched: a, page: "w2", disk: BuildID(web: "w2", shell: "s1")), .none, "already reloaded"),
+                (AppVersion.decide(launched: a, page: "w1", disk: BuildID(web: "w1", shell: "s2")), .relaunch, "new app"),
+                (AppVersion.decide(launched: a, page: "w1", disk: nil), .none, "unreadable on disk"),
+                (AppVersion.decide(launched: nil, page: "w1", disk: a), .none, "running build has no ids"),
+            ]
+            let wrong = decisions.filter { $0.0 != $0.1 }.map { "\($0.2)=\($0.0.rawValue)" }
+            say("version.decisions wrong=\(wrong)")
+            check(wrong.isEmpty, "new-version decisions")
+
+            // The page's hooks; a flush waits for a write still in progress; typing holds a reload.
+            try await load(URL(string: "esmeworld://app/area/writing")!)
+            let hooks = try await js("""
+            \(Self.waitJS("typeof window.esmeworldPrepareReload === 'function'"))
+            const hooks = typeof window.esmeworldFlush === "function" && typeof window.esmeworldPrepareReload === "function";
+            const db = await new Promise((res, rej) => {
+              const r = indexedDB.open("esmeworld-selftest-flush", 1);
+              r.onupgradeneeded = () => r.result.createObjectStore("kv");
+              r.onsuccess = () => res(r.result);
+              r.onerror = () => rej(r.error);
+            });
+            let landed = false;
+            const tx = db.transaction("kv", "readwrite");
+            const st = tx.objectStore("kv");
+            const until = Date.now() + 400;
+            const step = () => { st.put(Date.now(), "t").onsuccess = () => { if (Date.now() < until) step(); }; };
+            step();
+            tx.oncomplete = () => { landed = true; };
+            const t0 = Date.now();
+            const flushed = await window.esmeworldFlush();
+            const flushMs = Date.now() - t0;
+            const landedAtFlush = landed;
+            const t1 = Date.now();
+            await new Promise((r) => setTimeout(r, 20));
+            const timeout20Ms = Date.now() - t1;
+            db.close();
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "a" }));
+            const typing = await window.esmeworldPrepareReload(30000);
+            window.__esmeworldSelfTestMarker = 1;
+            return JSON.stringify({ hooks, landedAtFlush, settled: flushed.settled, typingReady: typing.ready, typingReason: typing.reason, flushMs, timeout20Ms, vis: document.visibilityState });
+            """)
+            say("version.hooks=\(hooks["hooks"] as? Bool ?? false) flushWaitedForWrite=\(hooks["landedAtFlush"] as? Bool ?? false) settled=\(hooks["settled"] as? Bool ?? false) whileTyping=\(hooks["typingReason"] ?? "nil") flushMs=\(hooks["flushMs"] ?? "nil") timeout20Ms=\(hooks["timeout20Ms"] ?? "nil") visibility=\(hooks["vis"] ?? "nil")")
+            check(hooks["hooks"] as? Bool == true, "the page has the flush hooks")
+            check(hooks["landedAtFlush"] as? Bool == true && hooks["settled"] as? Bool == true, "a flush waits for a write in progress")
+            check(hooks["typingReady"] as? Bool == false && hooks["typingReason"] as? String == "typing", "no reload while she is typing")
+
+            // An install: a new web build on disk.
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let copy = dir.appendingPathComponent("Info.plist")
+            try FileManager.default.copyItem(at: realPlist, to: copy)
+            AppVersion.infoPlistURL = copy
+            let info = NSMutableDictionary(contentsOf: copy) ?? NSMutableDictionary()
+            info[AppVersion.webKey] = "selftest-new-web"
+            guard info.write(to: copy, atomically: true) else { throw NSError(domain: "selftest", code: 3) }
+            let post = {
+                DistributedNotificationCenter.default().postNotificationName(
+                    AppVersion.installedNotification, object: Bundle.main.bundlePath, userInfo: nil, deliverImmediately: true)
+            }
+
+            // In front and just typed: it waits (no reload), and says so.
+            selfTestPretendInFront = true
+            let commitsBefore = selfTestCommits
+            post()
+            let waited = await waitUntil(seconds: 8) { self.readStatus()["state"] as? String == "waiting" }
+            let st1 = readStatus()
+            say("version.inFrontTyping state=\(st1["state"] ?? "nil") reason=\(st1["reason"] ?? "nil") diskWeb=\(st1["diskWeb"] ?? "nil") reloaded=\(selfTestCommits != commitsBefore)")
+            check(waited && st1["reason"] as? String == "typing" && st1["diskWeb"] as? String == "selftest-new-web",
+                  "a new version waits while she types")
+            check(selfTestCommits == commitsBefore, "no reload while she types")
+
+            // Behind other windows: it saves, then reloads onto the new files, on the same page.
+            selfTestPretendInFront = false
+            post()
+            let reloaded = await waitUntil(seconds: 10) {
+                self.pageWebBuild == "selftest-new-web" && self.readStatus()["state"] as? String == "current"
+            }
+            let after = try await js("""
+            \(Self.waitJS("typeof window.esmeworldPrepareReload === 'function'"))
+            return JSON.stringify({ path: location.pathname, marker: window.__esmeworldSelfTestMarker === 1,
+              hooks: typeof window.esmeworldPrepareReload === "function" });
+            """)
+            let st2 = readStatus()
+            say("version.behind reloaded=\(reloaded) path=\(after["path"] ?? "nil") oldPageGone=\(after["marker"] as? Bool == false) status=\(st2["state"] ?? "nil")/\(st2["web"] ?? "nil") pid=\(st2["pid"] ?? "nil")")
+            check(reloaded && after["marker"] as? Bool == false, "the page reloads onto a new version")
+            check(after["path"] as? String == "/area/writing", "the reload keeps her page")
+            check(st2["web"] as? String == "selftest-new-web"
+                  && st2["pid"] as? Int == Int(ProcessInfo.processInfo.processIdentifier), "the status file says what is running")
+
+            // A lazy chunk that fails to load: save and reload, but never twice in a minute.
+            let c0 = selfTestCommits
+            _ = try await js("""
+            window.dispatchEvent(new Event("vite:preloadError", { cancelable: true }));
+            return JSON.stringify({});
+            """)
+            let chunkReload = await waitUntil(seconds: 8) { self.selfTestCommits > c0 }
+            _ = try await js("""
+            \(Self.waitJS("typeof window.esmeworldPrepareReload === 'function'"))
+            return JSON.stringify({});
+            """)
+            let c1 = selfTestCommits
+            _ = try await js("""
+            window.dispatchEvent(new Event("vite:preloadError", { cancelable: true }));
+            return JSON.stringify({});
+            """)
+            let again = await waitUntil(seconds: 2) { self.selfTestCommits > c1 }
+            say("version.chunkError reloaded=\(chunkReload) reloadedAgainWithinAMinute=\(again)")
+            check(chunkReload, "a failed chunk load reloads the page")
+            check(!again, "a failed chunk load never reloads over and over")
+        } catch {
+            check(false, "version: \(error.localizedDescription)")
+        }
+    }
+
     @MainActor
     private func runSelfTest() async {
         var ok = true
@@ -1372,6 +1808,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             }
             // (f) Reminders: the page, the bridge, a schedule sent and held, a reminder's link.
             await runReminderSelfTest(check)
+            // (g) A new version installed under the running app (bug #39).
+            await runVersionSelfTest(check)
         } catch {
             check(false, "error \(error.localizedDescription)")
         }
