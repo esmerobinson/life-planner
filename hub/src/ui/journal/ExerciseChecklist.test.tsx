@@ -10,6 +10,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_CHECKLIST, PRETEND_FEATURES } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { openReadBackPart } from "../../test/readBack";
 import { openCardInMap } from "../../test/chapterMap";
 
 // The checklist part: each item answered with one of the card's own options (and perhaps a
@@ -156,8 +157,8 @@ describe("a checklist card", () => {
     ]);
     view.unmount();
     renderApp("/journal/read-back", TODAY);
-    const list = await screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
-    await userEvent.click(within(list).getByText(/Sunday 1 November · Exercise · Day 1 · Pretend checklist/));
+    const list = await openReadBackPart("Mental health exercise");
+    await userEvent.click(within(list).getByText(/Sunday 1 November · Day 1 · Pretend checklist/));
     expect(within(list).getByText("Pretend feature one: Yes — Pretend because tea")).toBeInTheDocument();
     expect(within(list).getByText("Pretend feature three: No")).toBeInTheDocument();
   });
@@ -169,8 +170,8 @@ describe("a checklist card", () => {
       { prompt: PLAIN.parts[0]!.prompt, kind: "checklist", answer: [["Pretend walk", "Done", ""], ["Pretend tea", "", ""]] },
     ]);
     renderApp("/journal/read-back", TODAY);
-    const list = await screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
-    await userEvent.click(within(list).getByText(/Exercise · Day 2/));
+    const list = await openReadBackPart("Mental health exercise");
+    await userEvent.click(within(list).getByText(/· Day 2/));
     expect(within(list).getByText("Pretend walk: Done")).toBeInTheDocument();
     expect(within(list).getByText((_, el) => el?.tagName === "LI" && el.textContent === "Pretend tea: Not answered")).toBeInTheDocument();
   });

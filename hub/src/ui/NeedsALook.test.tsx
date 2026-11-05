@@ -141,6 +141,10 @@ describe("Inbox pill count", () => {
     shell(t);
     expect(await screen.findByRole("link", { name: "Inbox (1)" })).toBeInTheDocument();
     expect(within(await screen.findByRole("list", { name: "Overdue" })).getByText("Loose and late")).toBeInTheDocument();
+    // Shown once: under Overdue, not also under To sort (Esme, 2026-11-05: "show it once").
+    expect(screen.queryByRole("list", { name: "Inbox items" })).toBeNull();
+    expect(screen.getAllByText("Loose and late")).toHaveLength(1);
+    expect(screen.getByText("1 to sort")).toBeInTheDocument();
   });
 
   it("drops after changing a date from the page", async () => {

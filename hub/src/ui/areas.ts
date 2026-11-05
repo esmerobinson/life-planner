@@ -12,6 +12,8 @@ import vision from "../assets/icons/vision-board.svg";
 import tech from "../assets/icons/tech.svg";
 import production from "../assets/icons/production.svg";
 import admin from "../assets/icons/admin.svg";
+import farmIcon from "../assets/farm/esmes-farm-icon-pixel.png";
+import inbox from "../assets/icons/inbox.svg";
 
 export type NavEntry = {
   id: string;
@@ -35,6 +37,9 @@ export const NAV: NavEntry[] = [
   { id: "production", label: "Production", path: "/area/production", icon: production, tile: "#d59770", group: 2 },
   { id: "journal", label: "Journal", path: "/journal", icon: journal, tile: "#9285c5", group: 3 },
   { id: "vision", label: "Vision board", path: "/vision", icon: vision, tile: "#ecca7d", group: 3 },
+  // Esme's Farm: the one entry point for the game. Esme (2026-11-04): the 24px pixel barn on a
+  // Room Sketch yellow tile (roomyellow #e2cd5b, a palette value; this use is her choice).
+  { id: "farm", label: "Esme's Farm", path: "/farm", icon: farmIcon, tile: "#e2cd5b", group: 3 },
 ];
 
 /**
@@ -43,6 +48,13 @@ export const NAV: NavEntry[] = [
  * There is no Today page any more (2026-11-04: Home is it), so it is not in NAV.
  */
 export const TODO_TILE = { icon: today, tile: "#e8dd6e" };
+
+/**
+ * The Inbox's tile where an area tile is shown for it (⌘K search results): Esme's pick
+ * 2026-11-05, option A of inbox-tile.html: pale stone #d4d1c3 (--track) with the tray icon.
+ * The Inbox is not in NAV (it has no sidebar row).
+ */
+export const INBOX_TILE = { icon: inbox, tile: "#d4d1c3" };
 
 /** Area choices for forms: every area in AREA_IDS order (the inbox first), labels from NAV. */
 export const AREA_CHOICES: { id: AreaId; label: string }[] = AREA_IDS.map((id) => ({

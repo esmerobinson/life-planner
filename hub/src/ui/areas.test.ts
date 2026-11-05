@@ -8,13 +8,13 @@ describe("areas", () => {
     ]);
   });
 
-  it("NAV has twelve entries in order with exact labels and paths", () => {
+  it("NAV has thirteen entries in order with exact labels and paths", () => {
     expect(NAV.map((n) => [n.label, n.path])).toEqual([
       ["Home", "/"], ["Goals", "/goals"], ["Admin", "/area/admin"],
       ["Mind", "/area/mind"], ["Writing", "/area/writing"], ["Art", "/area/art"],
       ["Content", "/area/content"], ["Body", "/area/body"],
       ["Tech projects", "/area/tech"], ["Production", "/area/production"],
-      ["Journal", "/journal"], ["Vision board", "/vision"],
+      ["Journal", "/journal"], ["Vision board", "/vision"], ["Esme's Farm", "/farm"],
     ]);
   });
 
@@ -40,5 +40,11 @@ describe("areas", () => {
     expect(tile("tech")).toBe("#cedb6e");
     expect(tile("production")).toBe("#d59770");
     expect(tile("admin")).toBe("#90825b");
+  });
+
+  it("Esme's Farm is the pixel barn on the Room Sketch yellow tile (Esme, 2026-11-04)", () => {
+    const farm = NAV.find((n) => n.id === "farm")!;
+    expect(farm.icon).toContain("esmes-farm-icon-pixel");
+    expect(farm.tile).toBe("#e2cd5b");
   });
 });

@@ -1,0 +1,221 @@
+/* Esme's Farm. Pixel art is shown only at whole-number scales (set inline from the art's own
+   size), never smoothed. Colours are app tokens only. Not decided by Esme (from the sprite
+   designer's mocks, or placeholders): the cream nook's 14px radius and padding (mock
+   "creamnook2"), the farm page's spacing, the slot card and the phone nook's spot (bottom left).
+   The phone's room under the last row (for the + and the nook) is in add.css. */
+
+.farm-px {
+  image-rendering: pixelated;
+  display: block;
+}
+
+/* ---- the nook ---- */
+.farm-nook {
+  margin-top: var(--space-3);
+}
+.farm-nook-link {
+  display: flex;
+  justify-content: center;
+  background: var(--panel);
+  border-radius: 14px; /* sprite designer's mock (creamnook2); not Esme's */
+  padding: 2px 0 0;
+}
+/* Phone: always in view, bottom left, level with the round + (add.css) and under every sheet,
+   menu and panel (z 15+). The page gets room under its last row to clear it, as for the +. */
+.farm-nook.is-phone {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(28px, env(safe-area-inset-bottom));
+  z-index: 14;
+  margin: 0;
+}
+.farm-nook.is-phone .farm-nook-link {
+  padding: 2px 4px 0;
+}
+/* While she types on the phone the nook steps aside (it's asleep then anyway; review M2). */
+.farm-nook.is-phone.is-typing {
+  visibility: hidden;
+}
+
+/* The sidebar entry (Esme, 2026-11-04): the 24px pixel barn, at 1x in the sidebar and 2x in the
+   phone's app grid (whole-number scales only), on its yellow tile (ui/areas.ts). */
+.sidebar-item[href="/farm"] img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
+.phone-app[href="/farm"] img {
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+}
+
+/* ---- the page ---- */
+.farm-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-stack);
+}
+.farm-page > h1 {
+  align-self: stretch;
+}
+
+.farm-book {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+.farm-book-window {
+  position: relative;
+}
+.farm-book-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.farm-book-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.farm-book-layer canvas {
+  cursor: pointer;
+}
+.farm-slot {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.farm-slot:focus-visible,
+.farm-zone-hit:focus-visible,
+.farm-char-hit:focus-visible {
+  outline: 2px solid var(--placeholder);
+}
+.farm-book-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-buttons);
+}
+.farm-book-where {
+  min-width: 12em;
+  text-align: center;
+  font-weight: 600;
+}
+
+.farm-pop {
+  position: absolute;
+  z-index: 5;
+  width: 220px;
+  background: var(--panel);
+  border-radius: var(--radius-tile);
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
+  box-shadow: 0 0 0 1px var(--track);
+}
+.farm-pop p {
+  margin: 0 0 var(--space-2);
+}
+.farm-pop-title {
+  font-weight: 600;
+}
+.farm-pop-close {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text);
+}
+.farm-pop-hint,
+.farm-muted {
+  font-size: 14px;
+}
+
+.farm-scene-wrap {
+  align-self: stretch;
+  min-width: 0;
+}
+.farm-scene {
+  width: 100%;
+  overflow-x: auto;
+}
+.farm-scene-layer {
+  position: relative;
+  margin: 0 auto;
+}
+.farm-zone-hit,
+.farm-char-hit {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.farm-cast,
+.farm-wardrobe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-buttons);
+  justify-content: center;
+}
+.farm-wardrobe {
+  justify-content: flex-start;
+}
+.farm-cast button[aria-pressed="true"],
+.farm-wardrobe button[aria-pressed="true"] {
+  background: var(--track);
+}
+
+.farm-character {
+  position: relative;
+  width: min(560px, 100%);
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: var(--pad-card);
+}
+.farm-character-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.farm-character h2 {
+  margin: 0;
+}
+.farm-character h3 {
+  margin: var(--space-4) 0 var(--space-2);
+}
+.farm-character-top p {
+  margin: var(--space-1) 0 0;
+}
+
+.farm-arrival {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: var(--space-2) var(--space-4);
+}
+.farm-arrival-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-weight: 600;
+}
+
+.farm-popin {
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: var(--space-2);
+}

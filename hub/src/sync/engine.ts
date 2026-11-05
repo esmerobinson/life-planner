@@ -22,7 +22,8 @@ import { pictureIds } from "../domain/page";
 import type { FileRow, Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
-import { retireCandidateForToken } from "../journal/keyStore";
+import { validFarm } from "../farm/state";
+import { retireCandidateForToken, writeAcceptedKeyWrap } from "../journal/keyStore";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
 /** The deployed sync server. The Sync page offers it when no address is saved (still editable). */
@@ -87,7 +88,22 @@ export type MetaKey =
   /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
   | "tokenVersion"
   /** The exact token the server last accepted in a whole run (confirms a journal key). */
-  | "acceptedToken";
+  | "acceptedToken"
+  /** Newer tables (NEWER_TABLES) the server at `serverUrl` has accepted a row of. */
+  | "acceptedTables"
+  /** How many runs ended with the token accepted (a counter, never a clock: bug #4). */
+  | "acceptedSeq"
+  /** `acceptedSeq` when the current token was saved (a Save's journal key needs a later acceptance). */
+  | "tokenSeq";
+
+/**
+ * Tables added after the sync server first shipped: a server not yet updated refuses their rows
+ * (400 bad_change). Until a run shows the server takes one, a single probe row is sent first; if
+ * it is refused, that table's rows wait here for the next run (never marked stuck), and every
+ * other table syncs as usual. Without this, each refused row would be split out one by one
+ * (farm review I1: 120 rows hit the round cap and stopped other rows syncing).
+ */
+export const NEWER_TABLES: readonly SyncTable[] = ["farm"];
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -127,6 +143,7 @@ async function saveUnderLock(db: HubDB, serverUrl: string, token: string): Promi
     await setMeta(db, "serverUrl", serverUrl);
     await setMeta(db, "token", token);
     await setMeta(db, "tokenVersion", ((await getMeta<number>(db, "tokenVersion")) ?? 0) + 1);
+    await setMeta(db, "tokenSeq", (await getMeta<number>(db, "acceptedSeq")) ?? 0);
     await db.syncMeta.delete("needsPassphrase");
   });
 }
@@ -180,7 +197,7 @@ export async function stopSyncing(db: HubDB): Promise<void> {
 
 /** The row check for each synced table (the same one every local write passes). */
 const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = {
-  items: validItem, goals: validGoal, files: validFile, journal: validJournal,
+  items: validItem, goals: validGoal, files: validFile, journal: validJournal, farm: validFarm,
 };
 /** A table this build syncs (a later build may add more; their rows are skipped here). */
 const isSyncTable = (t: unknown): t is SyncTable => (SYNC_TABLES as readonly unknown[]).includes(t);
@@ -192,7 +209,16 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 /** Runs a whole sync. Never throws for network or server problems; returns what happened. */
 export async function syncOnce(env: SyncEnv): Promise<SyncOutcome> {
   // One run at a time per database, across tabs too (and never during a restore).
-  return withSyncLock(env.db, () => run(env));
+  return withSyncLock(env.db, async () => {
+    const outcome = await run(env);
+    // The server has just accepted this token: a new passphrase saved here may now get its
+    // journal keywrap row (journal/keyStore.ts). One more run sends it straight away. If that
+    // run fails, this sync still succeeded: the wrap waits as a pending change for the next one.
+    if (outcome.kind !== "ok" || !(await writeAcceptedKeyWrap(env.db).catch(() => false))) return outcome;
+    const more = await run(env);
+    if (more.kind !== "ok") return outcome;
+    return { kind: "ok", sent: outcome.sent + more.sent, received: outcome.received + more.received, held: more.held };
+  });
 }
 
 async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
@@ -215,15 +241,29 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   /** Halves of a batch the server refused with 400, being narrowed down to the culprit(s). */
   const probes: Batch[] = [];
   let finished = false;
+  // Newer tables this server hasn't taken yet: one probe row each, first (NEWER_TABLES).
+  const knownTables = await getMeta<{ url: string; tables: string[] }>(db, "acceptedTables");
+  const acceptedTables = new Set(knownTables?.url === serverUrl ? knownTables.tables : []);
+  const heldTables = new Set<string>();
+  const tableProbes = NEWER_TABLES.filter((t) => !acceptedTables.has(t));
   /** This device's copies of pictures that arrived emptied (purged) this run, checked once the last page is in. */
   const emptied = new Map<string, { local: FileRow; stamp: number }>();
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const probing = probes.length > 0;
-    let batch: Batch;
-    if (probing) batch = probes.shift()!;
-    else {
-      const built = await buildBatch(db, deviceId, cursor, attempted);
+    let batch: Batch | null = null;
+    let tableProbe: SyncTable | null = null;
+    while (probes.length === 0 && tableProbes.length > 0 && tableProbe === null) {
+      const t = tableProbes.shift()!;
+      const one = await buildBatch(db, deviceId, cursor, attempted, heldTables, t);
+      if (one.changes.length > 0) {
+        tableProbe = t;
+        batch = one;
+      }
+    }
+    const probing = probes.length > 0 || tableProbe !== null;
+    if (batch === null && probes.length > 0) batch = probes.shift()!;
+    else if (batch === null) {
+      const built = await buildBatch(db, deviceId, cursor, attempted, heldTables);
       for (const k of built.held) attempted.add(k);
       held += built.held.length;
       batch = built;
@@ -277,6 +317,11 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
         hasMore = false;
         continue;
       }
+      if (res.status === 400 && code === "bad_change" && tableProbe !== null) {
+        // This server doesn't take the table yet: its rows wait here (not stuck) for a later run.
+        heldTables.add(tableProbe);
+        continue;
+      }
       if (res.status === 400 && code === "bad_change" && !badChangeRetried && !probing) {
         badChangeRetried = true; // a wrong clock: re-stamp far-future changes, retry once
         await restampFarFuture(db);
@@ -314,6 +359,10 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
     }
 
     received += await applyReply(db, batch.changes, batch.pendingVersions, reply, emptied);
+    if (tableProbe !== null) {
+      acceptedTables.add(tableProbe);
+      await setMeta(db, "acceptedTables", { url: serverUrl, tables: [...acceptedTables] });
+    }
     for (const c of batch.changes) attempted.add(keyOf(c.table, c.id));
     sent += batch.changes.length;
     cursor = reply.cursor;
@@ -322,11 +371,13 @@ async function run({ db, fetch }: SyncEnv): Promise<SyncOutcome> {
   }
   // The loop ran out while there was still work: say so rather than loop on.
   if (!finished) return { kind: "error", message: STOPPED_EARLY_MESSAGE };
-  // The server accepted this token for a whole run: remember it (the journal key candidate
-  // made with exactly this token may now be confirmed, journal/keyStore.ts).
+  // The server accepted this token for a whole run: remember it, and count the run (the
+  // journal key candidate made with exactly this token before this run may now be confirmed,
+  // journal/keyStore.ts; an acceptance from before the candidate never counts, bug #4).
   await db.transaction("rw", db.syncMeta, async () => {
     if ((await getMeta<string>(db, "token")) === token && (await getMeta<number>(db, "tokenVersion")) === tokenVersion) {
       await setMeta(db, "acceptedToken", token);
+      await setMeta(db, "acceptedSeq", ((await getMeta<number>(db, "acceptedSeq")) ?? 0) + 1);
     }
   });
   return { kind: "ok", sent, received, held };
@@ -348,8 +399,18 @@ async function markStuck(db: HubDB, keys: { key: string; table: SyncTable; id: s
   });
 }
 
-/** Pending changes not yet attempted in this run, within the count and size limits. */
-async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted: Set<string>) {
+/**
+ * Pending changes not yet attempted in this run, within the count and size limits, leaving out
+ * tables the server doesn't take yet. With `only`, a single change of that table (a probe).
+ */
+async function buildBatch(
+  db: HubDB,
+  deviceId: string,
+  cursor: number,
+  attempted: Set<string>,
+  heldTables: ReadonlySet<string> = new Set(),
+  only?: SyncTable,
+) {
   return db.transaction("rw", [...syncTables(db), db.pending], async () => {
     const changes: WireChange[] = [];
     /** The pending entry's updatedAt when the request was built, per key. */
@@ -357,9 +418,11 @@ async function buildBatch(db: HubDB, deviceId: string, cursor: number, attempted
     const held: string[] = [];
     const base = utf8Length(JSON.stringify({ deviceId, cursor, changes: [] }));
     let bytes = base;
-    for (const p of await db.pending.toArray()) {
+    const pending = only ? await db.pending.where("[table+id]").between([only, ""], [only, "￿"]).toArray() : await db.pending.toArray();
+    for (const p of pending) {
       const key = keyOf(p.table, p.id);
-      if (attempted.has(key) || p.stuck) continue;
+      if (attempted.has(key) || p.stuck || heldTables.has(p.table)) continue;
+      if (only && changes.length >= 1) break;
       const row = (await db.table(p.table).get(p.id)) as { updatedAt?: number } | undefined;
       if (!row) {
         await db.pending.delete([p.table, p.id]); // the row is gone (e.g. replaced by a restore)

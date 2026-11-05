@@ -36,13 +36,14 @@ button.add-fab {
   bottom: max(28px, env(safe-area-inset-bottom));
 }
 
-/* Room under the last row: 24 + 48 + 24 (desktop), 28 + 48 + 16 (phone). */
+/* Room under the last row: 24 + 48 + 24 (desktop); phone 28 + 82 + 16, the taller of the round +
+   (48) and the farm nook beside it (82, farm/farm.css). */
 .app-content {
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 .is-phone .app-content {
-  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  padding-bottom: calc(126px + env(safe-area-inset-bottom));
 }
 
 /* Desktop: the card just above the button. */
@@ -79,8 +80,8 @@ button.add-fab {
 
 /* The shell's Undo line (fix round 1, I-2: a project made a to-do or an idea, without its
    sessions). The existing Undo line (.undo-line: 14px text, "· Undo" link) in a --panel pill
-   with the menus' shadow, beside the round button, centred on it. Where it sits is NOT
-   decided, so it carries the 2px magenta placeholder outline. Undo takes the focus when it
+   with the menus' shadow, beside the round button, centred on it. Where it sits is Esme's
+   choice ("next to the round + button", 2026-11-04), so no placeholder outline. Undo takes the focus when it
    shows (the control that was used has just closed or moved). */
 .shell-undo {
   position: fixed;
@@ -103,7 +104,6 @@ button.add-fab {
   border-radius: 999px;
   padding: 8px 16px;
   box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
-  outline: 2px solid var(--placeholder);
 }
 
 /* Phone: a sheet from the bottom over a shade. */

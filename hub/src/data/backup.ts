@@ -4,6 +4,8 @@ import { keepOwnStamps } from "./changeTracking";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
 import { JOURNAL_KINDS, type FileRow, type Goal, type ISODate, type Item, type JournalRow } from "../domain/types";
 import { isObj, isStr, sealedJournalShape, validFile, validGoal, validItem, validJournal } from "./validate";
+import { validFarm, type FarmRow } from "../farm/state";
+import { JOURNAL_KEY_META, VERIFIER_ID } from "../journal/keyStore";
 
 export { validFile, validGoal, validItem, validJournal };
 
@@ -20,6 +22,8 @@ export interface BackupFile {
    * Optional: older backups have none and still load.
    */
   journal?: JournalRow[];
+  /** Esme's Farm's own state (farm/state.ts). Optional: older backups have none and still load. */
+  farm?: FarmRow[];
 }
 
 /** For a file that isn't a backup this app can read at all. */
@@ -32,6 +36,14 @@ export const INVALID_BACKUP =
  */
 export const NEWER_BACKUP =
   "Part of that backup can't be read by this version of Esmeworld. If the app has an update waiting, update it, then try again. Nothing has changed.";
+
+/**
+ * Placeholder wording (Esme may reword; journal-rekey report): Replace with a backup whose
+ * journal is ANOTHER one (its check row carries another key's fingerprint). Restoring it would
+ * lock her own journal on every device once it synced (bug #35), so nothing is restored.
+ */
+export const FOREIGN_JOURNAL_BACKUP =
+  "This backup holds a different journal from the one on this device, so nothing was restored. Your journal, tasks and goals are just as they were.";
 
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
@@ -66,7 +78,9 @@ export function parseBackup(raw: unknown): BackupFile {
     (data.journal !== undefined &&
       (!Array.isArray(data.journal) ||
         !data.journal.every((r) => sealedJournalShape(r) && (!known(r) || validJournal(r))) ||
-        hasDuplicateIds(data.journal as JournalRow[])))
+        hasDuplicateIds(data.journal as JournalRow[]))) ||
+    (data.farm !== undefined &&
+      (!Array.isArray(data.farm) || !data.farm.every(validFarm) || hasDuplicateIds(data.farm as FarmRow[])))
   ) {
     throw new Error(INVALID_BACKUP);
   }
@@ -77,7 +91,7 @@ export function parseBackup(raw: unknown): BackupFile {
 }
 
 export async function exportBackup(today: ISODate): Promise<BackupFile> {
-  return db.transaction("r", [db.items, db.goals, db.files, db.journal, db.quarantine], async () => {
+  return db.transaction("r", [db.items, db.goals, db.files, db.journal, db.farm, db.quarantine], async () => {
     const journal = new Map((await db.journal.toArray()).map((r) => [r.id, r] as const));
     // Journal rows this version can't read yet are in the backup too, as they arrived (review
     // I3), and a held copy newer than the one here takes its place (re-review m5b).
@@ -96,6 +110,7 @@ export async function exportBackup(today: ISODate): Promise<BackupFile> {
       goals: await db.goals.toArray(),
       files: await db.files.toArray(),
       journal: [...journal.values()],
+      farm: await db.farm.toArray(),
     };
   });
 }
@@ -110,27 +125,38 @@ export async function restoreBackup(
     return await withSyncLock(db, () => writeBackup(file, mode));
   } catch (err) {
     // The transaction aborted, so nothing was written.
-    if (err instanceof Error && (err.message === WAITING_FIRST_SYNC || err.message === REPLACE_OFF_WHILE_SYNCING)) throw err;
+    if (err instanceof Error && [WAITING_FIRST_SYNC, REPLACE_OFF_WHILE_SYNCING, FOREIGN_JOURNAL_BACKUP].includes(err.message)) throw err;
     throw new Error(RESTORE_FAILED);
   }
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
   // Journal rows of a kind this version doesn't know wait in quarantine, applied after the update.
-  const known = (file.journal ?? []).filter(validJournal);
+  let known = (file.journal ?? []).filter(validJournal);
   const later = (file.journal ?? []).filter((r) => !validJournal(r));
-  return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.syncMeta, db.quarantine], async () => {
+  return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.farm, db.syncMeta, db.quarantine], async () => {
     // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
     // a copy the server already has, edited since on another device, wins over them.
     keepOwnStamps();
     const gate = await readSyncGate(db.syncMeta);
     if (mode === "replace" && replaceBlocked(gate)) throw new Error(REPLACE_OFF_WHILE_SYNCING);
     if (mode === "merge" && mergeBlocked(gate)) throw new Error(WAITING_FIRST_SYNC);
+    // Another journal's check row never comes in (bug #35): it would win on the server and
+    // lock this journal on every device. Replace refuses the whole file; Merge leaves it out.
+    const ours = await journalFingerprintHere();
+    const theirs = known.find((r) => r.id === VERIFIER_ID);
+    if (ours && theirs && theirs.fp !== ours) {
+      if (mode === "replace") throw new Error(FOREIGN_JOURNAL_BACKUP);
+      known = known.filter((r) => r !== theirs);
+    }
     if (mode === "replace") {
       await db.items.clear();
       await db.goals.clear();
       await db.files.clear();
       await db.journal.clear();
+      // An older backup has no farm: the farm here is kept rather than reset (its stickers are
+      // derived from the data anyway; nothing of the farm is ever lost).
+      if (file.farm !== undefined) await db.farm.clear();
       // Sync never deletes, so rows removed here still exist on the server. Pulling from
       // the start again brings them back instead of leaving this device silently missing
       // them.
@@ -140,6 +166,7 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       await db.goals.bulkAdd(file.goals);
       await db.files.bulkAdd(file.files ?? []);
       await db.journal.bulkAdd(known);
+      await db.farm.bulkAdd(file.farm ?? []);
       await holdForLater(later);
       return { addedItems: file.items.filter(notPurged).length, addedGoals: file.goals.filter(notPurged).length, skipped: 0, ...keptCount(later) };
     }
@@ -155,6 +182,9 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     // Journal entries: only the missing ones (an entry already here is this device's own copy).
     const haveJournal = new Set(await db.journal.toCollection().primaryKeys());
     await db.journal.bulkAdd(known.filter((j) => !haveJournal.has(j.id)));
+    // The farm: only the missing facts (a row already here is this device's own, or newer).
+    const haveFarm = new Set(await db.farm.toCollection().primaryKeys());
+    await db.farm.bulkAdd((file.farm ?? []).filter((f) => !haveFarm.has(f.id)));
     await holdForLater(later);
     const fileVisible = file.items.filter(notPurged).length;
     const addedVisible = newItems.filter(notPurged).length;
@@ -167,6 +197,17 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       ...keptCount(later),
     };
   });
+}
+
+/**
+ * This device's journal, by its key's fingerprint: the confirmed key's, else the verifier row's
+ * here (a locked device). Undefined when neither is here (nothing to compare with). In the
+ * caller's transaction (syncMeta and journal).
+ */
+async function journalFingerprintHere(): Promise<string | undefined> {
+  const confirmed = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as { fp?: unknown } | undefined;
+  if (typeof confirmed?.fp === "string") return confirmed.fp;
+  return (await db.journal.get(VERIFIER_ID))?.fp;
 }
 
 /** How many rows wait for a newer version (said only when there are some). */

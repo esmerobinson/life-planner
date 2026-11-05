@@ -462,7 +462,7 @@ describe("scan a pairing code (Journal, Unlock journal)", () => {
     renderApp("/journal/morning", "2026-10-28");
     await userEvent.click(await screen.findByRole("button", { name: "Scan pairing code" }));
     // Not the journal's passphrase: refused just like a typed one.
-    expect(await screen.findByText("That isn't the journal's passphrase. Try again.", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText(/That passphrase doesn't open your journal/, {}, { timeout: 5000 })).toBeInTheDocument();
     expect(unlockJournal).toHaveBeenCalledWith(db, PASSPHRASE);
     expect(stop).toHaveBeenCalled();
     expect(await loadJournalKey(db)).toBeUndefined();

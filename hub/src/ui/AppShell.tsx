@@ -21,6 +21,8 @@ import { SidePanel } from "./SidePanel";
 import { isSearchShortcut, SearchDialog } from "./SearchDialog";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
+import { FarmProvider } from "../farm/FarmContext";
+import { Nook } from "../farm/Nook";
 import { useReminderScheduler } from "../reminders/scheduler";
 import { useNativeNavigate } from "../reminders/nativeNavigate";
 
@@ -147,6 +149,7 @@ export function AppShell() {
       <OpenAddContext.Provider value={openAddWith}>
       <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
+      <FarmProvider items={items} goals={goals} today={today}>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
@@ -200,8 +203,10 @@ export function AppShell() {
               />
             )}
           </AddButton>
+          {phone && <Nook phone />}
         </main>
       </div>
+      </FarmProvider>
       </PanelProvider>
       </ShellUndoContext.Provider>
       </OpenAddContext.Provider>

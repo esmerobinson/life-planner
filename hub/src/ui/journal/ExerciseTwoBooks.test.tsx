@@ -9,6 +9,7 @@ import { getDeviceId } from "../../sync/engine";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { openAllChapters } from "../../test/chapterMap";
 import { renderApp } from "../../test/renderApp";
+import { openReadBackPart } from "../../test/readBack";
 
 // Esme, 2026-11-04: two books taken in turn, each numbered from Day 1. Her answer to the second
 // book's Day 1 ("What coping costs") couldn't be found among entries labelled only "Day 1 · …",
@@ -78,12 +79,13 @@ it("the store keeps them apart: three entries, each its own card", async () => {
 
 it("Read back: the date first, then the book and the card's title; each opens to its own full answer", async () => {
   renderApp("/journal/read-back", TODAY);
-  const list = await screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
-  const summaries = [...list.querySelectorAll("summary")].map((s) => s.textContent).filter((t) => t?.includes("Exercise"));
+  const list = await openReadBackPart("Mental health exercise");
+  // Every exercise in Read back's Mental health exercise part, newest first (each entry's own summary).
+  const summaries = [...list.querySelectorAll(".journal-readback-list > li > details > summary")].map((s) => s.textContent);
   expect(summaries).toEqual([
-    "Wednesday 4 November · Exercise · Pretend DBT book · Day 1 · Pretend costs",
-    "Tuesday 3 November · Exercise · Pretend BPD book · Day 1 · Pretend naming",
-    "Monday 2 November · Exercise · Earlier card (day 1) · Pretend naming",
+    "Wednesday 4 November · Pretend DBT book · Day 1 · Pretend costs",
+    "Tuesday 3 November · Pretend BPD book · Day 1 · Pretend naming",
+    "Monday 2 November · Earlier card (day 1) · Pretend naming",
   ]);
   await userEvent.click(within(list).getByText(/Pretend DBT book · Day 1 · Pretend costs/));
   expect(within(list).getByText("Pretend: it cost me a whole made-up afternoon, and then some more.")).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { readBackPath } from "./tabs";
 import {
   answeredPrompts, CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, moveAnswerOn, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
@@ -379,7 +380,7 @@ function PastCheckIns({ past }: { past: CheckinDay[] }) {
       </ul>
       {days.length > PAST_ON_TAB && (
         <p>
-          <Link to="/journal/read-back">See all</Link>
+          <Link to={readBackPath("check-in")}>See all</Link>
         </p>
       )}
     </details>

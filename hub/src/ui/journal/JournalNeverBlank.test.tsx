@@ -123,7 +123,7 @@ describe("the key check", () => {
     const unlock = await screen.findByRole("region", { name: "Unlock journal" });
     await userEvent.type(within(unlock).getByLabelText("Sync passphrase"), "not-the-passphrase");
     await userEvent.click(within(unlock).getByRole("button", { name: "Unlock" }));
-    expect(await within(unlock).findByRole("alert")).toHaveTextContent("That isn't the journal's passphrase. Try again.");
+    expect(await within(unlock).findByRole("alert")).toHaveTextContent("That passphrase doesn't open your journal");
     expect(unlock).toHaveTextContent(UNLOCK_AGAIN_LINE);
   });
 
