@@ -1,0 +1,203 @@
+<title>Finishing Celebrations</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: two questions. Celebrations: three option cards side by side (wrapping on a phone), each
+   with a real to-do strip to tick and an "All sorted" card to replay, plus a Quick / Gentle speed
+   switch for the whole page. Focus ring: three strips you can Tab to. Colours are the app's
+   tokens and NookPhone palette values; system font (the app's font isn't chosen yet). Single light
+   look: the app has no dark mode yet. */
+:root {
+  --page: #e2e8ff; --sidebar: #3a412f; --sidebar-text: #e9e3d6; --panel: #e9e3d6; --row: #e3ddcd;
+  --track: #d4d1c3; --text: #3a412f; --muted: #6f735f; --green: #98c293; --mint: #a3d5c2;
+  --gold: #ecca7d; --pink: #e6aeaf; --sky: #a6ced6; --violet: #b693ec; --orange: #e39876; --yellow: #e8dd6e; --blue: #9eb4e6;
+  color-scheme: light; font-family: system-ui, -apple-system, sans-serif;
+}
+body { background: var(--page); color: var(--text); margin: 0; font-size: 15px; line-height: 1.45; }
+main { max-width: 1140px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 48px; }
+header h1 { margin: 0 0 8px; font-size: 28px; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+section > h2 { margin: 0 0 6px; font-size: 21px; }
+.lede { margin-bottom: 18px; }
+.speed { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.pill { border: 0; font: inherit; color: var(--text); background: var(--track); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.pill[aria-pressed="true"] { background: var(--sidebar); color: var(--sidebar-text); }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; align-items: start; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+figcaption b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sidebar); color: var(--sidebar-text); font-size: 13px; margin-right: 4px; }
+.note { font-size: 13px; color: var(--muted); }
+.stage { position: relative; background: var(--panel); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.strip { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--row); border-radius: 9px; }
+.strip .t { flex: 1; min-width: 0; }
+.strip .s { font-size: 13px; color: var(--muted); }
+.strip.done .t > span:first-child { text-decoration: line-through; opacity: .6; }
+.box { position: relative; width: 22px; height: 22px; flex: none; border: 2px solid var(--text); border-radius: 6px; background: #fbfaf6; display: grid; place-items: center; font-weight: 700; font-size: 13px; cursor: pointer; padding: 0; color: var(--text); }
+.box[aria-checked="true"] { background: var(--green); }
+.sorted { position: relative; background: var(--row); border-radius: 9px; padding: 18px 12px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; overflow: visible; }
+.sorted b { font-size: 18px; }
+.layer { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.bit { position: absolute; width: 8px; height: 10px; border-radius: 2px; }
+.star { position: absolute; width: 16px; height: 16px; }
+.focus-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+.f-strip { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--row); border-radius: 9px; }
+.f-strip button { font: inherit; border: 0; border-radius: 999px; padding: 6px 14px; background: var(--track); color: var(--text); }
+.fA :focus, .fA .show { outline: 2px solid var(--text); outline-offset: 2px; }
+.fB :focus, .fB .show { outline: 3px solid var(--mint); outline-offset: 2px; }
+.fC :focus, .fC .show { outline: 3px solid var(--blue); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .note.rm { font-weight: 600; } }
+</style>
+
+<main>
+  <header>
+    <h1>Celebrating when you finish</h1>
+    <p>Right now a magenta box appears when you tick off a to-do, and when you finish sorting the Inbox ("All sorted"). Tick the boxes below to see each option. "Replay" shows the big moment.</p>
+    <div class="speed" role="group" aria-label="Speed">
+      <span>Speed:</span>
+      <button class="pill" type="button" data-speed="quick" aria-pressed="true">Quick (about ⅔ second)</button>
+      <button class="pill" type="button" data-speed="gentle" aria-pressed="false">Gentle (about 1¼ seconds)</button>
+    </div>
+  </header>
+
+  <section>
+    <h2>1 · What happens when you finish</h2>
+    <p class="lede">The colours are the NookPhone ones already in the app. If your Mac is set to reduce motion, there's no movement at all, just the tick.</p>
+    <div class="opts">
+      <figure data-kind="confetti"><figcaption><b>A</b> · Confetti</figcaption>
+        <div class="stage">
+          <div class="strip"><button class="box" role="checkbox" aria-checked="false" aria-label="Tick: Water the pretend fern"></button><div class="t"><span>Water the pretend fern</span><div class="s">Due today</div></div></div>
+          <div class="strip"><button class="box" role="checkbox" aria-checked="false" aria-label="Tick: Book a pretend physio"></button><div class="t"><span>Book a pretend physio</span></div></div>
+          <div class="sorted"><b>All sorted</b><button class="pill replay" type="button">Replay</button></div>
+        </div>
+        <p class="note">Little paper squares in the app's colours burst from the tick and fall. Big moments get a bigger burst.</p>
+      </figure>
+      <figure data-kind="stars"><figcaption><b>B</b> · Stars</figcaption>
+        <div class="stage">
+          <div class="strip"><button class="box" role="checkbox" aria-checked="false" aria-label="Tick: Water the pretend fern"></button><div class="t"><span>Water the pretend fern</span><div class="s">Due today</div></div></div>
+          <div class="strip"><button class="box" role="checkbox" aria-checked="false" aria-label="Tick: Book a pretend physio"></button><div class="t"><span>Book a pretend physio</span></div></div>
+          <div class="sorted"><b>All sorted</b><button class="pill replay" type="button">Replay</button></div>
+        </div>
+        <p class="note">A few soft gold stars pop out around the tick and fade. Big moments get a ring of stars.</p>
+      </figure>
+      <figure data-kind="mixed"><figcaption><b>C</b> · Stars for a tick, confetti for big moments</figcaption>
+        <div class="stage">
+          <div class="strip"><button class="box" role="checkbox" aria-checked="false" aria-label="Tick: Water the pretend fern"></button><div class="t"><span>Water the pretend fern</span><div class="s">Due today</div></div></div>
+          <div class="strip"><button class="box" role="checkbox" aria-checked="false" aria-label="Tick: Book a pretend physio"></button><div class="t"><span>Book a pretend physio</span></div></div>
+          <div class="sorted"><b>All sorted</b><button class="pill replay" type="button">Replay</button></div>
+        </div>
+        <p class="note">Everyday ticks get a small star pop. Confetti is saved for bigger things, like "All sorted", or ticking off everything on Today.</p>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>2 · The keyboard focus ring</h2>
+    <p class="lede">When you move around with Tab, the thing you're on gets an outline. It's magenta now. Press Tab inside each box to try it (the first row shows it already).</p>
+    <div class="focus-opts">
+      <figure class="fA"><figcaption><b>A</b> · Thin dark green</figcaption>
+        <div class="stage"><div class="f-strip show">Water the pretend fern</div><div class="f-strip"><button type="button">Restore</button><button type="button">Edit</button></div></div>
+        <p class="note">A 2px forest-green line, like the text colour. Clear on every background.</p>
+      </figure>
+      <figure class="fB"><figcaption><b>B</b> · Soft mint</figcaption>
+        <div class="stage"><div class="f-strip show">Water the pretend fern</div><div class="f-strip"><button type="button">Restore</button><button type="button">Edit</button></div></div>
+        <p class="note">A 3px Map mint line: gentler, matches the Journal rows.</p>
+      </figure>
+      <figure class="fC"><figcaption><b>C</b> · Sky blue</figcaption>
+        <div class="stage"><div class="f-strip show">Water the pretend fern</div><div class="f-strip"><button type="button">Restore</button><button type="button">Edit</button></div></div>
+        <p class="note">A 3px Nook Miles blue line, the Home tile's colour.</p>
+      </figure>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const COLOURS = ["#e6aeaf", "#a3d5c2", "#ecca7d", "#9eb4e6", "#b693ec", "#e39876", "#e8dd6e", "#a6ced6", "#98c293"];
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let speed = "quick";
+  const dur = () => (speed === "quick" ? 650 : 1250);
+  document.querySelectorAll("[data-speed]").forEach((b) =>
+    b.addEventListener("click", () => {
+      speed = b.dataset.speed;
+      document.querySelectorAll("[data-speed]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    }),
+  );
+  const starSVG = (fill) =>
+    `<svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2.5l2.7 6 6.5.6-4.9 4.3 1.5 6.4L12 16.5l-5.8 3.3 1.5-6.4L2.8 9.1l6.5-.6z" fill="${fill}" stroke="#3a412f" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+
+  function layerFor(el) {
+    let layer = el.querySelector(":scope > .layer");
+    if (!layer) { layer = document.createElement("div"); layer.className = "layer"; el.appendChild(layer); }
+    return layer;
+  }
+  function confetti(host, x, y, n, spread) {
+    const layer = layerFor(host);
+    for (let i = 0; i < n; i++) {
+      const b = document.createElement("i");
+      b.className = "bit";
+      b.style.left = x + "px"; b.style.top = y + "px";
+      b.style.background = COLOURS[i % COLOURS.length];
+      layer.appendChild(b);
+      const a = Math.random() * Math.PI * 2;
+      const r = spread * (0.5 + Math.random() * 0.6);
+      const dx = Math.cos(a) * r, dy = Math.sin(a) * r * 0.7 - spread * 0.4;
+      const rot = (Math.random() - 0.5) * 720;
+      b.animate(
+        [
+          { transform: "translate(-50%,-50%) rotate(0)", opacity: 1 },
+          { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot / 2}deg)`, opacity: 1, offset: 0.55 },
+          { transform: `translate(calc(-50% + ${dx * 1.1}px), calc(-50% + ${dy + spread * 0.9}px)) rotate(${rot}deg)`, opacity: 0 },
+        ],
+        { duration: dur() * (1 + Math.random() * 0.3), easing: "cubic-bezier(.2,.7,.3,1)" },
+      ).onfinish = () => b.remove();
+    }
+  }
+  function stars(host, x, y, n, radius) {
+    const layer = layerFor(host);
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement("span");
+      s.className = "star";
+      s.innerHTML = starSVG("#ecca7d");
+      s.style.left = x + "px"; s.style.top = y + "px";
+      layer.appendChild(s);
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2 + (Math.random() - 0.5) * 0.4;
+      const dx = Math.cos(a) * radius, dy = Math.sin(a) * radius;
+      s.animate(
+        [
+          { transform: "translate(-50%,-50%) scale(.2)", opacity: 0 },
+          { transform: `translate(calc(-50% + ${dx * 0.8}px), calc(-50% + ${dy * 0.8}px)) scale(1.1)`, opacity: 1, offset: 0.4 },
+          { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.9)`, opacity: 0 },
+        ],
+        { duration: dur(), easing: "cubic-bezier(.2,.8,.3,1)" },
+      ).onfinish = () => s.remove();
+    }
+  }
+  function centreOf(el, host) {
+    const a = el.getBoundingClientRect(), h = host.getBoundingClientRect();
+    return [a.left - h.left + a.width / 2, a.top - h.top + a.height / 2];
+  }
+  document.querySelectorAll("figure[data-kind]").forEach((fig) => {
+    const kind = fig.dataset.kind;
+    fig.querySelectorAll(".box").forEach((box) =>
+      box.addEventListener("click", () => {
+        const on = box.getAttribute("aria-checked") !== "true";
+        box.setAttribute("aria-checked", String(on));
+        box.textContent = on ? "✓" : "";
+        box.closest(".strip").classList.toggle("done", on);
+        if (!on || reduce) return;
+        const host = box.closest(".strip");
+        const [x, y] = centreOf(box, host);
+        if (kind === "confetti") confetti(host, x, y, 14, 46);
+        else stars(host, x, y, 5, 30);
+      }),
+    );
+    fig.querySelector(".replay").addEventListener("click", () => {
+      if (reduce) return;
+      const host = fig.querySelector(".sorted");
+      const [x, y] = centreOf(host.querySelector("b"), host);
+      if (kind === "stars") stars(host, x, y, 10, 70);
+      else confetti(host, x, y, 40, 110);
+    });
+  });
+})();
+</script>
