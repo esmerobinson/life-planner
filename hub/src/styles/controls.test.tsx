@@ -116,8 +116,21 @@ describe("controls.css (approved mockup A, soft pills)", () => {
     expect(controls).toContain("--control-disabled-text: #a09f88");
   });
 
-  it("focus ring is the magenta placeholder", () => {
-    expect(rule("button:focus-visible")).toContain("outline: 2px solid var(--placeholder)");
+  it("focus ring is the thin dark green one (2026-11-05), on :focus-visible everywhere but the sidebar", () => {
+    for (const sel of [":where(:not(.sidebar *)):focus-visible", "button:focus-visible", "input:focus-visible"]) {
+      const r = rule(sel);
+      expect(r).toContain("outline: 2px solid var(--text)");
+      expect(r).toContain("outline-offset: 2px");
+    }
+    const panel = read("src/styles/panel.css");
+    expect(rule(".peek-handle:focus-visible", panel)).toContain("outline: 2px solid var(--text)");
+    // No focus state is magenta any more.
+    for (const file of ["controls", "panel", "strips", "goals", "journal", "tokens"]) {
+      const code = read(`src/styles/${file}.css`).replace(/\/\*[\s\S]*?\*\//g, "");
+      for (const m of code.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (m[1].includes(":focus")) expect(m[2]).not.toContain("--placeholder");
+      }
+    }
   });
 
   it("uses only palette colours and no unapproved effects", () => {
@@ -130,7 +143,9 @@ describe("controls.css (approved mockup A, soft pills)", () => {
 
   it("does not target sidebar links and is imported by main.tsx", () => {
     const code = controls.replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(code).not.toMatch(/sidebar|nav/);
+    // The focus ring's catch-all names the sidebar only to leave it out.
+    expect(code).toContain(":where(:not(.sidebar *)):focus-visible");
+    expect(code.replace(":where(:not(.sidebar *))", "")).not.toMatch(/sidebar|nav/);
     // Any anchor selector must be scoped to the content area or be the pill variant.
     for (const m of code.matchAll(/([^{}]+)\{/g)) {
       for (const sel of m[1].split(",").map((x) => x.trim())) {

@@ -1,10 +1,11 @@
-import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { tickItem, untickItem } from "../data/repo";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { listGoals, listItems, tickItem, untickItem } from "../data/repo";
 import { pickToday, tickedOffToday, withTickedOff } from "../domain/triage";
 import { monthlyProgress } from "../domain/progress";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { isActive } from "../domain/goalCounts";
-import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
+import { CELEBRATION_MS, canCelebrate, centreOf, confettiBurst, starPop, textCentreOf, type Point } from "./celebrate";
+import { CelebrationStatus } from "./CelebrationStatus";
 import { DoneSection } from "./DoneSection";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
@@ -16,7 +17,14 @@ function thisMonthDoneFor(goals: Goal[], items: Item[], today: ISODate): Record<
   return Object.fromEntries(goals.map((g) => [g.id, monthlyProgress(g, items, today)?.done ?? 0]));
 }
 
-const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
+/**
+ * Habits and started projects ticked today stay, crossed out, at the bottom of their list;
+ * a to-do done today moves to the "Done today" dropdown. Inactive goals don't count (goals redesign).
+ */
+function todayLists(items: Item[], goals: Goal[], today: ISODate) {
+  const active = goals.filter(isActive);
+  return withTickedOff(pickToday(items, active, today, thisMonthDoneFor(active, items, today)), items, today);
+}
 
 /**
  * Today's list, on Home (there is no separate Today page since 2026-11-04). `lead` comes first
@@ -32,6 +40,7 @@ export function TodayPanel({
   const [celebrating, setCelebrating] = useState(false);
   const { attempt, saveError } = useSaveError();
   const shell = useContext(ShellContext);
+  const heading = useRef<HTMLHeadingElement>(null);
 
   /** Re-read locally, then tell the shell so every other useHubData consumer re-reads too. */
   async function changed() {
@@ -45,17 +54,35 @@ export function TodayPanel({
     return () => clearTimeout(t);
   }, [celebrating]);
 
-  // Habits and started projects ticked today stay, crossed out, at the bottom of their list;
-  // a to-do done today moves to the "Done today" dropdown.
-  // Inactive goals don't count (goals redesign).
-  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => {
-    const active = goals.filter(isActive);
-    return withTickedOff(pickToday(items, active, today, thisMonthDoneFor(active, items, today)), items, today);
-  }, [items, goals, today]);
+  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => todayLists(items, goals, today), [items, goals, today]);
 
-  async function tick(id: string): Promise<boolean> {
+  /**
+   * After a saved tick: confetti from the Today heading when it left nothing unticked on the
+   * list (rhythm and picks; the Journal rows are not to-dos, Also due is not the list), else
+   * stars from the box. Decided on a fresh read, as Today may pull in another to-do. Never
+   * rejects; a failed read just gives the stars.
+   */
+  async function celebrateTick(at: Point | null, onList: boolean) {
+    let cleared = false;
+    if (onList && canCelebrate()) {
+      try {
+        const [i, g] = await Promise.all([listItems(), listGoals()]);
+        const now = todayLists(i, g, today);
+        cleared = [...now.rhythm, ...now.picks].every((x) => tickedOffToday(x, today));
+      } catch {
+        // stars instead
+      }
+    }
+    if (cleared && heading.current) confettiBurst(textCentreOf(heading.current));
+    else if (at) starPop(at);
+  }
+
+  async function tick(id: string, box?: Element): Promise<boolean> {
+    const at = box ? centreOf(box) : null;
+    const onList = [...rhythm, ...picks].some((i) => i.id === id);
     if (!(await attempt(() => tickItem(id, today)))) return false;
     setCelebrating(true);
+    void celebrateTick(at, onList); // nothing waits for it
     await changed();
     return true;
   }
@@ -94,10 +121,10 @@ export function TodayPanel({
 
   return (
     <section className="today-panel">
-      <Heading>Today</Heading>
+      <Heading ref={heading}>Today</Heading>
       <div className="today-body">
         {lead}
-        {celebrating && <CelebrationPlaceholder />}
+        {celebrating && <CelebrationStatus />}
         {saveError && <p className="form-message">{saveError}</p>}
         {empty && <p>Nothing planned for today.</p>}
         {rhythm.length > 0 && (

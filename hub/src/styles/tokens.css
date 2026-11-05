@@ -14,7 +14,8 @@
 
    (b2) Form controls live in controls.css and use the approved mockup A (soft pills)
        values listed there. Unapproved there: rounded-square checkbox, disabled colours
-       (--track background, sage #a09f88 text), magenta focus ring, no hover.
+       (--track background, sage #a09f88 text), no hover. The focus ring is decided
+       (2026-11-05): 2px solid --text, offset 2px.
 
    (c) Role assignments made by the implementers/controller that Esme has NOT approved:
        --text #3a412f (forest green used as body text), --sidebar-text #e9e3d6 (cream used

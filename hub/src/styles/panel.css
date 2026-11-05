@@ -61,8 +61,10 @@
   background: var(--track);
 }
 
+/* The keyboard focus ring (VISUAL-LANGUAGE.md "Keyboard focus ring (2026-11-05)"), as in controls.css. */
 .peek-handle:focus-visible {
-  outline: 2px solid var(--placeholder);
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 .peek-top {

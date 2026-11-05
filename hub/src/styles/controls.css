@@ -3,7 +3,8 @@
    --row #e3ddcd, --text #3a412f). Selectors are element-level on purpose: sidebar
    links are anchors, so nothing here reaches them.
    Not in the mockup, filled in as stated in README "Placeholders you must replace":
-   disabled colours (palette greys), magenta focus ring, no hover, checkbox shape. */
+   disabled colours (palette greys), no hover, checkbox shape. The focus ring was decided
+   2026-11-05 (see its rule below). */
 :root {
   --control-disabled-text: #a09f88; /* sage, palette value; disabled text, not in mockup A */
 }
@@ -87,11 +88,21 @@ input[type="checkbox"]:checked {
   background: var(--bar-fill);
 }
 
+/* The keyboard focus ring (VISUAL-LANGUAGE.md "Keyboard focus ring (2026-11-05)", mockup
+   docs/design/celebrations.html option A, thin dark green): on :focus-visible everywhere.
+   The form controls stay listed so they keep the weight the old ring had; rules with a
+   stronger selector that set their own outline (a selected card, today's day) keep it, as
+   before. :where() keeps the catch-all as light as a single class, so a later
+   `outline: none` (the panel's page text) still wins.
+   Builder's call: not inside the dark green sidebar, whose links keep the browser's ring
+   (a #3a412f ring on the #3a412f sidebar could not be seen; the sidebar has no controls). */
+:where(:not(.sidebar *)):focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--placeholder);
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 /* Pill links: the secondary button look for anchors (mockup A). */

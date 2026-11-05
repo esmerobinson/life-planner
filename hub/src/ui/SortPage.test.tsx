@@ -40,7 +40,7 @@ function show(path = "/inbox/sort") {
 const card = () => screen.getByRole("region", { name: "Item to sort" });
 /** Waits until the card on screen (a new card replaces the old one) shows this title. */
 const title = (t: string) => vi.waitFor(() => expect(within(card()).getByText(t)).toBeInTheDocument());
-/** The line after an action (the celebration placeholder is a status too). */
+/** The line after an action (the celebration is a status too). */
 const status = () => screen.getAllByRole("status").find((el) => el.classList.contains("undo-line"))!;
 
 describe("Sort one by one: the card", () => {
@@ -187,10 +187,10 @@ describe("Sort one by one: the card", () => {
     await title("Stubborn");
   });
 
-  it("when nothing is left: All sorted, the celebration placeholder and a link back to the Inbox", async () => {
+  it("when nothing is left: All sorted, the celebration status and a link back to the Inbox", async () => {
     show();
     expect(await screen.findByText("All sorted")).toBeInTheDocument();
-    expect(screen.getByTestId("celebration-placeholder")).toBeInTheDocument();
+    expect(screen.getByTestId("celebration")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("link", { name: "Back to the Inbox" }));
     expect(await screen.findByRole("heading", { name: "Inbox page" })).toBeInTheDocument();
   });

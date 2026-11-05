@@ -19,7 +19,7 @@ function Row({
 }: {
   item: Item;
   today: ISODate;
-  onTick: (id: string) => Promise<boolean>;
+  onTick: (id: string, box?: Element) => Promise<boolean>;
   onChanged: () => Promise<void>;
 }) {
   const [due, setDue] = useState(item.due ?? "");

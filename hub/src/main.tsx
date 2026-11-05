@@ -16,6 +16,7 @@ import "./styles/pairing.css";
 import "./styles/reminders.css";
 import "./styles/books.css";
 import "./styles/search.css";
+import "./styles/celebration.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

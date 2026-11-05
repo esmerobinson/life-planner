@@ -21,7 +21,7 @@ test("approved soft-pill control styles in real Chrome", async ({ page }) => {
   });
   expect(i).toEqual({ bg: "rgb(227, 221, 205)", r: "12px" });
 
-  // Keyboard focus ring is the magenta placeholder.
+  // Keyboard focus ring: 2px solid --text (#3a412f), 2px out (2026-11-05).
   await page.locator("body").click({ position: { x: 5, y: 5 } });
   for (let n = 0; n < 40; n++) {
     await page.keyboard.press("Tab");
@@ -30,10 +30,9 @@ test("approved soft-pill control styles in real Chrome", async ({ page }) => {
   await expect(add).toBeFocused();
   const ring = await add.evaluate((el) => {
     const s = getComputedStyle(el);
-    return { color: s.outlineColor, style: s.outlineStyle };
+    return { color: s.outlineColor, style: s.outlineStyle, width: s.outlineWidth, offset: s.outlineOffset };
   });
-  expect(ring.color).toBe("rgb(255, 0, 255)");
-  expect(ring.style).not.toBe("none");
+  expect(ring).toEqual({ color: "rgb(58, 65, 47)", style: "solid", width: "2px", offset: "2px" });
 });
 
 test("sidebar stays pinned after scrolling", async ({ page }) => {

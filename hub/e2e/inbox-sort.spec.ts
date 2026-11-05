@@ -107,7 +107,10 @@ test("sort one by one: To-do, Idea, Goal, Skip, Archive, Delete, Undo and the Bi
   await expect(page.getByText("1 of 1")).toBeVisible();
   await card(page).getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("All sorted")).toBeVisible();
-  await expect(page.getByTestId("celebration-placeholder")).toBeVisible();
+  // The big moment: confetti from "All sorted" (40 pieces, gone again), and a "Done" status.
+  await expect(page.getByTestId("celebration")).toHaveText("Done");
+  await expect(page.locator(".celebration-layer .celebration-bit")).toHaveCount(40);
+  await expect(page.locator(".celebration-layer")).toHaveCount(0);
 
   // Where things went.
   await page.goto("/area/content");

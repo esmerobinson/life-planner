@@ -1,0 +1,34 @@
+/* Celebrations (VISUAL-LANGUAGE.md "Celebrations (2026-11-05)", mockup docs/design/celebrations.html,
+   option C, speed "Quick"): the layer, star and confetti piece sizes from the mockup's styles; the
+   motion itself is in ui/celebrate.ts (Web Animations, 650ms, the mockup's two easings).
+   Builder's calls (not in the mockup, none of them visible): the layer is fixed over the whole
+   window (the mockup's sat inside its strip) so a burst outlives the row it came from, which may
+   leave its list at once; z-index 60 keeps it over the side panel (20), the Undo line (21) and the
+   choose-goals shade (50); pieces rest at opacity 0 so none can flash for a frame between its
+   animation ending and its removal. */
+.celebration-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 60;
+}
+
+.celebration-star {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+}
+
+.celebration-star svg {
+  display: block;
+}
+
+.celebration-bit {
+  position: absolute;
+  width: 8px;
+  height: 10px;
+  border-radius: 2px;
+  opacity: 0;
+}

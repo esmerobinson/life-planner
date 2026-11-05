@@ -3,7 +3,8 @@ import { tickItem } from "../data/repo";
 import { dueLine } from "../domain/display";
 import { HABIT_WORDS, isHabit } from "../domain/habits";
 import type { ISODate, Item } from "../domain/types";
-import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
+import { CELEBRATION_MS, centreOf, starPop } from "./celebrate";
+import { CelebrationStatus } from "./CelebrationStatus";
 import { FLAG_GLYPH, REPEAT_GLYPH } from "./IconPopover";
 import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
@@ -13,9 +14,11 @@ import { isBook } from "../domain/books";
 import { usePanel } from "./panelContext";
 import { ScheduleMenu } from "./ScheduleMenu";
 
-const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
-
-/** Tick handler plus the celebration placeholder it triggers (or the save message if it fails). */
+/**
+ * Tick handler plus the celebration it triggers once the tick has saved (or the save message
+ * if it fails): the star pop from the tick box `box` (where it was when clicked) and a
+ * visually hidden "Done" status for screen readers.
+ */
 export function useTick(today: ISODate, refresh: () => Promise<void>) {
   const [celebrating, setCelebrating] = useState(false);
   const { attempt, saveError } = useSaveError();
@@ -25,15 +28,17 @@ export function useTick(today: ISODate, refresh: () => Promise<void>) {
     return () => clearTimeout(t);
   }, [celebrating]);
   /** Returns whether the tick saved. */
-  async function tick(id: string): Promise<boolean> {
+  async function tick(id: string, box?: Element): Promise<boolean> {
+    const at = box ? centreOf(box) : null;
     if (!(await attempt(() => tickItem(id, today)))) return false;
+    if (at) starPop(at);
     setCelebrating(true);
     await refresh();
     return true;
   }
   return {
     tick,
-    celebration: celebrating ? <CelebrationPlaceholder /> : null,
+    celebration: celebrating ? <CelebrationStatus /> : null,
     message: saveError ? <p className="form-message">{saveError}</p> : null,
   };
 }
@@ -157,8 +162,11 @@ export function TaskRow({
   meta?: ReactNode;
   item: Item;
   today: ISODate;
-  /** Marks it done; resolving to false (the save failed) unticks the box again. */
-  onTick?: (id: string) => void | Promise<boolean | void>;
+  /**
+   * Marks it done; resolving to false (the save failed) unticks the box again. `box` is the
+   * tick box that was clicked, for the celebration to come out of.
+   */
+  onTick?: (id: string, box?: Element) => void | Promise<boolean | void>;
   /** Unticks a crossed-off strip. */
   onUntick?: (id: string) => void | Promise<unknown>;
   crossed?: boolean;
@@ -199,14 +207,15 @@ export function TaskRow({
           className="tick"
           aria-label={crossed ? `Done: ${item.title}` : project ? `Log a session: ${item.title}` : `Mark done: ${item.title}`}
           checked={checked}
-          onChange={async () => {
+          onChange={async (e) => {
+            const box = e.currentTarget;
             if (crossed) {
               await onUntick?.(item.id);
               return;
             }
             if (ticked) return;
             setTicked(true);
-            if ((await onTick(item.id)) === false || project) setTicked(false);
+            if ((await onTick(item.id, box)) === false || project) setTicked(false);
           }}
         />
       )}

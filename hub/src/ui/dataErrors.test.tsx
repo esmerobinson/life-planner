@@ -65,6 +65,6 @@ describe("failing writes show the save line", () => {
     at("/area/body", "/area/:areaId", <AreaPage today={TODAY} />);
     await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Stretch" }));
     expect(await screen.findByText(SAVE_LINE)).toBeInTheDocument();
-    expect(screen.queryByTestId("celebration-placeholder")).toBeNull();
+    expect(screen.queryByTestId("celebration")).toBeNull();
   });
 });

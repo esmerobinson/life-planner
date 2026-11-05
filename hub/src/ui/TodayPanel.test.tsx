@@ -89,11 +89,11 @@ describe("TodayPanel", () => {
     expect(within(row).getByText("On Tue 27 Oct")).toBeInTheDocument();
   });
 
-  it("ticking calls tickItem and shows the celebration placeholder", async () => {
+  it("ticking calls tickItem and shows the celebration (the Done status)", async () => {
     const it = await task("Tick me", { priority: 1 });
     render(<TodayPanel today={TODAY} />);
     await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Tick me" }));
-    expect(await screen.findByTestId("celebration-placeholder")).toBeInTheDocument();
+    expect(await screen.findByTestId("celebration")).toBeInTheDocument();
     expect((await db.items.get(it.id))!.status).toBe("done");
   });
 
@@ -216,7 +216,7 @@ describe("TodayPanel", () => {
       render(<TodayPanel today={TODAY} />);
       await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Tick fails" }));
       expect(await screen.findByText(SAVE_LINE)).toBeInTheDocument();
-      expect(screen.queryByTestId("celebration-placeholder")).toBeNull();
+      expect(screen.queryByTestId("celebration")).toBeNull();
       await act(async () => {
         await new Promise((r) => setTimeout(r, 20));
       });

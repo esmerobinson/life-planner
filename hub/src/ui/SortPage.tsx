@@ -5,7 +5,8 @@ import {
 } from "../data/repo";
 import type { AreaId, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS_BY_SIDEBAR, NAV, TODO_TILE } from "./areas";
-import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
+import { confettiBurst, textCentreOf } from "./celebrate";
+import { CelebrationStatus } from "./CelebrationStatus";
 import { UndoLine } from "./DeleteButton";
 import { inboxOrder, inboxSource } from "./inboxSource";
 import { useSaveError } from "./messages";
@@ -167,20 +168,37 @@ export function SortPage({ today }: { today: ISODate }) {
             attempt={attempt}
           />
         )}
-        {loaded && !current && (
-          <div className="sort-card sort-done">
-            <div className="sort-title">All sorted</div>
-            <CelebrationPlaceholder />
-            <Link to="/inbox" className="btn-secondary">
-              Back to the Inbox
-            </Link>
-          </div>
-        )}
+        {loaded && !current && <AllSorted celebrate={acted.current} />}
         {saveError && <p className="form-message">{saveError}</p>}
         {current && <div className="sort-count">{`1 of ${queue.length}`}</div>}
         <UndoLine message={last?.message} onUndo={last?.undo && (() => void last.undo!())} />
       </div>
     </section>
+  );
+}
+
+/**
+ * The end of the queue. Reached by sorting (`celebrate`), it is a big moment: confetti from
+ * "All sorted" as the card appears (not when the Inbox was already empty on arrival).
+ */
+function AllSorted({ celebrate }: { celebrate: boolean }) {
+  const title = useRef<HTMLDivElement>(null);
+  const fired = useRef(false); // once per card, also under StrictMode's double effects
+  useEffect(() => {
+    if (!celebrate || fired.current || !title.current) return;
+    fired.current = true;
+    confettiBurst(textCentreOf(title.current));
+  }, [celebrate]);
+  return (
+    <div className="sort-card sort-done">
+      <div className="sort-title" ref={title}>
+        All sorted
+      </div>
+      <CelebrationStatus />
+      <Link to="/inbox" className="btn-secondary">
+        Back to the Inbox
+      </Link>
+    </div>
   );
 }
 
