@@ -77,6 +77,30 @@ class Stop extends Error {
   }
 }
 
+// ---- the run in flight (bug #44) -----------------------------------------------------------------
+
+/** The send in flight on this tab, so Stop and Sign in never wait behind a hung request. */
+let running: AbortController | null = null;
+
+/** Gives up the send in flight on this tab (its requests end at once, the run stops). */
+function abortRunning(): void {
+  running?.abort();
+}
+
+/** `fetchFn` with this run's abort signal joined to every request's own (its time limit). */
+function withSignal(fetchFn: Fetch, signal: AbortSignal): Fetch {
+  return (input, init = {}) => {
+    const own = init.signal;
+    if (!own) return fetchFn(input, { ...init, signal });
+    const both = new AbortController();
+    for (const s of [own, signal]) {
+      if (s.aborted) both.abort();
+      else s.addEventListener("abort", () => both.abort(), { once: true });
+    }
+    return fetchFn(input, { ...init, signal: both.signal });
+  };
+}
+
 // ---- sign in / out ----------------------------------------------------------------------------
 
 export type SignInResult = { kind: "ok" } | { kind: "error"; message: string };
@@ -107,6 +131,7 @@ export async function signInToTogether(
   const anonKey = form.anonKey.trim();
   const now = env.now ?? Date.now;
   const db = appDb;
+  abortRunning(); // a send stuck on Together never keeps her from signing in
   const out = await withTogetherLock(db, async (): Promise<SignInResult> => {
     const s = await signInWithPassword(env.fetch, url, anonKey, form.email.trim(), form.password, now());
     if (s.kind === "transient") return { kind: "error", message: SIGN_IN_MESSAGES.offline };
@@ -144,6 +169,12 @@ export type StopResult = { kind: "ok" } | { kind: "error"; message: string };
 export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean }): Promise<StopResult> {
   const db = appDb;
   const now = env.now ?? Date.now;
+  abortRunning(); // a send in flight stops now, and never sends again after this
+  if (!opts.markDeleted) {
+    // Needs no request, so it never waits behind one (bug #44).
+    await db.syncMeta.delete(TOGETHER_META);
+    return { kind: "ok" };
+  }
   const out = await withTogetherLock(db, async (): Promise<StopResult> => {
     if (opts.markDeleted) {
       try {
@@ -210,7 +241,19 @@ async function forgetTokens(db: HubDB): Promise<void> {
 /** Sends whatever changed. At most one run at a time on this device (any tab). */
 export async function sendToTogether(env: SendEnv): Promise<SendOutcome> {
   const db = appDb;
-  const out = await withTogetherLock(db, () => run(db, env), { ifAvailable: true });
+  const out = await withTogetherLock(
+    db,
+    async () => {
+      const ctrl = new AbortController();
+      running = ctrl;
+      try {
+        return await run(db, { ...env, fetch: withSignal(env.fetch, ctrl.signal) });
+      } finally {
+        if (running === ctrl) running = null;
+      }
+    },
+    { ifAvailable: true },
+  );
   return out ?? { kind: "busy" };
 }
 
@@ -389,15 +432,17 @@ async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: Day
         rec.live = false;
         await ctx.save();
       }
-      const v = await insertTally(ctx, key, rec ? rec.v + 1 : 1, {
-        couple_id: ctx.auth.coupleId, todo_id: habitId, user_id: ctx.auth.userId, kind: "tally", at: dayStamp(date), note: note === "" ? null : note,
-      });
-      if (v === null) {
+      // The tick is read again right before the insert itself (bug #42): the delete above was a
+      // round trip, during which she (or a sync) may have ticked the day private.
+      const ins = await insertTally(ctx, key, rec ? rec.v + 1 : 1, () => noteFor(ctx, kind, date, day), (n) => ({
+        couple_id: ctx.auth.coupleId, todo_id: habitId, user_id: ctx.auth.userId, kind: "tally", at: dayStamp(date), note: n === "" ? null : n,
+      }));
+      if (ins === null) {
         sent.refused[key] = { hash: h, what: "copy" };
         await ctx.save();
         continue;
       }
-      sent.tallies[key] = { v, hash: h, live: true };
+      sent.tallies[key] = { v: ins.v, hash: await ctx.hash(ins.note), live: true };
       delete sent.refused[key];
       await ctx.save();
     } else if (rec?.live) {
@@ -424,15 +469,20 @@ async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: Day
 }
 
 /**
- * Inserts a tally as version `v` (a plain insert: a skipped duplicate never counts as sent). An
- * id already taken holds content we can't know, so it is deleted and the next version tried
- * (review I2). Returns the version that went in, or null when refused.
+ * Inserts a tally as version `v` (a plain insert: a skipped duplicate never counts as sent). The
+ * note is worked out again right before every attempt, so a private tick that arrived meanwhile
+ * is always honoured (bug #42). An id already taken holds content we can't know, so it is deleted
+ * and the next version tried (review I2). Returns the version and the note that went in, or null
+ * when refused.
  */
-async function insertTally(ctx: Ctx, key: string, v: number, row: Record<string, unknown>): Promise<number | null> {
+async function insertTally(
+  ctx: Ctx, key: string, v: number, noteNow: () => Promise<string>, rowFor: (note: string) => Record<string, unknown>,
+): Promise<{ v: number; note: string } | null> {
   for (let tries = 0; tries < MAX_VERSION_TRIES; tries++, v++) {
     const id = await togetherId("tally", key, v);
-    const r = await ctx.call("POST", "todo_events", { id, ...row });
-    if (r.kind === "ok") return v;
+    const note = await noteNow();
+    const r = await ctx.call("POST", "todo_events", { id, ...rowFor(note) });
+    if (r.kind === "ok") return { v, note };
     if (!isDuplicate(r)) return null;
     if (!(await ctx.deleteEvent(id))) return null;
   }

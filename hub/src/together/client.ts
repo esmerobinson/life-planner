@@ -31,14 +31,31 @@ export function validTogetherUrl(text: string): boolean {
   }
 }
 
+/**
+ * The longest any one request to Together may take (bug #44): after this it is given up on (like
+ * being offline), so a hung request never holds the Together lock or stops copying for good.
+ */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
 async function call(fetchFn: Fetch, url: string, init: RequestInit): Promise<CallResult> {
+  // Its own time limit, joined with any abort the caller passed in (Stop, Sign in).
+  const ctrl = new AbortController();
+  const outer = init.signal;
+  const abort = () => ctrl.abort();
+  if (outer?.aborted) ctrl.abort();
+  else outer?.addEventListener("abort", abort);
+  const timer = setTimeout(abort, REQUEST_TIMEOUT_MS);
   let res: Response;
+  let text: string;
   try {
-    res = await fetchFn(url, init);
+    res = await fetchFn(url, { ...init, signal: ctrl.signal });
+    text = await res.text();
   } catch {
     return { kind: "transient" };
+  } finally {
+    clearTimeout(timer);
+    outer?.removeEventListener("abort", abort);
   }
-  const text = await res.text().catch(() => "");
   let body: unknown = null;
   try {
     body = text ? JSON.parse(text) : null;

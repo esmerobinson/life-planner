@@ -48,7 +48,28 @@ export class TogetherRunner {
   }
 
   private run(opts: { retryRefused?: boolean }): Promise<SendOutcome> {
-    if (this.inFlight && !opts.retryRefused) return this.inFlight;
+    if (this.inFlight) {
+      // A sync (or a tick's sync) finished, or Send now was pressed, during this send: one more
+      // run as soon as this one ends, never only after the next sync (bug #43).
+      const want = { retryRefused: !!(this.next?.opts.retryRefused || opts.retryRefused) };
+      if (!this.next) {
+        let start!: () => void;
+        const ready = new Promise<void>((r) => (start = r));
+        const next: NonNullable<TogetherRunner["next"]> = { opts: want, promise: Promise.resolve(null as never), start };
+        next.promise = ready.then(() => this.start1(next.opts));
+        this.next = next;
+      } else {
+        this.next.opts = want;
+      }
+      return this.next.promise;
+    }
+    return this.start1(opts);
+  }
+
+  /** The follow-up run asked for while one was in flight. */
+  private next: { opts: { retryRefused?: boolean }; promise: Promise<SendOutcome>; start: () => void } | null = null;
+
+  private start1(opts: { retryRefused?: boolean }): Promise<SendOutcome> {
     const p = (async () => {
       this.set({ running: true });
       let out: SendOutcome;
@@ -62,7 +83,11 @@ export class TogetherRunner {
     })();
     this.inFlight = p;
     void p.finally(() => {
-      if (this.inFlight === p) this.inFlight = null;
+      if (this.inFlight !== p) return;
+      this.inFlight = null;
+      const next = this.next;
+      this.next = null;
+      next?.start();
     });
     return p;
   }
