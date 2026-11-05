@@ -122,6 +122,11 @@ export interface MorningDay {
   pages: number;
   /** This device's draft for the day. */
   draft: string;
+  /**
+   * When `draft` is a draft under a former id that no "I'm done" has dealt with (ownMorningDraft):
+   * its mark, for the box to pass back with its saves (saveMorningDraft `from`).
+   */
+  draftFrom?: string;
   /** Photo file ids for the day. */
   photos: string[];
   /** Rows for the day this device can't open (each skipped on its own). */
@@ -131,20 +136,11 @@ export interface MorningDay {
 /** One day's morning pages. Finished pages and photos count from their rows alone. */
 export async function readMorningDay(jk: JournalKey, date: ISODate, deviceId: string): Promise<MorningDay> {
   const day: MorningDay = { date, done: false, pages: 0, draft: "", photos: [], unreadable: 0 };
-  let ownDraft = false;
   let legacyDraft = "";
-  // This device's draft: the one with its current id, else the newest with a former one (deviceIds.ts).
-  const own = await ownRow(deviceId, (d) => journalId("draft", date, d));
   for (const row of await rowsOn(date)) {
     if (row.kind === "page") day.pages++;
     else if (row.kind === "photo") day.photos.push(suffixOf(row));
-    else if (row.kind === "draft" && row.id === own?.row.id) {
-      const o = await openRow(jk, row, "draft");
-      if (o.state === "ok") {
-        day.draft = o.entry.text;
-        ownDraft = true;
-      } else day.unreadable++;
-    } else if (row.kind === "morning") {
+    else if (row.kind === "morning") {
       const o = await openRow(jk, row, "morning");
       if (o.state === "ok") {
         day.pages += o.entry.pages > 0 ? 1 : 0;
@@ -153,16 +149,59 @@ export async function readMorningDay(jk: JournalKey, date: ISODate, deviceId: st
       } else day.unreadable++;
     }
   }
-  if (!ownDraft) day.draft = legacyDraft;
+  const own = await ownMorningDraft(jk, date, deviceId);
+  day.unreadable += own.unreadable;
+  day.draft = own.text ?? legacyDraft;
+  if (own.from) day.draftFrom = own.from;
   day.done = day.pages > 0 || day.photos.length > 0;
   return day;
+}
+
+/**
+ * This device's draft for a day, decided each time the day is read (restore-safe review I1):
+ * - its current-id draft, when that has words;
+ * - else a draft under a former id (deviceIds.ts) with words that no "I'm done" has dealt with
+ *   yet (its `<id>@<updatedAt>` is in no `kept` list): words written before a Replace that came
+ *   back from the server, perhaps after she had already finished that day's page. The box opens
+ *   on them (an earlier day's is offered with "Open that page"), so they are never hidden;
+ * - else the current-id draft (empty), or nothing (`text` null: no draft of this device's here).
+ */
+async function ownMorningDraft(
+  jk: JournalKey, date: ISODate, deviceId: string,
+): Promise<{ text: string | null; from?: string; unreadable: number }> {
+  const { current, former } = await ownDevices(deviceId);
+  let unreadable = 0;
+  const kept = new Set<string>();
+  const open = async (row: JournalRow | undefined) => {
+    if (!row) return null;
+    const o = await openRow(jk, row, "draft");
+    if (o.state !== "ok") {
+      unreadable++;
+      return null;
+    }
+    (o.entry.kept ?? []).forEach((k) => kept.add(k));
+    return { mark: `${row.id}@${row.updatedAt ?? 0}`, text: o.entry.text, at: row.updatedAt ?? 0 };
+  };
+  const cur = await open(await db.journal.get(journalId("draft", date, current)));
+  const olds = [];
+  for (const row of former.length ? await db.journal.bulkGet(former.map((d) => journalId("draft", date, d))) : []) {
+    const o = await open(row);
+    if (o) olds.push(o);
+  }
+  if (cur && cur.text.trim() !== "") return { text: cur.text, unreadable };
+  const waiting = olds.sort((a, b) => b.at - a.at).find((o) => o.text.trim() !== "" && !kept.has(o.mark));
+  if (waiting) return { text: waiting.text, from: waiting.mark, unreadable };
+  if (cur) return { text: cur.text, unreadable };
+  return { text: olds.length ? "" : null, unreadable };
 }
 
 /**
  * This device's newest unfinished morning page before `before` (a draft with words that "I'm
  * done" never emptied), or null. Never hidden however old (bug #6): the page offers it back.
  */
-export async function latestMorningDraft(jk: JournalKey, before: ISODate, deviceId: string): Promise<{ date: ISODate; text: string } | null> {
+export async function latestMorningDraft(
+  jk: JournalKey, before: ISODate, deviceId: string,
+): Promise<{ date: ISODate; text: string; from?: string } | null> {
   const rows = await db.journal.where("kind").anyOf("draft", "morning").toArray();
   const { current, former } = await ownDevices(deviceId);
   const mine = new Set([current, ...former]);
@@ -170,7 +209,7 @@ export async function latestMorningDraft(jk: JournalKey, before: ISODate, device
   dates.sort((a, b) => b.localeCompare(a));
   for (const date of dates) {
     const day = await readMorningDay(jk, date, deviceId);
-    if (day.draft.trim() !== "") return { date, text: day.draft };
+    if (day.draft.trim() !== "") return { date, text: day.draft, ...(day.draftFrom ? { from: day.draftFrom } : {}) };
   }
   return null;
 }
@@ -201,10 +240,14 @@ export async function listJournalledDays(): Promise<Set<ISODate>> {
   return new Set(rows.map((r) => r.date));
 }
 
-/** Autosaves this device's draft for the day (sealed). Only this device writes it. */
-export async function saveMorningDraft(jk: JournalKey, date: ISODate, device: string, text: string): Promise<void> {
+/**
+ * Autosaves this device's draft for the day (sealed). Only this device writes it. `from`: the
+ * former-id draft the box opened on (MorningDay.draftFrom), now dealt with: her words carry on here.
+ */
+export async function saveMorningDraft(jk: JournalKey, date: ISODate, device: string, text: string, from?: string): Promise<void> {
   const deviceId = await writerId(device);
   const kept = await keptDrafts(jk, date, deviceId); // never written over if it won't open
+  if (from && !kept.includes(from)) kept.push(from);
   await write(jk, [await seal(jk, "draft", date, deviceId, { v: 1, text, ...(kept.length ? { kept } : {}) })]);
 }
 
@@ -1297,9 +1340,12 @@ const versionOf = (e: NoteEntry, vid: string): NoteVersion => ({ vid, prompt: e.
  */
 export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ notes: Note[]; unreadable: number; drafts: NoteDraft[] }> {
   const groups = new Map<string, { date: ISODate; versions: { e: NoteEntry; vid: string }[] }>();
-  // This device's draft of each note: the one under its current id, else the newest under a former one (deviceIds.ts).
   const { current, former } = deviceId === undefined ? { current: undefined, former: [] as string[] } : await ownDevices(deviceId);
-  const ownDrafts = new Map<string, { at: number; current: boolean; draft: NoteDraft | null }>();
+  // This device's drafts of each note: under its current id, and under its former ids (deviceIds.ts).
+  type OwnDraft = { e: NoteEntry; date: ISODate; at: number; tag: string };
+  const own = new Map<string, { current?: OwnDraft; former: OwnDraft[] }>();
+  /** Every `seen` entry of a note's rows (any device): a former draft's tag here was dealt with. */
+  const acks = new Map<string, Set<string>>();
   let unreadable = 0;
   for (const row of await db.journal.where("kind").equals("note").toArray()) {
     const o = await openRow(jk, row, "note");
@@ -1309,23 +1355,49 @@ export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ no
     }
     const part = noteRowParts(row);
     const e = o.entry;
+    const ack = acks.get(part.id) ?? new Set<string>();
+    (e.seen ?? []).forEach((x) => ack.add(x));
+    acks.set(part.id, ack);
     if (part.draft) {
-      const isCurrent = part.device === current;
-      if (!isCurrent && !former.includes(part.device)) continue;
-      const have = ownDrafts.get(part.id);
-      const stamp = row.updatedAt ?? 0;
-      if (have && (have.current || (!isCurrent && have.at >= stamp))) continue;
-      ownDrafts.set(part.id, {
-        at: stamp, current: isCurrent,
-        draft: filled(e)
-          ? { id: part.id, date: row.date, fields: { prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill }, seen: e.seen ?? [], at: e.at }
-          : null,
-      });
+      const mine = own.get(part.id) ?? { former: [] };
+      const d = { e, date: row.date, at: row.updatedAt ?? 0, tag: formerDraftTag(row) };
+      if (part.device === current) mine.current = d;
+      else if (former.includes(part.device)) mine.former.push(d);
+      else continue;
+      own.set(part.id, mine);
       continue;
     }
     const g = groups.get(part.id) ?? { date: row.date, versions: [] };
     g.versions.push({ e, vid: vidOf(row.id, e) });
     groups.set(part.id, g);
+  }
+  // Her draft of a note: the one under the current id; with none, the newest under a former id
+  // that nothing has dealt with yet (it opens with its tag in `seen`, so saving, cancelling or
+  // deleting from it deals with it). Any other former draft with words nothing has dealt with
+  // (words written before a Replace that synced in after she changed the restored draft here:
+  // restore-safe review I2) is shown as another version of the note, never hidden.
+  const drafts: NoteDraft[] = [];
+  const fieldsOfEntry = (e: NoteEntry): NoteFields => ({ prompt: e.prompt, thought: e.thought, steady: e.steady, memory: e.memory, skill: e.skill });
+  for (const [id, mine] of own) {
+    const dealt = acks.get(id) ?? new Set<string>();
+    const waiting = mine.former.filter((d) => filled(d.e) && !dealt.has(d.tag)).sort((a, b) => b.at - a.at);
+    let opened: OwnDraft | undefined = mine.current;
+    if (mine.current) {
+      if (filled(mine.current.e)) {
+        const e = mine.current.e;
+        drafts.push({ id, date: mine.current.date, fields: fieldsOfEntry(e), seen: e.seen ?? [], at: e.at });
+      }
+    } else if (waiting[0]) {
+      opened = waiting[0];
+      const e = opened.e;
+      drafts.push({ id, date: opened.date, fields: fieldsOfEntry(e), seen: [...(e.seen ?? []), opened.tag], at: e.at });
+    }
+    for (const d of waiting) {
+      if (d === opened || (opened && filled(opened.e) && noteKey(versionOf(opened.e, "")) === noteKey(versionOf(d.e, "")))) continue;
+      const g = groups.get(id) ?? { date: d.date, versions: [] };
+      g.versions.push({ e: { ...d.e, seen: [], deleted: undefined, draft: undefined }, vid: d.tag });
+      groups.set(id, g);
+    }
   }
   const notes: Note[] = [];
   for (const [id, { date, versions }] of groups) {
@@ -1347,10 +1419,16 @@ export async function listNotes(jk: JournalKey, deviceId?: string): Promise<{ no
     });
   }
   notes.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
-  const drafts = [...ownDrafts.values()].flatMap((d) => (d.draft ? [d.draft] : []));
   drafts.sort((a, b) => b.at - a.at);
   return { notes, unreadable, drafts };
 }
+
+/**
+ * A former-id draft's tag (`draft@<row id>@<updatedAt>`): in a version's or a draft's `seen`
+ * once she saved, cancelled or deleted from it, so it is dealt with (restore-safe I2). A newer
+ * copy of that row (synced in later) has another tag, so it shows again.
+ */
+const formerDraftTag = (row: JournalRow) => `draft@${row.id}@${row.updatedAt ?? 0}`;
 
 /**
  * A note's rows here, opened. This device's draft row that won't open is never written over.
@@ -1377,9 +1455,10 @@ async function noteRows(jk: JournalKey, id: string, deviceId: string) {
 }
 
 /** This device's draft row for a note, emptied (only when there is one). */
-async function clearedNoteDraft(jk: JournalKey, id: string, deviceId: string, hasDraft: boolean): Promise<JournalRow[]> {
+async function clearedNoteDraft(jk: JournalKey, id: string, deviceId: string, hasDraft: boolean, seen: string[] = []): Promise<JournalRow[]> {
   if (!hasDraft) return [];
-  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: 0, at: Date.now(), draft: true };
+  // `seen`: what she had open (a former draft's tag in it is dealt with: listNotes).
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: 0, at: Date.now(), draft: true, ...(seen.length ? { seen } : {}) };
   return [await seal(jk, "note", noteDate(id), noteRowId(id, deviceId, true).slice(`note:${noteDate(id)}:`.length), empty)];
 }
 
@@ -1418,11 +1497,11 @@ export async function saveNoteDraft(jk: JournalKey, deviceId: string, id: string
   await write(jk, [await seal(jk, "note", date, noteRowId(id, deviceId, true).slice(`note:${date}:`.length), entry)]);
 }
 
-/** Cancel: this device's note in progress is let go (its draft row emptied). */
-export async function clearNoteDraft(jk: JournalKey, deviceId: string, id: string): Promise<void> {
+/** Cancel: this device's note in progress is let go (its draft row emptied). `seen`: what she had open. */
+export async function clearNoteDraft(jk: JournalKey, deviceId: string, id: string, seen: string[] = []): Promise<void> {
   deviceId = await writerId(deviceId);
   const { hasDraft } = await noteRows(jk, id, deviceId);
-  const rows = await clearedNoteDraft(jk, id, deviceId, hasDraft);
+  const rows = await clearedNoteDraft(jk, id, deviceId, hasDraft, seen);
   if (rows.length) await write(jk, rows);
 }
 
