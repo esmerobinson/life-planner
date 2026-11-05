@@ -38,6 +38,12 @@ export interface AnswerEntry {
    * can win over an older answer from another device. Never set by Skip.
    */
   cleared?: true;
+  /**
+   * She pressed Skip with the box empty (bug #40): the finished check-in leaves this question
+   * out. Without it an empty answer is shown, so a blank from Next (or a lost answer) can be
+   * written again. Older rows never have it. Never set with words or with `cleared`.
+   */
+  skipped?: true;
 }
 
 /** The day's questions, written by the first device to open the check-in that day. */

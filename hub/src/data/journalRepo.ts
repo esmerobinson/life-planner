@@ -274,6 +274,12 @@ export interface CheckinAnswer {
   at: number;
   /** Cleared on purpose with Edit (bug #30). */
   cleared?: boolean;
+  /**
+   * Skipped on purpose, with nothing written, on every device that has a row for it (bug #40).
+   * Anything less sure (a blank from Next, a lost answer, an older row) leaves it unset, so the
+   * finished check-in shows the question.
+   */
+  skipped?: boolean;
 }
 
 /**
@@ -289,7 +295,20 @@ function mergeAnswer(prev: CheckinAnswer | undefined, next: CheckinAnswer): Chec
     return a.at >= b.at ? a : b;
   };
   const best = pick(prev, next);
-  return { answer: best.answer, done: prev.done || next.done, at: Math.max(prev.at, next.at), ...(best.cleared ? { cleared: true } : {}) };
+  const skipped = !counts(best) && prev.skipped === true && next.skipped === true;
+  return {
+    answer: best.answer, done: prev.done || next.done, at: Math.max(prev.at, next.at),
+    ...(best.cleared ? { cleared: true } : {}), ...(skipped ? { skipped: true } : {}),
+  };
+}
+
+/** One answer row as the day reads it: `skipped` only on an empty one she skipped (bug #40). */
+function answerOfEntry(e: AnswerEntry): CheckinAnswer {
+  return {
+    answer: e.answer, done: e.done, at: e.at,
+    ...(e.cleared ? { cleared: true } : {}),
+    ...(e.skipped === true && e.answer === null && !e.cleared ? { skipped: true } : {}),
+  };
 }
 
 export interface CheckinDay {
@@ -318,7 +337,7 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
       const o = await openRow(jk, row, "answer");
       if (o.state === "ok") {
         const e = o.entry;
-        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), { answer: e.answer, done: e.done, at: e.at, ...(e.cleared ? { cleared: true } : {}) }));
+        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), answerOfEntry(e)));
       } else unreadable++;
     } else if (row.kind === "checkin") {
       const o = await openRow(jk, row, "checkin");
@@ -382,6 +401,8 @@ export async function saveAnswer(
    * answer is saved as cleared on purpose (bug #30).
    */
   edit?: { session: string; seenAt?: number },
+  /** Skip pressed: an empty answer is saved as skipped (bug #40); words are kept as words. */
+  skip = false,
 ): Promise<void> {
   const text = answer && answer.trim() ? answer : null;
   const pk = await promptKey(jk, prompt);
@@ -390,7 +411,11 @@ export async function saveAnswer(
   // wins over her change here). Words that arrive from elsewhere while she edits can still be newer.
   const before = edit ? (edit.seenAt !== undefined ? [edit.seenAt] : (await answersTo(jk, date, pk)).map((e) => e.at)) : [];
   const at = Math.max(Date.now(), ...before.map((t) => t + 1));
-  const entry: AnswerEntry = { v: 1, prompt, answer: text, done, at, ...(edit && text === null ? { cleared: true as const } : {}) };
+  const entry: AnswerEntry = {
+    v: 1, prompt, answer: text, done, at,
+    ...(edit && text === null ? { cleared: true as const } : {}),
+    ...(skip && !edit && text === null ? { skipped: true as const } : {}),
+  };
   const suffix = edit ? `${pk}:${deviceId}-e${edit.session}` : await ownAnswerSuffix(jk, date, prompt, deviceId);
   await write(jk, [await seal(jk, "answer", date, suffix, entry)]);
 }
@@ -425,15 +450,21 @@ async function ownAnswerSuffix(jk: JournalKey, date: ISODate, prompt: string, de
  * Never copies another device's answer, never blanks this device's own one, and never makes
  * its words look newer than they are.
  */
-export async function moveAnswerOn(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<void> {
+export async function moveAnswerOn(
+  jk: JournalKey, date: ISODate, prompt: string, deviceId: string, how: { skip?: boolean } = {},
+): Promise<void> {
+  const skip = how.skip === true;
   const suffix = await ownAnswerSuffix(jk, date, prompt, deviceId);
   const own = await db.journal.get(journalId("answer", date, suffix));
-  if (!own) return saveAnswer(jk, date, prompt, deviceId, null, true); // nothing here: an empty answer never wins
+  if (!own) return saveAnswer(jk, date, prompt, deviceId, null, true, undefined, skip); // nothing here: an empty answer never wins
   const o = await openRow(jk, own, "answer");
   if (o.state !== "ok") throw new Error("That answer could not be read, so it was left as it is.");
   // Only "moved past" changes: the words keep the time they were written, so they never look
   // newer than an answer (or a clear) made since on another device (bug #33).
-  await write(jk, [await seal(jk, "answer", date, suffix, { ...o.entry, done: true })]);
+  // Skip on a row with no words marks it skipped (bug #40); Next, or words, never do.
+  const { skipped: _was, ...entry } = o.entry;
+  const skipped = skip && entry.answer === null && !entry.cleared;
+  await write(jk, [await seal(jk, "answer", date, suffix, { ...entry, done: true, ...(skipped ? { skipped: true as const } : {}) })]);
 }
 
 /** Every day with a check-in, newest first. */
