@@ -93,18 +93,25 @@ for (const width of [1280, 390]) {
       await page.getByRole("button", { name: "Open yesterday's page" }).click();
       await expect(box).toHaveValue("Pretend unfinished words from yesterday");
       await page.getByRole("button", { name: "I'm done" }).click();
+      // The late page closes once "I'm done" has saved (MorningPages awaits it before onFinished).
+      await expect(page.getByText("Finishing yesterday's page")).toHaveCount(0);
       await expect(page.getByLabel("Today's morning page")).toHaveValue("");
       await expect(page.getByRole("button", { name: "Open yesterday's page" })).toHaveCount(0);
       await expect(page.getByText("Yesterday's unfinished page is saved.")).toHaveCount(0);
       await sideways(page);
       await shoot(page, `yesterday-finished-${width}`);
-      // Filed under yesterday's date, not today's.
-      const dates = await page.evaluate(async () => {
-        const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
-        const { db } = await at("/src/data/db.ts");
-        return (await db.journal.where("kind").equals("page").toArray()).map((r: { date: string }) => r.date);
-      });
-      expect(dates).toEqual([await pageDate(page, -1)]);
+      // Filed under yesterday's date, not today's. Polled: the checks above already hold while
+      // "I'm done" is still saving (today's box was empty and the offer hidden all along).
+      const yesterday = await pageDate(page, -1);
+      await expect
+        .poll(() =>
+          page.evaluate(async () => {
+            const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
+            const { db } = await at("/src/data/db.ts");
+            return (await db.journal.where("kind").equals("page").toArray()).map((r: { date: string }) => r.date);
+          }),
+        )
+        .toEqual([yesterday]);
     });
 
     test("Cancel in a goal's Edit puts its month goals back", async ({ page }) => {
