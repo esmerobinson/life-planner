@@ -4,6 +4,7 @@ import { keepOwnStamps } from "./changeTracking";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
 import { JOURNAL_KINDS, type FileRow, type Goal, type ISODate, type Item, type JournalRow } from "../domain/types";
 import { isObj, isStr, sealedJournalShape, validFile, validGoal, validItem, validJournal } from "./validate";
+import { JOURNAL_KEY_META, VERIFIER_ID } from "../journal/keyStore";
 
 export { validFile, validGoal, validItem, validJournal };
 
@@ -32,6 +33,14 @@ export const INVALID_BACKUP =
  */
 export const NEWER_BACKUP =
   "Part of that backup can't be read by this version of Esmeworld. If the app has an update waiting, update it, then try again. Nothing has changed.";
+
+/**
+ * Placeholder wording (Esme may reword; journal-rekey report): Replace with a backup whose
+ * journal is ANOTHER one (its check row carries another key's fingerprint). Restoring it would
+ * lock her own journal on every device once it synced (bug #35), so nothing is restored.
+ */
+export const FOREIGN_JOURNAL_BACKUP =
+  "This backup holds a different journal from the one on this device, so nothing was restored. Your journal, tasks and goals are just as they were.";
 
 /** Shown when the write itself fails; the transaction leaves the data as it was. */
 export const RESTORE_FAILED = "The restore did not work. Nothing was changed.";
@@ -110,14 +119,14 @@ export async function restoreBackup(
     return await withSyncLock(db, () => writeBackup(file, mode));
   } catch (err) {
     // The transaction aborted, so nothing was written.
-    if (err instanceof Error && (err.message === WAITING_FIRST_SYNC || err.message === REPLACE_OFF_WHILE_SYNCING)) throw err;
+    if (err instanceof Error && [WAITING_FIRST_SYNC, REPLACE_OFF_WHILE_SYNCING, FOREIGN_JOURNAL_BACKUP].includes(err.message)) throw err;
     throw new Error(RESTORE_FAILED);
   }
 }
 
 async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
   // Journal rows of a kind this version doesn't know wait in quarantine, applied after the update.
-  const known = (file.journal ?? []).filter(validJournal);
+  let known = (file.journal ?? []).filter(validJournal);
   const later = (file.journal ?? []).filter((r) => !validJournal(r));
   return db.transaction("rw", [db.items, db.goals, db.files, db.journal, db.syncMeta, db.quarantine], async () => {
     // Restored rows keep the file's own stamp (its updatedAt, else createdAt), never "now":
@@ -126,6 +135,14 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
     const gate = await readSyncGate(db.syncMeta);
     if (mode === "replace" && replaceBlocked(gate)) throw new Error(REPLACE_OFF_WHILE_SYNCING);
     if (mode === "merge" && mergeBlocked(gate)) throw new Error(WAITING_FIRST_SYNC);
+    // Another journal's check row never comes in (bug #35): it would win on the server and
+    // lock this journal on every device. Replace refuses the whole file; Merge leaves it out.
+    const ours = await journalFingerprintHere();
+    const theirs = known.find((r) => r.id === VERIFIER_ID);
+    if (ours && theirs && theirs.fp !== ours) {
+      if (mode === "replace") throw new Error(FOREIGN_JOURNAL_BACKUP);
+      known = known.filter((r) => r !== theirs);
+    }
     if (mode === "replace") {
       await db.items.clear();
       await db.goals.clear();
@@ -167,6 +184,17 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       ...keptCount(later),
     };
   });
+}
+
+/**
+ * This device's journal, by its key's fingerprint: the confirmed key's, else the verifier row's
+ * here (a locked device). Undefined when neither is here (nothing to compare with). In the
+ * caller's transaction (syncMeta and journal).
+ */
+async function journalFingerprintHere(): Promise<string | undefined> {
+  const confirmed = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as { fp?: unknown } | undefined;
+  if (typeof confirmed?.fp === "string") return confirmed.fp;
+  return (await db.journal.get(VERIFIER_ID))?.fp;
 }
 
 /** How many rows wait for a newer version (said only when there are some). */

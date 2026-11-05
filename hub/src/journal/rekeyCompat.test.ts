@@ -86,3 +86,48 @@ it("an app version without the keywrap kind keeps the row in quarantine and keep
   expect(await old.quarantine.get(["journal", row.id])).toMatchObject({ id: row.id });
   expect((await olderEngine.syncOnce({ db: old, fetch: server.fetch })).kind).toBe("ok");
 });
+
+// Bug #35 guard: a backup of ANOTHER journal (its verifier carries another fingerprint) never
+// replaces this journal's verifier: Replace refuses the whole file, Merge leaves that row out.
+describe("a backup of another journal (bug #35)", () => {
+  const OURS = "pretend-guard-ours";
+  const THEIRS = "pretend-guard-theirs";
+  async function backupWith(verifierOf: string) {
+    const { verifierRow } = await import("../test/journalKey");
+    const file = JSON.parse(JSON.stringify(await exportBackup(DAY)));
+    return { ...file, items: [], goals: [], files: [], journal: [{ ...(await verifierRow(await keyFor(verifierOf))), updatedAt: Date.now() + 60_000 }] };
+  }
+
+  it("Replace refuses it with a kind message and changes nothing, on a device with the journal open", async () => {
+    const { confirmedDevice } = await import("../test/journalKey");
+    const { FOREIGN_JOURNAL_BACKUP } = await import("../data/backup");
+    await confirmedDevice(db, await keyFor(OURS));
+    const before = await db.journal.toArray();
+    await expect(restoreBackup(JSON.stringify(await backupWith(THEIRS)), "replace")).rejects.toThrow(FOREIGN_JOURNAL_BACKUP);
+    expect(await db.journal.toArray()).toEqual(before);
+    expect(FOREIGN_JOURNAL_BACKUP).toMatch(/nothing was restored/i);
+  });
+
+  it("Replace also refuses it on a locked device that has this journal's verifier", async () => {
+    const { verifierRow } = await import("../test/journalKey");
+    const { FOREIGN_JOURNAL_BACKUP } = await import("../data/backup");
+    await db.journal.put(await verifierRow(await keyFor(OURS)));
+    await expect(restoreBackup(JSON.stringify(await backupWith(THEIRS)), "replace")).rejects.toThrow(FOREIGN_JOURNAL_BACKUP);
+  });
+
+  it("Replace with a backup of this same journal still works", async () => {
+    const { confirmedDevice } = await import("../test/journalKey");
+    await confirmedDevice(db, await keyFor(OURS));
+    await restoreBackup(JSON.stringify(await backupWith(OURS)), "replace");
+    expect((await db.journal.get("verifier"))!.fp).toBe((await keyFor(OURS)).fp);
+  });
+
+  it("Merge never brings in another journal's verifier (a device whose verifier isn't here yet)", async () => {
+    await db.syncMeta.put({ key: "journalKey", value: { ...(await keyFor(OURS)), id: "k" } }); // confirmed, no verifier row
+    const file = await backupWith(THEIRS);
+    file.journal.push(await keywrapRow());
+    await restoreBackup(JSON.stringify(file), "merge");
+    expect(await db.journal.get("verifier")).toBeUndefined();
+    expect(await db.journal.count()).toBe(1); // the other row came in
+  });
+});
