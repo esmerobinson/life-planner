@@ -5,7 +5,8 @@
 // missing or changed after restoring her backup. Fictional data only.
 
 import { db } from "./db";
-import { exportBackup, restoreBackup } from "./backup";
+import { exportBackup, INVALID_BACKUP, NEWER_BACKUP, parseBackup, restoreBackup } from "./backup";
+import { arrivedRow, outfitRow, placedRow, seenRow, startRow, todayRow, type FarmRow } from "../farm/state";
 import { journalId } from "./validate";
 import { JOURNAL_KINDS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 import { journalAad, sealJson } from "../journal/crypto";
@@ -75,8 +76,17 @@ const files: FileRow[] = [
   { id: "pic2", mime: "image/png", data: "", width: 0, height: 0, createdAt: "2026-10-01", status: "purged" },
 ];
 
+// Esme's Farm: one row of every kind (fictional device ids and dates).
+const farm: FarmRow[] = [
+  startRow("devicePretend01", "2026-10-02"), startRow("devicePretend02", "2026-10-05"),
+  seenRow("hi", "2026-10-02"), seenRow("lilypad", "2026-10-03"),
+  placedRow("hen", "hen", "2026-10-04"), arrivedRow("bap", "2026-10-06"),
+  outfitRow("bap", "A1"), outfitRow("domino", null), todayRow("2026-10-07"),
+];
+
 async function all() {
   return {
+    farm: await db.farm.orderBy("id").toArray(),
     items: await db.items.orderBy("id").toArray(),
     goals: await db.goals.orderBy("id").toArray(),
     files: await db.files.orderBy("id").toArray(),
@@ -85,7 +95,7 @@ async function all() {
 }
 
 async function clearAll() {
-  await Promise.all([db.items.clear(), db.goals.clear(), db.files.clear(), db.journal.clear(), db.pending.clear(), db.syncMeta.clear(), db.quarantine.clear()]);
+  await Promise.all([db.items.clear(), db.goals.clear(), db.files.clear(), db.journal.clear(), db.farm.clear(), db.pending.clear(), db.syncMeta.clear(), db.quarantine.clear()]);
 }
 
 beforeEach(clearAll);
@@ -97,12 +107,102 @@ describe("backup round trip of every synced table", () => {
     await db.goals.bulkAdd(goals);
     await db.files.bulkAdd([...files, photo]);
     await db.journal.bulkAdd(rows);
+    await db.farm.bulkAdd(farm);
     const before = await all();
     expect(before.journal.length).toBe(JOURNAL_KINDS.length + 1);
+    expect(before.farm.length).toBe(farm.length);
 
     const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
     await clearAll();
     await restoreBackup(file, mode);
     expect(await all()).toEqual(before);
+  });
+});
+
+// Esme's Farm in backups (Testing session, farm x data safety). What Esme would see if these
+// failed: her farm (where she put her stickers, who has moved in, outfits) changed or gone after
+// a restore, or a backup she can't restore at all.
+describe("the farm in backups", () => {
+  const pretendTask: Item = { id: "t1", kind: "task", title: "Pretend task", links: [], areaId: "mind", priority: 2,
+    status: "open", createdAt: "2026-10-01", touchedAt: "2026-10-01" };
+
+  it("an older backup with no farm key: Merge leaves the farm exactly as it was", async () => {
+    await db.farm.bulkAdd(farm);
+    const before = (await all()).farm;
+    const { farm: _f, ...older } = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    await restoreBackup({ ...older, items: [pretendTask] }, "merge");
+    expect((await all()).farm).toEqual(before);
+    expect(await db.items.get("t1")).toBeTruthy();
+  });
+
+  it("an older backup with no farm key: Replace still restores and keeps the farm as it was (backup.ts's stated intent)", async () => {
+    await db.farm.bulkAdd(farm);
+    const before = (await all()).farm;
+    const { farm: _f, ...older } = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    await restoreBackup({ ...older, items: [pretendTask] }, "replace");
+    expect((await all()).farm).toEqual(before);
+    expect((await db.items.toArray()).map((i) => i.id)).toEqual(["t1"]);
+  });
+
+  it("a backup made before the farm was opened (farm: []) on Replace empties the farm, like every other table", async () => {
+    const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    expect(file.farm).toEqual([]);
+    await db.farm.bulkAdd(farm);
+    await restoreBackup(file, "replace");
+    expect(await db.farm.count()).toBe(0);
+  });
+
+  it.each([
+    ["an extra key", { ...seenRow("hi", "2026-10-02"), extra: 1 }],
+    ["an id that doesn't match its sticker", { id: "seen:hi", kind: "seen", sticker: "door", date: "2026-10-02" }],
+    ["a bad date", { ...placedRow("hen", "hen", "2026-10-02"), date: "2026-13-40" }],
+    ["an unknown character", { id: "arrived:rex", kind: "arrived", character: "rex", date: "2026-10-02" }],
+    ["a bad stamp", { ...seenRow("hi", "2026-10-02"), updatedAt: -1 }],
+  ])("a damaged farm row (%s) refuses the whole file and changes nothing", async (_n, bad) => {
+    await db.farm.bulkAdd(farm);
+    await db.items.add(pretendTask);
+    const before = await all();
+    const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    const damaged = { ...file, items: [], farm: [...file.farm, bad] };
+    expect(() => parseBackup(damaged)).toThrow(INVALID_BACKUP);
+    for (const mode of ["merge", "replace"] as const) await expect(restoreBackup(damaged, mode)).rejects.toThrow(INVALID_BACKUP);
+    expect(await all()).toEqual(before);
+  });
+
+  it("two farm rows with the same id refuse the file whole", async () => {
+    const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    expect(() => parseBackup({ ...file, farm: [seenRow("hi", "2026-10-02"), seenRow("hi", "2026-10-03")] })).toThrow(INVALID_BACKUP);
+  });
+
+  it("Merge into a hub with its own farm keeps this device's rows and adds only the missing ones", async () => {
+    await db.farm.bulkAdd(farm);
+    const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    await db.farm.clear();
+    await db.farm.bulkAdd([outfitRow("bap", "H4"), placedRow("daisy", "daisy", "2026-10-20")]);
+    await restoreBackup(file, "merge");
+    const ids = (await db.farm.toArray()).map((r) => r.id).sort();
+    expect(ids).toEqual([...farm.map((r) => r.id), "placed:daisy"].sort());
+    expect(await db.farm.get("outfit:bap")).toMatchObject({ item: "H4" });
+  });
+
+  // FOUND (forward compatibility): sync keeps a farm row of a kind only a later app version knows
+  // (sync/farm.test.ts "a later pack's kind"), and a backup keeps a journal row of a later kind
+  // for later; but a backup holding a later farm kind is called "not an Esmeworld backup" and
+  // nothing in it can be restored.
+  it("a backup from a newer version with a farm kind this version doesn't know says so (NEWER_BACKUP), not 'not a backup'", async () => {
+    const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    const newer = { ...file, items: [pretendTask], farm: [seenRow("hi", "2026-10-02"), { id: "coins:all", kind: "coins", n: 3, updatedAt: 10 }] };
+    expect(() => parseBackup(newer)).toThrow(NEWER_BACKUP);
+  });
+
+  // FOUND (backup leaves out): farm rows this version holds in quarantine (sent by a newer
+  // device) aren't in the backup, while held journal rows are (backup.ts exportBackup, review I3).
+  it("farm rows held for a later version are in the backup, as held journal rows are", async () => {
+    await db.quarantine.put({
+      table: "farm", id: "coins:all", updatedAt: 10, data: { id: "coins:all", kind: "coins", n: 3, updatedAt: 10 },
+      reason: "pretend: a later version reads it", cursor: 1,
+    });
+    const file = await exportBackup("2026-10-28");
+    expect(file.farm?.map((r) => r.id)).toContain("coins:all");
   });
 });
