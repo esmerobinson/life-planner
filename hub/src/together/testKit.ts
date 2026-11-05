@@ -53,25 +53,37 @@ function strings(v: unknown, out: string[] = []): string[] {
 }
 
 /**
- * A fetch that fails the test the moment any request holds one of `forbidden`: in its address
- * (as sent and decoded), its headers, its raw body, or any string inside the body once parsed
- * (so text with line breaks, quotes or backslashes, which JSON escapes, is still caught). A body
- * that isn't a string fails at once (it couldn't be checked). Every request is kept in `seen`.
+ * A fetch that records every request that holds one of `forbidden`: in its address (as sent and
+ * decoded), its headers, its raw body, or any string inside the body once parsed (so text with
+ * line breaks, quotes or backslashes, which JSON escapes, is still caught). A body that isn't a
+ * string is a violation (it couldn't be checked).
+ *
+ * Time-zone proof (Testing, 2026-11-05): the only timestamp the client makes up is the sending
+ * instant, `new Date(sendingInstant()).toISOString()`; that is blanked before matching (a send at
+ * 03:30 in Dubai is 23:30Z the day before, which isn't a journal date), and every `deleted_at`
+ * must be exactly that instant or null, so nothing can hide behind the blank. Violations are
+ * collected, not thrown (the client would swallow a throw as "offline"): assert none at the end.
  */
-export function guardedFetch(inner: typeof fetch, forbidden: () => string[]) {
+export function guardedFetch(inner: typeof fetch, forbidden: () => string[], sendingInstant: () => number) {
   const seen: { url: string; headers: Record<string, string>; body: string }[] = [];
+  const violations: string[] = [];
   const f = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (init.body !== undefined && init.body !== null && typeof init.body !== "string") throw new Error("FORBIDDEN: a body the recorder can't read");
+    if (init.body !== undefined && init.body !== null && typeof init.body !== "string") violations.push("a body the recorder can't read");
     const headers: Record<string, string> = {};
     new Headers(init.headers).forEach((v, k) => (headers[k] = v));
     const body = typeof init.body === "string" ? init.body : "";
     seen.push({ url, headers, body });
-    let parsed: string[] = [];
+    const now = new Date(sendingInstant()).toISOString();
+    let parsed: unknown = null;
     try {
-      parsed = body ? strings(JSON.parse(body)) : [];
+      parsed = body ? JSON.parse(body) : null;
     } catch {
-      parsed = [];
+      parsed = null;
+    }
+    if (parsed && typeof parsed === "object" && "deleted_at" in parsed) {
+      const d = (parsed as { deleted_at: unknown }).deleted_at;
+      if (d !== null && d !== now) violations.push(`deleted_at isn't the sending instant: ${JSON.stringify(d)}`);
     }
     let decoded = url;
     try {
@@ -79,13 +91,14 @@ export function guardedFetch(inner: typeof fetch, forbidden: () => string[]) {
     } catch {
       /* keep as sent */
     }
-    const places = [url, decoded, JSON.stringify(headers), ...Object.values(headers), body, ...parsed];
+    const blank = (x: string) => x.split(now).join("<now>");
+    const places = [url, decoded, JSON.stringify(headers), ...Object.values(headers), body, ...strings(parsed)].map(blank);
     for (const bad of forbidden()) {
-      if (bad && places.some((p) => p.includes(bad))) throw new Error(`FORBIDDEN content was about to be sent: ${JSON.stringify(bad.slice(0, 40))}`);
+      if (bad && places.some((p) => p.includes(bad))) violations.push(`forbidden: ${JSON.stringify(bad.slice(0, 40))} in ${new URL(url).pathname}`);
     }
     return inner(input, init);
   }) as typeof fetch;
-  return { fetch: f, seen };
+  return { fetch: f, seen, violations };
 }
 
 export const DEVICE = "device-pretend-mac-01";

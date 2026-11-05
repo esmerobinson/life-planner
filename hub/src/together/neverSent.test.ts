@@ -64,7 +64,7 @@ it("nothing forbidden is ever sent to Together", async () => {
     MORNING_ONLY, JPEG, PASS, jk.fp, SYNC_TOKEN, set.source, ...cardFileText,
     ...(signedIn ? [PASSWORD, EMAIL] : []),
   ];
-  const guard = guardedFetch(fake.fetch, forbidden);
+  const guard = guardedFetch(fake.fetch, forbidden, c.now);
   const env = { fetch: guard.fetch, now: c.now };
 
   expect(await signInToTogether(env, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD })).toEqual({ kind: "ok" });
@@ -77,6 +77,7 @@ it("nothing forbidden is ever sent to Together", async () => {
   expect(await sendToTogether({ ...env, retryRefused: true })).toMatchObject({ kind: "ok" });
   expect(await stopTogether(env, { markDeleted: true })).toEqual({ kind: "ok" });
 
+  expect(guard.violations).toEqual([]);
   // It did send: both days' habits and tallies, DAY's answers and what she learned.
   const all = guard.seen.map((r) => r.body).join("\n");
   expect(all).toContain("Pretend exercise answer");
@@ -96,14 +97,20 @@ it("nothing forbidden is ever sent to Together", async () => {
   expect(withPassword[0]!.url).toContain("grant_type=password");
 });
 
-it("the recorder catches text with line breaks and quotes inside JSON, and refuses bodies it can't read", async () => {
+it("the recorder catches text with line breaks and quotes inside JSON, bodies it can't read, dates however encoded, and a made-up deleted_at", async () => {
   const c = clock(`${DAY}T09:00:00`);
   const fake = fakeTogether(c);
-  const guard = guardedFetch(fake.fetch, () => [MORNING]);
-  await expect(guard.fetch(`${fake.url}/rest/v1/todo_events`, { method: "POST", body: JSON.stringify({ note: `x ${MORNING} y` }) })).rejects.toThrow(/FORBIDDEN/);
-  await expect(guard.fetch(`${fake.url}/rest/v1/todo_events`, { method: "POST", body: new URLSearchParams({ a: "b" }) })).rejects.toThrow(/FORBIDDEN/);
-  const dates = guardedFetch(fake.fetch, () => [MORNING_ONLY]);
-  await expect(dates.fetch(`${fake.url}/rest/v1/todo_events?at=eq.${encodeURIComponent(`${MORNING_ONLY}T12:00:00.000Z`)}`, { method: "GET" })).rejects.toThrow(/FORBIDDEN/);
+  const guard = guardedFetch(fake.fetch, () => [MORNING, MORNING_ONLY], c.now);
+  await guard.fetch(`${fake.url}/rest/v1/todo_events`, { method: "POST", body: JSON.stringify({ note: `x ${MORNING} y` }) });
+  await guard.fetch(`${fake.url}/rest/v1/todo_events`, { method: "POST", body: new URLSearchParams({ a: "b" }) });
+  await guard.fetch(`${fake.url}/rest/v1/todo_events?at=eq.${encodeURIComponent(`${MORNING_ONLY}T12:00:00.000Z`)}`, { method: "GET" });
+  await guard.fetch(`${fake.url}/rest/v1/todo_events?id=eq.x`, { method: "PATCH", body: JSON.stringify({ deleted_at: `${MORNING_ONLY}T12:00:00.000Z` }) });
+  expect(guard.violations).toHaveLength(5); // the date-like deleted_at is both forbidden and not the sending instant
+  // The sending instant itself is never taken for a journal date.
+  c.set("2026-11-06T03:30:00");
+  const ok = guardedFetch(fake.fetch, () => [new Date(c.now()).toISOString().slice(0, 10)], c.now);
+  await ok.fetch(`${fake.url}/rest/v1/todo_events?id=eq.x`, { method: "PATCH", body: JSON.stringify({ deleted_at: new Date(c.now()).toISOString() }) });
+  expect(ok.violations).toEqual([]);
 });
 
 it("only this device sends: the Together sign-in and record are never synced and never in a backup", async () => {
