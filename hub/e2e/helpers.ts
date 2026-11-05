@@ -1,4 +1,4 @@
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Opens one exercise card (by its line, "Day 2 · …") from "See all chapters": the chapter map
@@ -21,4 +21,15 @@ export async function pageDate(page: Page, offset = 0): Promise<string> {
     const p = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }, offset);
+}
+
+/**
+ * On Read back's tile view (2026-11-05, option B): taps a part's tile and returns that part's
+ * whole list (the region named after it).
+ */
+export async function openReadBackPart(page: Page, name: string): Promise<Locator> {
+  await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
+  const part = page.getByRole("region", { name, exact: true });
+  await expect(part.getByRole("heading", { level: 3, name, exact: true })).toBeVisible();
+  return part;
 }

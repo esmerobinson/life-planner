@@ -345,6 +345,120 @@ a.journal-tab.is-selected {
   overflow-wrap: anywhere;
 }
 
+/* ---- Read back (2026-11-05, option B "Choose a part first"; VISUAL-LANGUAGE.md "Read back
+   (2026-11-05, option B)", docs/design/journal-together.html section 1 B). Values are the
+   mockup's: tiles Map mint (--mint), --radius-panel, 14px padding, the name bold 15px, the
+   count 26px bold (line-height 1.1, 6px above it), a 13px line, 2px between, 8px apart.
+   Inside a part: the month heading 13px bold uppercase, letter-spacing .05em, in the muted
+   look (.journal-muted's opacity); each entry a --row strip (--radius-tile, 10px x 12px).
+   Esme: "I want everywhere on this app to be full, no blank space": the tiles and lists take
+   the tab's whole width. The tiles go 4 across when four 160px tiles fit, else 2 (the phone
+   too): never 3 and a lone 1, which would leave two empty cells (a builder's call within the
+   brief's minmax(160px, 1fr), not yet seen by Esme). ---- */
+.journal-readback {
+  container: readback / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+}
+
+.journal-readback p {
+  margin: 0;
+}
+
+.journal-readback-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap-rows);
+}
+
+/* 664px = four 160px tiles and three 8px gaps. */
+@container readback (min-width: 664px) {
+  .journal-readback-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+button.journal-readback-tile {
+  background: var(--mint);
+  color: var(--text);
+  border-radius: var(--radius-panel);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.journal-readback-tile-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.journal-readback-tile-count {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: 6px;
+}
+
+.journal-readback-tile-line {
+  font-size: 13px;
+}
+
+.journal-readback-part > a.quiet-link {
+  align-self: flex-start;
+}
+
+.journal-readback-title {
+  margin: 0;
+}
+
+.journal-readback-month {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-rows);
+}
+
+.journal-readback-month-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+.journal-readback-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-rows);
+}
+
+.journal-readback-list > li > details,
+.journal-readback-list > li > .journal-readback-locked {
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 10px 12px;
+  overflow-wrap: anywhere;
+}
+
+.journal-readback-list summary {
+  cursor: pointer;
+}
+
+.journal-readback-list details > * + * {
+  margin-top: var(--gap-rows);
+}
+
 /* Home and Today: clear space between the last Today strip and the Journal heading (Esme,
    2026-11-02: "due is too close to journal header"). Spacing pass: the heading is a page
    section heading like any other (tokens.css h2: --gap-section, 32px, above it), so the

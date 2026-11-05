@@ -7,7 +7,7 @@ import { loadJournalDocs } from "../search/journalSearch";
 import {
   buildIndex, GROUP_CAP, GROUP_LABEL, highlight, queryWords, searchIndex, searchJournal, type Hit, type JournalDoc, type ResultGroup,
 } from "../search/search";
-import { NAV } from "./areas";
+import { INBOX_TILE, NAV } from "./areas";
 import { useDbChanges } from "./journal/useJournalKey";
 import { usePanel } from "./panelContext";
 
@@ -39,9 +39,9 @@ function Marked({ text, words }: { text: string; words: string[] }) {
   );
 }
 
-/** The area's sidebar tile (the Inbox has none: an undecided magenta placeholder). */
+/** The area's sidebar tile; an Inbox result gets the Inbox's own stone tile with the tray (Esme, 2026-11-05). */
 function ResultTile({ tile }: { tile: string }) {
-  const nav = NAV.find((n) => n.id === tile);
+  const nav = tile === "inbox" ? INBOX_TILE : NAV.find((n) => n.id === tile);
   if (!nav) return <span className="sidebar-tile search-tile-placeholder" aria-hidden="true" />;
   return (
     <span className="sidebar-tile" style={{ background: nav.tile }} aria-hidden="true">

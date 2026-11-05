@@ -13,6 +13,7 @@ import { getDeviceId, saveSyncSettings } from "../../sync/engine";
 import { deriveToken } from "../../sync/token";
 import { confirmedDevice, keyFor, verifierRow } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { findReadBackTile, openReadBackPart } from "../../test/readBack";
 import { CHECKING_LINE, JournalPage } from "./JournalPage";
 import { DailyCheckIn } from "./DailyCheckIn";
 
@@ -178,13 +179,19 @@ describe("morning pages", () => {
     await finishMorningPage(jk, "2026-10-01", "device-other-1", SECRET);
     const first = renderApp("/journal/morning", "2026-10-28");
     await userEvent.click(await screen.findByRole("link", { name: "Read back" }));
-    expect(await screen.findByText("Opens on Thursday 29 October")).toBeInTheDocument();
+    expect(await findReadBackTile("Morning pages")).toHaveTextContent("Morning pages10 ready to read · 1 opening later");
+    expect(document.body.innerHTML).not.toContain("Pretend secret");
+    const locked = await openReadBackPart("Morning pages");
+    expect(within(locked).getByText("Opens on Thursday 29 October")).toBeInTheDocument();
+    expect(within(locked).queryByRole("group")).toBeNull(); // nothing to open
     expect(document.body.innerHTML).not.toContain("Pretend secret");
     first.unmount();
     vi.useRealTimers();
     renderApp("/journal/read-back", "2026-10-29");
-    await userEvent.click(await screen.findByText("Thursday 1 October · Morning pages"));
-    expect(await screen.findByText(SECRET)).toBeInTheDocument();
+    expect(await findReadBackTile("Morning pages")).toHaveTextContent("Morning pages11 ready to read");
+    const part = await openReadBackPart("Morning pages");
+    await userEvent.click(within(part).getByText("Thursday 1 October"));
+    expect(await within(part).findByText(SECRET)).toBeInTheDocument();
   });
 
   it("an entry that won't open here is noted, and the box and Add photo still work (nothing blocks the day)", async () => {
@@ -359,12 +366,14 @@ describe("daily check-in", () => {
     expect(screen.getByText("Tuesday 27 October")).toBeInTheDocument();
     view.unmount();
     renderApp("/journal/read-back", TODAY);
-    const list = await screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
-    expect(within(list).queryByText(/20 October · Check-in/)).toBeNull();
-    await userEvent.click(within(list).getByText(/27 October · Check-in/));
+    // The tile counts only the day with an answer.
+    expect(await findReadBackTile("Daily check-in")).toHaveTextContent("Daily check-in1Last: Tuesday 27 October");
+    const list = await openReadBackPart("Daily check-in");
+    expect(within(list).queryByText(/20 October/)).toBeNull();
+    await userEvent.click(within(list).getByText("Tuesday 27 October · 1 answer"));
     expect(within(list).getByText("Pretend kept answer")).toBeInTheDocument();
     expect(within(list).queryByText("Skipped")).toBeNull();
-    expect(within(within(list).getByText(/27 October · Check-in/).closest("details")!).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(within(list).getByText("Tuesday 27 October · 1 answer").closest("details")!).getAllByRole("listitem")).toHaveLength(1);
   });
 
   it("a question skipped yesterday comes back first in its slot today", async () => {

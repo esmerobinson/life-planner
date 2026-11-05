@@ -24,3 +24,15 @@ export const TAB_FOR_HASH: Record<string, JournalTabId> = {
   "#daily-check-in": "check-in",
   "#mental-health-exercise": "exercise",
 };
+
+/** A Journal part Read back shows (every tab but Read back itself). */
+export type ReadBackPart = Exclude<JournalTabId, "read-back">;
+
+/**
+ * Read back's parts (2026-11-05, option B): every tab with something to read back, in the
+ * tabs' order. Each opens at `/journal/read-back?part=<id>`; with no part, the four tiles.
+ */
+export const READ_BACK_PARTS = JOURNAL_TABS.filter((t) => t.id !== "read-back") as { id: ReadBackPart; title: string }[];
+
+/** Read back opened straight on one part ("See all" under Past exercises and Past check-ins). */
+export const readBackPath = (part: ReadBackPart): string => `${tabPath("read-back")}?part=${part}`;
