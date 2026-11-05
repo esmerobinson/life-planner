@@ -345,6 +345,12 @@ class Ctx {
     return r;
   }
 
+  /** A tally is gone: deleted now, already deleted, or never there (no such row for her). */
+  async gone(id: string): Promise<boolean> {
+    const r = await this.patch("todo_events", id, { deleted_at: this.nowIso() });
+    return r.kind === "ok" || r.code === "P0001" || r.code === "no-row";
+  }
+
   /** Delete a tally (once). One already deleted (say, by her Undo in Together) counts as done. */
   async deleteEvent(id: string): Promise<boolean> {
     const r = await this.patch("todo_events", id, { deleted_at: this.nowIso() });
@@ -358,6 +364,14 @@ const isDuplicate = (r: CallResult) => r.kind === "refused" && (r.code === "2350
 // ---- the two habits and their tallies -----------------------------------------------------------
 
 async function sendJournal(ctx: Ctx, journal: JournalDays): Promise<void> {
+  // Anything a cut-off request may have left in Together goes first (bug #49); until it has,
+  // nothing new is sent.
+  if ((await clearMaybes(ctx)) > 0) {
+    ctx.sent.refused["maybe"] = { hash: "maybe", what: "hide" };
+    await ctx.save();
+    return;
+  }
+  delete ctx.sent.refused["maybe"];
   for (const kind of HABITS) {
     const days = journal[kind];
     if (!days) continue; // couldn't be read this time: nothing changes
@@ -481,34 +495,69 @@ async function insertTally(
   for (let tries = 0; tries < MAX_VERSION_TRIES; tries++, v++) {
     const id = await togetherId("tally", key, v);
     const note = await noteNow();
+    // Written down before it goes (bug #49): if this request is cut off, it may still be in Together.
+    (ctx.sent.maybe ??= {})[id] = { key, v };
+    await ctx.save();
     const r = await ctx.call("POST", "todo_events", { id, ...rowFor(note) });
-    if (r.kind === "ok") return { v, note };
-    if (!isDuplicate(r)) return null;
-    if (!(await ctx.deleteEvent(id))) return null;
+    if (r.kind === "ok") {
+      delete ctx.sent.maybe[id]; // the caller records it as sent, in the same save
+      return { v, note };
+    }
+    if (!isDuplicate(r)) {
+      delete ctx.sent.maybe[id]; // refused: it never went in
+      await ctx.save();
+      return null;
+    }
+    if (!(await ctx.deleteEvent(id))) return null; // still a maybe: cleaned up before the next send
+    delete ctx.sent.maybe[id];
+    await ctx.save();
   }
   return null;
 }
 
+/**
+ * Deletes every tally that may be in Together without being recorded as sent (bug #49). Each is
+ * forgotten only once Together confirms it's deleted, or that it was never there. Returns how
+ * many couldn't be.
+ */
+async function clearMaybes(ctx: Ctx): Promise<number> {
+  const maybe = ctx.sent.maybe ?? {};
+  let failed = 0;
+  for (const id of Object.keys(maybe)) {
+    if (await ctx.gone(id)) {
+      delete maybe[id];
+      await ctx.save();
+    } else failed++;
+  }
+  return failed;
+}
+
 // ---- stop: mark everything deleted -------------------------------------------------------------
 
-/** Marks every live tally and both habits deleted. Returns how many couldn't be. */
+/**
+ * Marks every live tally, every tally that may be in Together (bug #49) and both habits deleted.
+ * Returns how many couldn't be.
+ */
 async function markAllDeleted(ctx: Ctx): Promise<number> {
   const { sent } = ctx;
-  let failed = 0;
+  let failed = await clearMaybes(ctx);
   for (const [key, t] of Object.entries(sent.tallies)) {
     if (!t.live) continue;
-    if (await ctx.deleteEvent(await togetherId("tally", key, t.v))) t.live = false;
+    if (await ctx.gone(await togetherId("tally", key, t.v))) t.live = false;
     else failed++;
     await ctx.save();
   }
   for (const kind of HABITS) {
+    // By its fixed id, recorded or not: a habit insert can be cut off too.
     const h = sent.habits[kind];
-    if (!h || h.deleted) continue;
+    if (h?.deleted) continue;
     const id = await togetherId("habit", kind, 1);
     const live = Object.entries(sent.tallies).filter(([k, t]) => k.startsWith(`${kind}:`) && t.live).length;
-    if (h.tally !== live && (await ctx.patch("todos", id, { tally: live })).kind === "ok") h.tally = live;
-    if ((await ctx.patch("todos", id, { deleted_at: ctx.nowIso() })).kind === "ok") h.deleted = true;
-    else failed++;
+    if (h && h.tally !== live && (await ctx.patch("todos", id, { tally: live })).kind === "ok") h.tally = live;
+    const r = await ctx.patch("todos", id, { deleted_at: ctx.nowIso() });
+    if (r.kind === "ok") {
+      if (h) h.deleted = true;
+    } else if (h || r.code !== "no-row") failed++;
     await ctx.save();
   }
   return failed;

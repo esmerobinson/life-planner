@@ -59,6 +59,14 @@ export interface TogetherSent {
   tallies: Record<string, SentTally>;
   /** Set aside after Together refused it (tried again once it changes, or on Send now). */
   refused: Record<string, SetAside>;
+  /**
+   * Tallies that may be in Together but aren't recorded as sent (bug #49): written here BEFORE
+   * each insert, by fixed id, so a request cut off (timed out, aborted, reply lost) is never
+   * forgotten. Each is deleted in Together before anything new goes, and by Stop with removing;
+   * an entry goes only once Together confirms that tally is gone (or was never there), or once
+   * the insert is confirmed and the tally is recorded as sent.
+   */
+  maybe?: Record<string, { key: string; v: number }>;
   lastSentAt?: number;
 }
 

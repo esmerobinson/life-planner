@@ -245,3 +245,53 @@ it("a refused delete is set aside as \"couldn't be hidden\", not \"couldn't be c
   expect(await send(fake, c, true)).toMatchObject({ kind: "ok", refused: 0 }); // Send now tries again
   expect((await tally(fake, "checkin", 1))!.deleted_at).not.toBeNull();
 });
+
+describe("tallies that may be in Together (bug #49)", () => {
+  it("is written down before the insert goes, and forgotten once the insert is confirmed", async () => {
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    await journalDay(DAY, { checkin: true });
+    c.set(TITLES_AT);
+    let seenBefore: unknown = null;
+    const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST" && String(input).includes("todo_events")) seenBefore = { ...(await readSent(db))!.maybe };
+      return fake.fetch(input, init);
+    }) as typeof fetch;
+    const { sendToTogether } = await import("./sender");
+    expect(await sendToTogether({ fetch: f, now: c.now })).toMatchObject({ kind: "ok" });
+    expect(seenBefore).toEqual({ [await togetherId("tally", `checkin:${DAY}`, 1)]: { key: `checkin:${DAY}`, v: 1 } });
+    expect((await readSent(db))!.maybe).toEqual({});
+  });
+
+  it("a cut-off insert is deleted before anything new goes; one that never reached Together is just forgotten", async () => {
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    await journalDay(DAY, { checkin: true });
+    c.set(TITLES_AT);
+    fake.inject({ networkError: true, when: (r) => r.method === "POST" && r.url.includes("todo_events") }); // never reached Together
+    expect(await send(fake, c)).toEqual({ kind: "offline" });
+    expect(Object.keys((await readSent(db))!.maybe!)).toHaveLength(1);
+    const n = fake.requests.length;
+    expect(await send(fake, c)).toMatchObject({ kind: "ok" });
+    const after = fake.requests.slice(n);
+    expect(after[0]!.method).toBe("PATCH"); // the cleanup comes first
+    expect((await readSent(db))!.maybe).toEqual({});
+    expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
+  });
+
+  it("a cleanup Together refuses: nothing new goes, and it's shown as not yet hidden", async () => {
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    await journalDay(DAY, { checkin: true });
+    c.set(TITLES_AT);
+    fake.inject({ lostReply: true, when: (r) => r.method === "POST" && r.url.includes("todo_events") });
+    expect(await send(fake, c)).toEqual({ kind: "offline" });
+    fake.inject({ status: 403, body: { code: "42501" }, when: (r) => r.method === "PATCH" });
+    const n = fake.requests.length;
+    expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 1 });
+    expect(fake.requests.slice(n).filter((r) => r.method === "POST")).toHaveLength(0);
+    expect((await readSent(db))!.refused.maybe).toMatchObject({ what: "hide" });
+    expect(await send(fake, c, true)).toMatchObject({ kind: "ok", refused: 0 });
+    expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
+  });
+});
