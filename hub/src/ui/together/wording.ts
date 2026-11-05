@@ -57,4 +57,10 @@ export const TOGETHER_WORDS = {
   learnedEarlierHere: "Your earlier words on this device",
   /** Over a version from another device that the box doesn't hold. */
   learnedOtherDevice: "Other words from another device",
+  /** Under a version the box doesn't hold: put its words into the box (then it's replaced). */
+  learnedMerge: "Add to my words",
+  learnedRemove: "Remove",
+  learnedRemoveAsk: "Remove these words from every device? They won't be in the box, Read back or Together.",
+  learnedRemoveYes: "Remove them",
+  learnedRemoveNo: "Keep them",
 };

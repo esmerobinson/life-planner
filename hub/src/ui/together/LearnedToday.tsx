@@ -1,6 +1,6 @@
 import { liveQuery } from "dexie";
 import { useEffect, useRef, useState } from "react";
-import { listLearned, readLearned, saveLearned, type Learned, type LearnedVersion } from "../../data/repo";
+import { listLearned, readLearned, removeLearnedVersion, saveLearned, type Learned, type LearnedVersion } from "../../data/repo";
 import type { ISODate } from "../../domain/types";
 import { MAX_LEARNED } from "../../journal/entries";
 import type { JournalKey } from "../../journal/crypto";
@@ -32,7 +32,6 @@ export function LearnedToday({ jk, today, deviceId }: { jk: JournalKey; today: I
   return (
     <section className="together-placeholder together-learned" aria-label={W.learnedSection}>
       {day === null ? null : <LearnedBox key={today} jk={jk} today={today} deviceId={deviceId} day={day} />}
-      {day && <OtherVersions versions={day.others} deviceId={deviceId} />}
       {earlier.length > 0 && (
         <details>
           <summary>{W.learnedEarlier}</summary>
@@ -54,8 +53,14 @@ export function LearnedToday({ jk, today, deviceId }: { jk: JournalKey; today: I
   );
 }
 
-/** The versions the box doesn't hold, read-only, each saying where it was written. */
-function OtherVersions({ versions, deviceId }: { versions: LearnedVersion[]; deviceId: string }) {
+/**
+ * The versions the box doesn't hold, read-only, each saying where it was written, with a way to
+ * put its words into the box or (once confirmed) remove it: never cleared silently.
+ */
+function OtherVersions({
+  versions, deviceId, onMerge, onRemove,
+}: { versions: LearnedVersion[]; deviceId: string; onMerge: (v: LearnedVersion) => void; onRemove: (v: LearnedVersion) => Promise<void> }) {
+  const [asking, setAsking] = useState<string | null>(null);
   if (versions.length === 0) return null;
   return (
     <>
@@ -63,6 +68,26 @@ function OtherVersions({ versions, deviceId }: { versions: LearnedVersion[]; dev
         <div key={v.id} className="together-learned-other">
           <p>{v.device === deviceId ? W.learnedEarlierHere : W.learnedOtherDevice}</p>
           <p className="journal-past-answer">{v.text}</p>
+          {asking === v.id ? (
+            <div role="group" aria-label={W.learnedRemoveAsk}>
+              <p>{W.learnedRemoveAsk}</p>
+              <button type="button" onClick={() => void onRemove(v).then(() => setAsking(null))}>
+                {W.learnedRemoveYes}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setAsking(null)}>
+                {W.learnedRemoveNo}
+              </button>
+            </div>
+          ) : (
+            <div className="form-actions">
+              <button type="button" className="btn-secondary" onClick={() => onMerge(v)}>
+                {W.learnedMerge}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => setAsking(v.id)}>
+                {W.learnedRemove}
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </>
@@ -96,16 +121,37 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
     },
     AUTOSAVE_MS,
   );
-  function change(text: string) {
+  function begin() {
     // Nothing unsaved and the box holds a version this session didn't write: a new session,
     // replacing only that version.
     if (draft.value === day.text && (!session.current || session.current.version !== day.id)) {
       session.current = { seen: day.id ? [day.id] : [] };
     }
+  }
+  function change(text: string) {
+    begin();
     draft.set(text);
+  }
+  /** Its words go into the box, after hers, and it is replaced by the box's version. */
+  function merge(v: LearnedVersion) {
+    begin();
+    const s = session.current ?? (session.current = { seen: day.id ? [day.id] : [] });
+    if (!s.seen.includes(v.id)) s.seen.push(v.id);
+    const now = draft.value.trimEnd();
+    draft.set(now ? `${now}\n\n${v.text}` : v.text);
+    draft.flush();
+  }
+  async function remove(v: LearnedVersion) {
+    try {
+      await removeLearnedVersion(jk, today, deviceId, v.id);
+      setProblem("");
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+    }
   }
   const fromOther = day.id !== "" && day.device !== deviceId && day.text.trim() !== "";
   return (
+    <>
     <div className="together-learned-box">
       <label className="form-field">
         <span className="form-label">{W.learnedLabel}</span>
@@ -114,5 +160,7 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
       {fromOther && <p>{W.learnedOther}</p>}
       {problem && <p role="alert">{problem}</p>}
     </div>
+    <OtherVersions versions={day.others} deviceId={deviceId} onMerge={merge} onRemove={remove} />
+    </>
   );
 }

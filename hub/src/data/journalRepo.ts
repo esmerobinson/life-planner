@@ -1506,6 +1506,18 @@ export async function listLearned(jk: JournalKey, before: ISODate): Promise<({ d
   return out;
 }
 
+/**
+ * Removes one version from the day (she confirmed it): a new, empty version from this device
+ * that replaces only that one. Its words are gone from the box, Read back and Together on every
+ * device; nothing else changes. Returns the new row's id.
+ */
+export async function removeLearnedVersion(jk: JournalKey, date: ISODate, deviceId: string, versionId: string): Promise<string> {
+  const id = newLearnedId(date, deviceId);
+  // At 0, so it never shows in place of another version's words.
+  await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), { v: 1, text: "", at: 0, seen: [versionId] })]);
+  return id;
+}
+
 /** A new version's row id for this device. */
 export function newLearnedId(date: ISODate, deviceId: string): string {
   const vid = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
