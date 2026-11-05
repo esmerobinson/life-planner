@@ -5,6 +5,7 @@
 import Dexie, { liveQuery } from "dexie";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
+import { ErrorGuard } from "../ui/ErrorGuard";
 import { db } from "../data/db";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { loadJournalKey } from "../journal/keyStore";
@@ -136,7 +137,27 @@ export function useFarmItems(on: boolean): Item[] {
 }
 const NO_ITEMS: Item[] = [];
 
-export function FarmProvider({ items: listItems, goals, today, children }: { items: Item[]; goals: Goal[]; today: ISODate; children: ReactNode }) {
+/**
+ * The farm's view for everything inside it. The farm is worked out in its own component under
+ * an error guard (bug #46): if anything in the farm throws, the farm switches off (no nook, no
+ * stickers this session) and the rest of the app, the Journal above all, stays on screen.
+ */
+export function FarmProvider({ items, goals, today, children }: { items: Item[]; goals: Goal[]; today: ISODate; children: ReactNode }) {
+  const [view, setView] = useState<FarmView | null>(null);
+  const [failed, setFailed] = useState(false);
+  return (
+    <FarmContext.Provider value={failed ? null : view}>
+      {!failed && (
+        <ErrorGuard name="farm" onError={() => setFailed(true)}>
+          <FarmEngine items={items} goals={goals} today={today} onView={setView} />
+        </ErrorGuard>
+      )}
+      {children}
+    </FarmContext.Provider>
+  );
+}
+
+function FarmEngine({ items: listItems, goals, today, onView }: { items: Item[]; goals: Goal[]; today: ISODate; onView: (v: FarmView) => void }) {
   const [rows, setRows] = useState<unknown[] | null>(null);
   useEffect(() => {
     const sub = liveQuery(() => db.farm.toArray()).subscribe({ next: setRows, error: () => setRows([]) });
@@ -206,6 +227,7 @@ export function FarmProvider({ items: listItems, goals, today, children }: { ite
     }),
     [rows, today, state, c, earned, earnedSet, collected, arrived, awake, unlocked, queue, journal, farmZones, setFarmZones, glint],
   );
-  return <FarmContext.Provider value={view}>{children}</FarmContext.Provider>;
+  useEffect(() => onView(view), [view, onView]);
+  return null;
 
 }

@@ -1,3 +1,4 @@
+import { ErrorGuard } from "./ErrorGuard";
 import type { CSSProperties } from "react";
 import { NavLink } from "react-router-dom";
 import { NAV } from "./areas";
@@ -54,7 +55,7 @@ export function Sidebar() {
       <div className="sidebar-footer">
         <FooterLinks />
       </div>
-      <Nook />
+      <ErrorGuard name="nook"><Nook /></ErrorGuard>
     </aside>
   );
 }
