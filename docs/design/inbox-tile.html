@@ -1,0 +1,56 @@
+<title>Inbox Search Tile</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: three search-result sketches side by side, wrapping on a phone. App tokens; system font
+   (the app's font isn't chosen yet). Single light look: the app has no dark mode yet. */
+:root {
+  --page: #e2e8ff; --sidebar: #3a412f; --sidebar-text: #e9e3d6; --panel: #e9e3d6; --row: #e3ddcd;
+  --track: #d4d1c3; --text: #3a412f; --muted: #6f735f; --pink: #e6aeaf; --coral: #df7e6f; --stone: #d4d1c3;
+  color-scheme: light; font-family: system-ui, -apple-system, sans-serif;
+}
+body { background: var(--page); color: var(--text); margin: 0; font-size: 15px; line-height: 1.45; }
+main { max-width: 1100px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 24px; }
+h1 { margin: 0; font-size: 26px; text-wrap: balance; }
+p { margin: 0; max-width: 66ch; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+figcaption b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sidebar); color: var(--sidebar-text); font-size: 13px; margin-right: 4px; }
+.dialog { background: var(--panel); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 14px rgba(58,65,47,.25); }
+.q { background: #fbfaf6; border: 1px solid var(--track); border-radius: 9px; padding: 8px 10px; color: var(--muted); }
+.res { display: flex; align-items: center; gap: 10px; background: var(--row); border-radius: 9px; padding: 8px 10px; }
+.tile { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; }
+.tile svg, .tile img { width: 24px; height: 24px; }
+.res .t { flex: 1; min-width: 0; }
+.res .s { font-size: 13px; color: var(--muted); }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--track); }
+.note { font-size: 13px; color: var(--muted); }
+</style>
+<main>
+  <h1>Inbox in search</h1>
+  <p>When you search (⌘K), each result shows its area's coloured tile. The Inbox never got a tile, so its results show a bright magenta square. Which should it be? The tray drawing is new, drawn in the same style as the area icons.</p>
+  <div class="opts">
+    <figure><figcaption><b>A</b> · Stone tile, tray icon</figcaption>
+      <div class="dialog"><div class="q">pret</div>
+        <div class="res"><span class="tile" style="background:var(--stone)"><svg viewBox="0 0 32 32" fill="none" stroke="#3a412f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18l3.5-10h17L28 18v6.5a2.5 2.5 0 0 1-2.5 2.5h-19A2.5 2.5 0 0 1 4 24.5z" fill="#e9e3d6"/><path d="M4 18h7l1.5 3h7l1.5-3h7"/></svg></span><div class="t">Pretend recipe idea<div class="s">Inbox</div></div></div>
+        <div class="res"><span class="tile" style="background:var(--pink)"></span><div class="t">Write pretend pages<div class="s">Writing</div></div></div>
+      </div>
+      <p class="note">Pale stone, the same grey-beige as the bars' track: quiet, like "not sorted yet".</p>
+    </figure>
+    <figure><figcaption><b>B</b> · Coral tile, tray icon</figcaption>
+      <div class="dialog"><div class="q">pret</div>
+        <div class="res"><span class="tile" style="background:var(--coral)"><svg viewBox="0 0 32 32" fill="none" stroke="#3a412f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18l3.5-10h17L28 18v6.5a2.5 2.5 0 0 1-2.5 2.5h-19A2.5 2.5 0 0 1 4 24.5z" fill="#e9e3d6"/><path d="M4 18h7l1.5 3h7l1.5-3h7"/></svg></span><div class="t">Pretend recipe idea<div class="s">Inbox</div></div></div>
+        <div class="res"><span class="tile" style="background:var(--pink)"></span><div class="t">Write pretend pages<div class="s">Writing</div></div></div>
+      </div>
+      <p class="note">Rescue coral, from the NookPhone colours: an Inbox colour of its own.</p>
+    </figure>
+    <figure><figcaption><b>C</b> · No tile, just a label</figcaption>
+      <div class="dialog"><div class="q">pret</div>
+        <div class="res"><span class="tile"></span><div class="t">Pretend recipe idea</div><span class="chip">Inbox</span></div>
+        <div class="res"><span class="tile" style="background:var(--pink)"></span><div class="t">Write pretend pages<div class="s">Writing</div></div></div>
+      </div>
+      <p class="note">An empty space where the tile would be, and a small "Inbox" label on the right.</p>
+    </figure>
+  </div>
+</main>

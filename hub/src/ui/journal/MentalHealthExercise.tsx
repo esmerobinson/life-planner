@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { readBackPath } from "./tabs";
 import {
   CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseProgress,
   recordExerciseShown, setExerciseStar, type CardsState, type ExerciseProgress, type ExerciseResponse,
@@ -521,7 +522,7 @@ function PastExercises({ past, cards }: { past: ExerciseResponse[]; cards: Exerc
       </ul>
       {past.length > PAST_ON_TAB && (
         <p>
-          <Link to="/journal/read-back">
+          <Link to={readBackPath("exercise")}>
             See all
           </Link>
         </p>

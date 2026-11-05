@@ -188,7 +188,12 @@ for (const width of [360, 390, 430]) {
       m = await wide();
       expect(m.s).toBeLessThanOrEqual(m.w);
       await page.goto("/journal/read-back");
-      await expect(page.getByRole("list", { name: "Read back" })).toBeVisible();
+      await expect(page.locator("button.journal-readback-tile")).toHaveCount(4);
+      m = await wide();
+      expect(m.s).toBeLessThanOrEqual(m.w);
+      // Its parts too (straight in, as "See all" links).
+      await page.goto("/journal/read-back?part=morning");
+      await expect(page.getByRole("region", { name: "Morning pages", exact: true }).getByText(/Opens on/).first()).toBeVisible();
       m = await wide();
       expect(m.s).toBeLessThanOrEqual(m.w);
     });

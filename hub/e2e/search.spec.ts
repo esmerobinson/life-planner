@@ -76,6 +76,8 @@ async function unlockedJournal(page: Page) {
 
 for (const width of [1280, 390]) {
   test.describe(`search at ${width}px`, () => {
+    // Seeding plus typing runs ~25 s on a busy machine: give it room (Testing, 2026-11-05).
+    test.describe.configure({ timeout: 60_000 });
     test.use({ viewport: { width, height: width === 390 ? 844 : 900 } });
 
     test("opens from any page; grouped results with bold matches; arrows and Enter open the side panel", async ({ page }) => {

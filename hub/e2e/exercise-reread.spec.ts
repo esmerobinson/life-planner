@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
+import { openReadBackPart } from "./helpers";
 
 /* Esme, 2026-11-04: "I submitted responses on todays exercise but cant see it in past exercises
    and it is not accurate to what i typed; i should be able to see this and easily reread what I
@@ -60,11 +61,11 @@ test("type a long answer, Submit at once, and reread it word for word", async ({
   // Read back, and again after a reload.
   for (const reload of [false, true]) {
     if (reload) await page.reload();
-    await page.getByRole("link", { name: /Read back/ }).click();
-    const list = page.getByRole("list", { name: "Read back" });
-    await list.getByText(/Exercise · Day 1 · Pretend weather/).click();
+    await page.getByRole("link", { name: "Read back", exact: true }).click();
+    const list = await openReadBackPart(page, "Mental health exercise");
+    await list.getByText(/· Day 1 · Pretend weather/).click();
     await expect(list.locator(".journal-past-answer")).toHaveText(LONG);
     await expect(list.getByText("Not submitted")).toHaveCount(0);
-    await expect(list.getByText(/Exercise · Day 1 · Pretend weather/)).toHaveCount(1); // no repeats
+    await expect(list.getByText(/· Day 1 · Pretend weather/)).toHaveCount(1); // no repeats
   }
 });

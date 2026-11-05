@@ -11,6 +11,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_V2, FAKE_CARD_TEXT_V2 } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { openReadBackPart } from "../../test/readBack";
 import { cardLines, openAllChapters, openCardInMap } from "../../test/chapterMap";
 
 // Journal v2's exercise tab with a version 2 card file: the chapter line, Read more with its
@@ -170,12 +171,12 @@ describe("reviewing past work", () => {
     expect(within(items[0]!).queryByRole("textbox")).toBeNull(); // read-only
   });
 
-  it("Read back lists exercise responses, check-ins and pages by date, newest first", async () => {
+  it("Read back: the Mental health exercise part lists an exercise response, which opens to its words", async () => {
     const device = await getDeviceId(db);
     await submitExerciseEntry(jk, "2026-11-01", device, cardRef(SET.cards[1]!), "Pretend cloud thoughts");
     renderApp("/journal/read-back", TODAY);
-    const list = await screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
-    await userEvent.click(within(list).getByText("Sunday 1 November · Exercise · Day 1 · Pretend weather"));
+    const list = await openReadBackPart("Mental health exercise");
+    await userEvent.click(within(list).getByText("Sunday 1 November · Day 1 · Pretend weather"));
     expect(within(list).getByText("Pretend cloud thoughts")).toBeInTheDocument();
   });
 });

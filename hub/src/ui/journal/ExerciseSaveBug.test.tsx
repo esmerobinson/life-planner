@@ -13,6 +13,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_CHECKLIST, FAKE_CARD_FILE_V2, PRETEND_FEATURES } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { openReadBackPart } from "../../test/readBack";
 import { EARLIER_ANSWER, UNSENT_DRAFT } from "./ResponseView";
 
 // Esme, 2026-11-04: "I submitted responses on todays exercise but cant see it in past exercises
@@ -56,7 +57,7 @@ async function openReadBack() {
   cleanup();
   vi.useRealTimers();
   renderApp("/journal/read-back", TODAY);
-  return screen.findByRole("list", { name: "Read back" }, { timeout: 5000 });
+  return openReadBackPart("Mental health exercise");
 }
 
 describe("a text card: type a long answer, Submit at once", () => {
@@ -86,7 +87,7 @@ describe("a text card: type a long answer, Submit at once", () => {
     expect(within(mine).getByText((_, el) => el?.tagName === "P" && el.textContent === LONG)).toBeInTheDocument();
 
     const list = await openReadBack();
-    await userEvent.click(within(list).getByText(/Wednesday 4 November · Exercise · Day 1 · Pretend weather/));
+    await userEvent.click(within(list).getByText(/Wednesday 4 November · Day 1 · Pretend weather/));
     expect(within(list).getByText((_, el) => el?.tagName === "P" && el.textContent === LONG)).toBeInTheDocument();
     expect(within(list).queryByText("Not submitted")).toBeNull();
   });
@@ -114,8 +115,8 @@ describe("a text card: type a long answer, Submit at once", () => {
     const entry = { v: 2, id: WEATHER.id, day: 1, theme: WEATHER.theme, text: "Pretend half", submittedAt: null, at };
     await db.journal.put({ id, kind: "exercise-entry", date: TODAY, fp: jk.fp, ...(await sealJson(jk.key, entry, journalAad(id))) });
     const list = await openReadBack();
-    expect(within(list).getAllByText(/Exercise · Day 1 · Pretend weather/)).toHaveLength(1); // one entry, no repeats
-    await userEvent.click(within(list).getByText(/Wednesday 4 November · Exercise · Day 1 · Pretend weather/));
+    expect(within(list).getAllByText(/· Day 1 · Pretend weather/)).toHaveLength(1); // one entry, no repeats
+    await userEvent.click(within(list).getByText(/Wednesday 4 November · Day 1 · Pretend weather/));
     expect(within(list).getByText((_, el) => el?.tagName === "P" && el.textContent === LONG)).toBeInTheDocument();
     expect(within(list).getByText(new RegExp(UNSENT_DRAFT))).toBeInTheDocument();
     expect(within(list).getByText("Pretend half")).toBeInTheDocument();
@@ -144,7 +145,7 @@ describe("a card with a list part", () => {
     const parts = (await readExerciseEntry(jk, TODAY, cardRef(KETTLE))).entry!.parts!;
     expect(parts.map((p) => p.answer)).toEqual([LONG, ["Pretend chest", "Pretend hands", "Pretend jaw, last keys"], 4, "Tin"]);
     const list = await openReadBack();
-    await userEvent.click(within(list).getByText(/Exercise · Day 2 · The fictional kettle/));
+    await userEvent.click(within(list).getByText(/· Day 2 · The fictional kettle/));
     expect(within(list).getByText("Pretend jaw, last keys")).toBeInTheDocument();
     expect(within(list).getByText((_, el) => el?.tagName === "P" && el.textContent === LONG)).toBeInTheDocument();
   });
@@ -193,7 +194,7 @@ describe("a checklist card", () => {
       ["Pretend feature four", "Yes", "Pretend last note"],
     ]);
     const list = await openReadBack();
-    await userEvent.click(within(list).getByText(/Exercise · Day 1 · Pretend checklist/));
+    await userEvent.click(within(list).getByText(/· Day 1 · Pretend checklist/));
     expect(within(list).getByText("Pretend feature four: Yes — Pretend last note")).toBeInTheDocument();
   });
 
@@ -202,7 +203,7 @@ describe("a checklist card", () => {
       { prompt: NOTES.parts[0]!.prompt, kind: "checklist", answer: [["Pretend feature one", "No", "Pretend draft note"]] },
     ]);
     const list = await openReadBack();
-    await userEvent.click(within(list).getByText(/Exercise · Day 1 · Pretend checklist/));
+    await userEvent.click(within(list).getByText(/· Day 1 · Pretend checklist/));
     expect(within(list).getByText("Pretend feature one: No — Pretend draft note")).toBeInTheDocument();
     expect(within(list).getByText("Not submitted")).toBeInTheDocument();
   });

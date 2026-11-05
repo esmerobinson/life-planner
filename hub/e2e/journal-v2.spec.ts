@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
-import { openCardInMap, pageDate } from "./helpers";
+import { openCardInMap, openReadBackPart, pageDate } from "./helpers";
 
 /* Journal v2 end to end, with a lived-in FICTIONAL journal: the rows on Home (at the top of
    Today's list) and in Mind's Habits box; then every Journal tab (the
@@ -85,7 +85,7 @@ async function walk(page: Page, w: number) {
   await page.goto("/area/mind");
   const habits = page.getByRole("list", { name: "Habits" });
   await expect(habits.locator("li .strip-title")).toHaveText([/Pretend breathing practice/, "Mental health exercise", "Morning pages", "Daily check-in"]);
-  await expect(habits.locator("li.journal-row").nth(1).getByText(/session \d+ of \d+/)).toBeVisible();
+  await expect(habits.locator("li.journal-row").nth(1).getByText(/\d+ of \d+ this month/)).toBeVisible();
   await noSidewaysScroll(page);
   await shot("mind-habits");
 
@@ -130,14 +130,32 @@ async function walk(page: Page, w: number) {
   await noSidewaysScroll(page);
   await shot("check-in");
 
-  // Read back: one list, newest first.
-  await page.getByRole("link", { name: "Read back" }).click();
-  const list = page.getByRole("list", { name: "Read back" });
-  await expect(list.getByText(/Exercise · Day 1 · Pretend weather/)).toBeVisible();
-  await expect(list.getByText(/Opens on/).first()).toBeVisible();
-  await list.getByText(/Exercise · Day 1 · Pretend weather/).click();
+  // Read back (2026-11-05, option B): four tiles filling the tab's width, 4 across on a wide
+  // window and 2 across on the phone; each opens its part.
+  await page.getByRole("link", { name: "Read back", exact: true }).click();
+  const tiles = page.locator("button.journal-readback-tile");
+  await expect(tiles).toHaveCount(4);
+  await expect(tiles.nth(1)).toHaveText(/^Morning pages51 ready to read · 4 opening later$/);
+  const boxes = (await Promise.all([0, 1, 2, 3].map((i) => tiles.nth(i).boundingBox()))).map((b) => b!);
+  expect(new Set(boxes.map((b) => Math.round(b.y))).size).toBe(w >= 1000 ? 1 : 2);
+  const grid = (await page.locator(".journal-readback-tiles").boundingBox())!;
+  const inner = (await page.locator(".journal-panel").boundingBox())!;
+  expect(grid.width).toBeGreaterThanOrEqual(inner.width - 2 * 16 - 1); // the panel's whole width, inside its padding
+  expect(Math.abs(Math.max(...boxes.map((b) => b.x + b.width)) - (grid.x + grid.width))).toBeLessThan(1);
   await noSidewaysScroll(page);
   await shot("read-back");
+  const ex2 = await openReadBackPart(page, "Mental health exercise");
+  await ex2.getByText(/· Day 1 · Pretend weather/).click();
+  await expect(ex2.getByText("Pretend: one small grey cloud floated past.")).toBeVisible();
+  const row = (await ex2.locator(".journal-readback-list > li > details").first().boundingBox())!;
+  expect(row.width).toBeGreaterThanOrEqual(inner.width - 2 * 16 - 1); // full width too
+  await noSidewaysScroll(page);
+  await shot("read-back-exercise");
+  await ex2.getByRole("link", { name: "← Read back" }).click();
+  const pages = await openReadBackPart(page, "Morning pages");
+  await expect(pages.getByText(/Opens on/).first()).toBeVisible();
+  await expect(pages.getByText("Pretend page")).toHaveCount(0);
+  await noSidewaysScroll(page);
 }
 
 test.describe("at 1280px", () => {

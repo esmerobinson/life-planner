@@ -155,6 +155,9 @@ describe("an older unfinished page (bug #6: never hidden, however old)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Open that page" }));
     expect(screen.getByText(/^Finishing the page from /)).toBeInTheDocument();
     expect(screen.getByDisplayValue("Pretend Saturday unfinished words")).toBeInTheDocument();
+    // Its box is named by its real day, not "Yesterday's" (Esme, 2026-11-05).
+    expect(screen.getByLabelText(/^Morning page from .+/)).toHaveValue("Pretend Saturday unfinished words");
+    expect(screen.queryByLabelText("Yesterday's morning page")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "I'm done" }));
     await waitFor(async () => expect((await readMorningDay(jk, "2026-10-31", device)).pages).toBe(1));
     // The one before it is still offered.
