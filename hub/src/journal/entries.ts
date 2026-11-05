@@ -200,11 +200,16 @@ export interface ShareEntry {
 /** The most a "what I learned today" box holds (characters). */
 export const MAX_LEARNED = 4000;
 
-/** One device's "what I learned about BPD / mental health today" words (optional). */
+/**
+ * One saved version of her "what I learned about BPD / mental health today" words (optional).
+ * `seen`: the row ids of the versions she had in front of her when she wrote this one; it replaces
+ * those only, never a version she didn't see (bug #41).
+ */
 export interface LearnedEntry {
   v: 1;
   text: string;
   at: number;
+  seen?: string[];
 }
 
 /** The earlier one-row-per-day morning shape (read and split; never written). */
@@ -274,7 +279,9 @@ export const ENTRY_CHECK = {
     (v.draft === undefined || v.draft === true),
   "note-read": (v: unknown): v is NoteReadEntry => isObj(v) && v.v === 1 && strList(v.ids) && num(v.at),
   share: (v: unknown): v is ShareEntry => isObj(v) && v.v === 1 && typeof v.private === "boolean" && num(v.at),
-  learned: (v: unknown): v is LearnedEntry => isObj(v) && v.v === 1 && isStr(v.text) && v.text.length <= MAX_LEARNED && num(v.at),
+  learned: (v: unknown): v is LearnedEntry =>
+    isObj(v) && v.v === 1 && isStr(v.text) && v.text.length <= MAX_LEARNED && num(v.at) &&
+    (v.seen === undefined || (strList(v.seen) && (v.seen as string[]).length <= 64 && (v.seen as string[]).every((x) => x.length <= 256))),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&
     (v.draft === undefined || isStr(v.draft)) && strList(v.photos),

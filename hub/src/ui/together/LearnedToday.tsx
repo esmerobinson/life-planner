@@ -1,6 +1,6 @@
 import { liveQuery } from "dexie";
-import { useEffect, useState } from "react";
-import { listLearned, readLearned, saveLearned, type Learned } from "../../data/repo";
+import { useEffect, useRef, useState } from "react";
+import { listLearned, readLearned, saveLearned, type Learned, type LearnedVersion } from "../../data/repo";
 import type { ISODate } from "../../domain/types";
 import { MAX_LEARNED } from "../../journal/entries";
 import type { JournalKey } from "../../journal/crypto";
@@ -31,17 +31,8 @@ export function LearnedToday({ jk, today, deviceId }: { jk: JournalKey; today: I
   }, [jk, today]);
   return (
     <section className="together-placeholder together-learned" aria-label={W.learnedSection}>
-      {day === null ? null : <LearnedBox key={today} jk={jk} today={today} deviceId={deviceId} stored={day.text} />}
-      {day && day.others.length > 0 && (
-        <div>
-          <p>{W.learnedOther}</p>
-          {day.others.map((o, i) => (
-            <p key={i} className="journal-past-answer">
-              {o.text}
-            </p>
-          ))}
-        </div>
-      )}
+      {day === null ? null : <LearnedBox key={today} jk={jk} today={today} deviceId={deviceId} day={day} />}
+      {day && <OtherVersions versions={day.others} deviceId={deviceId} />}
       {earlier.length > 0 && (
         <details>
           <summary>{W.learnedEarlier}</summary>
@@ -63,28 +54,65 @@ export function LearnedToday({ jk, today, deviceId }: { jk: JournalKey; today: I
   );
 }
 
-function LearnedBox({ jk, today, deviceId, stored }: { jk: JournalKey; today: ISODate; deviceId: string; stored: string }) {
+/** The versions the box doesn't hold, read-only, each saying where it was written. */
+function OtherVersions({ versions, deviceId }: { versions: LearnedVersion[]; deviceId: string }) {
+  if (versions.length === 0) return null;
+  return (
+    <>
+      {versions.map((v) => (
+        <div key={v.id} className="together-learned-other">
+          <p>{v.device === deviceId ? W.learnedEarlierHere : W.learnedOtherDevice}</p>
+          <p className="journal-past-answer">{v.text}</p>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The box. A session starts at the first word typed into a box with nothing unsaved: it writes
+ * one new version (its own row, rewritten as she goes on typing) that replaces only the version
+ * the box held when she started. Saves go one at a time.
+ */
+function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODate; deviceId: string; day: Learned }) {
   const [problem, setProblem] = useState("");
+  const session = useRef<{ version?: string; seen: string[] } | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   const draft = useDraft(
-    stored,
-    async (text) => {
-      try {
-        await saveLearned(jk, today, deviceId, text);
-        setProblem("");
-      } catch (e) {
-        setProblem(e instanceof Error ? e.message : String(e));
-        throw e;
-      }
+    day.text,
+    (text) => {
+      const s = session.current ?? (session.current = { seen: day.id ? [day.id] : [] });
+      const run = queue.current.then(async () => {
+        try {
+          s.version = await saveLearned(jk, today, deviceId, text, s);
+          setProblem("");
+        } catch (e) {
+          setProblem(e instanceof Error ? e.message : String(e));
+          throw e;
+        }
+      });
+      queue.current = run.catch(() => undefined);
+      return run;
     },
     AUTOSAVE_MS,
   );
+  function change(text: string) {
+    // Nothing unsaved and the box holds a version this session didn't write: a new session,
+    // replacing only that version.
+    if (draft.value === day.text && (!session.current || session.current.version !== day.id)) {
+      session.current = { seen: day.id ? [day.id] : [] };
+    }
+    draft.set(text);
+  }
+  const fromOther = day.id !== "" && day.device !== deviceId && day.text.trim() !== "";
   return (
-    <>
+    <div className="together-learned-box">
       <label className="form-field">
         <span className="form-label">{W.learnedLabel}</span>
-        <textarea rows={3} maxLength={MAX_LEARNED} value={draft.value} onChange={(e) => draft.set(e.target.value)} onBlur={draft.flush} />
+        <textarea rows={3} maxLength={MAX_LEARNED} value={draft.value} onChange={(e) => change(e.target.value)} onBlur={draft.flush} />
       </label>
+      {fromOther && <p>{W.learnedOther}</p>}
       {problem && <p role="alert">{problem}</p>}
-    </>
+    </div>
   );
 }

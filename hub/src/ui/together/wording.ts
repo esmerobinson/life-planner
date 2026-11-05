@@ -49,5 +49,10 @@ export const TOGETHER_WORDS = {
   learnedSection: "What I learned",
   learnedLabel: "What I learned about BPD or mental health today (optional)",
   learnedEarlier: "What I learned, earlier days",
+  /** Beside the box when the words in it were written on another device. */
   learnedOther: "Also written on another device",
+  /** Over a version from this device that the box doesn't hold (bug #41: kept, never lost). */
+  learnedEarlierHere: "Your earlier words on this device",
+  /** Over a version from another device that the box doesn't hold. */
+  learnedOtherDevice: "Other words from another device",
 };

@@ -626,3 +626,286 @@ test.describe("Notes to myself at 1280px", () => {
     await noWordsInClear(page, [PROMPT.steady, PROMPT.memory, PROMPT.skill, "Fennick"]);
   });
 });
+
+// ================================================================ What I learned today (Together link)
+
+/* The optional "What I learned about BPD or mental health today" box under the exercise (kind
+   `learned:<date>:<device>`, sealed). Every way she leaves it must keep her words: a pause, a
+   click away, the app hidden, Home and back, the window closed and opened again (each checked
+   after a reload too). Each step adds its own made-up word, so a failure says which way lost it. */
+
+const LEARNED_LABEL = "What I learned about BPD or mental health today (optional)";
+const LEARNED = {
+  pause: "Pretend Pellucid lesson: a made-up wave rises, peaks and passes.",
+  away: " Pretend Brindlewick: naming it makes it smaller.",
+  hidden: " Pretend Corvantle: the phone locked mid-thought.",
+  home: " Pretend Sallowmere: went Home and came back.",
+  closed: " Pretend Tinderquay: closed the window and opened it again.",
+};
+const LEARNED_WORDS = ["Pellucid", "Brindlewick", "Corvantle", "Sallowmere", "Tinderquay"];
+
+const learnedBox = (page: Page) => exerciseTab(page).getByLabel(LEARNED_LABEL);
+/** Somewhere else on the exercise tab to click (the box's own heading text). */
+const learnedAway = (page: Page) => exerciseTab(page).getByText(LEARNED_LABEL);
+
+/**
+ * Click in the box, put the cursor after the last word (where she clicks to carry on: End only
+ * goes to the end of a wrapped line), type key by key, stop to think; then (if `away`) click away.
+ */
+async function addLikeAPerson(page: Page, box: Locator, words: string, away?: Locator) {
+  await box.click();
+  await box.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(el.value.length, el.value.length));
+  await box.pressSequentially(words, { delay: 25 });
+  await page.waitForTimeout(THINK_MS);
+  if (away) await away.click();
+}
+
+/** The day's learned words as the app reads them back (opened with this device's key). */
+async function storedLearned(page: Page, iso: string): Promise<{ text: string; others: string[] }> {
+  return page.evaluate(async (d) => {
+    const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+    const { db } = await at("/src/data/db.ts");
+    const keys = await at("/src/journal/keyStore.ts");
+    const repo = await at("/src/data/repo.ts");
+    const l = await repo.readLearned(await keys.loadJournalKey(db), d);
+    return { text: l.text, others: l.others.map((o: { text: string }) => o.text) };
+  }, iso);
+}
+
+/** The page goes to the background (app switched away, phone locked): visibilitychange to hidden. */
+async function hidePage(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+}
+
+/** "What I learned, earlier days": the day's long date, then her words. */
+async function learnedEarlier(page: Page, long: string): Promise<Locator> {
+  const s = exerciseTab(page).getByRole("region", { name: "What I learned" });
+  const fold = s.locator("details", { has: page.getByText("What I learned, earlier days", { exact: true }) });
+  await fold.locator("> summary").click();
+  const day = fold.locator("li", { has: page.locator(`p:text-is("${long}")`) });
+  await expect(day).toHaveCount(1);
+  return day;
+}
+
+for (const width of [1280, 390]) {
+  test.describe(`What I learned today at ${width}px`, () => {
+    test.use({ viewport: { width, height: width === 390 ? 844 : 900 } });
+
+    test(`${ENGINE}: typed like a person: pause, click away, hidden, Home and back, closed and reopened: word for word, sealed`, async ({ page, context }) => {
+      test.setTimeout(150_000);
+      await unlocked(page, "/journal/exercise");
+      const { iso } = await appDay(page);
+      let want = "";
+
+      // (1) Typed, then she stops to think (no click away): the pause saves it.
+      await expect(learnedBox(page)).toBeVisible();
+      await typeLikeAPerson(page, learnedBox(page), LEARNED.pause);
+      want += LEARNED.pause;
+      expect((await storedLearned(page, iso)).text).toBe(want);
+      await page.reload();
+      await expect(learnedBox(page)).toHaveValue(want);
+
+      // (2) More, then a click somewhere else at once (before the pause would save it).
+      await learnedBox(page).click();
+      await learnedBox(page).evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(el.value.length, el.value.length));
+      await learnedBox(page).pressSequentially(LEARNED.away, { delay: 25 });
+      await learnedAway(page).click();
+      want += LEARNED.away;
+      await expect.poll(async () => (await storedLearned(page, iso)).text).toBe(want);
+      await page.reload();
+      await expect(learnedBox(page)).toHaveValue(want);
+
+      // (3) More, then the app goes to the background at once (phone locked, app switched).
+      await learnedBox(page).click();
+      await learnedBox(page).evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(el.value.length, el.value.length));
+      await learnedBox(page).pressSequentially(LEARNED.hidden, { delay: 25 });
+      await hidePage(page);
+      want += LEARNED.hidden;
+      await expect.poll(async () => (await storedLearned(page, iso)).text).toBe(want);
+      await page.reload();
+      await expect(learnedBox(page)).toHaveValue(want);
+
+      // (4) More, then straight to Home (the box goes away) and back.
+      await addLikeAPerson(page, learnedBox(page), LEARNED.home);
+      want += LEARNED.home;
+      if (width < 700) await page.getByRole("button", { name: "Back" }).click();
+      else await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Home", exact: true }).click();
+      await expect(page).toHaveURL(/\/$/);
+      if (width < 700) await page.goto("/journal/exercise");
+      else await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Journal", exact: true }).click();
+      await expect(learnedBox(page)).toHaveValue(want);
+
+      // (5) More, a pause and a click away, then the window is closed and opened again.
+      await addLikeAPerson(page, learnedBox(page), LEARNED.closed, learnedAway(page));
+      want += LEARNED.closed;
+      await page.close({ runBeforeUnload: true });
+      const again = await context.newPage();
+      await again.goto("/journal/exercise");
+      await expect(learnedBox(again)).toHaveValue(want);
+      expect(await storedLearned(again, iso)).toEqual({ text: want, others: [] });
+      await noWordsInClear(again, [...Object.values(LEARNED).map((w) => w.trim()), ...LEARNED_WORDS]);
+    });
+
+    test(`${ENGINE}: typed, then the Mac app is closed straight away (no pause, no click away): still there when opened again`, async ({ page, context }) => {
+      test.setTimeout(120_000);
+      await unlocked(page, "/journal/exercise");
+      const { iso } = await appDay(page);
+      await learnedBox(page).click();
+      await learnedBox(page).pressSequentially(LEARNED.pause, { delay: 25 });
+      // What the Mac app does on Close (its last window) or Quit: it waits for the page's flush
+      // (mac/Esmeworld/main.swift, applicationShouldTerminate), then the page goes.
+      expect(await page.evaluate(() => (window as unknown as { esmeworldFlush: () => Promise<{ settled: boolean }> }).esmeworldFlush())).toEqual({ settled: true });
+      await page.close({ runBeforeUnload: true });
+      const again = await context.newPage();
+      await again.goto("/journal/exercise");
+      await expect(learnedBox(again)).toHaveValue(LEARNED.pause);
+      expect((await storedLearned(again, iso)).text).toBe(LEARNED.pause);
+      await noWordsInClear(again, [LEARNED.pause, "Pellucid"]);
+    });
+  });
+}
+
+test.describe("What I learned today across 3am at 1280px", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test(`${ENGINE}: typed at 01:30 (still that day); past 03:00 it is under that day in earlier days, and the new day's box is empty`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.clock.install({ time: localAt(1, 1, 30) });
+    await unlocked(page, "/journal/exercise");
+    const day = await appDay(page);
+    expect(day.iso).toBe(localAt(0, 12).toLocaleDateString("en-CA")); // the evening's own day
+    await typeLikeAPerson(page, learnedBox(page), LEARNED.pause, learnedAway(page));
+
+    await page.clock.setSystemTime(localAt(1, 3, 5));
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(learnedBox(page)).toHaveValue("");
+    await expect((await learnedEarlier(page, day.long)).locator(".journal-past-answer")).toHaveText(LEARNED.pause);
+
+    await page.reload();
+    const next = await appDay(page);
+    expect(next.iso).toBe(localAt(1, 12).toLocaleDateString("en-CA"));
+    await expect(learnedBox(page)).toHaveValue("");
+    await expect((await learnedEarlier(page, day.long)).locator(".journal-past-answer")).toHaveText(LEARNED.pause);
+    expect((await storedLearned(page, day.iso)).text).toBe(LEARNED.pause);
+    expect((await storedLearned(page, next.iso)).text).toBe("");
+    await noWordsInClear(page, [LEARNED.pause, "Pellucid"]);
+  });
+
+  test(`${ENGINE}: still typing at 02:59 when 3am passes (no pause): her words stay on the day she typed them`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.clock.install({ time: localAt(1, 2, 59) });
+    await unlocked(page, "/journal/exercise");
+    const day = await appDay(page);
+    expect(day.iso).toBe(localAt(0, 12).toLocaleDateString("en-CA"));
+    await learnedBox(page).click();
+    await learnedBox(page).pressSequentially(LEARNED.pause, { delay: 25 });
+    // The day changes under her (the app's minute check, or she clicks back into the window).
+    await page.clock.setSystemTime(localAt(1, 3, 0));
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(learnedBox(page)).toHaveValue("");
+    await expect.poll(async () => (await storedLearned(page, day.iso)).text).toBe(LEARNED.pause);
+    await page.reload();
+    await expect((await learnedEarlier(page, day.long)).locator(".journal-past-answer")).toHaveText(LEARNED.pause);
+    expect((await storedLearned(page, (await appDay(page)).iso)).text).toBe("");
+  });
+});
+
+/* Two devices wrote the box the same day (each its own row). The Mac's words are the older ones,
+   so the phone's newer words fill the Mac's box and the Mac's own show under "Also written on
+   another device". She adds a line in the box on the Mac. Nothing she wrote on either device may
+   go. */
+test.describe("What I learned today on two devices at 1280px", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test(`${ENGINE}: the phone's newer words arrive; she adds to the box on the Mac: the Mac's own earlier words are still kept`, async ({ page }) => {
+    test.setTimeout(120_000);
+    const MAC_WORDS = "Pretend Quorrel Mac lesson: breathe out longer than in.";
+    const PHONE_WORDS = "Pretend Vantry phone lesson: a feeling is a visitor.";
+    const ADDED = " Pretend Ellowby added on the Mac.";
+    await unlocked(page, "/journal/exercise");
+    const { iso } = await appDay(page);
+    await typeLikeAPerson(page, learnedBox(page), MAC_WORDS, learnedAway(page));
+    await expect.poll(async () => (await storedLearned(page, iso)).text).toBe(MAC_WORDS);
+
+    // The phone's row (written later that day) arrives by sync, sealed as the phone seals it.
+    await page.evaluate(async ({ d, text }) => {
+      const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+      const { db } = await at("/src/data/db.ts");
+      const keys = await at("/src/journal/keyStore.ts");
+      const c = await at("/src/journal/crypto.ts");
+      const jk = await keys.loadJournalKey(db);
+      const id = `learned:${d}:device-pretend-phone-1`;
+      await db.journal.put({ id, kind: "learned", date: d, fp: jk.fp, ...(await c.sealJson(jk.key, { v: 1, text, at: Date.now() }, c.journalAad(id))) });
+    }, { d: iso, text: PHONE_WORDS });
+    await expect(learnedBox(page)).toHaveValue(PHONE_WORDS);
+    await expect(exerciseTab(page).getByText("Also written on another device")).toBeVisible();
+    await expect(exerciseTab(page).getByText(MAC_WORDS, { exact: true })).toBeVisible();
+
+    // She adds a line in the box, on the Mac.
+    await addLikeAPerson(page, learnedBox(page), ADDED, learnedAway(page));
+    await page.reload();
+    await expect(learnedBox(page)).toHaveValue(PHONE_WORDS + ADDED);
+    const s = await storedLearned(page, iso);
+    expect([s.text, ...s.others].join("\n"), "the Mac's own earlier words are gone").toContain(MAC_WORDS);
+    await expect(exerciseTab(page).getByText(MAC_WORDS, { exact: false })).toBeVisible();
+  });
+});
+
+// ================================================================ Keep today's answers private (Together link)
+
+const privateTick = (s: Locator) => s.getByRole("checkbox", { name: "Keep today's answers private" });
+
+test.describe("Keep today's answers private at 1280px", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test(`${ENGINE}: the exercise and check-in ticks each stay as she left them across reloads, and never touch each other`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await unlocked(page, "/journal/exercise");
+    const { iso } = await appDay(page);
+    const read = () =>
+      page.evaluate(async (d) => {
+        const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+        const { db } = await at("/src/data/db.ts");
+        const keys = await at("/src/journal/keyStore.ts");
+        const repo = await at("/src/data/repo.ts");
+        return repo.readSharePrivate(await keys.loadJournalKey(db), d);
+      }, iso);
+
+    await expect(privateTick(exerciseTab(page))).toBeEnabled();
+    await privateTick(exerciseTab(page)).click();
+    await expect(privateTick(exerciseTab(page))).toBeChecked();
+    await page.reload();
+    await expect(privateTick(exerciseTab(page))).toBeChecked();
+
+    await tabLink(page, "Daily check-in").click();
+    await expect(privateTick(checkinTab(page))).toBeEnabled();
+    await expect(privateTick(checkinTab(page))).not.toBeChecked();
+    await privateTick(checkinTab(page)).click();
+    await expect(privateTick(checkinTab(page))).toBeChecked();
+    await page.reload();
+    await expect(privateTick(checkinTab(page))).toBeChecked();
+    expect(await read()).toEqual({ exercise: true, checkin: true });
+
+    // Unticking the exercise leaves the check-in ticked.
+    await tabLink(page, "Mental health exercise").click();
+    await privateTick(exerciseTab(page)).click();
+    await expect(privateTick(exerciseTab(page))).not.toBeChecked();
+    await page.reload();
+    await expect(privateTick(exerciseTab(page))).not.toBeChecked();
+    expect(await read()).toEqual({ exercise: false, checkin: true });
+    await tabLink(page, "Daily check-in").click();
+    await expect(privateTick(checkinTab(page))).toBeChecked();
+
+    // Sealed: the rows say nothing in clear beyond their kind, day and part.
+    const rows: string[] = await page.evaluate(async () => {
+      const { db } = await import(/* @vite-ignore */ "/src/data/db.ts" as string);
+      return (await db.journal.where("kind").equals("share").toArray()).map((r: Record<string, unknown>) => JSON.stringify({ ...r, id: "", kind: "" }));
+    });
+    expect(rows).toHaveLength(2);
+    for (const r of rows) expect(r).not.toMatch(/private|true|false/);
+  });
+});

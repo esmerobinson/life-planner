@@ -1437,49 +1437,61 @@ export function saveSharePrivate(jk: JournalKey, date: ISODate, part: SharePart,
 
 // ---- "What I learned today" (Mental health exercise, optional) ------------------------------
 //
-// Each device writes its own row, `learned:<date>:<deviceId>` (rewritten whole as she types),
-// so no device writes over another's words. The day shows the newest; any other device's
-// different words are kept and shown too, so nothing she wrote is hidden.
+// One row per saved version, `learned:<date>:<deviceId>_<vid>` (the notes pattern, bug #41): a
+// box session (from the first word typed until the box is left) writes its own row only, and
+// names the version it started from (`seen`), which it replaces. No device ever writes over
+// another's words, and a version she didn't see is never replaced: it stays, shown read-only.
+// The day shows the newest version not replaced. An earlier one-row-per-device row
+// (`learned:<date>:<deviceId>`) still reads as one version.
 
-export interface Learned {
-  /** The newest words for the day ("" when none). */
+/** One version of the day's words, as the box and Read back see it. */
+export interface LearnedVersion {
+  /** Its row id. */
+  id: string;
   text: string;
   at: number;
-  /** Other devices' different words for the same day, newest first. */
-  others: { text: string; at: number }[];
+  /** The device that wrote it. */
+  device: string;
+}
+
+export interface Learned extends LearnedVersion {
+  /** Every other version not replaced, with something written, newest first. */
+  others: LearnedVersion[];
   /** Rows for the day this device can't open. */
   unreadable: number;
 }
 
-function mergeLearned(entries: { text: string; at: number }[], unreadable: number): Learned {
-  const sorted = [...entries].sort((a, b) => b.at - a.at);
-  const best = sorted[0] ?? { text: "", at: 0 };
-  const seen = new Set([best.text.trim()]);
-  const others: { text: string; at: number }[] = [];
-  for (const e of sorted.slice(1)) {
-    const t = e.text.trim();
-    if (t === "" || seen.has(t)) continue;
-    seen.add(t);
-    others.push(e);
-  }
-  return { text: best.text, at: best.at, others, unreadable };
-}
+const learnedDevice = (row: JournalRow) => {
+  const suffix = suffixOf(row);
+  const cut = suffix.lastIndexOf("_");
+  return cut > 0 ? suffix.slice(0, cut) : suffix;
+};
 
-async function openLearned(jk: JournalKey, rows: JournalRow[]) {
-  const entries: { text: string; at: number }[] = [];
+async function mergeLearned(jk: JournalKey, rows: JournalRow[]): Promise<Learned> {
+  const versions: (LearnedVersion & { seen: string[] })[] = [];
   let unreadable = 0;
   for (const row of rows) {
     const o = await openRow(jk, row, "learned");
-    if (o.state === "ok") entries.push({ text: o.entry.text, at: o.entry.at });
+    if (o.state === "ok") versions.push({ id: row.id, text: o.entry.text, at: o.entry.at, device: learnedDevice(row), seen: o.entry.seen ?? [] });
     else unreadable++;
   }
-  return { entries, unreadable };
+  const replaced = new Set(versions.flatMap((v) => v.seen));
+  const live = versions.filter((v) => !replaced.has(v.id)).sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
+  const shown = live[0] ?? { id: "", text: "", at: 0, device: "", seen: [] };
+  const words = new Set([shown.text.trim()]);
+  const others: LearnedVersion[] = [];
+  for (const v of live.slice(1)) {
+    const t = v.text.trim();
+    if (t === "" || words.has(t)) continue;
+    words.add(t);
+    others.push({ id: v.id, text: v.text, at: v.at, device: v.device });
+  }
+  return { id: shown.id, text: shown.text, at: shown.at, device: shown.device, others, unreadable };
 }
 
-/** The day's "what I learned" words, from every device's row. */
+/** The day's "what I learned" words: the newest version, and every other one not replaced. */
 export async function readLearned(jk: JournalKey, date: ISODate): Promise<Learned> {
-  const { entries, unreadable } = await openLearned(jk, (await rowsOn(date)).filter((r) => r.kind === "learned"));
-  return mergeLearned(entries, unreadable);
+  return mergeLearned(jk, (await rowsOn(date)).filter((r) => r.kind === "learned"));
 }
 
 /** Every day with "what I learned" words before `before`, newest first (empty days left out). */
@@ -1488,18 +1500,32 @@ export async function listLearned(jk: JournalKey, before: ISODate): Promise<({ d
   const dates = [...new Set(rows.map((r) => r.date))].sort((a, b) => b.localeCompare(a));
   const out: ({ date: ISODate } & Learned)[] = [];
   for (const date of dates) {
-    const { entries, unreadable } = await openLearned(jk, rows.filter((r) => r.date === date));
-    const day = mergeLearned(entries, unreadable);
+    const day = await mergeLearned(jk, rows.filter((r) => r.date === date));
     if (day.text.trim() !== "" || day.others.length > 0) out.push({ date, ...day });
   }
   return out;
 }
 
-/** Saves this device's words for the day (its own row; a row here that won't open is kept beside). */
-export async function saveLearned(jk: JournalKey, date: ISODate, deviceId: string, text: string): Promise<void> {
+/** A new version's row id for this device. */
+export function newLearnedId(date: ISODate, deviceId: string): string {
+  const vid = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
+  return journalId("learned", date, `${deviceId}_${vid}`);
+}
+
+/**
+ * Saves her words as a version. Without `version`, a new version (replacing only what `seen`
+ * names). With it, that version is rewritten: only one this device made (a box session's own
+ * row), never another device's. Returns the version's row id.
+ */
+export async function saveLearned(
+  jk: JournalKey, date: ISODate, deviceId: string, text: string, session: { version?: string; seen?: string[] } = {},
+): Promise<string> {
   if (text.length > MAX_LEARNED) throw new Error("That's too long to save. Nothing was changed.");
-  let suffix = deviceId;
-  if (await wontOpen(jk, journalId("learned", date, suffix), "learned")) suffix = `${deviceId}-2`;
-  if (await wontOpen(jk, journalId("learned", date, suffix), "learned")) throw new Error(CANT_OPEN);
-  await write(jk, [await seal(jk, "learned", date, suffix, { v: 1, text, at: Date.now() })]);
+  const id = session.version ?? newLearnedId(date, deviceId);
+  if (!id.startsWith(`learned:${date}:${deviceId}_`)) throw new Error("Only this device's own version can be changed here.");
+  if (await wontOpen(jk, id, "learned")) throw new Error(CANT_OPEN); // never written over (bug #20)
+  const seen = (session.seen ?? []).filter((x) => x !== id);
+  const entry = { v: 1, text, at: Date.now(), ...(seen.length ? { seen } : {}) };
+  await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), entry)]);
+  return id;
 }
