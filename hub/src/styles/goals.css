@@ -32,14 +32,23 @@
   margin-top: var(--gap-section);
 }
 
+/* VISUAL-LANGUAGE.md "Full, no blank space (2026-11-05)", her pick 1 · A · cards stretch: an
+   area's cards share its whole row, never leaving empty slots. Each card starts at a third of
+   the row (at most 3 across; never under the 280px the grid had) and grows into what's left:
+   one goal fills the row, two take half each, three a third; a 4th or 5th wraps and its row
+   stretches too. Where a third would be under 280px (a narrow window, the phone) they go 2 or
+   1 across. Cards in a row share its height (builder's call: no gap under the shorter one). */
 .goal-grid {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.goal-grid > .goal-tile-a {
+  flex: 1 1 max(280px, calc((100% - 2 * var(--space-4)) / 3));
 }
 
 .goal-tile-a {
@@ -298,13 +307,20 @@ button.goal-plan {
   margin: 0;
 }
 
+/* The same for Suggested goals (VISUAL-LANGUAGE.md "Full, no blank space (2026-11-05)", pick
+   1 · A): its three cards fill the row instead of leaving a 4th empty slot; never under the
+   200px they had, so narrower they wrap and the wrapped row stretches. */
 .suggested-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+}
+
+.suggested-list > .suggested-item {
+  flex: 1 1 max(200px, calc((100% - 2 * 10px) / 3));
 }
 
 .suggested-item {

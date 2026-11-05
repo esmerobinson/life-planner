@@ -36,7 +36,7 @@ export function RepeatingPage({ today }: { today: ISODate }) {
   const phone = usePhone();
 
   return (
-    <section className="repeating-page">
+    <section className="repeating-page page-sheet">
       <h1>Repeating</h1>
       {error && <p>{error}</p>}
       <p>

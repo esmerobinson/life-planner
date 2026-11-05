@@ -145,7 +145,7 @@ export function SortPage({ today }: { today: ISODate }) {
 
   if (error) {
     return (
-      <section className="sort-page">
+      <section className="sort-page page-fill">
         <h1 className="sort-heading">Sort one by one</h1>
         <p>{error}</p>
       </section>
@@ -153,7 +153,7 @@ export function SortPage({ today }: { today: ISODate }) {
   }
 
   return (
-    <section className="sort-page">
+    <section className="sort-page page-fill">
       <h1 className="sort-heading">Sort one by one</h1>
       <div className="sort-stage">
         {loaded && current && (

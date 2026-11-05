@@ -10,7 +10,12 @@
      the mockup's 6px 14px;
    - the notes box grows with its text and has no resize handle. */
 
+/* VISUAL-LANGUAGE.md "Full, no blank space (2026-11-05)", her pick 3 · A: the card fills the
+   width (no more 520px cap) and is itself the cream sheet down to the bottom of the window.
+   The page (.page-fill, tokens.css) reaches the bottom; the stage takes all of it and the card
+   grows into what the "1 of N" count and the undo line under it leave. */
 .sort-stage {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18,11 +23,11 @@
 }
 
 .sort-card {
+  flex: 1 0 auto;
   background: var(--panel);
   border-radius: var(--radius-panel);
   padding: 24px;
   width: 100%;
-  max-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 16px;

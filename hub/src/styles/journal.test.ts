@@ -39,10 +39,13 @@ describe("journal.css", () => {
     expect(code).toMatch(/\.journal-answer\.exercise-response \{[^}]*font-size: max\(16px, 1em\)/);
   });
 
-  it("Journal v2 tabs: the mockup's big pills (16px, 12px 18px, --row; selected mint and bold); never scrolling sideways, stacked when narrow", () => {
-    expect(code).not.toMatch(/\.journal-tabs \{[^}]*overflow-x: auto/);
-    expect(code).toMatch(/\.journal-tabs\.is-stacked \{[^}]*flex-direction: column/);
-    expect(code).toMatch(/\.journal-tabs\.is-stacked a\.journal-tab \{[^}]*white-space: normal/);
+  it("Journal v2 tabs: the mockup's big pills (16px, 12px 18px, --row; selected mint and bold); never scrolling sideways: one row on the Mac, stacked on the phone and when narrow", () => {
+    expect(code).not.toContain("overflow-x");
+    // Stacked is the default (the phone, a narrow window, no container queries)...
+    expect(code).toMatch(/\.journal-tabs \{[^}]*flex-direction: column/);
+    expect(code).toMatch(/\.journal-tabs a\.journal-tab \{[^}]*white-space: normal/);
+    // ...and with room for five columns, not on the phone, one row of equal columns (2026-11-05).
+    expect(code).toMatch(/@container journal-tabs \(min-width: 680px\) \{\s*\.journal-tabs:not\(\.is-stacked\) \{[^}]*display: grid;[^}]*grid-auto-columns: minmax\(0, 1fr\)/);
     expect(code).toMatch(/a\.journal-tab \{[^}]*border-radius: 14px;[^}]*padding: 12px 18px;[^}]*background: var\(--row\);[^}]*font-size: 16px/);
     expect(code).toMatch(/a\.journal-tab\.is-selected \{[^}]*background: var\(--mint\);[^}]*font-weight: 700/);
     expect(code).toMatch(/\.journal-tab \.tick-auto,[^{]*\{[^}]*width: 18px;[^}]*height: 18px;[^}]*border-radius: 6px/);

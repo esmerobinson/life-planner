@@ -112,7 +112,7 @@ export function RemindersPage() {
   const where = place === "mac" ? "on this Mac" : "";
 
   return (
-    <section className="reminders-page">
+    <section className="reminders-page page-sheet">
       <h1>Reminders</h1>
       <p className="rem-intro">
         Esmeworld pops up a notification{where ? ` ${where}` : ""} at these times. Nothing pops up if you've already done it today.

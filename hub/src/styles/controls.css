@@ -172,6 +172,27 @@ a.btn-secondary {
   width: 100%;
 }
 
+/* Text boxes run the full width of their space (VISUAL-LANGUAGE.md "Full, no blank space
+   (2026-11-05)"): Add to inbox, the Sync and pairing fields, Backup's file and pasted-text
+   boxes, Unlock journal, and any other labelled text field, instead of the browser's ~200px.
+   Date, number and choice fields keep their own width outside a form grid. In a row of
+   controls (Add to inbox) the field takes what its button leaves, the button still beside it. */
+.form-field input[type="text"],
+.form-field input[type="url"],
+.form-field input[type="password"],
+.form-field input[type="search"],
+.form-field input[type="email"],
+.form-field input[type="file"],
+.form-field input:not([type]),
+.form-field textarea {
+  width: 100%;
+}
+
+.form-row > .form-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 fieldset {
   border: 0;
   padding: 0;

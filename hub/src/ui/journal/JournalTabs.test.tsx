@@ -2,10 +2,11 @@ import { screen, within } from "@testing-library/react";
 import { vi } from "vitest";
 import { db } from "../../data/db";
 import { renderApp } from "../../test/renderApp";
-import { tabsFit } from "./useTabsFit";
 
-// The Journal's big tabs never scroll sideways (journal v3): on the phone, and whenever they
-// don't fit in one row, they stack as full-width rows. Fictional data only.
+// The Journal's big tabs never scroll sideways (journal v3): on the phone they stack as
+// full-width rows (2026-11-04); on the Mac they sit in one row across (VISUAL-LANGUAGE.md "Full,
+// no blank space (2026-11-05)", pick 4 · A), which journal.css lays out (a narrow Mac window
+// stacks them there too). Fictional data only.
 
 beforeEach(async () => {
   await Promise.all([db.journal.clear(), db.syncMeta.clear()]);
@@ -32,24 +33,15 @@ it("on the phone the tabs stack (full-width rows), every tab listed, Notes to my
   ]);
 });
 
-it("on a wide screen where they fit, they stay in a row", async () => {
+it("on the Mac they are one row, even where their one-line widths wouldn't fit (labels wrap inside their tab)", async () => {
   setPhone(false);
-  renderApp("/journal", "2026-11-04");
-  expect(await nav()).not.toHaveClass("is-stacked"); // jsdom measures nothing: everything fits
-});
-
-it("on a wide screen where they don't fit, they stack", async () => {
-  setPhone(false);
+  // Before 2026-11-05 a row this narrow for tabs this wide stacked them; nothing is measured now.
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 120 } as DOMRect);
   renderApp("/journal", "2026-11-04");
-  expect(await nav()).toHaveClass("is-stacked");
-});
-
-describe("tabsFit", () => {
-  it("adds each tab's natural width and the gaps between them", () => {
-    expect(tabsFit([100, 100, 100], 8, 316)).toBe(true);
-    expect(tabsFit([100, 100, 100], 8, 315)).toBe(false);
-    expect(tabsFit([], 8, 0)).toBe(true);
-  });
+  const tabs = await nav();
+  expect(tabs).toHaveClass("journal-tabs");
+  expect(tabs).not.toHaveClass("is-stacked");
+  // The room journal.css's container query measures the row against.
+  expect(tabs.parentElement).toHaveClass("journal-tabs-room");
 });

@@ -246,6 +246,33 @@ body {
   .home-goals > h2 {
     align-self: baseline;
   }
+
+  /* "Goals this month" ends where Today ends (VISUAL-LANGUAGE.md "Full, no blank space
+     (2026-11-05)", her pick 2 · B · cards share the height). The goals box already stretches
+     to the content row, which is as tall as the taller column; the list takes what "Choose
+     goals" leaves, and the cards share it out equally, each spreading its own lines (count
+     and streak, bar, month dots) evenly under its band. Nothing is added to a card. When
+     Today is the shorter column there is nothing left over, so nothing grows. Side by side
+     only: narrower, the goals sit under Today as before. */
+  .home-goals-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .home-goals-body > .goal-mini-list {
+    flex-grow: 1;
+  }
+
+  .home-goals-body .goal-mini {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .home-goals-body .goal-mini-body {
+    flex-grow: 1;
+    justify-content: space-evenly;
+  }
 }
 
 /* Under 1000px wide the goals column goes below Today instead of squashing against it
@@ -254,4 +281,62 @@ body {
   .home-page {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Short pages on a cream sheet (VISUAL-LANGUAGE.md "Full, no blank space (2026-11-05)", her
+   pick 3 · A): Bin, Sync, Backup, Repeating and Reminders sit on one --panel sheet that always
+   reaches the bottom of the window; rows on it stay --row. Sort one by one fills the same way
+   (.page-fill), but there its card is the sheet (sort.css), with nothing drawn behind it.
+   How it reaches the bottom: the content column becomes a column at least the window tall
+   (dvh, so a phone's browser bars never push it past the bottom; vh where dvh is missing)
+   and the page grows into whatever is left; the column's own padding still holds the safe
+   areas. The column's usual bottom room for the round + button (add.css: 96px, 92px on a
+   phone) shrinks to the side gutter (24px; on a phone 16px above the home bar, as phone.css)
+   and moves inside the sheet, so the sheet ends at the window's edge and its last row still
+   scrolls clear of the button: the button's 48px plus its offset (24px, phone 28px). */
+.app-content:has(> .page-sheet, > .page-fill) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
+}
+
+.is-phone .app-content:has(> .page-sheet, > .page-fill) {
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+
+.page-sheet,
+.page-fill {
+  flex: 1 0 auto;
+  min-width: 0;
+}
+
+.page-fill {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The sheet's edge sits a block's space (--gap-stack) under the Inbox pill's row, which a bare
+   title could touch; its first line starts at the sheet's padding (on a phone, where the bar
+   shows the title, that is the line after the hidden title). */
+.shell-actions + .page-sheet,
+.shell-actions + .page-fill {
+  margin-top: var(--gap-stack);
+}
+
+.page-sheet > :first-child,
+.is-phone .has-bar-title .page-sheet > h1:first-child + * {
+  margin-top: 0;
+}
+
+.page-sheet {
+  background: var(--panel);
+  border-radius: var(--radius-panel);
+  padding: var(--pad-card);
+  padding-bottom: calc(48px + var(--space-5));
+}
+
+.is-phone .page-sheet {
+  padding-bottom: calc(48px + 28px);
 }

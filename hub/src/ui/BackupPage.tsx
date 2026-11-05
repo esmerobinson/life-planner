@@ -143,7 +143,7 @@ export function BackupPage({ today }: { today: ISODate }) {
   const replacing = mode === "replace";
 
   return (
-    <section className="backup-page">
+    <section className="backup-page page-sheet">
       <h1>Backup</h1>
       <p>Your tasks are saved in this browser only.</p>
       {persistence && <p>{PERSISTENCE_TEXT[persistence]}</p>}

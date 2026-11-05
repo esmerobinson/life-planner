@@ -76,7 +76,7 @@ export function BinPage({ today }: { today: ISODate }) {
     if (asking) cancelRef.current?.focus();
   }, [asking]);
   return (
-    <section className="bin-page">
+    <section className="bin-page page-sheet">
       <h1>Bin</h1>
       {readError && <p>{DATA_ERROR}</p>}
       {saveError && <p className="form-message">{saveError}</p>}

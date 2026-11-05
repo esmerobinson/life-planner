@@ -20,7 +20,6 @@ import { JOURNAL_TABS, TAB_FOR_HASH, tabPath, ticks, type JournalTabId, type Tic
 import { HARD_MOMENT, HardMomentView, NotesToMyself } from "./NotesToMyself";
 import { useJournalKey } from "./useJournalKey";
 import { useJournalRows } from "./useJournalRows";
-import { useTabsStacked } from "./useTabsFit";
 import { usePhone } from "../usePhone";
 
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
@@ -41,7 +40,7 @@ const isTab = (t: string | undefined): t is JournalTabId => JOURNAL_TABS.some((x
 /**
  * The Journal (journal brief; Journal v2): big tabs, in her order: Mental health exercise ·
  * Morning pages · Daily check-in · Read back · Notes to myself, each at its own address (`/journal`
- * opens the exercise); stacked when they don't fit in a row. Once the journal is open, "Hard
+ * opens the exercise); one row across on the Mac, stacked on the phone. Once the journal is open, "Hard
  * moment" (top right, every tab) opens her notes to herself at once. Each of the first three shows a small read-only tick when that part is done
  * today, and its streak. Everything here is end-to-end encrypted. Only a CONFIRMED key shows
  * or writes entries; without one the page shows "Unlock journal" (or "Checking your
@@ -55,8 +54,11 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
   const device = useDeviceId();
   const rows = useJournalRows(today);
   const asked = useRef(false);
-  const tabsRef = useRef<HTMLElement>(null);
-  const stacked = useTabsStacked(tabsRef, usePhone());
+  // VISUAL-LANGUAGE.md "Full, no blank space (2026-11-05)", pick 4 · A: on the Mac the five
+  // tabs sit in one row filling the width (labels wrap inside their tab); on the phone they
+  // stack (2026-11-04). Nothing is measured any more: journal.css also stacks them in a Mac
+  // window too narrow for five columns, so they never scroll sideways.
+  const stacked = usePhone();
   // "Hard moment": her notes, open over the page.
   const [hard, setHard] = useState(false);
 
@@ -123,26 +125,29 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
       ) : view.state === "unreadable" ? (
         <UnlockJournal again />
       ) : null}
-      <nav ref={tabsRef} className={stacked ? "journal-tabs is-stacked" : "journal-tabs"} aria-label="Journal parts">
-        {JOURNAL_TABS.map((t) => {
-          const selected = t.id === tab;
-          const s = ticks(t.id) ? status[t.id] : undefined;
-          return (
-            <Link
-              key={t.id}
-              to={t.path}
-              className={selected ? "journal-tab is-selected" : "journal-tab"}
-              aria-current={selected ? "page" : undefined}
-            >
-              {ticks(t.id) && (
-                <ReadOnlyTick state={open && s ? (s.done ? "done" : "todo") : unknown} title={t.title} inLink />
-              )}
-              <span className="journal-tab-label">{t.title}</span>
-              {open && s && <Streak n={s.streak} week={s.week} always />}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* The room the tabs are measured against (journal.css: a container query decides one row or stacked). */}
+      <div className="journal-tabs-room">
+        <nav className={stacked ? "journal-tabs is-stacked" : "journal-tabs"} aria-label="Journal parts">
+          {JOURNAL_TABS.map((t) => {
+            const selected = t.id === tab;
+            const s = ticks(t.id) ? status[t.id] : undefined;
+            return (
+              <Link
+                key={t.id}
+                to={t.path}
+                className={selected ? "journal-tab is-selected" : "journal-tab"}
+                aria-current={selected ? "page" : undefined}
+              >
+                {ticks(t.id) && (
+                  <ReadOnlyTick state={open && s ? (s.done ? "done" : "todo") : unknown} title={t.title} inLink />
+                )}
+                <span className="journal-tab-label">{t.title}</span>
+                {open && s && <Streak n={s.streak} week={s.week} always />}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
       {open && (
         <section className="journal-card journal-panel" aria-labelledby="journal-panel-heading">
           <h2 id="journal-panel-heading" className="visually-hidden">

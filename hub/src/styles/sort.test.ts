@@ -33,7 +33,10 @@ describe("sort.css (the chosen sort card, tab B)", () => {
     expect(rule(".sort-card")).toContain("background: var(--panel)");
     expect(rule(".sort-card")).toContain("border-radius: var(--radius-panel)");
     expect(rule(".sort-card")).toContain("padding: 24px");
-    expect(rule(".sort-card")).toContain("max-width: 520px");
+    // No 520px cap any more: the card fills the width and is the sheet (VISUAL-LANGUAGE.md
+    // "Full, no blank space (2026-11-05)", pick 3 · A).
+    expect(rule(".sort-card")).not.toContain("max-width");
+    expect(rule(".sort-card")).toContain("width: 100%");
     expect(rule("button.sort-type")).toContain("background: var(--row)");
     expect(rule("button.sort-type")).toContain("padding: 18px 8px");
     expect(rule(".sort-type .sort-tile")).toContain("width: 44px");

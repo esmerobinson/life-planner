@@ -41,17 +41,22 @@ for (const width of [1280, 390]) {
   test.describe(`at ${width}px`, () => {
     test.use({ viewport: { width, height: 900 } });
 
-    test("the tabs never scroll sideways; stacked as full-width rows on the phone", async ({ page }) => {
+    test("the tabs never scroll sideways; stacked as full-width rows on the phone, one row across on the Mac", async ({ page }) => {
       await unlocked(page);
       const nav = tabsNav(page);
       await expect(nav.getByRole("link")).toHaveCount(5);
       const m = await nav.evaluate((el) => ({ s: el.scrollWidth, c: el.clientWidth, stacked: el.classList.contains("is-stacked") }));
       expect(m.s).toBeLessThanOrEqual(m.c);
+      const boxes = await nav.getByRole("link").evaluateAll((ls) => ls.map((l) => ({ w: Math.round(l.getBoundingClientRect().width), top: Math.round(l.getBoundingClientRect().top) })));
       if (width === 390) {
         expect(m.stacked).toBe(true);
-        const widths = await nav.getByRole("link").evaluateAll((ls) => ls.map((l) => Math.round(l.getBoundingClientRect().width)));
-        expect(new Set(widths).size).toBe(1); // full-width rows
-        expect(widths[0]).toBe(m.c);
+        expect(new Set(boxes.map((b) => b.w)).size).toBe(1); // full-width rows
+        expect(boxes[0].w).toBe(m.c);
+      } else {
+        // VISUAL-LANGUAGE.md "Full, no blank space (2026-11-05)", pick 4 · A: one row of equal columns.
+        expect(m.stacked).toBe(false);
+        expect(new Set(boxes.map((b) => b.top)).size).toBe(1);
+        expect(new Set(boxes.map((b) => b.w)).size).toBe(1);
       }
       // The selected tab is mint.
       const bg = await nav.getByRole("link", { name: "Mental health exercise" }).evaluate((el) => getComputedStyle(el).backgroundColor);

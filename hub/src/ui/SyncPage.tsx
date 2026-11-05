@@ -172,7 +172,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
   const canPair = state.configured && state.status !== "needs-passphrase";
 
   return (
-    <section className="sync-page">
+    <section className="sync-page page-sheet">
       <h1>Sync</h1>
       <p>
         Sync keeps your tasks and goals the same on every device where you enter the passphrase. Everything still works

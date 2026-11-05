@@ -47,31 +47,60 @@
 /* ---- Journal v2 tabs (the approved mockup-journal-v2.html): big pills in a row, 16px text,
    12px x 18px padding, 14px radius, --row; the selected tab is Map mint and bold. Each holds
    the rows' read-only tick at the mockup's 18px (6px radius) and the streak. They never
-   scroll sideways (journal v3, Esme 2026-11-04): on the phone, and whenever they don't fit in
-   one row (JournalPage measures), they stack as full-width rows with the same styling. ---- */
+   scroll sideways (journal v3, Esme 2026-11-04).
+   VISUAL-LANGUAGE.md "Full, no blank space (2026-11-05)", her pick 4 · A · one row across: on
+   the Mac the five tabs sit side by side in equal columns filling the width; a label that
+   can't fit its column wraps inside the tab, and the week bars go on their own line under it.
+   On the phone (.is-stacked, set from usePhone) they still stack as full-width rows. The row
+   needs the room for five columns of at least a tab's tick, longest word and padding (about
+   130px each): in a Mac window narrower than that they stack too, so nothing ever scrolls
+   sideways. Stacked is the default, so without container queries they stack. ---- */
+.journal-tabs-room {
+  container: journal-tabs / inline-size;
+  min-width: 0;
+}
+
 .journal-tabs {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   min-width: 0;
-  /* Its tabs never widen the page: the row takes the column's width and JournalPage stacks
-     the tabs when they don't fit in it (not a look). */
-  contain: inline-size;
   /* Its screen-reader-only text (position: absolute) stays inside the row. */
   position: relative;
 }
 
-.journal-tabs.is-stacked {
-  flex-direction: column;
-}
-
-.journal-tabs.is-stacked a.journal-tab {
+.journal-tabs a.journal-tab {
   white-space: normal;
 }
 
 /* Stacked, the three parts' week bars line up at the right edge (Esme, 2026-11-04: "the same
    weekly progress UI across all three"). */
-.journal-tabs.is-stacked a.journal-tab .streak {
+.journal-tabs a.journal-tab .streak {
   margin-left: auto;
+}
+
+@container journal-tabs (min-width: 680px) {
+  .journal-tabs:not(.is-stacked) {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .journal-tabs:not(.is-stacked) a.journal-tab {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .journal-tabs:not(.is-stacked) .journal-tab-label {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .journal-tabs:not(.is-stacked) a.journal-tab .streak {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
 }
 
 a.journal-tab {
