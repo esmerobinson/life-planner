@@ -119,18 +119,22 @@ function useJournalFacts(on: boolean): JournalFacts | null {
 /**
  * Every item that isn't in the Bin, archived ones included: archiving never takes anything away
  * from the farm (review I3). The shell's lists leave archived items out, so the farm reads its own.
+ * Only once the farm has started (`on`): before that nothing is counted, and a full read after
+ * every write would slow every page (a thousand quick writes, a thousand full reads).
  */
-function useFarmItems(): Item[] {
+export function useFarmItems(on: boolean): Item[] {
   const [items, setItems] = useState<Item[]>([]);
   useEffect(() => {
+    if (!on) return;
     const sub = liveQuery(() => db.items.filter((i) => i.status !== "deleted" && i.status !== "purged").toArray()).subscribe({
       next: setItems,
       error: () => undefined,
     });
     return () => sub.unsubscribe();
-  }, []);
-  return items;
+  }, [on]);
+  return on ? items : NO_ITEMS;
 }
+const NO_ITEMS: Item[] = [];
 
 export function FarmProvider({ items: listItems, goals, today, children }: { items: Item[]; goals: Goal[]; today: ISODate; children: ReactNode }) {
   const [rows, setRows] = useState<unknown[] | null>(null);
@@ -138,8 +142,8 @@ export function FarmProvider({ items: listItems, goals, today, children }: { ite
     const sub = liveQuery(() => db.farm.toArray()).subscribe({ next: setRows, error: () => setRows([]) });
     return () => sub.unsubscribe();
   }, []);
-  const items = useFarmItems();
   const state = useMemo(() => (rows ? farmState(rows) : EMPTY_FARM), [rows]);
+  const items = useFarmItems(state.start !== null);
   const journal = useJournalFacts(state.start !== null);
   const location = useLocation();
   const onJournal = location.pathname === "/journal" || location.pathname.startsWith("/journal/");
