@@ -46,15 +46,32 @@
 
 /* ---- Journal v2 tabs (the approved mockup-journal-v2.html): big pills in a row, 16px text,
    12px x 18px padding, 14px radius, --row; the selected tab is Map mint and bold. Each holds
-   the rows' read-only tick at the mockup's 18px (6px radius) and the streak. On a narrow
-   screen the row scrolls sideways instead of overflowing the page. ---- */
+   the rows' read-only tick at the mockup's 18px (6px radius) and the streak. They never
+   scroll sideways (journal v3, Esme 2026-11-04): on the phone, and whenever they don't fit in
+   one row (JournalPage measures), they stack as full-width rows with the same styling. ---- */
 .journal-tabs {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
   min-width: 0;
-  /* Its screen-reader-only text (position: absolute) stays inside the scrolling row. */
+  /* Its tabs never widen the page: the row takes the column's width and JournalPage stacks
+     the tabs when they don't fit in it (not a look). */
+  contain: inline-size;
+  /* Its screen-reader-only text (position: absolute) stays inside the row. */
   position: relative;
+}
+
+.journal-tabs.is-stacked {
+  flex-direction: column;
+}
+
+.journal-tabs.is-stacked a.journal-tab {
+  white-space: normal;
+}
+
+/* Stacked, the three parts' week bars line up at the right edge (Esme, 2026-11-04: "the same
+   weekly progress UI across all three"). */
+.journal-tabs.is-stacked a.journal-tab .streak {
+  margin-left: auto;
 }
 
 a.journal-tab {
@@ -743,9 +760,13 @@ input.exercise-list-line {
   overflow-wrap: anywhere;
 }
 
-input.exercise-check-note {
+/* A checklist note is a one-line box that grows downwards as she writes (2026-11-04: "text
+   boxes should get bigger downwards"), so it is a textarea drawn exactly as the input was. */
+.exercise-check-note {
+  display: block;
   width: 100%;
   box-sizing: border-box;
+  resize: none;
   margin-top: var(--gap-label); /* + the item's 4px gap = 8px, a form's field-to-field */
 }
 
@@ -776,6 +797,7 @@ input.exercise-check-note {
    what sits on them to --row, so nothing vanishes into its background (as Read more does). */
 .exercise-boxed .journal-answer,
 .exercise-boxed .exercise-parts input,
+.exercise-boxed .exercise-check-note,
 .exercise-boxed .exercise-table th,
 .exercise-boxed .exercise-tracker-day,
 .exercise-boxed .chip.exercise-format {
@@ -789,6 +811,227 @@ input.exercise-check-note {
 
 .is-phone .exercise-boxed .exercise-table tr {
   background: var(--panel);
+}
+
+/* ---- Workbook bars (2A) and the chapter map (2C), journal v3: every value from the approved
+   mockup cards-progress-reading.html. 2A: the normal progress bar under the 13px bar-label
+   line, the whole bar a button (hover underlines the book's name). 2C: chapter rows are task-strip
+   boxes (--row, tile radius), the dots the goal tiles' 9px dots (--bar-fill = done), "up next"
+   the Journal violet outline that marks today on the morning-pages calendar. Not in the
+   mockup (builder's call): the small "Chapter map" quiet link under the bars. ---- */
+.wb-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+button.wb-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+}
+
+button.wb-bar:hover .wb-name,
+button.wb-bar:focus-visible .wb-name {
+  text-decoration: underline;
+}
+
+.wb-bars .wb-map-link {
+  align-self: flex-start;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.wb-map {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 12px;
+}
+
+.wb-summary-label {
+  margin-bottom: 4px;
+}
+
+.wb-map .goal-peek-box .progress-bar {
+  height: 8px;
+}
+
+.wb-chapters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-ch {
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-ch-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.wb-ch-title {
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A chapter's title opens it to its cards (Esme, 2026-11-04, "See all chapters"): drawn as the
+   plain title, underlined on hover like the 2A bars; its cards are small quiet links under the
+   dots. Builder's call, not yet seen by Esme. */
+button.wb-ch-toggle {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.wb-ch-toggle:hover,
+button.wb-ch-toggle:focus-visible {
+  text-decoration: underline;
+}
+
+.wb-ch-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-ch-n {
+  font-size: 13px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.wb-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+button.wb-dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--track);
+}
+
+button.wb-dot.on {
+  background: var(--bar-fill);
+}
+
+button.wb-dot.now {
+  outline: 2px solid var(--journal-violet);
+  outline-offset: 1px;
+}
+
+/* ---- Notes to myself and "Hard moment" (journal v3). Only existing pieces: the page's
+   title row holds the Hard moment button (the normal pill) on the right; groups are the
+   exercise label over task strips (--row, tile radius); a note's labels are the strips' small
+   line; "I read this today" is the task tick box; the editor is the form fields and the
+   check-in answer box; Hard moment opens the Choose goals pop-up (full screen on the phone).
+   Builder's call, not yet seen by Esme: that arrangement and the spacing (the page's own 8px /
+   --gap-stack steps). ---- */
+.journal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.journal-head > h1 {
+  margin: 0;
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  min-width: 0;
+}
+
+.notes-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.notes-group .strip-list,
+.notes-hard-list {
+  margin: 0;
+}
+
+.notes-body p {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.notes-body .strip-meta + .strip-title,
+.notes-body .strip-meta + p {
+  margin-top: 2px;
+}
+
+.notes-body .strip-title + .strip-meta {
+  margin-top: 8px;
+}
+
+.notes-today {
+  align-items: start;
+}
+
+.notes-read-label {
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.notes-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notes-editor .form-field {
+  margin: 0;
+}
+
+.notes-editor textarea {
+  width: 100%;
+}
+
+.notes-hard-list {
+  margin-top: var(--gap-stack);
 }
 
 /* Morning pages: "Add photo instead" left, "I'm done" right (the mockup's row). */

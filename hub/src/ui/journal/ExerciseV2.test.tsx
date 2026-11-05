@@ -11,6 +11,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_V2, FAKE_CARD_TEXT_V2 } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { cardLines, openAllChapters, openCardInMap } from "../../test/chapterMap";
 
 // Journal v2's exercise tab with a version 2 card file: the chapter line, Read more with its
 // sources, optional cards, cards with parts (one input per part), the example, and her
@@ -71,16 +72,17 @@ it("no Read more on a card without it", async () => {
   expect(within(card).queryByText("Read more")).toBeNull();
 });
 
-it("All cards: the optional Introduction first, as optional reading; then the days", async () => {
+it("See all chapters: the optional Introduction first, as optional reading; then the days by chapter", async () => {
   renderApp("/journal/exercise", TODAY);
   const s = await section();
   await todayCard();
-  await userEvent.click(within(s).getByText("All cards"));
-  const items = within(within(s).getByRole("list", { name: "All cards" })).getAllByRole("listitem");
-  expect(items.map((i) => i.querySelector("summary > span")!.textContent)).toEqual([
+  const map = await openAllChapters(s);
+  expect(cardLines(map)).toEqual([
     "Introduction (optional reading)", "Day 1 · Pretend weather", "Day 2 · The fictional kettle", "Day 3 · Imaginary pebbles",
     "Day 4 · A pretend lighthouse",
   ]);
+  await userEvent.click(within(map).getByRole("button", { name: "Introduction (optional reading)" }));
+  expect(within(map).getByText("Flip through the pretend contents page.")).toBeInTheDocument();
 });
 
 describe("a card with parts", () => {
@@ -158,9 +160,7 @@ describe("reviewing past work", () => {
     renderApp("/journal/exercise", TODAY);
     const s = await section();
     await todayCard();
-    await userEvent.click(within(s).getByText("All cards"));
-    const kettle = within(within(s).getByRole("list", { name: "All cards" })).getAllByRole("listitem")[2]!;
-    await userEvent.click(within(kettle).getByText("Day 2 · The fictional kettle"));
+    const kettle = await openCardInMap(s, "Day 2 · The fictional kettle");
     const mine = within(kettle).getByRole("list", { name: "Your responses" });
     const items = within(mine).getAllByRole("listitem").filter((li) => li.parentElement === mine);
     expect(items.map((li) => li.querySelector("b")!.textContent)).toEqual(["Tuesday 27 October", "Tuesday 20 October"]);

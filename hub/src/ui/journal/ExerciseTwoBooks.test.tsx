@@ -7,6 +7,7 @@ import type { JournalKey } from "../../journal/crypto";
 import { checkCardFile } from "../../journal/exercise";
 import { getDeviceId } from "../../sync/engine";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
+import { openAllChapters } from "../../test/chapterMap";
 import { renderApp } from "../../test/renderApp";
 
 // Esme, 2026-11-04: two books taken in turn, each numbered from Day 1. Her answer to the second
@@ -90,10 +91,11 @@ it("Read back: the date first, then the book and the card's title; each opens to
   expect(within(list).getByText("Pretend cost one: Yes")).toBeInTheDocument();
 });
 
-it("Past exercises and All cards: each entry under its own book and title, with its own words", async () => {
+it("Past exercises and the chapter map: each entry under its own book and title, with its own words", async () => {
   renderApp("/journal/exercise", TODAY);
   const s = await screen.findByRole("region", { name: "Mental health exercise" });
-  await within(s).findByRole("article", { name: "Today's card" }, { timeout: 5000 });
+  // Today's card is done, so the next one is on the tab (never a finished card).
+  await within(s).findByRole("article", {}, { timeout: 5000 });
   await userEvent.click(within(s).getByText("Past exercises"));
   const past = within(s).getByRole("list", { name: "Past exercises" });
   expect(within(past).getAllByRole("listitem").map((li) => li.querySelector("summary")!.textContent)).toEqual([
@@ -104,17 +106,19 @@ it("Past exercises and All cards: each entry under its own book and title, with 
   await userEvent.click(within(past).getByText(/Pretend DBT book · Day 1 · Pretend costs/));
   expect(within(past).getByText("Pretend: it cost me a whole made-up afternoon, and then some more.")).toBeInTheDocument();
 
-  await userEvent.click(within(s).getByText("All cards"));
-  const all = within(s).getByRole("list", { name: "All cards" });
-  const dbt = within(all).getAllByRole("listitem").find((li) => li.querySelector("summary")?.textContent?.includes("Pretend costs"))!;
-  expect(dbt.querySelector("summary")!.textContent).toContain("Pretend DBT book · Day 1 · Pretend costs");
-  await userEvent.click(dbt.querySelector("summary")!);
-  const mine = within(dbt).getByRole("list", { name: "Your responses" });
+  // The chapter map: each book its own tab, each card its own responses.
+  const map = await openAllChapters(s);
+  await userEvent.click(within(map).getByRole("button", { name: "DBT" }));
+  for (const t of within(map).queryAllByRole("button", { expanded: false })) await userEvent.click(t);
+  await userEvent.click([...map.querySelectorAll<HTMLButtonElement>("button.wb-card-link")].find((b) => b.textContent?.includes("Pretend costs"))!);
+  const mine = within(map).getByRole("list", { name: "Your responses" });
   expect(within(mine).getByText("Pretend: go for a walk by the made-up river instead.")).toBeInTheDocument();
   expect(within(mine).queryByText(BPD_WORDS)).toBeNull();
-  const bpd = within(all).getAllByRole("listitem").find((li) => li.querySelector("summary")?.textContent?.includes("Pretend BPD book · Day 1 · Pretend naming"))!;
-  await userEvent.click(bpd.querySelector("summary")!);
-  const theirs = within(bpd).getByRole("list", { name: "Your responses" });
+  await userEvent.click(within(map).getByRole("button", { name: "← All chapters" }));
+  await userEvent.click(within(map).getByRole("button", { name: "BPD" }));
+  for (const t of within(map).queryAllByRole("button", { expanded: false })) await userEvent.click(t);
+  await userEvent.click([...map.querySelectorAll<HTMLButtonElement>("button.wb-card-link")].find((b) => b.textContent?.includes("Pretend naming"))!);
+  const theirs = within(map).getByRole("list", { name: "Your responses" });
   expect(within(theirs).getByText(BPD_WORDS)).toBeInTheDocument();
   expect(within(theirs).queryByText(/whole made-up afternoon/)).toBeNull();
 });

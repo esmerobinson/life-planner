@@ -109,6 +109,7 @@ export function GoalPanel({
   const [allDone, setAllDone] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const addingTask = useRef(false);
   const [asking, setAsking] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const addRef = useRef<HTMLInputElement>(null);
@@ -324,14 +325,20 @@ export function GoalPanel({
 
   async function addTask() {
     const title = newTitle.trim();
-    if (!title) return;
-    const ok = await write(() =>
-      createItem(
-        { kind: "task", title, areaId: goal.areaId, goalId: goal.id, priority: 2, order: nextGoalOrder(goal, items) },
-        today,
-      ),
-    );
-    if (ok) setNewTitle("");
+    // One save at a time: the second click of a double-click must not add the task again.
+    if (!title || addingTask.current) return;
+    addingTask.current = true;
+    try {
+      const ok = await write(() =>
+        createItem(
+          { kind: "task", title, areaId: goal.areaId, goalId: goal.id, priority: 2, order: nextGoalOrder(goal, items) },
+          today,
+        ),
+      );
+      if (ok) setNewTitle("");
+    } finally {
+      addingTask.current = false;
+    }
   }
 
   const nav = NAV.find((n) => n.id === goal.areaId);

@@ -33,6 +33,14 @@ describe("<Streak>", () => {
     expect(container.querySelector(".streak")).toBeNull();
   });
 
+  it("`always` (the Journal's three parts, Esme 2026-11-04): shown at 0 with nothing this week, every bar empty, and 0", () => {
+    const { container } = render(<Streak week={week()} n={0} always />);
+    expect(container.querySelectorAll(".streak-day")).toHaveLength(7);
+    expect(container.querySelectorAll(".streak-day.on")).toHaveLength(0);
+    expect(container.querySelector(".streak-n")!.textContent).toBe("0");
+    expect(screen.getByText("0 days in a row")).toBeInTheDocument();
+  });
+
   it("has no placeholder star", () => {
     const { container } = render(<Streak week={week(6)} n={1} />);
     expect(container.querySelector(".journal-star")).toBeNull();

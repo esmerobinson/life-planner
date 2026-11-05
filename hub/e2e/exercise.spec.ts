@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_CARD_FILE_CHECKLIST, FAKE_CARD_FILE_KINDS, FAKE_CARD_FILE_TRACKS, FAKE_CARD_TEXT_V2, PRETEND_FEATURES } from "../src/test/exerciseCards";
+import { openCardInMap } from "./helpers";
 
 /* The Journal's "Mental health exercise" tab in a real browser (Journal v2): Import (a version 2
    card file), today's card with its chapter line and Read more, Submit, "Do the next one →", a
@@ -97,11 +98,14 @@ async function walkThrough(page: Page, prefix: string) {
   await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
   await noSidewaysScroll(page);
 
-  await s.getByText("All cards", { exact: true }).click();
-  await expect(s.getByText("Introduction (optional reading)")).toBeVisible();
-  await s.getByText("Day 2 · The fictional kettle", { exact: true }).click(); // under All cards (Past exercises has it too, dated)
-  await expect(s.getByRole("list", { name: "Your responses" }).getByText("6 out of 10")).toBeVisible();
+  // Every card lives in the chapter map pop-up ("See all chapters"); nothing long on the tab.
+  await expect(s.getByText("All cards", { exact: true })).toHaveCount(0);
+  const map = await openCardInMap(page, s, "Day 2 · The fictional kettle");
+  await expect(map.getByRole("list", { name: "Your responses" }).getByText("6 out of 10")).toBeVisible();
   await shoot(page, `${prefix}-all-cards`);
+  await map.getByRole("button", { name: "← All chapters" }).click();
+  await expect(map.getByRole("button", { name: "Introduction (optional reading)" })).toBeVisible();
+  await map.locator(".choose-top").getByRole("button", { name: "Done" }).click();
   await noSidewaysScroll(page);
 
   // Stored sealed: no card or response text in clear.
@@ -112,10 +116,17 @@ async function walkThrough(page: Page, prefix: string) {
   });
   for (const word of ["Pretend", "pebble", "grey cloud", "small train", "example.org"]) expect(rows).not.toContain(word);
 
-  // Reloaded: still today's card, done.
+  // Reloaded after two Submits: the third card alone, never a finished one above it.
   await page.reload();
-  await expect(section(page).getByText("Done for today · next card tomorrow")).toBeVisible();
+  const third = section(page).getByRole("article", { name: "Next card: Day 3" });
+  await expect(third).toBeVisible();
+  await expect(section(page).getByRole("article")).toHaveCount(1);
+  await expect(section(page).getByText(/Day 2 · The fictional kettle saved\. Here's the next one if you'd like to keep going\./)).toBeVisible();
+  // The finished card is never on the page (Past exercises lists today's answer too, by name).
+  await expect(section(page).getByRole("article").getByText("Pretend weather")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Mental health exercise/ }).locator(".tick-auto.is-done")).toBeVisible();
+  await noSidewaysScroll(page);
+  await shoot(page, `${prefix}-reloaded-next-card`);
 }
 
 test.describe("at 1280px", () => {
@@ -184,8 +195,7 @@ for (const width of [1280, 390]) {
       await shoot(page, `exercise-${width}-kinds`);
 
       // Two books: replace the cards, then the second book's card follows the first's.
-      await s.getByText("All cards", { exact: true }).click();
-      await importFile(page, JSON.stringify(FAKE_CARD_FILE_TRACKS));
+      await s.getByLabel("Exercise card file (update)").setInputFiles({ name: "pretend.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(FAKE_CARD_FILE_TRACKS)) });
       await s.getByRole("button", { name: "Replace" }).click();
       await expect(today.getByText("Pretend first workbook · Chapter 1 · Pretend chapter")).toBeVisible();
       await today.getByRole("button", { name: "Do the next one →" }).click();
@@ -211,11 +221,11 @@ for (const width of [360, 390, 430]) {
       await s.getByRole("button", { name: "Do the next one →" }).click();
       await expect(s.getByRole("group", { name: "How loud is it right now?" })).toBeVisible();
       await noSidewaysScroll(page);
-      await s.getByText("All cards", { exact: true }).click();
-      for (const name of ["Introduction (optional reading)", "Day 1 · Pretend weather", "Day 4 · A pretend lighthouse"]) {
-        await s.getByText(name).click();
-      }
-      await expect(s.getByText(/doesn't chase the boats/)).toBeVisible();
+      const map = await openCardInMap(page, s, "Day 4 · A pretend lighthouse");
+      await expect(map.getByText(/doesn't chase the boats/)).toBeVisible();
+      await noSidewaysScroll(page);
+      await map.getByRole("button", { name: "← All chapters" }).click();
+      await map.getByRole("button", { name: "Introduction (optional reading)" }).click();
       await noSidewaysScroll(page);
     });
   });
@@ -302,22 +312,21 @@ for (const width of [1280, 390]) {
       await today.getByRole("button", { name: "Submit" }).click();
       await expect(s.getByRole("article", { name: "Next card: Day 2" })).toBeVisible(); // the next one takes its place
 
-      // Reloaded: the answers come back; All cards shows each item with its choice and note.
+      // Reloaded: the next card alone (never the finished one); All cards shows each item with its choice and note.
       await page.reload();
-      const again = section(page).getByRole("article", { name: "Today's card" });
-      await expect(again.getByLabel("Pretend feature two, note")).toHaveValue("Pretend: only on weekdays");
-      await expect(again.getByText("4 of 4 answered · Yes 2 · Partly 1 · No 1")).toBeVisible();
-      await s.getByText("All cards", { exact: true }).click();
-      await s.getByText("Day 1 · Pretend checklist", { exact: true }).click(); // under All cards
-      const mine = s.getByRole("list", { name: "Your responses" });
+      const wide = section(page).getByRole("article", { name: "Next card: Day 2" });
+      await expect(wide).toBeVisible();
+      await expect(s.getByRole("article")).toHaveCount(1);
+      await expect(s.getByLabel("Pretend feature two, note")).toHaveCount(0);
+      const review = await openCardInMap(page, s, "Day 1 · Pretend checklist");
+      const mine = review.getByRole("list", { name: "Your responses" });
       await expect(mine.getByText("Pretend feature two: Partly — Pretend: only on weekdays")).toBeVisible();
       await expect(mine.getByText("Pretend feature three: No", { exact: true })).toBeVisible();
       await noSidewaysScroll(page);
       await shoot(page, `checklist-${width}-review`);
+      await review.locator(".choose-top").getByRole("button", { name: "Done" }).click();
 
       // The widest card: long labels, four 20-character options, a long note placeholder.
-      await again.getByRole("button", { name: "Do the next one →" }).click();
-      const wide = s.getByRole("article", { name: "Next card: Day 2" });
       await expect(wide.getByText("Pretend option one 1").first()).toBeVisible();
       await noSidewaysScroll(page);
       await shootCard(wide, `checklist-${width}-widest`);

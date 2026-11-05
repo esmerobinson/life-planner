@@ -7,6 +7,8 @@ export const NOT_ANSWERED = "Not answered";
 export const UNSENT_DRAFT = "Unsent draft";
 /** Over another submitted version of the same card on the same day (another device's). */
 export const ALSO_SUBMITTED = "Also submitted";
+/** Over the answer she changed with "Edit" (review I4): it stays, under her new one. */
+export const EARLIER_VERSION = "Earlier version";
 /** On a card whose parts changed since she answered: what she wrote then, read-only. */
 export const EARLIER_ANSWER = "Your earlier answer (the card has changed since)";
 
@@ -59,7 +61,7 @@ export function OtherVersions({ others }: { others: ResponseVersion[] }) {
     <>
       {others.map((o, i) => (
         <div key={i}>
-          <p className="journal-muted">{`${o.submitted ? ALSO_SUBMITTED : UNSENT_DRAFT} · ${when(o.at)}`}</p>
+          <p className="journal-muted">{`${o.earlier ? EARLIER_VERSION : o.submitted ? ALSO_SUBMITTED : UNSENT_DRAFT} · ${whenWritten(o.at)}`}</p>
           <ResponseView text={o.text} parts={o.parts} />
         </div>
       ))}
@@ -67,7 +69,8 @@ export function OtherVersions({ others }: { others: ResponseVersion[] }) {
   );
 }
 
-const when = (at: number) => {
+/** When a version was written: "Wednesday 4 November, 9:15 pm" (this device's clock). */
+export const whenWritten = (at: number) => {
   const d = new Date(at);
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return `${longDate(day)}, ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;

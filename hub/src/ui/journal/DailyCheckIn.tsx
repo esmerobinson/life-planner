@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
-  CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, readCheckinDay, readPromptSettings, saveAnswer,
+  answeredPrompts, CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, moveAnswerOn, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
 } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
@@ -8,9 +9,15 @@ import { PROMPTS, PROMPT_BY_ID, STARTER_IDS, workbookPage } from "../../journal/
 import { pickPrompts } from "../../journal/rotation";
 import type { ISODate } from "../../domain/types";
 import { AUTOSAVE_MS, useDraft, useHiddenFlush } from "../useDraft";
+import { AutoGrowTextarea } from "../useAutoGrow";
 import { DoneBox, LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
 import { useDbChanges } from "./useJournalKey";
 
+/** On a finished check-in: the answers back into boxes, then read-only again. */
+export const EDIT_ANSWERS = "Edit";
+export const SAVE_ANSWERS = "Save";
+/** How many past check-ins the tab lists before "See all" (Read back). */
+const PAST_ON_TAB = 3;
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
 export const CHECKED_IN_LINE = "Kind to yourself today? That counts.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
@@ -48,7 +55,9 @@ export function DailyCheckIn({ jk, today, deviceId }: { jk: JournalKey; today: I
         // This device is the first to open today's check-in: pick and store the questions
         // (once; a reload meanwhile waits for that same write).
         if (ensuring.current?.date !== today) {
-          const history = all.filter((d) => d.date < today).map((d) => ({ date: d.date, prompts: d.prompts }));
+          const history = all
+            .filter((d) => d.date < today)
+            .map((d) => ({ date: d.date, prompts: d.prompts, answered: new Set(answeredPrompts(d)) }));
           const prompts = pickPrompts({ date: today, hour: new Date().getHours(), active: ids, history });
           ensuring.current = {
             date: today,
@@ -121,8 +130,8 @@ export function QuestionText({ id }: { id: string }) {
  * One question. The answer box shows the newest answer from any device and saves this
  * device's own row (not yet "moved past") after a pause in typing, on blur, when it goes away
  * and when the app is hidden. Next and Skip save it as moved past; Skip keeps anything typed.
- * Next / Skip on a box left untouched never copies or blanks another device's answer: it
- * writes nothing when the question is already moved past anywhere, else only "moved past".
+ * Next / Skip on a box left untouched never copies another device's answer and never blanks
+ * this device's own: it writes nothing when already moved past anywhere, else only "moved past".
  */
 function Question({
   jk, day, step, deviceId, onProblem,
@@ -181,7 +190,10 @@ function Question({
       if (untouched && doneThere.current) {
         moved.current = true; // already moved past on another device: nothing to write
       } else {
-        await enqueue(() => saveAnswer(jk, day.date, prompt, deviceId, untouched ? null : value, true));
+        // Nothing new typed: keep what this device already saved (never blank it).
+        await enqueue(() =>
+          untouched ? moveAnswerOn(jk, day.date, prompt, deviceId) : saveAnswer(jk, day.date, prompt, deviceId, value, true),
+        );
         moved.current = true; // the next question shows once the save is read back
       }
       onProblem("");
@@ -201,7 +213,7 @@ function Question({
         ))}
       </div>
       <QuestionText id={prompt} />
-      <textarea
+      <AutoGrowTextarea
         className="journal-answer"
         aria-label="Your answer"
         placeholder="Anything you like…"
@@ -226,39 +238,93 @@ function Question({
   );
 }
 
-/** "Checked in for today", then today's questions and answers, still editable. */
+/**
+ * Once today's check-in is finished (Esme, 2026-11-04: "i should just see a completed check in
+ * with my answers, maybe an option to edit"): "Checked in for today", then each question she
+ * answered with her answer as it is, read-only (a skipped one isn't shown). "Edit" turns them
+ * back into boxes (each saved as she types, as before); Save shows them read-only again.
+ */
 function CheckedIn({
   jk, day, deviceId, onProblem,
 }: { jk: JournalKey; day: CheckinDay; deviceId: string; onProblem: (p: string) => void }) {
+  // While editing: the questions she had answered when she pressed Edit, kept until Save, so
+  // clearing one to rewrite it never takes its box away (re-review m2).
+  const [editingIds, setEditingIds] = useState<string[] | null>(null);
+  const editing = editingIds !== null;
+  // The answers the boxes opened with: while she edits, a re-read of the day never puts other
+  // words into a box (bug #32); she sees them again after Save.
+  const [editStart, setEditStart] = useState<Record<string, { text: string; at: number }>>({});
+  // This Edit's own rows (a new version each time she edits; bug #24).
+  const [session, setSession] = useState("");
+  // What she just saved here, shown at once until the day is read again; then the day's merged
+  // answer, newest from any device, shows (bug #23).
+  const [mine, setMine] = useState<Record<string, string>>({});
+  useEffect(() => setMine({}), [day]);
+  const answerOf = (id: string) => mine[id] ?? day.answers.get(id)?.answer ?? "";
+  const answered = editingIds ?? day.prompts.filter((id) => answerOf(id).trim() !== "");
   return (
     <>
       <DoneBox title="Checked in for today" line={CHECKED_IN_LINE} />
       <ol className="journal-answers">
-        {day.prompts.map((id) => (
+        {answered.map((id) => (
           <li key={id}>
             <QuestionText id={id} />
-            <EditableAnswer
-              stored={day.answers.get(id)?.answer ?? ""}
-              onSave={async (text) => {
-                try {
-                  await saveAnswer(jk, day.date, id, deviceId, text, true); // this device's own row
-                } catch (err) {
-                  onProblem(SAVE_PROBLEM);
-                  throw err;
-                }
-              }}
-            />
+            {editing ? (
+              <EditableAnswer
+                stored={editStart[id]?.text ?? answerOf(id)}
+                onSave={async (text) => {
+                  setMine((m) => ({ ...m, [id]: text }));
+                  try {
+                    await saveAnswer(jk, day.date, id, deviceId, text, true, { session, seenAt: editStart[id]?.at }); // this Edit's own row
+                  } catch (err) {
+                    onProblem(SAVE_PROBLEM);
+                    throw err;
+                  }
+                }}
+              />
+            ) : (
+              <p className="journal-past-answer">
+                <output aria-label="Your answer" aria-live="off">
+                  {answerOf(id)}
+                </output>
+              </p>
+            )}
           </li>
         ))}
       </ol>
+      {answered.length > 0 && (
+        <div className="btn-group">
+          {editing ? (
+            <button type="button" onClick={() => setEditingIds(null)}>
+              {SAVE_ANSWERS}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setSession(Date.now().toString(36));
+                setEditStart(Object.fromEntries(answered.map((id) => [id, { text: answerOf(id), at: day.answers.get(id)?.at ?? 0 }])));
+                setEditingIds(answered);
+              }}
+            >
+              {EDIT_ANSWERS}
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }
 
 function EditableAnswer({ stored, onSave }: { stored: string; onSave: (text: string) => Promise<void> }) {
   const draft = useDraft(stored, onSave, AUTOSAVE_MS);
+  // Save (or anything else) taking the boxes away: what is typed is saved first.
+  const flush = useRef(draft.flush);
+  flush.current = draft.flush;
+  useEffect(() => () => flush.current(), []);
   return (
-    <textarea
+    <AutoGrowTextarea
       className="journal-answer"
       aria-label="Your answer"
       placeholder="Anything you like…"
@@ -269,33 +335,41 @@ function EditableAnswer({ stored, onSave }: { stored: string; onSave: (text: str
   );
 }
 
-/** Past check-ins, newest first; each opens its questions and answers (these may be reread). */
+/**
+ * Past check-ins, newest first (the latest few; "See all" opens Read back); each opens the
+ * questions she answered (these may be reread).
+ * Skipped questions aren't shown, and a day with nothing answered isn't listed (Esme,
+ * 2026-11-04): those questions come round again instead.
+ */
 function PastCheckIns({ past }: { past: CheckinDay[] }) {
-  if (past.length === 0) return null;
+  const days = past.filter((c) => answeredPrompts(c).length > 0 || c.unreadable > 0);
+  if (days.length === 0) return null;
   return (
     <details className="journal-fold">
       <summary>Past check-ins</summary>
       <ul className="journal-past">
-        {past.map((c) => (
+        {days.slice(0, PAST_ON_TAB).map((c) => (
           <li key={c.date}>
             <details>
               <summary>{longDate(c.date)}</summary>
               <ol className="journal-answers">
-                {c.prompts.map((id) => {
-                  const a = c.answers.get(id)?.answer ?? null;
-                  return (
-                    <li key={id}>
-                      <QuestionText id={id} />
-                      <p className="journal-past-answer">{a ?? <span className="journal-muted">Skipped</span>}</p>
-                    </li>
-                  );
-                })}
+                {answeredPrompts(c).map((id) => (
+                  <li key={id}>
+                    <QuestionText id={id} />
+                    <p className="journal-past-answer">{c.answers.get(id)!.answer}</p>
+                  </li>
+                ))}
               </ol>
               {c.unreadable > 0 && <p className="journal-muted">{CANT_OPEN}</p>}
             </details>
           </li>
         ))}
       </ul>
+      {days.length > PAST_ON_TAB && (
+        <p>
+          <Link to="/journal/read-back">See all</Link>
+        </p>
+      )}
     </details>
   );
 }

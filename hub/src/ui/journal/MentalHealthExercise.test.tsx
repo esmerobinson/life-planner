@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../../data/db";
-import { importExerciseCards, readExerciseCards, readExerciseEntry, readExerciseProgress, saveExerciseMark } from "../../data/repo";
+import { importExerciseCards, readExerciseCards, readExerciseEntry, readExerciseProgress, saveExerciseMark, submitExerciseEntry } from "../../data/repo";
 import { journalAad, sealJson, type JournalKey } from "../../journal/crypto";
 import { checkCardFile, INVALID_CARD_FILE } from "../../journal/exercise";
 import { getDeviceId } from "../../sync/engine";
@@ -233,7 +233,7 @@ it("a draft in the next card is not lost when it is replaced, and the submitted 
   });
 });
 
-it("reloaded after a Submit: the tab stays ticked and today's card shows what she wrote, with the next one still on offer", async () => {
+it("reloaded after a Submit: the next card shows alone in its place, never the finished one (her answers stay in See what you wrote)", async () => {
   await confirmedDevice(db, jk);
   await imported();
   const view = renderApp("/journal", TODAY);
@@ -244,11 +244,57 @@ it("reloaded after a Submit: the tab stays ticked and today's card shows what sh
   await within(s).findByRole("article", { name: "Next card: Day 2" }, { timeout: 5000 });
   view.unmount();
   renderApp("/journal", TODAY);
-  const again = await within(await section()).findByRole("article", { name: "Today's card" });
-  await waitFor(() => expect(within(again).getByRole("textbox", { name: "Your response" })).toHaveValue(PRETEND_WORDS));
-  expect(within(again).getByText("Saved")).toBeInTheDocument();
-  expect(within(again).getByRole("button", { name: "Do the next one →" })).toBeInTheDocument();
+  const s2 = await section();
+  const next = await within(s2).findByRole("article", { name: "Next card: Day 2" });
+  expect(articles(s2)).toHaveLength(1);
+  expect(within(s2).queryByText("Pretend weather")).toBeNull();
+  expect(within(s2).queryByText(PRETEND_WORDS)).toBeNull();
+  expect(within(s2).queryByDisplayValue(PRETEND_WORDS)).toBeNull();
+  expect(within(next).getByText("The fictional kettle")).toBeInTheDocument();
+  expect(within(s2).getByText(/Day 1 · Pretend weather saved\. Here's the next one if you'd like to keep going\./)).toBeInTheDocument();
   await waitFor(() => expect(tabTick()).not.toBeNull());
+  await userEvent.click(within(s2).getByRole("button", { name: "See what you wrote" }));
+  expect(within(await within(s2).findByRole("list", { name: "Your responses" })).getByText(PRETEND_WORDS)).toBeInTheDocument();
+});
+
+it("two Submits today, then a reload: the third card shows alone", async () => {
+  await confirmedDevice(db, jk);
+  await imported();
+  const view = renderApp("/journal", TODAY);
+  const s = await section();
+  const first = await within(s).findByRole("article", { name: "Today's card" });
+  await userEvent.type(await within(first).findByRole("textbox", { name: "Your response" }), PRETEND_WORDS);
+  await submit(within(first));
+  const second = await within(s).findByRole("article", { name: "Next card: Day 2" });
+  await userEvent.type(await within(second).findByRole("textbox", { name: "Your response" }), "Pretend kettle words");
+  await submit(within(second));
+  await within(s).findByRole("article", { name: "Next card: Day 3" });
+  view.unmount();
+  renderApp("/journal", TODAY);
+  const s2 = await section();
+  const third = await within(s2).findByRole("article", { name: "Next card: Day 3" });
+  expect(articles(s2)).toHaveLength(1);
+  expect(within(third).getByText("Imaginary pebbles")).toBeInTheDocument();
+  expect(within(s2).queryByText("Pretend weather")).toBeNull();
+  expect(within(s2).queryByText("The fictional kettle")).toBeNull();
+  expect(within(s2).getByText(/Day 2 · The fictional kettle saved\. Here's the next one if you'd like to keep going\./)).toBeInTheDocument();
+});
+
+it("reloaded once every card is done today: the all-done line, no card", async () => {
+  await confirmedDevice(db, jk);
+  await importExerciseCards(jk, checkCardFile({ ...FAKE_CARD_FILE, cards: FAKE_CARD_FILE.cards.slice(0, 1) })!, "2026-10-01");
+  const view = renderApp("/journal", TODAY);
+  const s = await section();
+  const today = await within(s).findByRole("article", { name: "Today's card" });
+  await userEvent.type(await within(today).findByRole("textbox", { name: "Your response" }), PRETEND_WORDS);
+  await submit(within(today));
+  await within(s).findByText(/That's every card for now\. Lovely work\./);
+  view.unmount();
+  renderApp("/journal", TODAY);
+  const s2 = await section();
+  expect(await within(s2).findByText(/That's every card for now\. Lovely work\./)).toBeInTheDocument();
+  expect(within(s2).queryAllByRole("article")).toHaveLength(0);
+  expect(within(s2).queryByDisplayValue(PRETEND_WORDS)).toBeNull();
 });
 
 it("no card left to do: a gentle line instead (the answers still reachable)", async () => {
@@ -262,7 +308,7 @@ it("no card left to do: a gentle line instead (the answers still reachable)", as
   await submit(within(today));
   expect(await within(s).findByText(/That's every card for now\. Lovely work\./)).toBeInTheDocument();
   expect(within(s).queryAllByRole("article")).toHaveLength(0);
-  expect(tabTick()).not.toBeNull();
+  await waitFor(() => expect(tabTick()).not.toBeNull());
   await userEvent.click(within(s).getByRole("button", { name: "See what you wrote" }));
   expect(within(await within(s).findByRole("list", { name: "Your responses" })).getByText(PRETEND_WORDS)).toBeInTheDocument();
 });
@@ -281,7 +327,7 @@ it("the star toggles and is stored on this device's own row", async () => {
   await waitFor(async () => expect((await readExerciseProgress(jk)).starred).toEqual(new Set()));
 });
 
-it("All cards lists every card (done / starred) and opens any one to read", async () => {
+it("nothing long on the tab: one 'See all chapters' opens the pop-up, where every card is (done marked) and opens to read", async () => {
   await confirmedDevice(db, jk);
   await imported();
   const device = await getDeviceId(db);
@@ -289,17 +335,37 @@ it("All cards lists every card (done / starred) and opens any one to read", asyn
   renderApp("/journal", TODAY);
   const s = await section();
   await within(s).findByText("The fictional kettle");
-  await userEvent.click(within(s).getByText("All cards"));
-  const list = within(s).getByRole("list", { name: "All cards" });
-  const items = within(list).getAllByRole("listitem");
-  expect(items).toHaveLength(5);
-  expect(items[0]).toHaveTextContent("Day 1 · Pretend weather");
-  expect(within(items[0]!).getByLabelText("done")).toBeInTheDocument();
-  expect(within(items[1]!).queryByLabelText("done")).toBeNull();
-  await userEvent.click(within(items[3]!).getByText("Day 4 · A pretend lighthouse"));
-  expect(within(items[3]!).getByText(/doesn't chase the boats/)).toBeInTheDocument();
-  await userEvent.click(within(items[3]!).getByRole("button", { name: "Star this card" }));
-  await waitFor(() => expect(within(items[3]!).getByLabelText("starred")).toBeInTheDocument());
+  expect(within(s).queryByText("All cards")).toBeNull();
+  expect(within(s).queryByRole("list", { name: "All cards" })).toBeNull();
+  await userEvent.click(within(s).getByRole("button", { name: "See all chapters" }));
+  const map = await screen.findByRole("dialog", { name: "Your workbooks" });
+  await userEvent.click(within(map).getByRole("button", { name: "All cards" })); // a book without chapters: one row
+  const items = within(within(map).getByRole("list", { name: "Chapter 1 cards" })).getAllByRole("button");
+  expect(items.map((b) => b.textContent)).toEqual([
+    "Day 1 · Pretend weather ✓", "Day 2 · The fictional kettle", "Day 3 · Imaginary pebbles", "Day 4 · A pretend lighthouse", "Day 5 · The made-up garden",
+  ]);
+  await userEvent.click(items[3]!);
+  expect(within(map).getByText(/doesn't chase the boats/)).toBeInTheDocument();
+  await userEvent.click(within(map).getByRole("button", { name: "Star this card" }));
+  await waitFor(async () => expect((await readExerciseProgress(jk)).starred).toEqual(new Set(["day-4"])));
+  await userEvent.click(within(map).getByRole("button", { name: "← All chapters" }));
+  expect(within(map).getByRole("list", { name: "Your cards chapters" })).toBeInTheDocument();
+});
+
+it("Past exercises on the tab: the latest three, then See all (Read back)", async () => {
+  await confirmedDevice(db, jk);
+  await imported();
+  const device = await getDeviceId(db);
+  const card = (n: number) => ({ id: `day-${n}`, day: n, theme: FAKE_CARD_FILE.cards[n - 1]!.theme, legacy: true });
+  for (const n of [1, 2, 3, 4]) {
+    await submitExerciseEntry(jk, `2026-10-2${n}`, device, card(n), `Pretend answer ${n}`);
+  }
+  renderApp("/journal", TODAY);
+  const s = await section();
+  await userEvent.click(await within(s).findByText("Past exercises"));
+  expect(within(within(s).getByRole("list", { name: "Past exercises" })).getAllByRole("listitem")).toHaveLength(3);
+  await userEvent.click(within(s).getByRole("link", { name: "See all" }));
+  expect(await screen.findByRole("region", { name: "Read back" })).toBeInTheDocument();
 });
 
 it("re-importing asks first: 'Replace your exercise cards?'; Cancel keeps them, Replace replaces", async () => {
@@ -308,13 +374,12 @@ it("re-importing asks first: 'Replace your exercise cards?'; Cancel keeps them, 
   renderApp("/journal", TODAY);
   const s = await section();
   await within(s).findByText("Pretend weather");
-  await userEvent.click(within(s).getByText("All cards"));
   const two = JSON.stringify({ ...FAKE_CARD_FILE, cards: FAKE_CARD_FILE.cards.slice(1, 3) });
-  await userEvent.upload(within(s).getByLabelText("Exercise card file"), cardFile(two));
+  await userEvent.upload(within(s).getByLabelText("Exercise card file (update)"), cardFile(two));
   expect(await within(s).findByText("Replace your exercise cards?")).toBeInTheDocument();
   await userEvent.click(within(s).getByRole("button", { name: "Cancel" }));
   expect(await readExerciseCards(jk)).toEqual({ state: "ok", set: SET });
-  await userEvent.upload(within(s).getByLabelText("Exercise card file"), cardFile(two));
+  await userEvent.upload(within(s).getByLabelText("Exercise card file (update)"), cardFile(two));
   expect(within(s).queryByText(RESTARTS_LINE)).toBeNull(); // nothing done yet: nothing to lose
   await userEvent.click(await within(s).findByRole("button", { name: "Replace" }));
   await waitFor(async () => expect((await readExerciseCards(jk) as { set: { cards: unknown[] } }).set.cards).toHaveLength(2));
@@ -327,12 +392,11 @@ it("replacing with cards whose ids don't match what's done says the progress res
   renderApp("/journal", TODAY);
   const s = await section();
   await within(s).findByText("The fictional kettle");
-  await userEvent.click(within(s).getByText("All cards"));
-  await userEvent.upload(within(s).getByLabelText("Exercise card file"), cardFile(FAKE_CARD_TEXT));
+  await userEvent.upload(within(s).getByLabelText("Exercise card file (update)"), cardFile(FAKE_CARD_TEXT));
   expect(await within(s).findByText("Replace your exercise cards?")).toBeInTheDocument();
   expect(within(s).queryByText(RESTARTS_LINE)).toBeNull(); // the same file again: same ids
   await userEvent.click(within(s).getByRole("button", { name: "Cancel" }));
-  await userEvent.upload(within(s).getByLabelText("Exercise card file"), cardFile(FAKE_CARD_TEXT_V2));
+  await userEvent.upload(within(s).getByLabelText("Exercise card file (update)"), cardFile(FAKE_CARD_TEXT_V2));
   expect(await within(s).findByText(RESTARTS_LINE)).toBeInTheDocument();
 });
 

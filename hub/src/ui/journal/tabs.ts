@@ -7,9 +7,14 @@ export const JOURNAL_TABS = [
   { id: "morning", path: "/journal/morning", title: "Morning pages" },
   { id: "check-in", path: "/journal/check-in", title: "Daily check-in" },
   { id: "read-back", path: "/journal/read-back", title: "Read back" },
+  { id: "notes", path: "/journal/notes", title: "Notes to myself" },
 ] as const;
 
 export type JournalTabId = (typeof JOURNAL_TABS)[number]["id"];
+
+/** The tabs that tick themselves and show a streak (Read back and Notes to myself never do). */
+export type TickingTabId = Exclude<JournalTabId, "read-back" | "notes">;
+export const ticks = (id: JournalTabId): id is TickingTabId => id !== "read-back" && id !== "notes";
 
 export const tabPath = (id: JournalTabId): string => JOURNAL_TABS.find((t) => t.id === id)!.path;
 

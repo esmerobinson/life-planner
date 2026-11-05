@@ -98,7 +98,7 @@ for (const width of [1280, 1920]) {
       // The unlock card, then the tabs (Journal v2; 2026-11-02: never a blank page).
       expect(w.cards).toHaveLength(1);
       for (const c of w.cards) expect(Math.abs(c - w.column)).toBeLessThanOrEqual(1);
-      await expect(page.getByRole("navigation", { name: "Journal parts" }).getByRole("link")).toHaveCount(4);
+      await expect(page.getByRole("navigation", { name: "Journal parts" }).getByRole("link")).toHaveCount(5);
       await noSidewaysScroll(page);
     });
 
@@ -174,13 +174,14 @@ for (const width of [1280, 1920]) {
       const s = exercise(page);
       await s.getByText("Past exercises", { exact: true }).click();
       const items = s.getByRole("list", { name: "Past exercises" }).getByRole("listitem");
-      await expect(items).toHaveCount(4);
+      // The latest 3 on the tab, then See all (journal v3: nothing long inline; Read back has every one).
+      await expect(items).toHaveCount(3);
+      await expect(s.getByRole("link", { name: "See all" })).toHaveAttribute("href", "/journal/read-back");
       // The date first, then the card (the day-1 and day-2 answers here are from the earliest,
       // day-keyed cards, so they say "Earlier card").
       await expect(items.nth(0).locator("summary")).toHaveText(/ · Day 4 · A pretend lighthouse$/);
       await expect(items.nth(1).locator("summary")).toHaveText(/ · Day 3 · Imaginary pebbles$/);
       await expect(items.nth(2).locator("summary")).toHaveText(/ · (Day 2|Earlier card \(day 2\)) · The fictional kettle$/);
-      await expect(items.nth(3).locator("summary")).toHaveText(/ · (Day 1|Earlier card \(day 1\)) · Pretend weather$/);
       await items.nth(2).locator("summary").click();
       await expect(items.nth(2).getByText(/a kettle whistles before it boils over/)).toBeVisible();
       await expect(items.nth(2).getByText("In your book: Pretend workbook, page 2")).toBeVisible();

@@ -212,7 +212,8 @@ export function canPlanMonth(goal: Goal, today: ISODate): boolean {
 /**
  * This month's counts copied from the latest earlier month that had any (usually last month;
  * a skipped month is passed over): same titles and targets; steps aren't copied. A daily goal
- * whose target was every day of that month gets every day of this one.
+ * whose target was every day of that month gets every day of this one, and its target is
+ * never more than this month's days.
  */
 export function plannedFromLastMonth(goal: Goal, today: ISODate, newId: () => string): MonthGoal[] {
   if (!canPlanMonth(goal, today)) return [];
@@ -223,7 +224,8 @@ export function plannedFromLastMonth(goal: Goal, today: ISODate, newId: () => st
     .map((m) => {
       const everyDay = isDaily(goal) && m.target === daysInMonth(last);
       const next: MonthGoal = { id: newId(), month: now, kind: "count", title: m.title };
-      const target = everyDay ? daysInMonth(now) : m.target;
+      // A daily count never asks for more days than this month has (30 in January, 28 in February).
+      const target = everyDay ? daysInMonth(now) : isDaily(goal) && m.target !== undefined ? Math.min(m.target, daysInMonth(now)) : m.target;
       if (target !== undefined) next.target = target;
       if (m.auto === false) next.auto = false;
       return next;

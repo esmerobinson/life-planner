@@ -242,3 +242,32 @@ export const FAKE_CARD_FILE_CHECKLIST = {
     }),
   ],
 };
+
+/**
+ * A FICTIONAL two-book file shaped like hers (the books' ids "bpd" and "dbt", each in chapters):
+ * every title and word is made up. The first book has 4 days in 2 chapters; the second 3 cards
+ * in 2 chapters; plus one optional reading card (never counted).
+ */
+export const FAKE_CARD_FILE_BOOKS = {
+  app: "esmeworld",
+  kind: "exercise-cards",
+  version: 2,
+  source: "Two pretend workbooks in chapters (test fixture)",
+  tracks: [
+    { id: "bpd", title: "Pretend first workbook" },
+    { id: "dbt", title: "Pretend second workbook" },
+  ],
+  cards: [
+    pretendCard("b-intro", 1, "Pretend introduction", { track: "bpd", day: null, optional: true, chapter: 0, chapterTitle: "Pretend start" }),
+    pretendCard("b-001", 1, "Pretend first-book one", { track: "bpd", chapter: 1, chapterTitle: "Pretend meadow" }),
+    pretendCard("b-002", 2, "Pretend first-book two", { track: "bpd", chapter: 1, chapterTitle: "Pretend meadow" }),
+    pretendCard("b-003", 3, "Pretend first-book three", { track: "bpd", chapter: 2, chapterTitle: "Pretend river" }),
+    pretendCard("b-004", 4, "Pretend first-book four", { track: "bpd", chapter: 2, chapterTitle: "Pretend river" }),
+    pretendCard("d-001", 1, "Pretend second-book one", { track: "dbt", chapter: 1, chapterTitle: "Pretend hilltop" }),
+    pretendCard("d-002", 2, "Pretend second-book two", { track: "dbt", chapter: 2, chapterTitle: "Pretend valley" }),
+    pretendCard("d-003", 3, "Pretend second-book three", { track: "dbt", chapter: 2, chapterTitle: "Pretend valley" }),
+  ],
+};
+
+/** The books fixture as the text of a file. */
+export const FAKE_CARD_TEXT_BOOKS = JSON.stringify(FAKE_CARD_FILE_BOOKS);

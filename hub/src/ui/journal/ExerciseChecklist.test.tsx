@@ -10,6 +10,7 @@ import { getDeviceId } from "../../sync/engine";
 import { FAKE_CARD_FILE_CHECKLIST, PRETEND_FEATURES } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { renderApp } from "../../test/renderApp";
+import { openCardInMap } from "../../test/chapterMap";
 
 // The checklist part: each item answered with one of the card's own options (and perhaps a
 // short note), with the items on the card. Plus the scale part with no end labels.
@@ -146,9 +147,7 @@ describe("a checklist card", () => {
     const view = renderApp("/journal/exercise", TODAY);
     const s = await section();
     await todayCard();
-    await userEvent.click(within(s).getByText("All cards"));
-    const row = within(within(s).getByRole("list", { name: "All cards" })).getAllByRole("listitem")[0]!;
-    await userEvent.click(within(row).getByText("Day 1 · Pretend checklist"));
+    const row = await openCardInMap(s, "Day 1 · Pretend checklist");
     const mine = within(row).getByRole("list", { name: "Your responses" });
     expect(within(mine).getByText(PROMPT)).toBeInTheDocument();
     const lines = within(mine).getAllByRole("listitem").filter((li) => li.classList.contains("exercise-check-answer")).map((li) => li.textContent);
