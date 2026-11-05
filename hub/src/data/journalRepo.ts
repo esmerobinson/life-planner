@@ -1452,6 +1452,12 @@ export interface LearnedVersion {
   at: number;
   /** The device that wrote it. */
   device: string;
+  /**
+   * What to put in `seen` to replace this version as she sees it: `<id>@<at>` for it and for
+   * every other live version with the same words (shown once, so replaced together: bug #55).
+   * A later write to any of those rows has a newer stamp, so it shows again (bug #56).
+   */
+  seen: string[];
 }
 
 export interface Learned extends LearnedVersion {
@@ -1467,26 +1473,48 @@ const learnedDevice = (row: JournalRow) => {
   return cut > 0 ? suffix.slice(0, cut) : suffix;
 };
 
+/** A `seen` entry: the row id and the stamp she saw (`<id>@<at>`); a bare id (earlier rows) covers every stamp. */
+const seenToken = (v: { id: string; at: number }) => `${v.id}@${v.at}`;
+
+/** Replaced by some version's `seen`: only as written when she saw it, never a later write. */
+function replacedBy(seen: Set<string>, sawAt: Map<string, number>, v: { id: string; at: number }): boolean {
+  if (seen.has(v.id)) return true;
+  const at = sawAt.get(v.id);
+  return at !== undefined && at >= v.at;
+}
+
 async function mergeLearned(jk: JournalKey, rows: JournalRow[]): Promise<Learned> {
-  const versions: (LearnedVersion & { seen: string[] })[] = [];
+  const versions: { id: string; text: string; at: number; device: string; seen: string[] }[] = [];
   let unreadable = 0;
   for (const row of rows) {
     const o = await openRow(jk, row, "learned");
     if (o.state === "ok") versions.push({ id: row.id, text: o.entry.text, at: o.entry.at, device: learnedDevice(row), seen: o.entry.seen ?? [] });
     else unreadable++;
   }
-  const replaced = new Set(versions.flatMap((v) => v.seen));
-  const live = versions.filter((v) => !replaced.has(v.id)).sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
-  const shown = live[0] ?? { id: "", text: "", at: 0, device: "", seen: [] };
+  const bare = new Set<string>();
+  const sawAt = new Map<string, number>();
+  for (const t of versions.flatMap((v) => v.seen)) {
+    const cut = t.lastIndexOf("@");
+    const at = cut > 0 ? Number(t.slice(cut + 1)) : NaN;
+    if (cut > 0 && Number.isFinite(at)) sawAt.set(t.slice(0, cut), Math.max(at, sawAt.get(t.slice(0, cut)) ?? -Infinity));
+    else bare.add(t);
+  }
+  const live = versions.filter((v) => !replacedBy(bare, sawAt, v)).sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
+  // Versions with the same words are one entry: replacing it replaces all of them (bug #55).
+  const sameWords = (text: string) => live.filter((v) => v.text.trim() === text.trim()).map(seenToken);
+  const top = live[0];
+  const shown: LearnedVersion = top
+    ? { id: top.id, text: top.text, at: top.at, device: top.device, seen: sameWords(top.text) }
+    : { id: "", text: "", at: 0, device: "", seen: [] };
   const words = new Set([shown.text.trim()]);
   const others: LearnedVersion[] = [];
   for (const v of live.slice(1)) {
     const t = v.text.trim();
     if (t === "" || words.has(t)) continue;
     words.add(t);
-    others.push({ id: v.id, text: v.text, at: v.at, device: v.device });
+    others.push({ id: v.id, text: v.text, at: v.at, device: v.device, seen: sameWords(v.text) });
   }
-  return { id: shown.id, text: shown.text, at: shown.at, device: shown.device, others, unreadable };
+  return { ...shown, others, unreadable };
 }
 
 /** The day's "what I learned" words: the newest version, and every other one not replaced. */
@@ -1512,9 +1540,16 @@ export async function listLearned(jk: JournalKey, before: ISODate): Promise<({ d
  * device; nothing else changes. Returns the new row's id.
  */
 export async function removeLearnedVersion(jk: JournalKey, date: ISODate, deviceId: string, versionId: string): Promise<string> {
+  // As it is now (and every live version with the same words): a later write to it shows again.
+  const day = await readLearned(jk, date);
+  const v = [day, ...day.others].find((x) => x.id === versionId || x.seen.some((t) => t.startsWith(`${versionId}@`)));
+  const row = v ? null : await db.journal.get(versionId);
+  const opened = row ? await openRow(jk, row, "learned") : null;
+  const seen = v ? v.seen : opened?.state === "ok" ? [seenToken({ id: versionId, at: opened.entry.at })] : [];
+  if (seen.length === 0) return "";
   const id = newLearnedId(date, deviceId);
   // At 0, so it never shows in place of another version's words.
-  await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), { v: 1, text: "", at: 0, seen: [versionId] })]);
+  await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), { v: 1, text: "", at: 0, seen })]);
   return id;
 }
 

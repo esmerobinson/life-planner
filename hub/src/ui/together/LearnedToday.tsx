@@ -106,7 +106,7 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
   const draft = useDraft(
     day.text,
     (text) => {
-      const s = session.current ?? (session.current = { seen: day.id ? [day.id] : [] });
+      const s = session.current ?? (session.current = { seen: [...day.seen] });
       const run = queue.current.then(async () => {
         try {
           s.version = await saveLearned(jk, today, deviceId, text, s);
@@ -125,7 +125,7 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
     // Nothing unsaved and the box holds a version this session didn't write: a new session,
     // replacing only that version.
     if (draft.value === day.text && (!session.current || session.current.version !== day.id)) {
-      session.current = { seen: day.id ? [day.id] : [] };
+      session.current = { seen: [...day.seen] };
     }
   }
   function change(text: string) {
@@ -135,8 +135,8 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
   /** Its words go into the box, after hers, and it is replaced by the box's version. */
   function merge(v: LearnedVersion) {
     begin();
-    const s = session.current ?? (session.current = { seen: day.id ? [day.id] : [] });
-    if (!s.seen.includes(v.id)) s.seen.push(v.id);
+    const s = session.current ?? (session.current = { seen: [...day.seen] });
+    for (const t of v.seen) if (!s.seen.includes(t)) s.seen.push(t);
     const now = draft.value.trimEnd();
     draft.set(now ? `${now}\n\n${v.text}` : v.text);
     draft.flush();
