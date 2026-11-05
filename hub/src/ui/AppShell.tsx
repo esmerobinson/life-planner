@@ -23,6 +23,7 @@ import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
 import { FarmProvider } from "../farm/FarmContext";
 import { Nook } from "../farm/Nook";
+import { ErrorGuard } from "./ErrorGuard";
 import { useReminderScheduler } from "../reminders/scheduler";
 import { useNativeNavigate } from "../reminders/nativeNavigate";
 
@@ -163,7 +164,10 @@ export function AppShell() {
               <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>
             </div>
           )}
-          <Outlet />
+          {/* A page that throws while drawing shows this instead; the sidebar and every other page stay (bug #46). */}
+          <ErrorGuard resetOn={location.pathname} name="page" fallback={<PageProblem />}>
+            <Outlet />
+          </ErrorGuard>
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
           {searching && (
             <SearchDialog items={items} goals={goals} today={today} phone={phone} onClose={() => setSearching(false)} />
@@ -203,7 +207,7 @@ export function AppShell() {
               />
             )}
           </AddButton>
-          {phone && <Nook phone />}
+          {phone && <ErrorGuard name="nook"><Nook phone /></ErrorGuard>}
         </main>
       </div>
       </FarmProvider>
@@ -212,5 +216,17 @@ export function AppShell() {
       </OpenAddContext.Provider>
       </AddDefaultsContext.Provider>
     </ShellContext.Provider>
+  );
+}
+
+/** Wording provisional (for Esme / Design). */
+function PageProblem() {
+  return (
+    <div role="alert">
+      <p>This page hit a problem. Everything you wrote is saved.</p>
+      <button type="button" className="btn-secondary" onClick={() => window.location.reload()}>
+        Reload
+      </button>
+    </div>
   );
 }
