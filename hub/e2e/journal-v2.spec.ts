@@ -82,7 +82,7 @@ async function walk(page: Page, w: number) {
   await page.goto("/area/mind");
   const habits = page.getByRole("list", { name: "Habits" });
   await expect(habits.locator("li .strip-title")).toHaveText([/Pretend breathing practice/, "Mental health exercise", "Morning pages", "Daily check-in"]);
-  await expect(habits.locator("li.journal-row").nth(1).getByText(/session \d+ of \d+/)).toBeVisible();
+  await expect(habits.locator("li.journal-row").nth(1).getByText(/\d+ of \d+ this month/)).toBeVisible();
   await noSidewaysScroll(page);
   await shot("mind-habits");
 

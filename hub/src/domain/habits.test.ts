@@ -62,6 +62,6 @@ describe("habits", () => {
   });
 
   it("the session wording", () => {
-    expect(HABIT_WORDS.session("2026-10-28", 20, 28)).toBe("October · session 20 of 28");
+    expect(HABIT_WORDS.session("2026-10-28", 20, 28)).toBe("20 of 28 this month");
   });
 });

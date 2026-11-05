@@ -1,0 +1,253 @@
+<title>Read Back and Together</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: three questions, each a set of options that sit side by side and wrap to one column
+   on a phone. Colours, radii and sizes are the app's own (hub/src/styles/tokens.css, journal.css).
+   System font on purpose: the app's font isn't chosen yet. Single light look: the app has no
+   dark mode yet. All example text is made up. */
+:root {
+  --page: #e2e8ff; --sidebar: #3a412f; --sidebar-text: #e9e3d6;
+  --panel: #e9e3d6; --row: #e3ddcd; --track: #d4d1c3; --text: #3a412f; --muted: #6f735f;
+  --green: #98c293; --mint: #a3d5c2; --violet: #9285c5; --white: #fbfaf6;
+  --radius-panel: 18px; --radius-tile: 9px;
+  color-scheme: light;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+body { background: var(--page); color: var(--text); margin: 0; font-size: 15px; line-height: 1.45; }
+main { max-width: 1180px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 56px; }
+header h1 { margin: 0 0 8px; font-size: 28px; text-wrap: balance; }
+header p, .lede { margin: 0; max-width: 66ch; }
+section > h2 { margin: 0 0 6px; font-size: 21px; text-wrap: balance; }
+section > .lede { margin-bottom: 22px; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 24px; align-items: start; }
+.opt { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.opt figcaption { font-size: 15px; }
+.opt figcaption b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sidebar); color: var(--sidebar-text); font-size: 13px; margin-right: 4px; }
+.note { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* A screen in the app */
+.screen { background: var(--page); border: 1px solid var(--track); border-radius: var(--radius-panel); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--panel); border-radius: var(--radius-panel); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.muted { color: var(--muted); font-size: 13px; margin: 0; }
+h3 { margin: 0; font-size: 17px; }
+h4 { margin: 0; font-size: 15px; }
+
+/* Strips */
+.strip { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--row); border-radius: var(--radius-tile); }
+.strip.mint { background: var(--mint); font-weight: 700; }
+.strip .grow { flex: 1; min-width: 0; }
+.strip .sub { font-size: 13px; color: var(--muted); font-weight: 400; }
+.strip.mint .sub { color: var(--text); }
+.chev { font-size: 13px; color: var(--muted); }
+.box { width: 20px; height: 20px; flex: none; border: 2px solid var(--text); border-radius: 6px; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--white); }
+.box.ticked { background: var(--green); }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.open { background: var(--row); border-radius: var(--radius-tile); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.open .q { font-weight: 600; }
+.open p { margin: 0; }
+.locked { opacity: .65; }
+.link { color: var(--text); text-decoration: underline; font-size: 14px; }
+.pill { display: inline-block; padding: 6px 14px; border-radius: 999px; background: var(--track); font-size: 14px; border: 0; color: var(--text); font: inherit; }
+.pill.on { background: var(--sidebar); color: var(--sidebar-text); }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile { background: var(--mint); border-radius: var(--radius-panel); padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+.tile b { font-size: 15px; }
+.tile .n { font-size: 26px; font-weight: 700; line-height: 1.1; margin-top: 6px; }
+.month { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+.answer { width: 100%; min-height: 64px; border-radius: var(--radius-tile); background: var(--white); border: 1px solid var(--track); padding: 10px; font: inherit; color: var(--muted); box-sizing: border-box; }
+.row { display: flex; gap: 10px; align-items: flex-start; }
+.row .box { margin-top: 1px; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lock { display: inline-flex; align-items: center; gap: 6px; }
+.lock svg { width: 14px; height: 14px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.done-line { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+</style>
+
+<main>
+  <header>
+    <h1>Read back, private days, and what I learned</h1>
+    <p>Three choices. Pick a letter for each. Colours and sizes are the app's own. The font is still the plain system one because you haven't chosen a font yet. All the example text is made up.</p>
+  </header>
+
+  <!-- 1 · READ BACK -->
+  <section>
+    <h2>1 · Read back: each part in its own section</h2>
+    <p class="lede">Right now Read back is one long mixed list. You asked for each part to have its own section and to be very easy to see. Morning pages stay locked for 4 weeks.</p>
+    <div class="opts">
+      <figure class="opt">
+        <figcaption><b>A</b> · Four sections, tap to open</figcaption>
+        <div class="screen">
+          <p class="muted">Everything you've done in the Journal, saved. Newest first.</p>
+          <div class="strip mint"><span class="grow">Mental health exercise</span><span class="sub">14 saved</span></div>
+          <div class="list">
+            <div class="open">
+              <div class="spread"><b>Wed 4 Nov · Wise mind</b><span class="chev">▲</span></div>
+              <p class="q">What did emotion mind want you to do?</p><p>Text back straight away and say sorry for nothing.</p>
+              <p class="q">What did wise mind say?</p><p>Wait an hour, then reply kindly.</p>
+            </div>
+            <div class="strip"><span class="grow">Tue 3 Nov · Check the facts</span><span class="chev">▼</span></div>
+            <div class="strip"><span class="grow">Mon 2 Nov · Naming feelings</span><span class="chev">▼</span></div>
+            <a class="link">Show all 14</a>
+          </div>
+          <div class="strip mint"><span class="grow">Daily check-in</span><span class="sub">21 saved</span></div>
+          <div class="list">
+            <div class="strip"><span class="grow">Thu 5 Nov · 3 answers</span><span class="chev">▼</span></div>
+            <div class="strip"><span class="grow">Wed 4 Nov · 4 answers</span><span class="chev">▼</span></div>
+            <a class="link">Show all 21</a>
+          </div>
+          <div class="strip mint"><span class="grow">Morning pages</span><span class="sub">18 saved</span></div>
+          <div class="list">
+            <div class="strip"><span class="grow">Mon 5 Oct · page 1</span><span class="chev">▼</span></div>
+            <div class="strip locked"><span class="grow">Thu 5 Nov</span><span class="sub">Opens Thu 3 Dec</span></div>
+          </div>
+          <div class="strip mint"><span class="grow">Notes to myself</span><span class="sub">6 saved</span></div>
+          <div class="list">
+            <div class="strip"><span class="grow">Fear of being left · 2 notes</span><span class="chev">▼</span></div>
+          </div>
+        </div>
+        <p class="note">Each part has a green heading with how many are saved. Under it are its newest three, folded. Tap one to read it.</p>
+      </figure>
+
+      <figure class="opt">
+        <figcaption><b>B</b> · Choose a part first</figcaption>
+        <div class="screen">
+          <p class="muted">Everything you've done in the Journal, saved.</p>
+          <div class="tiles">
+            <div class="tile"><b>Mental health exercise</b><span class="n">14</span><span class="sub">Last: Wed 4 Nov</span></div>
+            <div class="tile"><b>Daily check-in</b><span class="n">21</span><span class="sub">Last: today</span></div>
+            <div class="tile"><b>Morning pages</b><span class="n">18</span><span class="sub">4 ready to read</span></div>
+            <div class="tile"><b>Notes to myself</b><span class="n">6</span><span class="sub">Last: Sun 1 Nov</span></div>
+          </div>
+        </div>
+        <div class="screen">
+          <a class="link">← Read back</a>
+          <h3>Daily check-in</h3>
+          <div class="month">November</div>
+          <div class="list">
+            <div class="open">
+              <div class="spread"><b>Thu 5 Nov</b><span class="chev">▲</span></div>
+              <p class="q">What's one thing you're looking forward to?</p><p>Seeing Mia on Saturday.</p>
+              <p class="q">How's your body feeling?</p><p>Tired, shoulders tight.</p>
+            </div>
+            <div class="strip"><span class="grow">Wed 4 Nov · 4 answers</span><span class="chev">▼</span></div>
+          </div>
+          <div class="month">October</div>
+          <div class="list"><div class="strip"><span class="grow">Sat 31 Oct · 3 answers</span><span class="chev">▼</span></div></div>
+        </div>
+        <p class="note">Read back opens on four big green tiles with counts. Tap one to see all of that part, grouped by month.</p>
+      </figure>
+
+      <figure class="opt">
+        <figcaption><b>C</b> · Everything open, like a book</figcaption>
+        <div class="screen">
+          <div class="pills"><span class="pill on">Mental health exercise</span><span class="pill">Daily check-in</span><span class="pill">Morning pages</span><span class="pill">Notes to myself</span></div>
+          <h3>Daily check-in</h3>
+          <div class="month">November</div>
+          <div class="card">
+            <h4>Thu 5 Nov</h4>
+            <div><p class="muted">What's one thing you're looking forward to?</p><p style="margin:2px 0 0">Seeing Mia on Saturday.</p></div>
+            <div><p class="muted">How's your body feeling?</p><p style="margin:2px 0 0">Tired, shoulders tight.</p></div>
+            <div><p class="muted">What would wise mind say about today?</p><p style="margin:2px 0 0">It's ok to go slow.</p></div>
+          </div>
+          <div class="card">
+            <h4>Wed 4 Nov</h4>
+            <div><p class="muted">What did you notice this morning?</p><p style="margin:2px 0 0">The light was nice.</p></div>
+          </div>
+        </div>
+        <p class="note">Pick a part at the top. Every entry is already open, so you just scroll and read, with nothing to tap. The pills wrap onto new lines and never scroll sideways.</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- 2 · PRIVATE TICK -->
+  <section>
+    <h2>2 · Keeping a day's answers private from Together</h2>
+    <p class="lede">Your Mental health exercise and Daily check-in go to Oliver after 3am. That includes the date, which exercise or questions, and your answers. A tick keeps that day's answers here only. Shown on a finished check-in. The Mental health exercise would get the same tick.</p>
+    <div class="opts">
+      <figure class="opt">
+        <figcaption><b>A</b> · A tick under your answers</figcaption>
+        <div class="card">
+          <div class="done-line"><span class="box ticked">✓</span>Checked in for today</div>
+          <div class="open"><p class="q">How's your body feeling?</p><p>Tired, shoulders tight.</p></div>
+          <div class="row"><span class="box"></span><div><b>Keep today's answers private</b><p class="muted">Oliver still sees that you checked in and which questions. Your answers stay here.</p></div></div>
+          <div class="btns"><span class="pill">Edit</span></div>
+        </div>
+        <p class="note">Always visible, in plain words, right where your answers are.</p>
+      </figure>
+
+      <figure class="opt">
+        <figcaption><b>B</b> · A small switch at the top</figcaption>
+        <div class="card">
+          <div class="spread"><div class="done-line"><span class="box ticked">✓</span>Checked in for today</div>
+            <span class="pill lock"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Shared with Oliver</span></div>
+          <div class="open"><p class="q">How's your body feeling?</p><p>Tired, shoulders tight.</p></div>
+          <div class="btns"><span class="pill">Edit</span></div>
+        </div>
+        <div class="card">
+          <div class="spread"><div class="done-line"><span class="box ticked">✓</span>Checked in for today</div>
+            <span class="pill lock on"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Private today</span></div>
+          <p class="muted">Oliver sees you checked in, not your answers.</p>
+        </div>
+        <p class="note">A small pill in the corner. Tap it to switch between "Shared with Oliver" and "Private today".</p>
+      </figure>
+
+      <figure class="opt">
+        <figcaption><b>C</b> · A line at the bottom</figcaption>
+        <div class="card">
+          <div class="done-line"><span class="box ticked">✓</span>Checked in for today</div>
+          <div class="open"><p class="q">How's your body feeling?</p><p>Tired, shoulders tight.</p></div>
+          <div class="btns"><span class="pill">Edit</span></div>
+          <p class="muted">Goes to Oliver at 3am with your answers. <a class="link" style="font-size:13px">Keep answers private</a></p>
+        </div>
+        <p class="note">Quiet: one small line that says what happens, with a link to keep it private.</p>
+      </figure>
+    </div>
+    <p class="note" style="margin-top:16px; max-width:66ch">Whichever you pick: once a day's answers have gone, ticking private hides them in Together but can't wipe them from Oliver's side. The app will say that plainly if you tick it after 3am.</p>
+  </section>
+
+  <!-- 3 · WHAT I LEARNED -->
+  <section>
+    <h2>3 · "What I learned today" in Mental health exercise</h2>
+    <p class="lede">An optional box for what you learned about BPD or mental health that day. It goes to Oliver with that day's exercise (unless the day is private).</p>
+    <div class="opts">
+      <figure class="opt">
+        <figcaption><b>A</b> · Always there, under the exercise</figcaption>
+        <div class="card">
+          <div class="strip mint"><span class="box ticked">✓</span><span class="grow">Mental health exercise</span></div>
+          <h3>Wise mind</h3>
+          <p class="muted">Your answer is saved.</p>
+          <div><b>What I learned today</b> <span class="muted">(optional)</span></div>
+          <div class="answer">Anything you learned about BPD or mental health today…</div>
+        </div>
+        <p class="note">The box is always under today's exercise. Leave it empty if you like.</p>
+      </figure>
+
+      <figure class="opt">
+        <figcaption><b>B</b> · Folded until you want it</figcaption>
+        <div class="card">
+          <div class="strip mint"><span class="box ticked">✓</span><span class="grow">Mental health exercise</span></div>
+          <h3>Wise mind</h3>
+          <p class="muted">Your answer is saved.</p>
+          <div class="btns"><span class="pill">+ What I learned today</span></div>
+        </div>
+        <p class="note">Just a small pill. Tap it and the box opens. Once you've written something, it stays open.</p>
+      </figure>
+
+      <figure class="opt">
+        <figcaption><b>C</b> · Asked when you finish</figcaption>
+        <div class="card">
+          <div class="strip mint"><span class="box ticked">✓</span><span class="grow">Mental health exercise</span></div>
+          <h3>One more, if you like</h3>
+          <p style="margin:0">Did you learn anything about BPD or mental health today?</p>
+          <div class="answer">Write it here…</div>
+          <div class="spread"><span class="pill">Skip</span><span class="pill on">Save</span></div>
+        </div>
+        <p class="note">After you finish today's exercise, one calm question like the check-in, with Skip.</p>
+      </figure>
+    </div>
+  </section>
+</main>
