@@ -24,6 +24,13 @@ export const MORNING_RULES =
 /** Under the word count until her 1,000 (Journal v2: a target, never a lock; no guilt). */
 export const KEEP_GOING = "Keep going if you can — 1,000 is about three pages.";
 const SAVE_PROBLEM = "That didn't save. Try again.";
+/**
+ * The box's name for an unfinished earlier page: "Yesterday's morning page", or its real day
+ * ("Morning page from Tue 27 Oct") when it is older (Esme, 2026-11-05: "its real day").
+ */
+export const lateLabel = (date: ISODate, today: ISODate) =>
+  date === addDays(today, -1) ? "Yesterday's morning page" : `Morning page from ${dayLabel(date, today)}`;
+
 /** Over the box when yesterday's words were left unfinished (review I1: kept as yesterday's draft). */
 export const YESTERDAY_SAVED = "Yesterday's unfinished page is saved.";
 /** Over the box when an older page was left unfinished (bug #6: never hidden, however old). */
@@ -365,7 +372,7 @@ function WritingView({
     <div className="journal-writing">
       <textarea
         className="journal-page-box"
-        aria-label={late ? "Yesterday's morning page" : "Today's morning page"}
+        aria-label={late ? lateLabel(date, todayISO()) : "Today's morning page"}
         placeholder="Just write. No topic, no editing."
         value={text}
         onChange={(e) => onChange(e.target.value)}

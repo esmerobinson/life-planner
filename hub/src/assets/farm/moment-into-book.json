@@ -1,0 +1,170 @@
+{
+ "frames": [
+  {
+   "filename": "moment-into-book 0.aseprite",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 52
+   },
+   "duration": 100
+  },
+  {
+   "filename": "moment-into-book 1.aseprite",
+   "frame": {
+    "x": 64,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 52
+   },
+   "duration": 100
+  },
+  {
+   "filename": "moment-into-book 2.aseprite",
+   "frame": {
+    "x": 128,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 52
+   },
+   "duration": 100
+  },
+  {
+   "filename": "moment-into-book 3.aseprite",
+   "frame": {
+    "x": 192,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 52
+   },
+   "duration": 100
+  },
+  {
+   "filename": "moment-into-book 4.aseprite",
+   "frame": {
+    "x": 256,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 52
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 52
+   },
+   "duration": 100
+  }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3",
+  "image": "moment-into-book.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 320,
+   "h": 52
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "arrive",
+    "from": 0,
+    "to": 0,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "drift",
+    "from": 1,
+    "to": 1,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "line-up",
+    "from": 2,
+    "to": 2,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "stick",
+    "from": 3,
+    "to": 3,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "settled",
+    "from": 4,
+    "to": 4,
+    "direction": "forward",
+    "color": "#000000ff"
+   }
+  ],
+  "layers": [
+   {
+    "name": "Layer 1",
+    "opacity": 255,
+    "blendMode": "normal"
+   }
+  ],
+  "slices": []
+ }
+}

@@ -2,7 +2,6 @@
 // it never changes `status` and never goes into the Done fold-out. "Done for today" is
 // derived from the date, so tomorrow it is unticked again without a write.
 
-import { monthName } from "./display";
 import { addDays, endOfMonth, monthOf, weekdayOf } from "./dates";
 import type { ISODate, Item, Weekday } from "./types";
 
@@ -78,8 +77,8 @@ export const HABIT_WORDS = {
   heading: "Habits",
   /** The small line once it is ticked today. */
   doneForToday: "Done for today",
-  /** The right-hand count: "October · session 20 of 28". */
-  session: (today: ISODate, done: number, planned: number) => `${monthName(today)} · session ${done} of ${planned}`,
+  /** The right-hand count: "20 of 28 this month" (VISUAL-LANGUAGE.md, quick wins option A, 2026-11-05). */
+  session: (_today: ISODate, done: number, planned: number) => `${done} of ${planned} this month`,
   /** The panel's line: "Repeats Mondays, Wednesdays and Fridays" (the area follows it). */
   repeatsLine: (recur: Weekday[] | undefined) => `Repeats ${HABIT_WORDS.schedule(recur)}`,
   /** The schedule line: "every day", "every day but Sunday", "Mondays", "Mondays and Thursdays". */

@@ -130,7 +130,7 @@ for (const width of [1280, 390]) {
       const lastBottom = await page.evaluate(() => {
         const main = document.querySelector("main.app-content")!;
         const kids = [...main.querySelectorAll("*")].filter(
-          (e) => !e.closest(".add-fab, .add-pop, .add-shade, .shell-undo, .peek") && e.getBoundingClientRect().height > 0,
+          (e) => !e.closest(".add-fab, .add-pop, .add-shade, .shell-undo, .peek, .farm-nook") && e.getBoundingClientRect().height > 0,
         );
         return Math.max(...kids.map((e) => e.getBoundingClientRect().bottom));
       });

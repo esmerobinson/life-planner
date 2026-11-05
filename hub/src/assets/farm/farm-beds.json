@@ -1,0 +1,1137 @@
+{
+ "frames": [
+  {
+   "filename": "farm-beds 0.aseprite",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 1.aseprite",
+   "frame": {
+    "x": 26,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 2.aseprite",
+   "frame": {
+    "x": 52,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 3.aseprite",
+   "frame": {
+    "x": 78,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 4.aseprite",
+   "frame": {
+    "x": 104,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 5.aseprite",
+   "frame": {
+    "x": 130,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 6.aseprite",
+   "frame": {
+    "x": 156,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 7.aseprite",
+   "frame": {
+    "x": 182,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 8.aseprite",
+   "frame": {
+    "x": 208,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 9.aseprite",
+   "frame": {
+    "x": 234,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 10.aseprite",
+   "frame": {
+    "x": 260,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 11.aseprite",
+   "frame": {
+    "x": 286,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 12.aseprite",
+   "frame": {
+    "x": 312,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 13.aseprite",
+   "frame": {
+    "x": 338,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 14.aseprite",
+   "frame": {
+    "x": 364,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 15.aseprite",
+   "frame": {
+    "x": 390,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 16.aseprite",
+   "frame": {
+    "x": 416,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 17.aseprite",
+   "frame": {
+    "x": 442,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 18.aseprite",
+   "frame": {
+    "x": 468,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 19.aseprite",
+   "frame": {
+    "x": 494,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 20.aseprite",
+   "frame": {
+    "x": 520,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 21.aseprite",
+   "frame": {
+    "x": 546,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 22.aseprite",
+   "frame": {
+    "x": 572,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 23.aseprite",
+   "frame": {
+    "x": 598,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 24.aseprite",
+   "frame": {
+    "x": 624,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 25.aseprite",
+   "frame": {
+    "x": 650,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 26.aseprite",
+   "frame": {
+    "x": 676,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 27.aseprite",
+   "frame": {
+    "x": 702,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 28.aseprite",
+   "frame": {
+    "x": 728,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 29.aseprite",
+   "frame": {
+    "x": 754,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 30.aseprite",
+   "frame": {
+    "x": 780,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 31.aseprite",
+   "frame": {
+    "x": 806,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 32.aseprite",
+   "frame": {
+    "x": 832,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 33.aseprite",
+   "frame": {
+    "x": 858,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 34.aseprite",
+   "frame": {
+    "x": 884,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 35.aseprite",
+   "frame": {
+    "x": 910,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 36.aseprite",
+   "frame": {
+    "x": 936,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 37.aseprite",
+   "frame": {
+    "x": 962,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 38.aseprite",
+   "frame": {
+    "x": 988,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 39.aseprite",
+   "frame": {
+    "x": 1014,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 40.aseprite",
+   "frame": {
+    "x": 1040,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 41.aseprite",
+   "frame": {
+    "x": 1066,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 42.aseprite",
+   "frame": {
+    "x": 1092,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 43.aseprite",
+   "frame": {
+    "x": 1118,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 44.aseprite",
+   "frame": {
+    "x": 1144,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 45.aseprite",
+   "frame": {
+    "x": 1170,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 46.aseprite",
+   "frame": {
+    "x": 1196,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  },
+  {
+   "filename": "farm-beds 47.aseprite",
+   "frame": {
+    "x": 1222,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 26,
+    "h": 16
+   },
+   "sourceSize": {
+    "w": 26,
+    "h": 16
+   },
+   "duration": 100
+  }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3",
+  "image": "farm-beds.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 1248,
+   "h": 16
+  },
+  "scale": "1",
+  "frameTags": [
+   {
+    "name": "Mind",
+    "from": 0,
+    "to": 5,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "Writing",
+    "from": 6,
+    "to": 11,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "Art",
+    "from": 12,
+    "to": 17,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "Content",
+    "from": 18,
+    "to": 23,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "Body",
+    "from": 24,
+    "to": 29,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "Tech",
+    "from": 30,
+    "to": 35,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "Production",
+    "from": 36,
+    "to": 41,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "Admin",
+    "from": 42,
+    "to": 47,
+    "direction": "forward",
+    "color": "#000000ff"
+   }
+  ],
+  "layers": [
+   {
+    "name": "Layer 1",
+    "opacity": 255,
+    "blendMode": "normal"
+   }
+  ],
+  "slices": []
+ }
+}

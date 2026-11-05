@@ -1,10 +1,14 @@
 import Dexie, { type Table } from "dexie";
 import type { FileRow, Item, Goal, JournalRow } from "../domain/types";
+import type { FarmRow } from "../farm/state";
 import { dropUnreadableKeys } from "../journal/unreadableKeys";
 import { installChangeTracking, legacyStamp, markTransactionUntracked } from "./changeTracking";
 
-/** The tables that sync (files: the pictures on pages, round 3b; journal: the encrypted journal). */
-export const SYNC_TABLES = ["items", "goals", "files", "journal"] as const;
+/**
+ * The tables that sync (files: the pictures on pages, round 3b; journal: the encrypted journal;
+ * farm: Esme's Farm's own state, farm/state.ts).
+ */
+export const SYNC_TABLES = ["items", "goals", "files", "journal", "farm"] as const;
 export type SyncTable = (typeof SYNC_TABLES)[number];
 
 /**
@@ -56,6 +60,7 @@ export class HubDB extends Dexie {
   goals!: Table<Goal, string>;
   files!: Table<FileRow, string>;
   journal!: Table<JournalRow, string>;
+  farm!: Table<FarmRow, string>;
   pending!: Table<PendingChange, [string, string]>;
   syncMeta!: Table<SyncMetaRow, string>;
   quarantine!: Table<QuarantinedRow, [string, string]>;
@@ -93,6 +98,8 @@ export class HubDB extends Dexie {
     this.version(4).stores({ files: "id" });
     // v5: the journal (end-to-end encrypted entries). New and empty, so nothing to stamp.
     this.version(5).stores({ journal: "id, kind, date" });
+    // v6: Esme's Farm (farm/state.ts). New and empty, so nothing to stamp.
+    this.version(6).stores({ farm: "id, kind" });
     installChangeTracking(this);
     // Before anything reads the journal key: remove key rows WebKit can't read back (their
     // `get` never answers there and would hang every journal read). See unreadableKeys.ts.

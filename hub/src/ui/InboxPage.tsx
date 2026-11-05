@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createItem, deleteItem, getItem, listItems, putItemBack, restoreItem } from "../data/repo";
+import { needsALook } from "../domain/attention";
 import type { ISODate, Item } from "../domain/types";
 import { useAddDefaults } from "./addContext";
 import { UndoLine } from "./DeleteButton";
@@ -29,7 +30,12 @@ export function InboxPage({ today }: { today: ISODate }) {
   useEffect(() => {
     if (stale) setFrom("All");
   }, [stale]);
-  const shown = effectiveFrom === "All" ? inbox : inbox.filter((i) => inboxSource(i) === effectiveFrom);
+  // An item listed under Needs a look (Overdue, Due soon) shows there only, not twice (Esme,
+  // 2026-11-05: "show it once"). It still counts in "N to sort" and in Sort one by one.
+  const lookIds = new Set(Object.values(needsALook(items, today)).flat().map((i) => i.id));
+  const shown = (effectiveFrom === "All" ? inbox : inbox.filter((i) => inboxSource(i) === effectiveFrom)).filter(
+    (i) => !lookIds.has(i.id),
+  );
 
   const { attempt, saveError } = useSaveError();
   const [archived, setArchived] = useState<Item[]>([]);

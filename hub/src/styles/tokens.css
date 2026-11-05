@@ -160,9 +160,13 @@ body {
   border-radius: var(--radius-tile);
 }
 
-/* Active highlight is undecided: magenta placeholder outline. */
+/* "You are here" (Esme, 2026-11-05, quick wins option B · Its own colour): the page she's on
+   fills with its own area tile colour (--tile, set per row in Sidebar.tsx), dark bold text;
+   same size, padding and radius as the other rows, no outline. */
 .sidebar-item[aria-current="page"] {
-  outline: 2px solid var(--placeholder);
+  background: var(--tile);
+  color: var(--text);
+  font-weight: 700;
 }
 
 .sidebar-tile {
