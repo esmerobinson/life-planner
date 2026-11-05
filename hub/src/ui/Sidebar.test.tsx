@@ -20,14 +20,6 @@ describe("Sidebar", () => {
     ]);
   });
 
-  it("draws the farm's pixel barn as pixel art (whole-number size, pixelated)", () => {
-    renderAt("/");
-    const img = screen.getByRole("link", { name: "Esme's Farm" }).querySelector("img")!;
-    expect(img).toHaveClass("pixel-icon");
-    expect(img).toHaveAttribute("width", "24");
-    expect(screen.getByRole("link", { name: "Home" }).querySelector("img")).not.toHaveClass("pixel-icon");
-  });
-
   it("has no Today link (Esme, 2026-11-04: Home is the Today page)", () => {
     renderAt("/");
     expect(screen.queryByRole("link", { name: "Today" })).toBeNull();

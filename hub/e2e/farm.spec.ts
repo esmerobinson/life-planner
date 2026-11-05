@@ -83,7 +83,7 @@ for (const width of [1280, 390]) {
 
     test("the farm's pixel barn icon is pixel art at a whole-number scale (sidebar, or the phone's Home grid)", async ({ page }) => {
       await page.goto("/");
-      const icon = page.locator(phone ? ".phone-app-tile img.pixel-icon" : ".sidebar-tile img.pixel-icon");
+      const icon = page.locator(phone ? '.phone-app[href="/farm"] img' : '.sidebar-item[href="/farm"] img');
       await expect(icon).toHaveCount(1);
       const p = await icon.evaluate(async (el) => {
         const img = el as HTMLImageElement;

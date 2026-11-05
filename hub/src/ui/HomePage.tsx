@@ -35,7 +35,7 @@ function PhoneHome({ today }: { today: ISODate }) {
             <li key={n.id}>
               <Link to={n.path} className="phone-app">
                 <span className="phone-app-tile" style={{ background: n.tile }}>
-                  <img src={n.icon} alt="" className={n.pixel ? "pixel-icon" : undefined} />
+                  <img src={n.icon} alt="" />
                 </span>
                 <span>{n.label}</span>
               </Link>

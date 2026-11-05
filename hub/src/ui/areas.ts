@@ -21,8 +21,6 @@ export type NavEntry = {
   icon: string;
   tile: string;
   group: 1 | 2 | 3;
-  /** Pixel art (the farm's barn): shown at a whole-number scale with pixelated scaling. */
-  pixel?: true;
 };
 
 export const NAV: NavEntry[] = [
@@ -40,7 +38,7 @@ export const NAV: NavEntry[] = [
   { id: "vision", label: "Vision board", path: "/vision", icon: vision, tile: "#ecca7d", group: 3 },
   // Esme's Farm: the one entry point for the game. Esme (2026-11-04): the 24px pixel barn on a
   // Room Sketch yellow tile (roomyellow #e2cd5b, a palette value; this use is her choice).
-  { id: "farm", label: "Esme's Farm", path: "/farm", icon: farmIcon, tile: "#e2cd5b", group: 3, pixel: true },
+  { id: "farm", label: "Esme's Farm", path: "/farm", icon: farmIcon, tile: "#e2cd5b", group: 3 },
 ];
 
 /**

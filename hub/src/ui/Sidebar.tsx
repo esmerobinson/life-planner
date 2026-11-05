@@ -36,7 +36,7 @@ export function Sidebar() {
             {NAV.filter((n) => n.group === group).map((n) => (
               <NavLink key={n.id} to={n.path} end={n.path === "/"} className="sidebar-item">
                 <span className="sidebar-tile" style={{ background: n.tile }}>
-                  <img src={n.icon} alt="" width={24} height={24} className={n.pixel ? "pixel-icon" : undefined} />
+                  <img src={n.icon} alt="" width={24} height={24} />
                 </span>
                 <span>{n.label}</span>
               </NavLink>
