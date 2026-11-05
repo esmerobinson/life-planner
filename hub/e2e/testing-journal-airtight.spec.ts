@@ -191,21 +191,31 @@ async function pastExercise(page: Page, line: string): Promise<Locator> {
   return item;
 }
 
-async function readBack(page: Page) {
+/**
+ * Read back (option B, 2026-11-05): four tiles, one per Journal part; tapping one opens that
+ * part's own section (its heading, then its entries by month). Returns the part's section.
+ */
+async function readBack(page: Page, part: string): Promise<Locator> {
   await tabLink(page, "Read back").click();
-  const list = page.getByRole("list", { name: "Read back" });
-  await expect(list).toBeVisible();
-  return list;
+  await page.locator("button.journal-readback-tile", { hasText: part }).click();
+  const section = page.locator("section.journal-readback-part");
+  await expect(section.getByRole("heading", { level: 3, name: part })).toBeVisible();
+  return section;
 }
 
-/** One Read back item, opened (a <details>). */
-async function readBackItem(page: Page, line: string): Promise<Locator> {
-  const list = await readBack(page);
-  const item = list.locator("details", { has: page.locator(`summary:text-is("${line}")`) });
+/** One Read back entry in its part's section, opened (a <details>). */
+async function readBackItem(page: Page, part: string, line: string | RegExp): Promise<Locator> {
+  const section = await readBack(page, part);
+  // Relative to each entry (a `has` locator is searched inside the entry, not from the page).
+  const summary = typeof line === "string" ? page.locator(`summary:text-is("${line}")`) : page.locator("summary").filter({ hasText: line });
+  const item = section.locator("details", { has: summary });
   await expect(item).toHaveCount(1);
   await item.locator("> summary").click();
   return item;
 }
+
+/** A check-in day's line in Read back: its date and how many answers. */
+const checkinLine = (long: string) => new RegExp(`^${long.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} · \\d+ answers?$`);
 
 /** The kettle card's four parts, word for word, as she answered them. */
 async function kettleShown(where: Locator) {
@@ -243,7 +253,7 @@ test.describe("Mental health exercise at 1280px", () => {
     await expect((await pastExercise(page, `${long} · Day 1 · Pretend weather`)).locator(".journal-past-answer")).toHaveText(EX_TEXT);
 
     // (c) In Read back.
-    const rb = await readBackItem(page, `${long} · Exercise · Day 1 · Pretend weather`);
+    const rb = await readBackItem(page, "Mental health exercise", `${long} · Day 1 · Pretend weather`);
     await expect(rb.locator(".journal-past-answer")).toBeVisible();
     await expect(rb.locator(".journal-past-answer")).toHaveText(EX_TEXT);
     await expect(rb.getByText("Not submitted")).toHaveCount(0);
@@ -293,8 +303,8 @@ test.describe("Mental health exercise at 1280px", () => {
     await map.locator(".choose-top").getByRole("button", { name: "Done" }).click();
 
     // (c) Read back: both cards, each word for word.
-    await kettleShown(await readBackItem(page, `${long} · Exercise · Day 2 · The fictional kettle`));
-    const day1 = await readBackItem(page, `${long} · Exercise · Day 1 · Pretend weather`);
+    await kettleShown(await readBackItem(page, "Mental health exercise", `${long} · Day 2 · The fictional kettle`));
+    const day1 = await readBackItem(page, "Mental health exercise", `${long} · Day 1 · Pretend weather`);
     await expect(day1.locator(".journal-past-answer")).toHaveText(EX_TEXT);
 
     // (d) Home and back.
@@ -342,8 +352,8 @@ test.describe("Morning pages at 1280px", () => {
     await done();
 
     // (c) Read back: listed, locked until its day.
-    const list = await readBack(page);
-    const locked = list.locator(".journal-readback-locked", { hasText: `${long} · Morning pages` });
+    const list = await readBack(page, "Morning pages");
+    const locked = list.locator(".journal-readback-locked", { hasText: long });
     await expect(locked).toHaveCount(1);
     await expect(locked).toContainText(`Opens on ${opens.long}`);
     await expect(page.locator("body")).not.toContainText("Marrowind");
@@ -358,7 +368,7 @@ test.describe("Morning pages at 1280px", () => {
     await page.clock.setSystemTime(new Date(start.getTime() + 29 * DAY_MS));
     await page.reload();
     expect((await appDay(page)).iso > opens.iso).toBe(true);
-    const page1 = await readBackItem(page, `${long} · Morning pages`);
+    const page1 = await readBackItem(page, "Morning pages", long);
     await expect(page1.locator(".journal-readback-text")).toBeVisible();
     await expect(page1.locator(".journal-readback-text")).toHaveText(MORNING);
     await noWordsInClear(page, [MORNING, "Marrowind"]); // opening it never stores it in clear
@@ -437,7 +447,7 @@ for (const width of [1280, 390]) {
       await tabDone(page, "Daily check-in");
 
       // (c) Read back.
-      await checkinListed(await readBackItem(page, `${long} · Check-in`), questions, CHECKIN);
+      await checkinListed(await readBackItem(page, "Daily check-in", checkinLine(long)), questions, CHECKIN);
 
       // (d) Home and back.
       await homeAndBack(page, "Daily check-in");
@@ -456,7 +466,7 @@ for (const width of [1280, 390]) {
       await page.waitForTimeout(1000); // she looks at it for a moment
       await page.reload();
       await checkedIn(page, questions, edited);
-      await checkinListed(await readBackItem(page, `${long} · Check-in`), questions, edited);
+      await checkinListed(await readBackItem(page, "Daily check-in", checkinLine(long)), questions, edited);
       await homeAndBack(page, "Daily check-in");
       await checkedIn(page, questions, edited);
 
@@ -505,7 +515,7 @@ test.describe("Daily check-in across 3am at 1280px", () => {
       expect((await appDay(page)).iso).toBe(localAt(1, 12).toLocaleDateString("en-CA"));
       await expect(checkinTab(page).getByRole("img", { name: /^Question 1 of \d+$/ })).toBeVisible();
       await checkinListed(await pastCheckin(page, day.long), questions, CHECKIN);
-      await checkinListed(await readBackItem(page, `${day.long} · Check-in`), questions, CHECKIN);
+      await checkinListed(await readBackItem(page, "Daily check-in", checkinLine(day.long)), questions, CHECKIN);
 
       await noWordsInClear(page, [...CHECKIN, "Glimmerfen"]);
     });
@@ -535,6 +545,13 @@ async function noteShown(where: Locator, note: { thought: string; steady: string
   await expect(strip.locator(".notes-steady")).toHaveText(note.steady);
   if (note.memory) await expect(strip.getByText(note.memory, { exact: true })).toBeVisible();
   if (note.skill) await expect(strip.getByText(note.skill, { exact: true })).toBeVisible();
+}
+
+/** A note opened in Read back: every part of it she wrote is on screen, word for word. */
+async function noteInReadBack(entry: Locator, note: { thought: string; steady: string; memory?: string; skill?: string }) {
+  for (const words of [note.thought, note.steady, note.memory, note.skill]) {
+    if (words) await expect(entry.getByText(words, { exact: false }).first()).toBeVisible();
+  }
 }
 
 /** Her notes in the Hard moment pop-up, then closed. */
@@ -568,8 +585,9 @@ test.describe("Notes to myself at 1280px", () => {
     await page.reload();
     await noteShown(mine(), OWN);
     await expect(notesTab(page).getByRole("form")).toHaveCount(0);
-    // (c) Where she rereads her notes: Hard moment.
+    // (c) Where she rereads her notes: Hard moment, and Notes to myself in Read back.
     await inHardMoment(page, OWN);
+    await noteInReadBack(await readBackItem(page, "Notes to myself", new RegExp(` · ${OWN.thought}$`)), OWN);
     // (d) Home and back.
     await homeAndBack(page, "Notes to myself");
     await noteShown(mine(), OWN);
@@ -598,6 +616,7 @@ test.describe("Notes to myself at 1280px", () => {
     await noteShown(group(), note);
     await expect(notesTab(page).getByRole("form")).toHaveCount(0);
     await inHardMoment(page, note);
+    await noteInReadBack(await readBackItem(page, "Notes to myself", new RegExp(` · ${note.thought.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`)), note);
     await homeAndBack(page, "Notes to myself");
     await noteShown(group(), note);
 
