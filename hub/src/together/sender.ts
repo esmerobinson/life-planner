@@ -1,0 +1,465 @@
+// The Together sender (Together link brief, fix round 1): signs in, refreshes, and copies the
+// Mental health exercise and Daily check-in days to Together as two habits with one tally per
+// day. Nothing else goes (no to-dos, Esme 2026-11-05). One way only: nothing is read back.
+// It runs after a sync run has finished (never during one: what it sends is read under the sync
+// lock) and on "Send now", one tab at a time (a Web Lock).
+//
+// When a day goes, in two stages (review C1: a private tick made on another device must never
+// lose the race):
+// 1. After the day ends (the 3am day change): titles only (the cards' titles, the questions she
+//    answered). Leaving these behind in Together is harmless.
+// 2. ANSWERS_DELAY_MS later, and only if that part isn't ticked private (read again right before
+//    sending): the titles-only tally is deleted and one with her answers takes its place.
+//
+// - Every id is fixed (ids.ts). created_at / updated_at are never sent.
+// - A tally is never edited: a change deletes the old one (`deleted_at`, once; its text stays in
+//   Together's database, hidden) and inserts a new version. An id already taken (its content
+//   unknown, say a reply lost on the way) is deleted too, and a new version goes (review I2).
+// - A record per day (store.ts) says what went, so a run sends only what changed.
+// - Offline or a server error: stop, try again next run. One row refused: set aside (counted on
+//   the box), the rest goes on. A 401: one refresh is tried; if that fails too, or a refresh is
+//   refused, stop, forget the tokens and ask her to sign in again. Nothing else is affected.
+
+import { db as appDb, type HubDB } from "../data/db";
+import { readSharePrivate } from "../data/repo";
+import { withSyncLock } from "../data/syncGate";
+import { todayISO } from "../domain/dates";
+import type { ISODate } from "../domain/types";
+import type { JournalKey } from "../journal/crypto";
+import { loadJournalKey } from "../journal/keyStore";
+import { coupleOf, normaliseTogetherUrl, refreshSession, rest, signInWithPassword, validTogetherUrl, type CallResult, type Fetch } from "./client";
+import { togetherId } from "./ids";
+import { readJournalDays, type DayNotes, type JournalDays } from "./journalNotes";
+import {
+  readAuth, readSent, saveSent, TOGETHER_META, TOGETHER_SENT_META, withTogetherLock,
+  type HabitKind, type TogetherAuth, type TogetherSent,
+} from "./store";
+
+/**
+ * How long after a day ends (3am) her answers follow the titles: 24 hours (review C1; a named
+ * setting for Esme to rule on). Until then only the titles and questions are in Together.
+ */
+export const ANSWERS_DELAY_MS = 24 * 60 * 60 * 1000;
+
+/** Provisional wording (Esme may reword): the two habits on her side in Together. */
+export const HABIT_TITLES: Record<HabitKind, string> = {
+  exercise: "Mental health exercise",
+  checkin: "Daily check-in",
+};
+const HABITS: HabitKind[] = ["exercise", "checkin"];
+
+/** A tally's `at`: the day at noon UTC (the same date in any time zone from UTC-11 to UTC+11). */
+export const dayStamp = (d: ISODate): string => `${d}T12:00:00.000Z`;
+
+/** Refresh this long before the access token runs out. */
+const REFRESH_MARGIN_MS = 60_000;
+/** At most this many new versions for one day in one run (each is a taken id deleted first). */
+const MAX_VERSION_TRIES = 5;
+
+export type SendOutcome =
+  | { kind: "off" }
+  | { kind: "needs-sign-in" }
+  /** Another tab is sending right now. */
+  | { kind: "busy" }
+  | { kind: "offline" }
+  | { kind: "ok"; sent: number; refused: number };
+
+export interface SendEnv {
+  fetch: Fetch;
+  now?: () => number;
+  /** "Send now": rows set aside are tried again. */
+  retryRefused?: boolean;
+}
+
+class Stop extends Error {
+  constructor(readonly why: "auth" | "transient") {
+    super(why);
+  }
+}
+
+// ---- sign in / out ----------------------------------------------------------------------------
+
+export type SignInResult = { kind: "ok" } | { kind: "error"; message: string };
+
+/** Provisional wording (Esme may reword). */
+export const SIGN_IN_MESSAGES = {
+  badAddress: "That Together address doesn't look right. It starts with https://.",
+  refused: "Together didn't accept that email and password.",
+  offline: "Couldn't reach Together. Check the connection and try again.",
+  noCouple: "That Together login isn't part of a couple yet.",
+  busy: "Together is busy in another tab. Try again in a moment.",
+};
+
+/** Provisional wording (Esme may reword). */
+export const NEEDS_SIGN_IN = "Sign in to Together again";
+export const notRemoved = (n: number) =>
+  `${n === 1 ? "1 thing" : `${n} things`} couldn't be removed from Together. Try again, or stop without removing them.`;
+
+/**
+ * Signs in with her Together email and password. The password is used for this one request and
+ * never kept. Stores only the address, anon key, her user and couple ids and the tokens.
+ */
+export async function signInToTogether(
+  env: SendEnv, form: { url: string; anonKey: string; email: string; password: string },
+): Promise<SignInResult> {
+  if (!validTogetherUrl(form.url)) return { kind: "error", message: SIGN_IN_MESSAGES.badAddress };
+  const url = normaliseTogetherUrl(form.url);
+  const anonKey = form.anonKey.trim();
+  const now = env.now ?? Date.now;
+  const db = appDb;
+  const out = await withTogetherLock(db, async (): Promise<SignInResult> => {
+    const s = await signInWithPassword(env.fetch, url, anonKey, form.email.trim(), form.password, now());
+    if (s.kind === "transient") return { kind: "error", message: SIGN_IN_MESSAGES.offline };
+    if (s.kind === "refused") return { kind: "error", message: SIGN_IN_MESSAGES.refused };
+    const c = await coupleOf(env.fetch, { url, anonKey, accessToken: s.session.accessToken }, s.session.userId);
+    if (c.kind === "transient") return { kind: "error", message: SIGN_IN_MESSAGES.offline };
+    if (!c.coupleId) return { kind: "error", message: c.kind === "refused" && c.code === "no-couple" ? SIGN_IN_MESSAGES.noCouple : SIGN_IN_MESSAGES.refused };
+    const auth: TogetherAuth = {
+      url, anonKey, userId: s.session.userId, coupleId: c.coupleId,
+      accessToken: s.session.accessToken, refreshToken: s.session.refreshToken, expiresAt: s.session.expiresAt,
+    };
+    await db.transaction("rw", db.syncMeta, async () => {
+      await db.syncMeta.put({ key: TOGETHER_META, value: auth });
+      const sent = await readSent(db);
+      if (!sent || sent.userId !== auth.userId) await saveSent(db, freshSent(auth.userId, todayISO(new Date(now()))));
+    });
+    return { kind: "ok" };
+  });
+  return out ?? { kind: "error", message: SIGN_IN_MESSAGES.busy };
+}
+
+function freshSent(userId: string, since: ISODate): TogetherSent {
+  const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return { userId, since, salt, habits: {}, tallies: {}, refused: {} };
+}
+
+export type StopResult = { kind: "ok" } | { kind: "error"; message: string };
+
+/**
+ * "Stop copying to Together": forgets the sign-in on this device. With `markDeleted`, first marks
+ * everything sent as deleted in Together, and forgets the record too, so signing in again later
+ * starts from that day (review M9). If anything can't be removed, nothing is forgotten and she is
+ * told how many (review M2), so she can try again or stop without removing.
+ */
+export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean }): Promise<StopResult> {
+  const db = appDb;
+  const now = env.now ?? Date.now;
+  const out = await withTogetherLock(db, async (): Promise<StopResult> => {
+    if (opts.markDeleted) {
+      try {
+        const auth = await freshAuth(db, env.fetch, now());
+        const sent = await readSent(db);
+        if (auth && sent && sent.userId === auth.userId) {
+          const failed = await markAllDeleted(new Ctx(db, env, auth, sent, null));
+          if (failed > 0) return { kind: "error", message: notRemoved(failed) };
+        }
+      } catch (e) {
+        if (!(e instanceof Stop)) throw e;
+        return { kind: "error", message: e.why === "auth" ? NEEDS_SIGN_IN : SIGN_IN_MESSAGES.offline };
+      }
+      await db.syncMeta.delete(TOGETHER_SENT_META);
+    }
+    await db.syncMeta.delete(TOGETHER_META);
+    return { kind: "ok" };
+  });
+  return out ?? { kind: "error", message: SIGN_IN_MESSAGES.busy };
+}
+
+// ---- tokens -----------------------------------------------------------------------------------
+
+/**
+ * Signed in with tokens that still work (refreshed when near expiry, or when `force`d after a
+ * 401), or null when there's no sign-in at all.
+ */
+async function freshAuth(db: HubDB, fetchFn: Fetch, now: number, force = false): Promise<Required<TogetherAuth> | null> {
+  const auth = await readAuth(db);
+  if (!auth) return null;
+  if (!auth.accessToken || !auth.refreshToken || auth.expiresAt === undefined) throw new Stop("auth");
+  if (!force && auth.expiresAt - REFRESH_MARGIN_MS > now) return auth as Required<TogetherAuth>;
+  const used = auth.refreshToken;
+  const r = await refreshSession(fetchFn, auth.url, auth.anonKey, used, now);
+  if (r.kind === "transient") throw new Stop("transient");
+  if (r.kind === "refused" || r.session.userId !== auth.userId) {
+    await forgetTokens(db);
+    throw new Stop("auth");
+  }
+  // The refresh token is single use: the new pair is saved before it is used.
+  const saved = await db.transaction("rw", db.syncMeta, async () => {
+    const cur = await readAuth(db);
+    if (!cur || cur.refreshToken !== used) return null;
+    const next: TogetherAuth = { ...cur, accessToken: r.session.accessToken, refreshToken: r.session.refreshToken, expiresAt: r.session.expiresAt };
+    await db.syncMeta.put({ key: TOGETHER_META, value: next });
+    return next as Required<TogetherAuth>;
+  });
+  if (!saved) throw new Stop("transient"); // signed out or in again meanwhile: next run uses that
+  return saved;
+}
+
+/** Keeps the address, anon key and ids (for signing in again) but no token. */
+async function forgetTokens(db: HubDB): Promise<void> {
+  await db.transaction("rw", db.syncMeta, async () => {
+    const cur = await readAuth(db);
+    if (!cur) return;
+    const { accessToken: _a, refreshToken: _r, expiresAt: _e, ...rest } = cur;
+    await db.syncMeta.put({ key: TOGETHER_META, value: rest });
+  });
+}
+
+// ---- one run ----------------------------------------------------------------------------------
+
+/** Sends whatever changed. At most one run at a time on this device (any tab). */
+export async function sendToTogether(env: SendEnv): Promise<SendOutcome> {
+  const db = appDb;
+  const out = await withTogetherLock(db, () => run(db, env), { ifAvailable: true });
+  return out ?? { kind: "busy" };
+}
+
+async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
+  const now = env.now ?? Date.now;
+  if (!(await readAuth(db))) return { kind: "off" };
+  try {
+    const auth = (await freshAuth(db, env.fetch, now()))!;
+    let sent = await readSent(db);
+    if (!sent || sent.userId !== auth.userId) {
+      sent = freshSent(auth.userId, todayISO(new Date(now())));
+      await saveSent(db, sent);
+    }
+    if (env.retryRefused) sent.refused = {};
+    const today = todayISO(new Date(now()));
+    const since = sent.since;
+    // Read under the sync lock, so nothing is read halfway through a sync run.
+    const snap = await withSyncLock(db, async () => {
+      const jk = await loadJournalKey(db).catch(() => undefined);
+      const journal = jk ? await readJournalDays(jk, since, today).catch(() => null) : null;
+      return { jk, journal };
+    });
+    if (snap.jk && snap.journal) {
+      const ctx = new Ctx(db, env, auth, sent, snap.jk);
+      await sendJournal(ctx, snap.journal);
+      sent.lastSentAt = now();
+      await ctx.save();
+      return { kind: "ok", sent: ctx.sentCount, refused: Object.keys(sent.refused).length };
+    }
+    sent.lastSentAt = now();
+    await saveSent(db, sent);
+    return { kind: "ok", sent: 0, refused: Object.keys(sent.refused).length };
+  } catch (e) {
+    if (!(e instanceof Stop)) throw e;
+    if (e.why === "auth") {
+      await forgetTokens(db);
+      return { kind: "needs-sign-in" };
+    }
+    return { kind: "offline" };
+  }
+}
+
+class Ctx {
+  sentCount = 0;
+  private refreshedAfter401 = false;
+  constructor(
+    readonly db: HubDB,
+    readonly env: SendEnv,
+    public auth: Required<TogetherAuth>,
+    readonly sent: TogetherSent,
+    readonly jk: JournalKey | null,
+  ) {}
+
+  now(): number {
+    return (this.env.now ?? Date.now)();
+  }
+
+  nowIso(): string {
+    return new Date(this.now()).toISOString();
+  }
+
+  save(): Promise<void> {
+    return saveSent(this.db, this.sent);
+  }
+
+  async hash(text: string): Promise<string> {
+    const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${this.sent.salt}|${text}`)));
+    return [...bytes.subarray(0, 16)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  /** One request. On a 401, one refresh and one retry (review M4); then stop. Offline stops. */
+  async call(method: "POST" | "PATCH", path: string, body: unknown, prefer = "return=minimal"): Promise<CallResult & { kind: "ok" | "refused" }> {
+    let r = await rest(this.env.fetch, this.auth, method, path, body, prefer);
+    if (r.kind === "auth" && !this.refreshedAfter401) {
+      this.refreshedAfter401 = true;
+      this.auth = (await freshAuth(this.db, this.env.fetch, this.now(), true))!;
+      r = await rest(this.env.fetch, this.auth, method, path, body, prefer);
+    }
+    if (r.kind === "auth") throw new Stop("auth");
+    if (r.kind === "transient") throw new Stop("transient");
+    if (r.kind === "ok") this.sentCount++;
+    return r;
+  }
+
+  /** PATCH one row by id; refused when Together has no such row for her. */
+  async patch(table: "todos" | "todo_events", id: string, body: Record<string, unknown>) {
+    const r = await this.call("PATCH", `${table}?id=eq.${id}&select=id`, body, "return=representation");
+    if (r.kind === "ok" && !(Array.isArray(r.body) && r.body.length === 1)) return { kind: "refused" as const, status: 200, code: "no-row" };
+    return r;
+  }
+
+  /** Delete a tally (once). One already deleted (say, by her Undo in Together) counts as done. */
+  async deleteEvent(id: string): Promise<boolean> {
+    const r = await this.patch("todo_events", id, { deleted_at: this.nowIso() });
+    return r.kind === "ok" || r.code === "P0001";
+  }
+}
+
+/** The id is already taken (not "its to-do doesn't exist", which is also a 409). */
+const isDuplicate = (r: CallResult) => r.kind === "refused" && (r.code === "23505" || (r.status === 409 && r.code !== "23503"));
+
+// ---- the two habits and their tallies -----------------------------------------------------------
+
+async function sendJournal(ctx: Ctx, journal: JournalDays): Promise<void> {
+  for (const kind of HABITS) {
+    const days = journal[kind];
+    if (!days) continue; // couldn't be read this time: nothing changes
+    const habitId = await ensureHabit(ctx, kind);
+    if (!habitId) continue;
+    await sendTallies(ctx, kind, habitId, days);
+  }
+}
+
+/** The habit to-do on her side, made once with a fixed id (un-deleted if it was deleted). */
+async function ensureHabit(ctx: Ctx, kind: HabitKind): Promise<string | null> {
+  const { sent } = ctx;
+  const id = await togetherId("habit", kind, 1);
+  const key = `habit:${kind}`;
+  const have = sent.habits[kind];
+  if (have && !have.deleted) return id;
+  if (sent.refused[key]) return null;
+  let r: CallResult;
+  if (!have) {
+    r = await ctx.call("POST", "todos", {
+      id, couple_id: ctx.auth.coupleId, owner_id: ctx.auth.userId, created_by: ctx.auth.userId,
+      title: HABIT_TITLES[kind], type: "habit", period: "day", target: 1, points_earn: 0, points_miss: 0,
+    });
+    if (isDuplicate(r)) r = await ctx.patch("todos", id, { deleted_at: null });
+  } else {
+    r = await ctx.patch("todos", id, { deleted_at: null });
+  }
+  if (r.kind !== "ok") {
+    sent.refused[key] = { hash: "habit", what: "copy" };
+    await ctx.save();
+    return null;
+  }
+  sent.habits[kind] = { tally: have?.tally ?? 0, deleted: false };
+  await ctx.save();
+  return id;
+}
+
+/**
+ * The note that may go for a day right now: titles only until ANSWERS_DELAY_MS after the day
+ * ends, and whenever that part is ticked private (the tick is read again right before sending).
+ */
+async function noteFor(ctx: Ctx, kind: HabitKind, date: ISODate, note: { titles: string; full: string }): Promise<string> {
+  if (note.full === note.titles) return note.titles;
+  const answersDue = date < todayISO(new Date(ctx.now() - ANSWERS_DELAY_MS));
+  if (!answersDue) return note.titles;
+  const ticks = await readSharePrivate(ctx.jk!, date);
+  return ticks[kind] ? note.titles : note.full;
+}
+
+async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: DayNotes): Promise<void> {
+  const { sent } = ctx;
+  const prefix = `${kind}:`;
+  const dates = new Set<ISODate>([...days.notes.keys(), ...Object.keys(sent.tallies).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))]);
+  for (const date of [...dates].sort()) {
+    if (days.unknown.has(date)) continue;
+    const key = `${kind}:${date}`;
+    const rec = sent.tallies[key];
+    const day = days.notes.get(date);
+    if (day) {
+      const note = await noteFor(ctx, kind, date, day);
+      const h = await ctx.hash(note);
+      if (rec?.live && rec.hash === h) continue;
+      if (sent.refused[key]?.hash === h) continue;
+      // A sent tally can't be edited: the old one is deleted (its text stays in Together's
+      // database, hidden) before a new version goes.
+      if (rec?.live) {
+        if (!(await ctx.deleteEvent(await togetherId("tally", key, rec.v)))) {
+          sent.refused[key] = { hash: h, what: "hide" };
+          await ctx.save();
+          continue;
+        }
+        rec.live = false;
+        await ctx.save();
+      }
+      const v = await insertTally(ctx, key, rec ? rec.v + 1 : 1, {
+        couple_id: ctx.auth.coupleId, todo_id: habitId, user_id: ctx.auth.userId, kind: "tally", at: dayStamp(date), note: note === "" ? null : note,
+      });
+      if (v === null) {
+        sent.refused[key] = { hash: h, what: "copy" };
+        await ctx.save();
+        continue;
+      }
+      sent.tallies[key] = { v, hash: h, live: true };
+      delete sent.refused[key];
+      await ctx.save();
+    } else if (rec?.live) {
+      if (!(await ctx.deleteEvent(await togetherId("tally", key, rec.v)))) {
+        sent.refused[key] = { hash: "gone", what: "hide" };
+        await ctx.save();
+        continue;
+      }
+      rec.live = false;
+      delete sent.refused[key];
+      await ctx.save();
+    }
+  }
+  // Together counts live tallies itself; its stored count (for Undo and the plain count) matches.
+  const live = Object.entries(sent.tallies).filter(([k, t]) => k.startsWith(prefix) && t.live).length;
+  const habit = sent.habits[kind]!;
+  if (habit.tally !== live) {
+    const r = await ctx.patch("todos", habitId, { tally: live });
+    if (r.kind === "ok") {
+      habit.tally = live;
+      await ctx.save();
+    }
+  }
+}
+
+/**
+ * Inserts a tally as version `v` (a plain insert: a skipped duplicate never counts as sent). An
+ * id already taken holds content we can't know, so it is deleted and the next version tried
+ * (review I2). Returns the version that went in, or null when refused.
+ */
+async function insertTally(ctx: Ctx, key: string, v: number, row: Record<string, unknown>): Promise<number | null> {
+  for (let tries = 0; tries < MAX_VERSION_TRIES; tries++, v++) {
+    const id = await togetherId("tally", key, v);
+    const r = await ctx.call("POST", "todo_events", { id, ...row });
+    if (r.kind === "ok") return v;
+    if (!isDuplicate(r)) return null;
+    if (!(await ctx.deleteEvent(id))) return null;
+  }
+  return null;
+}
+
+// ---- stop: mark everything deleted -------------------------------------------------------------
+
+/** Marks every live tally and both habits deleted. Returns how many couldn't be. */
+async function markAllDeleted(ctx: Ctx): Promise<number> {
+  const { sent } = ctx;
+  let failed = 0;
+  for (const [key, t] of Object.entries(sent.tallies)) {
+    if (!t.live) continue;
+    if (await ctx.deleteEvent(await togetherId("tally", key, t.v))) t.live = false;
+    else failed++;
+    await ctx.save();
+  }
+  for (const kind of HABITS) {
+    const h = sent.habits[kind];
+    if (!h || h.deleted) continue;
+    const id = await togetherId("habit", kind, 1);
+    const live = Object.entries(sent.tallies).filter(([k, t]) => k.startsWith(`${kind}:`) && t.live).length;
+    if (h.tally !== live && (await ctx.patch("todos", id, { tally: live })).kind === "ok") h.tally = live;
+    if ((await ctx.patch("todos", id, { deleted_at: ctx.nowIso() })).kind === "ok") h.deleted = true;
+    else failed++;
+    await ctx.save();
+  }
+  return failed;
+}
