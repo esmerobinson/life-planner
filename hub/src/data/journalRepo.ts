@@ -439,6 +439,7 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
   let set: string[] | null = null;
   let legacy: Shape<"checkin"> | null = null;
   const answers = new Map<string, CheckinAnswer>();
+  const byPrompt = new Map<string, { e: AnswerEntry; row: JournalRow }[]>();
   let unreadable = 0;
   for (const row of await rowsOn(date)) {
     if (row.kind === "set") {
@@ -448,13 +449,28 @@ export async function readCheckinDay(jk: JournalKey, date: ISODate): Promise<Che
     } else if (row.kind === "answer") {
       const o = await openRow(jk, row, "answer");
       if (o.state === "ok") {
-        const e = o.entry;
-        answers.set(e.prompt, mergeAnswer(answers.get(e.prompt), answerOfEntry(e)));
+        const list = byPrompt.get(o.entry.prompt) ?? [];
+        list.push({ e: o.entry, row });
+        byPrompt.set(o.entry.prompt, list);
       } else unreadable++;
     } else if (row.kind === "checkin") {
       const o = await openRow(jk, row, "checkin");
       if (o.state === "ok") legacy = o.entry;
       else unreadable++;
+    }
+  }
+  // After a Replace (deviceIds.ts), what this device saved for a question since (under its
+  // current id) stands over its own earlier rows (former ids) that were here when it was written
+  // (`over`): a clear or a Skip on purpose stays (bug #52). Words of its own that synced in later
+  // (newer than that), and every other device's answers, merge as always.
+  const here = (await db.syncMeta.get("deviceId"))?.value;
+  const former = await formerDeviceIds();
+  for (const [prompt, list] of byPrompt) {
+    const mine = typeof here === "string" ? list.filter((r) => answerFrom(r.row, here)) : [];
+    const over = Math.max(-1, ...mine.map((r) => r.e.over ?? -1));
+    for (const r of list) {
+      if (r.e.at <= over && former.some((d) => answerFrom(r.row, d))) continue;
+      answers.set(prompt, mergeAnswer(answers.get(prompt), answerOfEntry(r.e)));
     }
   }
   if (legacy) {
@@ -524,14 +540,45 @@ export async function saveAnswer(
   // wins over her change here). Words that arrive from elsewhere while she edits can still be newer.
   const before = edit ? (edit.seenAt !== undefined ? [edit.seenAt] : (await answersTo(jk, date, pk)).map((e) => e.at)) : [];
   const at = Math.max(Date.now(), ...before.map((t) => t + 1));
+  const suffix = edit ? `${pk}:${deviceId}-e${edit.session}` : await ownAnswerSuffix(jk, date, prompt, deviceId);
+  const over = await answerOver(jk, date, prompt, deviceId, edit ? undefined : suffix);
   const entry: AnswerEntry = {
     v: 1, prompt, answer: text, done, at,
     ...(edit && text === null ? { cleared: true as const } : {}),
     ...(skip && !edit && text === null ? { skipped: true as const } : {}),
+    ...(over !== undefined ? { over } : {}),
   };
-  const suffix = edit ? `${pk}:${deviceId}-e${edit.session}` : await ownAnswerSuffix(jk, date, prompt, deviceId);
   await write(jk, [await seal(jk, "answer", date, suffix, entry)]);
 }
+
+/**
+ * `over` for this device's answer row (AnswerEntry): the row it already has keeps its own (what
+ * was here when it was first written); a new one takes the newest of this device's answers to
+ * the question under a former id here now (deviceIds.ts), or none.
+ */
+async function answerOver(jk: JournalKey, date: ISODate, prompt: string, deviceId: string, suffix?: string): Promise<number | undefined> {
+  if (suffix) {
+    const have = await db.journal.get(journalId("answer", date, suffix));
+    if (have) {
+      const o = await openRow(jk, have, "answer");
+      return o.state === "ok" ? o.entry.over : undefined;
+    }
+  }
+  const old = await formerAnswer(jk, date, prompt, deviceId);
+  return old?.state === "ok" ? old.entry.at : undefined;
+}
+
+/**
+ * Whether an answer row (`<promptKey>:<deviceId>`, or with `-2` or an Edit's `-e<session>`) is
+ * from `device`. Matched against the id itself: a device id may end in "-e…" of its own.
+ */
+const answerFrom = (row: JournalRow, device: string) => {
+  const rest = suffixOf(row);
+  const part = rest.slice(rest.indexOf(":") + 1);
+  if (rest.indexOf(":") < 0 || !part.startsWith(device)) return false;
+  const tail = part.slice(device.length);
+  return tail === "" || tail === "-2" || /^-e[0-9a-z]+$/.test(tail);
+};
 
 /** Every answer row to one question on a day (any device) that opens here. */
 async function answersTo(jk: JournalKey, date: ISODate, pk: string): Promise<AnswerEntry[]> {
@@ -570,15 +617,31 @@ export async function moveAnswerOn(
   deviceId = await writerId(deviceId);
   const suffix = await ownAnswerSuffix(jk, date, prompt, deviceId);
   const own = await db.journal.get(journalId("answer", date, suffix));
-  if (!own) return saveAnswer(jk, date, prompt, deviceId, null, true, undefined, skip); // nothing here: an empty answer never wins
-  const o = await openRow(jk, own, "answer");
+  // With no row of its own since a Replace, this device starts from its own earlier answer (under
+  // a former id, deviceIds.ts), with the time it was typed, so Next keeps those words (bug #52).
+  const o = own ? await openRow(jk, own, "answer") : await formerAnswer(jk, date, prompt, deviceId);
+  if (!o) return saveAnswer(jk, date, prompt, deviceId, null, true, undefined, skip); // nothing here: an empty answer never wins
   if (o.state !== "ok") throw new Error("That answer could not be read, so it was left as it is.");
   // Only "moved past" changes: the words keep the time they were written, so they never look
   // newer than an answer (or a clear) made since on another device (bug #33).
   // Skip on a row with no words marks it skipped (bug #40); Next, or words, never do.
-  const { skipped: _was, ...entry } = o.entry;
+  const { skipped: _was, ...entry } = own ? o.entry : { ...o.entry, over: o.entry.at };
   const skipped = skip && entry.answer === null && !entry.cleared;
   await write(jk, [await seal(jk, "answer", date, suffix, { ...entry, done: true, ...(skipped ? { skipped: true as const } : {}) })]);
+}
+
+/** This device's newest answer to a question under a former id (deviceIds.ts), opened, or null. */
+async function formerAnswer(jk: JournalKey, date: ISODate, prompt: string, deviceId: string): Promise<Opened<AnswerEntry> | null> {
+  const { former } = await ownDevices(deviceId);
+  if (former.length === 0) return null;
+  const pk = await promptKey(jk, prompt);
+  let best: AnswerEntry | null = null;
+  for (const row of (await rowsOn(date)).filter((r) => r.kind === "answer" && r.id.startsWith(`answer:${date}:${pk}:`))) {
+    if (!former.some((d) => answerFrom(row, d))) continue;
+    const o = await openRow(jk, row, "answer");
+    if (o.state === "ok" && (!best || o.entry.at > best.at)) best = o.entry;
+  }
+  return best && { state: "ok", entry: best };
 }
 
 /** Every day with a check-in, newest first. */
@@ -996,7 +1059,7 @@ const contentKey = (r: ExerciseResponseEntry) => JSON.stringify([r.text, partsOf
  * Every other version with something written is in `others`: nothing is hidden.
  */
 function mergeResponses(
-  date: ISODate, rows: ExerciseResponseEntry[], mode: "read" | "edit" = "read", deviceId?: string,
+  date: ISODate, rows: ExerciseResponseEntry[], mode: "read" | "edit" = "read", devices: readonly string[] = [],
 ): ExerciseResponse | null {
   if (rows.length === 0) return null;
   const newest = (list: ExerciseResponseEntry[]) => list.reduce((a, b) => (b.at > a.at ? b : a));
@@ -1005,7 +1068,11 @@ function mergeResponses(
   const lastSent = sent.length ? newest(sent) : null;
   // The box (edit): this device's own draft when it is the newest row, even emptied (bug #19:
   // she cleared her answer to rewrite it, and the old words must not come back).
-  const own = deviceId === undefined ? undefined : rows.find((r) => deviceOf(r) === `${deviceId}${DRAFT_SUFFIX}`);
+  // This device's drafts: under its current id and, after a Replace, its former ids (bug #52: an
+  // answer she emptied before the backup stays empty after it).
+  const drafts = new Set(devices.map((d) => `${d}${DRAFT_SUFFIX}`));
+  const ownDrafts = rows.filter((r) => drafts.has(deviceOf(r)));
+  const own = ownDrafts.length ? newest(ownDrafts) : undefined;
   const ownLast = mode === "edit" && own && newest(rows) === own ? own : null;
   const best = ownLast ?? (mode === "read" && lastSent ? lastSent : newest(filled.length ? filled : rows));
   // Her edit (flagged in the sealed entry, never guessed from a device id: re-review m1).
@@ -1061,8 +1128,9 @@ export async function readExerciseEntry(
 ): Promise<{ entry: ExerciseResponse | null; unreadable: number }> {
   const prefix = `${ENTRY_PREFIX}${date}:${await cardKey(jk, card)}:`;
   const { groups, unreadable } = await openResponses(jk, (await rowsOn(date)).filter((r) => r.id.startsWith(prefix)));
-  const own = deviceId === undefined ? undefined : await writerId(deviceId);
-  return { entry: groups[0] ? mergeResponses(date, groups[0].entries, "edit", own) : null, unreadable };
+  const own = deviceId === undefined ? undefined : await ownDevices(deviceId);
+  const devices = own ? [own.current, ...own.former] : [];
+  return { entry: groups[0] ? mergeResponses(date, groups[0].entries, "edit", devices) : null, unreadable };
 }
 
 /** This device's own response row for the card, opened (never written over if it won't open). */
@@ -1509,13 +1577,17 @@ export async function clearNoteDraft(jk: JournalKey, deviceId: string, id: strin
 export async function deleteNote(jk: JournalKey, deviceId: string, id: string, seen: string[]): Promise<void> {
   deviceId = await writerId(deviceId);
   const { versions, hasDraft } = await noteRows(jk, id, deviceId);
-  if (versions.length === 0) throw new Error("That note isn't here.");
+  // A note never saved shows in the list from this device's draft under a former id (listNotes,
+  // after a Replace): Delete works on it too (bug #51). The delete row names what she had open
+  // (`seen`), so only that goes; any other words stay.
+  if (versions.length === 0 && !hasDraft) throw new Error("That note isn't here.");
   const at = Date.now();
   const vid = newVid();
-  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt: Math.min(...versions.map((v) => v.createdAt)), at, vid, seen, deleted: true };
+  const createdAt = versions.length ? Math.min(...versions.map((v) => v.createdAt)) : at;
+  const empty = { v: 1, prompt: null, thought: "", steady: "", memory: "", skill: "", createdAt, at, vid, seen, deleted: true };
   const date = noteDate(id);
   const row = await seal(jk, "note", date, versionRowId(id, deviceId, vid).slice(`note:${date}:`.length), empty);
-  await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft))]);
+  await write(jk, [row, ...(await clearedNoteDraft(jk, id, deviceId, hasDraft, seen))]);
 }
 
 /** Which notes were read on which day, from every device's "I read this today" rows. */

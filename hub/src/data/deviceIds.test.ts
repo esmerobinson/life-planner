@@ -6,7 +6,8 @@ import { db } from "./db";
 import { exportBackup, restoreBackup } from "./backup";
 import { DEVICE_ID_META, FORMER_DEVICE_IDS_META, ownDevices } from "./deviceIds";
 import {
-  clearNoteDraft, finishMorningPage, listNoteReads, listNotes, readMorningDay, saveMorningDraft, saveNote, saveNoteDraft, setNoteRead,
+  clearNoteDraft, finishMorningPage, listNoteReads, listNotes, moveAnswerOn, readCheckinDay, readMorningDay, saveAnswer, saveMorningDraft,
+  saveNote, saveNoteDraft, setNoteRead,
 } from "./repo";
 import { journalId } from "./validate";
 import { journalAad, openJson, type JournalKey } from "../journal/crypto";
@@ -123,4 +124,15 @@ describe("after a Replace", () => {
     expect((await listNoteReads(jk)).ownOn(DAY, now)).toEqual(new Set(["note:2026-11-01:aaaaaaaaaaaaaaaa", "note:2026-11-01:bbbbbbbbbbbbbbbb"]));
     expect((await listNoteReads(jk)).ownOn(DAY, mac)).toEqual((await listNoteReads(jk)).ownOn(DAY, now));
   });
+});
+
+it("device ids that end in \"-e…\" (as a random one can) are told apart from a check-in Edit's rows", async () => {
+  const OLD = "aaaaaaaa-aaaa-4aaa-8aaa-e00000000001";
+  const NEW = "bbbbbbbb-bbbb-4bbb-8bbb-e00000000002";
+  await db.syncMeta.put({ key: DEVICE_ID_META, value: OLD });
+  await saveAnswer(jk, DAY, "Pretend question?", OLD, null, false);
+  await restoreBackup(await backup(), "replace");
+  await db.syncMeta.put({ key: DEVICE_ID_META, value: NEW });
+  await moveAnswerOn(jk, DAY, "Pretend question?", NEW, { skip: true });
+  expect((await readCheckinDay(jk, DAY)).answers.get("Pretend question?")!.skipped).toBe(true);
 });
