@@ -12,18 +12,47 @@ export function isTypingTarget(el: Element | null): boolean {
   return (el as HTMLElement).isContentEditable === true;
 }
 
-/** True while a text field has focus. */
+/**
+ * True while a text field has focus. A press that takes focus off the field (a tap on a form's
+ * Save) keeps it true until the press is released and its click has landed, so the phone nook
+ * never comes back under her finger mid-tap and takes the tap instead.
+ */
 export function useTyping(): boolean {
   const [typing, setTyping] = useState(() => typeof document !== "undefined" && isTypingTarget(document.activeElement));
   useEffect(() => {
-    const check = () => setTyping(isTypingTarget(document.activeElement));
+    let pressed = false;
+    let waiting = false;
+    const check = () => {
+      const now = isTypingTarget(document.activeElement);
+      if (!now && pressed) {
+        waiting = true; // settle once the press is over
+        return;
+      }
+      setTyping(now);
+    };
     // focusout fires before the next element is focused: check once focus has settled.
     const later = () => setTimeout(check, 0);
+    const down = () => {
+      pressed = true;
+    };
+    const up = () => {
+      pressed = false;
+      if (waiting) {
+        waiting = false;
+        setTimeout(check, 0); // after the click this release makes
+      }
+    };
     document.addEventListener("focusin", check);
     document.addEventListener("focusout", later);
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("pointerup", up, true);
+    document.addEventListener("pointercancel", up, true);
     return () => {
       document.removeEventListener("focusin", check);
       document.removeEventListener("focusout", later);
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("pointerup", up, true);
+      document.removeEventListener("pointercancel", up, true);
     };
   }, []);
   return typing;
