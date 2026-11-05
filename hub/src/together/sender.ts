@@ -177,6 +177,9 @@ export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean })
   }
   const out = await withTogetherLock(db, async (): Promise<StopResult> => {
     if (opts.markDeleted) {
+      // Paused first, durably (bug #53): if this is cut off, no run puts anything back.
+      const rec = await readSent(db);
+      if (rec && !rec.removing) await saveSent(db, { ...rec, removing: true });
       try {
         const auth = await freshAuth(db, env.fetch, now());
         const sent = await readSent(db);
@@ -194,6 +197,18 @@ export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean })
     return { kind: "ok" };
   });
   return out ?? { kind: "error", message: SIGN_IN_MESSAGES.busy };
+}
+
+/** Cancels a paused "Stop copying" with removing: copying carries on from the next run. */
+export async function cancelStopRemoving(): Promise<void> {
+  const db = appDb;
+  await withTogetherLock(db, async () => {
+    const rec = await readSent(db);
+    if (rec?.removing) {
+      const { removing: _r, ...rest } = rec;
+      await saveSent(db, rest);
+    }
+  });
 }
 
 // ---- tokens -----------------------------------------------------------------------------------
@@ -268,6 +283,26 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       await saveSent(db, sent);
     }
     if (env.retryRefused) sent.refused = {};
+    const ctx = new Ctx(db, env, auth, sent, null);
+    const done = async (copied: boolean) => {
+      sent.lastSentAt = now();
+      if (copied) sent.lastCopiedAt = sent.lastSentAt;
+      sent.held = !copied && !sent.removing;
+      await ctx.save();
+      return { kind: "ok" as const, sent: ctx.sentCount, refused: Object.keys(sent.refused).length };
+    };
+    // A "Stop copying" with removing that didn't finish: only carry on removing (bug #53).
+    if (sent.removing) {
+      await markAllDeleted(ctx);
+      return done(false);
+    }
+    // Anything a cut-off request may have left in Together goes first, needing no journal key
+    // (bugs #49, #54); until it has, nothing new is sent.
+    if ((await clearMaybes(ctx)) > 0) {
+      sent.refused["maybe"] = { hash: "maybe", what: "hide" };
+      return done(false);
+    }
+    delete sent.refused["maybe"];
     const today = todayISO(new Date(now()));
     const since = sent.since;
     // Read under the sync lock, so nothing is read halfway through a sync run.
@@ -277,15 +312,10 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       return { jk, journal };
     });
     if (snap.jk && snap.journal) {
-      const ctx = new Ctx(db, env, auth, sent, snap.jk);
+      ctx.jk = snap.jk;
       await sendJournal(ctx, snap.journal);
-      sent.lastSentAt = now();
-      await ctx.save();
-      return { kind: "ok", sent: ctx.sentCount, refused: Object.keys(sent.refused).length };
     }
-    sent.lastSentAt = now();
-    await saveSent(db, sent);
-    return { kind: "ok", sent: 0, refused: Object.keys(sent.refused).length };
+    return done(true);
   } catch (e) {
     if (!(e instanceof Stop)) throw e;
     if (e.why === "auth") {
@@ -304,7 +334,7 @@ class Ctx {
     readonly env: SendEnv,
     public auth: Required<TogetherAuth>,
     readonly sent: TogetherSent,
-    readonly jk: JournalKey | null,
+    public jk: JournalKey | null,
   ) {}
 
   now(): number {
@@ -364,14 +394,6 @@ const isDuplicate = (r: CallResult) => r.kind === "refused" && (r.code === "2350
 // ---- the two habits and their tallies -----------------------------------------------------------
 
 async function sendJournal(ctx: Ctx, journal: JournalDays): Promise<void> {
-  // Anything a cut-off request may have left in Together goes first (bug #49); until it has,
-  // nothing new is sent.
-  if ((await clearMaybes(ctx)) > 0) {
-    ctx.sent.refused["maybe"] = { hash: "maybe", what: "hide" };
-    await ctx.save();
-    return;
-  }
-  delete ctx.sent.refused["maybe"];
   for (const kind of HABITS) {
     const days = journal[kind];
     if (!days) continue; // couldn't be read this time: nothing changes
@@ -555,9 +577,8 @@ async function markAllDeleted(ctx: Ctx): Promise<number> {
     const live = Object.entries(sent.tallies).filter(([k, t]) => k.startsWith(`${kind}:`) && t.live).length;
     if (h && h.tally !== live && (await ctx.patch("todos", id, { tally: live })).kind === "ok") h.tally = live;
     const r = await ctx.patch("todos", id, { deleted_at: ctx.nowIso() });
-    if (r.kind === "ok") {
-      if (h) h.deleted = true;
-    } else if (h || r.code !== "no-row") failed++;
+    if (r.kind === "ok" || (!h && r.code === "no-row")) sent.habits[kind] = { tally: h?.tally ?? 0, deleted: true };
+    else failed++;
     await ctx.save();
   }
   return failed;

@@ -36,6 +36,12 @@ export const TOGETHER_WORDS = {
   stopConfirm: "Stop copying",
   cancel: "Cancel",
   stopped: "Stopped copying to Together on this device.",
+  /** After a "Stop copying" with removing that didn't finish (bug #53). */
+  paused: "Copying is paused: removing what was copied to Together didn't finish. Nothing new goes until you finish removing, or keep copying instead.",
+  finishRemoving: "Finish removing",
+  cancelRemoving: "Keep copying",
+  /** While a refused clean-up holds new days back. */
+  daysWaiting: "New days are waiting and will be copied once that's sorted.",
   privateHeading: "Keep a day's answers private",
   privateDay: "Day",
   privateExercise: "Mental health exercise: keep that day's answers private",

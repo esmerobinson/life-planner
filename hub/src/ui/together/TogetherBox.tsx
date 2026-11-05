@@ -3,7 +3,7 @@ import { todayISO } from "../../domain/dates";
 import { isValidISODate } from "../../domain/dates";
 import type { Fetch } from "../../together/client";
 import { togetherRunner, type TogetherRunner } from "../../together/runner";
-import { signInToTogether, stopTogether } from "../../together/sender";
+import { cancelStopRemoving, signInToTogether, stopTogether } from "../../together/sender";
 import { useJournalKey } from "../journal/useJournalKey";
 import { PrivateDayTick } from "./PrivateDayTick";
 import { useRunner, useTogetherMeta } from "./useTogether";
@@ -52,6 +52,18 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
       const r = await signInToTogether({ fetch: fetchFn }, { url, anonKey, email, password: pw });
       if (r.kind === "error") setProblem(r.message);
       else setEmail("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function finishRemoving() {
+    setProblem("");
+    setBusy(true);
+    try {
+      const r = await stopTogether({ fetch: fetchFn }, { markDeleted: true });
+      if (r.kind === "error") setProblem(r.message);
+      else setNote(W.stopped);
     } finally {
       setBusy(false);
     }
@@ -115,8 +127,24 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
         </form>
       ) : (
         <>
-          <p>{W.copying}</p>
-          <p>{meta?.sent?.lastSentAt ? W.lastSent(new Date(meta.sent.lastSentAt).toLocaleString()) : W.notSentYet}</p>
+          {meta?.sent?.removing ? (
+            <div role="alert">
+              <p>{W.paused}</p>
+              <div className="form-actions">
+                <button type="button" disabled={busy} onClick={() => void finishRemoving()}>
+                  {W.finishRemoving}
+                </button>
+                <button type="button" className="btn-secondary" disabled={busy} onClick={() => void cancelStopRemoving()}>
+                  {W.cancelRemoving}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p>{W.copying}</p>
+          )}
+          <p>{W.onlyThisDevice}</p>
+          <p>{meta?.sent?.lastCopiedAt ? W.lastSent(new Date(meta.sent.lastCopiedAt).toLocaleString()) : W.notSentYet}</p>
+          {meta?.sent?.held && <p>{W.daysWaiting}</p>}
           {last?.kind === "offline" && <p role="status">{W.offline}</p>}
           {notHidden > 0 && <p role="alert">{W.notHidden(notHidden)}</p>}
           {notCopied > 0 && <p>{W.setAside(notCopied)}</p>}

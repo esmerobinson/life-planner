@@ -67,7 +67,18 @@ export interface TogetherSent {
    * the insert is confirmed and the tally is recorded as sent.
    */
   maybe?: Record<string, { key: string; v: number }>;
+  /** The last run (any outcome but offline). */
   lastSentAt?: number;
+  /** The last run that could copy (nothing held back): "Last copied" in the box. */
+  lastCopiedAt?: number;
+  /** New days are held back until a refused clean-up goes through. */
+  held?: boolean;
+  /**
+   * "Stop copying" with removing began and hasn't finished (bug #53): copying is paused. Runs
+   * may only carry on removing; nothing is sent or shown again until she presses Stop again
+   * (which finishes it) or cancels.
+   */
+  removing?: boolean;
 }
 
 async function meta<T>(db: HubDB, key: string): Promise<T | undefined> {
