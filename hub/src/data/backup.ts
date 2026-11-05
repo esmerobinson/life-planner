@@ -1,6 +1,7 @@
 import { isValidISODate } from "../domain/dates";
 import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
+import { retireDeviceId } from "./deviceIds";
 import { mergeBlocked, readSyncGate, REPLACE_OFF_WHILE_SYNCING, replaceBlocked, WAITING_FIRST_SYNC, withSyncLock } from "./syncGate";
 import { JOURNAL_KINDS, type FileRow, type Goal, type ISODate, type Item, type JournalRow } from "../domain/types";
 import { isObj, isStr, sealedJournalShape, validFile, validGoal, validItem, validJournal } from "./validate";
@@ -162,6 +163,11 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       // them.
       await db.syncMeta.put({ key: "cursor", value: 0 });
       await db.syncMeta.delete("firstPullDone");
+      // The server may have newer copies of this device's own journal rows than the file (words
+      // written after the backup). From now on the device writes with a new id, beside them,
+      // never over them: an edit made before the next sync can't win over words it never saw
+      // (bug #31, deviceIds.ts). The rows restored here keep the file's stamps, so a newer copy wins.
+      await retireDeviceId(db.syncMeta);
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       await db.files.bulkAdd(file.files ?? []);
@@ -221,7 +227,7 @@ async function holdForLater(rows: JournalRow[]) {
     if (held && held.updatedAt > updatedAt) continue;
     await db.quarantine.put({
       table: "journal", id: r.id, updatedAt, data: r as unknown as Record<string, unknown>,
-      reason: "From a backup: a later version of the app reads it.", cursor: 0,
+      reason: "From a backup: a later version of the app reads it.", cursor: 0, fromBackup: true,
     });
   }
 }

@@ -24,6 +24,12 @@ export interface PhotoEntry {
 export interface DraftEntry {
   v: 1;
   text: string;
+  /**
+   * The day's drafts under this device's former ids (data/deviceIds.ts) that "I'm done" has
+   * already dealt with (`<row id>@<updatedAt>`): their words are in a page, so they are never
+   * kept as a page again. Earlier versions read the row without it.
+   */
+  kept?: string[];
 }
 
 /** One check-in answer. `done` once Next / Skip moved past it (else it is still being typed). */
@@ -219,7 +225,7 @@ const partAnswers = (v: unknown): v is PartAnswer[] =>
 export const ENTRY_CHECK = {
   page: (v: unknown): v is PageEntry => isObj(v) && v.v === 1 && isStr(v.text) && num(v.at),
   photo: (v: unknown): v is PhotoEntry => isObj(v) && v.v === 1 && isStr(v.fileId) && num(v.at),
-  draft: (v: unknown): v is DraftEntry => isObj(v) && v.v === 1 && isStr(v.text),
+  draft: (v: unknown): v is DraftEntry => isObj(v) && v.v === 1 && isStr(v.text) && (v.kept === undefined || strList(v.kept)),
   answer: (v: unknown): v is AnswerEntry =>
     isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at) &&
     (v.cleared === undefined || (v.cleared === true && v.answer === null)),
