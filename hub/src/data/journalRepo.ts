@@ -22,7 +22,7 @@ import {
   type JournalKey,
 } from "../journal/crypto";
 import {
-  ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type NoteEntry, type PartAnswer,
+  ENTRY_CHECK, MAX_LEARNED, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type NoteEntry, type PartAnswer,
 } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import {
@@ -1382,4 +1382,124 @@ export async function setExerciseStar(jk: JournalKey, today: ISODate, deviceId: 
   }
   marks = [...marks.filter((m) => m.id !== cardId), { id: cardId, on, at: Date.now() }];
   await write(jk, [await seal(jk, "stars", today, deviceId, { v: 2, marks })]);
+}
+
+// ---- Together link: "Keep my answers private" ----------------------------------------------
+//
+// Each tick is its own sealed row, `share:<date>:exercise` and `share:<date>:checkin`, so ticking
+// one never touches the other (on one device or across devices). Ticks are saved one at a time.
+// Only the Together sender and the ticks read them. A row this device can't open counts as
+// ticked: a tick is never taken for "shared" because it couldn't be read.
+
+/** One day's "Keep my answers private" ticks. */
+export interface SharePrivate {
+  exercise: boolean;
+  checkin: boolean;
+}
+export type SharePart = keyof SharePrivate;
+const SHARE_PARTS: SharePart[] = ["exercise", "checkin"];
+
+/** The row id of one day's tick. */
+export const shareId = (date: ISODate, part: SharePart): string => journalId("share", date, part);
+
+async function openShare(jk: JournalKey, row: JournalRow | undefined): Promise<boolean> {
+  if (!row) return false;
+  const o = await openRow(jk, row, "share");
+  return o.state === "ok" ? o.entry.private : true;
+}
+
+/** The day's ticks (off when never ticked). */
+export async function readSharePrivate(jk: JournalKey, date: ISODate): Promise<SharePrivate> {
+  const [exercise, checkin] = await Promise.all(SHARE_PARTS.map(async (p) => openShare(jk, await db.journal.get(shareId(date, p)))));
+  return { exercise: exercise!, checkin: checkin! };
+}
+
+/** Every day with a tick row (ticked or not), by date. */
+export async function listSharePrivate(jk: JournalKey): Promise<Map<ISODate, SharePrivate>> {
+  const out = new Map<ISODate, SharePrivate>();
+  for (const row of await db.journal.where("kind").equals("share").toArray()) {
+    const part = row.id.slice(`share:${row.date}:`.length) as SharePart;
+    const day = out.get(row.date) ?? { exercise: false, checkin: false };
+    day[part] = await openShare(jk, row);
+    out.set(row.date, day);
+  }
+  return out;
+}
+
+/** Ticks or unticks one part of the day, in its own row; saves go one at a time. */
+export function saveSharePrivate(jk: JournalKey, date: ISODate, part: SharePart, on: boolean): Promise<void> {
+  return oneAtATime(async () => {
+    const id = shareId(date, part);
+    if (await wontOpen(jk, id, "share")) throw new Error(CANT_OPEN); // never written over (bug #20)
+    await write(jk, [await seal(jk, "share", date, part, { v: 1, private: on, at: Date.now() })]);
+  });
+}
+
+// ---- "What I learned today" (Mental health exercise, optional) ------------------------------
+//
+// Each device writes its own row, `learned:<date>:<deviceId>` (rewritten whole as she types),
+// so no device writes over another's words. The day shows the newest; any other device's
+// different words are kept and shown too, so nothing she wrote is hidden.
+
+export interface Learned {
+  /** The newest words for the day ("" when none). */
+  text: string;
+  at: number;
+  /** Other devices' different words for the same day, newest first. */
+  others: { text: string; at: number }[];
+  /** Rows for the day this device can't open. */
+  unreadable: number;
+}
+
+function mergeLearned(entries: { text: string; at: number }[], unreadable: number): Learned {
+  const sorted = [...entries].sort((a, b) => b.at - a.at);
+  const best = sorted[0] ?? { text: "", at: 0 };
+  const seen = new Set([best.text.trim()]);
+  const others: { text: string; at: number }[] = [];
+  for (const e of sorted.slice(1)) {
+    const t = e.text.trim();
+    if (t === "" || seen.has(t)) continue;
+    seen.add(t);
+    others.push(e);
+  }
+  return { text: best.text, at: best.at, others, unreadable };
+}
+
+async function openLearned(jk: JournalKey, rows: JournalRow[]) {
+  const entries: { text: string; at: number }[] = [];
+  let unreadable = 0;
+  for (const row of rows) {
+    const o = await openRow(jk, row, "learned");
+    if (o.state === "ok") entries.push({ text: o.entry.text, at: o.entry.at });
+    else unreadable++;
+  }
+  return { entries, unreadable };
+}
+
+/** The day's "what I learned" words, from every device's row. */
+export async function readLearned(jk: JournalKey, date: ISODate): Promise<Learned> {
+  const { entries, unreadable } = await openLearned(jk, (await rowsOn(date)).filter((r) => r.kind === "learned"));
+  return mergeLearned(entries, unreadable);
+}
+
+/** Every day with "what I learned" words before `before`, newest first (empty days left out). */
+export async function listLearned(jk: JournalKey, before: ISODate): Promise<({ date: ISODate } & Learned)[]> {
+  const rows = (await db.journal.where("kind").equals("learned").toArray()).filter((r) => r.date < before);
+  const dates = [...new Set(rows.map((r) => r.date))].sort((a, b) => b.localeCompare(a));
+  const out: ({ date: ISODate } & Learned)[] = [];
+  for (const date of dates) {
+    const { entries, unreadable } = await openLearned(jk, rows.filter((r) => r.date === date));
+    const day = mergeLearned(entries, unreadable);
+    if (day.text.trim() !== "" || day.others.length > 0) out.push({ date, ...day });
+  }
+  return out;
+}
+
+/** Saves this device's words for the day (its own row; a row here that won't open is kept beside). */
+export async function saveLearned(jk: JournalKey, date: ISODate, deviceId: string, text: string): Promise<void> {
+  if (text.length > MAX_LEARNED) throw new Error("That's too long to save. Nothing was changed.");
+  let suffix = deviceId;
+  if (await wontOpen(jk, journalId("learned", date, suffix), "learned")) suffix = `${deviceId}-2`;
+  if (await wontOpen(jk, journalId("learned", date, suffix), "learned")) throw new Error(CANT_OPEN);
+  await write(jk, [await seal(jk, "learned", date, suffix, { v: 1, text, at: Date.now() })]);
 }

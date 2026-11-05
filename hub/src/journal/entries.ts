@@ -187,6 +187,26 @@ export interface NoteReadEntry {
   at: number;
 }
 
+/**
+ * One "Keep my answers private" tick for a day's exercise or check-in (Together link), in its
+ * own row: ticked, that part's answers never go to Together (only card titles or questions do).
+ */
+export interface ShareEntry {
+  v: 1;
+  private: boolean;
+  at: number;
+}
+
+/** The most a "what I learned today" box holds (characters). */
+export const MAX_LEARNED = 4000;
+
+/** One device's "what I learned about BPD / mental health today" words (optional). */
+export interface LearnedEntry {
+  v: 1;
+  text: string;
+  at: number;
+}
+
 /** The earlier one-row-per-day morning shape (read and split; never written). */
 export interface LegacyMorningEntry {
   v: 1;
@@ -253,6 +273,8 @@ export const ENTRY_CHECK = {
     (v.vid === undefined || (isStr(v.vid) && v.vid.length <= 64)) && (v.seen === undefined || (strList(v.seen) && (v.seen as string[]).length <= 64)) &&
     (v.draft === undefined || v.draft === true),
   "note-read": (v: unknown): v is NoteReadEntry => isObj(v) && v.v === 1 && strList(v.ids) && num(v.at),
+  share: (v: unknown): v is ShareEntry => isObj(v) && v.v === 1 && typeof v.private === "boolean" && num(v.at),
+  learned: (v: unknown): v is LearnedEntry => isObj(v) && v.v === 1 && isStr(v.text) && v.text.length <= MAX_LEARNED && num(v.at),
   morning: (v: unknown): v is LegacyMorningEntry =>
     isObj(v) && v.v === 1 && isStr(v.text) && Number.isInteger(v.pages) && (v.pages as number) >= 0 &&
     (v.draft === undefined || isStr(v.draft)) && strList(v.photos),
