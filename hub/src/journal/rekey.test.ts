@@ -421,3 +421,35 @@ describe("fix round 1: minor items", () => {
     expect(serverWraps(server)).toHaveLength(1);
   });
 });
+
+describe("a passphrase changed on a build without the re-key (bug #34)", () => {
+  it("is carried over once she types her FIRST passphrase on a device where the new one was saved on this build", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const mac = device();
+    await saveSyncSettings(mac, { serverUrl: SERVER, token: await deriveToken(A) });
+    expect((await syncOnce({ db: mac, fetch: server.fetch })).kind).toBe("ok");
+    await confirmedDevice(mac, await keyFor(A)); // the live build's key: no copy of S
+    const page = await writePage(mac, await keyFor(A), "A pretend page from before the change.");
+    expect((await syncOnce({ db: mac, fetch: server.fetch })).kind).toBe("ok");
+    // B is saved on the live build: only the token changes there (no KEK is kept anywhere).
+    changeServer(server, await deriveToken(B));
+    await saveSyncSettings(mac, { serverUrl: SERVER, token: await deriveToken(B) });
+    expect((await syncOnce({ db: mac, fetch: server.fetch })).kind).toBe("ok");
+    expect(await journalNeedsOldPassphrase(mac)).toBe(false); // nothing here can know B
+
+    // A new phone on this build: B on the Sync page doesn't open the journal...
+    const phone = device();
+    expect(await savePassphrase(phone, server, B)).toBe("ok");
+    expect(await confirmJournalKey(phone)).toBe("locked");
+    expect(await unlockJournal(phone, B)).toBe("wrong");
+    // ...her first passphrase does, and the phone then writes B's wrap (it kept B's KEK).
+    expect(await unlockJournal(phone, A)).toBe("ok");
+    expect(await phone.journal.get(keyWrapId((await deriveKeyWrapKey(B)).fp))).toBeTruthy();
+    expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");
+
+    const tablet = device();
+    expect(await savePassphrase(tablet, server, B)).toBe("ok");
+    expect(await confirmJournalKey(tablet)).toBe("confirmed");
+    expect(await readPage(tablet, page)).toBe("A pretend page from before the change.");
+  });
+});

@@ -81,7 +81,7 @@ async function walkThrough(page: Page, prefix: string) {
 
   await prompt.getByLabel("Old passphrase").fill(NEW);
   await prompt.getByRole("button", { name: "Save" }).click();
-  await expect(prompt.getByRole("alert")).toHaveText("That isn't your old passphrase. Try again.");
+  await expect(prompt.getByRole("alert")).toContainText("try the one you first set the journal up with");
   await expect(prompt.getByLabel("Old passphrase")).toHaveValue("");
   expect(await keywrapRows(page)).toBe(0);
 

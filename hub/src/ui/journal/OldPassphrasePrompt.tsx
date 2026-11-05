@@ -10,7 +10,8 @@ export const OLD_PASSPHRASE_HEADING = "Type your old passphrase once";
 export const OLD_PASSPHRASE_LINE =
   "Sync now uses your new passphrase. So that the new one also opens your journal on your other devices, type your old passphrase here once.";
 export const OLD_PASSPHRASE_LABEL = "Old passphrase";
-export const OLD_PASSPHRASE_WRONG = "That isn't your old passphrase. Try again.";
+export const OLD_PASSPHRASE_WRONG =
+  "That passphrase doesn't open your journal. If you've changed it more than once, try the one you first set the journal up with.";
 export const OLD_PASSPHRASE_DONE = "Done. Your new passphrase now opens your journal on your other devices too.";
 const FAILED = "That didn't work. Try again.";
 
