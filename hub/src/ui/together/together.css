@@ -1,0 +1,16 @@
+/* PLACEHOLDER look for the Together link (nothing here is designed): magenta, the system font,
+   no easing. The Design session decides the real look; nothing here may be taken as a choice. */
+.together-placeholder,
+.together-placeholder * {
+  font-family: system-ui, sans-serif;
+  transition: none !important;
+  animation: none !important;
+}
+.together-placeholder {
+  border: 2px dashed magenta;
+  padding: 8px;
+  margin: 16px 0;
+}
+.together-placeholder .together-warning {
+  color: magenta;
+}

@@ -21,6 +21,7 @@ import { SidePanel } from "./SidePanel";
 import { isSearchShortcut, SearchDialog } from "./SearchDialog";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
+import { togetherRunner } from "../together/runner";
 import { useReminderScheduler } from "../reminders/scheduler";
 import { useNativeNavigate } from "../reminders/nativeNavigate";
 
@@ -98,6 +99,8 @@ export function AppShell() {
   // Automatic sync (does nothing until an address and passphrase are saved on the Sync
   // page). Rows that arrive refresh every view the same way a local write does.
   useEffect(() => syncController.start({ onSynced: () => void changed() }), [changed]);
+  // The Together link copies after each finished sync run (only on a device signed in to it).
+  useEffect(() => togetherRunner.start(syncController), []);
 
   // The shell's Undo line (fix round 1, I-2): e.g. after a project lost its sessions.
   const [undoNote, setUndoNote] = useState<UndoNote | null>(null);

@@ -6,6 +6,7 @@ import { deriveToken } from "../sync/token";
 import { confirmJournalKey, saveJournalKeyFromSync } from "../journal/keyStore";
 import { MAX_PAIRING_PASSPHRASE } from "../pairing/pairingText";
 import { PairingCode, ScanPairingCode, TOO_LONG } from "./Pairing";
+import { TogetherBox } from "./together/TogetherBox";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
@@ -279,6 +280,8 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
           </button>
         )}
       </div>
+
+      <TogetherBox />
     </section>
   );
 }

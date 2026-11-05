@@ -22,6 +22,8 @@ import { useJournalKey } from "./useJournalKey";
 import { useJournalRows } from "./useJournalRows";
 import { useTabsStacked } from "./useTabsFit";
 import { usePhone } from "../usePhone";
+import { LearnedToday } from "../together/LearnedToday";
+import { PrivateDayTick } from "../together/PrivateDayTick";
 
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
@@ -149,8 +151,11 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
             {current.title}
           </h2>
           {tab === "exercise" && <MentalHealthExercise jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "exercise" && <LearnedToday jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "exercise" && <PrivateDayTick jk={open.jk} date={today} part="exercise" />}
           {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "check-in" && <PrivateDayTick jk={open.jk} date={today} part="checkin" />}
           {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
           {tab === "notes" && <NotesToMyself jk={open.jk} today={today} deviceId={open.deviceId} />}
         </section>
