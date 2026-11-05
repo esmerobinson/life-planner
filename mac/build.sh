@@ -3,14 +3,16 @@
 #
 #   mac/build.sh              build the web app, then the Mac app, then self-test it
 #   mac/build.sh --skip-web   reuse the existing hub/dist (no npm run build)
-#   mac/build.sh --install    also copy the app to ~/Applications/Esmeworld.app
+#   mac/build.sh --install    also copy the app to ~/Applications/Esmeworld.app, and
+#                             get an open Esmeworld onto it (it saves, then reloads)
 #
 # Signing: $ESMEWORLD_SIGN_IDENTITY if set, else a login-keychain code-signing
 # identity named exactly "Esmeworld Local Signing", else ad hoc. Ad hoc is fine:
 # the app never uses the login keychain (see README "Signing").
 #
 # Requires: node/npm (unless --skip-web), swiftc, sips, iconutil, codesign, plutil,
-# security; --install also uses ditto and /usr/bin/python3 (for an atomic swap).
+# security; --install also uses ditto, /usr/bin/python3 (for an atomic swap), ps
+# and osascript (to tell an open Esmeworld).
 # Never writes to /Applications. Never touches hub/dist except via `npm run build`.
 
 set -euo pipefail
@@ -21,7 +23,7 @@ for arg in "$@"; do
     case "$arg" in
         --skip-web) SKIP_WEB=1 ;;
         --install) INSTALL=1 ;;
-        -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
         *) echo "error: unknown option $arg" >&2; exit 2 ;;
     esac
 done
@@ -33,7 +35,7 @@ BUILD_DIR="$MAC_DIR/build"
 APP="$BUILD_DIR/Esmeworld.app"
 CONTENTS="$APP/Contents"
 ICON_SRC="$HUB_DIR/public/icons/icon-512.png"
-SELFTEST_TIMEOUT=60
+SELFTEST_TIMEOUT=90
 AUTO_SIGN_IDENTITY="Esmeworld Local Signing"
 
 step() { echo ""; echo "== $1 =="; }
@@ -72,8 +74,8 @@ echo "$CONTENTS/Resources/AppIcon.icns"
 
 # --- 4. compile ----------------------------------------------------------------
 step "4/7: compile (swiftc -O)"
-swiftc -swift-version 5 -O \
-    -target "$(uname -m)-apple-macos13.0" \
+SWIFT_FLAGS=(-swift-version 5 -O -target "$(uname -m)-apple-macos13.0")
+swiftc "${SWIFT_FLAGS[@]}" \
     "$MAC_DIR/Esmeworld/main.swift" \
     -o "$CONTENTS/MacOS/Esmeworld"
 echo "$CONTENTS/MacOS/Esmeworld"
@@ -116,6 +118,17 @@ plutil -lint "$CONTENTS/Info.plist"
 # Copied as built (sw.js and workbox files included; they are simply unused here).
 cp -R "$HUB_DIR/dist" "$CONTENTS/Resources/web"
 echo "$CONTENTS/Resources/web ($(find "$CONTENTS/Resources/web" -type f | wc -l | tr -d ' ') files)"
+# Build ids (bug #39): a running Esmeworld compares these with the bundle on disk to
+# notice a new install. Hashes of what went in, so rebuilding the same thing changes
+# nothing: the web files (names and contents), and the app's source, compiler, flags
+# and Info.plist (the binary itself also depends on the build folder's path).
+WEB_BUILD="$(cd "$CONTENTS/Resources/web" && find . -type f -print0 | LC_ALL=C sort -z \
+    | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-16)"
+SHELL_BUILD="$( { shasum -a 256 "$MAC_DIR/Esmeworld/main.swift" | cut -d' ' -f1; swiftc --version 2>&1; \
+    echo "${SWIFT_FLAGS[*]}"; cat "$CONTENTS/Info.plist"; } | shasum -a 256 | cut -c1-16)"
+plutil -insert EsmeworldWebBuild -string "$WEB_BUILD" "$CONTENTS/Info.plist"
+plutil -insert EsmeworldShellBuild -string "$SHELL_BUILD" "$CONTENTS/Info.plist"
+echo "build ids: web $WEB_BUILD, app $SHELL_BUILD"
 
 # --- 6. sign -------------------------------------------------------------------
 # Optional stable identity. Not needed for the keychain any more: the app hands
@@ -216,7 +229,10 @@ if libc.renamex_np(sys.argv[1].encode(), sys.argv[2].encode(), 0x2) != 0:
     rm -rf "$STAGE"   # now holds the old bundle (if any)
     trap - EXIT
     echo "installed: $DEST"
-    echo "Quit and reopen Esmeworld to use the new version."
+
+    # A running Esmeworld picks up the new version (bug #39): never killed; see the script.
+    step "install: the open Esmeworld"
+    "$MAC_DIR/tell-running-app.sh" "$DEST"
 fi
 
 echo ""

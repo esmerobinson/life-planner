@@ -20,6 +20,8 @@ export const SAVE_ANSWERS = "Save";
 const PAST_ON_TAB = 3;
 /** The gentle line under "Checked in for today" (from the mockup, tab A). */
 export const CHECKED_IN_LINE = "Kind to yourself today? That counts.";
+/** A finished day's question with no words saved (blank, cleared or lost; bug #40). Provisional wording. */
+export const NO_ANSWER_SAVED = "No answer saved";
 const SAVE_PROBLEM = "That didn't save. Try again.";
 
 /**
@@ -129,7 +131,8 @@ export function QuestionText({ id }: { id: string }) {
 /**
  * One question. The answer box shows the newest answer from any device and saves this
  * device's own row (not yet "moved past") after a pause in typing, on blur, when it goes away
- * and when the app is hidden. Next and Skip save it as moved past; Skip keeps anything typed.
+ * and when the app is hidden. Next and Skip save it as moved past; Skip keeps anything typed,
+ * and Skip on an empty box saves it as skipped (left out of the finished check-in; bug #40).
  * Next / Skip on a box left untouched never copies another device's answer and never blanks
  * this device's own: it writes nothing when already moved past anywhere, else only "moved past".
  */
@@ -179,7 +182,7 @@ function Question({
   useEffect(() => () => saveNow(), [saveNow]);
   useHiddenFlush(saveNow);
 
-  async function move() {
+  async function move(skip: boolean) {
     if (busy) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -192,7 +195,9 @@ function Question({
       } else {
         // Nothing new typed: keep what this device already saved (never blank it).
         await enqueue(() =>
-          untouched ? moveAnswerOn(jk, day.date, prompt, deviceId) : saveAnswer(jk, day.date, prompt, deviceId, value, true),
+          untouched
+            ? moveAnswerOn(jk, day.date, prompt, deviceId, { skip })
+            : saveAnswer(jk, day.date, prompt, deviceId, value, true, undefined, skip),
         );
         moved.current = true; // the next question shows once the save is read back
       }
@@ -227,10 +232,10 @@ function Question({
         onBlur={saveNow}
       />
       <div className="btn-group journal-question-actions">
-        <button type="button" className="btn-secondary" disabled={busy} onClick={() => void move()}>
+        <button type="button" className="btn-secondary" disabled={busy} onClick={() => void move(true)}>
           Skip
         </button>
-        <button type="button" disabled={busy} onClick={() => void move()}>
+        <button type="button" disabled={busy} onClick={() => void move(false)}>
           {last ? "Finish" : "Next →"}
         </button>
       </div>
@@ -240,15 +245,17 @@ function Question({
 
 /**
  * Once today's check-in is finished (Esme, 2026-11-04: "i should just see a completed check in
- * with my answers, maybe an option to edit"): "Checked in for today", then each question she
- * answered with her answer as it is, read-only (a skipped one isn't shown). "Edit" turns them
- * back into boxes (each saved as she types, as before); Save shows them read-only again.
+ * with my answers, maybe an option to edit"): "Checked in for today", then every question of
+ * the day with her answer as it is, read-only, or "No answer saved" when it has no words
+ * (saved blank, cleared or lost; bug #40). Only a question she skipped on purpose isn't shown.
+ * "Edit" is always there and turns every shown question into a box (every question, when she
+ * skipped them all; each saved as she types, as before); Save shows them read-only again.
  */
 function CheckedIn({
   jk, day, deviceId, onProblem,
 }: { jk: JournalKey; day: CheckinDay; deviceId: string; onProblem: (p: string) => void }) {
-  // While editing: the questions she had answered when she pressed Edit, kept until Save, so
-  // clearing one to rewrite it never takes its box away (re-review m2).
+  // While editing: the questions shown when she pressed Edit, kept until Save, so clearing one
+  // to rewrite it never takes its box away (re-review m2).
   const [editingIds, setEditingIds] = useState<string[] | null>(null);
   const editing = editingIds !== null;
   // The answers the boxes opened with: while she edits, a re-read of the day never puts other
@@ -261,12 +268,16 @@ function CheckedIn({
   const [mine, setMine] = useState<Record<string, string>>({});
   useEffect(() => setMine({}), [day]);
   const answerOf = (id: string) => mine[id] ?? day.answers.get(id)?.answer ?? "";
-  const answered = editingIds ?? day.prompts.filter((id) => answerOf(id).trim() !== "");
+  const hasWords = (id: string) => answerOf(id).trim() !== "";
+  // Hidden only when skipped on purpose with nothing written; anything unsure shows (bug #40).
+  const skipped = (id: string) => !hasWords(id) && !(id in mine) && day.answers.get(id)?.skipped === true;
+  const visible = day.prompts.filter((id) => !skipped(id));
+  const shown = editingIds ?? visible;
   return (
     <>
       <DoneBox title="Checked in for today" line={CHECKED_IN_LINE} />
       <ol className="journal-answers">
-        {answered.map((id) => (
+        {shown.map((id) => (
           <li key={id}>
             <QuestionText id={id} />
             {editing ? (
@@ -282,37 +293,38 @@ function CheckedIn({
                   }
                 }}
               />
-            ) : (
+            ) : hasWords(id) ? (
               <p className="journal-past-answer">
                 <output aria-label="Your answer" aria-live="off">
                   {answerOf(id)}
                 </output>
               </p>
+            ) : (
+              <p className="journal-muted">{NO_ANSWER_SAVED}</p>
             )}
           </li>
         ))}
       </ol>
-      {answered.length > 0 && (
-        <div className="btn-group">
-          {editing ? (
-            <button type="button" onClick={() => setEditingIds(null)}>
-              {SAVE_ANSWERS}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setSession(Date.now().toString(36));
-                setEditStart(Object.fromEntries(answered.map((id) => [id, { text: answerOf(id), at: day.answers.get(id)?.at ?? 0 }])));
-                setEditingIds(answered);
-              }}
-            >
-              {EDIT_ANSWERS}
-            </button>
-          )}
-        </div>
-      )}
+      <div className="btn-group">
+        {editing ? (
+          <button type="button" onClick={() => setEditingIds(null)}>
+            {SAVE_ANSWERS}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              const open = visible.length > 0 ? visible : day.prompts; // all skipped: every one
+              setSession(Date.now().toString(36));
+              setEditStart(Object.fromEntries(open.map((id) => [id, { text: answerOf(id), at: day.answers.get(id)?.at ?? 0 }])));
+              setEditingIds(open);
+            }}
+          >
+            {EDIT_ANSWERS}
+          </button>
+        )}
+      </div>
     </>
   );
 }
