@@ -51,7 +51,10 @@ test("first run, import, file, tick, move, persist and backup round trip", async
   await test.step("triage: Sort one by one", async () => {
     // File three Inbox items one at a time; Gamma is skipped and stays in the Inbox.
     await page.goto("/inbox");
-    await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(4);
+    // The overdue one shows once, under Needs a look, not also under To sort (Esme, 2026-11-05).
+    await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(3);
+    await expect(page.getByRole("list", { name: "Overdue" }).getByText("Overdue pretend errand")).toBeVisible();
+    await expect(page.getByText("4 to sort")).toBeVisible();
     await page.getByRole("link", { name: "Sort one by one" }).click();
     const card = page.getByRole("region", { name: "Item to sort" });
     const plan: Record<string, string> = {
