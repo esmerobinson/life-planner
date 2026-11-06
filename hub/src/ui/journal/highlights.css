@@ -1,0 +1,88 @@
+/* Highlights (2026-11-06). EVERY rule here is a PLACEHOLDER, obviously wrong on purpose (CLAUDE.md
+   art direction): nothing about how a highlight looks is in VISUAL-LANGUAGE.md yet. Magenta
+   (--placeholder), the system font, no motion. Esme chooses: the mark's colour and shape, the
+   Highlight button (look and where it sits), the note pop-up's insides, the Read back entries and
+   the fifth tile's place. */
+
+mark.hl-mark {
+  background: var(--placeholder);
+  color: inherit;
+  cursor: pointer;
+}
+
+button.hl-action {
+  position: fixed;
+  z-index: 1000;
+  background: var(--placeholder);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  border: 0;
+  padding: 6px 12px;
+}
+
+.hl-sheet .hl-quote {
+  margin: 0;
+  padding-left: 8px;
+  border-left: 4px solid var(--placeholder);
+  font-family: system-ui, sans-serif;
+  white-space: pre-wrap;
+}
+
+.hl-note-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: system-ui, sans-serif;
+}
+
+textarea.hl-note-box {
+  width: 100%;
+  min-height: 80px;
+  font-family: system-ui, sans-serif;
+}
+
+.hl-note {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: system-ui, sans-serif;
+}
+
+/* Read back's Highlights part. */
+button.journal-readback-tile.hl-provisional {
+  outline: 2px dashed var(--placeholder);
+}
+
+button.hl-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  font-family: system-ui, sans-serif;
+  background: transparent;
+  border: 2px solid var(--placeholder);
+  padding: 8px;
+  cursor: pointer;
+}
+
+.hl-entry .hl-quote,
+.hl-lost .hl-quote {
+  border-left: 4px solid var(--placeholder);
+  padding-left: 8px;
+  white-space: pre-wrap;
+}
+
+.hl-lost {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 2px dashed var(--placeholder);
+  padding: 8px;
+  font-family: system-ui, sans-serif;
+}
+
+.hl-group-name {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}

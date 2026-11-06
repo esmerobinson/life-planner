@@ -64,11 +64,11 @@ async function everything() {
   await saveNote(jk, "2026-10-15", OTHER, { ...note, thought: "Pretend October thought", steady: "Pretend steady October words", skill: "Pretend skill" });
 }
 
-it("opens on four tiles in the Journal's tab order, each with its count and last day", async () => {
+it("opens on four tiles in the Journal's tab order (then Highlights), each with its count and last day", async () => {
   await everything();
   renderApp("/journal/read-back", TODAY);
   expect(await within(await panel()).findByText(READ_BACK_LINE)).toBeInTheDocument();
-  expect(await tileNames()).toEqual(["Mental health exercise", "Morning pages", "Daily check-in", "Notes to myself"]);
+  expect(await tileNames()).toEqual(["Mental health exercise", "Morning pages", "Daily check-in", "Notes to myself", "Highlights"]);
   expect(await findReadBackTile("Mental health exercise")).toHaveTextContent(/^Mental health exercise3Last: Wednesday 4 November$/);
   expect(await findReadBackTile("Morning pages")).toHaveTextContent(/^Morning pages21 ready to read · 1 opening later$/);
   expect(await findReadBackTile("Daily check-in")).toHaveTextContent(/^Daily check-in2Last: Tuesday 3 November$/);

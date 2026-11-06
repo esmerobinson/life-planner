@@ -13,6 +13,7 @@ import { NoteBody, ReadOnlyVersions } from "./NotesToMyself";
 import { cardTitle, OtherVersions, ResponseView } from "./ResponseView";
 import { READ_BACK_PARTS, tabPath, type ReadBackPart } from "./tabs";
 import { useDbChanges } from "./useJournalKey";
+import { HighlightsPart, useHighlightsTile } from "./HighlightsReadBack";
 
 /** The line at the top of Read back (the approved mockup, 2026-11-05 option B). */
 export const READ_BACK_LINE = "Everything you've done in the Journal, saved.";
@@ -52,6 +53,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   const guardFail = useRef<() => void>(() => undefined);
   // Keyboard focus follows her: onto a part's heading when she opens it, back onto its tile.
   const opened = useRef<ReadBackPart | null>(null);
+  const highlights = useHighlightsTile(jk);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
@@ -101,6 +103,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   guardFail.current = guard.fail;
 
   if (data === null) return <LoadLine guard={guard} />;
+  if (part === "highlights") return <HighlightsPart jk={jk} focus={opened.current === part} />;
   if (part) return <PartView jk={jk} today={today} part={part} data={data} focus={opened.current === part} />;
   const unreadable = data.unreadable.exercise + data.unreadable["check-in"] + data.unreadable.notes;
   return (
@@ -111,7 +114,8 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         {READ_BACK_PARTS.map((p) => (
           <Tile
             key={p.id}
-            {...tileOf(p.id, data, today)}
+            {...(p.id === "highlights" ? highlights : tileOf(p.id, data, today))}
+            provisional={p.id === "highlights"}
             title={p.title}
             refocus={opened.current === p.id}
             onOpen={() => {
@@ -137,13 +141,15 @@ function tileOf(part: ReadBackPart, data: Loaded, today: ISODate): { count: numb
   return { count: data.pages.length, line: `${ready} ready to read${later > 0 ? ` · ${later} opening later` : ""}` };
 }
 
-function Tile({ title, count, line, refocus, onOpen }: { title: string; count: number; line: string; refocus: boolean; onOpen: () => void }) {
+function Tile({
+  title, count, line, refocus, onOpen, provisional = false,
+}: { title: string; count: number; line: string; refocus: boolean; onOpen: () => void; provisional?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (refocus) ref.current?.focus();
   }, [refocus]);
   return (
-    <button ref={ref} type="button" className="journal-readback-tile" onClick={onOpen}>
+    <button ref={ref} type="button" className={provisional ? "journal-readback-tile hl-provisional" : "journal-readback-tile"} onClick={onOpen}>
       <span className="journal-readback-tile-name">{title}</span>
       <span className="journal-readback-tile-count">{count}</span>
       <span className="journal-readback-tile-line">{line}</span>
@@ -164,7 +170,7 @@ function byMonth<T>(items: T[], date: (t: T) => ISODate): [string, T[]][] {
 }
 
 /** One part's whole list: "← Read back", its name, then its entries by month. */
-function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISODate; part: ReadBackPart; data: Loaded; focus: boolean }) {
+function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISODate; part: Exclude<ReadBackPart, "highlights">; data: Loaded; focus: boolean }) {
   const id = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {

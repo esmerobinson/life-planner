@@ -67,7 +67,8 @@ export interface HighlightEntry {
 // ---- the text as it shows ------------------------------------------------------------------
 
 /** A text's pieces as PromptText shows them: `*emphasis*` shown as emphasis, its stars left out. */
-export function plainSegments(text: string): { text: string; em: boolean }[] {
+export function plainSegments(text: string, emphasis = true): { text: string; em: boolean }[] {
+  if (!emphasis) return text ? [{ text, em: false }] : [];
   return text
     .split(/(\*[^*]+\*)/g)
     .filter(Boolean)
@@ -210,12 +211,14 @@ export interface MarkRun {
 /**
  * A text (with *emphasis*) as runs, split at its emphasis and at every highlight's edges. `base`
  * is where the text starts in its field's shown text (a later Read more paragraph); `marks` are
- * in field offsets.
+ * in field offsets. `emphasis` false: a text shown as it is (the skill line).
  */
-export function markRuns(raw: string, base: number, marks: readonly { start: number; end: number; key: string }[]): MarkRun[] {
+export function markRuns(
+  raw: string, base: number, marks: readonly { start: number; end: number; key: string }[], emphasis = true,
+): MarkRun[] {
   const runs: MarkRun[] = [];
   let at = base;
-  for (const seg of plainSegments(raw)) {
+  for (const seg of plainSegments(raw, emphasis)) {
     const from = at;
     const to = at + seg.text.length;
     const cuts = new Set([from, to]);
