@@ -709,6 +709,34 @@ for (const width of [1280, 390]) {
 
       await noWordsInClear(page, [HL_NOTE, "Glimmerfold", HL_WORDS]);
     });
+
+    test(`${ENGINE}: words in Read more: marked after a reload, in Read back word for word, opens the card with Read more open at them`, async ({ page }) => {
+      test.setTimeout(120_000);
+      const words = "clouds pass, hills stay";
+      await unlocked(page, "/journal/exercise");
+      await importCards(page);
+      const today = exerciseTab(page).getByRole("article", { name: "Today's card" });
+      await today.getByText("Read more").click();
+      const para = today.locator('[data-hl-field="more"]', { hasText: words });
+      await dragSelect(page, para, words);
+      await page.getByRole("button", { name: "Highlight", exact: true }).click();
+      await expect(para.locator("mark.hl-mark")).toHaveText(words);
+      await page.waitForTimeout(THINK_MS);
+      await page.reload();
+      const again = exerciseTab(page).getByRole("article", { name: "Today's card" });
+      await again.getByText("Read more").click();
+      await expect(again.locator('[data-hl-field="more"] mark.hl-mark')).toHaveText(words);
+
+      const part = await readBack(page, "Highlights");
+      const entry = part.locator("button.hl-entry");
+      await expect(entry.locator(".hl-quote")).toHaveText(words);
+      await entry.click();
+      const map = page.getByRole("dialog", { name: "Your workbooks" });
+      await expect(map.locator("details.exercise-more")).toHaveAttribute("open", "");
+      await expect(map.locator("mark.hl-mark")).toHaveText(words);
+      await expect(map.locator("mark.hl-mark")).toBeInViewport();
+      await noWordsInClear(page, [words]);
+    });
   });
 }
 
