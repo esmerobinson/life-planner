@@ -233,6 +233,8 @@ export interface FileRow {
  *                                          a day's card (journal polish brief; cardKey is an opaque HMAC)
  * - "morning" / "checkin" `${kind}:<date>` the earlier one-row-per-day shape: read (split), never written
  * - "note"     `note:<date>:<uuid>`        one note to herself (journal v3), rewritten whole on edit
+ * - "highlight" `highlight:<date>:<hid>_<deviceId>_<vid>` one version of one highlight in a card's
+ *                                          learning text (Highlights; data/highlightRepo.ts)
  * - "note-read" `note-read:<date>:<deviceId>` one device's "I read this today" ticks for a day
  * - "keywrap"  `keywrap:<kekFp>`           the journal secret sealed with one sync passphrase's
  *                                          key-wrap key (journal re-key; journal/keyStore.ts)
@@ -243,6 +245,7 @@ export interface FileRow {
 export const JOURNAL_KINDS = [
   "page", "photo", "draft", "answer", "set", "settings", "verifier", "morning", "checkin", "cards", "exercise", "stars",
   "exercise-entry", "note", "note-read", "keywrap",
+  "highlight",
 ] as const;
 export type JournalKind = (typeof JOURNAL_KINDS)[number];
 

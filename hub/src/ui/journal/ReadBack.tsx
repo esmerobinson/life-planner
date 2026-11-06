@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  answeredPrompts, CANT_OPEN, listCheckinDays, listExerciseEntries, listNotes, listReadBack, morningOpensOn, readExerciseCards, readMorningPage,
+  answeredPrompts, CANT_OPEN, shownPrompts, listCheckinDays, listExerciseEntries, listNotes, listReadBack, morningOpensOn, readExerciseCards, readMorningPage,
   type CheckinDay, type ExerciseResponse, type MorningText, type Note,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
 import type { ISODate } from "../../domain/types";
 import type { JournalKey } from "../../journal/crypto";
 import { LoadLine, longDate, monthLabel, useLoadGuard } from "./bits";
-import { QuestionText } from "./DailyCheckIn";
+import { AnswerText, QuestionText } from "./DailyCheckIn";
 import { NoteBody, ReadOnlyVersions } from "./NotesToMyself";
 import { cardTitle, OtherVersions, ResponseView } from "./ResponseView";
 import { READ_BACK_PARTS, tabPath, type ReadBackPart } from "./tabs";
 import { useDbChanges } from "./useJournalKey";
+import { HighlightsPart, useHighlightsTile } from "./HighlightsReadBack";
 
 /** The line at the top of Read back (the approved mockup, 2026-11-05 option B). */
 export const READ_BACK_LINE = "Everything you've done in the Journal, saved.";
@@ -52,6 +53,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   const guardFail = useRef<() => void>(() => undefined);
   // Keyboard focus follows her: onto a part's heading when she opens it, back onto its tile.
   const opened = useRef<ReadBackPart | null>(null);
+  const highlights = useHighlightsTile(jk);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
@@ -76,8 +78,9 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         exercises: [...exercises.entries]
           .sort((a, b) => b.date.localeCompare(a.date))
           .map((entry) => ({ entry, title: title(entry) })),
-        // Only what she answered: a day of skips isn't listed (Esme, 2026-11-04).
-        checkins: checkins.filter((d) => answeredPrompts(d).length > 0).sort((a, b) => b.date.localeCompare(a.date)),
+        // Every day she checked in, even if its words were lost; only a day of skips isn't listed
+        // (Esme, 2026-11-04 and 2026-11-06).
+        checkins: checkins.filter((d) => shownPrompts(d).length > 0).sort((a, b) => b.date.localeCompare(a.date)),
         pages: pages.map((p) => {
           const n = (pageCount.get(p.date) ?? 0) + 1;
           pageCount.set(p.date, n);
@@ -100,8 +103,9 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   guardFail.current = guard.fail;
 
   if (data === null) return <LoadLine guard={guard} />;
+  if (part === "highlights") return <HighlightsPart jk={jk} focus={opened.current === part} />;
   if (part) return <PartView jk={jk} today={today} part={part} data={data} focus={opened.current === part} />;
-  const unreadable = data.unreadable.exercise + data.unreadable["check-in"] + data.unreadable.notes;
+  const unreadable = data.unreadable.exercise + data.unreadable["check-in"] + data.unreadable.notes + highlights.unreadable;
   return (
     <div className="journal-readback">
       <p className="journal-muted">{READ_BACK_LINE}</p>
@@ -110,7 +114,8 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         {READ_BACK_PARTS.map((p) => (
           <Tile
             key={p.id}
-            {...tileOf(p.id, data, today)}
+            {...(p.id === "highlights" ? { count: highlights.count, line: highlights.line } : tileOf(p.id, data, today))}
+            provisional={p.id === "highlights"}
             title={p.title}
             refocus={opened.current === p.id}
             onOpen={() => {
@@ -136,13 +141,15 @@ function tileOf(part: ReadBackPart, data: Loaded, today: ISODate): { count: numb
   return { count: data.pages.length, line: `${ready} ready to read${later > 0 ? ` · ${later} opening later` : ""}` };
 }
 
-function Tile({ title, count, line, refocus, onOpen }: { title: string; count: number; line: string; refocus: boolean; onOpen: () => void }) {
+function Tile({
+  title, count, line, refocus, onOpen, provisional = false,
+}: { title: string; count: number; line: string; refocus: boolean; onOpen: () => void; provisional?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (refocus) ref.current?.focus();
   }, [refocus]);
   return (
-    <button ref={ref} type="button" className="journal-readback-tile" onClick={onOpen}>
+    <button ref={ref} type="button" className={provisional ? "journal-readback-tile hl-provisional" : "journal-readback-tile"} onClick={onOpen}>
       <span className="journal-readback-tile-name">{title}</span>
       <span className="journal-readback-tile-count">{count}</span>
       <span className="journal-readback-tile-line">{line}</span>
@@ -163,7 +170,7 @@ function byMonth<T>(items: T[], date: (t: T) => ISODate): [string, T[]][] {
 }
 
 /** One part's whole list: "← Read back", its name, then its entries by month. */
-function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISODate; part: ReadBackPart; data: Loaded; focus: boolean }) {
+function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISODate; part: Exclude<ReadBackPart, "highlights">; data: Loaded; focus: boolean }) {
   const id = useId();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -187,16 +194,17 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
     }
     if (part === "check-in") {
       return byMonth(data.checkins, (d) => d.date).map(([m, ds]) => [m, ds.map((d) => {
-        const ids = answeredPrompts(d);
+        const ids = shownPrompts(d);
+        const n = answeredPrompts(d).length;
         return (
           <li key={d.date}>
             <details>
-              <summary>{`${longDate(d.date)} · ${ids.length} ${ids.length === 1 ? "answer" : "answers"}`}</summary>
+              <summary>{`${longDate(d.date)} · ${n} ${n === 1 ? "answer" : "answers"}`}</summary>
               <ol className="journal-answers">
                 {ids.map((q) => (
                   <li key={q}>
                     <QuestionText id={q} />
-                    <p className="journal-past-answer">{d.answers.get(q)!.answer}</p>
+                    <AnswerText text={d.answers.get(q)?.answer} />
                   </li>
                 ))}
               </ol>

@@ -95,10 +95,12 @@ export function TodayPanel({
         )}
         {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
         {doneToday.length > 0 && <DoneSection title="Done today" items={doneToday} today={today} onUndo={untick} />}
+        {/* Only things due in the next few days that didn't fit: anything due today or overdue is
+            always on the list above (Esme, 2026-11-06). Wording provisional, for Esme / Design. */}
         {alsoDue.length > 0 && (
           <details>
-            <summary>Also due</summary>
-            <ul aria-label="Also due" className="strip-list">{alsoDue.map(row)}</ul>
+            <summary>Due in the next few days</summary>
+            <ul aria-label="Due in the next few days" className="strip-list">{alsoDue.map(row)}</ul>
           </details>
         )}
       </div>

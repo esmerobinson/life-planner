@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { readBackPath } from "./tabs";
 import {
   CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseProgress,
@@ -8,18 +8,20 @@ import {
 import { addDays } from "../../domain/dates";
 import type { JournalKey } from "../../journal/crypto";
 import {
-  chapterLine, INVALID_CARD_FILE, moreParagraphs, parseCardFile, planExercise, replacingRestarts,
+  chapterLine, INVALID_CARD_FILE, parseCardFile, planExercise, replacingRestarts,
   type CardSet, type ExerciseCard,
 } from "../../journal/exercise";
 import type { ISODate } from "../../domain/types";
 import { exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows";
 import { Streak } from "../Streak";
-import { LoadLine, longDate, PromptText, useLoadGuard } from "./bits";
+import { LoadLine, longDate, useLoadGuard } from "./bits";
 import { CardExample, ExerciseResponseBox, fillsCard } from "./ExerciseResponseBox";
 import { ChapterMap, WorkbookBars } from "./WorkbookProgress";
 import { workbooks } from "../../journal/workbooks";
 import { cardTitle, OtherVersions, ResponseView } from "./ResponseView";
 import { useDbChanges } from "./useJournalKey";
+import { HighlightsProvider, hlRoot, HlText } from "./Highlights";
+import { moreOffsets } from "../../journal/highlights";
 
 export const REPLACE_QUESTION = "Replace your exercise cards?";
 /** Said with the question only when progress would be lost (a done card's id isn't in the new file). */
@@ -88,6 +90,10 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const loaded = useRef(false);
   const recorded = useRef<string | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  // Opened from a highlight in Read back: its card in the chapter map, scrolled to the words.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [focusKey, setFocusKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
@@ -240,9 +246,28 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const titles = useMemo(() => new Map((set?.tracks ?? []).filter((t) => t.title).map((t) => [t.id, t.title])), [set]);
 
   const editing = useMemo(() => ({ jk, today, deviceId, onProblem: setProblem }), [jk, today, deviceId]);
+  const wanted = (location.state as { highlight?: { card: string; key: string } } | null)?.highlight;
+  useEffect(() => {
+    if (!wanted || !set) return;
+    const card = set.cards.find((c) => c.id === wanted.card); // (Read back sends the card it's on now)
+    if (card) {
+      setMapOf({ book: card.track, card: card.id });
+      setFocusKey(wanted.key);
+    }
+    navigate(location.pathname, { replace: true, state: null });
+  }, [wanted, set, navigate, location.pathname]);
   return (
     <EditContext.Provider value={editing}>
     <TrackTitles.Provider value={titles}>
+    <HighlightsProvider
+      jk={jk}
+      today={today}
+      deviceId={deviceId}
+      cards={set?.cards ?? []}
+      books={titles}
+      focus={focusKey}
+      onFocused={() => setFocusKey(null)}
+    >
       {cards === null && <LoadLine guard={guard} />}
       {cards?.state === "none" && (
         <div className="exercise-empty">
@@ -369,6 +394,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
         </div>
       )}
       {problem && <p role="alert">{problem}</p>}
+    </HighlightsProvider>
     </TrackTitles.Provider>
     </EditContext.Provider>
   );
@@ -436,26 +462,38 @@ function CardHead({ card, streak, round = 1 }: { card: ExerciseCard; streak?: Ro
   );
 }
 
+/** Before the book line's words (not part of a highlight). */
+const IN_YOUR_BOOK = "In your book: ";
+
 /** Learn, Try this, then the book, the skill and the session line. */
 function CardBody({ card }: { card: ExerciseCard }) {
   return (
     <>
       <div>
         <h3 className="exercise-label">Learn</h3>
-        <p className="exercise-text">
-          <PromptText text={card.learn} />
+        <p className="exercise-text" {...hlRoot(card, "learn")}>
+          <HlText card={card} field="learn" text={card.learn} />
         </p>
       </div>
       <div>
         <h3 className="exercise-label">Try this</h3>
-        <p className="exercise-text">
-          <PromptText text={card.try} />
+        <p className="exercise-text" {...hlRoot(card, "try")}>
+          <HlText card={card} field="try" text={card.try} />
         </p>
       </div>
       {(card.book || card.skill || card.session) && (
         <div className="exercise-meta">
-          {card.book && <p className="journal-muted exercise-text">In your book: <PromptText text={card.book} /></p>}
-          {card.skill && <p className="journal-muted exercise-text">{card.skill}</p>}
+          {card.book && (
+            <p className="journal-muted exercise-text" {...hlRoot(card, "book", 0, IN_YOUR_BOOK.length)}>
+              {IN_YOUR_BOOK}
+              <HlText card={card} field="book" text={card.book} />
+            </p>
+          )}
+          {card.skill && (
+            <p className="journal-muted exercise-text" {...hlRoot(card, "skill")}>
+              <HlText card={card} field="skill" text={card.skill} raw />
+            </p>
+          )}
           {card.session && <p className="journal-muted">Good one to bring to a session</p>}
         </div>
       )}
@@ -469,15 +507,15 @@ function CardBody({ card }: { card: ExerciseCard }) {
  * card has no "Read more" text.
  */
 function ReadMore({ card }: { card: ExerciseCard }) {
-  const paras = moreParagraphs(card.more);
+  const paras = moreOffsets(card.more);
   if (paras.length === 0) return null;
   return (
     <details className="exercise-more">
       <summary>Read more</summary>
       <div className="exercise-more-box">
         {paras.map((p, i) => (
-          <p key={i}>
-            <PromptText text={p} />
+          <p key={i} {...hlRoot(card, "more", p.base)}>
+            <HlText card={card} field="more" text={p.text} base={p.base} />
           </p>
         ))}
         {card.sources.length > 0 && (

@@ -626,3 +626,146 @@ test.describe("Notes to myself at 1280px", () => {
     await noWordsInClear(page, [PROMPT.steady, PROMPT.memory, PROMPT.skill, "Fennick"]);
   });
 });
+
+// ================================================================ Highlights (2026-11-06)
+
+const HL_WORDS = "clouds over a made-up hill";
+const HL_NOTE = "Pretend Glimmerfold note: remember this one on a grey pretend day.";
+
+/** Selects words in an element's text the way a person does: press, drag across them, let go. */
+async function dragSelect(page: Page, within: Locator, words: string) {
+  await within.scrollIntoViewIfNeeded();
+  const box = await within.evaluate((el, w) => {
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      const i = (n as Text).data.indexOf(w);
+      if (i < 0) continue;
+      const at = (k: number) => {
+        const r = document.createRange();
+        r.setStart(n!, k);
+        r.setEnd(n!, k + 1);
+        return r.getBoundingClientRect();
+      };
+      const a = at(i);
+      const b = at(i + w.length - 1);
+      return { x1: a.left + 1, y1: a.top + a.height / 2, x2: b.right - 1, y2: b.top + b.height / 2 };
+    }
+    return null;
+  }, words);
+  if (!box) throw new Error(`"${words}" isn't on the page`);
+  await page.mouse.move(box.x1, box.y1);
+  await page.mouse.down();
+  await page.mouse.move(box.x2, box.y2, { steps: 12 });
+  await page.mouse.up();
+}
+
+for (const width of [1280, 390]) {
+  test.describe(`Highlights at ${width}px`, () => {
+    test.use({ viewport: { width, height: width === 390 ? 844 : 900 } });
+
+    test(`${ENGINE}: highlight words in a card, add a note: marked after a reload, in Read back word for word, opens the card; nothing in clear`, async ({ page }) => {
+      test.setTimeout(150_000);
+      await unlocked(page, "/journal/exercise");
+      await importCards(page);
+      const today = exerciseTab(page).getByRole("article", { name: "Today's card" });
+      await expect(today.getByText("Pretend weather")).toBeVisible();
+      const learn = today.locator('[data-hl-field="learn"]');
+
+      // Select, Highlight.
+      await dragSelect(page, learn, HL_WORDS);
+      await page.getByRole("button", { name: "Highlight", exact: true }).click();
+      await expect(learn.locator("mark.hl-mark")).toHaveText(HL_WORDS);
+      await page.waitForTimeout(THINK_MS); // she reads on
+
+      // After a reload: still marked.
+      await page.reload();
+      const mark = exerciseTab(page).getByRole("article", { name: "Today's card" }).locator('[data-hl-field="learn"] mark.hl-mark');
+      await expect(mark).toHaveText(HL_WORDS);
+
+      // Tap it, write a note like a person, close.
+      await mark.click();
+      const sheet = page.getByRole("dialog", { name: "Highlight" });
+      await typeLikeAPerson(page, sheet.getByLabel("Note (optional)"), HL_NOTE, sheet.locator(".hl-quote"));
+      await sheet.locator(".choose-top").getByRole("button", { name: "Done" }).click();
+      await expect(sheet).toHaveCount(0);
+      await page.waitForTimeout(THINK_MS);
+      await page.reload();
+
+      // Read back: its words and note, word for word, under its book and chapter.
+      const part = await readBack(page, "Highlights");
+      const entry = part.locator("button.hl-entry");
+      await expect(entry).toHaveCount(1);
+      await expect(entry.locator(".hl-quote")).toHaveText(HL_WORDS);
+      await expect(entry.locator(".hl-note")).toHaveText(HL_NOTE);
+      await expect(entry).toContainText("Day 1 · Pretend weather");
+      await expect(part.getByText("Couldn't find this in the card any more")).toHaveCount(0);
+
+      // Tapping it opens the card at the words.
+      await entry.click();
+      await expect(page).toHaveURL(/\/journal\/exercise$/);
+      const map = page.getByRole("dialog", { name: "Your workbooks" });
+      await expect(map.locator("mark.hl-mark")).toHaveText(HL_WORDS);
+      await expect(map.locator("mark.hl-mark")).toBeInViewport();
+
+      await noWordsInClear(page, [HL_NOTE, "Glimmerfold", HL_WORDS]);
+    });
+
+    test(`${ENGINE}: words in Read more: marked after a reload, in Read back word for word, opens the card with Read more open at them`, async ({ page }) => {
+      test.setTimeout(120_000);
+      const words = "clouds pass, hills stay";
+      await unlocked(page, "/journal/exercise");
+      await importCards(page);
+      const today = exerciseTab(page).getByRole("article", { name: "Today's card" });
+      await today.getByText("Read more").click();
+      const para = today.locator('[data-hl-field="more"]', { hasText: words });
+      await dragSelect(page, para, words);
+      await page.getByRole("button", { name: "Highlight", exact: true }).click();
+      await expect(para.locator("mark.hl-mark")).toHaveText(words);
+      await page.waitForTimeout(THINK_MS);
+      await page.reload();
+      const again = exerciseTab(page).getByRole("article", { name: "Today's card" });
+      await again.getByText("Read more").click();
+      await expect(again.locator('[data-hl-field="more"] mark.hl-mark')).toHaveText(words);
+
+      const part = await readBack(page, "Highlights");
+      const entry = part.locator("button.hl-entry");
+      await expect(entry.locator(".hl-quote")).toHaveText(words);
+      await entry.click();
+      const map = page.getByRole("dialog", { name: "Your workbooks" });
+      await expect(map.locator("details.exercise-more")).toHaveAttribute("open", "");
+      await expect(map.locator("mark.hl-mark")).toHaveText(words);
+      await expect(map.locator("mark.hl-mark")).toBeInViewport();
+      await noWordsInClear(page, [words]);
+    });
+  });
+}
+
+test.describe("Highlights by touch at 390px", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test(`${ENGINE}: words selected (the phone's own handles), a tap on Highlight marks exactly them`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await unlocked(page, "/journal/exercise");
+    await importCards(page);
+    const learn = exerciseTab(page).getByRole("article", { name: "Today's card" }).locator('[data-hl-field="learn"]');
+    await expect(learn).toBeVisible();
+    // A test browser can't long-press to select: the selection is made as the phone's handles leave it.
+    await learn.evaluate((el, w) => {
+      const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        const i = (n as Text).data.indexOf(w);
+        if (i < 0) continue;
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + w.length);
+        document.getSelection()!.removeAllRanges();
+        document.getSelection()!.addRange(r);
+        return;
+      }
+    }, HL_WORDS);
+    await page.getByRole("button", { name: "Highlight", exact: true }).tap();
+    await expect(learn.locator("mark.hl-mark")).toHaveText(HL_WORDS);
+    await page.reload();
+    await expect(exerciseTab(page).getByRole("article", { name: "Today's card" }).locator("mark.hl-mark")).toHaveText(HL_WORDS);
+  });
+});

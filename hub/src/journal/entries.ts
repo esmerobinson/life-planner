@@ -3,6 +3,7 @@
 // as "can't open" and is skipped on its own.
 
 import { isObj, isStr } from "../data/validate";
+import { isHighlightEntry } from "./highlights";
 import { MAX_CARD_DAY, MAX_CARD_ID, MAX_PARTS, PART_KINDS, readStoredSet, type PartKind, type PartValue } from "./exercise";
 
 /** One finished morning page ("I'm done"). Hidden for MORNING_LOCK_DAYS from its date. */
@@ -24,6 +25,12 @@ export interface PhotoEntry {
 export interface DraftEntry {
   v: 1;
   text: string;
+  /**
+   * The day's drafts under this device's former ids (data/deviceIds.ts) that "I'm done" has
+   * already dealt with (`<row id>@<updatedAt>`): their words are in a page, so they are never
+   * kept as a page again. Earlier versions read the row without it.
+   */
+  kept?: string[];
 }
 
 /** One check-in answer. `done` once Next / Skip moved past it (else it is still being typed). */
@@ -44,6 +51,12 @@ export interface AnswerEntry {
    * written again. Older rows never have it. Never set with words or with `cleared`.
    */
   skipped?: true;
+  /**
+   * After a Replace (data/deviceIds.ts): the newest of this device's own answers to the question
+   * under a former id when this row was first written. Those up to this time are replaced by it
+   * (bug #52); one newer, synced in later, still counts. Earlier versions read the row without it.
+   */
+  over?: number;
 }
 
 /** The day's questions, written by the first device to open the check-in that day. */
@@ -219,10 +232,10 @@ const partAnswers = (v: unknown): v is PartAnswer[] =>
 export const ENTRY_CHECK = {
   page: (v: unknown): v is PageEntry => isObj(v) && v.v === 1 && isStr(v.text) && num(v.at),
   photo: (v: unknown): v is PhotoEntry => isObj(v) && v.v === 1 && isStr(v.fileId) && num(v.at),
-  draft: (v: unknown): v is DraftEntry => isObj(v) && v.v === 1 && isStr(v.text),
+  draft: (v: unknown): v is DraftEntry => isObj(v) && v.v === 1 && isStr(v.text) && (v.kept === undefined || strList(v.kept)),
   answer: (v: unknown): v is AnswerEntry =>
     isObj(v) && v.v === 1 && isStr(v.prompt) && (v.answer === null || isStr(v.answer)) && typeof v.done === "boolean" && num(v.at) &&
-    (v.cleared === undefined || (v.cleared === true && v.answer === null)),
+    (v.cleared === undefined || (v.cleared === true && v.answer === null)) && (v.over === undefined || num(v.over)),
   set: (v: unknown): v is SetEntry => isObj(v) && v.v === 1 && strList(v.prompts) && num(v.at),
   settings: (v: unknown): v is SettingsEntry => isObj(v) && v.v === 1 && strList(v.active),
   cards: (v: unknown): v is CardsRow =>
@@ -260,6 +273,8 @@ export const ENTRY_CHECK = {
     isObj(v) && v.v === 1 && strList(v.prompts) && Array.isArray(v.answers) &&
     v.answers.length === (v.prompts as string[]).length && v.answers.every((a) => a === null || isStr(a)) &&
     Number.isInteger(v.step) && typeof v.finished === "boolean",
+  // One version of a highlight (journal/highlights.ts).
+  highlight: isHighlightEntry,
 } as const;
 
 /** Words in a text (for "N of 1,000 words"). */

@@ -117,16 +117,22 @@ export function pickToday(
         behind(a) - behind(b),
     );
 
-  const picks = [...pinned];
+  // Anything due today or overdue is always on the list, however full it is: only things due
+  // in the next few days wait in the dropdown (Esme, 2026-11-06: today's tasks were "sort of
+  // hidden in a dropdown menu that says also due").
+  const dueNow = due.filter((i) => i.due! <= today);
+  const dueSoon = due.filter((i) => i.due! > today);
+  const picks = [...pinned, ...dueNow];
 
   if (wd === "sun") {
-    picks.push(...due.slice(0, SUNDAY_DUE_LIMIT));
-    return { rhythm, picks, alsoDue: due.slice(SUNDAY_DUE_LIMIT) };
+    const room = Math.max(0, SUNDAY_DUE_LIMIT - dueNow.length);
+    picks.push(...dueSoon.slice(0, room));
+    return { rhythm, picks, alsoDue: dueSoon.slice(room) };
   }
 
   const dueRoom = Math.max(0, CAPACITY - picks.length);
-  picks.push(...due.slice(0, dueRoom));
-  const alsoDue = due.slice(dueRoom);
+  picks.push(...dueSoon.slice(0, dueRoom));
+  const alsoDue = dueSoon.slice(dueRoom);
 
   const dueIds = new Set(due.map((i) => i.id));
   const p1 = rest

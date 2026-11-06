@@ -79,17 +79,32 @@ describe("pickToday", () => {
     expect(ids(day1.picks).slice(2)).not.toEqual(ids(day2.picks).slice(2));
   });
 
-  it("seven overdue items: 4 picks, 3 alsoDue, none lost", () => {
+  it("seven overdue items: all seven on the list, never in the dropdown (Esme, 2026-11-06)", () => {
     const items = [1, 2, 3, 4, 5, 6, 7].map((k) => item({ id: `o${k}`, due: `2026-10-0${k}` }));
     const out = pickToday(items, [], TUE, {});
-    expect(out.picks).toHaveLength(4);
-    expect(out.alsoDue).toHaveLength(3);
-    expect(new Set([...ids(out.picks), ...ids(out.alsoDue)]).size).toBe(7);
+    expect(out.picks).toHaveLength(7);
+    expect(out.alsoDue).toEqual([]);
   });
 
-  it("pinned item is always included and counts toward the cap", () => {
+  it("due in the next few days fills the room left; the rest waits in the dropdown, none lost", () => {
+    const soon = [1, 2, 3, 4, 5, 6].map((k) => item({ id: `s${k}`, due: k <= 3 ? "2026-10-28" : "2026-10-30" }));
+    const out = pickToday(soon, [], TUE, {});
+    expect(out.picks).toHaveLength(CAPACITY);
+    expect(out.alsoDue).toHaveLength(2);
+    expect(new Set([...ids(out.picks), ...ids(out.alsoDue)]).size).toBe(6);
+  });
+
+  it("a to-do added with today's due date is on the list even when it is already full (Esme, 2026-11-06)", () => {
+    const pins = [1, 2, 3, 4].map((k) => item({ id: `pin${k}`, pinnedDate: TUE }));
+    const added = item({ id: "added-today", due: TUE, priority: 3 });
+    const out = pickToday([...pins, added], [], TUE, {});
+    expect(ids(out.picks)).toContain("added-today");
+    expect(out.alsoDue).toEqual([]);
+  });
+
+  it("pinned item is always included and counts toward the cap for things due later", () => {
     const pin = item({ id: "pin", pinnedDate: TUE, priority: 3 });
-    const dues = [1, 2, 3, 4].map((k) => item({ id: `d${k}`, due: "2026-10-20" }));
+    const dues = [1, 2, 3, 4].map((k) => item({ id: `d${k}`, due: "2026-10-29" }));
     const out = pickToday([...dues, pin], [], TUE, {});
     expect(out.picks[0].id).toBe("pin");
     expect(out.picks).toHaveLength(4);
@@ -126,13 +141,17 @@ describe("pickToday", () => {
     expect(ids([...out.picks, ...out.alsoDue, ...out.rhythm])).toEqual(["ok"]);
   });
 
-  it("sunday is light", () => {
+  it("sunday is light, but overdue and due-today things still show", () => {
     const pin = item({ id: "pin", pinnedDate: SUN });
     const dues = [1, 2, 3].map((k) => item({ id: `d${k}`, due: `2026-10-0${k}` }));
+    const soon = [1, 2, 3].map((k) => item({ id: `s${k}`, due: "2026-10-27" }));
     const p1 = item({ id: "p1", priority: 1 });
-    const out = pickToday([pin, ...dues, p1], [], SUN, {});
-    expect(ids(out.picks)).toEqual(["pin", "d1", "d2"]);
-    expect(ids(out.alsoDue)).toEqual(["d3"]);
+    const out = pickToday([pin, ...dues, ...soon, p1], [], SUN, {});
+    expect(ids(out.picks)).toEqual(["pin", "d1", "d2", "d3"]);
+    expect(ids(out.alsoDue)).toEqual(["s1", "s2", "s3"]);
+    const light = pickToday([pin, ...soon, p1], [], SUN, {});
+    expect(ids(light.picks)).toEqual(["pin", "s1", "s2"]);
+    expect(ids(light.alsoDue)).toEqual(["s3"]);
   });
 
   it("empty input returns empty lists", () => {
