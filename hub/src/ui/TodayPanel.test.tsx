@@ -5,6 +5,7 @@ import * as repo from "../data/repo";
 import { db } from "../data/db";
 import { createItem } from "../data/repo";
 import { TodayPanel } from "./TodayPanel";
+import { addDays } from "../domain/dates";
 
 const TODAY = "2026-10-27"; // a Tuesday
 
@@ -43,17 +44,30 @@ function watchUnhandled() {
   return { seen, stop: () => proc.off("unhandledRejection", seen) };
 }
 
+/** Provisional wording (was "Also due"), for Esme / Design. */
+const DROPDOWN = "Due in the next few days";
+
 describe("TodayPanel", () => {
-  it("shows up to 4 picks and an Also due section for the rest", async () => {
-    for (let i = 1; i <= 7; i++) await task(`Late ${i}`, { due: `2026-10-${10 + i}` });
+  it("overdue and due-today things are all on the list, never hidden in the dropdown (Esme, 2026-11-06)", async () => {
+    for (let i = 1; i <= 6; i++) await task(`Late ${i}`, { due: `2026-10-${10 + i}` });
+    await task("Added for today", { due: TODAY });
+    render(<TodayPanel today={TODAY} />);
+    const main = await screen.findByRole("list", { name: "Today" });
+    expect(within(main).getAllByRole("listitem")).toHaveLength(7);
+    expect(within(main).getByText("Added for today")).toBeInTheDocument();
+    expect(screen.queryByText(DROPDOWN)).toBeNull();
+  });
+
+  it("shows up to 4 and keeps things due in the next few days in a closed dropdown", async () => {
+    for (let i = 1; i <= 7; i++) await task(`Soon ${i}`, { due: addDays(TODAY, i <= 4 ? 1 : 2) });
     render(<TodayPanel today={TODAY} />);
     const main = await screen.findByRole("list", { name: "Today" });
     expect(within(main).getAllByRole("listitem")).toHaveLength(4);
-    const also = screen.getByText("Also due").closest("details")!;
+    const also = screen.getByText(DROPDOWN).closest("details")!;
     expect(also).not.toHaveAttribute("open");
     expect(within(also).getAllByRole("listitem")).toHaveLength(3);
     for (let i = 1; i <= 7; i++) {
-      expect(screen.getAllByText(`Late ${i}`)).toHaveLength(1);
+      expect(screen.getAllByText(`Soon ${i}`)).toHaveLength(1);
     }
   });
 
@@ -113,17 +127,17 @@ describe("TodayPanel", () => {
     ["Move to", "This week", "Move to This week"],
     ["Move to", "Remove from today", "Remove from today"],
   ])("a due-today priority-1 item: %s %s", (icon, choice, what) => {
-    it(`${what} removes it from the picks and from Also due`, async () => {
-      // Four earlier-due items fill the picks so the target can sit in Also due too.
-      for (let i = 1; i <= 4; i++) await task(`Filler ${i}`, { due: `2026-10-2${i}` });
-      await task("Urgent", { due: TODAY, priority: 1 });
+    it(`${what} removes it from the dropdown`, async () => {
+      // Four sooner-due items fill the list so the target (due in two days) sits in the dropdown.
+      for (let i = 1; i <= 4; i++) await task(`Filler ${i}`, { due: addDays(TODAY, 1) });
+      await task("Urgent", { due: addDays(TODAY, 2), priority: 1 });
       render(<TodayPanel today={TODAY} />);
-      const also = await screen.findByRole("list", { name: "Also due", hidden: true });
+      const also = await screen.findByRole("list", { name: DROPDOWN, hidden: true });
       expect(within(also).getByText("Urgent")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: `${icon}: Urgent` }));
       await userEvent.click(choiceIn(icon, choice));
       await vi.waitFor(() => expect(screen.queryByText("Urgent")).toBeNull());
-      expect(screen.queryByRole("list", { name: "Also due", hidden: true })).toBeNull();
+      expect(screen.queryByRole("list", { name: DROPDOWN, hidden: true })).toBeNull();
     });
 
     it(`${what} removes it when it is a pick`, async () => {

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  answeredPrompts, CANT_OPEN, listCheckinDays, listExerciseEntries, listNotes, listReadBack, morningOpensOn, readExerciseCards, readMorningPage,
+  answeredPrompts, CANT_OPEN, shownPrompts, listCheckinDays, listExerciseEntries, listNotes, listReadBack, morningOpensOn, readExerciseCards, readMorningPage,
   type CheckinDay, type ExerciseResponse, type MorningText, type Note,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
 import type { ISODate } from "../../domain/types";
 import type { JournalKey } from "../../journal/crypto";
 import { LoadLine, longDate, monthLabel, useLoadGuard } from "./bits";
-import { QuestionText } from "./DailyCheckIn";
+import { AnswerText, QuestionText } from "./DailyCheckIn";
 import { NoteBody, ReadOnlyVersions } from "./NotesToMyself";
 import { cardTitle, OtherVersions, ResponseView } from "./ResponseView";
 import { READ_BACK_PARTS, tabPath, type ReadBackPart } from "./tabs";
@@ -76,8 +76,9 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         exercises: [...exercises.entries]
           .sort((a, b) => b.date.localeCompare(a.date))
           .map((entry) => ({ entry, title: title(entry) })),
-        // Only what she answered: a day of skips isn't listed (Esme, 2026-11-04).
-        checkins: checkins.filter((d) => answeredPrompts(d).length > 0).sort((a, b) => b.date.localeCompare(a.date)),
+        // Every day she checked in, even if its words were lost; only a day of skips isn't listed
+        // (Esme, 2026-11-04 and 2026-11-06).
+        checkins: checkins.filter((d) => shownPrompts(d).length > 0).sort((a, b) => b.date.localeCompare(a.date)),
         pages: pages.map((p) => {
           const n = (pageCount.get(p.date) ?? 0) + 1;
           pageCount.set(p.date, n);
@@ -187,16 +188,17 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
     }
     if (part === "check-in") {
       return byMonth(data.checkins, (d) => d.date).map(([m, ds]) => [m, ds.map((d) => {
-        const ids = answeredPrompts(d);
+        const ids = shownPrompts(d);
+        const n = answeredPrompts(d).length;
         return (
           <li key={d.date}>
             <details>
-              <summary>{`${longDate(d.date)} · ${ids.length} ${ids.length === 1 ? "answer" : "answers"}`}</summary>
+              <summary>{`${longDate(d.date)} · ${n} ${n === 1 ? "answer" : "answers"}`}</summary>
               <ol className="journal-answers">
                 {ids.map((q) => (
                   <li key={q}>
                     <QuestionText id={q} />
-                    <p className="journal-past-answer">{d.answers.get(q)!.answer}</p>
+                    <AnswerText text={d.answers.get(q)?.answer} />
                   </li>
                 ))}
               </ol>

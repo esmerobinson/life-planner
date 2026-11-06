@@ -496,6 +496,19 @@ export function answeredPrompts(day: CheckinDay): string[] {
   return day.prompts.filter((p) => (day.answers.get(p)?.answer ?? "").trim() !== "");
 }
 
+/**
+ * The questions a past check-in shows (Esme, 2026-11-06: whatever she completes stays easy to
+ * revisit): any with words, and any she moved past that has none (saved blank, cleared or lost,
+ * shown as "No answer saved"). Only a question she skipped on purpose is left out.
+ */
+export function shownPrompts(day: CheckinDay): string[] {
+  return day.prompts.filter((p) => {
+    const a = day.answers.get(p);
+    if ((a?.answer ?? "").trim() !== "") return true;
+    return a?.done === true && a.skipped !== true;
+  });
+}
+
 /** The first question not yet moved past (Next / Skip), or -1 once every one is. */
 export function currentStep(day: CheckinDay): number {
   return day.prompts.findIndex((p) => !day.answers.get(p)?.done);
