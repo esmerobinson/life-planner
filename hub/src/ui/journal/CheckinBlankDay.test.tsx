@@ -161,20 +161,20 @@ it("a cleared answer (Edit, emptied on purpose) still shows its question after a
   expect(screen.getByRole("button", { name: EDIT_ANSWERS })).toBeInTheDocument();
 });
 
-it("Past check-ins are unaffected: a blank day isn't listed, and a mixed day lists only what she answered", async () => {
+it("Past check-ins list a day whose answers were lost, with No answer saved; a question skipped on purpose stays hidden (Esme, 2026-11-06)", async () => {
   await ensureCheckinSet(jk, "2026-10-20", ["M1", "D3"]);
-  for (const id of ["M1", "D3"]) await saveAnswer(jk, "2026-10-20", id, ME, null, true);
+  for (const id of ["M1", "D3"]) await saveAnswer(jk, "2026-10-20", id, ME, null, true); // lost (the old Next bug)
   await ensureCheckinSet(jk, "2026-10-21", ["M1", "D3"]);
   await saveAnswer(jk, "2026-10-21", "M1", ME, "Pretend answer on the 21st", true);
-  await saveAnswer(jk, "2026-10-21", "D3", ME, null, true);
+  await saveAnswer(jk, "2026-10-21", "D3", ME, null, true, undefined, true); // Skip pressed
   await ensureCheckinSet(jk, TODAY, ["M1"]);
   await saveAnswer(jk, TODAY, "M1", ME, "Pretend today", true);
   checkIn();
   await screen.findByText("Checked in for today");
   const past = screen.getByText("Past check-ins").closest("details")!;
-  const days = [...past.querySelectorAll(".journal-past > li")];
-  expect(days).toHaveLength(1);
-  expect(within(days[0] as HTMLElement).getByText("Pretend answer on the 21st")).toBeInTheDocument();
-  expect(within(days[0] as HTMLElement).queryByText(text("D3"))).toBeNull();
-  expect(within(past).queryByText(NO_ANSWER_SAVED)).toBeNull();
+  const days = [...past.querySelectorAll(".journal-past > li")] as HTMLElement[];
+  expect(days).toHaveLength(2);
+  expect(within(days[0]!).getByText("Pretend answer on the 21st")).toBeInTheDocument();
+  expect(within(days[0]!).queryByText(text("D3"))).toBeNull();
+  expect(within(days[1]!).getAllByText(NO_ANSWER_SAVED)).toHaveLength(2);
 });
