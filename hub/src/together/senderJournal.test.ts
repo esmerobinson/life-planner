@@ -343,3 +343,20 @@ describe("Highlighted learnings (Esme, 2026-11-06)", () => {
     expect(fake.events.size).toBe(0);
   });
 });
+
+it("bug #59: a whole kind that can't be read (the card file won't open here): a day ticked private is still hidden", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  const { jk } = await journalDay(DAY, { exercise: true });
+  c.set(ANSWERS_AT);
+  await send(fake, c);
+  expect(String((await tally(fake, "exercise", 1))!.note)).toContain("Pretend exercise answer");
+  const other = await keyFor("fake-journal-some-other-key");
+  const cards = (await db.journal.get("cards"))!;
+  await db.journal.put({ ...cards, fp: other.fp, ...(await sealJson(other.key, { v: 1 }, journalAad("cards"))) });
+  await saveSharePrivate(jk, DAY, "exercise", true);
+  await send(fake, c);
+  const live = fake.liveTallies(await habit("exercise"));
+  expect(live).toHaveLength(1);
+  expect(String(live[0]!.note ?? "")).not.toContain("Pretend exercise answer");
+});
