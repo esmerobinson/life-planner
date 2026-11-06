@@ -302,6 +302,8 @@ const SUFFIX = /^[A-Za-z0-9_-]{1,64}$/;
 const CARDS_CHUNK = /^cards:(0|[1-9][0-9]{0,2})$/;
 /** A keywrap row's id: `keywrap:<16 hex kekFp>`. */
 const KEYWRAP_ID = /^keywrap:[0-9a-f]{16}$/;
+/** A highlight version's suffix: `<16 hex hid>_<deviceId>_<8 hex vid>` (at most 64, like every suffix). */
+const HIGHLIGHT_SUFFIX = /^(?=.{1,64}$)[0-9a-f]{16}_[A-Za-z0-9-]{1,37}_[0-9a-f]{8}$/;
 /** A per-device answer's suffix: `<12 hex promptKey>:<deviceId>`. */
 const ANSWER_SUFFIX = /^[0-9a-f]{12}:[A-Za-z0-9_-]{8,64}$/;
 
@@ -328,6 +330,8 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
 
 /** The id rule for one row: the id matches its kind and day (and a part has a plain suffix). */
 function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
+  // One version of a highlight: `highlight:<date>:<16 hex hid>_<deviceId>_<8 hex vid>` (highlightRepo.ts).
+  if (kind === "highlight") return id.startsWith(`highlight:${date}:`) && HIGHLIGHT_SUFFIX.test(id.slice(`highlight:${date}:`.length));
   if (kind === "stars") return id.startsWith("stars:") && SUFFIX.test(id.slice("stars:".length));
   if (kind === "cards") return id === "cards" || CARDS_CHUNK.test(id);
   // A passphrase's wrap is named only by its key-wrap key's fingerprint.

@@ -39,7 +39,7 @@ type Shape<K extends keyof typeof ENTRY_CHECK> = (typeof ENTRY_CHECK)[K] extends
 export type Opened<T> = { state: "ok"; entry: T } | { state: "unreadable" };
 
 /** Opens one row as `kind`. Another key's fingerprint is not even tried. */
-async function openRow<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey, row: JournalRow, kind: K): Promise<Opened<Shape<K>>> {
+export async function openRow<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey, row: JournalRow, kind: K): Promise<Opened<Shape<K>>> {
   if (row.fp !== undefined && row.fp !== jk.fp) return { state: "unreadable" };
   try {
     const value = await openJson(jk.key, row, journalAad(row.id));
@@ -49,7 +49,7 @@ async function openRow<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey, row: 
   }
 }
 
-async function seal(jk: JournalKey, kind: JournalKind, date: ISODate, suffix: string | undefined, entry: unknown): Promise<JournalRow> {
+export async function seal(jk: JournalKey, kind: JournalKind, date: ISODate, suffix: string | undefined, entry: unknown): Promise<JournalRow> {
   const id = journalId(kind, date, suffix);
   const row: JournalRow = { id, kind, date, fp: jk.fp, ...(await sealJson(jk.key, entry, journalAad(id))) };
   if (!validJournal(row)) throw new Error("That journal entry could not be saved.");
@@ -60,7 +60,7 @@ async function seal(jk: JournalKey, kind: JournalKind, date: ISODate, suffix: st
  * Writes rows (and files) in ONE transaction, only while `jk` is still this device's
  * confirmed key. `onlyIfAbsent` rows are skipped when a row with that id already exists.
  */
-async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: FileRow[]; onlyIfAbsent?: boolean } = {}): Promise<boolean> {
+export async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: FileRow[]; onlyIfAbsent?: boolean } = {}): Promise<boolean> {
   return db.transaction("rw", [db.journal, db.files, db.syncMeta], async () => {
     const confirmed = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as { fp?: string } | undefined;
     if (!confirmed || confirmed.fp !== jk.fp) throw new Error(NOT_CONFIRMED);

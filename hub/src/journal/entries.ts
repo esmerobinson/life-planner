@@ -3,6 +3,7 @@
 // as "can't open" and is skipped on its own.
 
 import { isObj, isStr } from "../data/validate";
+import { isHighlightEntry } from "./highlights";
 import { MAX_CARD_DAY, MAX_CARD_ID, MAX_PARTS, PART_KINDS, readStoredSet, type PartKind, type PartValue } from "./exercise";
 
 /** One finished morning page ("I'm done"). Hidden for MORNING_LOCK_DAYS from its date. */
@@ -260,6 +261,8 @@ export const ENTRY_CHECK = {
     isObj(v) && v.v === 1 && strList(v.prompts) && Array.isArray(v.answers) &&
     v.answers.length === (v.prompts as string[]).length && v.answers.every((a) => a === null || isStr(a)) &&
     Number.isInteger(v.step) && typeof v.finished === "boolean",
+  // One version of a highlight (journal/highlights.ts).
+  highlight: isHighlightEntry,
 } as const;
 
 /** Words in a text (for "N of 1,000 words"). */
