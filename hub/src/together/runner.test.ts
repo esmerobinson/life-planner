@@ -38,3 +38,22 @@ it("Send now tries again what was set aside, and keeps the outcome for the box",
   expect(send).toHaveBeenCalledWith({ retryRefused: true });
   expect(r.getState()).toEqual({ running: false, last: { kind: "ok", sent: 1, refused: 0 } });
 });
+
+it("while answers are held after a Replace: runs on app start and sync-state changes without a new sync, at most once a minute (bug #68)", async () => {
+  let held = true;
+  const send = vi.fn(async () => ({ kind: "ok" as const, sent: 0, refused: 0 }));
+  const r = new TogetherRunner(send, async () => held);
+  const sync = fakeSync();
+  const stop = r.start(sync); // the app opening
+  await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+  sync.set({ status: "idle", lastSyncedAt: 100 }); // a state change, no new sync: within the minute
+  await new Promise((res) => setTimeout(res, 10));
+  expect(send).toHaveBeenCalledTimes(1);
+  held = false;
+  vi.spyOn(Date, "now").mockReturnValue(Date.now() + 61_000);
+  sync.set({ status: "idle", lastSyncedAt: 100 }); // not held any more: nothing
+  await new Promise((res) => setTimeout(res, 10));
+  expect(send).toHaveBeenCalledTimes(1);
+  vi.restoreAllMocks();
+  stop();
+});

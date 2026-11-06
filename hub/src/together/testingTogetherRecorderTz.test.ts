@@ -151,6 +151,8 @@ async function recorderRun() {
     'Pretend "private" exercise', "Pretend private check-in",
     "Pretend shared-looking to-do", "Pretend to-do notes", "Pretend Mind to-do",
     MORNING_ONLY, ...morningIds, JPEG, PASS, jk.fp, SYNC_TOKEN, set.source, ...cardFileText,
+    // Together v1 (Esme, 2026-11-06): "what I learned" never goes (core-together, round 8).
+    "Pretend learned words", "What I learned",
     ...(signedIn ? [PASSWORD, EMAIL] : []),
   ];
   const guard = tzProofGuard(fake.fetch, forbidden, c.now);

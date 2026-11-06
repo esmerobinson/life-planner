@@ -510,6 +510,11 @@ async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: Day
       // never rebuilt or sent again from the restored journal (bug #64).
       if (ctx.restoredUnpulled && hadAnswers && !(await readSharePrivate(ctx.jk!, date))[kind]) continue;
       noteNow = () => noteFor(ctx, kind, date, day);
+    } else if (rec?.live && ctx.restoredUnpulled) {
+      // After a Replace, a day missing from the restored journal (a backup older than it) is left
+      // as it is; only a private tick hides it (bug #67).
+      if (rec.answers === false || !(await readSharePrivate(ctx.jk!, date))[kind]) continue;
+      noteNow = async () => "";
     }
     if (noteNow) {
       const note = await noteNow();

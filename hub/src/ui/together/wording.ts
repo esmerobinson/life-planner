@@ -69,7 +69,7 @@ export const TOGETHER_WORDS = {
   /** Under a version the box doesn't hold: put its words into the box (then it's replaced). */
   learnedMerge: "Add to my words",
   learnedRemove: "Remove",
-  learnedRemoveAsk: "Remove these words from every device? They won't be in the box, Read back or Together.",
+  learnedRemoveAsk: "Remove these words from every device? They won't be in the box or Read back.",
   learnedRemoveYes: "Remove them",
   learnedRemoveNo: "Keep them",
 };
