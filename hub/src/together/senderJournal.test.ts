@@ -59,7 +59,7 @@ it("at the day change: two habits (day, 1, 0/0) and titles-only tallies; no answ
   expect(wire(fake)).not.toContain(q2.text.slice(0, 30)); // a skipped question isn't one she answered
 });
 
-it("24 hours later: her answers (with the prompts) and what she learned replace the titles", async () => {
+it("24 hours later: her answers (with the prompts) replace the titles; what she learned never goes (v1)", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { q1 } = await journalDay(DAY, { exercise: true, checkin: true, learned: "Pretend learned words" });
@@ -71,7 +71,8 @@ it("24 hours later: her answers (with the prompts) and what she learned replace 
   c.set(ANSWERS_AT);
   await send(fake, c);
   expect((await tally(fake, "exercise", 1))!.deleted_at).not.toBeNull();
-  expect((await tally(fake, "exercise", 2))!.note).toBe(`${TITLE}\nPretend exercise answer\n\nWhat I learned today\nPretend learned words`);
+  expect((await tally(fake, "exercise", 2))!.note).toBe(`${TITLE}\nPretend exercise answer`);
+  expect(wire(fake)).not.toMatch(/Pretend learned words|What I learned/);
   expect((await tally(fake, "checkin", 2))!.note).toBe(`${q1.text}\nPretend check-in answer`);
   expect(fake.liveTallies(await habit("exercise"))).toHaveLength(1);
   expect(fake.todos.get(await habit("exercise"))!.tally).toBe(1);
@@ -296,53 +297,22 @@ describe("tallies that may be in Together (bug #49)", () => {
   });
 });
 
-describe("Highlighted learnings (Esme, 2026-11-06)", () => {
-  it("the day's highlights (passage and note) go with the answers, under their heading; never at 3am, never another day's or a removed one", async () => {
+describe("Together v1 (Esme, 2026-11-06): highlights never go", () => {
+  it("a day's highlights (passage and note) never go: not at 3am, not with the answers, not another day's", async () => {
     const c = clock(SIGN_IN);
     const fake = await signedIn(c);
     await journalDay(DAY, { exercise: true });
     await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
-    await new Promise((r) => setTimeout(r, 5)); // made a moment later
-    await highlightOn(DAY, "pretend Sallow hill");
-    await highlightOn(DAY, "pretend Gristlecomb river", "", { removed: true });
     await highlightOn("2026-11-03", "pretend Pellmoor yesterday");
-    c.set(TITLES_AT);
-    await send(fake, c);
-    expect(wire(fake)).not.toMatch(/Wrenfold|Sallow|Highlighted learnings/);
-    c.set(ANSWERS_AT);
-    await send(fake, c);
-    const note = String((await tally(fake, "exercise", 2))!.note);
-    expect(note).toBe(`${TITLE}\nPretend exercise answer\n\nHighlighted learnings\n"pretend Wrenfold clouds"\nPretend Wrenfold note\n"pretend Sallow hill"`);
-    expect(wire(fake)).not.toMatch(/Gristlecomb|Pellmoor/);
-    const n = restCalls(fake).length;
-    await send(fake, c); // a replay sends nothing: the note is the same every time
-    expect(restCalls(fake).length).toBe(n);
-  });
-
-  it("a private day: no highlight, ever", async () => {
-    const c = clock(SIGN_IN);
-    const fake = await signedIn(c);
-    const { jk } = await journalDay(DAY, { exercise: true });
-    await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
-    await saveSharePrivate(jk, DAY, "exercise", true);
     for (const at of [TITLES_AT, ANSWERS_AT, "2026-11-10T09:00:00"]) {
       c.set(at);
       await send(fake, c);
     }
-    expect(wire(fake)).not.toMatch(/Wrenfold|Highlighted learnings/);
-  });
-
-  it("highlights alone don't make an exercise day", async () => {
-    const c = clock(SIGN_IN);
-    const fake = await signedIn(c);
-    await journalDay(DAY, {});
-    await highlightOn(DAY, "pretend Wrenfold clouds");
-    c.set(ANSWERS_AT);
-    await send(fake, c);
-    expect(wire(fake)).not.toMatch(/Wrenfold/);
-    expect(fake.events.size).toBe(0);
+    expect((await tally(fake, "exercise", 2))!.note).toBe(`${TITLE}\nPretend exercise answer`);
+    expect(wire(fake)).not.toMatch(/Wrenfold|Pellmoor|Highlighted learnings/);
   });
 });
+
 
 it("bug #59: a whole kind that can't be read (the card file won't open here): a day ticked private is still hidden", async () => {
   const c = clock(SIGN_IN);

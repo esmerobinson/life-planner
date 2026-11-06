@@ -167,7 +167,9 @@ describe("ticked on the phone after the Mac sent the day's answers to Together",
     c.set("2026-11-06T03:30:00"); // the answers are due
     expect(await send(fake, c)).toMatchObject({ kind: "ok" });
     const habit = await togetherId("habit", "exercise", 1);
-    expect(fake.liveTallies(habit).map((e) => e.note).join()).toContain("Pretend Wyndle learned words");
+    expect(fake.liveTallies(habit).map((e) => e.note).join()).toContain("Pretend exercise answer");
+    // Together v1 (Esme, 2026-11-06): "what I learned" never goes (was: it goes with the answers).
+    expect(fake.liveTallies(habit).map((e) => e.note).join()).not.toContain("Pretend Wyndle learned words");
 
     await phoneTick(phone, "exercise", true); // on the phone, the next morning
     await syncBoth(server, phone);

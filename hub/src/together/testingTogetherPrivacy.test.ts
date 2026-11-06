@@ -43,7 +43,8 @@ it("titles: not at 02:59:59 after the day, yes at 03:00:00; answers: not at 02:5
   c.set("2026-11-06T03:00:00");
   await send(fake, c);
   expect(bodies(fake)).toMatch(/Pretend exercise answer/);
-  expect(bodies(fake)).toMatch(/Copperwhistle/);
+  // Together v1 (Esme, 2026-11-06): "what I learned" never goes (was: it goes with the answers).
+  expect(bodies(fake)).not.toMatch(/Copperwhistle/);
 });
 
 it("a tick one second before the answers are due (after the titles went): the answers never go", async () => {
@@ -276,7 +277,8 @@ it("scope: no marker from morning pages, notes, drafts, other days, other device
   const all = bodies(fake);
   expect(all).toContain("Pretend Gallowmere answer");
   expect(all).toContain("Pretend Rindlebay answer");
-  expect(all).toContain("Pretend Copperwhistle learned");
+  // Together v1 (Esme, 2026-11-06): "what I learned" never goes (was: it goes with the answers).
+  expect(all).not.toContain("Pretend Copperwhistle learned");
   expect(all).toContain(`${D4}T12:00:00.000Z`); // D4's titles did go
   expect([...fake.todos.values()].every((t) => t.type === "habit")).toBe(true);
   expect(fake.todos.size).toBe(2);

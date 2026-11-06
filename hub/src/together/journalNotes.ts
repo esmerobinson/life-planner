@@ -5,19 +5,20 @@
 // - Exercise: a day where any card was ticked done.
 //   - Titles-only: each card's title.
 //   - With answers: each card's title, then each prompt she answered and her submitted answer
-//     (never a draft), a checklist's items with her choices, her "what I learned today", and
-//     the day's highlighted passages with their notes ("Highlighted learnings", Esme 2026-11-06):
-//     only highlights made that day, never a removed one.
+//     (never a draft), and a checklist's items with her choices.
+// - v1 sends ONLY the exercise and check-in answers (Esme, 2026-11-06): "what I learned today"
+//   and highlights are never read or sent here. They come in a later update (the earlier send
+//   code is in git history: cb086e6, 8265e47).
 // - Check-in: a day she finished ("Checked in for today").
 //   - Titles-only: each question she answered.
 //   - With answers: each of those questions, then her answer.
 // - Only days from `since` (the sign-in day) and before `today` (which turns at 3am).
 // - Never read or sent: morning pages (not even dates), photos, drafts, Notes to myself, stars,
-//   the card file beyond the titles and prompts of cards she did.
+//   "what I learned", highlights, the card file beyond the titles and prompts of cards she did.
 
 import { db } from "../data/db";
 import {
-  answeredPrompts, listExerciseEntries, readCheckinDay, readExerciseCards, readExerciseProgress, readLearned,
+  answeredPrompts, listExerciseEntries, readCheckinDay, readExerciseCards, readExerciseProgress,
   type ExerciseResponse, type PartAnswer,
 } from "../data/repo";
 import type { ISODate } from "../domain/types";
@@ -26,48 +27,6 @@ import { trackTitle } from "../journal/exercise";
 import { PROMPTS } from "../journal/prompts";
 import { checkedIn } from "../journal/rows";
 import { cardTitle } from "../ui/journal/ResponseView";
-import { highlightRows } from "../data/journalRepo";
-import type { HighlightEntry } from "../journal/highlights";
-
-/**
- * The day's highlights for Together (bug #57): read per highlight id, from that day's own rows
- * only, never merged with the same words highlighted on another day. Each id's current note is
- * its newest version still there; a removed one is left out. `partial`: a row of the day wouldn't
- * open here.
- */
-async function dayHighlights(jk: JournalKey, date: ISODate): Promise<{ text: string; partial: boolean }> {
-  const byHid = new Map<string, HighlightEntry[]>();
-  let partial = false;
-  for (const row of await db.journal.where("date").equals(date).toArray()) {
-    if (row.kind !== "highlight") continue;
-    const o = await highlightRows.open(jk, row);
-    if (o.state !== "ok") {
-      partial = true;
-      continue;
-    }
-    const rest = row.id.slice(`highlight:${row.date}:`.length);
-    const hid = rest.slice(0, rest.indexOf("_"));
-    byHid.set(hid, [...(byHid.get(hid) ?? []), o.entry]);
-  }
-  const kept: { hid: string; exact: string; note: string; createdAt: number }[] = [];
-  for (const [hid, versions] of byHid) {
-    const heads = versions.filter((v) => !versions.some((w) => w !== v && w.seen.includes(v.vid)));
-    const live = heads.filter((v) => !v.deleted).sort((a, b) => b.at - a.at || b.vid.localeCompare(a.vid));
-    if (live.length === 0) continue;
-    const top = live.find((v) => v.note.trim() !== "") ?? live[0]!;
-    kept.push({ hid, exact: top.anchor.exact, note: top.note, createdAt: Math.min(...versions.map((v) => v.createdAt)) });
-  }
-  // A fixed order, so the note (and its hash) never changes by itself.
-  kept.sort((a, b) => a.createdAt - b.createdAt || a.hid.localeCompare(b.hid));
-  if (kept.length === 0) return { text: "", partial };
-  const text = [HIGHLIGHTS_HEADING, ...kept.map((h) => `"${clean(h.exact)}"${filled(h.note) ? `\n${clean(h.note)}` : ""}`)].join("\n");
-  return { text, partial };
-}
-
-/** Provisional wording (Esme may reword): the heading over her "what I learned" words in Together. */
-export const LEARNED_HEADING = "What I learned today";
-/** Esme's heading (2026-11-06) over the day's highlighted passages in Together. */
-export const HIGHLIGHTS_HEADING = "Highlighted learnings";
 
 /** One day's note: titles or questions only, and with her answers. */
 export interface DayNote {
@@ -154,9 +113,6 @@ async function exerciseDays(jk: JournalKey, inWindow: (d: ISODate) => boolean, t
   const { entries, unreadable } = await listExerciseEntries(jk, today);
   if (unreadable > 0) return null;
   for (const [date, cardIds] of ids) {
-    const learned = await readLearned(jk, date);
-    const hl = await dayHighlights(jk, date);
-    if (learned.unreadable > 0 || hl.partial) partial.add(date);
     const titles: string[] = [];
     const full: string[] = [];
     for (const id of cardIds) {
@@ -172,8 +128,6 @@ async function exerciseDays(jk: JournalKey, inWindow: (d: ISODate) => boolean, t
       const words = said ? answerText(said) : "";
       full.push(words ? `${title}\n${words}` : title);
     }
-    if (filled(learned.text)) full.push(`${LEARNED_HEADING}\n${clean(learned.text)}`);
-    if (hl.text) full.push(hl.text);
     notes.set(date, { titles: titles.join("\n"), full: full.join("\n\n") });
   }
   return { notes, unknown, partial };

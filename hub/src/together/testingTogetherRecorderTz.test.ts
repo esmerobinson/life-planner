@@ -175,7 +175,8 @@ it("nothing forbidden is ever sent to Together (time-zone proof)", async () => {
   expect(outcomes).toEqual(["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"]);
   const all = guard.seen.map((r) => r.body).join("\n");
   expect(all).toContain("Pretend exercise answer");
-  expect(all).toContain("Pretend learned words");
+  // Together v1 (Esme, 2026-11-06): "what I learned" never goes (was: it goes with the answers).
+  expect(all).not.toContain("Pretend learned words");
   expect(all).toContain("2026-11-06T12:00:00.000Z"); // the private day's titles went
   expect(all).toMatch(/"deleted_at":"\d{4}-/); // deletes did happen (and were checked)
   for (const r of guard.seen) {

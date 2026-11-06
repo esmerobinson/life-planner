@@ -64,7 +64,9 @@ describe("Highlighted learnings: a recorder over every request to the fake Toget
     privLearned: "Pretend Juniperdale learned on a private day",
   };
 
-  it("only the right day's kept highlights and notes go, only after the day ends + 24 h; never a private day's, a removed one, another day's, today's, or any other journal words", async () => {
+  // Together v1 (Esme, 2026-11-06): highlights and "what I learned" are not sent; this checks how they
+  // were sent, so it waits for the later update that brings them back (core-together, round 7).
+  it.skip("only the right day's kept highlights and notes go, only after the day ends + 24 h; never a private day's, a removed one, another day's, today's, or any other journal words", async () => {
     const c = clock(`${D1}T09:00:00`);
     const fake = fakeTogether(c);
     // Words that may go so far (grows as days become due), and words that may never go.
@@ -119,7 +121,9 @@ describe("Highlighted learnings: a recorder over every request to the fake Toget
     expect(g.violations).toEqual([]);
   });
 
-  it("a highlight removed AFTER its day went: hidden in Together at the next run (the old tally deleted, the new one without it)", async () => {
+  // Together v1 (Esme, 2026-11-06): highlights and "what I learned" are not sent; this checks how they
+  // were sent, so it waits for the later update that brings them back (core-together, round 7).
+  it.skip("a highlight removed AFTER its day went: hidden in Together at the next run (the old tally deleted, the new one without it)", async () => {
     const D = "2026-11-04";
     const c = clock(`${D}T09:00:00`);
     const fake = await signedIn(c);
@@ -143,7 +147,9 @@ describe("Highlighted learnings: a recorder over every request to the fake Toget
     expect(fake.liveTallies(await habit("exercise"))).toHaveLength(1);
   });
 
-  it("ticked private AFTER its day went: the highlights are hidden at the next run (titles only live)", async () => {
+  // Together v1 (Esme, 2026-11-06): highlights and "what I learned" are not sent; this checks how they
+  // were sent, so it waits for the later update that brings them back (core-together, round 7).
+  it.skip("ticked private AFTER its day went: the highlights are hidden at the next run (titles only live)", async () => {
     const D = "2026-11-04";
     const c = clock(`${D}T09:00:00`);
     const fake = await signedIn(c);
@@ -159,7 +165,9 @@ describe("Highlighted learnings: a recorder over every request to the fake Toget
     expect(String(live[0]!.note)).not.toMatch(/Moorcastle|Highlighted/);
   });
 
-  it("a note added later to a sent day's highlight is sent once (one new version), and a replay sends nothing", async () => {
+  // Together v1 (Esme, 2026-11-06): highlights and "what I learned" are not sent; this checks how they
+  // were sent, so it waits for the later update that brings them back (core-together, round 7).
+  it.skip("a note added later to a sent day's highlight is sent once (one new version), and a replay sends nothing", async () => {
     const D = "2026-11-04";
     const c = clock(`${D}T09:00:00`);
     const fake = await signedIn(c);
@@ -241,7 +249,9 @@ describe("after a backup Replace (a new device id)", () => {
     expect(fake.requests.slice(n).filter((r) => r.method !== "GET")).toEqual([]);
   });
 
-  it("learned words and highlights written after it (from a page still holding the former id) go under the current id, and to Together once", async () => {
+  // Together v1 (Esme, 2026-11-06): highlights and "what I learned" are not sent; this checks how they
+  // were sent, so it waits for the later update that brings them back (core-together, round 7).
+  it.skip("learned words and highlights written after it (from a page still holding the former id) go under the current id, and to Together once", async () => {
     const { D, c, fake, jk, before, after } = await replaced();
     const lid = await saveLearned(jk, D, before, "Pretend Quarrydown learned, and more after the Replace");
     expect(lid.startsWith(`learned:${D}:${after}_`)).toBe(true);
@@ -529,7 +539,8 @@ describe("a highlight row this device can't open (sealed with another key)", () 
       await hl(D, "pretend Ulverby tower", "Pretend Ulverby note");
       c.set("2026-11-06T03:30:00");
       await send(fake, c);
-      expect((await liveExerciseNotes(fake))[D], "set-up: sent with the highlight").toContain("Ulverby");
+      // Together v1 (Esme, 2026-11-06): highlights aren't sent; the set-up checks the answers went.
+      expect((await liveExerciseNotes(fake))[D], "set-up: sent with the answers").toContain("Pretend exercise answer");
       await unreadableHighlight(where === "on the same day" ? D : "2026-11-02");
       await saveSharePrivate(jk, D, "exercise", true);
       await send(fake, c);
