@@ -94,7 +94,9 @@ export type MetaKey =
   /** How many runs ended with the token accepted (a counter, never a clock: bug #4). */
   | "acceptedSeq"
   /** `acceptedSeq` when the current token was saved (a Save's journal key needs a later acceptance). */
-  | "tokenSeq";
+  | "tokenSeq"
+  /** This device's ids before each Replace: its journal rows with them are read, never written (data/deviceIds.ts). */
+  | "formerDeviceIds";
 
 /**
  * Tables added after the sync server first shipped: a server not yet updated refuses their rows
@@ -586,6 +588,8 @@ async function holdForLater(db: HubDB, c: { table: string; id: string; updatedAt
 /**
  * Tries every quarantined row again (after an app update it may now be readable) and
  * applies it by the usual rules; a row that is now outdated is dropped. ONE transaction.
+ * A row that came from a backup (`fromBackup`) and is applied is also marked to be sent, with
+ * its own stamp: the server may never have had it, and a newer copy there still wins (m5 c).
  */
 async function retryQuarantine(db: HubDB): Promise<number> {
   if ((await db.quarantine.count()) === 0) return 0;
@@ -596,7 +600,10 @@ async function retryQuarantine(db: HubDB): Promise<number> {
       const row = { ...q.data, id: q.id, updatedAt: q.updatedAt };
       if (!VALID_ROW[q.table](row)) continue; // still unreadable
       await db.quarantine.delete([q.table, q.id]);
-      if (await applyRow(db, { table: q.table, id: q.id, updatedAt: q.updatedAt, data: q.data }, q.cursor)) written++;
+      if (await applyRow(db, { table: q.table, id: q.id, updatedAt: q.updatedAt, data: q.data }, q.cursor)) {
+        written++;
+        if (q.fromBackup) await db.pending.put({ table: q.table, id: q.id, updatedAt: q.updatedAt });
+      }
     }
     return written;
   });

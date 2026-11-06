@@ -48,6 +48,12 @@ export interface QuarantinedRow {
   reason: string;
   /** The response cursor it arrived with (rows carry no seq of their own on the wire). */
   cursor: number;
+  /**
+   * It came from a backup, not the server (review m5 c): once this version reads it, it is
+   * applied AND sent, so it reaches the server and the other devices (its own stamp, so a newer
+   * copy there still wins). A row from the server is only applied: the server has it already.
+   */
+  fromBackup?: true;
 }
 
 export interface SyncMetaRow {
