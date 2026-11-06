@@ -31,6 +31,8 @@ export interface SentTally {
   /** Hash of the note it carries. */
   hash: string;
   live: boolean;
+  /** It carries her answers (not titles only). Absent on older records: taken as "may". */
+  answers?: boolean;
 }
 
 export interface SentHabit {

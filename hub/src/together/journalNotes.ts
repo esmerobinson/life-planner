@@ -26,16 +26,42 @@ import { trackTitle } from "../journal/exercise";
 import { PROMPTS } from "../journal/prompts";
 import { checkedIn } from "../journal/rows";
 import { cardTitle } from "../ui/journal/ResponseView";
-import { listHighlights, type Highlight } from "../data/highlightRepo";
+import { highlightRows } from "../data/journalRepo";
+import type { HighlightEntry } from "../journal/highlights";
 
-/** A highlight id's day: `highlight:<date>:<hex>`. */
-const highlightDay = (hid: string) => hid.slice("highlight:".length, "highlight:".length + 10);
-
-/** The day's highlights (made that day; removed ones are never listed), as plain text. */
-function highlightsText(all: Highlight[], date: ISODate): string {
-  const day = all.filter((h) => h.hids.some((id) => highlightDay(id) === date)).sort((a, b) => a.createdAt - b.createdAt || a.key.localeCompare(b.key)); // a fixed order, so the note (and its hash) never changes by itself
-  if (day.length === 0) return "";
-  return [HIGHLIGHTS_HEADING, ...day.map((h) => `"${clean(h.anchor.exact)}"${filled(h.note) ? `\n${clean(h.note)}` : ""}`)].join("\n");
+/**
+ * The day's highlights for Together (bug #57): read per highlight id, from that day's own rows
+ * only, never merged with the same words highlighted on another day. Each id's current note is
+ * its newest version still there; a removed one is left out. `partial`: a row of the day wouldn't
+ * open here.
+ */
+async function dayHighlights(jk: JournalKey, date: ISODate): Promise<{ text: string; partial: boolean }> {
+  const byHid = new Map<string, HighlightEntry[]>();
+  let partial = false;
+  for (const row of await db.journal.where("date").equals(date).toArray()) {
+    if (row.kind !== "highlight") continue;
+    const o = await highlightRows.open(jk, row);
+    if (o.state !== "ok") {
+      partial = true;
+      continue;
+    }
+    const rest = row.id.slice(`highlight:${row.date}:`.length);
+    const hid = rest.slice(0, rest.indexOf("_"));
+    byHid.set(hid, [...(byHid.get(hid) ?? []), o.entry]);
+  }
+  const kept: { hid: string; exact: string; note: string; createdAt: number }[] = [];
+  for (const [hid, versions] of byHid) {
+    const heads = versions.filter((v) => !versions.some((w) => w !== v && w.seen.includes(v.vid)));
+    const live = heads.filter((v) => !v.deleted).sort((a, b) => b.at - a.at || b.vid.localeCompare(a.vid));
+    if (live.length === 0) continue;
+    const top = live.find((v) => v.note.trim() !== "") ?? live[0]!;
+    kept.push({ hid, exact: top.anchor.exact, note: top.note, createdAt: Math.min(...versions.map((v) => v.createdAt)) });
+  }
+  // A fixed order, so the note (and its hash) never changes by itself.
+  kept.sort((a, b) => a.createdAt - b.createdAt || a.hid.localeCompare(b.hid));
+  if (kept.length === 0) return { text: "", partial };
+  const text = [HIGHLIGHTS_HEADING, ...kept.map((h) => `"${clean(h.exact)}"${filled(h.note) ? `\n${clean(h.note)}` : ""}`)].join("\n");
+  return { text, partial };
 }
 
 /** Provisional wording (Esme may reword): the heading over her "what I learned" words in Together. */
@@ -49,10 +75,15 @@ export interface DayNote {
   full: string;
 }
 
-/** One kind's days; days in `unknown` couldn't be read in full and are left as they are. */
+/**
+ * One kind's days. `partial`: a day whose note was made from what could be read, but something of
+ * it wouldn't open here; `unknown`: a day with no note at all because of that. Neither is ever
+ * sent with answers; either can still be hidden (titles only) when ticked private (bug #59).
+ */
 export interface DayNotes {
   notes: Map<ISODate, DayNote>;
   unknown: Set<ISODate>;
+  partial: Set<ISODate>;
 }
 
 export interface JournalDays {
@@ -118,21 +149,14 @@ async function exerciseDays(jk: JournalKey, inWindow: (d: ISODate) => boolean, t
   }
   const notes = new Map<ISODate, DayNote>();
   const unknown = new Set<ISODate>();
-  if (ids.size === 0) return { notes, unknown };
+  const partial = new Set<ISODate>();
+  if (ids.size === 0) return { notes, unknown, partial };
   const { entries, unreadable } = await listExerciseEntries(jk, today);
   if (unreadable > 0) return null;
-  // Highlights: a day with a highlight row this device can't open is left as it is.
-  const hl = await listHighlights(jk);
-  if (hl.unreadable > 0) {
-    for (const r of await db.journal.where("kind").equals("highlight").toArray()) if (ids.has(r.date)) unknown.add(r.date);
-  }
   for (const [date, cardIds] of ids) {
-    if (unknown.has(date)) continue;
     const learned = await readLearned(jk, date);
-    if (learned.unreadable > 0) {
-      unknown.add(date);
-      continue;
-    }
+    const hl = await dayHighlights(jk, date);
+    if (learned.unreadable > 0 || hl.partial) partial.add(date);
     const titles: string[] = [];
     const full: string[] = [];
     for (const id of cardIds) {
@@ -149,24 +173,28 @@ async function exerciseDays(jk: JournalKey, inWindow: (d: ISODate) => boolean, t
       full.push(words ? `${title}\n${words}` : title);
     }
     if (filled(learned.text)) full.push(`${LEARNED_HEADING}\n${clean(learned.text)}`);
-    const passages = highlightsText(hl.highlights, date);
-    if (passages) full.push(passages);
+    if (hl.text) full.push(hl.text);
     notes.set(date, { titles: titles.join("\n"), full: full.join("\n\n") });
   }
-  return { notes, unknown };
+  return { notes, unknown, partial };
 }
 
 async function checkinDays(jk: JournalKey, since: ISODate, today: ISODate): Promise<DayNotes> {
   const notes = new Map<ISODate, DayNote>();
   const unknown = new Set<ISODate>();
+  const partial = new Set<ISODate>();
   // Only the window's days are opened (the kind and date of a row are in clear).
   const rows = await db.journal.where("date").between(since, today, true, false).toArray();
   const dates = [...new Set(rows.filter((r) => r.kind === "set" || r.kind === "answer" || r.kind === "checkin").map((r) => r.date))].sort();
   for (const date of dates) {
     const day = await readCheckinDay(jk, date);
     if (day.unreadable > 0) {
-      unknown.add(date);
-      continue;
+      // Made from what opens (titles still go if it is ticked private); never sent with answers.
+      if (!checkedIn(day)) {
+        unknown.add(date);
+        continue;
+      }
+      partial.add(date);
     }
     if (!checkedIn(day)) continue;
     const qs = answeredPrompts(day);
@@ -175,5 +203,5 @@ async function checkinDays(jk: JournalKey, since: ISODate, today: ISODate): Prom
       full: qs.map((id) => `${PROMPT_TEXT.get(id) ?? id}\n${clean(day.answers.get(id)?.answer ?? "")}`).join("\n\n"),
     });
   }
-  return { notes, unknown };
+  return { notes, unknown, partial };
 }

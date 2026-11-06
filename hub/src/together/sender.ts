@@ -23,6 +23,8 @@
 import { db as appDb, type HubDB } from "../data/db";
 import { readSharePrivate } from "../data/repo";
 import { withSyncLock } from "../data/syncGate";
+import { formerDeviceIds } from "../data/deviceIds";
+import { getDeviceId } from "../sync/engine";
 import { todayISO } from "../domain/dates";
 import type { ISODate } from "../domain/types";
 import type { JournalKey } from "../journal/crypto";
@@ -143,6 +145,9 @@ export async function signInToTogether(
       url, anonKey, userId: s.session.userId, coupleId: c.coupleId,
       accessToken: s.session.accessToken, refreshToken: s.session.refreshToken, expiresAt: s.session.expiresAt,
     };
+    // This install's device id exists from now on, so a later Replace always leaves a former id
+    // behind: the sign of a restored journal that sync hasn't caught up with (bug #58).
+    await getDeviceId(db);
     await db.transaction("rw", db.syncMeta, async () => {
       await db.syncMeta.put({ key: TOGETHER_META, value: auth });
       const sent = await readSent(db);
@@ -311,8 +316,9 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       const journal = jk ? await readJournalDays(jk, since, today).catch(() => null) : null;
       return { jk, journal };
     });
-    if (snap.jk && snap.journal) {
+    if (snap.jk) {
       ctx.jk = snap.jk;
+      ctx.restoredUnpulled = (await formerDeviceIds(db.syncMeta)).length > 0 && (await db.syncMeta.get("firstPullDone"))?.value !== true;
       await sendJournal(ctx, snap.journal);
     }
     return done(true);
@@ -328,6 +334,8 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
 
 class Ctx {
   sentCount = 0;
+  /** A Replace happened and sync hasn't pulled everything since (bug #58). */
+  restoredUnpulled = false;
   private refreshedAfter401 = false;
   constructor(
     readonly db: HubDB,
@@ -393,10 +401,16 @@ const isDuplicate = (r: CallResult) => r.kind === "refused" && (r.code === "2350
 
 // ---- the two habits and their tallies -----------------------------------------------------------
 
-async function sendJournal(ctx: Ctx, journal: JournalDays): Promise<void> {
+async function sendJournal(ctx: Ctx, journal: JournalDays | null): Promise<void> {
   for (const kind of HABITS) {
-    const days = journal[kind];
-    if (!days) continue; // couldn't be read this time: nothing changes
+    let days = journal?.[kind] ?? null;
+    if (!days) {
+      // This kind couldn't be read this time: nothing new goes, but a day sent with answers and
+      // since ticked private is still hidden (bug #59).
+      if (!ctx.sent.habits[kind]) continue;
+      const prefix = `${kind}:`;
+      days = { notes: new Map(), partial: new Set(), unknown: new Set(Object.keys(ctx.sent.tallies).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))) };
+    }
     const habitId = await ensureHabit(ctx, kind);
     if (!habitId) continue;
     await sendTallies(ctx, kind, habitId, days);
@@ -435,10 +449,13 @@ async function ensureHabit(ctx: Ctx, kind: HabitKind): Promise<string | null> {
  * The note that may go for a day right now: titles only until ANSWERS_DELAY_MS after the day
  * ends, and whenever that part is ticked private (the tick is read again right before sending).
  */
-async function noteFor(ctx: Ctx, kind: HabitKind, date: ISODate, note: { titles: string; full: string }): Promise<string> {
+async function noteFor(ctx: Ctx, kind: HabitKind, date: ISODate, note: { titles: string; full: string }, hadAnswers: boolean): Promise<string> {
   if (note.full === note.titles) return note.titles;
   const answersDue = date < todayISO(new Date(ctx.now() - ANSWERS_DELAY_MS));
   if (!answersDue) return note.titles;
+  // After a Replace, until sync has pulled everything again, the journal here may be missing a
+  // tick made after the backup (bug #58): no day goes from titles to answers until then.
+  if (ctx.restoredUnpulled && !hadAnswers) return note.titles;
   const ticks = await readSharePrivate(ctx.jk!, date);
   return ticks[kind] ? note.titles : note.full;
 }
@@ -448,12 +465,24 @@ async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: Day
   const prefix = `${kind}:`;
   const dates = new Set<ISODate>([...days.notes.keys(), ...Object.keys(sent.tallies).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))]);
   for (const date of [...dates].sort()) {
-    if (days.unknown.has(date)) continue;
     const key = `${kind}:${date}`;
     const rec = sent.tallies[key];
     const day = days.notes.get(date);
-    if (day) {
-      const note = await noteFor(ctx, kind, date, day);
+    // What may go: the day's note as usual, or, for a day that couldn't be read in full, only
+    // its titles, and only to hide answers already sent once she has ticked it private (bug #59).
+    let noteNow: (() => Promise<string>) | null = null;
+    if (days.unknown.has(date) || days.partial.has(date)) {
+      if (!rec?.live || rec.answers === false) continue;
+      if (!(await readSharePrivate(ctx.jk!, date))[kind]) continue;
+      const titles = day?.titles ?? "";
+      noteNow = async () => titles;
+    } else if (day) {
+      // Whether Together held her answers for the day when this run began (bug #58).
+      const hadAnswers = !!rec?.live && rec.answers === true;
+      noteNow = () => noteFor(ctx, kind, date, day, hadAnswers);
+    }
+    if (noteNow) {
+      const note = await noteNow();
       const h = await ctx.hash(note);
       if (rec?.live && rec.hash === h) continue;
       if (sent.refused[key]?.hash === h) continue;
@@ -470,7 +499,7 @@ async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: Day
       }
       // The tick is read again right before the insert itself (bug #42): the delete above was a
       // round trip, during which she (or a sync) may have ticked the day private.
-      const ins = await insertTally(ctx, key, rec ? rec.v + 1 : 1, () => noteFor(ctx, kind, date, day), (n) => ({
+      const ins = await insertTally(ctx, key, rec ? rec.v + 1 : 1, noteNow, (n) => ({
         couple_id: ctx.auth.coupleId, todo_id: habitId, user_id: ctx.auth.userId, kind: "tally", at: dayStamp(date), note: n === "" ? null : n,
       }));
       if (ins === null) {
@@ -478,7 +507,7 @@ async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: Day
         await ctx.save();
         continue;
       }
-      sent.tallies[key] = { v: ins.v, hash: await ctx.hash(ins.note), live: true };
+      sent.tallies[key] = { v: ins.v, hash: await ctx.hash(ins.note), live: true, answers: ins.note !== (day?.titles ?? "") };
       delete sent.refused[key];
       await ctx.save();
     } else if (rec?.live) {
