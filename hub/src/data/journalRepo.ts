@@ -1862,7 +1862,7 @@ export async function removeLearnedVersion(jk: JournalKey, date: ISODate, device
   const opened = row ? await openRow(jk, row, "learned") : null;
   const seen = v ? v.seen : opened?.state === "ok" ? [seenToken({ id: versionId, at: opened.entry.at })] : [];
   if (seen.length === 0) return "";
-  const id = newLearnedId(date, deviceId);
+  const id = newLearnedId(date, await writerId(deviceId)); // its current id (restore-safe)
   // At 0, so it never shows in place of another version's words.
   await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), { v: 1, text: "", at: 0, seen })]);
   return id;
@@ -1883,10 +1883,16 @@ export async function saveLearned(
   jk: JournalKey, date: ISODate, deviceId: string, text: string, session: { version?: string; seen?: string[] } = {},
 ): Promise<string> {
   if (text.length > MAX_LEARNED) throw new Error("That's too long to save. Nothing was changed.");
-  const id = session.version ?? newLearnedId(date, deviceId);
-  if (!id.startsWith(`learned:${date}:${deviceId}_`)) throw new Error("Only this device's own version can be changed here.");
+  // Always this device's current id (restore-safe): a page still holding a former id (from before
+  // a Replace) writes with the new one; a box session's row under a former id is never written
+  // again, so its words move into a new version that replaces it.
+  const device = await writerId(deviceId);
+  const own = (id: string) => id.startsWith(`learned:${date}:${device}_`);
+  const carry = session.version && !own(session.version) && (await ownDevices(deviceId)).former.some((f) => session.version!.startsWith(`learned:${date}:${f}_`));
+  if (session.version && !own(session.version) && !carry) throw new Error("Only this device's own version can be changed here.");
+  const id = session.version && own(session.version) ? session.version : newLearnedId(date, device);
   if (await wontOpen(jk, id, "learned")) throw new Error(CANT_OPEN); // never written over (bug #20)
-  const seen = (session.seen ?? []).filter((x) => x !== id);
+  const seen = [...(session.seen ?? []), ...(carry ? [session.version!] : [])].filter((x) => x !== id);
   const entry = { v: 1, text, at: Date.now(), ...(seen.length ? { seen } : {}) };
   await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), entry)]);
   return id;

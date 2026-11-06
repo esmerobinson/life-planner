@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { listLearned, readLearned, removeLearnedVersion, saveLearned, type Learned, type LearnedVersion } from "../../data/repo";
 import type { ISODate } from "../../domain/types";
 import { MAX_LEARNED } from "../../journal/entries";
+import { ownDevices } from "../../data/deviceIds";
 import type { JournalKey } from "../../journal/crypto";
 import { AUTOSAVE_MS, useDraft } from "../useDraft";
 import { longDate } from "../journal/bits";
@@ -58,15 +59,15 @@ export function LearnedToday({ jk, today, deviceId }: { jk: JournalKey; today: I
  * put its words into the box or (once confirmed) remove it: never cleared silently.
  */
 function OtherVersions({
-  versions, deviceId, onMerge, onRemove,
-}: { versions: LearnedVersion[]; deviceId: string; onMerge: (v: LearnedVersion) => void; onRemove: (v: LearnedVersion) => Promise<void> }) {
+  versions, mine, onMerge, onRemove,
+}: { versions: LearnedVersion[]; mine: (device: string) => boolean; onMerge: (v: LearnedVersion) => void; onRemove: (v: LearnedVersion) => Promise<void> }) {
   const [asking, setAsking] = useState<string | null>(null);
   if (versions.length === 0) return null;
   return (
     <>
       {versions.map((v) => (
         <div key={v.id} className="together-learned-other">
-          <p>{v.device === deviceId ? W.learnedEarlierHere : W.learnedOtherDevice}</p>
+          <p>{mine(v.device) ? W.learnedEarlierHere : W.learnedOtherDevice}</p>
           <p className="journal-past-answer">{v.text}</p>
           {asking === v.id ? (
             <div role="group" aria-label={W.learnedRemoveAsk}>
@@ -100,6 +101,16 @@ function OtherVersions({
  * the box held when she started. Saves go one at a time.
  */
 function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODate; deviceId: string; day: Learned }) {
+  // This device's ids: its current one and any from before a Replace (restore-safe).
+  const [ids, setIds] = useState<string[]>([deviceId]);
+  useEffect(() => {
+    let live = true;
+    void ownDevices(deviceId).then((o) => live && setIds([deviceId, o.current, ...o.former]), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [deviceId]);
+  const mine = (device: string) => ids.includes(device);
   const [problem, setProblem] = useState("");
   const session = useRef<{ version?: string; seen: string[] } | null>(null);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -149,7 +160,7 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
       setProblem(e instanceof Error ? e.message : String(e));
     }
   }
-  const fromOther = day.id !== "" && day.device !== deviceId && day.text.trim() !== "";
+  const fromOther = day.id !== "" && !mine(day.device) && day.text.trim() !== "";
   return (
     <>
     <div className="together-learned-box">
@@ -160,7 +171,7 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
       {fromOther && <p>{W.learnedOther}</p>}
       {problem && <p role="alert">{problem}</p>}
     </div>
-    <OtherVersions versions={day.others} deviceId={deviceId} onMerge={merge} onRemove={remove} />
+    <OtherVersions versions={day.others} mine={mine} onMerge={merge} onRemove={remove} />
     </>
   );
 }
