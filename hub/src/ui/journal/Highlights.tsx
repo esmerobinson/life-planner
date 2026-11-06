@@ -21,6 +21,7 @@ import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { JournalSheet } from "./JournalSheet";
 import { useDbChanges } from "./useJournalKey";
 import "./highlights.css";
+import { TogetherHighlightLine } from "../together/TogetherHighlightLine";
 
 /** The button over selected words (placeholder wording). */
 export const HIGHLIGHT_ACTION = "Highlight";
@@ -484,6 +485,7 @@ export function HighlightNoteSheet({
           onBlur={flush}
         />
       </label>
+      <TogetherHighlightLine />
       {asking ? (
         <div className="btn-group" role="group" aria-label={REMOVE_QUESTION}>
           <p>{REMOVE_QUESTION}</p>

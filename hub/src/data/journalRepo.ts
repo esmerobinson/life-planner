@@ -1892,7 +1892,15 @@ export async function saveLearned(
   if (session.version && !own(session.version) && !carry) throw new Error("Only this device's own version can be changed here.");
   const id = session.version && own(session.version) ? session.version : newLearnedId(date, device);
   if (await wontOpen(jk, id, "learned")) throw new Error(CANT_OPEN); // never written over (bug #20)
-  const seen = [...(session.seen ?? []), ...(carry ? [session.version!] : [])].filter((x) => x !== id);
+  // The former-id row is replaced only as it is here now (bug #60): a newer copy of it from the
+  // server (words written after the backup) shows again.
+  let carried: string[] = [];
+  if (carry) {
+    const row = await db.journal.get(session.version!);
+    const o = row ? await openRow(jk, row, "learned") : null;
+    carried = o?.state === "ok" ? [seenToken({ id: session.version!, at: o.entry.at })] : [];
+  }
+  const seen = [...(session.seen ?? []), ...carried].filter((x) => x !== id && !x.startsWith(`${id}@`));
   const entry = { v: 1, text, at: Date.now(), ...(seen.length ? { seen } : {}) };
   await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), entry)]);
   return id;

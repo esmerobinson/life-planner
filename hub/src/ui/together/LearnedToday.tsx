@@ -147,6 +147,8 @@ function LearnedBox({ jk, today, deviceId, day }: { jk: JournalKey; today: ISODa
   function merge(v: LearnedVersion) {
     begin();
     const s = session.current ?? (session.current = { seen: [...day.seen] });
+    // Already added (a double click, bug #61): her words go into the box once.
+    if (v.seen.length > 0 && v.seen.every((t) => s.seen.includes(t))) return;
     for (const t of v.seen) if (!s.seen.includes(t)) s.seen.push(t);
     const now = draft.value.trimEnd();
     draft.set(now ? `${now}\n\n${v.text}` : v.text);

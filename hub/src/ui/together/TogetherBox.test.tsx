@@ -37,7 +37,7 @@ async function signIn(fake: ReturnType<typeof fakeTogether>, password = PASSWORD
 
 it("says plainly what goes (no to-dos), the two stages, one device, and that private after sending only hides", async () => {
   setup();
-  for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds, W.onlyThisDevice]) expect(screen.getByText(t)).toBeInTheDocument();
+  for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds, W.onlyThisDevice, W.highlightsGo, W.laterNote]) expect(screen.getByText(t)).toBeInTheDocument();
   expect(W.intro).toContain("To-dos never go");
   expect(W.afterDayEnds).toContain("24 hours");
   expect(screen.queryByRole("group", { name: /areas/i })).toBeNull();

@@ -96,6 +96,8 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
       <p>{W.intro}</p>
       <p className="together-warning">{W.notEncrypted}</p>
       <p className="together-warning">{W.afterDayEnds}</p>
+      <p>{W.highlightsGo}</p>
+      <p>{W.laterNote}</p>
       <p className="together-warning">{W.privateWarning}</p>
 
       {again && <p role="alert">{W.signInAgain}</p>}
