@@ -152,10 +152,27 @@ export interface Located {
 }
 
 /**
- * Where a highlight is in the card's text now (`texts`: each part's shown text), or null when its
- * words aren't there. Every place with the exact words counts; the one whose text around it
- * matches the kept context best wins (then its own part, then nearest the old offset). Only if
- * the words aren't there exactly are they looked for with their spaces and line breaks loosened.
+ * How well one place's surroundings agree with the context kept with a highlight. A side
+ * agrees in full when the kept text is there right beside the words, and (when fewer than
+ * CONTEXT_CHARS were kept because the words were near the start or end of their part) the part
+ * starts or ends there too.
+ */
+function contextAgrees(prefix: string, suffix: string, before: string, after: string): { score: number; ok: boolean } {
+  const pre = sharedEnd(prefix, before);
+  const suf = sharedStart(suffix, after);
+  const fullPre = pre === prefix.length && (prefix.length >= CONTEXT_CHARS || before.length === prefix.length);
+  const fullSuf = suf === suffix.length && (suffix.length >= CONTEXT_CHARS || after.length === suffix.length);
+  const kept = prefix.length + suffix.length;
+  // Half of the kept context, or one whole side: anything less is the same words somewhere else.
+  return { score: pre + suf, ok: fullPre || fullSuf || (kept > 0 && (pre + suf) * 2 >= kept) };
+}
+
+/**
+ * Where a highlight is in the card's text now (`texts`: each part's shown text), or null when it
+ * can't be found for sure (review I1: never a guess). Every place with the exact words counts
+ * only if the text around it agrees with the kept context (`contextAgrees`); of those, the best
+ * agreeing wins (then its own part, then nearest the old offset). Only if no exact place agrees
+ * are the words looked for with their spaces and line breaks loosened, by the same rule.
  */
 export function locateAnchor(a: TextAnchor, texts: Partial<Record<HighlightField, string>>): Located | null {
   if (a.exact === "") return null;
@@ -170,7 +187,8 @@ export function locateAnchor(a: TextAnchor, texts: Partial<Record<HighlightField
     if (!t) continue;
     for (let i = t.indexOf(a.exact); i >= 0; i = t.indexOf(a.exact, i + 1)) {
       const end = i + a.exact.length;
-      exact.push({ field, start: i, end, score: sharedEnd(a.prefix, t.slice(0, i)) + sharedStart(a.suffix, t.slice(end)) });
+      const c = contextAgrees(a.prefix, a.suffix, t.slice(0, i), t.slice(end));
+      if (c.ok) exact.push({ field, start: i, end, score: c.score });
     }
   }
   const hit = best(exact);
@@ -187,14 +205,33 @@ export function locateAnchor(a: TextAnchor, texts: Partial<Record<HighlightField
     const sq = squeezed(t);
     for (let i = sq.text.indexOf(want); i >= 0; i = sq.text.indexOf(want, i + 1)) {
       const j = i + want.length;
-      loose.push({
-        field, start: sq.from[i]!, end: sq.from[j - 1]! + 1,
-        score: sharedEnd(before, sq.text.slice(0, i)) + sharedStart(after, sq.text.slice(j)),
-      });
+      const c = contextAgrees(before, after, sq.text.slice(0, i), sq.text.slice(j));
+      if (c.ok) loose.push({ field, start: sq.from[i]!, end: sq.from[j - 1]! + 1, score: c.score });
     }
   }
   const near = best(loose);
   return near && { field: near.field, start: near.start, end: near.end };
+}
+
+/**
+ * The card a highlight is on now, and where its words are on it (null: not found for sure). By
+ * its card id; if that card is gone (or its words aren't on it), a card of the same book and day
+ * that has them, as after a re-import that renamed the ids (review M4), by the same context rule.
+ */
+export function resolveCard<C extends Pick<ExerciseCard, "id" | "track" | "day" | "learn" | "try" | "book" | "skill" | "more">>(
+  hc: Pick<HighlightCard, "id" | "track" | "day">, anchor: TextAnchor, cards: readonly C[],
+): { card: C | null; at: Located | null } {
+  const own = cards.find((c) => c.id === hc.id) ?? null;
+  const at = own ? locateAnchor(anchor, cardFieldTexts(own)) : null;
+  if (at) return { card: own, at };
+  if (hc.day !== null) {
+    for (const c of cards) {
+      if (c === own || c.track !== hc.track || c.day !== hc.day) continue;
+      const there = locateAnchor(anchor, cardFieldTexts(c));
+      if (there) return { card: c, at: there };
+    }
+  }
+  return { card: own, at: null };
 }
 
 // ---- showing the marks -------------------------------------------------------------------

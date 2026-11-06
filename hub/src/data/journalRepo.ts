@@ -88,8 +88,11 @@ async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: FileRow
 export const highlightRows = {
   open: (jk: JournalKey, row: JournalRow) => openRow(jk, row, "highlight"),
   seal: (jk: JournalKey, date: ISODate, suffix: string, entry: unknown) => seal(jk, "highlight", date, suffix, entry),
-  write: (jk: JournalKey, rows: JournalRow[]) => {
-    if (rows.some((r) => r.kind !== "highlight")) throw new Error("Only highlight rows are written here.");
+  write: async (jk: JournalKey, rows: JournalRow[]) => {
+    // Only highlight rows, under highlight ids (review M1: never a row of another kind's id).
+    if (rows.some((r) => r.kind !== "highlight" || !r.id.startsWith("highlight:") || !validJournal(r))) {
+      throw new Error("Only highlight rows are written here.");
+    }
     return write(jk, rows);
   },
 } as const;

@@ -86,3 +86,22 @@ button.hl-entry {
   margin: 0;
   font-family: system-ui, sans-serif;
 }
+
+li.hl-entry-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+mark.hl-mark.hl-mark-overlap {
+  outline: 2px dashed var(--placeholder);
+}
+
+.hl-choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

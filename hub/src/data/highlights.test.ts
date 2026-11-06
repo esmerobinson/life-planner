@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { db } from "./db";
 import { exportBackup, parseBackup, restoreBackup } from "./backup";
 import {
-  createHighlight, listHighlights, NOT_CONFIRMED, removeHighlight, saveHighlightNote, type HighlightCard,
+  createHighlight, highlightRows, listHighlights, NOT_CONFIRMED, openNoteSession, removeHighlight, saveHighlightNote, type HighlightCard,
 } from "./repo";
 import { journalId, validJournal } from "./validate";
 import { getDeviceId } from "../sync/engine";
@@ -87,6 +87,13 @@ describe("row ids and sealing", () => {
     expect(await rows()).toHaveLength(0);
   });
 
+  it("the highlight writer refuses any row that isn't under a highlight id (review M1)", async () => {
+    const id = `note:${DAY}:0123456789abcdef_${MAC}_0a1b2c3d`;
+    const sneaky = { id, kind: "highlight" as const, date: DAY, fp: jk.fp, ...(await sealJson(jk.key, { v: 1 }, journalAad(id))) };
+    await expect(highlightRows.write(jk, [sneaky])).rejects.toThrow();
+    expect(await db.journal.get(id)).toBeUndefined();
+  });
+
   it("a row this key can't open is counted, skipped on its own, and never written over", async () => {
     await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
     const id = journalId("highlight", DAY, `fedcba9876543210_${PHONE}_00000001`);
@@ -110,26 +117,54 @@ describe("notes and removing", () => {
     await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
     const first = (await rows())[0]!;
     const [h] = (await listHighlights(jk)).highlights;
-    await saveHighlightNote(jk, MAC, h!, "Pretend new note");
+    await saveHighlightNote(jk, MAC, openNoteSession(h!), "Pretend new note");
     const all = await rows();
     expect(all).toHaveLength(2);
     expect(all.find((r) => r.id === first.id)).toEqual(first);
     expect((await listHighlights(jk)).highlights[0]!.note).toBe("Pretend new note");
   });
 
-  it("one note box session rewrites only its own row, however many saves", async () => {
+  it("each save in one note box is its own new version, written over the box's last one: no row is ever rewritten", async () => {
     await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
-    let h = (await listHighlights(jk)).highlights[0]!;
-    let session = await saveHighlightNote(jk, MAC, h, "Pretend n");
-    h = (await listHighlights(jk)).highlights[0]!;
-    session = await saveHighlightNote(jk, MAC, h, "Pretend note", session);
-    h = (await listHighlights(jk)).highlights[0]!;
-    await saveHighlightNote(jk, MAC, h, "Pretend note, typed on", session);
-    expect(await rows()).toHaveLength(2);
+    const session = openNoteSession((await listHighlights(jk)).highlights[0]!);
+    await saveHighlightNote(jk, MAC, session, "Pretend n");
+    const firstSave = await rows();
+    await saveHighlightNote(jk, MAC, session, "Pretend note");
+    await saveHighlightNote(jk, MAC, session, "Pretend note, typed on");
+    const all = await rows();
+    expect(all).toHaveLength(4);
+    for (const r of firstSave) expect(all).toContainEqual(r); // never rewritten
     const after = (await listHighlights(jk)).highlights;
     expect(after).toHaveLength(1);
     expect(after[0]!.note).toBe("Pretend note, typed on");
-    expect(after[0]!.others).toEqual([]);
+    expect(after[0]!.others).toEqual([]); // her earlier saves are replaced by her later ones
+  });
+
+  it("two devices (review I3): a newer note arrives while her box is open; what she typed before and after both stay", async () => {
+    await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
+    const opened = (await listHighlights(jk)).highlights[0]!;
+    const mac = openNoteSession(opened);
+    const made = new Set((await rows()).map((r) => r.id));
+    await saveHighlightNote(jk, MAC, mac, "Pretend X from the Mac");
+    const xRow = (await rows()).find((r) => !made.has(r.id))!;
+    // The phone had the same version open and saves without seeing X (newer).
+    await saveHighlightNote(jk, PHONE, openNoteSession(opened), "Pretend Y from the phone");
+    expect((await listHighlights(jk)).highlights[0]).toMatchObject({ note: "Pretend Y from the phone", others: ["Pretend X from the Mac"] });
+    // She types on in the Mac's box: a new version over her X only, never over the phone's Y.
+    await saveHighlightNote(jk, MAC, mac, "Pretend X from the Mac, typed on");
+    const [h] = (await listHighlights(jk)).highlights;
+    expect(h!.note).toBe("Pretend X from the Mac, typed on");
+    expect(h!.others).toEqual(["Pretend Y from the phone"]);
+    expect(await db.journal.get(xRow.id)).toEqual(xRow);
+  });
+
+  it("Remove from an open note box also covers the box's own newest save (review M6)", async () => {
+    await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
+    const opened = (await listHighlights(jk)).highlights[0]!;
+    const session = openNoteSession(opened);
+    await saveHighlightNote(jk, MAC, session, "Pretend note saved just now");
+    await removeHighlight(jk, MAC, opened, session); // the list hadn't reloaded yet
+    expect((await listHighlights(jk)).highlights).toEqual([]);
   });
 
   it("remove is a tombstone version: every row stays, the highlight is gone", async () => {
@@ -187,14 +222,14 @@ describe("two devices", () => {
   it("a note edited on two devices without seeing each other: the newest shows, the other is kept under it", async () => {
     await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"), "Pretend first note");
     const seen = (await listHighlights(jk)).highlights[0]!; // both devices had this in front of them
-    await saveHighlightNote(jk, PHONE, seen, "Pretend phone edit");
-    await saveHighlightNote(jk, MAC, seen, "Pretend mac edit");
+    await saveHighlightNote(jk, PHONE, openNoteSession(seen), "Pretend phone edit");
+    await saveHighlightNote(jk, MAC, openNoteSession(seen), "Pretend mac edit");
     const [h] = (await listHighlights(jk)).highlights;
     expect(h!.note).toBe("Pretend mac edit");
     expect(h!.others).toEqual(["Pretend phone edit"]);
     expect(await rows()).toHaveLength(3); // nobody's row written over
     // Changing the note shown replaces only that one: the phone's stays until she removes it.
-    await saveHighlightNote(jk, MAC, h!, "Pretend mac edit, again");
+    await saveHighlightNote(jk, MAC, openNoteSession(h!), "Pretend mac edit, again");
     const [again] = (await listHighlights(jk)).highlights;
     expect(again!.note).toBe("Pretend mac edit, again");
     expect(again!.others).toEqual(["Pretend phone edit"]);
@@ -203,7 +238,7 @@ describe("two devices", () => {
   it("a remove on one device never takes a note the other wrote that it didn't see", async () => {
     await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
     const seen = (await listHighlights(jk)).highlights[0]!;
-    await saveHighlightNote(jk, PHONE, seen, "Pretend note the Mac never saw");
+    await saveHighlightNote(jk, PHONE, openNoteSession(seen), "Pretend note the Mac never saw");
     await removeHighlight(jk, MAC, seen);
     const { highlights } = await listHighlights(jk);
     expect(highlights).toHaveLength(1);
@@ -223,7 +258,7 @@ describe("device ids after a Replace (restore-safe)", () => {
     // A page open since before the Replace still passes the old id.
     await createHighlight(jk, DAY, before, CARD, anchorOf("pretend clouds always pass"));
     const hill = (await listHighlights(jk)).highlights.find((h) => h.anchor.exact === "pretend hill")!;
-    await saveHighlightNote(jk, before, hill, "Pretend note after the Replace");
+    await saveHighlightNote(jk, before, openNoteSession(hill), "Pretend note after the Replace");
 
     const ids = (await rows()).map((r) => r.id);
     expect(ids.filter((id) => id.includes(`_${before}_`))).toEqual([oldRow.id]); // the old row, never written again

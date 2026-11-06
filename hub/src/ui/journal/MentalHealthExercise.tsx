@@ -249,7 +249,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const wanted = (location.state as { highlight?: { card: string; key: string } } | null)?.highlight;
   useEffect(() => {
     if (!wanted || !set) return;
-    const card = set.cards.find((c) => c.id === wanted.card);
+    const card = set.cards.find((c) => c.id === wanted.card); // (Read back sends the card it's on now)
     if (card) {
       setMapOf({ book: card.track, card: card.id });
       setFocusKey(wanted.key);

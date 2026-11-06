@@ -27,7 +27,7 @@ import { ownDevices } from "./deviceIds";
 import type { JournalKey } from "../journal/crypto";
 import type { ISODate, JournalRow } from "../domain/types";
 import {
-  MAX_HIGHLIGHT_NOTE, type HighlightCard, type HighlightEntry, type TextAnchor,
+  isHighlightEntry, MAX_HIGHLIGHT_NOTE, type HighlightCard, type HighlightEntry, type TextAnchor,
 } from "../journal/highlights";
 
 export type { HighlightCard, TextAnchor };
@@ -152,19 +152,27 @@ export async function createHighlight(
   const hid = newHighlightId(today);
   const at = Date.now();
   const vid = newVid();
-  const entry: HighlightEntry = { v: 1, card, anchor, note, createdAt: at, at, vid, seen: [] };
+  const entry = checked({ v: 1, card, anchor, note, createdAt: at, at, vid, seen: [] });
   await highlightRows.write(jk, [await versionRow(jk, hid, device, vid, entry)]);
   return hid;
 }
 
 /**
- * A note box's session: per highlight id, the version row it writes and the versions that row is
- * written over (as they were when the box first saved), so each save while the box is open
- * rewrites only its own rows, never another (and never another device's).
+ * A note box while it is open (review I3): per highlight id, the versions its next save is
+ * written over. Every save is a NEW version row (like notes): the first over the versions she
+ * opened (`h.shown`), each later one over the box's own last save only. So a note from another
+ * device that arrives meanwhile is never written over, and nothing the box saved is rewritten.
  */
-export type NoteSession = Map<string, { vid: string; seen: string[] }>;
+export interface NoteSession {
+  over: Map<string, string[]>;
+}
 
-/** Serialised saves (a quick second save never races the first one's new rows). */
+/** A note box opened on `h` as she sees it now. */
+export const openNoteSession = (h: Pick<Highlight, "shown">): NoteSession => ({
+  over: new Map(h.shown.map((x) => [x.hid, [...x.vids]])),
+});
+
+/** Serialised saves (a quick second save is written over the first, never beside it). */
 let queue: Promise<unknown> = Promise.resolve();
 function oneAtATime<T>(op: () => Promise<T>): Promise<T> {
   const next = queue.then(op, op);
@@ -172,32 +180,28 @@ function oneAtATime<T>(op: () => Promise<T>): Promise<T> {
   return next;
 }
 
-/**
- * Saves the note on a highlight: a new version written over the note she had in front of her
- * (`h.shown`) on each of its ids; within one note box session (`session`), its own rows again.
- * Another note on it she didn't have open stays.
- */
-export function saveHighlightNote(
-  jk: JournalKey, deviceId: string, h: Pick<Highlight, "shown">, note: string, session: NoteSession = new Map(),
-): Promise<NoteSession> {
+/** A version checked before it is sealed (review M2): one that wouldn't open again is never written. */
+function checked(entry: HighlightEntry): HighlightEntry {
+  if (!isHighlightEntry(entry)) throw new Error("That highlight could not be saved.");
+  return entry;
+}
+
+/** Saves the note in an open note box: a new version on each of its highlight ids (see NoteSession). */
+export function saveHighlightNote(jk: JournalKey, deviceId: string, session: NoteSession, note: string): Promise<void> {
   return oneAtATime(async () => {
     if (note.length > MAX_HIGHLIGHT_NOTE) throw new Error("That note is too long to save.");
     const device = await writerDevice(deviceId);
     const at = Date.now();
     const rows: JournalRow[] = [];
-    const next: NoteSession = new Map(session);
-    const own = new Set([...session.values()].map((x) => x.vid));
-    for (const { hid, vids } of h.shown) {
+    const next = new Map<string, string[]>();
+    for (const [hid, seen] of session.over) {
       const base = await anyVersion(jk, hid);
-      const mine = next.get(hid) ?? { vid: newVid(), seen: vids.filter((v) => !own.has(v)) };
-      const existing = await db.journal.get(rowIdFor(hid, device, mine.vid));
-      if (existing && (await highlightRows.open(jk, existing)).state !== "ok") throw new Error(CANT_OPEN); // never written over
-      const entry: HighlightEntry = { v: 1, card: base.card, anchor: base.anchor, note, createdAt: base.createdAt, at, vid: mine.vid, seen: mine.seen };
-      rows.push(await versionRow(jk, hid, device, mine.vid, entry));
-      next.set(hid, mine);
+      const vid = newVid();
+      rows.push(await versionRow(jk, hid, device, vid, checked({ v: 1, card: base.card, anchor: base.anchor, note, createdAt: base.createdAt, at, vid, seen })));
+      next.set(hid, [vid]);
     }
     if (rows.length) await highlightRows.write(jk, rows);
-    return next;
+    session.over = next;
   });
 }
 
@@ -205,16 +209,19 @@ export function saveHighlightNote(
  * Removes a highlight (she confirmed): on each of its ids a new version, marked deleted, written
  * over every version she could see (`h.heads`). Its rows all stay; one made since elsewhere keeps it.
  */
-export function removeHighlight(jk: JournalKey, deviceId: string, h: Pick<Highlight, "heads">): Promise<void> {
+export function removeHighlight(jk: JournalKey, deviceId: string, h: Pick<Highlight, "heads">, session?: NoteSession): Promise<void> {
   return oneAtATime(async () => {
     const device = await writerDevice(deviceId);
     const at = Date.now();
     const rows: JournalRow[] = [];
-    for (const { hid, vids } of h.heads) {
+    // An open note box's own last save is one she can see too, even before the list reloads (review M6).
+    const heads = new Map(h.heads.map((x) => [x.hid, [...x.vids]]));
+    for (const [hid, vids] of session?.over ?? []) heads.set(hid, [...new Set([...(heads.get(hid) ?? []), ...vids])]);
+    for (const [hid, vids] of heads) {
       if (vids.length === 0) continue;
       const base = await anyVersion(jk, hid);
       const vid = newVid();
-      rows.push(await versionRow(jk, hid, device, vid, { v: 1, card: base.card, anchor: base.anchor, note: "", createdAt: base.createdAt, at, vid, seen: vids, deleted: true }));
+      rows.push(await versionRow(jk, hid, device, vid, checked({ v: 1, card: base.card, anchor: base.anchor, note: "", createdAt: base.createdAt, at, vid, seen: vids.slice(-64), deleted: true })));
     }
     if (rows.length) await highlightRows.write(jk, rows);
   });

@@ -105,7 +105,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   if (data === null) return <LoadLine guard={guard} />;
   if (part === "highlights") return <HighlightsPart jk={jk} focus={opened.current === part} />;
   if (part) return <PartView jk={jk} today={today} part={part} data={data} focus={opened.current === part} />;
-  const unreadable = data.unreadable.exercise + data.unreadable["check-in"] + data.unreadable.notes;
+  const unreadable = data.unreadable.exercise + data.unreadable["check-in"] + data.unreadable.notes + highlights.unreadable;
   return (
     <div className="journal-readback">
       <p className="journal-muted">{READ_BACK_LINE}</p>
@@ -114,7 +114,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         {READ_BACK_PARTS.map((p) => (
           <Tile
             key={p.id}
-            {...(p.id === "highlights" ? highlights : tileOf(p.id, data, today))}
+            {...(p.id === "highlights" ? { count: highlights.count, line: highlights.line } : tileOf(p.id, data, today))}
             provisional={p.id === "highlights"}
             title={p.title}
             refocus={opened.current === p.id}

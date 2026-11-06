@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../../data/db";
-import { createHighlight, importExerciseCards, listHighlights } from "../../data/repo";
+import { createHighlight, importExerciseCards, listHighlights, openNoteSession, saveHighlightNote } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
 import { parseCardFile } from "../../journal/exercise";
 import { cardFieldTexts, describeAnchor, type HighlightField } from "../../journal/highlights";
@@ -11,8 +11,12 @@ import { FAKE_CARD_TEXT_V2 } from "../../test/exerciseCards";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { findReadBackTile, openReadBackPart } from "../../test/readBack";
 import { currentUrl, renderApp } from "../../test/renderApp";
-import { highlightCard, HIGHLIGHT_ACTION, NOTE_LABEL, REMOVE_HIGHLIGHT, REMOVE_NO, REMOVE_QUESTION, REMOVE_YES } from "./Highlights";
-import { NOT_FOUND } from "./HighlightsReadBack";
+import {
+  highlightCard, HIGHLIGHT_ACTION, HIGHLIGHTS_HERE, NOTE_LABEL, OPEN_HIGHLIGHT, OTHER_NOTE, REMOVE_HIGHLIGHT, REMOVE_NO, REMOVE_QUESTION, REMOVE_YES,
+} from "./Highlights";
+import { CARDS_CANT_OPEN, NOT_FOUND, NOTE_OR_REMOVE } from "./HighlightsReadBack";
+import { FAKE_CARD_FILE_V2 } from "../../test/exerciseCards";
+import { db as hubDb } from "../../data/db";
 
 // Highlights in the Mental health exercise (Esme, 2026-11-06): select words in a card's
 // learning text, "Highlight", and they stay marked; tap one for its note or Remove; Read back's
@@ -111,6 +115,16 @@ it("a selection across emphasis is one highlight of the words as they show", asy
 it("words in her own answer box, or in a heading, never offer Highlight", async () => {
   renderApp("/journal/exercise", TODAY);
   const card = await todayCard();
+  // Her answer box (review M12): words typed and selected there are hers, never card text.
+  const box = (await within(card).findByLabelText("Your response", {}, { timeout: 5000 })) as HTMLTextAreaElement;
+  await userEvent.type(box, "Pretend words of her own");
+  box.setSelectionRange(0, 7);
+  const r = document.createRange();
+  r.selectNodeContents(box);
+  document.getSelection()!.removeAllRanges();
+  document.getSelection()!.addRange(r);
+  fireEvent(document, new Event("selectionchange"));
+  expect(screen.queryByRole("button", { name: HIGHLIGHT_ACTION })).toBeNull();
   select(within(card).getByRole("heading", { name: "Learn" }), "Learn");
   expect(screen.queryByRole("button", { name: HIGHLIGHT_ACTION })).toBeNull();
   select(within(card).getByText("Chapter 1 · Pretend basics"), "Pretend basics");
@@ -194,7 +208,7 @@ describe("Read back's Highlights part", () => {
     expect(within(part).queryByText(NOT_FOUND)).toBeNull();
 
     // The Read more one: the card opens in the chapter map, Read more open, at its words.
-    await userEvent.click(within(items[0]!).getByRole("button"));
+    await userEvent.click(items[0]!.querySelector("button.hl-entry")!);
     await waitFor(() => expect(currentUrl).toBe("/journal/exercise"));
     const map = await screen.findByRole("dialog", { name: "Your workbooks" }, { timeout: 5000 });
     await waitFor(() => expect(marks(map).map((m) => m.textContent)).toEqual(["made-up hill", "clouds pass, hills stay"]));
@@ -205,7 +219,7 @@ describe("Read back's Highlights part", () => {
     const me = await getDeviceId(db);
     const gone = { ...anchor("learn", "made-up hill"), exact: "Pretend words since rewritten", prefix: "", suffix: "" };
     await createHighlight(jk, TODAY, me, highlightCard(WEATHER, ""), gone, "Pretend kept note");
-    await createHighlight(jk, TODAY, me, { ...highlightCard(WEATHER, "Pretend old book"), id: "pretend-card-no-longer-here" }, anchor("learn", "made-up hill"));
+    await createHighlight(jk, TODAY, me, { ...highlightCard(WEATHER, "Pretend old book"), id: "pretend-card-no-longer-here", day: 9 }, anchor("learn", "made-up hill"));
     renderApp("/journal/read-back", TODAY);
     const part = await openReadBackPart("Highlights");
     const quotes = [...part.querySelectorAll(".hl-quote")].map((q) => q.textContent);
@@ -222,4 +236,178 @@ describe("Read back's Highlights part", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(marks()).toHaveLength(0);
   });
+});
+
+// ---- fix round 1 (review I1, I2, I3)
+
+const ME = () => getDeviceId(db);
+const at = (field: HighlightField, words: string, from = 0) => {
+  const text = cardFieldTexts(WEATHER)[field];
+  const i = text.indexOf(words, from);
+  return describeAnchor(field, text, i, i + words.length)!;
+};
+
+describe("review I1: never the wrong words marked", () => {
+  it("re-imported card where her sentence changed but the word is elsewhere: no mark at all, and Read back says it can't be found", async () => {
+    await createHighlight(jk, TODAY, await ME(), highlightCard(WEATHER, ""), at("learn", "hill"), "Pretend note about the hill");
+    // The new file: Learn's sentence is rewritten; "hill" is still in Read more ("hills" doesn't count: "hill" + "s").
+    const file = structuredClone(FAKE_CARD_FILE_V2) as typeof FAKE_CARD_FILE_V2;
+    const weather = file.cards[1] as (typeof file.cards)[number] & { more: string };
+    weather.learn = "A made-up note: feelings drift past like *pretend* clouds over a made-up field.";
+    weather.more = "A made-up first paragraph about a pretend hill far away.\n\nA made-up second paragraph.";
+    await importExerciseCards(jk, parseCardFile(JSON.stringify(file))!, TODAY);
+    renderApp("/journal/exercise", TODAY);
+    const card = await todayCard();
+    await waitFor(() => expect(within(card).getByText(/over a made-up field/)).toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 100));
+    expect(marks()).toHaveLength(0);
+    cleanup();
+    renderApp("/journal/read-back", TODAY);
+    const part = await openReadBackPart("Highlights");
+    expect(within(part).getByText("hill")).toHaveClass("hl-quote");
+    expect(within(part).getByText(NOT_FOUND)).toBeInTheDocument();
+    expect(part).toHaveTextContent("Pretend note about the hill");
+  });
+});
+
+describe("review I2: every highlight stays reachable", () => {
+  it("a highlight made inside an older one is marked on its own; tapping its words opens ITS note", async () => {
+    const me = await ME();
+    await createHighlight(jk, TODAY, me, highlightCard(WEATHER, ""), at("learn", "feelings drift past like pretend clouds over a made-up hill"), "Pretend outer note");
+    await new Promise((r) => setTimeout(r, 5));
+    await createHighlight(jk, TODAY, me, highlightCard(WEATHER, ""), at("learn", "pretend clouds"), "Pretend inner note");
+    renderApp("/journal/exercise", TODAY);
+    const card = await todayCard();
+    await waitFor(() => expect(marks(card).length).toBeGreaterThan(1));
+    const inner = marks(card).filter((m) => m.textContent === "pretend" || m.textContent === " clouds");
+    expect(inner.length).toBeGreaterThan(0);
+    await userEvent.click(inner[0]!);
+    // Inner words lie under both: she chooses, and each opens its own note.
+    const choose = await screen.findByRole("dialog", { name: HIGHLIGHTS_HERE });
+    expect(within(choose).getAllByRole("button").map((b) => b.textContent)).toEqual(
+      expect.arrayContaining(["pretend clouds", "feelings drift past like pretend clouds over a made-up hill"]),
+    );
+    await userEvent.click(within(choose).getByRole("button", { name: "pretend clouds" }));
+    const sheet = await screen.findByRole("dialog", { name: "Highlight" });
+    expect(within(sheet).getByLabelText(NOTE_LABEL)).toHaveValue("Pretend inner note");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Done" }));
+    // The outer one's own words (outside the inner) open it directly.
+    const outerOnly = marks(card).find((m) => m.textContent?.startsWith("feelings"))!;
+    await userEvent.click(outerOnly);
+    expect(within(await screen.findByRole("dialog", { name: "Highlight" })).getByLabelText(NOTE_LABEL)).toHaveValue("Pretend outer note");
+  });
+
+  it("selecting words already inside a highlight (a long-press on a mark) offers to open it, never a new one", async () => {
+    await createHighlight(jk, TODAY, await ME(), highlightCard(WEATHER, ""), at("learn", "clouds over a made-up hill"), "Pretend note");
+    renderApp("/journal/exercise", TODAY);
+    const card = await todayCard();
+    await waitFor(() => expect(marks(card)).toHaveLength(1));
+    select(marks(card)[0]!, "made-up"); // inside the mark
+    expect(screen.queryByRole("button", { name: HIGHLIGHT_ACTION })).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: OPEN_HIGHLIGHT }));
+    expect(within(await screen.findByRole("dialog", { name: "Highlight" })).getByLabelText(NOTE_LABEL)).toHaveValue("Pretend note");
+    expect((await listHighlights(jk)).highlights).toHaveLength(1);
+    // Words reaching beyond it are new words: Highlight again.
+    cleanup();
+    renderApp("/journal/exercise", TODAY);
+    const again = await todayCard();
+    await waitFor(() => expect(marks(again)).toHaveLength(1));
+    const r = document.createRange();
+    const texts = [...learnOf(again).childNodes];
+    r.setStart(texts[0]!, 3);
+    r.setEnd(marks(again)[0]!.firstChild!, 6);
+    document.getSelection()!.removeAllRanges();
+    document.getSelection()!.addRange(r);
+    fireEvent(document, new Event("selectionchange"));
+    expect(await screen.findByRole("button", { name: HIGHLIGHT_ACTION })).toBeInTheDocument();
+  });
+
+  it("Read back opens the card at an inner highlight; and from Read back its note can be changed and it can be removed", async () => {
+    const me = await ME();
+    await createHighlight(jk, TODAY, me, highlightCard(WEATHER, ""), at("learn", "feelings drift past like pretend clouds over a made-up hill"));
+    await new Promise((r) => setTimeout(r, 5));
+    await createHighlight(jk, TODAY, me, highlightCard(WEATHER, ""), at("learn", "made-up hill"), "Pretend inner note");
+    renderApp("/journal/read-back", TODAY);
+    let part = await openReadBackPart("Highlights");
+    const inner = within(part).getAllByRole("listitem").find((li) => li.querySelector(".hl-quote")!.textContent === "made-up hill")!;
+    // Its note and Remove right here.
+    await userEvent.click(within(inner).getByRole("button", { name: NOTE_OR_REMOVE }));
+    const sheet = await screen.findByRole("dialog", { name: "Highlight" });
+    await userEvent.clear(within(sheet).getByLabelText(NOTE_LABEL));
+    await userEvent.type(within(sheet).getByLabelText(NOTE_LABEL), "Pretend changed in Read back");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(inner).toHaveTextContent("Pretend changed in Read back"));
+    // Opening its card lands on its own mark.
+    await userEvent.click(inner.querySelector("button.hl-entry")!);
+    const map = await screen.findByRole("dialog", { name: "Your workbooks" }, { timeout: 5000 });
+    const innerKey = (await listHighlights(jk)).highlights.find((h) => h.anchor.exact === "made-up hill")!.key;
+    await waitFor(() =>
+      expect([...map.querySelectorAll("mark")].filter((m) => (m as HTMLElement).dataset.hlKey === innerKey).map((m) => m.textContent).join("")).toBe("made-up hill"),
+    );
+    // Remove from Read back.
+    cleanup();
+    renderApp("/journal/read-back", TODAY);
+    part = await openReadBackPart("Highlights");
+    const row = within(part).getAllByRole("listitem").find((li) => li.querySelector(".hl-quote")!.textContent === "made-up hill")!;
+    await userEvent.click(within(row).getByRole("button", { name: NOTE_OR_REMOVE }));
+    const s2 = await screen.findByRole("dialog", { name: "Highlight" });
+    await userEvent.click(within(s2).getByRole("button", { name: REMOVE_HIGHLIGHT }));
+    await userEvent.click(within(within(s2).getByRole("group", { name: REMOVE_QUESTION })).getByRole("button", { name: REMOVE_YES }));
+    await waitFor(() => expect([...part.querySelectorAll(".hl-quote")].map((q) => q.textContent)).toEqual(["feelings drift past like pretend clouds over a made-up hill"]));
+  });
+
+  it("a highlight whose words can't be found can still have its note changed and be removed, from Read back (review M3)", async () => {
+    const gone = { ...at("learn", "made-up hill"), exact: "Pretend words since rewritten", prefix: "", suffix: "" };
+    await createHighlight(jk, TODAY, await ME(), highlightCard(WEATHER, ""), gone, "Pretend kept note");
+    renderApp("/journal/read-back", TODAY);
+    const part = await openReadBackPart("Highlights");
+    await userEvent.click(within(part).getByRole("button", { name: NOTE_OR_REMOVE }));
+    const sheet = await screen.findByRole("dialog", { name: "Highlight" });
+    await userEvent.click(within(sheet).getByRole("button", { name: REMOVE_HIGHLIGHT }));
+    await userEvent.click(within(within(sheet).getByRole("group", { name: REMOVE_QUESTION })).getByRole("button", { name: REMOVE_YES }));
+    await waitFor(async () => expect((await listHighlights(jk)).highlights).toEqual([]));
+  });
+});
+
+describe("review I3: her words in the note box are never replaced or lost", () => {
+  it("a newer note from another device arrives while the box is open: the box keeps her words, the other shows as Also noted, both stay", async () => {
+    await createHighlight(jk, TODAY, await ME(), highlightCard(WEATHER, ""), at("learn", "made-up hill"));
+    const opened = (await listHighlights(jk)).highlights[0]!;
+    renderApp("/journal/exercise", TODAY);
+    const card = await todayCard();
+    await waitFor(() => expect(marks(card)).toHaveLength(1));
+    await userEvent.click(marks(card)[0]!);
+    const sheet = await screen.findByRole("dialog", { name: "Highlight" });
+    const box = within(sheet).getByLabelText(NOTE_LABEL);
+    await userEvent.type(box, "Pretend X on the Mac");
+    fireEvent.blur(box); // saved
+    await waitFor(async () => expect((await listHighlights(jk)).highlights[0]!.note).toBe("Pretend X on the Mac"));
+    // The phone, which had the first version open, saves its own note (newer).
+    await saveHighlightNote(jk, "device-phone-01", openNoteSession(opened), "Pretend Y on the phone");
+    await waitFor(() => expect(within(sheet).getByText("Pretend Y on the phone")).toBeInTheDocument());
+    expect(within(sheet).getByText(OTHER_NOTE)).toBeInTheDocument();
+    expect(box).toHaveValue("Pretend X on the Mac"); // never replaced
+    await userEvent.type(box, ", typed on");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(async () => {
+      const [h] = (await listHighlights(jk)).highlights;
+      expect([h!.note, ...h!.others].sort()).toEqual(["Pretend X on the Mac, typed on", "Pretend Y on the phone"]);
+    });
+    // What she sees in Read back: both, word for word.
+    cleanup();
+    renderApp("/journal/read-back", TODAY);
+    const part = await openReadBackPart("Highlights");
+    expect(part).toHaveTextContent("Pretend X on the Mac, typed on");
+    expect(part).toHaveTextContent("Pretend Y on the phone");
+  });
+});
+
+it("Read back says the cards can't be opened (not that the words are gone) when the card set won't open here (review M5)", async () => {
+  await createHighlight(jk, TODAY, await ME(), highlightCard(WEATHER, ""), at("learn", "made-up hill"));
+  const manifest = (await hubDb.journal.get("cards"))!;
+  await hubDb.journal.put({ ...manifest, ct: manifest.ct.slice(0, -8) + "AAAAAAAA" }); // damaged: won't open
+  renderApp("/journal/read-back", TODAY);
+  const part = await openReadBackPart("Highlights");
+  expect(within(part).getByText(CARDS_CANT_OPEN)).toBeInTheDocument();
+  expect(within(part).queryByText(NOT_FOUND)).toBeNull();
 });

@@ -1,6 +1,6 @@
 import { parseCardFile } from "./exercise";
 import {
-  cardFieldTexts, CONTEXT_CHARS, describeAnchor, isHighlightEntry, locateAnchor, markRuns, plainText, type HighlightEntry,
+  resolveCard, cardFieldTexts, CONTEXT_CHARS, describeAnchor, isHighlightEntry, locateAnchor, markRuns, plainText, type HighlightEntry,
 } from "./highlights";
 import { FAKE_CARD_TEXT_V2 } from "../test/exerciseCards";
 
@@ -79,7 +79,7 @@ describe("finding a highlight again", () => {
     expect(found.start).toBe(shifted.indexOf("pretend clouds", 40));
   });
 
-  it("moved into another part of the card (Learn to Read more): still found", () => {
+  it("moved into another part of the card WITH its sentence around it (Learn to Read more): found there", () => {
     const a = at(LEARN, "pretend clouds always pass");
     const found = locateAnchor(a, { learn: "Pretend new learn text.", more: `Pretend paragraph.\n\n${LEARN}` })!;
     expect(found.field).toBe("more");
@@ -90,6 +90,31 @@ describe("finding a highlight again", () => {
     const rewrapped = LEARN.replace("hill, and pretend", "hill,\nand  pretend");
     const found = locateAnchor(a, { learn: rewrapped })!;
     expect(rewrapped.slice(found.start, found.end)).toBe("pretend hill,\nand  pretend clouds");
+  });
+
+  // Review I1: the same words elsewhere, with nothing around them that matches, are not hers.
+  it("a short word whose sentence was rewritten isn't moved to the same word elsewhere (review: 'notice')", () => {
+    const learn = "A made-up note: when the pretend wave rises, notice the urge and let it pass.";
+    const more = "Some people notice nothing at first. That is a pretend normal.";
+    const s = learn.indexOf("notice");
+    const a = describeAnchor("learn", learn, s, s + "notice".length)!;
+    expect(locateAnchor(a, { learn, more })).toEqual({ field: "learn", start: s, end: s + 6 });
+    const reimported = "A made-up note: when the pretend wave rises, name the urge and let it pass.";
+    expect(locateAnchor(a, { learn: reimported, more })).toBeNull();
+  });
+
+  it("the second of two same phrases doesn't jump to the first when its sentence goes (review: 'Breathe in')", () => {
+    const learn = "Breathe in through the pretend nose. Count to four. Breathe in again slowly, then rest.";
+    const s = learn.indexOf("Breathe in", 5);
+    const a = describeAnchor("learn", learn, s, s + "Breathe in".length)!;
+    expect(locateAnchor(a, { learn })!.start).toBe(s);
+    expect(locateAnchor(a, { learn: "Breathe in through the pretend nose. Count to four. Then rest." })).toBeNull();
+  });
+
+  it("a whole short part (no context either side) is found only as a whole part again", () => {
+    const a = describeAnchor("skill", "Made-up skill A", 0, 15)!;
+    expect(locateAnchor(a, { skill: "Made-up skill A" })).toEqual({ field: "skill", start: 0, end: 15 });
+    expect(locateAnchor(a, { skill: "Made-up skill B", learn: "Try Made-up skill A today." })).toBeNull();
   });
 
   it("missing text (the words aren't in the card any more): null, never a guess", () => {
@@ -138,5 +163,22 @@ describe("the sealed entry's shape", () => {
     expect(isHighlightEntry({ ...entry, card: { ...entry.card, id: "" } })).toBe(false);
     expect(isHighlightEntry({ ...entry, seen: "x" })).toBe(false);
     expect(isHighlightEntry({ ...entry, v: 2 })).toBe(false);
+  });
+});
+
+describe("which card a highlight is on (review M4)", () => {
+  const set = parseCardFile(FAKE_CARD_TEXT_V2)!;
+  const weather = set.cards[1]!;
+  const text = cardFieldTexts(weather).learn;
+  const s = text.indexOf("made-up hill");
+  const anchor = describeAnchor("learn", text, s, s + 12)!;
+  it("its own card by id", () => {
+    expect(resolveCard({ id: weather.id, track: weather.track, day: 1 }, anchor, set.cards)).toEqual({ card: weather, at: { field: "learn", start: s, end: s + 12 } });
+  });
+  it("a re-import that changed the ids: the same book and day with the words", () => {
+    expect(resolveCard({ id: "day-1", track: weather.track, day: 1 }, anchor, set.cards).card).toBe(weather);
+  });
+  it("another day's card is never taken; a card gone with no match is null", () => {
+    expect(resolveCard({ id: "day-9", track: weather.track, day: 9 }, anchor, set.cards)).toEqual({ card: null, at: null });
   });
 });

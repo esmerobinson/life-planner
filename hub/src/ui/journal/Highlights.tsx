@@ -9,23 +9,27 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  createHighlight, listHighlights, removeHighlight, saveHighlightNote, type Highlight, type HighlightCard, type NoteSession,
+  createHighlight, listHighlights, openNoteSession, removeHighlight, saveHighlightNote, type Highlight, type HighlightCard, type NoteSession,
 } from "../../data/repo";
 import type { ISODate } from "../../domain/types";
 import type { JournalKey } from "../../journal/crypto";
 import type { ExerciseCard } from "../../journal/exercise";
 import {
-  cardFieldTexts, describeAnchor, locateAnchor, markRuns, MAX_HIGHLIGHT_NOTE, type HighlightField, type Located,
+  cardFieldTexts, describeAnchor, markRuns, MAX_HIGHLIGHT_NOTE, resolveCard, type HighlightField, type Located,
 } from "../../journal/highlights";
-import { AUTOSAVE_MS, useDraft } from "../useDraft";
+import { AUTOSAVE_MS, useHiddenFlush } from "../useDraft";
 import { JournalSheet } from "./JournalSheet";
 import { useDbChanges } from "./useJournalKey";
 import "./highlights.css";
 
 /** The button over selected words (placeholder wording). */
 export const HIGHLIGHT_ACTION = "Highlight";
+/** The same button when the words are already inside a highlight: it opens that one (placeholder wording). */
+export const OPEN_HIGHLIGHT = "Open highlight";
 /** The note pop-up's title (placeholder wording). */
 export const HIGHLIGHT_SHEET = "Highlight";
+/** Tapping words where highlights overlap: choose which (placeholder wording). */
+export const HIGHLIGHTS_HERE = "Highlights here";
 export const NOTE_LABEL = "Note (optional)";
 export const REMOVE_HIGHLIGHT = "Remove highlight";
 export const REMOVE_QUESTION = "Remove this highlight?";
@@ -33,6 +37,8 @@ export const REMOVE_YES = "Remove";
 export const REMOVE_NO = "Keep it";
 /** Over another note on the same highlight written without seeing this one (another device's). */
 export const OTHER_NOTE = "Also noted";
+/** A mark's name for a screen reader (placeholder wording). */
+export const markLabel = (words: string) => `Highlighted: ${words}. Open its note`;
 const SAVE_PROBLEM = "That didn't save. Try again.";
 
 /** The card a highlight keeps (so it reads back even after the card set changes). */
@@ -40,12 +46,20 @@ export const highlightCard = (c: ExerciseCard, book: string): HighlightCard => (
   id: c.id, track: c.track, book, day: c.day, chapter: c.chapter, chapterTitle: c.chapterTitle, theme: c.theme,
 });
 
+/** One highlight where it is on its card now. */
+type Placed = Located & { key: string; exact: string };
+
 interface Ctx {
-  /** The located marks on one card's field. */
-  marks: (cardId: string, field: HighlightField) => { start: number; end: number; key: string }[];
-  open: (key: string) => void;
+  /** The located marks on one card's field (newest highlight first). */
+  marks: (cardId: string, field: HighlightField) => Placed[];
+  /** Opens one highlight, or (several overlapping there) a choice of them. */
+  open: (keys: string[]) => void;
 }
 const HighlightContext = createContext<Ctx | null>(null);
+
+/** Of the highlights over some words, the innermost (shortest) first; then the newest. */
+const innermostFirst = (marks: readonly Placed[]) =>
+  marks.map((m, i) => ({ m, i })).sort((x, y) => x.m.end - x.m.start - (y.m.end - y.m.start) || x.i - y.i).map((x) => x.m);
 
 /**
  * Highlights for the exercise tab: loads them (again on every change), marks them in every card
@@ -64,9 +78,10 @@ export function HighlightsProvider({
   onFocused?: () => void;
   children: ReactNode;
 }) {
-  const [list, setList] = useState<Highlight[]>([]);
+  const [list, setList] = useState<Highlight[] | null>(null);
   const [problem, setProblem] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState<string[] | null>(null);
   const latest = useRef(0);
   const load = useCallback(async () => {
     const id = ++latest.current;
@@ -83,30 +98,41 @@ export function HighlightsProvider({
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   // Each highlight where it is in its card now (never guessed: one not found isn't marked).
   const located = useMemo(() => {
-    const out = new Map<string, (Located & { key: string })[]>();
-    for (const h of list) {
-      const card = byId.get(h.card.id);
-      const at = card ? locateAnchor(h.anchor, cardFieldTexts(card)) : null;
-      if (!at) continue;
-      out.set(h.card.id, [...(out.get(h.card.id) ?? []), { ...at, key: h.key }]);
+    const out = new Map<string, Placed[]>();
+    for (const h of list ?? []) {
+      const { card, at } = resolveCard(h.card, h.anchor, cards);
+      if (!card || !at) continue;
+      out.set(card.id, [...(out.get(card.id) ?? []), { ...at, key: h.key, exact: h.anchor.exact }]);
     }
     return out;
-  }, [list, byId]);
+  }, [list, cards]);
 
   const ctx = useMemo<Ctx>(
     () => ({
       marks: (cardId, field) => (located.get(cardId) ?? []).filter((m) => m.field === field),
-      open: (key) => setEditing(key),
+      open: (keys) => (keys.length === 1 ? setEditing(keys[0]!) : setChoosing(keys)),
     }),
     [located],
   );
 
+  // The innermost highlight a selection lies wholly inside, if any: tapping its button opens it
+  // instead of making a highlight inside it by accident (review I2).
+  const inside = useCallback(
+    (pick: Picked) =>
+      innermostFirst((located.get(pick.cardId) ?? []).filter((m) => m.field === pick.anchor.field && m.start <= pick.anchor.start && m.end >= pick.anchor.end))[0]?.key ?? null,
+    [located],
+  );
+
   // From Read back: once the mark is on screen, open its fold (Read more) and bring it into view.
+  // If the card is open but its words weren't found, there is nothing to wait for (review M13).
   useEffect(() => {
-    if (!focus) return;
-    const all = [...document.querySelectorAll<HTMLElement>(`mark[data-hl-key="${focus}"]`)];
+    if (!focus || list === null) return;
+    const all = [...document.querySelectorAll<HTMLElement>(`mark[data-hl-keys~="${focus}"]`)];
     const el = all.find((m) => m.closest('[role="dialog"]')) ?? all[0];
-    if (!el) return;
+    if (!el) {
+      if (document.querySelector('[role="dialog"] [data-hl-card]')) onFocused?.();
+      return;
+    }
     for (let d = el.closest("details"); d; d = d.parentElement?.closest("details") ?? null) d.open = true;
     el.scrollIntoView?.({ block: "center" });
     onFocused?.();
@@ -124,15 +150,33 @@ export function HighlightsProvider({
     }
   };
 
-  const shown = editing ? list.find((h) => h.key === editing) : undefined;
+  const find = (key: string) => (list ?? []).find((h) => h.key === key);
   return (
     <HighlightContext.Provider value={ctx}>
       {children}
       {problem && <p role="alert">{problem}</p>}
-      <SelectionAction cards={byId} onHighlight={(p) => void create(p)} />
-      {editing && (
-        <NoteSheet key={editing} jk={jk} deviceId={deviceId} highlight={shown} onClose={() => setEditing(null)} />
+      <SelectionAction cards={byId} inside={inside} onHighlight={(p) => void create(p)} onOpen={(key) => setEditing(key)} />
+      {choosing && (
+        <JournalSheet title={HIGHLIGHTS_HERE} onClose={() => setChoosing(null)} className="hl-sheet">
+          <ul className="hl-choices" aria-label={HIGHLIGHTS_HERE}>
+            {choosing.map((key) => (
+              <li key={key}>
+                <button
+                  type="button"
+                  className="hl-entry"
+                  onClick={() => {
+                    setChoosing(null);
+                    setEditing(key);
+                  }}
+                >
+                  <span className="hl-quote">{find(key)?.anchor.exact ?? ""}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </JournalSheet>
       )}
+      {editing && <HighlightNoteSheet key={editing} jk={jk} deviceId={deviceId} highlight={find(editing)} onClose={() => setEditing(null)} />}
     </HighlightContext.Provider>
   );
 }
@@ -158,36 +202,43 @@ export function HlText({
   const ctx = useContext(HighlightContext);
   const marks = ctx ? ctx.marks(card.id, field) : [];
   const runs = markRuns(text, base, marks, !raw);
+  const tabbed = new Set<string>();
   return (
     <>
       {runs.map((r) => {
         let node: ReactNode = r.em ? <em key={r.at}>{r.text}</em> : r.text;
-        const key = r.keys[r.keys.length - 1];
-        if (key && ctx) {
-          node = (
-            <mark
-              key={r.at}
-              className="hl-mark"
-              data-hl-key={key}
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                // Selecting words inside a mark isn't a tap on it.
-                if (!(document.getSelection()?.isCollapsed ?? true)) return;
-                ctx.open(key);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  ctx.open(key);
-                }
-              }}
-            >
-              {node}
-            </mark>
-          );
-        }
-        return node;
+        if (r.keys.length === 0 || !ctx) return node;
+        // Every highlight keeps somewhere to tap (review I2): each run shows the innermost one over
+        // it, and a tap where several overlap offers them all.
+        const here = innermostFirst(marks.filter((m) => r.keys.includes(m.key)));
+        const top = here[0]!;
+        const keys = here.map((m) => m.key);
+        // One tab stop per highlight, on its first piece (review M10).
+        const first = !tabbed.has(top.key);
+        tabbed.add(top.key);
+        const open = () => ctx.open(keys);
+        return (
+          <mark
+            key={r.at}
+            className={keys.length > 1 ? "hl-mark hl-mark-overlap" : "hl-mark"}
+            data-hl-key={top.key}
+            data-hl-keys={keys.join(" ")}
+            {...(first ? { role: "button", tabIndex: 0, "aria-label": markLabel(top.exact) } : {})}
+            onClick={() => {
+              // Selecting words inside a mark isn't a tap on it.
+              if (!(document.getSelection()?.isCollapsed ?? true)) return;
+              open();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                open();
+              }
+            }}
+          >
+            {node}
+          </mark>
+        );
       })}
     </>
   );
@@ -267,13 +318,23 @@ function sameCardOnScreen(a: Element, b: Element): boolean {
 /**
  * The "Highlight" button, under the selected words while some learning text is selected. A tap
  * on it keeps the selection (a phone may clear it as the finger lands): what was selected then
- * is what is highlighted.
+ * is what is highlighted. Words already inside a highlight (a long-press on a mark selects a
+ * word) get "Open highlight" instead, which opens that one (review I2).
  */
-function SelectionAction({ cards, onHighlight }: { cards: ReadonlyMap<string, ExerciseCard>; onHighlight: (p: Picked) => void }) {
-  const [state, setState] = useState<{ pick: Picked; top: number; left: number } | null>(null);
+function SelectionAction({
+  cards, inside, onHighlight, onOpen,
+}: {
+  cards: ReadonlyMap<string, ExerciseCard>;
+  inside: (p: Picked) => string | null;
+  onHighlight: (p: Picked) => void;
+  onOpen: (key: string) => void;
+}) {
+  const [state, setState] = useState<{ pick: Picked; within: string | null; top: number; left: number } | null>(null);
   const pressing = useRef(false);
   const cardsRef = useRef(cards);
   cardsRef.current = cards;
+  const insideRef = useRef(inside);
+  insideRef.current = inside;
   useEffect(() => {
     const read = () => {
       const sel = document.getSelection();
@@ -288,7 +349,7 @@ function SelectionAction({ cards, onHighlight }: { cards: ReadonlyMap<string, Ex
       const rects = typeof range.getClientRects === "function" ? range.getClientRects() : [];
       const box = rects.length ? rects[rects.length - 1]! : typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : { bottom: 0, left: 0 };
       // PLACEHOLDER placement: just under the end of the selection (a phone's own menu sits above it).
-      setState({ pick, top: box.bottom + 8, left: Math.max(8, Math.min(box.left, window.innerWidth - 140)) });
+      setState({ pick, within: insideRef.current(pick), top: box.bottom + 8, left: Math.max(8, Math.min(box.left, window.innerWidth - 140)) });
     };
     document.addEventListener("selectionchange", read);
     window.addEventListener("scroll", read, true);
@@ -300,6 +361,9 @@ function SelectionAction({ cards, onHighlight }: { cards: ReadonlyMap<string, Ex
     };
   }, []);
   if (!state) return null;
+  const letGo = () => {
+    pressing.current = false;
+  };
   return createPortal(
     <button
       type="button"
@@ -310,18 +374,19 @@ function SelectionAction({ cards, onHighlight }: { cards: ReadonlyMap<string, Ex
         pressing.current = true;
       }}
       onMouseDown={(e) => e.preventDefault() /* a mouse: keeps the selection (and the focus) where it is */}
-      onPointerCancel={() => {
-        pressing.current = false;
-      }}
+      // A finger that slides off and lifts sends no click: the button goes with the selection (review M11).
+      onPointerCancel={letGo}
+      onPointerLeave={letGo}
       onClick={() => {
-        pressing.current = false;
-        const pick = state.pick;
+        letGo();
+        const { pick, within } = state;
         setState(null);
         document.getSelection()?.removeAllRanges();
-        onHighlight(pick);
+        if (within) onOpen(within);
+        else onHighlight(pick);
       }}
     >
-      {HIGHLIGHT_ACTION}
+      {state.within ? OPEN_HIGHLIGHT : HIGHLIGHT_ACTION}
     </button>,
     document.body,
   );
@@ -330,39 +395,60 @@ function SelectionAction({ cards, onHighlight }: { cards: ReadonlyMap<string, Ex
 // ---- a highlight's note and Remove -------------------------------------------------------------
 
 /**
- * The note pop-up (the Journal's pop-up, JournalSheet): the highlighted words, any other note on
- * it, the note box (saved as she types, and when the pop-up closes), and Remove, which asks first.
+ * The note pop-up (the Journal's pop-up, JournalSheet): the highlighted words, the note box and
+ * Remove, which asks first. The box saves as she types (after a pause), when it loses focus,
+ * when the pop-up closes and when the app is put away; each save is a new version (NoteSession).
+ * Review I3: the box keeps HER words. A note from another device that arrives while it is open
+ * never replaces them; it shows above the box as "Also noted".
  */
-function NoteSheet({ jk, deviceId, highlight, onClose }: { jk: JournalKey; deviceId: string; highlight: Highlight | undefined; onClose: () => void }) {
-  // The highlight as she opened it, kept if it changes or goes elsewhere meanwhile.
+export function HighlightNoteSheet({
+  jk, deviceId, highlight, onClose,
+}: { jk: JournalKey; deviceId: string; highlight: Highlight | undefined; onClose: () => void }) {
+  // The highlight as it is now (kept if it goes elsewhere meanwhile), and as she opened it.
   const [h, setH] = useState(highlight);
   useEffect(() => {
     if (highlight) setH(highlight);
   }, [highlight]);
+  const opened = useRef(highlight);
+  const session = useRef<NoteSession | null>(highlight ? openNoteSession(highlight) : null);
+  const [text, setText] = useState(highlight?.note ?? "");
+  const latest = useRef(text);
+  const saved = useRef(text);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gone = useRef(false);
   const [problem, setProblem] = useState("");
   const [asking, setAsking] = useState(false);
-  const session = useRef<NoteSession>(new Map());
-  const gone = useRef(false);
-  const current = useRef(h);
-  current.current = h;
-  const draft = useDraft(h?.note ?? "", async (note) => {
-    const at = current.current;
-    if (gone.current || !at) return;
-    try {
-      session.current = await saveHighlightNote(jk, deviceId, at, note, session.current);
-      setProblem("");
-    } catch (e) {
-      setProblem(SAVE_PROBLEM);
-      throw e;
-    }
-  }, AUTOSAVE_MS);
+
+  const flush = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const note = latest.current;
+    const before = saved.current;
+    if (gone.current || !session.current || note === before) return;
+    saved.current = note;
+    saveHighlightNote(jk, deviceId, session.current, note).then(
+      () => setProblem(""),
+      () => {
+        // Still unsaved: the next pause, blur or close tries again.
+        if (saved.current === note) saved.current = before;
+        setProblem(SAVE_PROBLEM);
+      },
+    );
+  }, [jk, deviceId]);
+  useEffect(() => () => flush(), [flush]);
+  useHiddenFlush(flush);
+
   if (!h) return null;
+  // Every other note on it now, but not her own words in the box nor the note she started from.
+  const mine = new Set([text.trim(), (opened.current?.note ?? "").trim()]);
+  const also = [h.note, ...h.others].filter((n, i, all) => n.trim() !== "" && !mine.has(n.trim()) && all.findIndex((x) => x.trim() === n.trim()) === i);
 
   async function remove() {
     if (!h) return;
     gone.current = true;
+    if (timer.current) clearTimeout(timer.current);
     try {
-      await removeHighlight(jk, deviceId, h);
+      await removeHighlight(jk, deviceId, h, session.current ?? undefined);
       onClose();
     } catch {
       gone.current = false;
@@ -373,9 +459,9 @@ function NoteSheet({ jk, deviceId, highlight, onClose }: { jk: JournalKey; devic
   return (
     <JournalSheet title={HIGHLIGHT_SHEET} onClose={onClose} className="hl-sheet">
       <blockquote className="hl-quote">{h.anchor.exact}</blockquote>
-      {h.others.length > 0 && (
+      {also.length > 0 && (
         <div className="hl-others">
-          {h.others.map((o) => (
+          {also.map((o) => (
             <div key={o}>
               <p className="journal-muted">{OTHER_NOTE}</p>
               <p className="hl-note">{o}</p>
@@ -387,10 +473,15 @@ function NoteSheet({ jk, deviceId, highlight, onClose }: { jk: JournalKey; devic
         {NOTE_LABEL}
         <textarea
           className="hl-note-box"
-          value={draft.value}
+          value={text}
           maxLength={MAX_HIGHLIGHT_NOTE}
-          onChange={(e) => draft.set(e.target.value)}
-          onBlur={draft.flush}
+          onChange={(e) => {
+            latest.current = e.target.value;
+            setText(e.target.value);
+            if (timer.current) clearTimeout(timer.current);
+            timer.current = setTimeout(flush, AUTOSAVE_MS);
+          }}
+          onBlur={flush}
         />
       </label>
       {asking ? (
