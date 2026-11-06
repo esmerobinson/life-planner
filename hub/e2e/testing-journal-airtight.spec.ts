@@ -199,7 +199,12 @@ async function pastExercise(page: Page, line: string): Promise<Locator> {
  * part's own section (its heading, then its entries by month). Returns the part's section.
  */
 async function readBack(page: Page, part: string): Promise<Locator> {
-  await tabLink(page, "Read back").click();
+  // The tabs can still move into their stacked layout just after the Journal opens (a tap then
+  // lands on another tab): tap again until Read back is open. Never a wait on how it looks.
+  await expect(async () => {
+    await tabLink(page, "Read back").click();
+    await expect(page).toHaveURL(/\/journal\/read-back/, { timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
   await page.locator("button.journal-readback-tile", { hasText: part }).click();
   const section = page.locator("section.journal-readback-part");
   await expect(section.getByRole("heading", { level: 3, name: part })).toBeVisible();
