@@ -35,12 +35,32 @@ async function signIn(fake: ReturnType<typeof fakeTogether>, password = PASSWORD
   await userEvent.click(within(form).getByRole("button", { name: W.signIn }));
 }
 
-it("says plainly what goes (no to-dos), the two stages, one device, and that private after sending only hides", async () => {
+it("never signed in: only what it is and the sign-in form; no Together lines, no private ticks", async () => {
   setup();
-  for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds, W.onlyThisDevice, W.highlightsGo, W.laterNote]) expect(screen.getByText(t)).toBeInTheDocument();
+  expect(screen.getByText(W.intro)).toBeInTheDocument();
+  expect(screen.getByText(W.onlyThisDevice)).toBeInTheDocument();
+  for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds]) expect(screen.queryByText(t)).toBeNull();
+  expect(screen.queryByText(W.privateHeading)).toBeNull();
   expect(W.intro).toContain("To-dos never go");
+});
+
+it("signed in: says plainly what goes, the two stages, and that private, editing or removing after sending only hides; nothing about highlights or learned words (v1)", async () => {
+  const { fake } = setup();
+  await signIn(fake);
+  await screen.findByText(W.copying);
+  for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds, W.onlyThisDevice]) expect(screen.getByText(t)).toBeInTheDocument();
   expect(W.afterDayEnds).toContain("24 hours");
-  expect(screen.queryByRole("group", { name: /areas/i })).toBeNull();
+  expect(W.privateWarning).toMatch(/editing or removing them only hides/);
+  expect(document.body.textContent).not.toMatch(/highlight|learned/i);
+});
+
+it("after a backup was restored and sync hasn't caught up: says so (bug #65)", async () => {
+  const { fake } = setup();
+  await signIn(fake);
+  await screen.findByText(W.copying);
+  const { readSent, saveSent } = await import("../../together/store");
+  await saveSent(db, { ...(await readSent(db))!, waitingRestore: true });
+  expect(await screen.findByText(W.restoreWaiting)).toBeInTheDocument();
 });
 
 it("signs in; the password is cleared from the field and kept nowhere", async () => {
@@ -83,10 +103,11 @@ it("Stop copying offers (doesn't force) marking everything deleted", async () =>
   expect(await readAuth(db)).toBeUndefined();
 });
 
-it("a day's private ticks in the box, sealed in the journal, with the warning beside them", async () => {
+it("a day's private ticks in the box (once signed in), sealed in the journal, with the warning beside them", async () => {
   const jk = await keyFor("fake-journal-box");
   await confirmedDevice(db, jk);
-  setup();
+  const { fake } = setup();
+  await signIn(fake);
   const tick = await screen.findByLabelText(W.privateCheckin);
   await waitFor(() => expect(tick).toBeEnabled());
   await userEvent.click(tick);
@@ -102,6 +123,7 @@ it("the Journal's tick: syncs at once when saved, says what Oliver still sees, a
   await db.syncMeta.put({ key: "serverUrl", value: "https://sync.example.test" });
   await controller.reload();
   const syncNow = vi.spyOn(controller, "syncNow");
+  await db.syncMeta.put({ key: "together", value: { url: "https://together.example.test", anonKey: "x", userId: "u", coupleId: "c" } }); // Together in use here
   render(<PrivateDayTick jk={jk} date="2026-11-04" part="checkin" controller={controller} />);
   const tick = await screen.findByLabelText(W.privateTick);
   await waitFor(() => expect(tick).toBeEnabled());
@@ -161,4 +183,16 @@ describe("what I learned today", () => {
     await userEvent.click(await screen.findByText(W.learnedEarlier));
     expect(screen.getByText("Pretend earlier lesson")).toBeInTheDocument();
   });
+});
+
+it("the Journal's tick where Together isn't in use: the tick, but no Together lines", async () => {
+  const jk = await keyFor("fake-journal-box");
+  await confirmedDevice(db, jk);
+  render(<PrivateDayTick jk={jk} date="2026-11-04" part="exercise" />);
+  const tick = await screen.findByLabelText(W.privateTick);
+  await waitFor(() => expect(tick).toBeEnabled());
+  expect(screen.queryByText(W.oliverSeesExercise)).toBeNull();
+  expect(screen.queryByText(W.privateWarning)).toBeNull();
+  await userEvent.click(tick); // a tick saved (on any device) means Together is in use
+  expect(await screen.findByText(W.oliverSeesExercise)).toBeInTheDocument();
 });

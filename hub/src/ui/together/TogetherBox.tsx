@@ -94,11 +94,15 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
     <section className="together-placeholder together-box" aria-labelledby="together-heading">
       <h2 id="together-heading">{W.heading}</h2>
       <p>{W.intro}</p>
-      <p className="together-warning">{W.notEncrypted}</p>
-      <p className="together-warning">{W.afterDayEnds}</p>
-      <p>{W.highlightsGo}</p>
-      <p>{W.laterNote}</p>
-      <p className="together-warning">{W.privateWarning}</p>
+      {/* The rest of what it does is said once she has signed in (never to someone who hasn't). */}
+      {auth && (
+        <>
+          <p className="together-warning">{W.notEncrypted}</p>
+          <p className="together-warning">{W.afterDayEnds}</p>
+          <p className="together-warning">{W.privateWarning}</p>
+        </>
+      )}
+      {auth && meta?.sent?.waitingRestore && <p role="status">{W.restoreWaiting}</p>}
 
       {again && <p role="alert">{W.signInAgain}</p>}
 
@@ -180,7 +184,7 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
       {problem && <p role="alert">{problem}</p>}
       {note && <p role="status">{note}</p>}
 
-      <PrivateDays />
+      {auth && <PrivateDays />}
     </section>
   );
 }

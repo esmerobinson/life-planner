@@ -11,13 +11,12 @@ export const TOGETHER_WORDS = {
     "Copies the days you did a Mental health exercise or the Daily check-in to Together, as two habits. To-dos never go. One way only: nothing comes back from Together.",
   notEncrypted:
     "Together isn't end-to-end encrypted: Oliver, Supabase and anyone with Together's admin key can read what's copied there.",
-  afterDayEnds: `When a day ends (3am), only the card titles and the questions you answered go. Your answers, and what you learned, follow ${delay} later, unless you tick that day's answers private.`,
-  /** Highlights (Esme, 2026-11-06): in the Together box and on the Highlight sheet. */
-  highlightsGo:
-    "Highlights and their notes go to Together with that day's Mental health exercise, with your answers, unless you keep that day's answers private.",
-  laterNote: "A note added later to an earlier day's highlight goes at the next copy, without the 24-hour wait.",
+  afterDayEnds: `When a day ends (3am), only the card titles and the questions you answered go. Your answers follow ${delay} later, unless you tick that day's answers private.`,
   /** The brief's plain warning: shown in the Together box and beside every private tick. */
-  privateWarning: "Once a day's answers have gone to Together, ticking private hides them in Together but doesn't wipe them.",
+  privateWarning:
+    "Once a day's answers have gone to Together, ticking private, editing or removing them only hides the earlier version in Together: it isn't wiped.",
+  /** After a backup was restored here, until sync has caught up (bug #65). */
+  restoreWaiting: "Waiting for sync to catch up after restoring a backup. Your answers go once it has (or after 24 hours, if sync stays off).",
   onlyThisDevice: "Sign in on one device only. Only this device copies to Together. Your password isn't kept.",
   address: "Together address",
   anonKey: "Together anon key",

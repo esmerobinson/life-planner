@@ -3,10 +3,10 @@ import { FakeSupabase } from "../src/together/fakeSupabase";
 import { pageDate } from "./helpers";
 
 /* The Together link in a real browser, against a FAKE Together server (made-up address, key,
-   users and words; it never contacts anything real): sign in, do the day's exercise (with what
-   she learned) and check-in, pass 3am (titles only), then 24 hours more (her answers), and check
-   the fake holds the right rows and no to-do. The look is a placeholder. Set SHOTS_DIR to save
-   screenshots. */
+   users and words; it never contacts anything real): sign in, do the day's exercise (and write
+   what she learned, which v1 never sends) and check-in, pass 3am (titles only), then 24 hours
+   more (her answers), and check the fake holds the right rows and no to-do. The look is a
+   placeholder. Set SHOTS_DIR to save screenshots. */
 
 const PASS = "fake-journal-e2e-passphrase";
 const ME = "00000000-0000-4000-8000-0000000000e5";
@@ -100,7 +100,7 @@ for (const width of [1280, 390]) {
       // Sign in to the fake Together on the Sync page.
       await page.goto("/sync");
       const box = page.getByRole("region", { name: "Together" });
-      await expect(box.getByText("Once a day's answers have gone to Together, ticking private hides them in Together but doesn't wipe them.").first()).toBeVisible();
+      await expect(box.getByText(/ticking private, editing or removing them only hides/)).toHaveCount(0); // said once signed in
       await box.getByLabel("Together address").fill(fake.url);
       await box.getByLabel("Together anon key").fill(fake.anonKey);
       await box.getByLabel("Together email").fill(EMAIL);
@@ -108,6 +108,7 @@ for (const width of [1280, 390]) {
       await shoot(page, `together-sign-in-${width}`);
       await box.getByRole("button", { name: "Sign in" }).click();
       await expect(box.getByText("Copying to Together from this device.")).toBeVisible();
+      await expect(box.getByText(/ticking private, editing or removing them only hides the earlier version in Together/).first()).toBeVisible();
       const stored = await page.evaluate(async () => {
         const { db } = await import(/* @vite-ignore */ "/src/data/db.ts" as string);
         return JSON.stringify(await db.syncMeta.toArray());
@@ -177,7 +178,8 @@ for (const width of [1280, 390]) {
       const live = tallies(fake).filter((e) => !e.deleted_at);
       expect(live).toHaveLength(2);
       expect(live.map((e) => String(e.note)).join("\n")).toContain("Pretend exercise answer");
-      expect(live.map((e) => String(e.note)).join("\n")).toContain("Pretend: a wave passes");
+      // Together v1 (Esme, 2026-11-06): "what I learned" stays in Esmeworld, never sent.
+      expect(live.map((e) => String(e.note)).join("\n")).not.toContain("a wave passes");
       const checkinHabit = [...fake.todos.values()].find((t) => t.title === "Daily check-in")!;
       expect(checkinHabit).toMatchObject({ type: "habit", period: "day", target: 1, tally: 1, points_earn: 0, points_miss: 0 });
 

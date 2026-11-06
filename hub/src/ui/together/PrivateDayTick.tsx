@@ -6,6 +6,7 @@ import type { ISODate } from "../../domain/types";
 import type { JournalKey } from "../../journal/crypto";
 import { syncController, useSyncState } from "../../sync";
 import type { SyncController } from "../../sync/controller";
+import { TOGETHER_META } from "../../together/store";
 import { TOGETHER_WORDS as W } from "./wording";
 import "./together.css";
 
@@ -20,6 +21,7 @@ export function PrivateDayTick({
 }: { jk: JournalKey; date: ISODate; part: SharePart; label?: string; controller?: SyncController }) {
   const [on, setOn] = useState<boolean | null>(null);
   const [waiting, setWaiting] = useState(false);
+  const [known, setKnown] = useState(false);
   const [problem, setProblem] = useState("");
   const sync = useSyncState(controller);
   useEffect(() => {
@@ -27,10 +29,13 @@ export function PrivateDayTick({
     const sub = liveQuery(async () => ({
       on: (await readSharePrivate(jk, date))[part],
       waiting: !!(await db.pending.get(["journal", shareId(date, part)])),
+      // Together is in use: signed in on this device, or a tick saved on any device (synced).
+      known: !!(await db.syncMeta.get(TOGETHER_META)) || (await db.journal.where("kind").equals("share").count()) > 0,
     })).subscribe({
       next: (v) => {
         setOn(v.on);
         setWaiting(v.waiting);
+        setKnown(v.known);
       },
       error: () => setOn(null),
     });
@@ -50,8 +55,9 @@ export function PrivateDayTick({
       <label>
         <input type="checkbox" checked={on === true} disabled={on === null} onChange={(e) => void change(e.target.checked)} /> {label}
       </label>
-      <p>{part === "exercise" ? W.oliverSeesExercise : W.oliverSeesCheckin}</p>
-      <p className="together-warning">{W.privateWarning}</p>
+      {/* What it means for Together, only where Together is in use (never to someone who isn't). */}
+      {known && <p>{part === "exercise" ? W.oliverSeesExercise : W.oliverSeesCheckin}</p>}
+      {known && <p className="together-warning">{W.privateWarning}</p>}
       {waiting && sync.syncOn && <p role="status">{W.notSyncedYet}</p>}
       {problem && <p role="alert">{problem}</p>}
     </div>

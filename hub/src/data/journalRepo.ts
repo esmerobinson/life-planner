@@ -1901,7 +1901,11 @@ export async function saveLearned(
     carried = o?.state === "ok" ? [seenToken({ id: session.version!, at: o.entry.at })] : [];
   }
   const seen = [...(session.seen ?? []), ...carried].filter((x) => x !== id && !x.startsWith(`${id}@`));
-  const entry = { v: 1, text, at: Date.now(), ...(seen.length ? { seen } : {}) };
+  // Each write of a row is strictly newer than the one before it, even within a millisecond, so a
+  // version hidden as <id>@<stamp> always shows again once written to after (bugs #56, #60).
+  const prev = await db.journal.get(id);
+  const prevAt = prev ? await openRow(jk, prev, "learned").then((o) => (o.state === "ok" ? o.entry.at : 0)) : 0;
+  const entry = { v: 1, text, at: Math.max(Date.now(), prevAt + 1), ...(seen.length ? { seen } : {}) };
   await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), entry)]);
   return id;
 }
