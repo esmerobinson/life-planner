@@ -9,7 +9,7 @@ import { saveSyncSettings, syncOnce } from "../sync/engine";
 import { PROMPTS } from "../journal/prompts";
 import { sendToTogether, signInToTogether, stopTogether } from "./sender";
 import { readAuth, TOGETHER_META, TOGETHER_SENT_META } from "./store";
-import { clock, DEVICE, EMAIL, emptyDb, fakeTogether, guardedFetch, journalDay, PASSWORD } from "./testKit";
+import { clock, DEVICE, EMAIL, emptyDb, fakeTogether, guardedFetch, highlightOn, journalDay, PASSWORD } from "./testKit";
 
 // The request recorder (Together link brief §5, review I4): every request to Together, from
 // sign-in to "Stop", fails the test the moment it holds anything that must never go. Text with
@@ -52,6 +52,13 @@ it("nothing forbidden is ever sent to Together", async () => {
   await saveAnswer(jk, PRIVATE_DAY, PROMPTS[2]!.id, DEVICE, "Pretend private check-in\nanswer", true);
   await saveSharePrivate(jk, PRIVATE_DAY, "exercise", true);
   await saveSharePrivate(jk, PRIVATE_DAY, "checkin", true);
+  // Highlights: DAY's goes only once its answers are due; a private day's, a removed one and a
+  // morning-only day's never.
+  await highlightOn(DAY, 'pretend "Wrenfold"\nclouds', 'Pretend Wrenfold\nnote');
+  await highlightOn(DAY, "pretend Gristlecomb river", "Pretend Gristlecomb note", { removed: true });
+  await highlightOn(PRIVATE_DAY, "pretend Ambermoss hill", "Pretend Ambermoss note");
+  await highlightOn(MORNING_ONLY, "pretend Tallowmere path", "Pretend Tallowmere note");
+  const answersDue = new Date("2026-11-06T03:00:00").getTime();
 
   let signedIn = false;
   const cardFileText = set.cards.filter((k) => k.id !== card.id).flatMap((k) => [k.theme]).concat(
@@ -62,6 +69,8 @@ it("nothing forbidden is ever sent to Together", async () => {
     'Pretend "private" exercise', "Pretend private check-in",
     "Pretend shared-looking to-do", "Pretend to-do notes", "Pretend Mind to-do",
     MORNING_ONLY, JPEG, PASS, jk.fp, SYNC_TOKEN, set.source, ...cardFileText,
+    "Gristlecomb", "Ambermoss", "Tallowmere",
+    ...(c.now() < answersDue ? ["Wrenfold", "Highlighted learnings"] : []),
     ...(signedIn ? [PASSWORD, EMAIL] : []),
   ];
   const guard = guardedFetch(fake.fetch, forbidden, c.now);
@@ -82,6 +91,7 @@ it("nothing forbidden is ever sent to Together", async () => {
   const all = guard.seen.map((r) => r.body).join("\n");
   expect(all).toContain("Pretend exercise answer");
   expect(all).toContain("Pretend learned words");
+  expect(all).toContain("Wrenfold"); // DAY's highlight went, once due
   expect(all).toContain("2026-11-06T12:00:00.000Z"); // the private day's titles went
   // Only Together's own endpoints; only habits and tallies; only Together's own tokens.
   for (const r of guard.seen) {

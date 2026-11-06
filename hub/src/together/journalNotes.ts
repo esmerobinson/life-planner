@@ -5,7 +5,9 @@
 // - Exercise: a day where any card was ticked done.
 //   - Titles-only: each card's title.
 //   - With answers: each card's title, then each prompt she answered and her submitted answer
-//     (never a draft), a checklist's items with her choices, and her "what I learned today".
+//     (never a draft), a checklist's items with her choices, her "what I learned today", and
+//     the day's highlighted passages with their notes ("Highlighted learnings", Esme 2026-11-06):
+//     only highlights made that day, never a removed one.
 // - Check-in: a day she finished ("Checked in for today").
 //   - Titles-only: each question she answered.
 //   - With answers: each of those questions, then her answer.
@@ -24,9 +26,22 @@ import { trackTitle } from "../journal/exercise";
 import { PROMPTS } from "../journal/prompts";
 import { checkedIn } from "../journal/rows";
 import { cardTitle } from "../ui/journal/ResponseView";
+import { listHighlights, type Highlight } from "../data/highlightRepo";
+
+/** A highlight id's day: `highlight:<date>:<hex>`. */
+const highlightDay = (hid: string) => hid.slice("highlight:".length, "highlight:".length + 10);
+
+/** The day's highlights (made that day; removed ones are never listed), as plain text. */
+function highlightsText(all: Highlight[], date: ISODate): string {
+  const day = all.filter((h) => h.hids.some((id) => highlightDay(id) === date)).sort((a, b) => a.createdAt - b.createdAt);
+  if (day.length === 0) return "";
+  return [HIGHLIGHTS_HEADING, ...day.map((h) => `"${clean(h.anchor.exact)}"${filled(h.note) ? `\n${clean(h.note)}` : ""}`)].join("\n");
+}
 
 /** Provisional wording (Esme may reword): the heading over her "what I learned" words in Together. */
 export const LEARNED_HEADING = "What I learned today";
+/** Esme's heading (2026-11-06) over the day's highlighted passages in Together. */
+export const HIGHLIGHTS_HEADING = "Highlighted learnings";
 
 /** One day's note: titles or questions only, and with her answers. */
 export interface DayNote {
@@ -106,7 +121,13 @@ async function exerciseDays(jk: JournalKey, inWindow: (d: ISODate) => boolean, t
   if (ids.size === 0) return { notes, unknown };
   const { entries, unreadable } = await listExerciseEntries(jk, today);
   if (unreadable > 0) return null;
+  // Highlights: a day with a highlight row this device can't open is left as it is.
+  const hl = await listHighlights(jk);
+  if (hl.unreadable > 0) {
+    for (const r of await db.journal.where("kind").equals("highlight").toArray()) if (ids.has(r.date)) unknown.add(r.date);
+  }
   for (const [date, cardIds] of ids) {
+    if (unknown.has(date)) continue;
     const learned = await readLearned(jk, date);
     if (learned.unreadable > 0) {
       unknown.add(date);
@@ -128,6 +149,8 @@ async function exerciseDays(jk: JournalKey, inWindow: (d: ISODate) => boolean, t
       full.push(words ? `${title}\n${words}` : title);
     }
     if (filled(learned.text)) full.push(`${LEARNED_HEADING}\n${clean(learned.text)}`);
+    const passages = highlightsText(hl.highlights, date);
+    if (passages) full.push(passages);
     notes.set(date, { titles: titles.join("\n"), full: full.join("\n\n") });
   }
   return { notes, unknown };

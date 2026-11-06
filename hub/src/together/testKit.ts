@@ -128,3 +128,21 @@ export async function journalDay(day: string, opts: { exercise?: boolean; checki
   }
   return { jk, set, card, q1: PROMPTS[0]!, q2: PROMPTS[1]! };
 }
+
+/** A highlight of `words` (a phrase of the card's learning text, made up) on `day`. Returns it as listed. */
+export async function highlightOn(day: string, words: string, note = "", opts: { removed?: boolean } = {}) {
+  const repo = await import("../data/repo");
+  const { describeAnchor } = await import("../journal/highlights");
+  const { keyFor } = await import("../test/journalKey");
+  const jk = await keyFor("fake-journal-together");
+  const text = `A made-up learning text that says ${words} in the middle of it.`;
+  const start = text.indexOf(words);
+  const anchor = describeAnchor("learn", text, start, start + words.length)!;
+  const card = { id: "b-001", track: "bpd", book: "Pretend first workbook", day: 1, chapter: 1, chapterTitle: "Pretend meadow", theme: "Pretend first-book one" };
+  const hid = await repo.createHighlight(jk, day, DEVICE, card, anchor, note);
+  if (opts.removed) {
+    const h = (await repo.listHighlights(jk)).highlights.find((x) => x.hids.includes(hid))!;
+    await repo.removeHighlight(jk, DEVICE, h);
+  }
+  return hid;
+}

@@ -9,7 +9,7 @@ import { FAKE_CARD_FILE_CHECKLIST, PRETEND_FEATURES } from "../test/exerciseCard
 import { togetherId } from "./ids";
 import { ANSWERS_DELAY_MS, HABIT_TITLES } from "./sender";
 import { readSent } from "./store";
-import { clock, DEVICE, emptyDb, journalDay, ME, restCalls, send, signedIn } from "./testKit";
+import { clock, DEVICE, emptyDb, highlightOn, journalDay, ME, restCalls, send, signedIn } from "./testKit";
 
 // The Mental health exercise and Daily check-in days, against the fake Together server: titles
 // at the 3am day change, answers ANSWERS_DELAY_MS later unless private. Made-up cards and words.
@@ -293,5 +293,49 @@ describe("tallies that may be in Together (bug #49)", () => {
     expect((await readSent(db))!.refused.maybe).toMatchObject({ what: "hide" });
     expect(await send(fake, c, true)).toMatchObject({ kind: "ok", refused: 0 });
     expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
+  });
+});
+
+describe("Highlighted learnings (Esme, 2026-11-06)", () => {
+  it("the day's highlights (passage and note) go with the answers, under their heading; never at 3am, never another day's or a removed one", async () => {
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    await journalDay(DAY, { exercise: true });
+    await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
+    await highlightOn(DAY, "pretend Sallow hill");
+    await highlightOn(DAY, "pretend Gristlecomb river", "", { removed: true });
+    await highlightOn("2026-11-03", "pretend Pellmoor yesterday");
+    c.set(TITLES_AT);
+    await send(fake, c);
+    expect(wire(fake)).not.toMatch(/Wrenfold|Sallow|Highlighted learnings/);
+    c.set(ANSWERS_AT);
+    await send(fake, c);
+    const note = String((await tally(fake, "exercise", 2))!.note);
+    expect(note).toBe(`${TITLE}\nPretend exercise answer\n\nHighlighted learnings\n"pretend Wrenfold clouds"\nPretend Wrenfold note\n"pretend Sallow hill"`);
+    expect(wire(fake)).not.toMatch(/Gristlecomb|Pellmoor/);
+  });
+
+  it("a private day: no highlight, ever", async () => {
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    const { jk } = await journalDay(DAY, { exercise: true });
+    await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
+    await saveSharePrivate(jk, DAY, "exercise", true);
+    for (const at of [TITLES_AT, ANSWERS_AT, "2026-11-10T09:00:00"]) {
+      c.set(at);
+      await send(fake, c);
+    }
+    expect(wire(fake)).not.toMatch(/Wrenfold|Highlighted learnings/);
+  });
+
+  it("highlights alone don't make an exercise day", async () => {
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    await journalDay(DAY, {});
+    await highlightOn(DAY, "pretend Wrenfold clouds");
+    c.set(ANSWERS_AT);
+    await send(fake, c);
+    expect(wire(fake)).not.toMatch(/Wrenfold/);
+    expect(fake.events.size).toBe(0);
   });
 });
