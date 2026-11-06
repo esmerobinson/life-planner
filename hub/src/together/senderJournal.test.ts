@@ -302,6 +302,7 @@ describe("Highlighted learnings (Esme, 2026-11-06)", () => {
     const fake = await signedIn(c);
     await journalDay(DAY, { exercise: true });
     await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
+    await new Promise((r) => setTimeout(r, 5)); // made a moment later
     await highlightOn(DAY, "pretend Sallow hill");
     await highlightOn(DAY, "pretend Gristlecomb river", "", { removed: true });
     await highlightOn("2026-11-03", "pretend Pellmoor yesterday");
@@ -313,6 +314,9 @@ describe("Highlighted learnings (Esme, 2026-11-06)", () => {
     const note = String((await tally(fake, "exercise", 2))!.note);
     expect(note).toBe(`${TITLE}\nPretend exercise answer\n\nHighlighted learnings\n"pretend Wrenfold clouds"\nPretend Wrenfold note\n"pretend Sallow hill"`);
     expect(wire(fake)).not.toMatch(/Gristlecomb|Pellmoor/);
+    const n = restCalls(fake).length;
+    await send(fake, c); // a replay sends nothing: the note is the same every time
+    expect(restCalls(fake).length).toBe(n);
   });
 
   it("a private day: no highlight, ever", async () => {

@@ -33,7 +33,7 @@ const highlightDay = (hid: string) => hid.slice("highlight:".length, "highlight:
 
 /** The day's highlights (made that day; removed ones are never listed), as plain text. */
 function highlightsText(all: Highlight[], date: ISODate): string {
-  const day = all.filter((h) => h.hids.some((id) => highlightDay(id) === date)).sort((a, b) => a.createdAt - b.createdAt);
+  const day = all.filter((h) => h.hids.some((id) => highlightDay(id) === date)).sort((a, b) => a.createdAt - b.createdAt || a.key.localeCompare(b.key)); // a fixed order, so the note (and its hash) never changes by itself
   if (day.length === 0) return "";
   return [HIGHLIGHTS_HEADING, ...day.map((h) => `"${clean(h.anchor.exact)}"${filled(h.note) ? `\n${clean(h.note)}` : ""}`)].join("\n");
 }
