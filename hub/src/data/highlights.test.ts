@@ -5,6 +5,7 @@ import {
   createHighlight, listHighlights, NOT_CONFIRMED, removeHighlight, saveHighlightNote, type HighlightCard,
 } from "./repo";
 import { journalId, validJournal } from "./validate";
+import { getDeviceId } from "../sync/engine";
 import { journalAad, openJson, sealJson, toBase64, type JournalKey } from "../journal/crypto";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import { describeAnchor } from "../journal/highlights";
@@ -211,15 +212,38 @@ describe("two devices", () => {
 });
 
 describe("device ids after a Replace (restore-safe)", () => {
-  it("a page still holding a former id writes with the current one; another device's id is used as it is", async () => {
-    await db.syncMeta.put({ key: "deviceId", value: "device-new-after-replace" });
-    await db.syncMeta.put({ key: "formerDeviceIds", value: [MAC] });
-    await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
-    await createHighlight(jk, DAY, PHONE, CARD, anchorOf("pretend clouds always pass"));
+  it("a highlight made after a Replace is under the new id (even from a page holding the old one); old-id highlights still show", async () => {
+    const before = await getDeviceId(db);
+    await createHighlight(jk, DAY, before, CARD, anchorOf("pretend hill"), "Pretend note from before");
+    const oldRow = (await rows())[0]!;
+    await restoreBackup(JSON.parse(JSON.stringify(await exportBackup(DAY))), "replace");
+    const after = await getDeviceId(db);
+    expect(after).not.toBe(before);
+
+    // A page open since before the Replace still passes the old id.
+    await createHighlight(jk, DAY, before, CARD, anchorOf("pretend clouds always pass"));
+    const hill = (await listHighlights(jk)).highlights.find((h) => h.anchor.exact === "pretend hill")!;
+    await saveHighlightNote(jk, before, hill, "Pretend note after the Replace");
+
     const ids = (await rows()).map((r) => r.id);
-    expect(ids.some((id) => id.includes(`_${MAC}_`))).toBe(false);
-    expect(ids.filter((id) => id.includes("_device-new-after-replace_"))).toHaveLength(1);
-    expect(ids.filter((id) => id.includes(`_${PHONE}_`))).toHaveLength(1);
+    expect(ids.filter((id) => id.includes(`_${before}_`))).toEqual([oldRow.id]); // the old row, never written again
+    expect(ids.filter((id) => id.includes(`_${after}_`))).toHaveLength(2);
+    expect((await db.journal.get(oldRow.id))!.ct).toBe(oldRow.ct);
+    const { highlights } = await listHighlights(jk);
+    expect(highlights.map((h) => [h.anchor.exact, h.note]).sort()).toEqual([
+      ["pretend clouds always pass", ""],
+      ["pretend hill", "Pretend note after the Replace"],
+    ]);
+  });
+
+  it("removing an old-id highlight after a Replace writes its tombstone under the new id", async () => {
+    const before = await getDeviceId(db);
+    await createHighlight(jk, DAY, before, CARD, anchorOf("pretend hill"));
+    await restoreBackup(JSON.parse(JSON.stringify(await exportBackup(DAY))), "replace");
+    await removeHighlight(jk, before, (await listHighlights(jk)).highlights[0]!);
+    expect((await listHighlights(jk)).highlights).toEqual([]);
+    const now = await getDeviceId(db);
+    expect((await rows()).filter((r) => r.id.includes(`_${now}_`))).toHaveLength(1);
   });
 });
 

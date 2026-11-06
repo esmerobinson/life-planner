@@ -42,7 +42,7 @@ type Shape<K extends keyof typeof ENTRY_CHECK> = (typeof ENTRY_CHECK)[K] extends
 export type Opened<T> = { state: "ok"; entry: T } | { state: "unreadable" };
 
 /** Opens one row as `kind`. Another key's fingerprint is not even tried. */
-export async function openRow<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey, row: JournalRow, kind: K): Promise<Opened<Shape<K>>> {
+async function openRow<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey, row: JournalRow, kind: K): Promise<Opened<Shape<K>>> {
   if (row.fp !== undefined && row.fp !== jk.fp) return { state: "unreadable" };
   try {
     const value = await openJson(jk.key, row, journalAad(row.id));
@@ -52,7 +52,7 @@ export async function openRow<K extends keyof typeof ENTRY_CHECK>(jk: JournalKey
   }
 }
 
-export async function seal(jk: JournalKey, kind: JournalKind, date: ISODate, suffix: string | undefined, entry: unknown): Promise<JournalRow> {
+async function seal(jk: JournalKey, kind: JournalKind, date: ISODate, suffix: string | undefined, entry: unknown): Promise<JournalRow> {
   const id = journalId(kind, date, suffix);
   const row: JournalRow = { id, kind, date, fp: jk.fp, ...(await sealJson(jk.key, entry, journalAad(id))) };
   if (!validJournal(row)) throw new Error("That journal entry could not be saved.");
@@ -63,7 +63,7 @@ export async function seal(jk: JournalKey, kind: JournalKind, date: ISODate, suf
  * Writes rows (and files) in ONE transaction, only while `jk` is still this device's
  * confirmed key. `onlyIfAbsent` rows are skipped when a row with that id already exists.
  */
-export async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: FileRow[]; onlyIfAbsent?: boolean } = {}): Promise<boolean> {
+async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: FileRow[]; onlyIfAbsent?: boolean } = {}): Promise<boolean> {
   return db.transaction("rw", [db.journal, db.files, db.syncMeta], async () => {
     const confirmed = (await db.syncMeta.get(JOURNAL_KEY_META))?.value as { fp?: string } | undefined;
     if (!confirmed || confirmed.fp !== jk.fp) throw new Error(NOT_CONFIRMED);
@@ -80,6 +80,19 @@ export async function write(jk: JournalKey, rows: JournalRow[], opts: { files?: 
     return true;
   });
 }
+
+/**
+ * Highlights' own rows (highlightRepo.ts), and only those: opened as a highlight, sealed as one,
+ * and written through the same confirmed-key gate (`write`) as every journal row.
+ */
+export const highlightRows = {
+  open: (jk: JournalKey, row: JournalRow) => openRow(jk, row, "highlight"),
+  seal: (jk: JournalKey, date: ISODate, suffix: string, entry: unknown) => seal(jk, "highlight", date, suffix, entry),
+  write: (jk: JournalKey, rows: JournalRow[]) => {
+    if (rows.some((r) => r.kind !== "highlight")) throw new Error("Only highlight rows are written here.");
+    return write(jk, rows);
+  },
+} as const;
 
 const rowsOn = (date: ISODate) => db.journal.where("date").equals(date).toArray();
 
