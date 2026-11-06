@@ -8,11 +8,10 @@ import Dexie from "dexie";
 import { vi } from "vitest";
 import { db, HubDB } from "../data/db";
 import { exportBackup, restoreBackup } from "../data/backup";
-import { createHighlight, listHighlights, openNoteSession, readLearned, readSharePrivate, saveHighlightNote, saveLearned, saveSharePrivate } from "../data/repo";
+import { cardRef, readSharePrivate, saveExerciseEdit, saveSharePrivate } from "../data/repo";
 import { journalId } from "../data/validate";
 import type { JournalRow } from "../domain/types";
 import { journalAad, sealJson, type JournalKey } from "../journal/crypto";
-import { describeAnchor } from "../journal/highlights";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import type { FakeSupabase } from "../together/fakeSupabase";
 import { togetherId } from "../together/ids";
@@ -78,28 +77,32 @@ const postsWith = (fake: FakeSupabase, from: number, re: RegExp) =>
   fake.requests.slice(from).filter((r) => r.method === "POST" && r.url.includes("/rest/v1/todo_events") && re.test(r.body)).map((r) => r.body.slice(0, 160));
 const restWrites = (fake: FakeSupabase, from: number) => fake.requests.slice(from).filter((r) => r.method !== "GET" && r.url.includes("/rest/v1/"));
 
-async function hl(day: string, words: string, note = "") {
-  const text = `A made-up learning text that says ${words} in the middle of it.`;
-  const start = text.indexOf(words);
-  const anchor = describeAnchor("learn", text, start, start + words.length)!;
-  const card = { id: "b-001", track: "bpd", book: "Pretend first workbook", day: 1, chapter: 1, chapterTitle: "Pretend meadow", theme: "Pretend first-book one" };
-  return createHighlight(jk, day, DEVICE, card, anchor, note);
+// Together v1 sends only the exercise and check-in answers (Esme, 2026-11-06): what changes after
+// the backup here is her exercise answer (an Edit), where Testing's first version used "what I
+// learned" words, which v1 never sends. The checks are the same.
+
+/** Her exercise answer for D changed with Edit (a new submitted version, the one shown). */
+async function editAnswer(text: string) {
+  const { parseCardFile } = await import("../journal/exercise");
+  const { FAKE_CARD_TEXT_BOOKS } = await import("../test/exerciseCards");
+  const card = parseCardFile(FAKE_CARD_TEXT_BOOKS)!.cards.find((k) => k.id === "b-001")!;
+  await saveExerciseEdit(jk, D, DEVICE, cardRef(card), text);
 }
 
 /**
- * D's exercise (and check-in) with learned words "first"; synced; the backup is made; she then
- * replaces the learned words with "final" (synced). The answers go to Together with "final".
+ * D's exercise (and check-in) with the answer "first"; synced; the backup is made; she then
+ * changes the answer to "final" (synced). The answers go to Together with "final".
  */
 async function sentWithAnswersAfterBackup(): Promise<{ c: Clock; fake: FakeSupabase; server: FakeSyncServer; phone: HubDB; file: unknown }> {
   const c = clock(`${D}T10:00:00`);
   const fake = await signedIn(c);
   const server = new FakeSyncServer(TOKEN);
   const phone = await phoneDevice();
-  await journalDay(D, { exercise: true, checkin: true, learned: "Pretend Gildersleeve first words" });
+  await journalDay(D, { exercise: true, checkin: true });
+  await editAnswer("Pretend Gildersleeve first words");
   await syncBoth(server, phone);
   const file = JSON.parse(JSON.stringify(await exportBackup(D)));
-  const day = await readLearned(jk, D);
-  await saveLearned(jk, D, DEVICE, "Pretend Gildersleeve final words", { seen: day.seen });
+  await editAnswer("Pretend Gildersleeve final words");
   await syncBoth(server, phone);
   c.set("2026-11-06T03:30:00");
   expect((await send(fake, c)).kind).toBe("ok");
@@ -159,11 +162,11 @@ describe("#58 (a): a day the record says went titles only", () => {
       const fake = await signedIn(c);
       const server = new FakeSyncServer(TOKEN);
       const phone = await phoneDevice();
-      await journalDay(D, { exercise: true, checkin: true, learned: "Pretend Hollowmere learned" });
-      await hl(D, "pretend Hollowmere gate", "Pretend Hollowmere note");
+      await journalDay(D, { exercise: true, checkin: true });
+      await editAnswer("Pretend Hollowmere answer");
       c.set("2026-11-06T03:30:00");
       await send(fake, c);
-      expect((await liveNotes(fake))[D], "set-up: answers went").toContain("Hollowmere note");
+      expect((await liveNotes(fake))[D], "set-up: answers went").toContain("Hollowmere answer");
       if (when === "ticked private before the backup") {
         await saveSharePrivate(jk, D, "exercise", true);
         await saveSharePrivate(jk, D, "checkin", true);
@@ -197,23 +200,23 @@ describe("#58 (a): a day the record says went titles only", () => {
 });
 
 describe("#58 (c): words written after the Replace", () => {
-  it("a highlight note and learned words added in the gap on a day already sent with answers: in Together once each, not repeated after the pull", async () => {
+  it("an answer changed in the gap on a day already sent with answers: in Together once, not repeated after the pull", async () => {
     const { c, fake, server, file } = await sentWithAnswersAfterBackup();
     await stopSyncing(db);
     await restoreBackup(file, "replace");
-    const hid = await hl(D, "pretend Inglenook lane");
-    const h = (await listHighlights(jk)).highlights.find((x) => x.hids.includes(hid))!;
-    await saveHighlightNote(jk, DEVICE, openNoteSession(h), "Pretend Inglenook note after the Replace");
+    await editAnswer("Pretend Inglenook answer after the Replace");
     await saveSharePrivate(jk, D0, "exercise", false); // an unrelated write
+    const gap = fake.requests.length;
+    await send(fake, c, true);
+    expect(postsWith(fake, gap, /Inglenook/), "nothing rebuilt from the restored journal in the gap").toEqual([]);
     await saveSyncSettings(db, { serverUrl: SERVER, token: TOKEN });
     await ok(db, server);
     const from = fake.requests.length;
     await send(fake, c);
     await send(fake, c);
     const live = (await liveNotes(fake))[D]!;
-    expect(live.split("Pretend Inglenook note after the Replace").length - 1).toBe(1);
-    expect(live).toContain("Pretend Gildersleeve final words");
-    expect(postsWith(fake, from, /Inglenook note/)).toHaveLength(1);
+    expect(live.split("Pretend Inglenook answer after the Replace").length - 1).toBe(1);
+    expect(postsWith(fake, from, /Inglenook answer/)).toHaveLength(1);
     expect(fake.liveTallies(await habit("exercise"))).toHaveLength(1);
   });
 
@@ -227,7 +230,7 @@ describe("#58 (c): words written after the Replace", () => {
     const file = JSON.parse(JSON.stringify(await exportBackup(D)));
     await stopSyncing(db);
     await restoreBackup(file, "replace");
-    await saveLearned(jk, D, DEVICE, "Pretend Juniper learned after the Replace");
+    await editAnswer("Pretend Juniper answer after the Replace");
     c.set("2026-11-06T03:30:00");
     const from = fake.requests.length;
     await send(fake, c, true);
@@ -236,7 +239,7 @@ describe("#58 (c): words written after the Replace", () => {
     await ok(db, server);
     await send(fake, c);
     await send(fake, c);
-    expect(postsWith(fake, from, /Juniper learned after the Replace/)).toHaveLength(1);
+    expect(postsWith(fake, from, /Juniper answer after the Replace/)).toHaveLength(1);
   });
 });
 
@@ -263,13 +266,14 @@ describe("#58: the device that sends never Replaced (the other device did)", () 
     const fake = await signedIn(c);
     const server = new FakeSyncServer(TOKEN);
     const phone = await phoneDevice();
-    await journalDay(D, { exercise: true, learned: "Pretend Kittiwake learned" });
+    await journalDay(D, { exercise: true });
     await syncBoth(server, phone);
     // The phone's Replace: its restored rows keep old stamps; new rows under a new phone id.
     await sealed("learned", D, "device-pretend-phone-new-9_0a1b", { v: 1, text: "Pretend Kittiwake learned, the phone after its Replace", at: Date.now() }).then((r) => phone.journal.put(r));
     await syncBoth(server, phone);
     c.set("2026-11-06T03:30:00");
     await send(fake, c);
-    expect((await liveNotes(fake))[D]).toContain("Pretend Kittiwake learned, the phone after its Replace");
+    expect((await liveNotes(fake))[D]).toContain("Pretend exercise answer"); // answers go as usual
+    expect((await liveNotes(fake))[D]).not.toContain("Kittiwake"); // v1: learned words never go
   });
 });

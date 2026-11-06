@@ -22,7 +22,7 @@
 
 import { db as appDb, type HubDB } from "../data/db";
 import { readSharePrivate } from "../data/repo";
-import { withSyncLock } from "../data/syncGate";
+import { readSyncGate, withSyncLock } from "../data/syncGate";
 import { formerDeviceIds } from "../data/deviceIds";
 import { getDeviceId } from "../sync/engine";
 import { todayISO } from "../domain/dates";
@@ -151,7 +151,9 @@ export async function signInToTogether(
     await db.transaction("rw", db.syncMeta, async () => {
       await db.syncMeta.put({ key: TOGETHER_META, value: auth });
       const sent = await readSent(db);
-      if (!sent || sent.userId !== auth.userId) await saveSent(db, freshSent(auth.userId, todayISO(new Date(now()))));
+      if (!sent || sent.userId !== auth.userId) {
+        await saveSent(db, { ...freshSent(auth.userId, todayISO(new Date(now()))), formerSeen: (await formerDeviceIds(db.syncMeta)).length });
+      }
     });
     return { kind: "ok" };
   });
@@ -214,6 +216,31 @@ export async function cancelStopRemoving(): Promise<void> {
       await saveSent(db, rest);
     }
   });
+}
+
+// ---- after a Replace (bugs #58, #64, #65) ------------------------------------------------------
+
+/**
+ * Whether answers are held because a backup was restored (Replace) here and the journal may be
+ * missing what was written or ticked after the backup. Held until sync has pulled everything
+ * again; with sync off on this device, for ANSWERS_DELAY_MS after the Replace was first noticed
+ * (nothing can arrive to wait for, so answers then go as usual). Saved in the record, for the box.
+ */
+async function restoreHold(db: HubDB, sent: TogetherSent, now: number): Promise<boolean> {
+  const former = (await formerDeviceIds(db.syncMeta)).length;
+  if (sent.formerSeen === undefined) sent.formerSeen = former;
+  else if (former > sent.formerSeen) {
+    sent.formerSeen = former;
+    sent.restoredAt = now;
+  }
+  let held = false;
+  if (sent.restoredAt !== undefined) {
+    const gate = await readSyncGate(db.syncMeta);
+    held = gate.syncOn ? !gate.firstPullDone : now < sent.restoredAt + ANSWERS_DELAY_MS;
+    if (!held) delete sent.restoredAt;
+  }
+  sent.waitingRestore = held;
+  return held;
 }
 
 // ---- tokens -----------------------------------------------------------------------------------
@@ -318,7 +345,7 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
     });
     if (snap.jk) {
       ctx.jk = snap.jk;
-      ctx.restoredUnpulled = (await formerDeviceIds(db.syncMeta)).length > 0 && (await db.syncMeta.get("firstPullDone"))?.value !== true;
+      ctx.restoredUnpulled = await restoreHold(db, sent, now());
       await sendJournal(ctx, snap.journal);
     }
     return done(true);
@@ -449,13 +476,13 @@ async function ensureHabit(ctx: Ctx, kind: HabitKind): Promise<string | null> {
  * The note that may go for a day right now: titles only until ANSWERS_DELAY_MS after the day
  * ends, and whenever that part is ticked private (the tick is read again right before sending).
  */
-async function noteFor(ctx: Ctx, kind: HabitKind, date: ISODate, note: { titles: string; full: string }, hadAnswers: boolean): Promise<string> {
+async function noteFor(ctx: Ctx, kind: HabitKind, date: ISODate, note: { titles: string; full: string }): Promise<string> {
   if (note.full === note.titles) return note.titles;
   const answersDue = date < todayISO(new Date(ctx.now() - ANSWERS_DELAY_MS));
   if (!answersDue) return note.titles;
-  // After a Replace, until sync has pulled everything again, the journal here may be missing a
-  // tick made after the backup (bug #58): no day goes from titles to answers until then.
-  if (ctx.restoredUnpulled && !hadAnswers) return note.titles;
+  // After a Replace, until sync has caught up, the journal here may be missing a tick made or
+  // words written after the backup (bugs #58, #64): titles only.
+  if (ctx.restoredUnpulled) return note.titles;
   const ticks = await readSharePrivate(ctx.jk!, date);
   return ticks[kind] ? note.titles : note.full;
 }
@@ -479,7 +506,10 @@ async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: Day
     } else if (day) {
       // Whether Together held her answers for the day when this run began (bug #58).
       const hadAnswers = !!rec?.live && rec.answers === true;
-      noteNow = () => noteFor(ctx, kind, date, day, hadAnswers);
+      // After a Replace, a day already sent with answers is only ever hidden (when private),
+      // never rebuilt or sent again from the restored journal (bug #64).
+      if (ctx.restoredUnpulled && hadAnswers && !(await readSharePrivate(ctx.jk!, date))[kind]) continue;
+      noteNow = () => noteFor(ctx, kind, date, day);
     }
     if (noteNow) {
       const note = await noteNow();

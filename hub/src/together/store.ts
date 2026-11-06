@@ -75,6 +75,12 @@ export interface TogetherSent {
   lastCopiedAt?: number;
   /** New days are held back until a refused clean-up goes through. */
   held?: boolean;
+  /** How many former device ids this device had when last looked at: one more means a Replace. */
+  formerSeen?: number;
+  /** When a Replace was first noticed (bugs #58, #64, #65); gone once sync has caught up. */
+  restoredAt?: number;
+  /** Answers are held after a Replace (shown in the box, bug #65). */
+  waitingRestore?: boolean;
   /**
    * "Stop copying" with removing began and hasn't finished (bug #53): copying is paused. Runs
    * may only carry on removing; nothing is sent or shown again until she presses Stop again
