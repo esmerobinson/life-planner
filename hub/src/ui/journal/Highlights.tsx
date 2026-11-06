@@ -305,11 +305,11 @@ function SelectionAction({ cards, onHighlight }: { cards: ReadonlyMap<string, Ex
       type="button"
       className="hl-action"
       style={{ top: state.top, left: state.left }}
-      onPointerDown={(e) => {
+      // Not prevented on a touch: WebKit then sends no click at all.
+      onPointerDown={() => {
         pressing.current = true;
-        e.preventDefault(); // keeps the selection (and the focus) where it is
       }}
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault() /* a mouse: keeps the selection (and the focus) where it is */}
       onPointerCancel={() => {
         pressing.current = false;
       }}

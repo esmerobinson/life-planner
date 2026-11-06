@@ -15,9 +15,11 @@
 // kept under it. It is gone only when every head is a delete, and a delete only ever names the
 // versions she had in front of her: a note written elsewhere that she never saw keeps it.
 //
-// Device ids: every row is new (a random vid), so a Replace (restore-safe, bug #31) never makes
-// this device write over a row the server may hold newer: `writerDevice` is where its current id
-// is taken, once restore-safe's helpers are on this branch.
+// Device ids: every row is new (a random vid), so a Replace never makes this device write over a
+// row the server may hold newer (restore-safe, bug #31). After a Replace the device has a new id
+// and its earlier ones are "former" (restore-safe's deviceIds.ts, not on this branch yet; its
+// write guard refuses any row with a former id): `writerDevice` writes with the current id when
+// the page still holds a former one, reading the same syncMeta keys. Until then it is a no-op.
 
 import { db } from "./db";
 import { journalId } from "./validate";
@@ -68,9 +70,21 @@ const rowIdFor = (hid: string, device: string, vid: string) => `${hid}_${device}
 /** The same words at the same place (and on the same card): one highlight as she sees it. */
 const placeKey = (e: HighlightEntry) => JSON.stringify([e.card.id, e.anchor.field, e.anchor.exact, e.anchor.prefix, e.anchor.suffix]);
 
-/** The device id this device's new rows are written with (restore-safe: its current one, deviceIds.ts). */
-async function writerDevice(deviceId: string): Promise<string> {
-  return deviceId;
+/** syncMeta keys: the sync engine's device id, and restore-safe's former ids (deviceIds.ts). */
+const DEVICE_ID_META = "deviceId";
+const FORMER_DEVICE_IDS_META = "formerDeviceIds";
+
+/**
+ * The device id this device's new rows are written with: `deviceId`, or this device's current id
+ * when `deviceId` is one of its former ones (a page open since before a Replace). Any other id
+ * (another device's, in tests) is used as it is. Once restore-safe is merged this is its
+ * `(await ownDevices(deviceId)).current`.
+ */
+export async function writerDevice(deviceId: string): Promise<string> {
+  const [cur, prev] = await Promise.all([db.syncMeta.get(DEVICE_ID_META), db.syncMeta.get(FORMER_DEVICE_IDS_META)]);
+  const current = typeof cur?.value === "string" ? cur.value : "";
+  const former = Array.isArray(prev?.value) ? (prev.value as unknown[]) : [];
+  return current && former.includes(deviceId) ? current : deviceId;
 }
 
 /** Every highlight here (removed ones left out), newest first, and how many rows wouldn't open. */

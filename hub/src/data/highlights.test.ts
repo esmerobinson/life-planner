@@ -210,6 +210,19 @@ describe("two devices", () => {
   });
 });
 
+describe("device ids after a Replace (restore-safe)", () => {
+  it("a page still holding a former id writes with the current one; another device's id is used as it is", async () => {
+    await db.syncMeta.put({ key: "deviceId", value: "device-new-after-replace" });
+    await db.syncMeta.put({ key: "formerDeviceIds", value: [MAC] });
+    await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"));
+    await createHighlight(jk, DAY, PHONE, CARD, anchorOf("pretend clouds always pass"));
+    const ids = (await rows()).map((r) => r.id);
+    expect(ids.some((id) => id.includes(`_${MAC}_`))).toBe(false);
+    expect(ids.filter((id) => id.includes("_device-new-after-replace_"))).toHaveLength(1);
+    expect(ids.filter((id) => id.includes(`_${PHONE}_`))).toHaveLength(1);
+  });
+});
+
 describe("backups", () => {
   it("every highlight row (notes and tombstones too) goes into the backup sealed and comes back on restore", async () => {
     await createHighlight(jk, DAY, MAC, CARD, anchorOf("pretend hill"), "Pretend kept note");

@@ -188,7 +188,7 @@ for (const width of [360, 390, 430]) {
       m = await wide();
       expect(m.s).toBeLessThanOrEqual(m.w);
       await page.goto("/journal/read-back");
-      await expect(page.locator("button.journal-readback-tile")).toHaveCount(4);
+      await expect(page.locator("button.journal-readback-tile")).toHaveCount(5); // the four parts, then Highlights
       m = await wide();
       expect(m.s).toBeLessThanOrEqual(m.w);
       // Its parts too (straight in, as "See all" links).
