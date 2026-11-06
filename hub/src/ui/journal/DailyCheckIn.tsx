@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { readBackPath } from "./tabs";
 import {
-  answeredPrompts, CANT_OPEN, currentStep, ensureCheckinSet, listCheckinDays, moveAnswerOn, readCheckinDay, readPromptSettings, saveAnswer,
+  answeredPrompts, CANT_OPEN, shownPrompts, currentStep, ensureCheckinSet, listCheckinDays, moveAnswerOn, readCheckinDay, readPromptSettings, saveAnswer,
   savePromptSettings, type CheckinDay,
 } from "../../data/repo";
 import type { JournalKey } from "../../journal/crypto";
@@ -351,11 +351,12 @@ function EditableAnswer({ stored, onSave }: { stored: string; onSave: (text: str
 /**
  * Past check-ins, newest first (the latest few; "See all" opens Read back); each opens the
  * questions she answered (these may be reread).
- * Skipped questions aren't shown, and a day with nothing answered isn't listed (Esme,
- * 2026-11-04): those questions come round again instead.
+ * Skipped questions aren't shown (Esme, 2026-11-04): those come round again instead. A question
+ * she moved past whose words were lost shows "No answer saved" (Esme, 2026-11-06).
  */
 function PastCheckIns({ past }: { past: CheckinDay[] }) {
-  const days = past.filter((c) => answeredPrompts(c).length > 0 || c.unreadable > 0);
+  // Every day she checked in, even if its words were lost (Esme, 2026-11-06).
+  const days = past.filter((c) => shownPrompts(c).length > 0 || c.unreadable > 0);
   if (days.length === 0) return null;
   return (
     <details className="journal-fold">
@@ -366,10 +367,10 @@ function PastCheckIns({ past }: { past: CheckinDay[] }) {
             <details>
               <summary>{longDate(c.date)}</summary>
               <ol className="journal-answers">
-                {answeredPrompts(c).map((id) => (
+                {shownPrompts(c).map((id) => (
                   <li key={id}>
                     <QuestionText id={id} />
-                    <p className="journal-past-answer">{c.answers.get(id)!.answer}</p>
+                    <AnswerText text={c.answers.get(id)?.answer} />
                   </li>
                 ))}
               </ol>
@@ -411,4 +412,11 @@ function ChooseQuestions({ active, onChange }: { active: string[]; onChange: (id
       </ul>
     </details>
   );
+}
+
+/** A past answer as read-only text, or "No answer saved" when it has no words (bug #40's line). */
+export function AnswerText({ text }: { text: string | null | undefined }) {
+  return (text ?? "").trim() !== ""
+    ? <p className="journal-past-answer">{text}</p>
+    : <p className="journal-muted">{NO_ANSWER_SAVED}</p>;
 }

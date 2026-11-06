@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 /** Read back's parts, as their tiles and headings name them. */
-export type ReadBackPartName = "Mental health exercise" | "Morning pages" | "Daily check-in" | "Notes to myself";
+export type ReadBackPartName = "Mental health exercise" | "Morning pages" | "Daily check-in" | "Notes to myself" | "Highlights";
 
 /** A Read back tile (on the tile view), by its part's name. */
 export const findReadBackTile = (name: ReadBackPartName) =>

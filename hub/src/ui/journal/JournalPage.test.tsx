@@ -339,7 +339,7 @@ describe("daily check-in", () => {
     await saveAnswer(jk, "2026-10-20", "E3", "device-phone-01", "Pretend older", true);
     await ensureCheckinSet(jk, "2026-10-27", ["K4", "K2"]);
     await saveAnswer(jk, "2026-10-27", "K4", "device-phone-01", "Pretend newer", true);
-    await saveAnswer(jk, "2026-10-27", "K2", "device-phone-01", null, true);
+    await saveAnswer(jk, "2026-10-27", "K2", "device-phone-01", null, true, undefined, true); // Skip
     renderApp("/journal/check-in", TODAY);
     await userEvent.click(await screen.findByText("Past check-ins"));
     const days = screen.getAllByText(/^(Tuesday 27 October|Tuesday 20 October)$/);
@@ -355,11 +355,11 @@ describe("daily check-in", () => {
   it("past check-ins and Read back leave out skipped questions; a day of only skips isn't listed", async () => {
     await unlocked();
     await ensureCheckinSet(jk, "2026-10-20", ["E3", "K2"]);
-    await saveAnswer(jk, "2026-10-20", "E3", "device-phone-01", null, true); // skipped
-    await saveAnswer(jk, "2026-10-20", "K2", "device-phone-01", "   ", true); // left empty
+    await saveAnswer(jk, "2026-10-20", "E3", "device-phone-01", null, true, undefined, true); // Skip
+    await saveAnswer(jk, "2026-10-20", "K2", "device-phone-01", "   ", true, undefined, true); // Skip on an empty box
     await ensureCheckinSet(jk, "2026-10-27", ["K4", "K2"]);
     await saveAnswer(jk, "2026-10-27", "K4", "device-phone-01", "Pretend kept answer", true);
-    await saveAnswer(jk, "2026-10-27", "K2", "device-phone-01", null, true);
+    await saveAnswer(jk, "2026-10-27", "K2", "device-phone-01", null, true, undefined, true); // Skip
     const view = renderApp("/journal/check-in", TODAY);
     await userEvent.click(await screen.findByText("Past check-ins"));
     expect(screen.queryByText("Tuesday 20 October")).toBeNull();
@@ -374,6 +374,18 @@ describe("daily check-in", () => {
     expect(within(list).getByText("Pretend kept answer")).toBeInTheDocument();
     expect(within(list).queryByText("Skipped")).toBeNull();
     expect(within(within(list).getByText("Tuesday 27 October · 1 answer").closest("details")!).getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("a day she checked in whose words were lost is still in Read back, marked No answer saved (Esme, 2026-11-06)", async () => {
+    await unlocked();
+    await ensureCheckinSet(jk, "2026-10-26", ["E3", "K2"]);
+    await saveAnswer(jk, "2026-10-26", "E3", "device-phone-01", null, true); // lost by the old Next bug
+    await saveAnswer(jk, "2026-10-26", "K2", "device-phone-01", null, true);
+    renderApp("/journal/read-back", TODAY);
+    expect(await findReadBackTile("Daily check-in")).toHaveTextContent("Daily check-in1Last: Monday 26 October");
+    const list = await openReadBackPart("Daily check-in");
+    await userEvent.click(within(list).getByText("Monday 26 October · 0 answers"));
+    expect(within(list).getAllByText("No answer saved")).toHaveLength(2);
   });
 
   it("a question skipped yesterday comes back first in its slot today", async () => {
