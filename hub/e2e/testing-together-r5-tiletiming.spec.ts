@@ -167,3 +167,45 @@ for (let i = 0; i < RUNS; i++) {
     console.log(`TILE-TIMING ${JSON.stringify({ engine: ENGINE, run: i + 1, ms: timings.map((t) => t.ms), missed: timings.map((t) => !!t.missed), writes: timings.map((t) => t.writes), stores: timings[0]!.stores })}`);
   });
 }
+
+/** In the page: when (ms after navigation start) the Journal opened (its "Hard moment" button: the moment the "Loading…" line above the tabs goes and the tabs move up). */
+const OPENED_AT = () => {
+  const w = window as unknown as { __openedAt: number | null; __tabBefore: string | null; __tabAfter: string | null };
+  w.__openedAt = null;
+  w.__tabBefore = null;
+  const rect = () => {
+    const a = [...document.querySelectorAll('nav[aria-label="Journal parts"] a')].find((x) => x.textContent?.includes("Read back"));
+    const r = a?.getBoundingClientRect();
+    return r ? `y ${Math.round(r.top)}-${Math.round(r.bottom)} x ${Math.round(r.left)}-${Math.round(r.right)}` : null;
+  };
+  new MutationObserver((_, obs) => {
+    if (!w.__tabBefore) w.__tabBefore = rect();
+    if (document.querySelector("button.journal-hard-moment")) {
+      w.__openedAt = performance.now();
+      requestAnimationFrame(() => (w.__tabAfter = rect()));
+      obs.disconnect();
+    }
+  }).observe(document, { childList: true, subtree: true });
+};
+
+test(`${ENGINE}: after a reload, how long past the load event the Journal opens (and its tabs move)`, async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.addInitScript(OPENED_AT);
+  await unlocked(page, "/journal/exercise");
+  await exerciseTab(page).getByLabel("Exercise card file").setInputFiles({ name: "pretend-cards.json", mimeType: "application/json", buffer: Buffer.from(FAKE_CARD_TEXT_V2) });
+  await expect(exerciseTab(page).getByRole("article", { name: "Today's card" }).getByText("Pretend weather")).toBeVisible();
+  const rows: { load: number; opened: number; afterLoad: number; before: string; after: string }[] = [];
+  for (let k = 0; k < 12; k++) {
+    await page.reload();
+    await expect(page.locator("button.journal-hard-moment")).toBeVisible();
+    const r = await page.evaluate(() => {
+      const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
+      const opened = (window as unknown as { __openedAt: number }).__openedAt;
+      const ww = window as unknown as { __tabBefore: string; __tabAfter: string };
+      return { load: Math.round(nav.loadEventEnd), opened: Math.round(opened), before: ww.__tabBefore, after: ww.__tabAfter };
+    });
+    rows.push({ ...r, afterLoad: r.opened - r.load });
+  }
+  const after = rows.map((r) => r.afterLoad).sort((a, b) => a - b);
+  console.log(`OPEN-TIMING ${JSON.stringify({ engine: ENGINE, afterLoadMs: after, median: after[Math.floor(after.length / 2)], readBackTab: [rows[0]!.before, rows[0]!.after], load: rows.map((r) => r.load) })}`);
+});
