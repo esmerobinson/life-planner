@@ -99,6 +99,8 @@ export interface FarmState {
   /** The farm's start (the earliest start row), or null before the farm was ever opened. */
   start: ISODate | null;
   seen: ReadonlySet<string>;
+  /** The day each sticker first went into the book (its seen or placed row, whichever is earlier). */
+  earnedOn: ReadonlyMap<string, ISODate>;
   /** Placed sticker -> its spot. */
   placed: ReadonlyMap<string, string>;
   arrived: ReadonlySet<CharacterId>;
@@ -108,13 +110,18 @@ export interface FarmState {
 }
 
 export const EMPTY_FARM: FarmState = {
-  start: null, seen: new Set(), placed: new Map(), arrived: new Set(), outfits: new Map(), todayDone: [],
+  start: null, seen: new Set(), earnedOn: new Map(), placed: new Map(), arrived: new Set(), outfits: new Map(), todayDone: [],
 };
 
 /** The farm state from its rows (rows that aren't valid are ignored). */
 export function farmState(rows: readonly unknown[]): FarmState {
   const starts: ISODate[] = [];
   const seen = new Set<string>();
+  const earnedOn = new Map<string, ISODate>();
+  const on = (sticker: string, date: ISODate) => {
+    const had = earnedOn.get(sticker);
+    if (!had || date < had) earnedOn.set(sticker, date);
+  };
   const placed = new Map<string, string>();
   const arrived = new Set<CharacterId>();
   const outfits = new Map<CharacterId, string | null>();
@@ -122,13 +129,18 @@ export function farmState(rows: readonly unknown[]): FarmState {
   for (const r of rows) {
     if (!validFarm(r)) continue;
     if (r.kind === "start") starts.push(r.date);
-    else if (r.kind === "seen") seen.add(r.sticker);
-    else if (r.kind === "placed") placed.set(r.sticker, r.spot);
+    else if (r.kind === "seen") {
+      seen.add(r.sticker);
+      on(r.sticker, r.date);
+    } else if (r.kind === "placed") {
+      placed.set(r.sticker, r.spot);
+      on(r.sticker, r.date);
+    }
     else if (r.kind === "arrived") arrived.add(r.character);
     else if (r.kind === "outfit") outfits.set(r.character, r.item);
     else todayDone.push(r.date);
   }
   todayDone.sort();
   const start = starts.length ? starts.sort()[0]! : null;
-  return { start, seen, placed, arrived, outfits, todayDone };
+  return { start, seen, earnedOn, placed, arrived, outfits, todayDone };
 }

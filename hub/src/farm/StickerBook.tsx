@@ -1,10 +1,11 @@
 // Esme's Farm: the sticker book ("Esme's Farm", T2 cover). One canvas at a whole-number scale:
 // the cover opens and pages turn by swapping the art pack's book-turn overlays (click, arrow
 // keys, buttons). Each page's sets show their slots: collected, ready to place (the peel), or
-// not yet earned (the ghost; tap it for a gentle hint). Counts use the pixel font.
+// not yet earned (the ghost; tap it for a gentle hint). Counts use the pixel font, and so do the
+// captions under every sticker and each set's "what it counts" line (Esme, 2026-11-06).
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { COLLECTION, STICKERS, STICKER_BY_KEY, asset, hintFor, stickersIn } from "./catalogue";
+import { COLLECTION, MONTHS, SET_UNITS, STICKERS, STICKER_BY_KEY, asset, captionFor, hintFor, isSurprise, stickersIn } from "./catalogue";
 import type { FarmView } from "./FarmContext";
 import { isTypingTarget, useTicker } from "./hooks";
 import { PEEL_FRAME_MS, POP_FRAME_MS, TURN_FRAME_MS, reducedMotion } from "./motion";
@@ -16,6 +17,8 @@ export const BOOK_H = 152;
 const PAGE_W = 116;
 const COVER_X = 112;
 const SLOT = 19;
+/** A caption's top, below its slot's top (the pack's book-pages caption.below_slot). */
+const CAPTION_BELOW = (asset("book-pages") as unknown as { caption: { below_slot: number } }).caption.below_slot;
 /** The phone shows one page at a time through a window this wide (a page plus the spine). */
 const PHONE_WINDOW = 120;
 
@@ -86,6 +89,9 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
     for (const label of page.labels) {
       const inSet = STICKERS.filter((x) => x.set === label.set && x.group === page.group);
       drawText(ctx, font, `${countIn(inSet, view.earnedSet)}/${inSet.length}`, ox + label.count_x, label.y);
+      // What the set counts, once under its heading (captions, Esme 2026-11-06).
+      const unit = SET_UNITS[label.set];
+      if (unit) drawText(ctx, font, unit, ox + label.unit_x, label.unit_y);
     }
     for (const slot of page.slots) {
       const st = STICKER_BY_KEY.get(slot.sticker)!;
@@ -100,6 +106,9 @@ function drawPages(ctx: CanvasRenderingContext2D, s: Sheets, spread: Spread | nu
         drawBadge(ctx, s, repeatCount(slot.sticker, view.counters), x + 1, slot.y + 1); // always in the book
         if (state === "ready") drawFrame(ctx, s["book-slot"]!, SLOT, SLOT, 2 + peel, x, slot.y);
       }
+      // The caption under every sticker, earned or not (none for the surprises).
+      const caption = captionFor(st);
+      if (caption) drawText(ctx, font, caption, x + Math.floor((SLOT - textWidth(caption)) / 2), slot.y + CAPTION_BELOW);
       if (sparkle?.key === slot.sticker) drawFrame(ctx, s["fx-sparkle"]!, 30, 30, sparkle.frame, x + 9 - 15, slot.y + 9 - 15);
     }
   });
@@ -305,7 +314,7 @@ export function StickerBook({ view, phone, request, onRequestDone, onShow, onPla
                 data-sticker={s.sticker}
                 data-state={state}
                 style={{ left: s.x * scale, top: s.y * scale, width: SLOT * scale, height: SLOT * scale }}
-                aria-label={`${st.name}: ${state === "placed" ? "on the farm" : state === "ready" ? "ready to place" : "not yet"}`}
+                aria-label={`${state === "ghost" && isSurprise(st) ? "A surprise" : st.name}: ${state === "placed" ? "on the farm" : state === "ready" ? "ready to place" : "not yet"}`}
                 aria-expanded={picked === s.sticker}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -320,6 +329,7 @@ export function StickerBook({ view, phone, request, onRequestDone, onShow, onPla
           <SlotCard
             stickerKey={pickedSlot.sticker}
             state={slotState(pickedSlot.sticker, view)}
+            view={view}
             left={Math.min(Math.max(0, (pickedSlot.x - offset) * scale - 40), windowW - 220)}
             top={(pickedSlot.y + SLOT) * scale + 4}
             onPlace={async () => {
@@ -353,14 +363,40 @@ const PAGE_NAMES: Record<string, string> = {
 };
 export const pageName = (group: string): string => PAGE_NAMES[group] ?? group;
 
-function SlotCard({ stickerKey, state, left, top, onPlace, onClose }: {
-  stickerKey: string; state: SlotState; left: number; top: number; onPlace: () => void; onClose: () => void;
+/** "3 Nov" (placeholder wording). */
+const shortDate = (d: string): string => `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
+
+/**
+ * What a sticker's card says (Esme, 2026-11-06): its name, what it's for, and how close she is
+ * ("6 of 10 so far") or when she got it ("Earned 3 Nov"). A Kind note not yet earned stays a
+ * surprise: no name and no how-to. PLACEHOLDER WORDING: Esme words these.
+ */
+export function slotCard(
+  key: string,
+  state: SlotState,
+  view: Pick<FarmView, "counters" | "state">,
+): { title: string; hint: string | null; progress: string | null } {
+  const st = STICKER_BY_KEY.get(key)!;
+  if (state === "ghost" && isSurprise(st)) return { title: "A surprise", hint: null, progress: null };
+  const hint = hintFor(st);
+  if (state !== "ghost") {
+    const on = view.state.earnedOn.get(key);
+    return { title: st.name, hint, progress: on ? `Earned ${shortDate(on)}` : null };
+  }
+  const n = view.counters?.get(st.rule.source);
+  const counting = !st.later && st.rule.at > 1 && n !== undefined;
+  return { title: st.name, hint, progress: counting ? `${Math.min(n, st.rule.at)} of ${st.rule.at} so far` : null };
+}
+
+function SlotCard({ stickerKey, state, view, left, top, onPlace, onClose }: {
+  stickerKey: string; state: SlotState; view: FarmView; left: number; top: number; onPlace: () => void; onClose: () => void;
 }) {
-  const st = STICKER_BY_KEY.get(stickerKey)!;
+  const card = slotCard(stickerKey, state, view);
   return (
-    <div className="farm-pop" style={{ left, top }} role="dialog" aria-label={st.name}>
-      <p className="farm-pop-title">{st.name}</p>
-      {state === "ghost" && <p className="farm-pop-hint">{hintFor(st)}</p>}
+    <div className="farm-pop" style={{ left, top }} role="dialog" aria-label={card.title}>
+      <p className="farm-pop-title">{card.title}</p>
+      {card.hint && <p className="farm-pop-hint">{card.hint}</p>}
+      {card.progress && <p className="farm-pop-hint">{card.progress}</p>}
       {state === "placed" && <p className="farm-pop-hint">On the farm</p>}
       {state === "ready" && (
         <button type="button" className="btn-secondary" onClick={onPlace}>

@@ -32,7 +32,11 @@ export interface ManifestAsset {
   [extra: string]: unknown;
 }
 export interface BookSlot { sticker: string; name: string; x: number; y: number; set: string; milestone: number | string }
-export interface BookLabel { set: string; x: number; y: number; count_x: number; earned_by: string }
+export interface BookLabel {
+  set: string; x: number; y: number; count_x: number; earned_by: string;
+  /** Where the set's "what it counts" line goes (captions, Esme 2026-11-06). */
+  unit_x: number; unit_y: number;
+}
 export interface BookPage { page: number; side: "left" | "right"; group: string | null; slots: BookSlot[]; labels: BookLabel[] }
 export interface Manifest {
   palette: Record<string, string>;
@@ -255,5 +259,59 @@ export function hintFor(s: Sticker): string {
     default:
       if (source.startsWith("cleared:")) return `Every to-do due in ${AREA_NAMES[source.slice(8)]} in a month, done by the month's end`;
       return s.earnedBy;
+  }
+}
+
+// ---- captions in the book (Esme, 2026-11-06) -------------------------------------------------
+// A short caption under every sticker, earned or not, and one line per set saying what it counts,
+// so a grey outline shows what she needs to do. Drawn in the book's pixel font, so a caption fits
+// its slot (18px; the Bonus page's slots are wider). PLACEHOLDER WORDING: Esme words these.
+
+/** Kind notes stay a surprise (Esme, 2026-11-06): no caption, and no how-to until earned. */
+export const SURPRISE_SET = "Kind notes";
+export const isSurprise = (s: Pick<Sticker, "set">): boolean => s.set === SURPRISE_SET;
+
+/** Each set's one line: what it counts. */
+export const SET_UNITS: Readonly<Record<string, string>> = {
+  "Mind bed": "TO-DOS TICKED", "Writing bed": "TO-DOS TICKED", "Art bed": "TO-DOS TICKED", "Content bed": "TO-DOS TICKED",
+  "Body bed": "TO-DOS TICKED", "Tech bed": "TO-DOS TICKED", "Production bed": "TO-DOS TICKED", "Admin bed": "TO-DOS TICKED",
+  "Bee things": "DAYS WITH LIST DONE",
+  "Hedge flowers": "WEEKS WITH A HABIT",
+  "Seasons kept": "A HABIT KEPT",
+  Animals: "HABIT SESSIONS",
+  "Barn things": "GOOD HABIT MONTHS",
+  "Fruit trees": "MONTHLY GOALS HIT",
+  "Under the trees": "GOALS FINISHED",
+  Glasshouse: "MORNING PAGES",
+  "Lily pads": "DAYS CHECKED IN",
+  "Water's edge": "EXERCISE DAYS",
+  "Stream fish": "WORKBOOK CHAPTERS",
+  "Rare fish": "A WHOLE WORKBOOK",
+  Kitchen: "WEEKLY REVIEWS",
+  "Harvest table": "MONTHLY REVIEWS",
+  "Pressed and bound": "BOOKS READ",
+  "Dug up": "PROJECTS FINISHED",
+  [SURPRISE_SET]: "LITTLE SURPRISES",
+  Hedgerow: "ANYTHING THAT MONTH",
+  "Area cleared": "EVERYTHING DUE, DONE",
+};
+
+const AREA_SHORT: Record<string, string> = {
+  mind: "MIND", writing: "WRIT", art: "ART", content: "CONT", body: "BODY", tech: "TECH", production: "PROD", admin: "ADMN",
+};
+
+/** The caption under a sticker (null: none, for the surprises). */
+export function captionFor(s: Sticker): string | null {
+  if (isSurprise(s)) return null;
+  const { source, at } = s.rule;
+  if (source.startsWith("month:")) return source.slice(6).toUpperCase();
+  if (source.startsWith("cleared:")) return AREA_SHORT[source.slice(8)] ?? null;
+  switch (source) {
+    case "habit-full-month": return "ALL";
+    case "habit-run": return `${at}MO`;
+    case "habit-year": return "9/12";
+    case "workbook:dbt": return "DBT";
+    case "workbook:bpd": return "BPD";
+    default: return String(at);
   }
 }
