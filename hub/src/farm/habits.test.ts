@@ -5,8 +5,9 @@ import { counters, derivedEarned, type EarningInput } from "./earning";
 
 // Habit stickers (review I4 and Esme's decision, 2026-11-04): a month counts at 80% of its planned
 // sessions in any order; "Full month" is the first time a habit does every planned session of a
-// month; runs of 80% months earn 2, 3, 6 and 12 once each, and a lower month quietly restarts
-// the run (nothing earned is ever taken back). Archived things still count (review I3).
+// month; runs of 80% months earn 2, 3 and 6 once each, and a lower month quietly restarts
+// the run (nothing earned is ever taken back). The Great oak is 9 good months in any 12 in a row
+// (Esme, 2026-11-06). Archived things still count (review I3).
 
 const START = "2026-01-01";
 let n = 0;
@@ -42,7 +43,7 @@ describe("the five Seasons kept stickers", () => {
     expect(mine.map((s) => [s.key, s.rule.source, s.rule.at])).toEqual([
       ["full-month", "habit-full-month", 1],
       ["oak-2", "habit-run", 2], ["oak-3", "habit-run", 3],
-      ["oak-6", "habit-run", 6], ["oak-12", "habit-run", 12],
+      ["oak-6", "habit-run", 6], ["oak-12", "habit-year", 1],
     ]);
     expect(mine.every((s) => s.group === "meadow")).toBe(true);
     const keys = STICKERS.map((s) => s.key);
@@ -87,13 +88,44 @@ describe("runs of good months", () => {
     expect(earned).not.toContain("oak-6");
   });
 
-  it("2, 3, 6 and 12 are each earned once, never again, and there is no one-month sticker", () => {
+  it("2, 3 and 6 in a row and the Great oak are each earned once, never again, and there is no one-month sticker", () => {
     const year = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`2026-${String(i + 1).padStart(2, "0")}`, 0.8]));
     const earned = derivedEarned(counters(input({ items: [mondayHabit(year), mondayHabit(year)] })));
     for (const k of ["oak-2", "oak-3", "oak-6", "oak-12"]) {
       expect(earned.filter((x) => x === k)).toHaveLength(1);
     }
-    expect(STICKERS.filter((s) => s.rule.source === "habit-run").map((s) => s.rule.at)).toEqual([2, 3, 6, 12]);
+    expect(STICKERS.filter((s) => s.rule.source === "habit-run").map((s) => s.rule.at)).toEqual([2, 3, 6]);
+  });
+});
+
+describe("the Great oak: 9 good months within 12 in a row (Esme, 2026-11-06)", () => {
+  /** Twelve months of 2026: "g" good (every Monday), "-" nothing. */
+  const months = (pattern: string) =>
+    Object.fromEntries([...pattern].map((c, i) => [`2026-${String(i + 1).padStart(2, "0")}`, c === "g" ? 1 : 0]));
+  const oak = (pattern: string, today = "2026-12-31") =>
+    derivedEarned(counters(input({ today, items: [mondayHabit(months(pattern))] }))).includes("oak-12");
+
+  it("is the Great oak's rule", () => {
+    expect(STICKER_BY_KEY.get("oak-12")!.rule).toEqual({ source: "habit-year", at: 1 });
+  });
+
+  it("one or two off months don't reset it", () => {
+    expect(oak("gggggggg-ggg")).toBe(true); // 8 good, 1 off, 3 good
+    expect(oak("gg-gggg-ggg-")).toBe(true); // 9 good with two gaps
+  });
+
+  it("8 good months in 12 isn't enough", () => {
+    expect(oak("gggg--gggg--")).toBe(false);
+  });
+
+  it("9 good months in a row count as soon as the ninth is done", () => {
+    expect(oak("ggggggggg", "2026-10-01")).toBe(true);
+  });
+
+  it("needs one habit: two habits' months don't add up", () => {
+    const a = mondayHabit(months("gggg--------"));
+    const b = mondayHabit(months("----ggggg---"));
+    expect(derivedEarned(counters(input({ items: [a, b] })))).not.toContain("oak-12");
   });
 
   it("runs are per habit: two habits' alternate months don't join up", () => {

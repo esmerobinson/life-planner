@@ -88,6 +88,24 @@ const doneTodo = (it: Item) =>
 /** A habit month counts at 80% of its planned sessions, in any order (Esme, 2026-11-04). */
 export const HABIT_MONTH_SHARE = 0.8;
 
+/** The Great oak (Esme, 2026-11-06): YEAR_GOOD good months of one habit within YEAR_WINDOW in a row. */
+export const YEAR_WINDOW = 12;
+export const YEAR_GOOD = 9;
+
+/**
+ * The most `true`s in any `size` consecutive entries. Near the end the window just runs out, so
+ * 9 good months in a row count as soon as the ninth is done.
+ */
+export function bestWindow(flags: readonly boolean[], size: number): number {
+  let best = 0;
+  for (let i = 0; i < flags.length; i++) {
+    let n = 0;
+    for (let j = i; j < Math.min(flags.length, i + size); j++) if (flags[j]) n++;
+    best = Math.max(best, n);
+  }
+  return best;
+}
+
 /**
  * When an archived habit was archived. There's no archivedAt field: every archive (repo.ts) sets
  * `touchedAt` to that day and nothing ticks an archived habit, so its `touchedAt` is the archive
@@ -206,12 +224,15 @@ export function counters(input: EarningInput): Counters {
   let goodMonths = 0;
   let fullMonths = 0; // habits that have had a full month (each habit's first counts once)
   let longestRun = 0;
+  let year = false; // the Great oak: some habit had 9 good months within 12 in a row
   for (const h of habits) {
     let run = 0;
     let prev = "";
     let full = false;
+    const goods: boolean[] = []; // one per calendar month since the start, in order
     for (const { month, want, did } of habitMonths(h, start, today)) {
       const good = want > 0 && did >= want * HABIT_MONTH_SHARE;
+      goods.push(good);
       if (want > 0 && did >= want) full = true;
       if (good) {
         goodMonths++;
@@ -224,12 +245,14 @@ export function counters(input: EarningInput): Counters {
       }
     }
     if (full) fullMonths++;
+    if (bestWindow(goods, YEAR_WINDOW) >= YEAR_GOOD) year = true;
   }
   set("habit-months", goodMonths);
   set("habit-full-month", fullMonths);
   const clears = areaClears(items, start, today);
   for (const area of AREA_IDS) if (area !== "inbox") set(`cleared:${area}`, clears[area] ?? 0);
   set("habit-run", longestRun);
+  set("habit-year", year ? 1 : 0);
   set("habit-after-week-off", habits.some((h) => gaps(days(h.doneDates ?? []), 7) > 0) ? 1 : 0);
 
   set("today-finished", days(input.todayDone.filter(after)).length);

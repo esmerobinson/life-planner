@@ -2469,7 +2469,7 @@
        "x": 85,
        "y": 36,
        "set": "Seasons kept",
-       "milestone": "12 months 80%+"
+       "milestone": "9 of 12 months 80%+"
       }
      ],
      "labels": [
@@ -5132,7 +5132,7 @@
      "group": "meadow",
      "set": "Seasons kept",
      "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
-     "milestone": "12 months 80%+",
+     "milestone": "9 of 12 months 80%+",
      "tier": "everyday",
      "counts_toward_total": true,
      "repeatable": false

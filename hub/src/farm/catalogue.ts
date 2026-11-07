@@ -66,7 +66,7 @@ export function tagFrames(name: string, tag: string): number[] {
  */
 export type Source =
   | `todos:${Exclude<AreaId, "inbox">}`
-  | "today-finished" | "habit-weeks" | "habit-sessions" | "habit-months" | "habit-full-month" | "habit-run" | `cleared:${Exclude<AreaId, "inbox">}`
+  | "today-finished" | "habit-weeks" | "habit-sessions" | "habit-months" | "habit-full-month" | "habit-run" | "habit-year" | `cleared:${Exclude<AreaId, "inbox">}`
   | "monthly-goals" | "whole-goals" | "projects"
   | "morning-pages" | "checkins" | "exercise-days" | "chapters" | "workbook:dbt" | "workbook:bpd"
   | "weekly-reviews" | "monthly-reviews" | "reading-books"
@@ -133,6 +133,9 @@ export function ruleOf(s: Pick<ManifestSticker, "earned_by" | "milestone"> & { k
   // one, 3 month one, you don't keep earning a 1 month one"): each earned once, ever.
   if (s.earned_by === SEASONS_KEPT_UNIT) {
     if (s.milestone === "100% month") return { source: "habit-full-month", at: 1 };
+    // The Great oak (Esme, 2026-11-06): 9 good months in any 12 in a row, so one or two off
+    // months don't reset a year of looking after a habit.
+    if (s.milestone === "9 of 12 months 80%+") return { source: "habit-year", at: 1 };
     const run = typeof s.milestone === "string" ? /^(\d+) months 80%\+$/.exec(s.milestone) : null;
     if (run) return { source: "habit-run", at: Number(run[1]) };
   }
@@ -229,6 +232,7 @@ export function hintFor(s: Sticker): string {
     case "habit-months": return `${plural(at, "month")} with most of a habit's sessions done`;
     case "habit-full-month": return "Every planned session of a habit in one month";
     case "habit-run": return `${at} months one after another with most of a habit's sessions done`;
+    case "habit-year": return "9 good months out of 12 in a row with one habit";
     case "monthly-goals": return `${plural(at, "monthly goal")} reached`;
     case "whole-goals": return `${plural(at, "goal")} completed`;
     case "projects": return `${plural(at, "project")} finished`;
