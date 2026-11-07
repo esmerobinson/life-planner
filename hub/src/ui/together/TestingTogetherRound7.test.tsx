@@ -90,6 +90,9 @@ describe("#65: the restore line in the Together box, after a real Replace", () =
     const runner = new TogetherRunner((o) => sendToTogether({ fetch: fake.fetch, now: c.now, retryRefused: o.retryRefused }));
     let listener = () => undefined as void;
     const stop = runner.start({ getState: () => ({ status: "off", lastSyncedAt: null }), subscribe: (fn) => ((listener = fn), () => undefined) });
+    // Starting the runner sends once at once: let that run end before the Replace, or the Send
+    // now below can be answered by that earlier run (a test race under load, not app behaviour).
+    await runner.sendNow();
     await restoreBackup(JSON.parse(JSON.stringify(await exportBackup("2026-11-04"))), "replace");
     c.set("2026-11-06T09:00:00");
     await runner.sendNow(); // she presses Send now once: the line appears
