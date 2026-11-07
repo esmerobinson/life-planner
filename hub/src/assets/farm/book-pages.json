@@ -395,6 +395,226 @@
     "h": 152
    },
    "duration": 100
+  },
+  {
+   "filename": "page-17",
+   "frame": {
+    "x": 2088,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-18",
+   "frame": {
+    "x": 2204,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-19",
+   "frame": {
+    "x": 2320,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-20",
+   "frame": {
+    "x": 2436,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-21",
+   "frame": {
+    "x": 2552,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-22",
+   "frame": {
+    "x": 2668,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-23",
+   "frame": {
+    "x": 2784,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-24",
+   "frame": {
+    "x": 2900,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-25",
+   "frame": {
+    "x": 3016,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
+  },
+  {
+   "filename": "page-26",
+   "frame": {
+    "x": 3132,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 116,
+    "h": 152
+   },
+   "sourceSize": {
+    "w": 116,
+    "h": 152
+   },
+   "duration": 100
   }
  ],
  "meta": {
@@ -403,7 +623,7 @@
   "image": "book-pages.png",
   "format": "RGBA8888",
   "size": {
-   "w": 2088,
+   "w": 3248,
    "h": 152
   },
   "scale": "1",
@@ -531,6 +751,76 @@
     "name": "page-16",
     "from": 17,
     "to": 17,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-17",
+    "from": 18,
+    "to": 18,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-18",
+    "from": 19,
+    "to": 19,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-19",
+    "from": 20,
+    "to": 20,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-20",
+    "from": 21,
+    "to": 21,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-21",
+    "from": 22,
+    "to": 22,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-22",
+    "from": 23,
+    "to": 23,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-23",
+    "from": 24,
+    "to": 24,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-24",
+    "from": 25,
+    "to": 25,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-25",
+    "from": 26,
+    "to": 26,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "page-26",
+    "from": 27,
+    "to": 27,
     "direction": "forward",
     "color": "#000000ff"
    }

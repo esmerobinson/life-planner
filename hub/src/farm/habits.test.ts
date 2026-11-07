@@ -63,11 +63,11 @@ describe("habit months at 80%", () => {
     expect(count({ items: [mondayHabit(months)] }, "habit-months")).toBe(good);
   });
 
-  it("Barn things: 1, 3, 6, 12 such months (totals, any months)", () => {
+  it("Barn things: 1, 2, 3, 5, 8, 12 such months (totals, any months)", () => {
     const h = mondayHabit({ "2026-01": 1, "2026-03": 1, "2026-06": 0.8 });
     const earned = derivedEarned(counters(input({ items: [h] })));
-    expect(earned).toEqual(expect.arrayContaining(["haybale", "feed-trough"]));
-    expect(earned).not.toContain("weathervane");
+    expect(earned).toEqual(expect.arrayContaining(["haybale", "feed-trough", "weathervane"]));
+    expect(earned).not.toContain("barn-lantern");
   });
 });
 

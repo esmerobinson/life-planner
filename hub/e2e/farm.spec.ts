@@ -125,8 +125,8 @@ for (const width of [1280, 390]) {
       await page.keyboard.press("ArrowRight");
       await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "0");
       await page.locator('.farm-zone-hit[data-zone="meadow"]').dispatchEvent("click");
-      await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "3");
-      // The 16-page book (fix round 1): the Meadow fills both pages of its spread.
+      await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "5");
+      // The 26-page book (captions, Esme 2026-11-06): Bee things and Hedge flowers fill the Meadow's first spread.
       await expect(page.locator(".farm-scene")).toHaveAttribute("data-highlight", "meadow");
     });
 

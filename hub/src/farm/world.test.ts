@@ -2,7 +2,7 @@ import type { Item } from "../domain/types";
 import { todayList } from "../domain/triage";
 import { COLLECTION, STICKERS, STICKER_BY_KEY, hintFor, stickersIn } from "./catalogue";
 import {
-  ACCESSORIES, ARRIVES_AT, BED_STAGE_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, farmDay, momentQueue, nookHost,
+  ACCESSORIES, ARRIVES_AT, BED_STAGE_AT, PAGES, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, farmDay, momentQueue, nookHost,
   sleeping, spreadOf, spreadOfSticker, stickerTotals, todayListFinished, unlockedAccessories, wakeAt,
 } from "./world";
 import type { CharacterId } from "./state";
@@ -115,15 +115,19 @@ describe("zones and beds", () => {
 });
 
 describe("the book", () => {
-  it("9 spreads: the contents, then two pages each (the Meadow takes two; a back endpaper closes it)", () => {
-    expect(SPREADS).toHaveLength(9);
+  it("14 spreads: the contents, then 26 pages spaced out for captions (Esme, 2026-11-06), Bonus last", () => {
+    expect(SPREADS).toHaveLength(14);
+    expect(PAGES).toHaveLength(26);
     expect(SPREADS[0]!.zones).toEqual([]);
-    expect(SPREADS[3]!.zones).toEqual(["meadow"]);
-    expect(SPREADS[8]!.zones).toEqual(["lane"]);
+    expect(SPREADS[5]!.zones).toEqual(["meadow"]);
+    expect(SPREADS[6]!.zones).toEqual(["meadow", "barnyard"]);
+    expect(SPREADS[13]!.zones).toEqual(["lane"]);
+    expect(PAGES.at(-1)!.group).toBe("bonus");
     expect(spreadOf("beds")).toBe(1);
-    expect(spreadOf("lane")).toBe(7);
-    expect(spreadOfSticker("hen")).toBe(4);
-    expect(spreadOfSticker("oak-12")).toBe(3);
+    expect(spreadOf("pond")).toBe(9);
+    expect(spreadOf("lane")).toBe(12);
+    expect(spreadOfSticker("hen")).toBe(6);
+    expect(spreadOfSticker("oak-12")).toBe(6);
     // Every sticker has exactly one slot.
     const slots = SPREADS.flatMap((s) => s.pages.flatMap((p) => p?.slots ?? []));
     expect(slots.map((s) => s.sticker).sort()).toEqual(STICKERS.map((s) => s.key).sort());
@@ -134,14 +138,19 @@ describe("spots", () => {
   it("every sticker has the designer's fixed spot: the farm (504x276) or a museum/aquarium interior", () => {
     expect(SPOTS.size).toBe(183);
     expect(SPOTS.get("cleared-mind")).toMatchObject({ scene: "farm", layer: "bed-sign", placeholder: false });
-    for (const s of SPOTS.values()) {
+    // The sticker swap's five new barnyard stickers wait for Art: an obviously wrong spot until then.
+    const undrawn = ["horse", "goat", "rooster", "barn-cat", "owl"];
+    expect([...SPOTS].filter(([, s]) => s.placeholder).map(([k]) => k).sort()).toEqual([...undrawn].sort());
+    for (const k of undrawn) expect(SPOTS.get(k)).toMatchObject({ scene: "farm", zone: "barnyard" });
+    for (const [k, s] of SPOTS) {
+      if (undrawn.includes(k)) continue;
       expect(s.placeholder).toBe(false);
       const [w, h] = s.scene === "farm" ? [504, 276] : [200, 96];
       expect(s.x).toBeGreaterThanOrEqual(0);
       expect(s.x + 16).toBeLessThanOrEqual(w);
       expect(s.y + 16).toBeLessThanOrEqual(h);
     }
-    expect([...SPOTS.values()].filter((s) => s.scene !== "farm")).toHaveLength(22);
+    expect([...SPOTS.values()].filter((s) => s.scene !== "farm")).toHaveLength(21); // the bookmark went in the swap
     expect(SPOTS.get("seeds-mind")).toMatchObject({ layer: "bed", draw: false });
     expect(SPOTS.get("minnow")).toMatchObject({ scene: "aquarium-interior" });
   });

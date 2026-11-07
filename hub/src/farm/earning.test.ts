@@ -5,6 +5,9 @@ import { allEarned, clipItems, counters, derivedEarned, workbookProgress, type E
 // The v2 milestone table (tmp/game-design.md section 7), copied here by hand so the art pack's
 // manifest is checked against the design, not against itself. Pacing re-spaced by Esme on
 // 2026-11-04 (farm-brief-2026-11-04.md item 3): beds top at 60, Animals at 200, Glasshouse at 150.
+// The sticker swap (Art session, approved 2026-11-06; ladders by Game Design the same day): out go
+// pebbles, stepping stone, seed tray, the kitchen lantern and the bookmark; in come a black horse,
+// goat and rooster (Animals) and a barn cat and owl (Barn things). Still 175.
 const V2: Record<string, [string, number[]]> = {
   "Mind bed": ["todos:mind", [1, 3, 5, 10, 25, 40, 60]],
   "Writing bed": ["todos:writing", [1, 3, 5, 10, 25, 40, 60]],
@@ -16,21 +19,21 @@ const V2: Record<string, [string, number[]]> = {
   "Admin bed": ["todos:admin", [1, 3, 5, 10, 25, 40, 60]],
   "Bee things": ["today-finished", [1, 3, 5, 10, 15, 25, 40, 60]],
   "Hedge flowers": ["habit-weeks", [1, 4, 8, 12, 26, 52]],
-  Animals: ["habit-sessions", [1, 10, 25, 50, 75, 100, 150, 200]],
-  "Barn things": ["habit-months", [1, 3, 6, 12]],
+  Animals: ["habit-sessions", [1, 5, 10, 20, 30, 45, 60, 80, 110, 150, 200]],
+  "Barn things": ["habit-months", [1, 2, 3, 5, 8, 12]],
   "Fruit trees": ["monthly-goals", [1, 2, 4, 6, 9, 12, 18]],
   "Under the trees": ["whole-goals", [1, 3]],
-  Glasshouse: ["morning-pages", [1, 3, 5, 10, 15, 25, 40, 50, 75, 100, 125, 150]],
-  "Lily pads": ["checkins", [1, 5, 10, 25, 50, 75, 100]],
-  "Water's edge": ["exercise-days", [1, 3, 5, 10, 25, 50, 75]],
+  Glasshouse: ["morning-pages", [1, 3, 5, 10, 20, 30, 50, 75, 100, 125, 150]],
+  "Lily pads": ["checkins", [1, 5, 15, 30, 60, 100]],
+  "Water's edge": ["exercise-days", [1, 3, 10, 25, 50, 75]],
   "Stream fish": ["chapters", [1, 3, 6, 10, 15, 20, 25, 30]],
-  Kitchen: ["weekly-reviews", [1, 4, 8, 12, 26, 52]],
+  Kitchen: ["weekly-reviews", [1, 4, 12, 26, 52]],
   "Harvest table": ["monthly-reviews", [1, 3, 6, 9, 12]],
-  "Pressed and bound": ["reading-books", [1, 3, 6, 10, 15, 20]],
+  "Pressed and bound": ["reading-books", [1, 3, 7, 12, 20]],
   "Dug up": ["projects", [1, 2, 3, 5, 8, 12]],
 };
 // Meadow: v2's fourteen plus the five "Seasons kept" stickers (Esme, 2026-11-04).
-const GROUP_SIZES = { beds: 56, meadow: 19, barnyard: 12, orchard: 9, glasshouse: 12, pond: 14, aquarium: 10, farmhouse: 11, museum: 12, lane: 20 };
+const GROUP_SIZES = { beds: 56, meadow: 19, barnyard: 17, orchard: 9, glasshouse: 11, pond: 12, aquarium: 10, farmhouse: 10, museum: 11, lane: 20 };
 
 describe("the 170 stickers match game design v2", () => {
   it("175 stickers (v2's 170 and the five Seasons kept) in 10 groups", () => {
@@ -73,10 +76,10 @@ describe("the 170 stickers match game design v2", () => {
 
   it("journal stickers are marked, and the parts not built yet can't be earned", () => {
     expect(STICKERS.filter((s) => s.journal).map((s) => s.group).sort()).toEqual(
-      [...Array(12).fill("glasshouse"), ...Array(14).fill("pond"), ...Array(10).fill("aquarium"), "lane", "lane"].sort(),
+      [...Array(11).fill("glasshouse"), ...Array(12).fill("pond"), ...Array(10).fill("aquarium"), "lane", "lane"].sort(),
     );
     expect(STICKERS.filter((s) => s.later).map((s) => s.set)).toEqual([
-      ...Array(6).fill("Kitchen"), ...Array(5).fill("Harvest table"),
+      ...Array(5).fill("Kitchen"), ...Array(5).fill("Harvest table"),
     ]);
   });
 

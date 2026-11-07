@@ -1827,7 +1827,7 @@
    "duration": 100
   },
   {
-   "filename": "barnyard / Barn things / Hay bale",
+   "filename": "barnyard / Animals / Black horse",
    "frame": {
     "x": 1328,
     "y": 0,
@@ -1849,7 +1849,7 @@
    "duration": 100
   },
   {
-   "filename": "barnyard / Barn things / Feed trough",
+   "filename": "barnyard / Animals / Goat",
    "frame": {
     "x": 1344,
     "y": 0,
@@ -1871,7 +1871,7 @@
    "duration": 100
   },
   {
-   "filename": "barnyard / Barn things / Weathervane",
+   "filename": "barnyard / Animals / Rooster",
    "frame": {
     "x": 1360,
     "y": 0,
@@ -1893,7 +1893,7 @@
    "duration": 100
   },
   {
-   "filename": "barnyard / Barn things / Barn lantern",
+   "filename": "barnyard / Barn things / Hay bale",
    "frame": {
     "x": 1376,
     "y": 0,
@@ -1915,7 +1915,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Fruit trees / Sapling",
+   "filename": "barnyard / Barn things / Feed trough",
    "frame": {
     "x": 1392,
     "y": 0,
@@ -1937,7 +1937,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Fruit trees / Blossom branch",
+   "filename": "barnyard / Barn things / Weathervane",
    "frame": {
     "x": 1408,
     "y": 0,
@@ -1959,7 +1959,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Fruit trees / Apple",
+   "filename": "barnyard / Barn things / Barn lantern",
    "frame": {
     "x": 1424,
     "y": 0,
@@ -1981,7 +1981,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Fruit trees / Pear",
+   "filename": "barnyard / Barn things / Barn cat",
    "frame": {
     "x": 1440,
     "y": 0,
@@ -2003,7 +2003,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Fruit trees / Plum",
+   "filename": "barnyard / Barn things / Owl",
    "frame": {
     "x": 1456,
     "y": 0,
@@ -2025,7 +2025,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Fruit trees / Cherry",
+   "filename": "orchard / Fruit trees / Sapling",
    "frame": {
     "x": 1472,
     "y": 0,
@@ -2047,7 +2047,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Fruit trees / Peach tree",
+   "filename": "orchard / Fruit trees / Blossom branch",
    "frame": {
     "x": 1488,
     "y": 0,
@@ -2069,7 +2069,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Under the trees / Tree swing",
+   "filename": "orchard / Fruit trees / Apple",
    "frame": {
     "x": 1504,
     "y": 0,
@@ -2091,7 +2091,7 @@
    "duration": 100
   },
   {
-   "filename": "orchard / Under the trees / Picnic blanket",
+   "filename": "orchard / Fruit trees / Pear",
    "frame": {
     "x": 1520,
     "y": 0,
@@ -2113,7 +2113,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Seed tray",
+   "filename": "orchard / Fruit trees / Plum",
    "frame": {
     "x": 1536,
     "y": 0,
@@ -2135,7 +2135,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Seedling pot",
+   "filename": "orchard / Fruit trees / Cherry",
    "frame": {
     "x": 1552,
     "y": 0,
@@ -2157,7 +2157,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Watering can",
+   "filename": "orchard / Fruit trees / Peach tree",
    "frame": {
     "x": 1568,
     "y": 0,
@@ -2179,7 +2179,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Geranium",
+   "filename": "orchard / Under the trees / Tree swing",
    "frame": {
     "x": 1584,
     "y": 0,
@@ -2201,7 +2201,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Cactus",
+   "filename": "orchard / Under the trees / Picnic blanket",
    "frame": {
     "x": 1600,
     "y": 0,
@@ -2223,7 +2223,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Fern",
+   "filename": "glasshouse / Glasshouse / Seedling pot",
    "frame": {
     "x": 1616,
     "y": 0,
@@ -2245,7 +2245,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Sweet peas",
+   "filename": "glasshouse / Glasshouse / Watering can",
    "frame": {
     "x": 1632,
     "y": 0,
@@ -2267,7 +2267,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Hanging basket",
+   "filename": "glasshouse / Glasshouse / Geranium",
    "frame": {
     "x": 1648,
     "y": 0,
@@ -2289,7 +2289,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Orchid",
+   "filename": "glasshouse / Glasshouse / Cactus",
    "frame": {
     "x": 1664,
     "y": 0,
@@ -2311,7 +2311,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Lemon tree",
+   "filename": "glasshouse / Glasshouse / Fern",
    "frame": {
     "x": 1680,
     "y": 0,
@@ -2333,7 +2333,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Fig tree",
+   "filename": "glasshouse / Glasshouse / Sweet peas",
    "frame": {
     "x": 1696,
     "y": 0,
@@ -2355,7 +2355,7 @@
    "duration": 100
   },
   {
-   "filename": "glasshouse / Glasshouse / Vine over the roof",
+   "filename": "glasshouse / Glasshouse / Hanging basket",
    "frame": {
     "x": 1712,
     "y": 0,
@@ -2377,7 +2377,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Lily pads / Lily pad",
+   "filename": "glasshouse / Glasshouse / Orchid",
    "frame": {
     "x": 1728,
     "y": 0,
@@ -2399,7 +2399,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Lily pads / Pebbles",
+   "filename": "glasshouse / Glasshouse / Lemon tree",
    "frame": {
     "x": 1744,
     "y": 0,
@@ -2421,7 +2421,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Lily pads / Reeds",
+   "filename": "glasshouse / Glasshouse / Fig tree",
    "frame": {
     "x": 1760,
     "y": 0,
@@ -2443,7 +2443,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Lily pads / Frogspawn",
+   "filename": "glasshouse / Glasshouse / Vine over the roof",
    "frame": {
     "x": 1776,
     "y": 0,
@@ -2465,7 +2465,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Lily pads / Pond snail",
+   "filename": "pond / Lily pads / Lily pad",
    "frame": {
     "x": 1792,
     "y": 0,
@@ -2487,7 +2487,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Lily pads / Dragonfly",
+   "filename": "pond / Lily pads / Reeds",
    "frame": {
     "x": 1808,
     "y": 0,
@@ -2509,7 +2509,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Lily pads / Water lily in flower",
+   "filename": "pond / Lily pads / Frogspawn",
    "frame": {
     "x": 1824,
     "y": 0,
@@ -2531,7 +2531,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Water's edge / Stepping stone",
+   "filename": "pond / Lily pads / Pond snail",
    "frame": {
     "x": 1840,
     "y": 0,
@@ -2553,7 +2553,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Water's edge / Newt",
+   "filename": "pond / Lily pads / Dragonfly",
    "frame": {
     "x": 1856,
     "y": 0,
@@ -2575,7 +2575,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Water's edge / Duck",
+   "filename": "pond / Lily pads / Water lily in flower",
    "frame": {
     "x": 1872,
     "y": 0,
@@ -2597,7 +2597,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Water's edge / Ducklings",
+   "filename": "pond / Water's edge / Newt",
    "frame": {
     "x": 1888,
     "y": 0,
@@ -2619,7 +2619,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Water's edge / Moorhen",
+   "filename": "pond / Water's edge / Duck",
    "frame": {
     "x": 1904,
     "y": 0,
@@ -2641,7 +2641,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Water's edge / Kingfisher",
+   "filename": "pond / Water's edge / Ducklings",
    "frame": {
     "x": 1920,
     "y": 0,
@@ -2663,7 +2663,7 @@
    "duration": 100
   },
   {
-   "filename": "pond / Water's edge / Willow",
+   "filename": "pond / Water's edge / Moorhen",
    "frame": {
     "x": 1936,
     "y": 0,
@@ -2685,7 +2685,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Minnow",
+   "filename": "pond / Water's edge / Kingfisher",
    "frame": {
     "x": 1952,
     "y": 0,
@@ -2707,7 +2707,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Stickleback",
+   "filename": "pond / Water's edge / Willow",
    "frame": {
     "x": 1968,
     "y": 0,
@@ -2729,7 +2729,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Roach",
+   "filename": "aquarium / Stream fish / Minnow",
    "frame": {
     "x": 1984,
     "y": 0,
@@ -2751,7 +2751,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Perch",
+   "filename": "aquarium / Stream fish / Stickleback",
    "frame": {
     "x": 2000,
     "y": 0,
@@ -2773,7 +2773,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Carp",
+   "filename": "aquarium / Stream fish / Roach",
    "frame": {
     "x": 2016,
     "y": 0,
@@ -2795,7 +2795,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Trout",
+   "filename": "aquarium / Stream fish / Perch",
    "frame": {
     "x": 2032,
     "y": 0,
@@ -2817,7 +2817,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Eel",
+   "filename": "aquarium / Stream fish / Carp",
    "frame": {
     "x": 2048,
     "y": 0,
@@ -2839,7 +2839,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Stream fish / Koi",
+   "filename": "aquarium / Stream fish / Trout",
    "frame": {
     "x": 2064,
     "y": 0,
@@ -2861,7 +2861,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Rare fish / Moonfish (DBT, all 12)",
+   "filename": "aquarium / Stream fish / Eel",
    "frame": {
     "x": 2080,
     "y": 0,
@@ -2883,7 +2883,7 @@
    "duration": 100
   },
   {
-   "filename": "aquarium / Rare fish / Golden carp (BPD, all 22)",
+   "filename": "aquarium / Stream fish / Koi",
    "frame": {
     "x": 2096,
     "y": 0,
@@ -2905,7 +2905,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Kitchen / Lantern",
+   "filename": "aquarium / Rare fish / Moonfish (DBT, all 12)",
    "frame": {
     "x": 2112,
     "y": 0,
@@ -2927,7 +2927,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Kitchen / Teapot",
+   "filename": "aquarium / Rare fish / Golden carp (BPD, all 22)",
    "frame": {
     "x": 2128,
     "y": 0,
@@ -2949,7 +2949,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Kitchen / Quilt",
+   "filename": "farmhouse / Kitchen / Teapot",
    "frame": {
     "x": 2144,
     "y": 0,
@@ -2971,7 +2971,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Kitchen / Rocking chair",
+   "filename": "farmhouse / Kitchen / Quilt",
    "frame": {
     "x": 2160,
     "y": 0,
@@ -2993,7 +2993,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Kitchen / Dresser",
+   "filename": "farmhouse / Kitchen / Rocking chair",
    "frame": {
     "x": 2176,
     "y": 0,
@@ -3015,7 +3015,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Kitchen / Old clock",
+   "filename": "farmhouse / Kitchen / Dresser",
    "frame": {
     "x": 2192,
     "y": 0,
@@ -3037,7 +3037,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Harvest table / Jam jar",
+   "filename": "farmhouse / Kitchen / Old clock",
    "frame": {
     "x": 2208,
     "y": 0,
@@ -3059,7 +3059,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Harvest table / Harvest basket",
+   "filename": "farmhouse / Harvest table / Jam jar",
    "frame": {
     "x": 2224,
     "y": 0,
@@ -3081,7 +3081,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Harvest table / Pie",
+   "filename": "farmhouse / Harvest table / Harvest basket",
    "frame": {
     "x": 2240,
     "y": 0,
@@ -3103,7 +3103,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Harvest table / Bunting",
+   "filename": "farmhouse / Harvest table / Pie",
    "frame": {
     "x": 2256,
     "y": 0,
@@ -3125,7 +3125,7 @@
    "duration": 100
   },
   {
-   "filename": "farmhouse / Harvest table / Big table laid",
+   "filename": "farmhouse / Harvest table / Bunting",
    "frame": {
     "x": 2272,
     "y": 0,
@@ -3147,7 +3147,7 @@
    "duration": 100
   },
   {
-   "filename": "museum / Pressed and bound / Pressed daisy",
+   "filename": "farmhouse / Harvest table / Big table laid",
    "frame": {
     "x": 2288,
     "y": 0,
@@ -3169,7 +3169,7 @@
    "duration": 100
   },
   {
-   "filename": "museum / Pressed and bound / Bookmark",
+   "filename": "museum / Pressed and bound / Pressed daisy",
    "frame": {
     "x": 2304,
     "y": 0,
@@ -4118,83 +4118,83 @@
    {
     "name": "barnyard:Animals",
     "from": 75,
-    "to": 82,
+    "to": 85,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "barnyard:Barn things",
-    "from": 83,
-    "to": 86,
+    "from": 86,
+    "to": 91,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "orchard:Fruit trees",
-    "from": 87,
-    "to": 93,
+    "from": 92,
+    "to": 98,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "orchard:Under the trees",
-    "from": 94,
-    "to": 95,
+    "from": 99,
+    "to": 100,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "glasshouse:Glasshouse",
-    "from": 96,
-    "to": 107,
+    "from": 101,
+    "to": 111,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "pond:Lily pads",
-    "from": 108,
-    "to": 114,
+    "from": 112,
+    "to": 117,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "pond:Water's edge",
-    "from": 115,
-    "to": 121,
+    "from": 118,
+    "to": 123,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "aquarium:Stream fish",
-    "from": 122,
-    "to": 129,
-    "direction": "forward",
-    "color": "#000000ff"
-   },
-   {
-    "name": "aquarium:Rare fish",
-    "from": 130,
+    "from": 124,
     "to": 131,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
-    "name": "farmhouse:Kitchen",
+    "name": "aquarium:Rare fish",
     "from": 132,
-    "to": 137,
+    "to": 133,
+    "direction": "forward",
+    "color": "#000000ff"
+   },
+   {
+    "name": "farmhouse:Kitchen",
+    "from": 134,
+    "to": 138,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "farmhouse:Harvest table",
-    "from": 138,
-    "to": 142,
+    "from": 139,
+    "to": 143,
     "direction": "forward",
     "color": "#000000ff"
    },
    {
     "name": "museum:Pressed and bound",
-    "from": 143,
+    "from": 144,
     "to": 148,
     "direction": "forward",
     "color": "#000000ff"

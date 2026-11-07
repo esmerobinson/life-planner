@@ -1044,7 +1044,7 @@
    "flip_horizontal": true
   },
   {
-   "index": 83,
+   "index": 86,
    "sticker": "haybale",
    "scene": "farm",
    "zone": "barnyard",
@@ -1056,7 +1056,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 84,
+   "index": 87,
    "sticker": "feed-trough",
    "scene": "farm",
    "zone": "barnyard",
@@ -1068,7 +1068,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 85,
+   "index": 88,
    "sticker": "weathervane",
    "scene": "farm",
    "zone": "barnyard",
@@ -1080,7 +1080,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 86,
+   "index": 89,
    "sticker": "barn-lantern",
    "scene": "farm",
    "zone": "barnyard",
@@ -1092,7 +1092,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 87,
+   "index": 92,
    "sticker": "sapling",
    "scene": "farm",
    "zone": "orchard",
@@ -1104,7 +1104,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 88,
+   "index": 93,
    "sticker": "may",
    "scene": "farm",
    "zone": "orchard",
@@ -1116,7 +1116,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 89,
+   "index": 94,
    "sticker": "sep",
    "scene": "farm",
    "zone": "orchard",
@@ -1128,7 +1128,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 90,
+   "index": 95,
    "sticker": "pear",
    "scene": "farm",
    "zone": "orchard",
@@ -1140,7 +1140,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 91,
+   "index": 96,
    "sticker": "plum",
    "scene": "farm",
    "zone": "orchard",
@@ -1152,7 +1152,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 92,
+   "index": 97,
    "sticker": "cherries",
    "scene": "farm",
    "zone": "orchard",
@@ -1164,7 +1164,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 93,
+   "index": 98,
    "sticker": "peach-tree",
    "scene": "farm",
    "zone": "orchard",
@@ -1176,7 +1176,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 94,
+   "index": 99,
    "sticker": "tree-swing",
    "scene": "farm",
    "zone": "orchard",
@@ -1188,7 +1188,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 95,
+   "index": 100,
    "sticker": "picnic-blanket",
    "scene": "farm",
    "zone": "orchard",
@@ -1200,19 +1200,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 96,
-   "sticker": "seedtray",
-   "scene": "farm",
-   "zone": "glasshouse",
-   "layer": "ground",
-   "x": 233,
-   "y": 159,
-   "z": 175,
-   "draw_sprite": true,
-   "flip_horizontal": false
-  },
-  {
-   "index": 97,
+   "index": 101,
    "sticker": "seedling",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1224,7 +1212,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 98,
+   "index": 102,
    "sticker": "wateringcan",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1236,7 +1224,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 99,
+   "index": 103,
    "sticker": "geranium",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1248,7 +1236,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 100,
+   "index": 104,
    "sticker": "cactus",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1260,7 +1248,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 101,
+   "index": 105,
    "sticker": "fern",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1272,7 +1260,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 102,
+   "index": 106,
    "sticker": "sweet-peas",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1284,7 +1272,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 103,
+   "index": 107,
    "sticker": "hanging-basket",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1296,7 +1284,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 104,
+   "index": 108,
    "sticker": "orchid",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1308,7 +1296,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 105,
+   "index": 109,
    "sticker": "lemontree",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1320,7 +1308,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 106,
+   "index": 110,
    "sticker": "fig-tree",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1332,7 +1320,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 107,
+   "index": 111,
    "sticker": "roof-vine",
    "scene": "farm",
    "zone": "glasshouse",
@@ -1344,7 +1332,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 108,
+   "index": 112,
    "sticker": "lilypad",
    "scene": "farm",
    "zone": "pond",
@@ -1356,19 +1344,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 109,
-   "sticker": "pebble",
-   "scene": "farm",
-   "zone": "pond",
-   "layer": "ground",
-   "x": 364,
-   "y": 190,
-   "z": 206,
-   "draw_sprite": true,
-   "flip_horizontal": false
-  },
-  {
-   "index": 110,
+   "index": 113,
    "sticker": "cattail",
    "scene": "farm",
    "zone": "pond",
@@ -1380,7 +1356,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 111,
+   "index": 114,
    "sticker": "frogspawn",
    "scene": "farm",
    "zone": "pond",
@@ -1392,7 +1368,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 112,
+   "index": 115,
    "sticker": "snail",
    "scene": "farm",
    "zone": "pond",
@@ -1404,7 +1380,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 113,
+   "index": 116,
    "sticker": "dragonfly",
    "scene": "farm",
    "zone": "pond",
@@ -1416,7 +1392,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 114,
+   "index": 117,
    "sticker": "waterlily",
    "scene": "farm",
    "zone": "pond",
@@ -1428,19 +1404,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 115,
-   "sticker": "steppingstone",
-   "scene": "farm",
-   "zone": "pond",
-   "layer": "ground",
-   "x": 267,
-   "y": 196,
-   "z": 212,
-   "draw_sprite": true,
-   "flip_horizontal": false
-  },
-  {
-   "index": 116,
+   "index": 118,
    "sticker": "newt",
    "scene": "farm",
    "zone": "pond",
@@ -1452,7 +1416,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 117,
+   "index": 119,
    "sticker": "duckling",
    "scene": "farm",
    "zone": "pond",
@@ -1464,7 +1428,7 @@
    "flip_horizontal": true
   },
   {
-   "index": 118,
+   "index": 120,
    "sticker": "ducklings",
    "scene": "farm",
    "zone": "pond",
@@ -1476,7 +1440,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 119,
+   "index": 121,
    "sticker": "moorhen",
    "scene": "farm",
    "zone": "pond",
@@ -1488,7 +1452,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 120,
+   "index": 122,
    "sticker": "kingfisher",
    "scene": "farm",
    "zone": "pond",
@@ -1500,7 +1464,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 121,
+   "index": 123,
    "sticker": "willow",
    "scene": "farm",
    "zone": "pond",
@@ -1512,7 +1476,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 122,
+   "index": 124,
    "sticker": "minnow",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1524,7 +1488,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 123,
+   "index": 125,
    "sticker": "stickleback",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1536,7 +1500,7 @@
    "flip_horizontal": true
   },
   {
-   "index": 124,
+   "index": 126,
    "sticker": "roach",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1548,7 +1512,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 125,
+   "index": 127,
    "sticker": "perch",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1560,7 +1524,7 @@
    "flip_horizontal": true
   },
   {
-   "index": 126,
+   "index": 128,
    "sticker": "carp",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1572,7 +1536,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 127,
+   "index": 129,
    "sticker": "trout",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1584,7 +1548,7 @@
    "flip_horizontal": true
   },
   {
-   "index": 128,
+   "index": 130,
    "sticker": "eel",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1596,7 +1560,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 129,
+   "index": 131,
    "sticker": "koi",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1608,7 +1572,7 @@
    "flip_horizontal": true
   },
   {
-   "index": 130,
+   "index": 132,
    "sticker": "moonfish",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1620,7 +1584,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 131,
+   "index": 133,
    "sticker": "golden-carp",
    "scene": "aquarium-interior",
    "zone": "aquarium",
@@ -1632,19 +1596,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 132,
-   "sticker": "lantern",
-   "scene": "farm",
-   "zone": "farmhouse",
-   "layer": "ground",
-   "x": 234,
-   "y": 74,
-   "z": 90,
-   "draw_sprite": true,
-   "flip_horizontal": false
-  },
-  {
-   "index": 133,
+   "index": 134,
    "sticker": "teapot",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1656,7 +1608,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 134,
+   "index": 135,
    "sticker": "quilt",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1668,7 +1620,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 135,
+   "index": 136,
    "sticker": "rocking-chair",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1680,7 +1632,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 136,
+   "index": 137,
    "sticker": "dresser",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1692,7 +1644,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 137,
+   "index": 138,
    "sticker": "old-clock",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1704,7 +1656,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 138,
+   "index": 139,
    "sticker": "jam",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1716,7 +1668,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 139,
+   "index": 140,
    "sticker": "harvestbasket",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1728,7 +1680,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 140,
+   "index": 141,
    "sticker": "pie",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1740,7 +1692,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 141,
+   "index": 142,
    "sticker": "bunting",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1752,7 +1704,7 @@
    "flip_horizontal": false
   },
   {
-   "index": 142,
+   "index": 143,
    "sticker": "bigtable",
    "scene": "farm",
    "zone": "farmhouse",
@@ -1764,24 +1716,12 @@
    "flip_horizontal": false
   },
   {
-   "index": 143,
+   "index": 144,
    "sticker": "pressed-daisy",
    "scene": "museum-interior",
    "zone": "museum",
    "layer": "frame",
    "x": 11,
-   "y": 11,
-   "z": 0,
-   "draw_sprite": true,
-   "flip_horizontal": false
-  },
-  {
-   "index": 144,
-   "sticker": "ribbon",
-   "scene": "museum-interior",
-   "zone": "museum",
-   "layer": "frame",
-   "x": 37,
    "y": 11,
    "z": 0,
    "draw_sprite": true,

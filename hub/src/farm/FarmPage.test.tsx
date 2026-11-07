@@ -92,8 +92,8 @@ it("a tap on a farm zone opens the book at its page", async () => {
   renderApp("/farm", "2026-11-04");
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Open the book at the pond" }));
-  await waitFor(() => expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", "5"), { timeout: 3000 });
-  expect(document.querySelector(".farm-scene")).toHaveAttribute("data-highlight", "glasshouse pond");
+  await waitFor(() => expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", "9"), { timeout: 3000 });
+  expect(document.querySelector(".farm-scene")).toHaveAttribute("data-highlight", "pond");
 });
 
 it("a character's Wardrobe: pick one unlocked accessory (synced)", async () => {
