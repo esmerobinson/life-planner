@@ -22,7 +22,7 @@ import {
   type JournalKey,
 } from "../journal/crypto";
 import {
-  ENTRY_CHECK, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type NoteEntry, type PartAnswer,
+  ENTRY_CHECK, MAX_LEARNED, MORNING_LOCK_DAYS, type AnswerEntry, type ExerciseEntryV2, type ExerciseResponseEntry, type NoteEntry, type PartAnswer,
 } from "../journal/entries";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import { formerDeviceIds, ownDevices } from "./deviceIds";
@@ -1697,4 +1697,215 @@ export async function setExerciseStar(jk: JournalKey, today: ISODate, device: st
   }
   marks = [...marks.filter((m) => m.id !== cardId), { id: cardId, on, at: Date.now() }];
   await write(jk, [await seal(jk, "stars", today, deviceId, { v: 2, marks })]);
+}
+
+// ---- Together link: "Keep my answers private" ----------------------------------------------
+//
+// Each tick is its own sealed row, `share:<date>:exercise` and `share:<date>:checkin`, so ticking
+// one never touches the other (on one device or across devices). Ticks are saved one at a time.
+// Only the Together sender and the ticks read them. A row this device can't open counts as
+// ticked: a tick is never taken for "shared" because it couldn't be read.
+
+/** One day's "Keep my answers private" ticks. */
+export interface SharePrivate {
+  exercise: boolean;
+  checkin: boolean;
+}
+export type SharePart = keyof SharePrivate;
+const SHARE_PARTS: SharePart[] = ["exercise", "checkin"];
+
+/** The row id of one day's tick. */
+export const shareId = (date: ISODate, part: SharePart): string => journalId("share", date, part);
+
+async function openShare(jk: JournalKey, row: JournalRow | undefined): Promise<boolean> {
+  if (!row) return false;
+  const o = await openRow(jk, row, "share");
+  return o.state === "ok" ? o.entry.private : true;
+}
+
+/** The day's ticks (off when never ticked). */
+export async function readSharePrivate(jk: JournalKey, date: ISODate): Promise<SharePrivate> {
+  const [exercise, checkin] = await Promise.all(SHARE_PARTS.map(async (p) => openShare(jk, await db.journal.get(shareId(date, p)))));
+  return { exercise: exercise!, checkin: checkin! };
+}
+
+/** Every day with a tick row (ticked or not), by date. */
+export async function listSharePrivate(jk: JournalKey): Promise<Map<ISODate, SharePrivate>> {
+  const out = new Map<ISODate, SharePrivate>();
+  for (const row of await db.journal.where("kind").equals("share").toArray()) {
+    const part = row.id.slice(`share:${row.date}:`.length) as SharePart;
+    const day = out.get(row.date) ?? { exercise: false, checkin: false };
+    day[part] = await openShare(jk, row);
+    out.set(row.date, day);
+  }
+  return out;
+}
+
+/** Ticks or unticks one part of the day, in its own row; saves go one at a time. */
+export function saveSharePrivate(jk: JournalKey, date: ISODate, part: SharePart, on: boolean): Promise<void> {
+  return oneAtATime(async () => {
+    const id = shareId(date, part);
+    if (await wontOpen(jk, id, "share")) throw new Error(CANT_OPEN); // never written over (bug #20)
+    await write(jk, [await seal(jk, "share", date, part, { v: 1, private: on, at: Date.now() })]);
+  });
+}
+
+// ---- "What I learned today" (Mental health exercise, optional) ------------------------------
+//
+// One row per saved version, `learned:<date>:<deviceId>_<vid>` (the notes pattern, bug #41): a
+// box session (from the first word typed until the box is left) writes its own row only, and
+// names the version it started from (`seen`), which it replaces. No device ever writes over
+// another's words, and a version she didn't see is never replaced: it stays, shown read-only.
+// The day shows the newest version not replaced. An earlier one-row-per-device row
+// (`learned:<date>:<deviceId>`) still reads as one version.
+
+/** One version of the day's words, as the box and Read back see it. */
+export interface LearnedVersion {
+  /** Its row id. */
+  id: string;
+  text: string;
+  at: number;
+  /** The device that wrote it. */
+  device: string;
+  /**
+   * What to put in `seen` to replace this version as she sees it: `<id>@<at>` for it and for
+   * every other live version with the same words (shown once, so replaced together: bug #55).
+   * A later write to any of those rows has a newer stamp, so it shows again (bug #56).
+   */
+  seen: string[];
+}
+
+export interface Learned extends LearnedVersion {
+  /** Every other version not replaced, with something written, newest first. */
+  others: LearnedVersion[];
+  /** Rows for the day this device can't open. */
+  unreadable: number;
+}
+
+const learnedDevice = (row: JournalRow) => {
+  const suffix = suffixOf(row);
+  const cut = suffix.lastIndexOf("_");
+  return cut > 0 ? suffix.slice(0, cut) : suffix;
+};
+
+/** A `seen` entry: the row id and the stamp she saw (`<id>@<at>`); a bare id (earlier rows) covers every stamp. */
+const seenToken = (v: { id: string; at: number }) => `${v.id}@${v.at}`;
+
+/** Replaced by some version's `seen`: only as written when she saw it, never a later write. */
+function replacedBy(seen: Set<string>, sawAt: Map<string, number>, v: { id: string; at: number }): boolean {
+  if (seen.has(v.id)) return true;
+  const at = sawAt.get(v.id);
+  return at !== undefined && at >= v.at;
+}
+
+async function mergeLearned(jk: JournalKey, rows: JournalRow[]): Promise<Learned> {
+  const versions: { id: string; text: string; at: number; device: string; seen: string[] }[] = [];
+  let unreadable = 0;
+  for (const row of rows) {
+    const o = await openRow(jk, row, "learned");
+    if (o.state === "ok") versions.push({ id: row.id, text: o.entry.text, at: o.entry.at, device: learnedDevice(row), seen: o.entry.seen ?? [] });
+    else unreadable++;
+  }
+  const bare = new Set<string>();
+  const sawAt = new Map<string, number>();
+  for (const t of versions.flatMap((v) => v.seen)) {
+    const cut = t.lastIndexOf("@");
+    const at = cut > 0 ? Number(t.slice(cut + 1)) : NaN;
+    if (cut > 0 && Number.isFinite(at)) sawAt.set(t.slice(0, cut), Math.max(at, sawAt.get(t.slice(0, cut)) ?? -Infinity));
+    else bare.add(t);
+  }
+  const live = versions.filter((v) => !replacedBy(bare, sawAt, v)).sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
+  // Versions with the same words are one entry: replacing it replaces all of them (bug #55).
+  const sameWords = (text: string) => live.filter((v) => v.text.trim() === text.trim()).map(seenToken);
+  const top = live[0];
+  const shown: LearnedVersion = top
+    ? { id: top.id, text: top.text, at: top.at, device: top.device, seen: sameWords(top.text) }
+    : { id: "", text: "", at: 0, device: "", seen: [] };
+  const words = new Set([shown.text.trim()]);
+  const others: LearnedVersion[] = [];
+  for (const v of live.slice(1)) {
+    const t = v.text.trim();
+    if (t === "" || words.has(t)) continue;
+    words.add(t);
+    others.push({ id: v.id, text: v.text, at: v.at, device: v.device, seen: sameWords(v.text) });
+  }
+  return { ...shown, others, unreadable };
+}
+
+/** The day's "what I learned" words: the newest version, and every other one not replaced. */
+export async function readLearned(jk: JournalKey, date: ISODate): Promise<Learned> {
+  return mergeLearned(jk, (await rowsOn(date)).filter((r) => r.kind === "learned"));
+}
+
+/** Every day with "what I learned" words before `before`, newest first (empty days left out). */
+export async function listLearned(jk: JournalKey, before: ISODate): Promise<({ date: ISODate } & Learned)[]> {
+  const rows = (await db.journal.where("kind").equals("learned").toArray()).filter((r) => r.date < before);
+  const dates = [...new Set(rows.map((r) => r.date))].sort((a, b) => b.localeCompare(a));
+  const out: ({ date: ISODate } & Learned)[] = [];
+  for (const date of dates) {
+    const day = await mergeLearned(jk, rows.filter((r) => r.date === date));
+    if (day.text.trim() !== "" || day.others.length > 0) out.push({ date, ...day });
+  }
+  return out;
+}
+
+/**
+ * Removes one version from the day (she confirmed it): a new, empty version from this device
+ * that replaces only that one. Its words are gone from the box, Read back and Together on every
+ * device; nothing else changes. Returns the new row's id.
+ */
+export async function removeLearnedVersion(jk: JournalKey, date: ISODate, deviceId: string, versionId: string): Promise<string> {
+  // As it is now (and every live version with the same words): a later write to it shows again.
+  const day = await readLearned(jk, date);
+  const v = [day, ...day.others].find((x) => x.id === versionId || x.seen.some((t) => t.startsWith(`${versionId}@`)));
+  const row = v ? null : await db.journal.get(versionId);
+  const opened = row ? await openRow(jk, row, "learned") : null;
+  const seen = v ? v.seen : opened?.state === "ok" ? [seenToken({ id: versionId, at: opened.entry.at })] : [];
+  if (seen.length === 0) return "";
+  const id = newLearnedId(date, await writerId(deviceId)); // its current id (restore-safe)
+  // At 0, so it never shows in place of another version's words.
+  await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), { v: 1, text: "", at: 0, seen })]);
+  return id;
+}
+
+/** A new version's row id for this device. */
+export function newLearnedId(date: ISODate, deviceId: string): string {
+  const vid = `${Date.now().toString(36)}${Math.floor(Math.random() * 36 ** 4).toString(36)}`;
+  return journalId("learned", date, `${deviceId}_${vid}`);
+}
+
+/**
+ * Saves her words as a version. Without `version`, a new version (replacing only what `seen`
+ * names). With it, that version is rewritten: only one this device made (a box session's own
+ * row), never another device's. Returns the version's row id.
+ */
+export async function saveLearned(
+  jk: JournalKey, date: ISODate, deviceId: string, text: string, session: { version?: string; seen?: string[] } = {},
+): Promise<string> {
+  if (text.length > MAX_LEARNED) throw new Error("That's too long to save. Nothing was changed.");
+  // Always this device's current id (restore-safe): a page still holding a former id (from before
+  // a Replace) writes with the new one; a box session's row under a former id is never written
+  // again, so its words move into a new version that replaces it.
+  const device = await writerId(deviceId);
+  const own = (id: string) => id.startsWith(`learned:${date}:${device}_`);
+  const carry = session.version && !own(session.version) && (await ownDevices(deviceId)).former.some((f) => session.version!.startsWith(`learned:${date}:${f}_`));
+  if (session.version && !own(session.version) && !carry) throw new Error("Only this device's own version can be changed here.");
+  const id = session.version && own(session.version) ? session.version : newLearnedId(date, device);
+  if (await wontOpen(jk, id, "learned")) throw new Error(CANT_OPEN); // never written over (bug #20)
+  // The former-id row is replaced only as it is here now (bug #60): a newer copy of it from the
+  // server (words written after the backup) shows again.
+  let carried: string[] = [];
+  if (carry) {
+    const row = await db.journal.get(session.version!);
+    const o = row ? await openRow(jk, row, "learned") : null;
+    carried = o?.state === "ok" ? [seenToken({ id: session.version!, at: o.entry.at })] : [];
+  }
+  const seen = [...(session.seen ?? []), ...carried].filter((x) => x !== id && !x.startsWith(`${id}@`));
+  // Each write of a row is strictly newer than the one before it, even within a millisecond, so a
+  // version hidden as <id>@<stamp> always shows again once written to after (bugs #56, #60).
+  const prev = await db.journal.get(id);
+  const prevAt = prev ? await openRow(jk, prev, "learned").then((o) => (o.state === "ok" ? o.entry.at : 0)) : 0;
+  const entry = { v: 1, text, at: Math.max(Date.now(), prevAt + 1), ...(seen.length ? { seen } : {}) };
+  await write(jk, [await seal(jk, "learned", date, id.slice(`learned:${date}:`.length), entry)]);
+  return id;
 }

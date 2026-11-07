@@ -10,7 +10,8 @@ import { arrivedRow, outfitRow, placedRow, seenRow, startRow, todayRow, type Far
 import { journalId } from "./validate";
 import { JOURNAL_KINDS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 import { journalAad, sealJson } from "../journal/crypto";
-import { keyFor } from "../test/journalKey";
+import { confirmedDevice, keyFor } from "../test/journalKey";
+import { readLearned, readSharePrivate, saveLearned, saveSharePrivate } from "./repo";
 
 const PLAIN_JPEG = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJCkjHCAkIiwgHBwoNzA=";
 
@@ -59,11 +60,18 @@ async function journalRows(): Promise<{ rows: JournalRow[]; photo: FileRow }> {
     exercise: dev, stars: dev, "exercise-entry": `0123456789ab:${dev}`, cards: undefined,
     note: "22222222-2222-4222-8222-222222222222", "note-read": dev, keywrap: "0123456789abcdef",
     highlight: `0123456789abcdef_${dev}_0a1b2c3d`,
+    // Together link: one private tick per part of the day, and one device's learned words.
+    share: "exercise", learned: dev,
   };
   const rows: JournalRow[] = [];
   for (const kind of JOURNAL_KINDS) {
     const id = journalId(kind, "2026-10-04", suffix[kind]);
     rows.push({ id, kind, date: "2026-10-04", fp: jk.fp, ...(await sealJson(jk.key, { v: 1, pretend: kind }, journalAad(id))) });
+  }
+  // The day's other private tick (each part is its own row), if this branch knows ticks.
+  if ((JOURNAL_KINDS as readonly string[]).includes("share")) {
+    const id = journalId("share" as JournalRow["kind"], "2026-10-04", "checkin");
+    rows.push({ id, kind: "share" as JournalRow["kind"], date: "2026-10-04", fp: jk.fp, ...(await sealJson(jk.key, { v: 1, pretend: "checkin" }, journalAad(id))) });
   }
   // A cards chunk too.
   rows.push({ id: "cards:0", kind: "cards", date: "2026-10-04", fp: jk.fp, ...(await sealJson(jk.key, { v: 4 }, journalAad("cards:0"))) });
@@ -110,7 +118,7 @@ describe("backup round trip of every synced table", () => {
     await db.journal.bulkAdd(rows);
     await db.farm.bulkAdd(farm);
     const before = await all();
-    expect(before.journal.length).toBe(JOURNAL_KINDS.length + 1);
+    expect(before.journal.length).toBe(JOURNAL_KINDS.length + 1 + ((JOURNAL_KINDS as readonly string[]).includes("share") ? 1 : 0));
     expect(before.farm.length).toBe(farm.length);
 
     const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
@@ -205,5 +213,40 @@ describe("the farm in backups", () => {
     });
     const file = await exportBackup("2026-10-28");
     expect(file.farm?.map((r) => r.id)).toContain("coins:all");
+  });
+});
+
+// Together link (Testing session, 2026-11-05): the private ticks and "what I learned today"
+// words as the app really writes them (two devices' learned words, both ticks), round tripped
+// and read back word for word, still sealed in the file and here.
+describe("backup round trip of the private ticks and what I learned today", () => {
+  it.each(["replace", "merge"] as const)("download then %s into an empty hub: the same ticks and words, still sealed", async (mode) => {
+    const jk = await keyFor("pretend-roundtrip-passphrase");
+    await confirmedDevice(db, jk);
+    const DAY = "2026-10-04";
+    await saveSharePrivate(jk, DAY, "exercise", true);
+    await saveSharePrivate(jk, DAY, "checkin", false);
+    await saveSharePrivate(jk, "2026-10-05", "checkin", true);
+    await saveLearned(jk, DAY, "devicePretendMac1", "Pretend Ombrelle Mac lesson");
+    // The phone's words for the same day, sealed as the repo seals them.
+    const id = `learned:${DAY}:devicePretendPhone1`;
+    await db.journal.put({ id, kind: "learned", date: DAY, fp: jk.fp, ...(await sealJson(jk.key, { v: 1, text: "Pretend Ombrelle phone lesson", at: 1 }, journalAad(id))) });
+    const before = await all();
+
+    const file = JSON.parse(JSON.stringify(await exportBackup("2026-10-28")));
+    expect(JSON.stringify(file)).not.toMatch(/Ombrelle|"private"/);
+    expect(file.journal.filter((r: JournalRow) => ["share", "learned"].includes(r.kind))).toHaveLength(5);
+    await clearAll();
+    await confirmedDevice(db, jk);
+    await restoreBackup(file, mode);
+    // (Merge keeps this device's own check row, written again by confirmedDevice above.)
+    const notCheck = (rows: JournalRow[]) => rows.filter((r) => r.kind !== "verifier");
+    expect(notCheck((await all()).journal)).toEqual(notCheck(before.journal));
+    expect(await db.quarantine.count()).toBe(0);
+    expect(await readSharePrivate(jk, DAY)).toEqual({ exercise: true, checkin: false });
+    expect(await readSharePrivate(jk, "2026-10-05")).toEqual({ exercise: false, checkin: true });
+    const day = await readLearned(jk, DAY);
+    expect([day.text, ...day.others.map((o) => o.text)].sort()).toEqual(["Pretend Ombrelle Mac lesson", "Pretend Ombrelle phone lesson"]);
+    expect(JSON.stringify(await db.journal.toArray())).not.toContain("Ombrelle");
   });
 });
