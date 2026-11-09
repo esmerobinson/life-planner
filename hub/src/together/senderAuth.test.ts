@@ -1,8 +1,7 @@
 import { db } from "../data/db";
 import { signInToTogether, stopTogether, SIGN_IN_MESSAGES, notRemoved } from "./sender";
 import { readAuth, readSent, TOGETHER_META, TOGETHER_SENT_META } from "./store";
-import { togetherId } from "./ids";
-import { clock, COUPLE, EMAIL, emptyDb, fakeTogether, journalDay, ME, PASSWORD, send, signedIn } from "./testKit";
+import { clock, COUPLE, dayRow, EMAIL, emptyDb, fakeTogether, journalDay, liveDays, ME, PASSWORD, send, signedIn } from "./testKit";
 
 // Signing in, refreshing and stopping, against the fake Together server. Made-up values only.
 
@@ -59,11 +58,11 @@ it("a refused refresh: stops, forgets the tokens, asks to sign in again; signing
   const auth = (await readAuth(db))!;
   expect(auth.accessToken).toBeUndefined();
   expect(auth.refreshToken).toBeUndefined();
-  expect(fake.events.size).toBe(0);
+  expect(fake.days.size).toBe(0);
   expect(await send(fake, c)).toEqual({ kind: "needs-sign-in" }); // nothing is tried until she signs in
   await signInToTogether({ fetch: fake.fetch, now: c.now }, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD });
   expect(await send(fake, c)).toMatchObject({ kind: "ok" });
-  expect(fake.events.size).toBe(2);
+  expect(liveDays(fake)).toHaveLength(1); // the day, both parts in one row
 });
 
 it("a 401 on a request: one refresh is tried first (a clock behind isn't a reason to sign in again)", async () => {
@@ -100,7 +99,7 @@ it("two runs at once on this device: one is busy, never two refreshes", async ()
   expect(fake.requests.filter((r) => r.url.includes("grant_type=refresh_token"))).toHaveLength(1);
 });
 
-it("Stop with \"mark deleted\": tallies and habits deleted, sign-in and record forgotten (signing in again starts afresh)", async () => {
+it("Stop with \"mark deleted\": our days marked deleted, sign-in and record forgotten; signing in again shows the same row again (no second row)", async () => {
   const c = clock(`${DAY}T10:00:00`);
   const fake = await signedIn(c);
   await journalDay(DAY);
@@ -109,15 +108,18 @@ it("Stop with \"mark deleted\": tallies and habits deleted, sign-in and record f
   expect(await stopTogether({ fetch: fake.fetch, now: c.now }, { markDeleted: true })).toEqual({ kind: "ok" });
   expect(await db.syncMeta.get(TOGETHER_META)).toBeUndefined();
   expect(await db.syncMeta.get(TOGETHER_SENT_META)).toBeUndefined();
-  expect([...fake.events.values()].every((e) => e.deleted_at)).toBe(true);
-  expect([...fake.todos.values()].every((t) => t.deleted_at)).toBe(true);
+  expect(fake.days.size).toBe(1);
+  expect([...fake.days.values()].every((d) => d.deleted_at)).toBe(true);
+  expect(fake.todos.size).toBe(0);
   expect(await send(fake, c)).toEqual({ kind: "off" });
-  // Signed in again on a later day: earlier days don't go again.
+  // Signed in again on a later day: everything goes again from her first day (2026-11-08), into
+  // the same row by its fixed id, shown again: never a second row for the day.
   c.set("2026-11-08T10:00:00");
   await signInToTogether({ fetch: fake.fetch, now: c.now }, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD });
-  expect((await readSent(db))!.since).toBe("2026-11-08");
   await send(fake, c);
-  expect(fake.liveTallies(await togetherId("habit", "exercise", 1))).toHaveLength(0);
+  expect((await readSent(db))!.since).toBe(DAY);
+  expect(fake.days.size).toBe(1);
+  expect(dayRow(fake, DAY)!.deleted_at).toBeNull();
 });
 
 it("Stop without marking deleted leaves Together as it is", async () => {
@@ -135,7 +137,7 @@ it("Stop with \"mark deleted\" that can't remove everything: says how many, forg
   await journalDay(DAY);
   c.set(TITLES_AT);
   await send(fake, c);
-  fake.inject({ status: 403, body: { code: "42501" }, when: (r) => r.method === "PATCH" && r.url.includes("todo_events") });
+  fake.inject({ status: 403, body: { code: "42501" }, when: (r) => r.method === "PATCH" && r.url.includes("challenge_days") });
   expect(await stopTogether({ fetch: fake.fetch, now: c.now }, { markDeleted: true })).toEqual({ kind: "error", message: notRemoved(1) });
   expect(await readAuth(db)).toBeTruthy();
   expect(await stopTogether({ fetch: fake.fetch, now: c.now }, { markDeleted: true })).toEqual({ kind: "ok" });

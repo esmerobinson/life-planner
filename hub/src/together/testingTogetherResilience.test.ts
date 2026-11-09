@@ -2,18 +2,18 @@
 // journal. Together unreachable, hung, 401/403, 500, malformed replies, offline at the 3am day
 // change, signed out: the journal still saves at once, sync still syncs, no retry storm, no
 // unhandled rejection, nothing lost or double-sent when it comes back. Fakes only; every value
-// made up. Tests named "BUG:" are expected to fail on together-link @2a6edb2.
+// made up. Tests named "BUG:" were expected to fail on together-link @2a6edb2 (fixed since).
+// Challenge model (2026-11-09): one row per day in her challenge, checked with liveDays / liveNote.
 
 import { db } from "../data/db";
 import { cardRef, saveAnswer, saveLearned, saveSharePrivate, submitExerciseEntry } from "../data/repo";
 import { FakeSyncServer } from "../sync/fakeServer";
 import { saveSyncSettings, syncOnce } from "../sync/engine";
 import { PROMPTS } from "../journal/prompts";
-import { togetherId } from "./ids";
 import { TogetherRunner, type SyncWatch } from "./runner";
 import { sendToTogether, signInToTogether, stopTogether } from "./sender";
 import { readAuth, TOGETHER_META } from "./store";
-import { clock, DEVICE, EMAIL, emptyDb, fakeTogether, journalDay, PASSWORD, type Clock } from "./testKit";
+import { clock, DEVICE, EMAIL, emptyDb, fakeTogether, journalDay, liveDays, liveNote, PASSWORD, type Clock } from "./testKit";
 import type { FakeSupabase } from "./fakeSupabase";
 
 const DAY = "2026-11-04";
@@ -97,8 +97,6 @@ async function setUp(c: Clock) {
   return { fake, sw, env, ...day };
 }
 
-const habit = (kind: "exercise" | "checkin") => togetherId("habit", kind, 1);
-
 for (const mode of ["down", "500"] as const) {
   it(`Together ${mode === "down" ? "unreachable" : "answering 500"} for two days: one request a run at most, nothing forgotten; back again, each day goes once`, async () => {
     const c = clock(SIGN_IN);
@@ -114,12 +112,10 @@ for (const mode of ["down", "500"] as const) {
     sw.state.mode = "up";
     expect(await sendToTogether(env)).toMatchObject({ kind: "ok", refused: 0 });
     expect(await sendToTogether(env)).toMatchObject({ kind: "ok", sent: 0 }); // replay sends nothing
-    for (const kind of ["exercise", "checkin"] as const) {
-      expect(fake.liveTallies(await habit(kind))).toHaveLength(1);
-      expect(fake.todos.get(await habit(kind))!.tally).toBe(1);
-    }
+    expect(liveDays(fake)).toHaveLength(1);
+    expect(fake.days.size).toBe(1);
     // Past the delay already: the answers went straight away (no titles stage needed).
-    expect(fake.liveTallies(await habit("checkin"))[0]!.note).toContain("Pretend check-in answer");
+    expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
   });
 }
 
@@ -132,24 +128,26 @@ it("offline at the 3am day change: the titles go once it's back, once", async ()
   c.set("2026-11-05T10:00:00");
   sw.state.mode = "up";
   expect(await sendToTogether(env)).toMatchObject({ kind: "ok" });
-  expect(fake.events.size).toBe(2);
+  expect(fake.days.size).toBe(1);
   expect(JSON.stringify(fake.requests)).not.toContain("Pretend check-in answer");
 });
 
-it("a send cut off half-way (500 after the first tally) carries on next run without duplicates", async () => {
+it("a send cut off half-way (503 on the second day's insert) carries on next run without duplicates", async () => {
   const c = clock(SIGN_IN);
+  await journalDay("2026-11-03", { checkin: true });
   const { fake, sw, env } = await setUp(c);
   c.set(TITLES_AT);
-  let tallies = 0;
+  let inserts = 0;
   const inner = sw.fetch;
   const cut = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (init?.method === "POST" && String(input).includes("todo_events") && ++tallies === 2) return new Response("{}", { status: 503 });
+    if (init?.method === "POST" && String(input).includes("challenge_days") && ++inserts === 2) return new Response("{}", { status: 503 });
     return inner(input, init);
   }) as typeof fetch;
   expect(await sendToTogether({ ...env, fetch: cut })).toEqual({ kind: "offline" });
+  expect(fake.days.size).toBe(1);
   expect(await sendToTogether(env)).toMatchObject({ kind: "ok" });
-  for (const kind of ["exercise", "checkin"] as const) expect(fake.liveTallies(await habit(kind))).toHaveLength(1);
-  expect(fake.events.size).toBe(2);
+  expect(liveDays(fake).map((d) => d.day)).toEqual(["2026-11-03", DAY]);
+  expect(fake.days.size).toBe(2);
 });
 
 it("signed out in Together (401, refresh refused): asks once, then sends nothing at all; signing in again sends nothing twice", async () => {
@@ -157,7 +155,7 @@ it("signed out in Together (401, refresh refused): asks once, then sends nothing
   const { fake, sw, env } = await setUp(c);
   c.set(TITLES_AT);
   expect(await sendToTogether(env)).toMatchObject({ kind: "ok" });
-  const events = fake.events.size;
+  const days = JSON.stringify([...fake.days.values()]);
   c.set("2026-11-05T09:00:00");
   sw.state.mode = "401";
   expect(await sendToTogether(env)).toEqual({ kind: "needs-sign-in" });
@@ -167,7 +165,7 @@ it("signed out in Together (401, refresh refused): asks once, then sends nothing
   sw.state.mode = "up";
   expect(await signInToTogether(env, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD })).toEqual({ kind: "ok" });
   expect(await sendToTogether(env)).toMatchObject({ kind: "ok", sent: 0 });
-  expect(fake.events.size).toBe(events);
+  expect(JSON.stringify([...fake.days.values()])).toBe(days);
 });
 
 it("403 on everything: set aside, no storm (at most one request a run), back to normal on Send now", async () => {
@@ -185,7 +183,7 @@ it("403 on everything: set aside, no storm (at most one request a run), back to 
   }
   sw.state.mode = "up";
   expect(await sendToTogether({ ...env, retryRefused: true })).toMatchObject({ kind: "ok", refused: 0 });
-  for (const kind of ["exercise", "checkin"] as const) expect(fake.liveTallies(await habit(kind))).toHaveLength(1);
+  expect(liveDays(fake)).toHaveLength(1);
 });
 
 it("malformed replies (an HTML page with 200): no throw, no unhandled rejection, recovers on Send now without duplicates", async () => {
@@ -200,7 +198,8 @@ it("malformed replies (an HTML page with 200): no throw, no unhandled rejection,
   sw.state.mode = "up";
   await sendToTogether({ ...env, retryRefused: true });
   await sendToTogether({ ...env, retryRefused: true });
-  for (const kind of ["exercise", "checkin"] as const) expect(fake.liveTallies(await habit(kind)).length).toBeLessThanOrEqual(1);
+  expect(fake.days.size).toBe(1); // one row for the day, never two
+  expect(liveDays(fake)).toHaveLength(1);
 });
 
 it("not signed in at all: no request, ever", async () => {
@@ -284,7 +283,7 @@ it("BUG: a Together request that never answers is given up on, so copying carrie
     vi.useRealTimers();
     await within(new Promise((r) => runner.subscribe(() => !runner.getState().running && r(null))), 2000);
     stop();
-    expect(fake.events.size).toBe(2);
+    expect(liveDays(fake)).toHaveLength(1);
   } finally {
     vi.useRealTimers();
   }

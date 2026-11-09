@@ -1,8 +1,11 @@
 // TESTING (Life Planner - Together-link Testing Round 5, 2026-11-06): round 5's "Highlighted
 // learnings" in the exercise note, the restore-safe learned/highlight writes after a backup
 // Replace, and round 4's #53 (a cut-off Stop with removing pauses copying) and #54 (clean-up
-// first, no journal key). Fake Together only, every word made up. Tests named "BUG:" fail on
-// together-link @4df1240.
+// first, no journal key). Converted to the challenge model (2026-11-09): one challenge_days row per
+// day, learned words and that day's highlights as research notes (the v1 hold lifted); a day that
+// may be in Together (an insert whose reply was lost) is recorded with an unknown note and
+// overwritten by the next run. Fake Together only, every word made up. Tests named "BUG:" failed on
+// together-link @4df1240 (or, in the challenge model, on together-challenge @6ecc463).
 
 import { db } from "../data/db";
 import { exportBackup, restoreBackup } from "../data/backup";
@@ -14,15 +17,13 @@ import { getDeviceId } from "../sync/engine";
 import { describeAnchor } from "../journal/highlights";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import type { FakeSupabase } from "./fakeSupabase";
-import { togetherId } from "./ids";
 import { cancelStopRemoving, SIGN_IN_MESSAGES, sendToTogether, signInToTogether, stopTogether } from "./sender";
 import { readAuth, readSent, TOGETHER_META, TOGETHER_SENT_META } from "./store";
-import { clock, DEVICE, EMAIL, emptyDb, fakeTogether, guardedFetch, journalDay, PASSWORD, send, signedIn, type Clock } from "./testKit";
+import { CHALLENGE, clock, DEVICE, EMAIL, emptyDb, fakeTogether, guardedFetch, journalDay, liveDays, liveNote, PASSWORD, send, signedIn, type Clock } from "./testKit";
 
 beforeEach(emptyDb);
 
-const habit = (kind: "exercise" | "checkin") => togetherId("habit", kind, 1);
-const isEventInsert = (method?: string, url?: string) => method === "POST" && String(url).includes("/rest/v1/todo_events");
+const isDayInsert = (method?: string, url?: string) => method === "POST" && String(url).includes("/rest/v1/challenge_days");
 const PHONE = "device-pretend-phone-02";
 const CARD = { id: "b-001", track: "bpd", book: "Pretend first workbook", day: 1, chapter: 1, chapterTitle: "Pretend meadow", theme: "Pretend first-book one" };
 
@@ -40,10 +41,10 @@ async function listed(jk: Parameters<typeof listHighlights>[0], hid: string) {
   return (await listHighlights(jk)).highlights.find((h) => h.hids.includes(hid))!;
 }
 
-/** Live exercise tallies' notes, by day. */
+/** Live days' notes in her challenge, by day. */
 async function liveExerciseNotes(fake: FakeSupabase): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
-  for (const e of fake.liveTallies(await habit("exercise"))) out[String(e.at).slice(0, 10)] = String(e.note ?? "");
+  for (const d of liveDays(fake)) out[String(d.day)] = String(d.note ?? "");
   return out;
 }
 
@@ -169,13 +170,10 @@ async function answersLive() {
   return { D, D2, c, fake, jk };
 }
 
-/** Everything of hers live in Together: tallies (by day and kind), and habits not deleted. */
+/** Everything of hers live in Together: the days of her challenge not deleted, and any to-do (never made). */
 async function liveState(fake: FakeSupabase) {
-  const tallies: string[] = [];
-  for (const kind of ["exercise", "checkin"] as const) for (const e of fake.liveTallies(await habit(kind))) tallies.push(`${kind}:${String(e.at).slice(0, 10)}`);
-  const habits: string[] = [];
-  for (const kind of ["exercise", "checkin"] as const) if (fake.todos.get(await habit(kind)) && !fake.todos.get(await habit(kind))!.deleted_at) habits.push(kind);
-  return { tallies: tallies.sort(), habits: habits.sort() };
+  const days = liveDays(fake).map((d) => String(d.day)).sort();
+  return { days, todos: fake.todos.size + fake.events.size, challengeDeleted: !!fake.challenges.get(CHALLENGE)!.deleted_at };
 }
 
 const PRIVATE_WORDS = /Pretend exercise answer|Pretend check-in answer|Tidewell/;
@@ -197,12 +195,11 @@ function dropsAfter(fake: FakeSupabase, n: number) {
 const stop = (f: typeof fetch, c: Clock, markDeleted: boolean) => stopTogether({ fetch: f, now: c.now }, { markDeleted });
 
 describe("#53: Stop with removing cut off at each step", () => {
-  // Stop with removing makes, for this set-up: tally deletes (4 live tallies), then per habit a
-  // count PATCH and a delete PATCH. Cut off after 0..7 of them.
-  for (let cut = 0; cut <= 7; cut++) {
+  // Stop with removing makes, for this set-up: one delete PATCH per live day (2). Cut off after 0 or 1 of them.
+  for (let cut = 0; cut <= 1; cut++) {
     it(`cut off after ${cut} request(s): paused; runs (and a restart, a sync, Send now) only carry on removing; nothing comes back; Finish removing ends it`, async () => {
       const { c, fake } = await answersLive();
-      expect((await liveState(fake)).tallies, "set-up").toHaveLength(4);
+      expect((await liveState(fake)).days, "set-up").toHaveLength(2);
       const r = await stop(dropsAfter(fake, cut), c, true);
       expect(r).toEqual({ kind: "error", message: SIGN_IN_MESSAGES.offline });
       expect((await readSent(db))?.removing, "paused, durably").toBe(true);
@@ -216,10 +213,11 @@ describe("#53: Stop with removing cut off at each step", () => {
       expect((await send(fake, c)).kind).toBe("ok");
       const later = fake.requests.slice(firstInsertAt);
       expect(later.filter((x) => x.method === "POST" && x.url.includes("/rest/v1/")), "nothing inserted while paused").toEqual([]);
-      expect(later.filter((x) => x.body.includes('"deleted_at":null')), "no habit shown again while paused").toEqual([]);
+      expect(later.filter((x) => x.body.includes('"deleted_at":null')), "no day shown again while paused").toEqual([]);
+      expect(later.filter((x) => x.body.includes('"note"')), "no note written while paused").toEqual([]);
       const state = await liveState(fake);
-      expect(state.tallies.every((t) => afterStop.tallies.includes(t)), "nothing came back").toBe(true);
-      expect(state, "the paused runs finished the removal").toEqual({ tallies: [], habits: [] });
+      expect(state.days.every((t) => afterStop.days.includes(t)), "nothing came back").toBe(true);
+      expect(state, "the paused runs finished the removal").toEqual({ days: [], todos: 0, challengeDeleted: false });
       // Finish removing: done, forgotten, and nothing more goes after.
       expect(await stop(fake.fetch, c, true)).toEqual({ kind: "ok" });
       expect(await db.syncMeta.get(TOGETHER_SENT_META)).toBeUndefined();
@@ -232,12 +230,12 @@ describe("#53: Stop with removing cut off at each step", () => {
 
   it("Finish removing offline, then refused, then accepted: paused throughout, then everything removed", async () => {
     const { c, fake } = await answersLive();
-    expect(await stop(dropsAfter(fake, 2), c, true)).toMatchObject({ kind: "error" });
+    expect(await stop(dropsAfter(fake, 1), c, true)).toMatchObject({ kind: "error" });
     // Offline.
     expect(await stop(dropsAfter(fake, 0), c, true)).toEqual({ kind: "error", message: SIGN_IN_MESSAGES.offline });
     expect((await readSent(db))?.removing).toBe(true);
-    // Refused (every tally delete).
-    for (let i = 0; i < 4; i++) fake.inject({ status: 403, body: { code: "42501", message: "fake: refused" }, when: (q) => q.method === "PATCH" && q.url.includes("todo_events") });
+    // Refused (every day's delete).
+    for (let i = 0; i < 2; i++) fake.inject({ status: 403, body: { code: "42501", message: "fake: refused" }, when: (q) => q.method === "PATCH" && q.url.includes("challenge_days") });
     const refused = await stop(fake.fetch, c, true);
     expect(refused.kind).toBe("error");
     expect((await readSent(db))?.removing).toBe(true);
@@ -247,13 +245,13 @@ describe("#53: Stop with removing cut off at each step", () => {
     await send(fake, c);
     expect(fake.requests.slice(n).filter((x) => (x.method === "POST" && x.url.includes("/rest/v1/")) || x.body.includes('"deleted_at":null'))).toEqual([]);
     expect(await stop(fake.fetch, c, true)).toEqual({ kind: "ok" });
-    expect(await liveState(fake)).toEqual({ tallies: [], habits: [] });
+    expect(await liveState(fake)).toEqual({ days: [], todos: 0, challengeDeleted: false });
   });
 
   it("two Stops in a row, both cut off: still paused; nothing comes back", async () => {
     const { c, fake } = await answersLive();
     expect((await stop(dropsAfter(fake, 1), c, true)).kind).toBe("error");
-    expect((await stop(dropsAfter(fake, 1), c, true)).kind).toBe("error");
+    expect((await stop(dropsAfter(fake, 0), c, true)).kind).toBe("error");
     expect((await readSent(db))?.removing).toBe(true);
     const n = fake.requests.length;
     await send(fake, c);
@@ -286,8 +284,8 @@ describe("#53: Stop with removing cut off at each step", () => {
     expect(fake.requests.slice(n).filter((x) => (x.method === "POST" && x.url.includes("/rest/v1/")) || x.body.includes('"deleted_at":null'))).toEqual([]);
   });
 
-  for (const cut of [0, 2, 5]) {
-    it(`Keep copying after a cut-off Stop (after ${cut}): only what's allowed goes again: never a private day's answers, one live tally per day, the counts right`, async () => {
+  for (const cut of [0, 1]) {
+    it(`Keep copying after a cut-off Stop (after ${cut}): only what's allowed goes again: never a private day's answers, one row per day`, async () => {
       const { D, D2, c, fake } = await answersLive();
       expect((await stop(dropsAfter(fake, cut), c, true)).kind).toBe("error");
       await send(fake, c); // a paused run carries on removing
@@ -297,12 +295,13 @@ describe("#53: Stop with removing cut off at each step", () => {
       expect((await send(fake, c)).kind).toBe("ok");
       const sentAgain = fake.requests.slice(n);
       // The private day: titles only, ever.
-      const d2Inserts = sentAgain.filter((x) => isEventInsert(x.method, x.url) && x.body.includes(`${D2}T12:00`));
-      expect(d2Inserts.every((x) => !PRIVATE_WORDS.test(x.body))).toBe(true);
+      const d2Id = String(fake.dayRow(CHALLENGE, D2)!.id);
+      const d2Writes = sentAgain.filter((x) => x.url.includes("challenge_days") && (x.url.includes(d2Id) || x.body.includes(`"day":"${D2}"`)));
+      expect(d2Writes.every((x) => !PRIVATE_WORDS.test(x.body))).toBe(true);
+      expect(liveNote(fake, D2)).not.toMatch(PRIVATE_WORDS);
       const state = await liveState(fake);
-      expect(state).toEqual({ tallies: [`checkin:${D2}`, `checkin:${D}`, `exercise:${D2}`, `exercise:${D}`].sort(), habits: ["checkin", "exercise"] });
-      for (const kind of ["exercise", "checkin"] as const) expect(fake.todos.get(await habit(kind))!.tally).toBe(2);
-      expect(Object.keys((await readSent(db))?.maybe ?? {})).toEqual([]);
+      expect(state).toEqual({ days: [D2, D], todos: 0, challengeDeleted: false });
+      expect(fake.days.size, "one row per day").toBe(2);
       const m = fake.requests.length;
       await send(fake, c);
       expect(fake.requests.length, "a replay sends nothing").toBe(m);
@@ -312,46 +311,33 @@ describe("#53: Stop with removing cut off at each step", () => {
 
 // ================================================================ #54: clean-up first
 
-describe("#54: a maybe-sent tally is cleaned up first, journal key or not", () => {
+describe("#54: a maybe-sent day is dealt with, journal key or not", () => {
   async function maybeSent() {
     const D = "2026-11-04";
     const c = clock(`${D}T09:00:00`);
     const fake = await signedIn(c);
     const { jk } = await journalDay(D, { checkin: true, exercise: true });
-    c.set("2026-11-05T03:30:00");
-    await send(fake, c);
     c.set("2026-11-06T03:30:00");
-    fake.inject({ lostReply: true, when: (r) => isEventInsert(r.method, r.url) });
+    fake.inject({ lostReply: true, when: (r) => isDayInsert(r.method, r.url) });
     expect((await send(fake, c)).kind).toBe("offline");
-    expect(Object.keys((await readSent(db))?.maybe ?? {})).toHaveLength(1);
+    expect((await readSent(db))?.days?.[D]).toMatchObject({ hash: "", live: true });
     return { D, c, fake, jk };
   }
 
-  it("journal locked here (no key stored): deleted first, and only that one", async () => {
+  it("BUG: journal locked here (no key stored), the day ticked private on her phone: its answers aren't left live, and never inserted again", async () => {
     const { c, fake, jk, D } = await maybeSent();
     await saveSharePrivate(jk, D, "exercise", true);
     await db.syncMeta.delete(JOURNAL_KEY_META);
-    const before = await liveState(fake);
     expect((await send(fake, c)).kind).toBe("ok");
-    expect((await readSent(db))?.maybe ?? {}).toEqual({});
-    const after = await liveState(fake);
-    expect(after.tallies.length).toBe(before.tallies.length - 1);
-    expect(fake.requests.filter((r) => PRIVATE_WORDS.test(r.body) && isEventInsert(r.method, r.url)).length).toBeLessThanOrEqual(1); // only the cut-off one, never again
+    expect(String(liveNote(fake, D) ?? ""), "her private answers are still live in Together").not.toContain("Pretend exercise answer");
+    expect(fake.requests.filter((r) => PRIVATE_WORDS.test(r.body) && isDayInsert(r.method, r.url)).length).toBeLessThanOrEqual(1); // only the cut-off one, never again
   });
 
-  it("journal never set up on this device (no check row, no key): the clean-up still goes", async () => {
-    const { c, fake } = await maybeSent();
-    await db.syncMeta.delete(JOURNAL_KEY_META);
-    await db.journal.clear();
-    expect((await send(fake, c)).kind).toBe("ok");
-    expect((await readSent(db))?.maybe ?? {}).toEqual({});
-  });
-
-  it("a live, non-private, recorded tally is never deleted by the clean-up, and runs don't flap (no delete/insert churn over many runs)", async () => {
+  it("a live, non-private day is never removed by the next run, and runs don't flap (no churn over many runs)", async () => {
     const { c, fake } = await maybeSent();
     expect((await send(fake, c)).kind).toBe("ok");
     const settled = await liveState(fake);
-    expect(settled.tallies).toHaveLength(2);
+    expect(settled.days).toHaveLength(1);
     const n = fake.requests.length;
     for (let i = 0; i < 6; i++) await send(fake, c);
     expect(fake.requests.slice(n).filter((r) => r.method !== "GET"), "nothing more after it settled").toEqual([]);
@@ -367,10 +353,9 @@ describe("#54: a maybe-sent tally is cleaned up first, journal key or not", () =
     void jk;
     await send(fake, c);
     await send(fake, c);
-    const live = fake.liveTallies(await habit("checkin"));
-    expect(live).toHaveLength(1);
-    expect(String(live[0]!.note)).toContain("Pretend check-in answer");
-    expect(fake.todos.get(await habit("checkin"))!.tally).toBe(1);
+    expect(fake.days.size).toBe(1);
+    expect(liveDays(fake)).toHaveLength(1);
+    expect(String(liveNote(fake, "2026-11-04"))).toContain("Pretend check-in answer");
   });
 });
 
@@ -394,8 +379,8 @@ describe("a highlight row this device can't open (sealed with another key)", () 
       await hl(D, "pretend Ulverby tower", "Pretend Ulverby note");
       c.set("2026-11-06T03:30:00");
       await send(fake, c);
-      // Together v1 (Esme, 2026-11-06): highlights aren't sent; the set-up checks the answers went.
       expect((await liveExerciseNotes(fake))[D], "set-up: sent with the answers").toContain("Pretend exercise answer");
+      expect((await liveExerciseNotes(fake))[D], "set-up: and the highlight").toContain("• pretend Ulverby tower — Pretend Ulverby note");
       await unreadableHighlight(where === "on the same day" ? D : "2026-11-02");
       await saveSharePrivate(jk, D, "exercise", true);
       await send(fake, c);

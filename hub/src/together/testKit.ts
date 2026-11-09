@@ -86,7 +86,7 @@ function strings(v: unknown, out: string[] = []): string[] {
  * collected, not thrown (the client would swallow a throw as "offline"): assert none at the end.
  */
 export function guardedFetch(inner: typeof fetch, forbidden: () => string[], sendingInstant: () => number) {
-  const seen: { url: string; headers: Record<string, string>; body: string }[] = [];
+  const seen: { method: string; url: string; headers: Record<string, string>; body: string }[] = [];
   const violations: string[] = [];
   const f = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -94,7 +94,7 @@ export function guardedFetch(inner: typeof fetch, forbidden: () => string[], sen
     const headers: Record<string, string> = {};
     new Headers(init.headers).forEach((v, k) => (headers[k] = v));
     const body = typeof init.body === "string" ? init.body : "";
-    seen.push({ url, headers, body });
+    seen.push({ method: (init.method ?? "GET").toUpperCase(), url, headers, body });
     const now = new Date(sendingInstant()).toISOString();
     let parsed: unknown = null;
     try {

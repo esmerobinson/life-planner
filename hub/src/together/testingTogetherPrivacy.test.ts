@@ -1,7 +1,8 @@
 // TESTING (Life Planner - Together Link Testing): privacy timing, the private tick (incl. the C1
 // race while a send is in flight) and scope (only exercise and check-in days; never morning
 // pages, notes, to-dos, drafts...). Fakes only; every word is a made-up marker. Tests named
-// "BUG:" are expected to fail on together-link @2a6edb2.
+// "BUG:" were expected to fail on together-link @2a6edb2 (fixed since). Challenge model
+// (2026-11-09): one row per day in her challenge, its note overwritten as the stages go.
 
 import { db } from "../data/db";
 import {
@@ -13,7 +14,7 @@ import { PROMPTS } from "../journal/prompts";
 import { togetherId } from "./ids";
 import { TogetherRunner, type SyncWatch } from "./runner";
 import { sendToTogether, stopTogether } from "./sender";
-import { clock, DEVICE, emptyDb, journalDay, send, signedIn } from "./testKit";
+import { CHALLENGE, clock, DEVICE, emptyDb, journalDay, liveNote, send, signedIn } from "./testKit";
 import type { FakeSupabase } from "./fakeSupabase";
 
 const DAY = "2026-11-04";
@@ -22,7 +23,6 @@ const OTHER_DEVICE = "device-pretend-phone-02";
 
 beforeEach(emptyDb);
 
-const habit = (kind: "exercise" | "checkin") => togetherId("habit", kind, 1);
 const bodies = (fake: FakeSupabase) => fake.requests.map((r) => r.body).join("\n");
 
 // ---- timing --------------------------------------------------------------------------------
@@ -33,18 +33,17 @@ it("titles: not at 02:59:59 after the day, yes at 03:00:00; answers: not at 02:5
   await journalDay(DAY, { exercise: true, checkin: true, learned: "Pretend Copperwhistle" });
   c.set("2026-11-05T02:59:59");
   await send(fake, c);
-  expect(fake.events.size).toBe(0);
+  expect(fake.days.size).toBe(0);
   c.set("2026-11-05T03:00:00");
   await send(fake, c);
-  expect(fake.events.size).toBe(2);
+  expect(fake.days.size).toBe(1); // one row for the day: both parts
   c.set("2026-11-06T02:59:59");
   await send(fake, c);
   expect(bodies(fake)).not.toMatch(/Pretend exercise answer|Pretend check-in answer|Copperwhistle/);
   c.set("2026-11-06T03:00:00");
   await send(fake, c);
   expect(bodies(fake)).toMatch(/Pretend exercise answer/);
-  // Together v1 (Esme, 2026-11-06): "what I learned" never goes (was: it goes with the answers).
-  expect(bodies(fake)).not.toMatch(/Copperwhistle/);
+  expect(liveNote(fake, DAY)).toContain("• Pretend Copperwhistle"); // what she learned goes with the answers (2026-11-08)
 });
 
 it("a tick one second before the answers are due (after the titles went): the answers never go", async () => {
@@ -85,27 +84,30 @@ it("un-ticked after being private: the answers go then (and only then)", async (
   expect(bodies(fake)).not.toContain("Pretend check-in answer");
   await saveSharePrivate(jk, DAY, "checkin", false);
   await send(fake, c);
-  expect(fake.liveTallies(await habit("checkin")).map((e) => e.note)).toEqual([expect.stringContaining("Pretend check-in answer")]);
-  expect(fake.todos.get(await habit("checkin"))!.tally).toBe(1);
+  expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
+  expect(fake.days.size).toBe(1);
 });
 
 // ---- the C1 race, with a send in flight ----------------------------------------------------
 
 /**
- * Stage 2 for DAY's check-in: the titles-only tally is deleted (a PATCH, one round trip to
- * Together), then the answers tally is inserted. `during` runs while that PATCH is on the wire,
- * i.e. after the sender read the tick but before any answer has been sent.
+ * Stage 2 for DAY's check-in in a run that first overwrites an earlier day's note (an edited
+ * answer: a PATCH, one round trip to Together). `during` runs while that PATCH is on the wire,
+ * i.e. after the run began but before any of DAY's answers have been sent.
  */
 async function stage2WithTickDuringDelete(during: (jk: Awaited<ReturnType<typeof journalDay>>["jk"]) => Promise<void>) {
-  const c = clock(SIGN_IN);
+  const EARLIER = "2026-11-03";
+  const c = clock(`${EARLIER}T10:00:00`);
   const fake = await signedIn(c);
-  const { jk } = await journalDay(DAY, { checkin: true });
+  const { jk, q1 } = await journalDay(EARLIER, { checkin: true });
+  await journalDay(DAY, { checkin: true });
   c.set("2026-11-05T03:30:00");
-  await send(fake, c); // titles only
+  await send(fake, c); // EARLIER with answers, DAY titles only
+  await saveAnswer(jk, EARLIER, q1.id, DEVICE, "Pretend earlier day edited", true, { session: "1" });
   c.set("2026-11-06T03:30:00");
   let tickedAt = -1;
   const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (tickedAt < 0 && init?.method === "PATCH" && String(input).includes("todo_events")) {
+    if (tickedAt < 0 && init?.method === "PATCH" && String(input).includes("challenge_days")) {
       await during(jk);
       tickedAt = fake.requests.length; // every request from here on was sent after the tick
     }
@@ -113,12 +115,14 @@ async function stage2WithTickDuringDelete(during: (jk: Awaited<ReturnType<typeof
   }) as typeof fetch;
   await sendToTogether({ fetch: f, now: c.now });
   expect(tickedAt).toBeGreaterThan(0);
+  expect(liveNote(fake, EARLIER)).toContain("Pretend earlier day edited");
   return { fake, after: fake.requests.slice(tickedAt).map((r) => r.body).join("\n") };
 }
 
 it("BUG: ticked private on this device while the send is in flight, before any answer went: the answers never go", async () => {
-  const { after } = await stage2WithTickDuringDelete((jk) => saveSharePrivate(jk, DAY, "checkin", true));
+  const { after, fake } = await stage2WithTickDuringDelete((jk) => saveSharePrivate(jk, DAY, "checkin", true));
   expect(after).not.toContain("Pretend check-in answer");
+  expect(liveNote(fake, DAY)).not.toContain("Pretend check-in answer");
 });
 
 it("BUG: a tick from the phone arriving by sync while the Mac's send is in flight, before any answer went: the answers never go", async () => {
@@ -153,10 +157,10 @@ it("BUG: a tick whose sync finishes while a send is in flight is acted on when t
   let release: () => void = () => undefined;
   const gate = new Promise<void>((r) => (release = r));
   let held = false;
-  // The answers insert is slow to come back (Together busy).
+  // The answers overwrite is slow to come back (Together busy).
   const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const res = await fake.fetch(input, init);
-    if (!held && init?.method === "POST" && String(init.body).includes("Pretend check-in answer")) {
+    if (!held && init?.method === "PATCH" && String(init.body).includes("Pretend check-in answer")) {
       held = true;
       await gate;
     }
@@ -175,7 +179,8 @@ it("BUG: a tick whose sync finishes while a send is in flight is acted on when t
   await vi.waitFor(() => expect(runner.getState().running).toBe(false));
   stop();
   // No further sync has run. Her just-ticked answers should be hidden by now.
-  expect(fake.liveTallies(await habit("checkin")).map((e) => e.note)).not.toEqual([expect.stringContaining("Pretend check-in answer")]);
+  expect(liveNote(fake, DAY)).not.toContain("Pretend check-in answer");
+  expect(JSON.stringify([...fake.days.values()])).not.toContain("Pretend check-in answer"); // overwritten, not kept
 });
 
 // ---- scope: plant a marker in every part of the app, scan every request -------------------
@@ -189,7 +194,7 @@ function strings(v: unknown, out: string[] = []): string[] {
 }
 
 it("scope: no marker from morning pages, notes, drafts, other days, other devices' words, to-dos or goals ever reaches Together", async () => {
-  const D1 = DAY; // exercise + check-in + learned (allowed, after the delay)
+  const D1 = DAY; // exercise + check-in + learned (allowed, after the delay; the newest version only)
   const D2 = "2026-11-05"; // morning page only
   const D3 = "2026-11-06"; // learned words without a card; a check-in left half-done
   const D4 = "2026-11-07"; // exercise + check-in + learned, ticked private after its titles went
@@ -235,10 +240,10 @@ it("scope: no marker from morning pages, notes, drafts, other days, other device
     "Corrimbel", "Hollisfen", "Zarnwick", "Brumbleaf", "Velmora", "Quintash", "Oxbellow", "Tamsprig", "Drevelin",
     "Ambrelith", "Mistlewade", "Grubbinsk", "Pellucor", "Sorrelind", "Fennimore",
     "Wobblethorn", "Kestrigan", "pindlefax", "Snibbet", "Murkendale", "Snorvelt", "Thistlequorn", "Brackenmoor", "Grizzlemoot", "Quarrendell",
-    `${D2}T12`, `${D3}T12`, ...[...set.cards].filter((k) => k.id !== card.id).map((k) => k.theme).filter((s) => s && s.length > 8),
+    `"day":"${D2}"`, `"day":"${D3}"`, ...[...set.cards].filter((k) => k.id !== card.id).map((k) => k.theme).filter((s) => s && s.length > 8),
   ];
   const morningIds: string[] = [];
-  for (const d of [D2, D3]) for (const k of ["exercise", "checkin"]) for (let v = 1; v <= 6; v++) morningIds.push(await togetherId("tally", `${k}:${d}`, v));
+  for (const d of [D2, D3]) morningIds.push(await togetherId("day", `${CHALLENGE}:${d}`, 1));
   const bad: string[] = [];
   const f = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = String(input);
@@ -269,18 +274,22 @@ it("scope: no marker from morning pages, notes, drafts, other days, other device
     expect(await sendToTogether(env)).toMatchObject({ kind: "ok" });
     expect(await sendToTogether({ ...env, retryRefused: true })).toMatchObject({ kind: "ok" });
   }
-  await saveSharePrivate(jk, D1, "exercise", true); // after the answers went: hidden
+  expect(liveNote(fake, D1)).toContain("• Pretend Copperwhistle learned");
+  await saveSharePrivate(jk, D1, "exercise", true); // after the answers went: overwritten
   await sendToTogether(env);
+  expect(JSON.stringify([...fake.days.values()])).not.toMatch(/Copperwhistle|Gallowmere/);
   expect(await stopTogether(env, { markDeleted: true })).toEqual({ kind: "ok" });
 
   expect(bad).toEqual([]);
   const all = bodies(fake);
   expect(all).toContain("Pretend Gallowmere answer");
   expect(all).toContain("Pretend Rindlebay answer");
-  // Together v1 (Esme, 2026-11-06): "what I learned" never goes (was: it goes with the answers).
-  expect(all).not.toContain("Pretend Copperwhistle learned");
-  expect(all).toContain(`${D4}T12:00:00.000Z`); // D4's titles did go
-  expect([...fake.todos.values()].every((t) => t.type === "habit")).toBe(true);
-  expect(fake.todos.size).toBe(2);
-  for (const e of fake.events.values()) expect(Object.keys(e).sort()).toEqual(["at", "couple_id", "deleted_at", "id", "kind", "note", "todo_id", "updated_at", "user_id"]);
+  expect(all).toContain("Pretend Copperwhistle learned");
+  expect(all).toContain(`"day":"${D4}"`); // D4's titles did go
+  expect(fake.todos.size + fake.events.size).toBe(0);
+  expect([...fake.days.values()].map((d) => d.day).sort()).toEqual([D1, D4]);
+  for (const d of fake.days.values()) {
+    expect(d.challenge_id).toBe(CHALLENGE);
+    expect(Object.keys(d).sort()).toEqual(["by", "challenge_id", "couple_id", "created_at", "day", "deleted_at", "id", "note", "updated_at"]);
+  }
 });

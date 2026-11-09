@@ -96,7 +96,7 @@ describe("Remove", () => {
     // She empties the box later: the newest version is now empty.
     const s = await saveLearned(jk, DAY, MAC, "", { seen: [(await readLearned(jk, DAY)).id] });
     expect(s).toBeTruthy();
-    const days = await readJournalDays(jk, DAY, addDays(DAY, 2));
+    const days = await readJournalDays(jk, addDays(DAY, 2));
     const note = days.exercise?.notes.get(DAY)?.full ?? "";
     expect(note).not.toContain(PICKED);
     // Nothing hidden behind it either: what's left is the other phone version, under the box.

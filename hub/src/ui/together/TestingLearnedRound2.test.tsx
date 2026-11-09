@@ -134,7 +134,7 @@ it("cleared on one device: only what that box held goes; words written on the ot
   }
   // What Together would get for that day (the day's newest version only, and none once cleared).
   await be(MAC);
-  const days = await readJournalDays(jk, DAY, addDays(DAY, 2));
+  const days = await readJournalDays(jk, addDays(DAY, 2));
   const note = days.exercise?.notes.get(DAY)?.full ?? "";
   expect(note).not.toContain("Pretend Dunmire Mac line.");
 });

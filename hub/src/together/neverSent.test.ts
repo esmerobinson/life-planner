@@ -9,7 +9,7 @@ import { saveSyncSettings, syncOnce } from "../sync/engine";
 import { PROMPTS } from "../journal/prompts";
 import { sendToTogether, signInToTogether, stopTogether } from "./sender";
 import { readAuth, TOGETHER_META, TOGETHER_SENT_META } from "./store";
-import { clock, DEVICE, EMAIL, emptyDb, fakeTogether, guardedFetch, highlightOn, journalDay, PASSWORD } from "./testKit";
+import { CHALLENGE, clock, DEVICE, EMAIL, emptyDb, fakeTogether, guardedFetch, highlightOn, journalDay, PASSWORD } from "./testKit";
 
 // The request recorder (Together link brief §5, review I4): every request to Together, from
 // sign-in to "Stop", fails the test the moment it holds anything that must never go. Text with
@@ -52,7 +52,8 @@ it("nothing forbidden is ever sent to Together", async () => {
   await saveAnswer(jk, PRIVATE_DAY, PROMPTS[2]!.id, DEVICE, "Pretend private check-in\nanswer", true);
   await saveSharePrivate(jk, PRIVATE_DAY, "exercise", true);
   await saveSharePrivate(jk, PRIVATE_DAY, "checkin", true);
-  // Together v1 (Esme, 2026-11-06): "what I learned" and highlights never go, on any day.
+  // Learned words and highlights (2026-11-08): only in that day's note, never a removed one,
+  // another day's (the morning-only day has no card), or a private day's.
   await highlightOn(DAY, 'pretend "Wrenfold"\nclouds', 'Pretend Wrenfold\nnote');
   await highlightOn(DAY, "pretend Gristlecomb river", "Pretend Gristlecomb note", { removed: true });
   await highlightOn(PRIVATE_DAY, "pretend Ambermoss hill", "Pretend Ambermoss note");
@@ -67,9 +68,11 @@ it("nothing forbidden is ever sent to Together", async () => {
     'Pretend "private" exercise', "Pretend private check-in",
     "Pretend shared-looking to-do", "Pretend to-do notes", "Pretend Mind to-do",
     MORNING_ONLY, JPEG, PASS, jk.fp, SYNC_TOKEN, set.source, ...cardFileText,
-    "Gristlecomb", "Ambermoss", "Tallowmere", "Wrenfold", "Highlighted learnings", "Pretend learned words", "What I learned",
+    "Gristlecomb", "Ambermoss", "Tallowmere", "Highlighted learnings", "What I learned",
     ...(signedIn ? [PASSWORD, EMAIL] : []),
   ];
+  // Allowed only inside DAY's own note (checked per request below).
+  const dayOnly = ["Wrenfold", "Pretend learned words"];
   const guard = guardedFetch(fake.fetch, forbidden, c.now);
   const env = { fetch: guard.fetch, now: c.now };
 
@@ -84,18 +87,31 @@ it("nothing forbidden is ever sent to Together", async () => {
   expect(await stopTogether(env, { markDeleted: true })).toEqual({ kind: "ok" });
 
   expect(guard.violations).toEqual([]);
-  // It did send: both days' habits and tallies, and DAY's answers.
+  // It did send: DAY's answers, learned words and highlight went (before the private tick), and
+  // the private day's titles.
   const all = guard.seen.map((r) => r.body).join("\n");
   expect(all).toContain("Pretend exercise answer");
-  expect(all).toContain("2026-11-06T12:00:00.000Z"); // the private day's titles went
-  // Only Together's own endpoints; only habits and tallies; only Together's own tokens.
+  expect(all).toContain("Pretend learned words");
+  expect(all).toContain("Wrenfold");
+  expect(all).toContain(PRIVATE_DAY);
+  // Learned words and highlights only ever in a write of DAY's own row.
+  for (const r of guard.seen) {
+    if (!dayOnly.some((w) => r.body.includes(w))) continue;
+    expect(r.url).toContain("/rest/v1/challenge_days");
+    if (r.method === "POST") expect(JSON.parse(r.body).day).toBe(DAY);
+    else expect(r.url).toContain("id=eq.");
+  }
+  // Only Together's own endpoints; only her challenge's days; to-dos never made; only Together's own tokens.
   for (const r of guard.seen) {
     expect(new URL(r.url).origin).toBe(fake.url);
-    expect(new URL(r.url).pathname).toMatch(/^\/(auth\/v1\/token|rest\/v1\/(members|todos|todo_events))$/);
+    expect(new URL(r.url).pathname).toMatch(/^\/(auth\/v1\/token|rest\/v1\/(members|challenges|challenge_days))$/);
     expect(r.headers.apikey).toBe(fake.anonKey);
     if (r.headers.authorization) expect(r.headers.authorization).toMatch(/^Bearer fake-access-\d+$/);
+    if (r.method === "POST" && r.url.includes("challenge_days")) expect(JSON.parse(r.body).challenge_id).toBe(CHALLENGE);
   }
-  expect([...fake.todos.values()].map((t) => t.type)).toEqual(["habit", "habit"]);
+  expect(fake.todos.size + fake.events.size).toBe(0);
+  // After the private tick, DAY's learned words and highlight are overwritten, gone from Together.
+  expect(JSON.stringify([...fake.days.values()])).not.toMatch(/Pretend learned words|Wrenfold|Pretend exercise answer/);
   // The password went only in the one sign-in request.
   const withPassword = guard.seen.filter((r) => r.body.includes(PASSWORD));
   expect(withPassword).toHaveLength(1);

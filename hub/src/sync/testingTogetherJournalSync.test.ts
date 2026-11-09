@@ -6,8 +6,7 @@ import { journalId } from "../data/validate";
 import type { JournalRow } from "../domain/types";
 import { journalAad, openJson, sealJson, type JournalKey } from "../journal/crypto";
 import { confirmedDevice, keyFor } from "../test/journalKey";
-import { togetherId } from "../together/ids";
-import { clock, journalDay, send, signedIn } from "../together/testKit";
+import { clock, journalDay, liveDays, liveNote, send, signedIn } from "../together/testKit";
 import { FakeSyncServer } from "./fakeServer";
 import { saveSyncSettings, syncOnce } from "./engine";
 
@@ -157,7 +156,7 @@ describe("the private ticks on two devices", () => {
 });
 
 describe("ticked on the phone after the Mac sent the day's answers to Together", () => {
-  it("the exercise tick reaches the Mac by sync; its next send hides the answers and what she learned", async () => {
+  it("the exercise tick reaches the Mac by sync; its next send overwrites the note: no answers, no research notes", async () => {
     const c = clock("2026-11-04T10:00:00");
     const fake = await signedIn(c);
     const server = new FakeSyncServer(TOKEN);
@@ -166,17 +165,16 @@ describe("ticked on the phone after the Mac sent the day's answers to Together",
     await syncBoth(server, phone);
     c.set("2026-11-06T03:30:00"); // the answers are due
     expect(await send(fake, c)).toMatchObject({ kind: "ok" });
-    const habit = await togetherId("habit", "exercise", 1);
-    expect(fake.liveTallies(habit).map((e) => e.note).join()).toContain("Pretend exercise answer");
-    // Together v1 (Esme, 2026-11-06): "what I learned" never goes (was: it goes with the answers).
-    expect(fake.liveTallies(habit).map((e) => e.note).join()).not.toContain("Pretend Wyndle learned words");
+    expect(liveNote(fake, DAY)).toContain("Pretend exercise answer");
+    expect(liveNote(fake, DAY)).toContain("• Pretend Wyndle learned words"); // research notes go with the answers
 
     await phoneTick(phone, "exercise", true); // on the phone, the next morning
     await syncBoth(server, phone);
     expect((await readSharePrivate(jk, DAY)).exercise).toBe(true);
     expect(await send(fake, c)).toMatchObject({ kind: "ok" });
-    const live = fake.liveTallies(habit).map((e) => String(e.note));
-    expect(live).toHaveLength(1);
-    expect(live[0]).not.toMatch(/Pretend exercise answer|Wyndle|What I learned today/);
+    expect(liveDays(fake)).toHaveLength(1);
+    expect(liveNote(fake, DAY)).not.toMatch(/Pretend exercise answer|Wyndle|Research notes/);
+    // Overwritten, not hidden: the answers are nowhere in Together any more.
+    expect(JSON.stringify([...fake.days.values()])).not.toMatch(/Pretend exercise answer|Wyndle/);
   });
 });

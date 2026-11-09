@@ -45,7 +45,7 @@ it("Finish removing from the paused box removes the rest and forgets the sign-in
   expect(liveDays(fake)).toEqual([]);
 });
 
-it("an earlier build's habits that Together won't let be removed: said plainly; days are still copied and "Last copied" moves", async () => {
+it("an earlier build's habits that Together won't let be removed: said plainly; days are still copied and Last copied moves", async () => {
   const { c, fake } = await copied();
   const { togetherId } = await import("../../together/ids");
   const { saveSent } = await import("../../together/store");

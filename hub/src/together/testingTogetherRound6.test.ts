@@ -1,7 +1,9 @@
 // TESTING (Life Planner - Together-link Round 6 Testing, 2026-11-06): round 6's per-day
 // highlights (#57) and incomplete / private days (#59), and the device-local record of whether a
-// tally carries answers. Fake Together only, every word made up. Tests named "BUG:" fail on
-// together-link @e473622.
+// day carries answers. Converted to the challenge model (2026-11-09): one challenge_days row per
+// day; learned words and that day's highlights go as research notes (the v1 hold lifted). Fake
+// Together only, every word made up. Tests named "BUG:" failed on together-link @e473622 (or, in
+// the challenge model with highlights sent, on together-challenge @6ecc463).
 
 import { db } from "../data/db";
 import {
@@ -10,14 +12,12 @@ import {
 import { describeAnchor } from "../journal/highlights";
 import { journalAad, sealJson } from "../journal/crypto";
 import type { FakeSupabase } from "./fakeSupabase";
-import { togetherId } from "./ids";
 import { signInToTogether, stopTogether } from "./sender";
 import { readSent } from "./store";
-import { clock, DEVICE, EMAIL, emptyDb, journalDay, PASSWORD, send, signedIn } from "./testKit";
+import { clock, DEVICE, EMAIL, emptyDb, journalDay, liveDays, PASSWORD, send, signedIn } from "./testKit";
 
 beforeEach(emptyDb);
 
-const habit = (kind: "exercise" | "checkin") => togetherId("habit", kind, 1);
 const PHONE = "device-pretend-phone-02";
 const CARD = { id: "b-001", track: "bpd", book: "Pretend first workbook", day: 1, chapter: 1, chapterTitle: "Pretend meadow", theme: "Pretend first-book one" };
 
@@ -36,9 +36,10 @@ async function hl(day: string, words: string, note = "", device = DEVICE) {
 
 const listed = async (hid: string) => (await listHighlights(await key())).highlights.find((h) => h.hids.includes(hid))!;
 
-async function liveNotes(fake: FakeSupabase, kind: "exercise" | "checkin" = "exercise"): Promise<Record<string, string>> {
+/** Each live day's note in her challenge, by day. */
+async function liveNotes(fake: FakeSupabase): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
-  for (const e of fake.liveTallies(await habit(kind))) out[String(e.at).slice(0, 10)] = String(e.note ?? "");
+  for (const d of liveDays(fake)) out[String(d.day)] = String(d.note ?? "");
   return out;
 }
 
@@ -94,8 +95,8 @@ describe("#59: incomplete, private and normal days together", () => {
     await hl(D, "pretend Elmbridge spire", "Pretend Elmbridge note");
     c.set("2026-11-06T03:30:00");
     await send(fake, c);
-    // Together v1 (Esme, 2026-11-06): highlights and learned words aren't sent; the set-up checks the answers went.
     expect((await liveNotes(fake))[D]).toContain("Pretend exercise answer");
+    expect((await liveNotes(fake))[D]).toContain("• pretend Elmbridge spire — Pretend Elmbridge note");
     const bad = await unreadable("highlight", D, `0123456789abcdef_${PHONE}_0a1b2c3d`);
     await saveSharePrivate(jk, D, "exercise", true);
     await send(fake, c);
@@ -109,12 +110,14 @@ describe("#59: incomplete, private and normal days together", () => {
     }
     expect(writes(fake, n), "churn").toEqual([]);
     expect(bodiesWith(fake, /Pretend exercise answer/).length, "her words went once only (the first send)").toBe(1);
-    expect(bodiesWith(fake, /Elmbridge/), "v1: learned words and highlights never go").toEqual([]);
+    expect(bodiesWith(fake, /Elmbridge/).length, "learned words and highlights went once only (the first send)").toBe(1);
+    expect(JSON.stringify([...fake.days.values()]), "overwritten in Together, not kept underneath").not.toMatch(/Elmbridge|Pretend exercise answer/);
     // Unticked again and readable: her answers go again (her choice).
     await db.journal.delete(bad);
     await saveSharePrivate(jk, D, "exercise", false);
     await send(fake, c);
     expect((await liveNotes(fake))[D]).toContain("Pretend exercise answer");
+    expect((await liveNotes(fake))[D]).toContain("Pretend Elmbridge learned");
   });
 
   it("the record of what carries answers is kept over Stop without removing and signing in again; then a private tick still hides", async () => {
@@ -127,12 +130,12 @@ describe("#59: incomplete, private and normal days together", () => {
     c.set("2026-11-06T03:30:00");
     await send(fake, c);
     const before = (await readSent(db))!;
-    expect(before.tallies[`exercise:${D1}`]).toMatchObject({ live: true, answers: true });
-    expect(before.tallies[`exercise:${D2}`]).toMatchObject({ live: true, answers: false });
+    expect(before.days![D1]).toMatchObject({ live: true, parts: { exercise: "answers" } });
+    expect(before.days![D2]).toMatchObject({ live: true, parts: { exercise: "titles" } });
     expect((await stopTogether({ fetch: fake.fetch, now: c.now }, { markDeleted: false })).kind).toBe("ok");
     expect(await signInToTogether({ fetch: fake.fetch, now: c.now }, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD })).toEqual({ kind: "ok" });
     const after = (await readSent(db))!;
-    expect(after.tallies).toEqual(before.tallies);
+    expect(after.days).toEqual(before.days);
     const n = fake.requests.length;
     await send(fake, c);
     expect(writes(fake, n), "nothing re-sent after signing in again").toEqual([]);
@@ -140,7 +143,7 @@ describe("#59: incomplete, private and normal days together", () => {
     await saveSharePrivate(jk, D1, "exercise", true);
     await send(fake, c);
     expect((await liveNotes(fake))[D1]).not.toContain("Pretend exercise answer");
-    expect((await readSent(db))!.tallies[`exercise:${D1}`]).toMatchObject({ live: true, answers: false });
+    expect((await readSent(db))!.days![D1]).toMatchObject({ live: true, parts: { exercise: "titles" } });
   });
 
   it("learned words she replaced before the day went are never sent (only the newest version goes)", async () => {
@@ -152,8 +155,7 @@ describe("#59: incomplete, private and normal days together", () => {
     await saveLearned(jk, D, DEVICE, "Pretend Fallowfield second words", { seen: day.seen });
     c.set("2026-11-06T03:30:00");
     await send(fake, c);
-    // Together v1 (Esme, 2026-11-06): "what I learned" never goes, neither version.
-    expect((await liveNotes(fake))[D]).not.toContain("second words");
+    expect((await liveNotes(fake))[D]).toContain("• Pretend Fallowfield second words");
     expect(bodiesWith(fake, /Fallowfield first words/)).toEqual([]);
   });
 });

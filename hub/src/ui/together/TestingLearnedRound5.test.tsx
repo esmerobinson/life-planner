@@ -117,7 +117,7 @@ describe("#55: Remove, Add and the box act on every version with the same words"
     const days = await listLearned(jk, addDays(DAY, 1));
     const rb = render(<LearnedInReadBack day={days.find((d) => d.date === DAY)!} />);
     expect([...rb.container.querySelectorAll(".journal-past-answer")].map((p) => p.textContent)).toEqual([BOX, KEEP]);
-    expect((await readJournalDays(jk, DAY, addDays(DAY, 2))).exercise?.notes.get(DAY)?.full ?? "").not.toContain(PICKED);
+    expect((await readJournalDays(jk, addDays(DAY, 2))).exercise?.notes.get(DAY)?.full ?? "").not.toContain(PICKED);
   });
 
   it("Add on the repeated words: in the box once, nothing of the box lost, every copy replaced", async () => {

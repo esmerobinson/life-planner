@@ -14,9 +14,8 @@ import type { JournalRow } from "../domain/types";
 import { journalAad, sealJson, type JournalKey } from "../journal/crypto";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import type { FakeSupabase } from "../together/fakeSupabase";
-import { togetherId } from "../together/ids";
 import { readSent } from "../together/store";
-import { clock, DEVICE, journalDay, send, signedIn, type Clock } from "../together/testKit";
+import { clock, DEVICE, journalDay, liveDays, send, signedIn, type Clock } from "../together/testKit";
 import { FakeSyncServer } from "./fakeServer";
 import { saveSyncSettings, stopSyncing, syncOnce } from "./engine";
 
@@ -67,19 +66,21 @@ async function syncBoth(server: FakeSyncServer, phone: HubDB) {
     await ok(phone, server);
   }
 }
-const habit = (kind: "exercise" | "checkin") => togetherId("habit", kind, 1);
-async function liveNotes(fake: FakeSupabase, kind: "exercise" | "checkin" = "exercise"): Promise<Record<string, string>> {
+/** Her challenge's live days in Together, by date: the note (both parts in one row). */
+async function liveNotes(fake: FakeSupabase): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
-  for (const e of fake.liveTallies(await habit(kind))) out[String(e.at).slice(0, 10)] = String(e.note ?? "");
+  for (const d of liveDays(fake)) out[String(d.day)] = String(d.note ?? "");
   return out;
 }
+/** Every write of a day row (an insert or a note overwritten) since `from` holding `re`. */
 const postsWith = (fake: FakeSupabase, from: number, re: RegExp) =>
-  fake.requests.slice(from).filter((r) => r.method === "POST" && r.url.includes("/rest/v1/todo_events") && re.test(r.body)).map((r) => r.body.slice(0, 160));
+  fake.requests.slice(from).filter((r) => r.method !== "GET" && r.url.includes("/rest/v1/challenge_days") && re.test(r.body)).map((r) => r.body.slice(0, 160));
 const restWrites = (fake: FakeSupabase, from: number) => fake.requests.slice(from).filter((r) => r.method !== "GET" && r.url.includes("/rest/v1/"));
 
-// Together v1 sends only the exercise and check-in answers (Esme, 2026-11-06): what changes after
-// the backup here is her exercise answer (an Edit), where Testing's first version used "what I
-// learned" words, which v1 never sends. The checks are the same.
+// What changes after the backup here is her exercise answer (an Edit; Testing's first version
+// used "what I learned" words, which go as research notes again since 2026-11-08). The checks are
+// the same. Challenge model (2026-11-09): one row per day, its note overwritten in place, so
+// "sent" below means any write of a day row (insert or overwrite).
 
 /** Her exercise answer for D changed with Edit (a new submitted version, the one shown). */
 async function editAnswer(text: string) {
@@ -146,8 +147,9 @@ describe("#58 (b): a day already in Together WITH answers; after the Replace the
     expect((await readSharePrivate(jk, D)).exercise).toBe(true);
     await send(fake, c);
     const live = (await liveNotes(fake))[D] ?? "";
-    expect(live).not.toMatch(/Gildersleeve|Pretend exercise answer|What I learned/);
-    expect(fake.liveTallies(await habit("exercise"))).toHaveLength(1);
+    expect(live).not.toMatch(/Gildersleeve|Pretend exercise answer|Research notes/);
+    expect(liveDays(fake)).toHaveLength(1);
+    expect(JSON.stringify([...fake.days.values()]), "overwritten: the answers are nowhere in Together").not.toMatch(/Gildersleeve|Pretend exercise answer/);
     await ok(phone, server);
     const phoneRow = (await phone.journal.get(`share:${D}:exercise`))!;
     const { openJson } = await import("../journal/crypto");
@@ -180,10 +182,10 @@ describe("#58 (a): a day the record says went titles only", () => {
         await syncBoth(server, phone);
         await send(fake, c);
       }
-      expect((await readSent(db))!.tallies[`exercise:${D}`]).toMatchObject({ live: true, answers: false });
+      expect((await readSent(db))!.days![D]).toMatchObject({ live: true, parts: { exercise: "titles", checkin: "titles" } });
       await stopSyncing(db);
       await restoreBackup(file, "replace");
-      expect((await readSent(db))!.tallies[`exercise:${D}`], "(d) the device-local record survives the Replace").toMatchObject({ live: true, answers: false });
+      expect((await readSent(db))!.days![D], "(d) the device-local record survives the Replace").toMatchObject({ live: true, parts: { exercise: "titles", checkin: "titles" } });
       const from = fake.requests.length;
       for (let i = 0; i < 3; i++) {
         c.advance(60 * 60 * 1000);
@@ -194,7 +196,7 @@ describe("#58 (a): a day the record says went titles only", () => {
       await send(fake, c);
       await send(fake, c);
       expect(postsWith(fake, from, /Hollowmere|Pretend exercise answer|Pretend check-in answer/)).toEqual([]);
-      expect(restWrites(fake, from).filter((r) => r.url.includes("todo_events")), "nothing re-sent at all").toEqual([]);
+      expect(restWrites(fake, from).filter((r) => r.url.includes("challenge_days")), "nothing re-sent at all").toEqual([]);
     });
   }
 });
@@ -217,7 +219,7 @@ describe("#58 (c): words written after the Replace", () => {
     const live = (await liveNotes(fake))[D]!;
     expect(live.split("Pretend Inglenook answer after the Replace").length - 1).toBe(1);
     expect(postsWith(fake, from, /Inglenook answer/)).toHaveLength(1);
-    expect(fake.liveTallies(await habit("exercise"))).toHaveLength(1);
+    expect(liveDays(fake)).toHaveLength(1);
   });
 
   it("a day not yet due when restored waits in the gap (titles only), then its answers go once after the pull", async () => {
@@ -274,6 +276,7 @@ describe("#58: the device that sends never Replaced (the other device did)", () 
     c.set("2026-11-06T03:30:00");
     await send(fake, c);
     expect((await liveNotes(fake))[D]).toContain("Pretend exercise answer"); // answers go as usual
-    expect((await liveNotes(fake))[D]).not.toContain("Kittiwake"); // v1: learned words never go
+    // That day's newest learned words (the phone's, written after its Replace) go as research notes.
+    expect((await liveNotes(fake))[D]).toContain("• Pretend Kittiwake learned, the phone after its Replace");
   });
 });

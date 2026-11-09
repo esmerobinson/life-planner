@@ -1,18 +1,21 @@
-// TESTING (Life Planner - Together Round 3 Testing, 2026-11-05): the round-3 fix for #49 (a tally
-// that may be in Together is written down before it goes; every run deletes those first; Stop
-// with removing deletes them, the live tallies and both habits before forgetting anything).
-// Fake Together only, every value made up. Tests named "BUG:" fail on together-link @696dede.
+// TESTING (Life Planner - Together Round 3 Testing, 2026-11-05): the round-3 fix for #49 (a write
+// that may be in Together is written down before it goes; Stop with removing removes it with
+// everything else before forgetting anything). Converted to the challenge model (2026-11-09): one
+// `challenge_days` row per day by a fixed id; a day that may be in Together (an insert whose
+// reply was lost) is recorded with an unknown note and overwritten on the next run. Fake Together
+// only, every value made up. Tests named "BUG:" failed on together-link @696dede, or (the
+// challenge conversion's) on together-challenge @6ecc463.
 
 import { db } from "../data/db";
 import { saveSharePrivate } from "../data/repo";
 import { JOURNAL_KEY_META } from "../journal/keyStore";
 import type { FakeSupabase } from "./fakeSupabase";
-import { togetherId } from "./ids";
 import { notRemoved, SIGN_IN_MESSAGES, sendToTogether, signInToTogether, stopTogether } from "./sender";
 import { readAuth, readSent, TOGETHER_META, TOGETHER_SENT_META } from "./store";
-import { clock, EMAIL, emptyDb, journalDay, PASSWORD, send, signedIn, type Clock } from "./testKit";
+import { CHALLENGE, clock, dayRow, dayWrites, EMAIL, emptyDb, journalDay, liveDays, liveNote, PASSWORD, send, signedIn, type Clock } from "./testKit";
 
 const DAY = "2026-11-04";
+const EARLIER = "2026-11-03";
 const SIGN_IN = `${DAY}T10:00:00`;
 const TITLES_AT = "2026-11-05T03:30:00";
 const ANSWERS_AT = "2026-11-06T03:30:00";
@@ -21,43 +24,43 @@ const EX_ANSWER = "Pretend exercise answer"; // journalDay's made-up exercise wo
 
 beforeEach(emptyDb);
 
-const habit = (kind: "exercise" | "checkin") => togetherId("habit", kind, 1);
-const isEventInsert = (method?: string, url?: string) => method === "POST" && String(url).includes("/rest/v1/todo_events");
+const isDayInsert = (method?: string, url?: string) => method === "POST" && String(url).includes("/rest/v1/challenge_days");
+const isDayPatch = (method?: string, url?: string) => method === "PATCH" && String(url).includes("/rest/v1/challenge_days");
 
-/** Every tally in Together that isn't deleted and holds any of her answers (either habit). */
-async function liveAnswers(fake: FakeSupabase) {
-  const all = [...fake.liveTallies(await habit("checkin")), ...fake.liveTallies(await habit("exercise"))];
-  return all.filter((e) => String(e.note ?? "").includes(ANSWER) || String(e.note ?? "").includes(EX_ANSWER));
+/** Every live row in Together that holds any of her answers. */
+function liveAnswers(fake: FakeSupabase) {
+  return liveDays(fake).filter((d) => String(d.note ?? "").includes(ANSWER) || String(d.note ?? "").includes(EX_ANSWER));
 }
-const liveCount = async (fake: FakeSupabase) => fake.liveTallies(await habit("checkin")).length + fake.liveTallies(await habit("exercise")).length;
-const habitsDeleted = async (fake: FakeSupabase) => ({
-  exercise: !!fake.todos.get(await habit("exercise"))?.deleted_at,
-  checkin: !!fake.todos.get(await habit("checkin"))?.deleted_at,
-});
+const liveCount = (fake: FakeSupabase) => liveDays(fake).length;
+/** Nothing of the link's own beyond day rows: no to-do made, her challenge itself never deleted. */
+const onlyDays = (fake: FakeSupabase) => ({ todos: fake.todos.size, events: fake.events.size, challengeDeleted: !!fake.challenges.get(CHALLENGE)!.deleted_at });
 const stop = (f: typeof fetch, c: Clock, markDeleted: boolean) => stopTogether({ fetch: f, now: c.now }, { markDeleted });
 const signInAgain = (fake: FakeSupabase, c: Clock) =>
   signInToTogether({ fetch: fake.fetch, now: c.now }, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD });
 
-/** Signed in, DAY's exercise and check-in done, and their titles-only tallies in Together. */
+/** Signed in, DAY's check-in (and exercise) done, and its titles-only row in Together. */
 async function titlesSent(opts: { exercise?: boolean } = {}) {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk } = await journalDay(DAY, { checkin: true, exercise: opts.exercise ?? false });
   c.set(TITLES_AT);
   expect((await send(fake, c)).kind).toBe("ok");
-  expect(await liveAnswers(fake)).toHaveLength(0);
+  expect(liveAnswers(fake)).toHaveLength(0);
   c.set(ANSWERS_AT);
   return { c, fake, jk };
 }
 
-/** Like titlesSent, then the answers insert reaches Together but its reply is lost. */
+/** Signed in, DAY's check-in done; its first insert (with answers) reaches Together but the reply is lost. */
 async function answersMaybeSent() {
-  const t = await titlesSent();
-  t.fake.inject({ lostReply: true, when: (r) => isEventInsert(r.method, r.url) });
-  expect((await send(t.fake, t.c)).kind).toBe("offline");
-  expect(await liveAnswers(t.fake), "set-up: the answers are in Together").toHaveLength(1);
-  expect(Object.keys((await readSent(db))?.maybe ?? {}), "set-up: written down as maybe-sent").toHaveLength(1);
-  return t;
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  const { jk } = await journalDay(DAY, { checkin: true });
+  c.set(ANSWERS_AT);
+  fake.inject({ lostReply: true, when: (r) => isDayInsert(r.method, r.url) });
+  expect((await send(fake, c)).kind).toBe("offline");
+  expect(liveAnswers(fake), "set-up: the answers are in Together").toHaveLength(1);
+  expect((await readSent(db))?.days?.[DAY], "set-up: written down as maybe-sent").toMatchObject({ hash: "", live: true });
+  return { c, fake, jk };
 }
 
 /** A fetch that hangs (until aborted) on the first request `when` matches, after doing it or not. */
@@ -97,91 +100,85 @@ function gate(fake: FakeSupabase) {
 // ---- Stop with removing while something hangs ---------------------------------------------------
 
 describe("Stop with removing, while a request hangs", () => {
-  it("during a hung answers insert (done in Together): nothing of hers is left live, both habits deleted, record forgotten", async () => {
+  it("during a hung answers write (done in Together): nothing of hers is left live, her challenge kept, record forgotten", async () => {
     const { c, fake } = await titlesSent({ exercise: true });
-    const h = hangOn(fake, isEventInsert, { applied: true });
+    const h = hangOn(fake, isDayPatch, { applied: true });
     const run = sendToTogether({ fetch: h.fetch, now: c.now });
     await h.out;
     expect(await stop(h.fetch, c, true)).toEqual({ kind: "ok" });
     expect((await run).kind).toBe("offline");
-    expect(await liveCount(fake), "a tally is still live in Together").toBe(0);
-    expect(await habitsDeleted(fake)).toEqual({ exercise: true, checkin: true });
+    expect(liveCount(fake), "a day is still live in Together").toBe(0);
+    expect(onlyDays(fake)).toEqual({ todos: 0, events: 0, challengeDeleted: false });
     expect(await readSent(db), "the record is forgotten only after Together confirmed").toBeUndefined();
     expect(await readAuth(db)).toBeUndefined();
   });
 
-  it("during a hung delete of a maybe-sent tally (the next run's clean-up): nothing of hers is left live", async () => {
+  it("during the next run's hung overwrite of a maybe-sent day: nothing of hers is left live", async () => {
     const { c, fake } = await answersMaybeSent();
-    const maybeId = Object.keys((await readSent(db))!.maybe!)[0]!;
-    const h = hangOn(fake, (m, u) => m === "PATCH" && u.includes(maybeId), { applied: false });
+    const h = hangOn(fake, isDayPatch, { applied: false });
     const run = sendToTogether({ fetch: h.fetch, now: c.now });
     await h.out;
     expect(await stop(h.fetch, c, true)).toEqual({ kind: "ok" });
     expect((await run).kind).toBe("offline");
-    expect(await liveAnswers(fake)).toHaveLength(0);
-    expect(await liveCount(fake)).toBe(0);
-    expect(await habitsDeleted(fake)).toEqual({ exercise: true, checkin: true });
-    expect(fake.todos.size, "no habit made by Stop").toBe(2);
+    expect(liveAnswers(fake)).toHaveLength(0);
+    expect(liveCount(fake)).toBe(0);
+    expect(onlyDays(fake)).toEqual({ todos: 0, events: 0, challengeDeleted: false });
   });
 
-  it("during a hung habit insert (done in Together, never recorded): Stop deletes that habit too", async () => {
+  it("during a hung first insert of a day (done in Together, never confirmed): Stop removes that day too", async () => {
     const c = clock(SIGN_IN);
     const fake = await signedIn(c);
     await journalDay(DAY, { checkin: true });
     c.set(TITLES_AT);
-    const h = hangOn(fake, (m, u) => m === "POST" && u.includes("/rest/v1/todos"), { applied: true });
+    const h = hangOn(fake, isDayInsert, { applied: true });
     const run = sendToTogether({ fetch: h.fetch, now: c.now });
     await h.out;
     expect(await stop(h.fetch, c, true)).toEqual({ kind: "ok" });
     await run;
-    const made = [...fake.todos.values()];
-    expect(made.length, "set-up: the habit is in Together").toBe(1);
-    expect(made.every((t) => !!t.deleted_at)).toBe(true);
+    expect(fake.days.size, "set-up: the day is in Together").toBe(1);
+    expect(dayRow(fake, DAY)!.deleted_at).toBeTruthy();
   });
 });
 
 // ---- signing in again ---------------------------------------------------------------------------
 
 describe("after Stop", () => {
-  it("lost reply, Stop with removing, sign in again weeks later: no old answers come back, one habit per kind, only new days go", async () => {
+  it("lost reply, Stop with removing, sign in again weeks later: the same row comes back with titles only, its answers only after the 24 h for past days; one row a day", async () => {
     const { c, fake } = await answersMaybeSent();
     expect(await stop(fake.fetch, c, true)).toEqual({ kind: "ok" });
+    expect(liveCount(fake)).toBe(0);
     c.set("2026-11-25T10:00:00");
     expect(await signInAgain(fake, c)).toEqual({ kind: "ok" });
     expect((await send(fake, c)).kind).toBe("ok");
-    expect(await liveCount(fake), "nothing old comes back").toBe(0);
+    expect(liveAnswers(fake), "no old answers come back at once (past days wait 24 h)").toHaveLength(0);
+    expect(liveCount(fake), "the day is logged again (backfill), titles only").toBe(1);
     // A new day, sent normally.
     await journalDay("2026-11-25", { checkin: true });
     c.set("2026-11-27T03:30:00");
     expect((await send(fake, c)).kind).toBe("ok");
-    expect([...fake.todos.keys()].sort(), "no duplicate habits: the two fixed ids only").toEqual([await habit("checkin"), await habit("exercise")].sort());
-    expect(fake.todos.get(await habit("checkin"))!.deleted_at).toBeFalsy();
-    const live = fake.liveTallies(await habit("checkin"));
-    expect(live.map((e) => String(e.at).slice(0, 10))).toEqual(["2026-11-25"]);
-    expect(fake.todos.get(await habit("checkin"))!.tally).toBe(1);
+    expect(fake.days.size, "one row per day: the same fixed id shown again, never a second").toBe(2);
+    expect(liveDays(fake).map((d) => d.day)).toEqual([DAY, "2026-11-25"]);
+    expect(liveNote(fake, "2026-11-25")).toContain(ANSWER);
+    expect(onlyDays(fake)).toEqual({ todos: 0, events: 0, challengeDeleted: false });
   });
 
-  it("Stop WITHOUT removing during a hung answers insert, then sign in again: the record is kept, the maybe-sent tally goes first, the day is in Together exactly once", async () => {
+  it("Stop WITHOUT removing during a hung answers write, then sign in again: the record is kept, the day is in Together exactly once, with her answers", async () => {
     const { c, fake } = await titlesSent();
-    const h = hangOn(fake, isEventInsert, { applied: true });
+    const h = hangOn(fake, isDayPatch, { applied: true });
     const run = sendToTogether({ fetch: h.fetch, now: c.now });
     await h.out;
     expect(await stop(h.fetch, c, false)).toEqual({ kind: "ok" });
     await run;
-    expect(Object.keys((await readSent(db))?.maybe ?? {}), "kept for the next sign-in").toHaveLength(1);
+    expect((await readSent(db))?.days?.[DAY], "kept for the next sign-in").toBeTruthy();
     c.set("2026-11-10T10:00:00");
     expect(await signInAgain(fake, c)).toEqual({ kind: "ok" });
-    const before = fake.requests.length;
     expect((await send(fake, c)).kind).toBe("ok");
-    const inserts = fake.requests.slice(before).filter((r) => isEventInsert(r.method, r.url) && r.status === 201);
-    expect(inserts, "the day's answers went in once").toHaveLength(1);
-    expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
-    expect(await liveAnswers(fake)).toHaveLength(1);
-    expect((await readSent(db))?.maybe ?? {}).toEqual({});
+    expect(fake.days.size).toBe(1);
+    expect(liveAnswers(fake)).toHaveLength(1);
     // And a second run sends nothing more.
     const n = fake.requests.length;
     expect((await send(fake, c)).kind).toBe("ok");
-    expect(fake.requests.slice(n).filter((r) => r.method === "POST")).toHaveLength(0);
+    expect(fake.requests.slice(n).filter((r) => r.method !== "GET")).toHaveLength(0);
   });
 });
 
@@ -194,147 +191,131 @@ describe("Stop with removing while offline, or refused", () => {
     g.offline = true;
     expect(await stop(g.fetch, c, true)).toEqual({ kind: "error", message: SIGN_IN_MESSAGES.offline });
     expect(await readAuth(db)).toBeTruthy();
-    expect(Object.keys((await readSent(db))?.maybe ?? {})).toHaveLength(1);
+    expect((await readSent(db))?.days?.[DAY]).toMatchObject({ hash: "", live: true });
     g.offline = false;
     expect(await stop(g.fetch, c, true)).toEqual({ kind: "ok" });
-    expect(await liveCount(fake)).toBe(0);
-    expect((await habitsDeleted(fake)).checkin).toBe(true);
+    expect(liveCount(fake)).toBe(0);
     expect(await db.syncMeta.get(TOGETHER_SENT_META)).toBeUndefined();
     expect(await db.syncMeta.get(TOGETHER_META)).toBeUndefined();
   });
 
-  it("Together refuses the maybe-sent delete once: she's told \"1 thing\", nothing forgotten; the next try works", async () => {
+  it("Together refuses removing the maybe-sent day once: she's told \"1 thing\", nothing forgotten; the next try works", async () => {
     const { c, fake } = await answersMaybeSent();
-    const maybeId = Object.keys((await readSent(db))!.maybe!)[0]!;
-    fake.inject({ status: 403, body: { code: "42501", message: "fake: refused" }, when: (r) => r.method === "PATCH" && r.url.includes(maybeId) });
+    fake.inject({ status: 403, body: { code: "42501", message: "fake: refused" }, when: (r) => isDayPatch(r.method, r.url) });
     expect(await stop(fake.fetch, c, true)).toEqual({ kind: "error", message: notRemoved(1) });
-    expect(Object.keys((await readSent(db))?.maybe ?? {})).toEqual([maybeId]);
+    expect((await readSent(db))?.days?.[DAY]).toMatchObject({ live: true });
     expect(await readAuth(db)).toBeTruthy();
     expect(await stop(fake.fetch, c, true)).toEqual({ kind: "ok" });
-    expect(await liveCount(fake)).toBe(0);
+    expect(liveCount(fake)).toBe(0);
   });
 
-  it("BUG: Stop with removing cut off part-way (offline): the next run, before she tries again, doesn't put back in Together what Stop already removed", async () => {
-    const { c, fake } = await titlesSent({ exercise: true });
+  it("Stop with removing cut off part-way (offline): the next run, before she tries again, doesn't put back in Together what Stop already removed", async () => {
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    await journalDay(EARLIER, { checkin: true });
+    await journalDay(DAY, { checkin: true, exercise: true });
+    c.set(ANSWERS_AT);
     expect((await send(fake, c)).kind).toBe("ok");
-    expect(await liveAnswers(fake), "set-up: both days' answers in Together").toHaveLength(2);
-    // The connection drops after Stop's first three requests (the tallies are deleted).
+    expect(liveAnswers(fake), "set-up: both days' answers in Together").toHaveLength(2);
+    // The connection drops after Stop's first request (one day removed).
     const g = gate(fake);
     let n = 0;
     const flaky = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).includes("/rest/v1/") && ++n > 3) throw new TypeError("Failed to fetch");
+      if (String(input).includes("/rest/v1/") && ++n > 1) throw new TypeError("Failed to fetch");
       return g.fetch(input, init);
     }) as typeof fetch;
     expect(await stop(flaky, c, true)).toEqual({ kind: "error", message: SIGN_IN_MESSAGES.offline });
-    expect(await liveAnswers(fake), "set-up: Stop removed the answers before it was cut off").toHaveLength(0);
+    expect(liveAnswers(fake), "set-up: Stop removed one day before it was cut off").toHaveLength(1);
+    const removed = liveDays(fake).length === 1 ? [EARLIER, DAY].find((d) => !liveNote(fake, d))! : "";
     // Back online, a sync finishes and the Together run goes (she hasn't pressed Stop again yet).
     expect((await send(fake, c)).kind).toBe("ok");
-    expect({
-      answersBackInTogether: (await liveAnswers(fake)).length,
-      habitsShownAgain: Object.values(await habitsDeleted(fake)).filter((d) => !d).length,
-    }).toEqual({ answersBackInTogether: 0, habitsShownAgain: 0 });
+    expect({ removedDayBack: !!liveNote(fake, removed), postsAfter: dayWrites(fake).filter((r) => r.method === "POST").length }).toEqual({
+      removedDayBack: false, postsAfter: 2,
+    });
   });
 });
 
-// ---- a refused clean-up -------------------------------------------------------------------------
+// ---- a refused overwrite ------------------------------------------------------------------------
 
-describe("a maybe-sent tally whose clean-up Together refuses", () => {
-  it("blocks new sends while refused (she sees it as a day not hidden), and the next run once accepted clears it and sends the rest, no Send now needed", async () => {
+describe("a maybe-sent day whose overwrite Together refuses", () => {
+  it("is shown as not yet hidden; other days still go; Send now tries it again", async () => {
     const { c, fake } = await answersMaybeSent();
-    const maybeId = Object.keys((await readSent(db))!.maybe!)[0]!;
-    const refuse = () => fake.inject({ status: 400, body: { code: "23514", message: "fake: refused" }, when: (r) => r.method === "PATCH" && r.url.includes(maybeId) });
+    fake.inject({ status: 400, body: { code: "23514", message: "fake: refused" }, when: (r) => isDayPatch(r.method, r.url) && r.url.includes(String(dayRow(fake, DAY)!.id)) });
     // A new day is due meanwhile.
     await journalDay("2026-11-05", { checkin: true });
     c.set("2026-11-06T04:00:00");
-    for (let i = 0; i < 3; i++) {
-      refuse();
-      expect((await send(fake, c)).kind).toBe("ok");
-      const sent = (await readSent(db))!;
-      expect(sent.refused["maybe"], "she's told something couldn't be hidden").toMatchObject({ what: "hide" });
-      expect(fake.liveTallies(await habit("checkin")).some((e) => String(e.at).startsWith("2026-11-05")), "nothing new went").toBe(false);
-    }
-    // Send now while still refused: same.
-    refuse();
-    expect((await send(fake, c, true)).kind).toBe("ok");
-    expect((await readSent(db))!.refused["maybe"]).toBeTruthy();
-    // Together accepts again: an ordinary run clears it and copies the new day.
     expect((await send(fake, c)).kind).toBe("ok");
-    const sent = (await readSent(db))!;
-    expect(sent.refused["maybe"]).toBeUndefined();
-    expect(sent.maybe ?? {}).toEqual({});
-    expect(fake.liveTallies(await habit("checkin")).map((e) => String(e.at).slice(0, 10)).sort()).toEqual([DAY, "2026-11-05"]);
-    expect(await liveAnswers(fake)).toHaveLength(1); // DAY's answers (due); 11-05's are still titles only
+    expect((await readSent(db))!.refused[DAY], "she's told something couldn't be hidden").toMatchObject({ what: "hide" });
+    expect(liveDays(fake).map((d) => d.day)).toEqual([DAY, "2026-11-05"]);
+    expect(await send(fake, c, true)).toMatchObject({ kind: "ok", refused: 0 });
+    expect((await readSent(db))!.days![DAY]!.hash).not.toBe("");
+    expect(liveAnswers(fake).map((d) => d.day)).toEqual([DAY]); // DAY's answers (due); 11-05's are still titles only
   });
 
-  it("ticked private while its clean-up is refused: once accepted, the answers are deleted and never inserted again", async () => {
+  it("BUG: ticked private while its overwrite is refused: once Together accepts, the next run overwrites the answers (no Send now needed), never inserting them again", async () => {
     const { c, fake, jk } = await answersMaybeSent();
-    const maybeId = Object.keys((await readSent(db))!.maybe!)[0]!;
     await saveSharePrivate(jk, DAY, "checkin", true);
-    fake.inject({ status: 400, body: { code: "23514", message: "fake: refused" }, when: (r) => r.method === "PATCH" && r.url.includes(maybeId) });
+    fake.inject({ status: 400, body: { code: "23514", message: "fake: refused" }, when: (r) => isDayPatch(r.method, r.url) });
     expect((await send(fake, c)).kind).toBe("ok");
     const mark = fake.requests.length;
     expect((await send(fake, c)).kind).toBe("ok");
-    expect(await liveAnswers(fake)).toHaveLength(0);
-    expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
-    const answerInserts = fake.requests.slice(mark).filter((r) => isEventInsert(r.method, r.url) && r.body.includes(ANSWER));
-    expect(answerInserts).toHaveLength(0);
+    expect(liveAnswers(fake), "her private answers are still live in Together").toHaveLength(0);
+    expect(liveCount(fake)).toBe(1);
+    expect(fake.requests.slice(mark).filter((r) => isDayInsert(r.method, r.url) && r.body.includes(ANSWER))).toHaveLength(0);
   });
 
   it("while refused, Stop with removing says it couldn't remove it; Stop without removing still works at once", async () => {
     const { c, fake } = await answersMaybeSent();
-    const maybeId = Object.keys((await readSent(db))!.maybe!)[0]!;
-    fake.inject({ status: 400, body: { code: "23514", message: "fake: refused" }, when: (r) => r.method === "PATCH" && r.url.includes(maybeId) });
+    fake.inject({ status: 400, body: { code: "23514", message: "fake: refused" }, when: (r) => isDayPatch(r.method, r.url) });
     expect(await stop(fake.fetch, c, true)).toEqual({ kind: "error", message: notRemoved(1) });
     expect(await stop(fake.fetch, c, false)).toEqual({ kind: "ok" });
-    expect(Object.keys((await readSent(db))?.maybe ?? {})).toEqual([maybeId]);
+    expect((await readSent(db))?.days?.[DAY]).toMatchObject({ hash: "", live: true });
   });
 });
 
 // ---- a run that can't read the journal -----------------------------------------------------------
 
 describe("a run on a device whose journal key can't be read", () => {
-  it("BUG: a maybe-sent tally (a day she then ticked private on her phone) is still deleted first: deleting needs no journal", async () => {
+  it("BUG: a maybe-sent day (one she then ticked private on her phone) is still dealt with: removing it needs no journal", async () => {
     const { c, fake, jk } = await answersMaybeSent();
     await saveSharePrivate(jk, DAY, "checkin", true); // arrives by sync from the phone
     await db.syncMeta.delete(JOURNAL_KEY_META); // e.g. a stored key that came back unreadable
     expect((await send(fake, c)).kind).toBe("ok");
-    expect(await liveAnswers(fake), "her private answers are still live in Together").toHaveLength(0);
+    expect(liveAnswers(fake), "her private answers are still live in Together").toHaveLength(0);
   });
 });
 
 // ---- two devices ---------------------------------------------------------------------------------
 
 describe("two devices, each with its own device-only record (\"Sign in on one device only\")", () => {
-  it("both signed in, both maybe-sent the same day: Stop with removing on one leaves the other's copy live (documents the limit)", async () => {
+  it("both signed in, both sending the same day: one row (the same fixed id); Stop with removing on one removes it, and the other doesn't put it back unless the day changes (documents the limit)", async () => {
     // Device 1: the answers insert lands, reply lost.
     const { c, fake } = await answersMaybeSent();
     const dev1 = await db.syncMeta.bulkGet([TOGETHER_META, TOGETHER_SENT_META]);
-    // Device 2: signed in too (fresh record), sends the same day (same fixed ids); reply lost too.
+    // Device 2: signed in too (fresh record), sends the same day: the insert clashes, the same row is overwritten.
     await db.syncMeta.bulkDelete([TOGETHER_META, TOGETHER_SENT_META]);
     const c2 = clock("2026-11-01T10:00:00");
     expect(await signInToTogether({ fetch: fake.fetch, now: c2.now }, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD })).toEqual({ kind: "ok" });
     c2.set(ANSWERS_AT);
-    fake.inject({ lostReply: true, when: (r) => isEventInsert(r.method, r.url) && r.body.includes(ANSWER) });
-    await send(fake, c2);
     expect((await send(fake, c2)).kind).toBe("ok");
+    expect(fake.days.size, "one row for the day").toBe(1);
     const dev2 = await db.syncMeta.bulkGet([TOGETHER_META, TOGETHER_SENT_META]);
-    // Device 1 runs again (it never knew of device 2's copy).
+    // Device 1 runs again (it never knew of device 2's write).
     await db.syncMeta.bulkPut(dev1.filter((x) => !!x));
     expect((await send(fake, c)).kind).toBe("ok");
+    expect(fake.days.size).toBe(1);
     const dev1b = await db.syncMeta.bulkGet([TOGETHER_META, TOGETHER_SENT_META]);
     // Stop with removing on device 2 only.
     await db.syncMeta.bulkPut(dev2.filter((x) => !!x));
     expect(await stop(fake.fetch, c2, true)).toEqual({ kind: "ok" });
-    const leftAfterStop2 = (await liveAnswers(fake)).length;
-    const habitDeletedByStop2 = (await habitsDeleted(fake)).checkin;
-    // Device 1 runs on (still signed in), then she stops there too, with removing.
+    const leftAfterStop2 = liveAnswers(fake).length;
+    // Device 1 runs on (still signed in, the day unchanged), then she stops there too, with removing.
     await db.syncMeta.bulkPut(dev1b.filter((x) => !!x));
     expect((await send(fake, c)).kind).toBe("ok");
-    const habitStillDeletedAfterDev1Run = (await habitsDeleted(fake)).checkin;
+    const backAfterDev1Run = liveCount(fake);
     expect(await stop(fake.fetch, c, true)).toEqual({ kind: "ok" });
-    // Found 2026-11-05: device 1's copy stays live under a habit device 2 deleted; device 1 goes
-    // on copying into that deleted habit (it never un-deletes it), until its own Stop.
-    expect({ leftAfterStop2, habitDeletedByStop2, habitStillDeletedAfterDev1Run }).toEqual({ leftAfterStop2: 1, habitDeletedByStop2: true, habitStillDeletedAfterDev1Run: true });
-    expect(await liveCount(fake), "after Stop with removing on both devices, nothing is live").toBe(0);
+    expect({ leftAfterStop2, backAfterDev1Run }).toEqual({ leftAfterStop2: 0, backAfterDev1Run: 0 });
+    expect(liveCount(fake), "after Stop with removing on both devices, nothing is live").toBe(0);
+    expect(fake.days.size).toBe(1);
   });
 });
