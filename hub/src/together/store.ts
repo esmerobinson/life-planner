@@ -4,11 +4,14 @@
 //
 // - "together": the sign-in. The Supabase address and anon key, her Together user id and couple
 //   id, and the access and refresh tokens with their expiry. Never the password or email.
-// - "togetherSent": what has been sent, per day (its version and a hash of the note that went),
-//   so a run sends only what changed and a replay sends nothing.
+// - "togetherSent": what has been sent, per day (the parts its note holds and a hash of it), so
+//   a run sends only what changed and a replay sends nothing.
 
 import type { HubDB } from "../data/db";
 import type { ISODate } from "../domain/types";
+import type { Part } from "./journalNotes";
+
+export type { Part };
 
 export const TOGETHER_META = "together";
 export const TOGETHER_SENT_META = "togetherSent";
@@ -25,55 +28,63 @@ export interface TogetherAuth {
   expiresAt?: number;
 }
 
-/** One day's tally, as last sent. */
-export interface SentTally {
-  v: number;
-  /** Hash of the note it carries. */
+/** One day's row in her challenge (`challenge_days`, by our fixed id), as last sent. */
+export interface SentDay {
+  /**
+   * Hash of the note it holds. "" when unknown: written down BEFORE the insert goes (bug #49), so
+   * an insert cut off (timed out, reply lost) is never forgotten; the next run overwrites it.
+   */
   hash: string;
+  /** Not deleted in Together. */
   live: boolean;
-  /** It carries her answers (not titles only). Absent on older records: taken as "may". */
-  answers?: boolean;
+  /** The parts it holds, and whether with her answers (an unknown note: taken as answers). */
+  parts: Partial<Record<Part, "titles" | "answers">>;
 }
 
-export interface SentHabit {
-  /** `todos.tally` as last sent. */
-  tally: number;
-  deleted: boolean;
-}
-
-export type HabitKind = "exercise" | "checkin";
-
-/** Why something is set aside: it couldn't be copied, or an old tally couldn't be hidden. */
+/** Why something is set aside: it couldn't be copied, or something couldn't be hidden. */
 export interface SetAside {
   hash: string;
   what: "copy" | "hide";
 }
 
-export interface TogetherSent {
+/** What an earlier build kept (two habits and their tallies): cleaned up once, then forgotten. */
+export interface LegacyHabits {
+  habits?: Partial<Record<Part, { tally: number; deleted: boolean }>>;
+  /** By `<kind>:<date>`. */
+  tallies?: Record<string, { v: number; hash: string; live: boolean; answers?: boolean }>;
+  maybe?: Record<string, { key: string; v: number }>;
+}
+
+export interface TogetherSent extends LegacyHabits {
   /** The Together user these records belong to (a different account starts afresh). */
   userId: string;
-  /** The first day copied: nothing journalled before it goes. */
+  /** Her first exercise or check-in day (everything from it goes, Esme 2026-11-08). */
   since: ISODate;
   /** Random, for the note hashes. */
   salt: string;
-  habits: Partial<Record<HabitKind, SentHabit>>;
-  /** By `<kind>:<date>`. */
-  tallies: Record<string, SentTally>;
+  /** Her challenge in Together ("BPD research", renamed "Mental Health Work"), once found. */
+  challenge?: { id: string; renamed?: boolean };
+  /** No such challenge was found in Together on the last look: nothing goes. */
+  challengeMissing?: boolean;
+  /** By date. */
+  days?: Record<ISODate, SentDay>;
+  /** Days she had already logged by hand in Together: left as she wrote them. */
+  byHand?: Record<ISODate, true>;
   /** Set aside after Together refused it (tried again once it changes, or on Send now). */
   refused: Record<string, SetAside>;
   /**
-   * Tallies that may be in Together but aren't recorded as sent (bug #49): written here BEFORE
-   * each insert, by fixed id, so a request cut off (timed out, aborted, reply lost) is never
-   * forgotten. Each is deleted in Together before anything new goes, and by Stop with removing;
-   * an entry goes only once Together confirms that tally is gone (or was never there), or once
-   * the insert is confirmed and the tally is recorded as sent.
+   * Days before this one (the sign-in day, or the day this update first ran) are past days: their
+   * answers wait until `pastUntil` (24 h after that moment), so she can tick any old day private.
    */
-  maybe?: Record<string, { key: string; v: number }>;
+  pastBefore?: ISODate;
+  pastUntil?: number;
+  /** The last run stopped at its limit of writes (a big backfill): the rest goes next run. */
+  backlog?: boolean;
   /** The last run (any outcome but offline). */
   lastSentAt?: number;
-  /** The last run that could copy (nothing held back): "Last copied" in the box. */
+  /** The last run that could copy: "Last copied" in the box. */
   lastCopiedAt?: number;
-  /** New days are held back until a refused clean-up goes through. */
+  /** New days are held back until something is sorted. */
   held?: boolean;
   /** How many former device ids this device had when last looked at: one more means a Replace. */
   formerSeen?: number;

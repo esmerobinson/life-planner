@@ -1,24 +1,32 @@
-// The Together sender (Together link brief, fix round 1): signs in, refreshes, and copies the
-// Mental health exercise and Daily check-in days to Together as two habits with one tally per
-// day. Nothing else goes (no to-dos, Esme 2026-11-05). One way only: nothing is read back.
+// The Together sender: signs in, refreshes, and logs the Mental health exercise and Daily
+// check-in days in her existing Together challenge ("BPD research", renamed once to "Mental
+// Health Work"; challenge brief, Esme 2026-11-09): one `challenge_days` row per day, its note
+// holding both parts (journalNotes.ts). Each row counts towards the challenge exactly like a
+// "Log today" she made by hand. Nothing else goes: no to-dos, no habits. One way only: nothing is
+// read back except her couple id and which challenge is hers.
 // It runs after a sync run has finished (never during one: what it sends is read under the sync
 // lock) and on "Send now", one tab at a time (a Web Lock).
 //
 // When a day goes, in two stages (review C1: a private tick made on another device must never
 // lose the race):
-// 1. After the day ends (the 3am day change): titles only (the cards' titles, the questions she
-//    answered). Leaving these behind in Together is harmless.
-// 2. ANSWERS_DELAY_MS later, and only if that part isn't ticked private (read again right before
-//    sending): the titles-only tally is deleted and one with her answers takes its place.
+// 1. After the day ends (the 3am day change): titles and questions only.
+// 2. ANSWERS_DELAY_MS later, and only for a part that isn't ticked private (read again right
+//    before sending): the note is overwritten with her answers and research notes.
+// Past days (before the sign-in, or before this update first ran) wait ANSWERS_DELAY_MS after
+// that moment before their answers go, so she can tick any old day private first (2026-11-08).
 //
-// - Every id is fixed (ids.ts). created_at / updated_at are never sent.
-// - A tally is never edited: a change deletes the old one (`deleted_at`, once; its text stays in
-//   Together's database, hidden) and inserts a new version. An id already taken (its content
-//   unknown, say a reply lost on the way) is deleted too, and a new version goes (review I2).
-// - A record per day (store.ts) says what went, so a run sends only what changed.
+// - The note can be overwritten (challenge_days: only `note` and `deleted_at` change), so a
+//   private tick or an edit after sending really replaces the text there.
+// - Every row's id is fixed (ids.ts). created_at / updated_at / by are never sent.
+// - One row per day (unique challenge and day). A day she already logged by hand in Together is
+//   left exactly as she wrote it, and never tried again.
+// - A record per day (store.ts) says what went, so a run sends only what changed. At most
+//   MAX_WRITES_PER_RUN rows are written per run (a big backfill goes over several runs).
 // - Offline or a server error: stop, try again next run. One row refused: set aside (counted on
 //   the box), the rest goes on. A 401: one refresh is tried; if that fails too, or a refresh is
 //   refused, stop, forget the tokens and ask her to sign in again. Nothing else is affected.
+// - What an earlier build made (two habit to-dos and their tallies) is marked deleted once, then
+//   forgotten. To-dos are never written otherwise.
 
 import { db as appDb, type HubDB } from "../data/db";
 import { readSharePrivate } from "../data/repo";
@@ -31,32 +39,29 @@ import type { JournalKey } from "../journal/crypto";
 import { loadJournalKey } from "../journal/keyStore";
 import { coupleOf, normaliseTogetherUrl, refreshSession, rest, signInWithPassword, validTogetherUrl, type CallResult, type Fetch } from "./client";
 import { togetherId } from "./ids";
-import { readJournalDays, type DayNotes, type JournalDays } from "./journalNotes";
+import { PART_HEADINGS, PARTS, readJournalDays, type DayNote, type DayNotes, type JournalDays, type Part } from "./journalNotes";
 import {
   readAuth, readSent, saveSent, TOGETHER_META, TOGETHER_SENT_META, withTogetherLock,
-  type HabitKind, type TogetherAuth, type TogetherSent,
+  type SentDay, type TogetherAuth, type TogetherSent,
 } from "./store";
 
 /**
- * How long after a day ends (3am) her answers follow the titles: 24 hours (review C1; a named
- * setting for Esme to rule on). Until then only the titles and questions are in Together.
+ * How long after a day ends (3am) her answers follow the titles: 24 hours (review C1; approved
+ * by Esme 2026-11-05). Until then only the titles and questions are in Together.
  */
 export const ANSWERS_DELAY_MS = 24 * 60 * 60 * 1000;
 
-/** Provisional wording (Esme may reword): the two habits on her side in Together. */
-export const HABIT_TITLES: Record<HabitKind, string> = {
-  exercise: "Mental health exercise",
-  checkin: "Daily check-in",
-};
-const HABITS: HabitKind[] = ["exercise", "checkin"];
+/** The challenge's name once renamed (Esme, 2026-11-09). */
+export const CHALLENGE_NAME = "Mental Health Work";
+/** Her challenge, found by name (trimmed, any case) or by its id. */
+const CHALLENGE_NAMES = ["bpd research", "mental health work"];
+const CHALLENGE_IDS = ["bpd-research"];
 
-/** A tally's `at`: the day at noon UTC (the same date in any time zone from UTC-11 to UTC+11). */
-export const dayStamp = (d: ISODate): string => `${d}T12:00:00.000Z`;
+/** At most this many day rows written in one run (Together polls every 5 s; Supabase isn't flooded). */
+export const MAX_WRITES_PER_RUN = 50;
 
 /** Refresh this long before the access token runs out. */
 const REFRESH_MARGIN_MS = 60_000;
-/** At most this many new versions for one day in one run (each is a taken id deleted first). */
-const MAX_VERSION_TRIES = 5;
 
 export type SendOutcome =
   | { kind: "off" }
@@ -152,7 +157,7 @@ export async function signInToTogether(
       await db.syncMeta.put({ key: TOGETHER_META, value: auth });
       const sent = await readSent(db);
       if (!sent || sent.userId !== auth.userId) {
-        await saveSent(db, { ...freshSent(auth.userId, todayISO(new Date(now()))), formerSeen: (await formerDeviceIds(db.syncMeta)).length });
+        await saveSent(db, { ...freshSent(auth.userId, now()), formerSeen: (await formerDeviceIds(db.syncMeta)).length });
       }
     });
     return { kind: "ok" };
@@ -160,18 +165,19 @@ export async function signInToTogether(
   return out ?? { kind: "error", message: SIGN_IN_MESSAGES.busy };
 }
 
-function freshSent(userId: string, since: ISODate): TogetherSent {
+function freshSent(userId: string, now: number): TogetherSent {
   const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return { userId, since, salt, habits: {}, tallies: {}, refused: {} };
+  const today = todayISO(new Date(now));
+  return { userId, since: today, salt, days: {}, refused: {}, pastBefore: today, pastUntil: now + ANSWERS_DELAY_MS };
 }
 
 export type StopResult = { kind: "ok" } | { kind: "error"; message: string };
 
 /**
  * "Stop copying to Together": forgets the sign-in on this device. With `markDeleted`, first marks
- * everything sent as deleted in Together, and forgets the record too, so signing in again later
- * starts from that day (review M9). If anything can't be removed, nothing is forgotten and she is
- * told how many (review M2), so she can try again or stop without removing.
+ * every day logged in her challenge deleted in Together (never the challenge itself, which is
+ * hers), and forgets the record too (review M9). If anything can't be removed, nothing is
+ * forgotten and she is told how many (review M2), so she can try again or stop without removing.
  */
 export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean }): Promise<StopResult> {
   const db = appDb;
@@ -183,23 +189,21 @@ export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean })
     return { kind: "ok" };
   }
   const out = await withTogetherLock(db, async (): Promise<StopResult> => {
-    if (opts.markDeleted) {
-      // Paused first, durably (bug #53): if this is cut off, no run puts anything back.
-      const rec = await readSent(db);
-      if (rec && !rec.removing) await saveSent(db, { ...rec, removing: true });
-      try {
-        const auth = await freshAuth(db, env.fetch, now());
-        const sent = await readSent(db);
-        if (auth && sent && sent.userId === auth.userId) {
-          const failed = await markAllDeleted(new Ctx(db, env, auth, sent, null));
-          if (failed > 0) return { kind: "error", message: notRemoved(failed) };
-        }
-      } catch (e) {
-        if (!(e instanceof Stop)) throw e;
-        return { kind: "error", message: e.why === "auth" ? NEEDS_SIGN_IN : SIGN_IN_MESSAGES.offline };
+    // Paused first, durably (bug #53): if this is cut off, no run puts anything back.
+    const rec = await readSent(db);
+    if (rec && !rec.removing) await saveSent(db, { ...rec, removing: true });
+    try {
+      const auth = await freshAuth(db, env.fetch, now());
+      const sent = await readSent(db);
+      if (auth && sent && sent.userId === auth.userId) {
+        const failed = await markAllDeleted(new Ctx(db, env, auth, upgraded(sent, now()), null));
+        if (failed > 0) return { kind: "error", message: notRemoved(failed) };
       }
-      await db.syncMeta.delete(TOGETHER_SENT_META);
+    } catch (e) {
+      if (!(e instanceof Stop)) throw e;
+      return { kind: "error", message: e.why === "auth" ? NEEDS_SIGN_IN : SIGN_IN_MESSAGES.offline };
     }
+    await db.syncMeta.delete(TOGETHER_SENT_META);
     await db.syncMeta.delete(TOGETHER_META);
     return { kind: "ok" };
   });
@@ -216,6 +220,20 @@ export async function cancelStopRemoving(): Promise<void> {
       await saveSent(db, rest);
     }
   });
+}
+
+/**
+ * A record from an earlier build, brought up to date: a day record, and past days held for
+ * ANSWERS_DELAY_MS from the first run of this update (the backfill, 2026-11-08). Its habits and
+ * tallies stay until they have been cleaned up.
+ */
+function upgraded(sent: TogetherSent, now: number): TogetherSent {
+  sent.days ??= {};
+  if (sent.pastBefore === undefined) {
+    sent.pastBefore = todayISO(new Date(now));
+    sent.pastUntil = now + ANSWERS_DELAY_MS;
+  }
+  return sent;
 }
 
 // ---- after a Replace (bugs #58, #64, #65) ------------------------------------------------------
@@ -311,15 +329,16 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
     const auth = (await freshAuth(db, env.fetch, now()))!;
     let sent = await readSent(db);
     if (!sent || sent.userId !== auth.userId) {
-      sent = freshSent(auth.userId, todayISO(new Date(now())));
+      sent = freshSent(auth.userId, now());
       await saveSent(db, sent);
     }
+    upgraded(sent, now());
     if (env.retryRefused) sent.refused = {};
     const ctx = new Ctx(db, env, auth, sent, null);
     const done = async (copied: boolean) => {
       sent.lastSentAt = now();
       if (copied) sent.lastCopiedAt = sent.lastSentAt;
-      sent.held = !copied && !sent.removing;
+      sent.held = false;
       await ctx.save();
       return { kind: "ok" as const, sent: ctx.sentCount, refused: Object.keys(sent.refused).length };
     };
@@ -328,25 +347,23 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       await markAllDeleted(ctx);
       return done(false);
     }
-    // Anything a cut-off request may have left in Together goes first, needing no journal key
-    // (bugs #49, #54); until it has, nothing new is sent.
-    if ((await clearMaybes(ctx)) > 0) {
-      sent.refused["maybe"] = { hash: "maybe", what: "hide" };
-      return done(false);
-    }
-    delete sent.refused["maybe"];
+    // What an earlier build made (habits, tallies) is marked deleted, once; needs no journal key.
+    await cleanUpHabits(ctx);
+    const challengeId = await findChallenge(ctx);
+    if (!challengeId) return done(false);
     const today = todayISO(new Date(now()));
-    const since = sent.since;
     // Read under the sync lock, so nothing is read halfway through a sync run.
     const snap = await withSyncLock(db, async () => {
       const jk = await loadJournalKey(db).catch(() => undefined);
-      const journal = jk ? await readJournalDays(jk, since, today).catch(() => null) : null;
+      const journal = jk ? await readJournalDays(jk, today).catch(() => null) : null;
       return { jk, journal };
     });
     if (snap.jk) {
       ctx.jk = snap.jk;
+      ctx.challengeId = challengeId;
+      if (snap.journal?.earliest && snap.journal.earliest < sent.since) sent.since = snap.journal.earliest;
       ctx.restoredUnpulled = await restoreHold(db, sent, now());
-      await sendJournal(ctx, snap.journal);
+      await sendDays(ctx, snap.journal);
     }
     return done(true);
   } catch (e) {
@@ -361,8 +378,11 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
 
 class Ctx {
   sentCount = 0;
+  /** Day rows written this run (MAX_WRITES_PER_RUN). */
+  writes = 0;
   /** A Replace happened and sync hasn't pulled everything since (bug #58). */
   restoredUnpulled = false;
+  challengeId = "";
   private refreshedAfter401 = false;
   constructor(
     readonly db: HubDB,
@@ -371,6 +391,10 @@ class Ctx {
     readonly sent: TogetherSent,
     public jk: JournalKey | null,
   ) {}
+
+  get days(): Record<ISODate, SentDay> {
+    return (this.sent.days ??= {});
+  }
 
   now(): number {
     return (this.env.now ?? Date.now)();
@@ -390,7 +414,7 @@ class Ctx {
   }
 
   /** One request. On a 401, one refresh and one retry (review M4); then stop. Offline stops. */
-  async call(method: "POST" | "PATCH", path: string, body: unknown, prefer = "return=minimal"): Promise<CallResult & { kind: "ok" | "refused" }> {
+  async call(method: "GET" | "POST" | "PATCH", path: string, body: unknown, prefer = "return=minimal"): Promise<CallResult & { kind: "ok" | "refused" }> {
     let r = await rest(this.env.fetch, this.auth, method, path, body, prefer);
     if (r.kind === "auth" && !this.refreshedAfter401) {
       this.refreshedAfter401 = true;
@@ -399,249 +423,297 @@ class Ctx {
     }
     if (r.kind === "auth") throw new Stop("auth");
     if (r.kind === "transient") throw new Stop("transient");
-    if (r.kind === "ok") this.sentCount++;
+    if (r.kind === "ok" && method !== "GET") this.sentCount++;
     return r;
   }
 
-  /** PATCH one row by id; refused when Together has no such row for her. */
-  async patch(table: "todos" | "todo_events", id: string, body: Record<string, unknown>) {
-    const r = await this.call("PATCH", `${table}?id=eq.${id}&select=id`, body, "return=representation");
+  /** PATCH rows matched by `filter`; refused ("no-row") when Together has no such row for her. */
+  async patch(table: string, filter: string, body: Record<string, unknown>) {
+    const r = await this.call("PATCH", `${table}?${filter}&select=id`, body, "return=representation");
     if (r.kind === "ok" && !(Array.isArray(r.body) && r.body.length === 1)) return { kind: "refused" as const, status: 200, code: "no-row" };
     return r;
   }
 
-  /** A tally is gone: deleted now, already deleted, or never there (no such row for her). */
-  async gone(id: string): Promise<boolean> {
-    const r = await this.patch("todo_events", id, { deleted_at: this.nowIso() });
-    return r.kind === "ok" || r.code === "P0001" || r.code === "no-row";
-  }
-
-  /** Delete a tally (once). One already deleted (say, by her Undo in Together) counts as done. */
-  async deleteEvent(id: string): Promise<boolean> {
-    const r = await this.patch("todo_events", id, { deleted_at: this.nowIso() });
-    return r.kind === "ok" || r.code === "P0001";
+  /** PATCH our row for a day, by its fixed id, in her couple. */
+  patchDay(id: string, body: Record<string, unknown>) {
+    this.writes++;
+    return this.patch("challenge_days", `couple_id=eq.${enc(this.auth.coupleId)}&id=eq.${enc(id)}`, body);
   }
 }
 
-/** The id is already taken (not "its to-do doesn't exist", which is also a 409). */
+const enc = encodeURIComponent;
+
+/** Already there: the same id, or (challenge_days) a row for that day already (not "no such challenge", also a 409). */
 const isDuplicate = (r: CallResult) => r.kind === "refused" && (r.code === "23505" || (r.status === 409 && r.code !== "23503"));
 
-// ---- the two habits and their tallies -----------------------------------------------------------
+/** Our fixed id for a day of her challenge. */
+const dayId = (challengeId: string, date: ISODate) => togetherId("day", `${challengeId}:${date}`, 1);
 
-async function sendJournal(ctx: Ctx, journal: JournalDays | null): Promise<void> {
-  for (const kind of HABITS) {
-    let days = journal?.[kind] ?? null;
-    if (!days) {
-      // This kind couldn't be read this time: nothing new goes, but a day sent with answers and
-      // since ticked private is still hidden (bug #59).
-      if (!ctx.sent.habits[kind]) continue;
-      const prefix = `${kind}:`;
-      days = { notes: new Map(), partial: new Set(), unknown: new Set(Object.keys(ctx.sent.tallies).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))) };
-    }
-    const habitId = await ensureHabit(ctx, kind);
-    if (!habitId) continue;
-    await sendTallies(ctx, kind, habitId, days);
-  }
-}
-
-/** The habit to-do on her side, made once with a fixed id (un-deleted if it was deleted). */
-async function ensureHabit(ctx: Ctx, kind: HabitKind): Promise<string | null> {
-  const { sent } = ctx;
-  const id = await togetherId("habit", kind, 1);
-  const key = `habit:${kind}`;
-  const have = sent.habits[kind];
-  if (have && !have.deleted) return id;
-  if (sent.refused[key]) return null;
-  let r: CallResult;
-  if (!have) {
-    r = await ctx.call("POST", "todos", {
-      id, couple_id: ctx.auth.coupleId, owner_id: ctx.auth.userId, created_by: ctx.auth.userId,
-      title: HABIT_TITLES[kind], type: "habit", period: "day", target: 1, points_earn: 0, points_miss: 0,
-    });
-    if (isDuplicate(r)) r = await ctx.patch("todos", id, { deleted_at: null });
-  } else {
-    r = await ctx.patch("todos", id, { deleted_at: null });
-  }
-  if (r.kind !== "ok") {
-    sent.refused[key] = { hash: "habit", what: "copy" };
-    await ctx.save();
-    return null;
-  }
-  sent.habits[kind] = { tally: have?.tally ?? 0, deleted: false };
-  await ctx.save();
-  return id;
-}
+// ---- her challenge ----------------------------------------------------------------------------
 
 /**
- * The note that may go for a day right now: titles only until ANSWERS_DELAY_MS after the day
- * ends, and whenever that part is ticked private (the tick is read again right before sending).
+ * Her challenge's id: found once (by name, or its known id), never one that is Oliver's, and
+ * renamed once to CHALLENGE_NAME. null when there is none: nothing goes, and the box says so.
  */
-async function noteFor(ctx: Ctx, kind: HabitKind, date: ISODate, note: { titles: string; full: string }): Promise<string> {
-  if (note.full === note.titles) return note.titles;
-  const answersDue = date < todayISO(new Date(ctx.now() - ANSWERS_DELAY_MS));
-  if (!answersDue) return note.titles;
-  // After a Replace, until sync has caught up, the journal here may be missing a tick made or
-  // words written after the backup (bugs #58, #64): titles only.
-  if (ctx.restoredUnpulled) return note.titles;
-  const ticks = await readSharePrivate(ctx.jk!, date);
-  return ticks[kind] ? note.titles : note.full;
-}
-
-async function sendTallies(ctx: Ctx, kind: HabitKind, habitId: string, days: DayNotes): Promise<void> {
+async function findChallenge(ctx: Ctx): Promise<string | null> {
   const { sent } = ctx;
-  const prefix = `${kind}:`;
-  const dates = new Set<ISODate>([...days.notes.keys(), ...Object.keys(sent.tallies).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))]);
-  for (const date of [...dates].sort()) {
-    const key = `${kind}:${date}`;
-    const rec = sent.tallies[key];
-    const day = days.notes.get(date);
-    // What may go: the day's note as usual, or, for a day that couldn't be read in full, only
-    // its titles, and only to hide answers already sent once she has ticked it private (bug #59).
-    let noteNow: (() => Promise<string>) | null = null;
-    if (days.unknown.has(date) || days.partial.has(date)) {
-      if (!rec?.live || rec.answers === false) continue;
-      if (!(await readSharePrivate(ctx.jk!, date))[kind]) continue;
-      const titles = day?.titles ?? "";
-      noteNow = async () => titles;
-    } else if (day) {
-      // Whether Together held her answers for the day when this run began (bug #58).
-      const hadAnswers = !!rec?.live && rec.answers === true;
-      // After a Replace, a day already sent with answers is only ever hidden (when private),
-      // never rebuilt or sent again from the restored journal (bug #64).
-      if (ctx.restoredUnpulled && hadAnswers && !(await readSharePrivate(ctx.jk!, date))[kind]) continue;
-      noteNow = () => noteFor(ctx, kind, date, day);
-    } else if (rec?.live && ctx.restoredUnpulled) {
-      // After a Replace, a day missing from the restored journal (a backup older than it) is left
-      // as it is; only a private tick hides it (bug #67).
-      if (rec.answers === false || !(await readSharePrivate(ctx.jk!, date))[kind]) continue;
-      noteNow = async () => "";
-    }
-    if (noteNow) {
-      const note = await noteNow();
-      const h = await ctx.hash(note);
-      if (rec?.live && rec.hash === h) continue;
-      if (sent.refused[key]?.hash === h) continue;
-      // A sent tally can't be edited: the old one is deleted (its text stays in Together's
-      // database, hidden) before a new version goes.
-      if (rec?.live) {
-        if (!(await ctx.deleteEvent(await togetherId("tally", key, rec.v)))) {
-          sent.refused[key] = { hash: h, what: "hide" };
-          await ctx.save();
-          continue;
-        }
-        rec.live = false;
-        await ctx.save();
-      }
-      // The tick is read again right before the insert itself (bug #42): the delete above was a
-      // round trip, during which she (or a sync) may have ticked the day private.
-      const ins = await insertTally(ctx, key, rec ? rec.v + 1 : 1, noteNow, (n) => ({
-        couple_id: ctx.auth.coupleId, todo_id: habitId, user_id: ctx.auth.userId, kind: "tally", at: dayStamp(date), note: n === "" ? null : n,
-      }));
-      if (ins === null) {
-        sent.refused[key] = { hash: h, what: "copy" };
-        await ctx.save();
-        continue;
-      }
-      sent.tallies[key] = { v: ins.v, hash: await ctx.hash(ins.note), live: true, answers: ins.note !== (day?.titles ?? "") };
-      delete sent.refused[key];
-      await ctx.save();
-    } else if (rec?.live) {
-      if (!(await ctx.deleteEvent(await togetherId("tally", key, rec.v)))) {
-        sent.refused[key] = { hash: "gone", what: "hide" };
-        await ctx.save();
-        continue;
-      }
-      rec.live = false;
-      delete sent.refused[key];
-      await ctx.save();
-    }
-  }
-  // Together counts live tallies itself; its stored count (for Undo and the plain count) matches.
-  const live = Object.entries(sent.tallies).filter(([k, t]) => k.startsWith(prefix) && t.live).length;
-  const habit = sent.habits[kind]!;
-  if (habit.tally !== live) {
-    const r = await ctx.patch("todos", habitId, { tally: live });
-    if (r.kind === "ok") {
-      habit.tally = live;
-      await ctx.save();
-    }
-  }
-}
-
-/**
- * Inserts a tally as version `v` (a plain insert: a skipped duplicate never counts as sent). The
- * note is worked out again right before every attempt, so a private tick that arrived meanwhile
- * is always honoured (bug #42). An id already taken holds content we can't know, so it is deleted
- * and the next version tried (review I2). Returns the version and the note that went in, or null
- * when refused.
- */
-async function insertTally(
-  ctx: Ctx, key: string, v: number, noteNow: () => Promise<string>, rowFor: (note: string) => Record<string, unknown>,
-): Promise<{ v: number; note: string } | null> {
-  for (let tries = 0; tries < MAX_VERSION_TRIES; tries++, v++) {
-    const id = await togetherId("tally", key, v);
-    const note = await noteNow();
-    // Written down before it goes (bug #49): if this request is cut off, it may still be in Together.
-    (ctx.sent.maybe ??= {})[id] = { key, v };
-    await ctx.save();
-    const r = await ctx.call("POST", "todo_events", { id, ...rowFor(note) });
-    if (r.kind === "ok") {
-      delete ctx.sent.maybe[id]; // the caller records it as sent, in the same save
-      return { v, note };
-    }
-    if (!isDuplicate(r)) {
-      delete ctx.sent.maybe[id]; // refused: it never went in
+  if (!sent.challenge) {
+    const r = await ctx.call("GET", `challenges?couple_id=eq.${enc(ctx.auth.coupleId)}&select=id,name,for_user`, undefined, "");
+    const rows = r.kind === "ok" && Array.isArray(r.body) ? (r.body as { id?: unknown; name?: unknown; for_user?: unknown }[]) : [];
+    const mine = rows.filter(
+      (c) =>
+        typeof c.id === "string" &&
+        (CHALLENGE_IDS.includes(c.id) || (typeof c.name === "string" && CHALLENGE_NAMES.includes(c.name.trim().toLowerCase()))) &&
+        (c.for_user === undefined || c.for_user === null || c.for_user === ctx.auth.userId),
+    );
+    // The already-renamed one first, then her own, then by id (always the same pick).
+    const rank = (c: (typeof mine)[number]) => (typeof c.name === "string" && c.name.trim() === CHALLENGE_NAME ? 0 : 2) + (c.for_user === ctx.auth.userId ? 0 : 1);
+    mine.sort((a, b) => rank(a) - rank(b) || String(a.id).localeCompare(String(b.id)));
+    const pick = mine[0];
+    if (!pick) {
+      sent.challengeMissing = true;
       await ctx.save();
       return null;
     }
-    if (!(await ctx.deleteEvent(id))) return null; // still a maybe: cleaned up before the next send
-    delete ctx.sent.maybe[id];
+    sent.challenge = { id: pick.id as string, ...(pick.name === CHALLENGE_NAME ? { renamed: true } : {}) };
+    delete sent.challengeMissing;
     await ctx.save();
   }
-  return null;
+  const ch = sent.challenge;
+  if (!ch.renamed) {
+    // Once: tried again only if Together couldn't be reached.
+    await ctx.patch("challenges", `couple_id=eq.${enc(ctx.auth.coupleId)}&id=eq.${enc(ch.id)}`, { name: CHALLENGE_NAME });
+    ch.renamed = true;
+    await ctx.save();
+  }
+  return ch.id;
 }
 
-/**
- * Deletes every tally that may be in Together without being recorded as sent (bug #49). Each is
- * forgotten only once Together confirms it's deleted, or that it was never there. Returns how
- * many couldn't be.
- */
-async function clearMaybes(ctx: Ctx): Promise<number> {
-  const maybe = ctx.sent.maybe ?? {};
-  let failed = 0;
-  for (const id of Object.keys(maybe)) {
-    if (await ctx.gone(id)) {
-      delete maybe[id];
-      await ctx.save();
-    } else failed++;
+// ---- the days ---------------------------------------------------------------------------------
+
+/** One part of a day as read here: its note, or "unknown" (it wouldn't open), or absent. */
+type PartView = { note: DayNote; partial: boolean } | "unknown" | null;
+
+function view(kind: DayNotes | null, date: ISODate, recorded: boolean): PartView {
+  // A whole kind that couldn't be read: a recorded day of it is unknown (nothing new goes).
+  if (!kind) return recorded ? "unknown" : null;
+  if (kind.unknown.has(date)) return "unknown";
+  const note = kind.notes.get(date);
+  if (!note) return null;
+  return { note, partial: kind.partial.has(date) };
+}
+
+const hasAnswers = (rec: SentDay | undefined) => !!rec && PARTS.some((p) => rec.parts[p] === "answers");
+
+async function sendDays(ctx: Ctx, journal: JournalDays | null): Promise<void> {
+  const { sent } = ctx;
+  const ex = journal?.exercise ?? null;
+  const ci = journal?.checkin ?? null;
+  const dates = new Set<ISODate>(Object.keys(ctx.days));
+  for (const k of [ex, ci]) if (k) for (const d of [...k.notes.keys(), ...k.unknown, ...k.partial]) dates.add(d);
+  // A day that holds her answers first (a private tick or an edit never waits behind a backfill).
+  const order = [...dates].sort((a, b) => Number(hasAnswers(ctx.days[b])) - Number(hasAnswers(ctx.days[a])) || a.localeCompare(b));
+  sent.backlog = false;
+  for (const date of order) {
+    if (ctx.writes >= MAX_WRITES_PER_RUN) {
+      sent.backlog = true;
+      break;
+    }
+    if (sent.byHand?.[date]) continue;
+    const rec = ctx.days[date];
+    const recorded = (p: Part) => !!rec?.live && !!rec.parts[p];
+    await sendDay(ctx, date, { exercise: view(ex, date, recorded("exercise")), checkin: view(ci, date, recorded("checkin")) });
   }
+}
+
+type Want = { note: string; parts: SentDay["parts"] } | null | "skip";
+
+/** Answers may go for this day now (24 h after it ended; a past day, 24 h after sign-in or the update). */
+function answersDue(ctx: Ctx, date: ISODate): boolean {
+  const now = ctx.now();
+  if (!(date < todayISO(new Date(now - ANSWERS_DELAY_MS)))) return false;
+  const { pastBefore, pastUntil } = ctx.sent;
+  return pastBefore === undefined || date >= pastBefore || now >= (pastUntil ?? 0);
+}
+
+async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): Promise<void> {
+  const { sent } = ctx;
+  const rec = ctx.days[date];
+  // Only ever hidden, never built up: a part that wouldn't open here (bug #59), or, after a
+  // Replace until sync has caught up, a day already sent with answers (bug #64) or missing from
+  // the restored journal (bug #67).
+  const constrained =
+    PARTS.some((p) => parts[p] === "unknown" || (parts[p] as { partial?: boolean } | null)?.partial) ||
+    (ctx.restoredUnpulled && !!rec?.live && (hasAnswers(rec) || PARTS.every((p) => parts[p] === null)));
+
+  /** The note that may go right now (the ticks are read again each time: bug #42). */
+  const want = async (): Promise<Want> => {
+    const ticks = await readSharePrivate(ctx.jk!, date);
+    const out: string[] = [];
+    const held: SentDay["parts"] = {};
+    if (constrained) {
+      if (!rec?.live || !PARTS.some((p) => rec.parts[p] === "answers" && ticks[p])) return "skip";
+      // Hidden: every part with titles and questions only (a part that wouldn't open: its heading).
+      for (const p of PARTS) {
+        const v = parts[p];
+        const text = v && v !== "unknown" ? v.note.titles : rec.parts[p] ? PART_HEADINGS[p] : "";
+        if (text) {
+          out.push(text);
+          held[p] = "titles";
+        }
+      }
+    } else {
+      const due = answersDue(ctx, date) && !ctx.restoredUnpulled;
+      for (const p of PARTS) {
+        const v = parts[p];
+        if (!v || v === "unknown") continue;
+        const full = due && !ticks[p];
+        const text = full ? v.note.full : v.note.titles;
+        if (!text) continue;
+        out.push(text);
+        held[p] = full && v.note.full !== v.note.titles ? "answers" : "titles";
+      }
+    }
+    return out.length ? { note: out.join("\n\n"), parts: held } : null;
+  };
+
+  const first = await want();
+  if (first === "skip") return;
+  if (first === null) {
+    // Nothing of the day is left (a card un-ticked, say): our row is marked deleted.
+    if (!rec?.live) return;
+    const r = await ctx.patchDay(await dayId(ctx.challengeId, date), { deleted_at: ctx.nowIso() });
+    if (r.kind === "ok" || r.code === "no-row") {
+      rec.live = false;
+      delete sent.refused[date];
+    } else sent.refused[date] = { hash: "gone", what: "hide" };
+    await ctx.save();
+    return;
+  }
+  const h = await ctx.hash(first.note);
+  if (rec?.live && rec.hash === h) return;
+  if (sent.refused[date]?.hash === h) return;
+  const id = await dayId(ctx.challengeId, date);
+  const record = async (w: { note: string; parts: SentDay["parts"] }) => {
+    ctx.days[date] = { hash: await ctx.hash(w.note), live: true, parts: w.parts };
+    delete sent.refused[date];
+    await ctx.save();
+  };
+  const setAside = async (what: "copy" | "hide") => {
+    sent.refused[date] = { hash: h, what };
+    await ctx.save();
+  };
+
+  if (rec) {
+    // Our row is (or may be) there: its note is overwritten, a deleted one shown again.
+    const w = await want();
+    if (w === "skip" || w === null) return; // changed meanwhile: next run
+    const r = await ctx.patchDay(id, rec.live ? { note: w.note } : { note: w.note, deleted_at: null });
+    if (r.kind === "ok") return record(w);
+    if (r.code !== "no-row") return setAside(rec.live && hasAnswers(rec) ? "hide" : "copy");
+    // Never reached Together (a cut-off insert): inserted below.
+    delete ctx.days[date];
+  }
+  if (constrained) return; // only ever hidden: nothing new goes
+  const w = await want();
+  if (w === "skip" || w === null) return;
+  // Written down before it goes (bug #49): if this request is cut off, it may still be in Together.
+  ctx.days[date] = { hash: "", live: true, parts: { exercise: "answers", checkin: "answers" } };
+  await ctx.save();
+  ctx.writes++;
+  const r = await ctx.call("POST", "challenge_days", { id, couple_id: ctx.auth.coupleId, challenge_id: ctx.challengeId, day: date, note: w.note });
+  if (r.kind === "ok") return record(w);
+  if (isDuplicate(r)) {
+    // Ours from an earlier run (its content unknown), or a day she logged by hand.
+    const again = await want();
+    if (again !== "skip" && again !== null) {
+      const p = await ctx.patchDay(id, { note: again.note, deleted_at: null });
+      if (p.kind === "ok") return record(again);
+      if (p.code === "no-row") {
+        // Hers, written by hand in Together: left exactly as it is, and never tried again.
+        delete ctx.days[date];
+        (sent.byHand ??= {})[date] = true;
+        delete sent.refused[date];
+        await ctx.save();
+        return;
+      }
+    }
+    return; // still recorded as maybe there: the next run overwrites it
+  }
+  delete ctx.days[date]; // refused: it never went in
+  await setAside("copy");
+}
+
+// ---- an earlier build's habits ---------------------------------------------------------------
+
+const LEGACY_KINDS: Part[] = ["exercise", "checkin"];
+
+/**
+ * Marks what an earlier build made in Together deleted (its two habit to-dos, their tallies and
+ * any tally that may have gone in), then forgets them. Safe to repeat: one already deleted counts
+ * as done. Returns how many couldn't be (kept, and tried again next run or on Send now).
+ */
+async function cleanUpHabits(ctx: Ctx, force = false): Promise<number> {
+  const { sent } = ctx;
+  if (!sent.habits && !sent.tallies && !sent.maybe) return 0;
+  if (sent.refused["habits"] && !ctx.env.retryRefused && !force) return 1;
+  let failed = 0;
+  // A tally already deleted (P0001 "stays undone") or not there counts as done.
+  const tallyGone = async (id: string) => {
+    const r = await ctx.patch("todo_events", `id=eq.${enc(id)}`, { deleted_at: ctx.nowIso() });
+    return r.kind === "ok" || r.code === "P0001" || r.code === "no-row";
+  };
+  for (const [id] of Object.entries(sent.maybe ?? {})) {
+    if (await tallyGone(id)) delete sent.maybe![id];
+    else failed++;
+    await ctx.save();
+  }
+  for (const [key, t] of Object.entries(sent.tallies ?? {})) {
+    if (t.live && !(await tallyGone(await togetherId("tally", key, t.v)))) {
+      failed++;
+      continue;
+    }
+    delete sent.tallies![key];
+    await ctx.save();
+  }
+  for (const kind of LEGACY_KINDS) {
+    const h = sent.habits?.[kind];
+    if (!h) continue;
+    if (!h.deleted) {
+      // By its fixed id. Deleting one already deleted is fine.
+      const r = await ctx.patch("todos", `id=eq.${enc(await togetherId("habit", kind, 1))}`, { deleted_at: ctx.nowIso() });
+      if (!(r.kind === "ok" || r.code === "no-row" || r.code === "P0001")) {
+        failed++;
+        continue;
+      }
+    }
+    delete sent.habits![kind];
+    await ctx.save();
+  }
+  if (failed === 0) {
+    delete sent.habits;
+    delete sent.tallies;
+    delete sent.maybe;
+    delete sent.refused["habits"];
+  } else sent.refused["habits"] = { hash: "habits", what: "hide" };
+  await ctx.save();
   return failed;
 }
 
 // ---- stop: mark everything deleted -------------------------------------------------------------
 
 /**
- * Marks every live tally, every tally that may be in Together (bug #49) and both habits deleted.
- * Returns how many couldn't be.
+ * Marks every day of ours in her challenge deleted (and anything an earlier build left). Never
+ * the challenge, and never a day she logged by hand. Returns how many couldn't be.
  */
 async function markAllDeleted(ctx: Ctx): Promise<number> {
   const { sent } = ctx;
-  let failed = await clearMaybes(ctx);
-  for (const [key, t] of Object.entries(sent.tallies)) {
-    if (!t.live) continue;
-    if (await ctx.gone(await togetherId("tally", key, t.v))) t.live = false;
-    else failed++;
-    await ctx.save();
-  }
-  for (const kind of HABITS) {
-    // By its fixed id, recorded or not: a habit insert can be cut off too.
-    const h = sent.habits[kind];
-    if (h?.deleted) continue;
-    const id = await togetherId("habit", kind, 1);
-    const live = Object.entries(sent.tallies).filter(([k, t]) => k.startsWith(`${kind}:`) && t.live).length;
-    if (h && h.tally !== live && (await ctx.patch("todos", id, { tally: live })).kind === "ok") h.tally = live;
-    const r = await ctx.patch("todos", id, { deleted_at: ctx.nowIso() });
-    if (r.kind === "ok" || (!h && r.code === "no-row")) sent.habits[kind] = { tally: h?.tally ?? 0, deleted: true };
+  let failed = await cleanUpHabits(ctx, true);
+  const challengeId = sent.challenge?.id;
+  for (const [date, d] of Object.entries(ctx.days)) {
+    if (!d.live || !challengeId) continue;
+    const r = await ctx.patchDay(await dayId(challengeId, date), { deleted_at: ctx.nowIso() });
+    if (r.kind === "ok" || r.code === "no-row") d.live = false;
     else failed++;
     await ctx.save();
   }

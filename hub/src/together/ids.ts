@@ -9,8 +9,11 @@
 
 export const TOGETHER_ID_PREFIX = "esmeworld-together-v1";
 
-/** What a Together id is for: one of the two habits, or one day's tally. */
-export type TogetherIdKind = "habit" | "tally";
+/**
+ * What a Together id is for: one day of her challenge (`challenge_days`), or, only to clean up
+ * what an earlier build made, one of the two habits or a day's tally.
+ */
+export type TogetherIdKind = "day" | "habit" | "tally";
 
 export async function togetherId(kind: TogetherIdKind, id: string, version: number): Promise<string> {
   const input = new TextEncoder().encode(`${TOGETHER_ID_PREFIX}:${kind}:${id}:${version}`);

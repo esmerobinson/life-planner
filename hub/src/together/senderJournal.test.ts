@@ -7,12 +7,16 @@ import { journalAad, sealJson } from "../journal/crypto";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import { FAKE_CARD_FILE_CHECKLIST, PRETEND_FEATURES } from "../test/exerciseCards";
 import { togetherId } from "./ids";
-import { ANSWERS_DELAY_MS, HABIT_TITLES } from "./sender";
+import { ANSWERS_DELAY_MS, CHALLENGE_NAME } from "./sender";
 import { readSent } from "./store";
-import { clock, DEVICE, emptyDb, highlightOn, journalDay, ME, restCalls, send, signedIn } from "./testKit";
+import {
+  CHALLENGE, clock, COUPLE, dayRow, dayWrites, DEVICE, emptyDb, highlightOn, journalDay, liveDays, liveNote, ME, PARTNER, PARTNER_CHALLENGE,
+  restCalls, send, signedIn,
+} from "./testKit";
 
-// The Mental health exercise and Daily check-in days, against the fake Together server: titles
-// at the 3am day change, answers ANSWERS_DELAY_MS later unless private. Made-up cards and words.
+// The Mental health exercise and Daily check-in days, logged in her "Mental Health Work"
+// challenge against the fake Together server: one row per day, titles and questions at the 3am
+// day change, answers ANSWERS_DELAY_MS later unless private. Made-up cards and words.
 
 const DAY = "2026-11-04";
 const SIGN_IN = `${DAY}T10:00:00`;
@@ -22,10 +26,7 @@ const TITLE = "Pretend first workbook · Day 1 · Pretend first-book one";
 
 beforeEach(emptyDb);
 
-const habit = (kind: "exercise" | "checkin") => togetherId("habit", kind, 1);
-const tally = async (fake: { events: Map<string, Record<string, unknown>> }, kind: string, v: number, day = DAY) =>
-  fake.events.get(await togetherId("tally", `${kind}:${day}`, v));
-const wire = (fake: { requests: { body: string }[] }) => JSON.stringify(fake.requests);
+const wire = (fake: { requests: { body: string; url: string }[] }) => JSON.stringify(fake.requests);
 
 it("the delay is 24 hours after the day ends", () => {
   expect(ANSWERS_DELAY_MS).toBe(24 * 3_600_000);
@@ -39,60 +40,114 @@ it("nothing goes before the 3am day change", async () => {
   await send(fake, c);
   c.set("2026-11-05T02:30:00"); // still her Nov 4
   await send(fake, c);
-  expect(fake.events.size).toBe(0);
+  expect(fake.days.size).toBe(0);
 });
 
-it("at the day change: two habits (day, 1, 0/0) and titles-only tallies; no answer anywhere", async () => {
+it("her challenge is found by name, renamed once to Mental Health Work; Oliver's is never touched", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  await journalDay(DAY);
+  c.set(TITLES_AT);
+  expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 0 });
+  expect(fake.challenges.get(CHALLENGE)!.name).toBe(CHALLENGE_NAME);
+  expect(fake.challenges.get(PARTNER_CHALLENGE)!.name).toBe("Pretend partner challenge");
+  expect(fake.liveDays(PARTNER_CHALLENGE)).toEqual([]);
+  expect((await readSent(db))!.challenge).toEqual({ id: CHALLENGE, renamed: true });
+  c.set(ANSWERS_AT);
+  await send(fake, c);
+  const renames = fake.requests.filter((r) => r.url.includes("/rest/v1/challenges") && r.method === "PATCH");
+  expect(renames).toHaveLength(1);
+  expect(JSON.parse(renames[0]!.body)).toEqual({ name: CHALLENGE_NAME });
+  expect(renames[0]!.url).toContain(`couple_id=eq.${COUPLE}`);
+  // Looked up once, by her couple only.
+  expect(fake.requests.filter((r) => r.url.includes("/rest/v1/challenges") && r.method === "GET")).toHaveLength(1);
+});
+
+it("found under its new name or its id too; no such challenge: nothing goes, and the record says so", async () => {
+  for (const [name, id] of [["  mental health WORK ", "pretend-renamed"], ["Pretend other name", "bpd-research"]] as const) {
+    await emptyDb();
+    const c = clock(SIGN_IN);
+    const fake = await signedIn(c);
+    fake.challenges.delete(CHALLENGE);
+    fake.addChallenge({ id, couple_id: COUPLE, name, for_user: ME });
+    await journalDay(DAY);
+    c.set(TITLES_AT);
+    await send(fake, c);
+    expect(fake.liveDays(id)).toHaveLength(1);
+  }
+  await emptyDb();
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  fake.challenges.delete(CHALLENGE);
+  fake.addChallenge({ id: "pretend-olivers", couple_id: COUPLE, name: "BPD research", for_user: PARTNER }); // his, never hers
+  await journalDay(DAY);
+  c.set(TITLES_AT);
+  expect(await send(fake, c)).toMatchObject({ kind: "ok" });
+  expect(fake.days.size).toBe(0);
+  expect(fake.challenges.get("pretend-olivers")!.name).toBe("BPD research");
+  expect((await readSent(db))!.challengeMissing).toBe(true);
+  // Once it is there, the next run finds it.
+  fake.addChallenge({ id: CHALLENGE, couple_id: COUPLE, name: "BPD research", for_user: ME });
+  await send(fake, c);
+  expect(liveDays(fake)).toHaveLength(1);
+  expect((await readSent(db))!.challengeMissing).toBeUndefined();
+});
+
+it("at the day change: one row for the day (both parts), titles and questions only; no answer anywhere", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { q1, q2 } = await journalDay(DAY, { exercise: true, checkin: true, learned: "Pretend learned words" });
   c.set(TITLES_AT);
   expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 0 });
-  for (const kind of ["exercise", "checkin"] as const) {
-    expect(fake.todos.get(await habit(kind))).toMatchObject({
-      type: "habit", period: "day", target: 1, points_earn: 0, points_miss: 0, owner_id: ME, created_by: ME, title: HABIT_TITLES[kind], tally: 1,
-    });
-  }
-  expect(await tally(fake, "exercise", 1)).toMatchObject({ kind: "tally", user_id: ME, at: `${DAY}T12:00:00.000Z`, note: TITLE });
-  expect((await tally(fake, "checkin", 1))!.note).toBe(q1.text);
-  expect(wire(fake)).not.toMatch(/Pretend exercise answer|Pretend check-in answer|Pretend learned words/);
+  expect(liveDays(fake)).toHaveLength(1);
+  expect(dayRow(fake, DAY)).toMatchObject({
+    id: await togetherId("day", `${CHALLENGE}:${DAY}`, 1), couple_id: COUPLE, challenge_id: CHALLENGE, day: DAY, by: ME, deleted_at: null,
+    note: `Mental Health Exercise\n${TITLE}\n\nCheck In\n**${q1.text}**`,
+  });
+  expect(wire(fake)).not.toMatch(/Pretend exercise answer|Pretend check-in answer|Pretend learned words|Research notes/);
   expect(wire(fake)).not.toContain(q2.text.slice(0, 30)); // a skipped question isn't one she answered
 });
 
-it("24 hours later: her answers (with the prompts) replace the titles; what she learned never goes (v1)", async () => {
+it("24 hours later: the same row's note is overwritten with her answers and research notes", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
-  const { q1 } = await journalDay(DAY, { exercise: true, checkin: true, learned: "Pretend learned words" });
+  const { q1 } = await journalDay(DAY, { exercise: true, checkin: true, learned: "Pretend learned words\n\nPretend second line" });
   c.set(TITLES_AT);
   await send(fake, c);
   c.set("2026-11-06T02:30:00"); // not yet 24 hours after the day ended
-  await send(fake, c);
-  expect((await tally(fake, "exercise", 2))).toBeUndefined();
+  expect(await send(fake, c)).toMatchObject({ kind: "ok", sent: 0 });
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect((await tally(fake, "exercise", 1))!.deleted_at).not.toBeNull();
-  expect((await tally(fake, "exercise", 2))!.note).toBe(`${TITLE}\nPretend exercise answer`);
-  expect(wire(fake)).not.toMatch(/Pretend learned words|What I learned/);
-  expect((await tally(fake, "checkin", 2))!.note).toBe(`${q1.text}\nPretend check-in answer`);
-  expect(fake.liveTallies(await habit("exercise"))).toHaveLength(1);
-  expect(fake.todos.get(await habit("exercise"))!.tally).toBe(1);
-  // What stays behind, hidden, is titles only.
-  expect((await tally(fake, "exercise", 1))!.note).toBe(TITLE);
+  expect(fake.days.size).toBe(1);
+  expect(liveNote(fake, DAY)).toBe(
+    `Mental Health Exercise\n${TITLE}\n\nResearch notes\n• Pretend learned words\n• Pretend second line\n\nPretend exercise answer\n\nCheck In\n**${q1.text}**\nPretend check-in answer`,
+  );
+  expect(dayWrites(fake).map((r) => r.method)).toEqual(["POST", "PATCH"]);
 });
 
-it("ticked private before the day ended: the answers never go", async () => {
+it("ticked private before the day ended: the answers and research notes never go", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk } = await journalDay(DAY, { exercise: true, checkin: true, learned: "Pretend learned words" });
+  await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
   await saveSharePrivate(jk, DAY, "exercise", true);
   await saveSharePrivate(jk, DAY, "checkin", true);
   for (const at of [TITLES_AT, ANSWERS_AT, "2026-11-10T09:00:00"]) {
     c.set(at);
     await send(fake, c);
   }
-  expect(wire(fake)).not.toMatch(/Pretend exercise answer|Pretend check-in answer|Pretend learned words/);
-  expect((await tally(fake, "exercise", 1))!.note).toBe(TITLE);
-  expect((await tally(fake, "exercise", 2))).toBeUndefined();
+  expect(wire(fake)).not.toMatch(/Pretend exercise answer|Pretend check-in answer|Pretend learned words|Wrenfold/);
+  expect(liveNote(fake, DAY)).toContain(TITLE);
+});
+
+it("one part private: only the other part's answers go", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  const { jk, q1 } = await journalDay(DAY, { exercise: true, checkin: true, learned: "Pretend learned words" });
+  await saveSharePrivate(jk, DAY, "exercise", true);
+  c.set(ANSWERS_AT);
+  await send(fake, c);
+  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}\n\nCheck In\n**${q1.text}**\nPretend check-in answer`);
 });
 
 it("a tick from another device that arrives after the titles went (the race): the answers never go", async () => {
@@ -108,40 +163,49 @@ it("a tick from another device that arrives after the titles went (the race): th
   expect(wire(fake)).not.toContain("Pretend check-in answer");
 });
 
-it("ticked private after the answers went: the answers tally deleted (its text stays, hidden), titles in its place", async () => {
+it("ticked private after the answers went: the note is overwritten with titles only (really replaced)", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
-  const { jk, q1 } = await journalDay(DAY, { checkin: true });
+  const { jk, q1 } = await journalDay(DAY, { checkin: true, exercise: true, learned: "Pretend learned words" });
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect((await tally(fake, "checkin", 1))!.note).toContain("Pretend check-in answer");
+  expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
   await saveSharePrivate(jk, DAY, "checkin", true);
+  await saveSharePrivate(jk, DAY, "exercise", true);
   await send(fake, c);
-  expect((await tally(fake, "checkin", 1))!.deleted_at).not.toBeNull();
-  expect((await tally(fake, "checkin", 1))!.note).toContain("Pretend check-in answer"); // Together's rule: hidden, not wiped
-  expect(await tally(fake, "checkin", 2)).toMatchObject({ note: q1.text, deleted_at: null });
-  expect(fake.todos.get(await habit("checkin"))!.tally).toBe(1);
+  expect(fake.days.size).toBe(1);
+  expect(dayRow(fake, DAY)).toMatchObject({ note: `Mental Health Exercise\n${TITLE}\n\nCheck In\n**${q1.text}**`, deleted_at: null });
+  expect(JSON.stringify([...fake.days.values()])).not.toMatch(/Pretend check-in answer|Pretend exercise answer|Pretend learned words/);
 });
 
-it("a taken id with unknown content (a reply lost, then ticked private) is deleted, never counted as sent", async () => {
+it("an insert whose reply was lost, then ticked private: the row there is overwritten, never left with answers", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk, q1 } = await journalDay(DAY, { checkin: true });
-  c.set(TITLES_AT);
-  await send(fake, c); // v1: the question only
   c.set(ANSWERS_AT);
-  // v2, with her answer, reaches Together, but the reply is lost on the way back.
   fake.inject({ lostReply: true, when: (r) => r.method === "POST" && r.body.includes("Pretend check-in answer") });
   expect(await send(fake, c)).toEqual({ kind: "offline" });
-  expect((await tally(fake, "checkin", 2))!.note).toContain("Pretend check-in answer");
+  expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
+  expect((await readSent(db))!.days![DAY]).toMatchObject({ hash: "", live: true });
   await saveSharePrivate(jk, DAY, "checkin", true);
   expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 0 });
-  expect((await tally(fake, "checkin", 2))!.deleted_at).not.toBeNull();
-  expect(fake.liveTallies(await habit("checkin")).map((e) => e.note)).toEqual([q1.text]);
-  expect(fake.todos.get(await habit("checkin"))!.tally).toBe(1);
+  expect(liveNote(fake, DAY)).toBe(`Check In\n**${q1.text}**`);
+  expect(fake.days.size).toBe(1);
 });
 
-it("an edited answer after it went: a new version; nothing changed: nothing sent", async () => {
+it("an insert that never reached Together is inserted on the next run", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  await journalDay(DAY, { checkin: true });
+  c.set(TITLES_AT);
+  fake.inject({ networkError: true, when: (r) => r.method === "POST" && r.url.includes("challenge_days") });
+  expect(await send(fake, c)).toEqual({ kind: "offline" });
+  expect(fake.days.size).toBe(0);
+  expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 0 });
+  expect(liveDays(fake)).toHaveLength(1);
+});
+
+it("an edited answer after it went: the note is overwritten; nothing changed: nothing sent (a replay sends nothing)", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk, q1 } = await journalDay(DAY, { checkin: true });
@@ -152,8 +216,9 @@ it("an edited answer after it went: a new version; nothing changed: nothing sent
   expect(restCalls(fake).length).toBe(n);
   await saveAnswer(jk, DAY, q1.id, DEVICE, "Pretend edited answer", true, { session: "1" });
   await send(fake, c);
-  expect((await tally(fake, "checkin", 2))!.note).toContain("Pretend edited answer");
-  expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
+  expect(liveNote(fake, DAY)).toContain("Pretend edited answer");
+  expect(liveNote(fake, DAY)).not.toContain("Pretend check-in answer");
+  expect(fake.days.size).toBe(1);
 });
 
 it("a draft never goes (not even one typed after submitting); an unfinished check-in doesn't count", async () => {
@@ -165,12 +230,11 @@ it("a draft never goes (not even one typed after submitting); an unfinished chec
   await saveAnswer(jk, DAY, q1.id, DEVICE, "Pretend half-done check-in", true);
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect((await tally(fake, "exercise", 1))!.note).toContain("Pretend exercise answer");
-  expect(await tally(fake, "checkin", 1)).toBeUndefined();
-  expect(wire(fake)).not.toMatch(/Pretend later draft|Pretend half-done/);
+  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}\n\nPretend exercise answer`);
+  expect(wire(fake)).not.toMatch(/Pretend later draft|Pretend half-done|Check In/);
 });
 
-it("a card's answers go with the prompts and checklist items they answer", async () => {
+it("a card's answers go as bold prompts with her answer below, checklist items included", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const jk = await keyFor("fake-journal-together");
@@ -180,24 +244,65 @@ it("a card's answers go with the prompts and checklist items they answer", async
   const card = set.cards[0]!;
   const rows = PRETEND_FEATURES.map((f, i) => [f, i === 1 ? "Partly" : "Yes", i === 0 ? "Pretend note of mine" : ""]);
   await submitExerciseEntry(jk, DAY, DEVICE, cardRef(card), [{ prompt: card.parts[0]!.prompt, kind: "checklist", answer: rows }]);
+  c.set(TITLES_AT);
+  await send(fake, c);
+  expect(liveNote(fake, DAY)).toContain(`**${card.parts[0]!.prompt}**`); // the question goes with the titles
+  expect(liveNote(fake, DAY)).not.toContain("Pretend note of mine");
   c.set(ANSWERS_AT);
   await send(fake, c);
-  const note = String((await tally(fake, "exercise", 1))!.note);
-  expect(note).toContain(card.parts[0]!.prompt);
-  expect(note).toContain(`${PRETEND_FEATURES[0]}: Yes (Pretend note of mine)`);
+  const note = liveNote(fake, DAY)!;
+  expect(note).toContain(`**${card.parts[0]!.prompt}**\n${PRETEND_FEATURES[0]}: Yes (Pretend note of mine)`);
   expect(note).toContain(`${PRETEND_FEATURES[1]}: Partly`);
 });
 
-it("what she learned goes only with an exercise day", async () => {
+it("an n/a answer is left out with its question; a part with nothing left is left out", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
-  await journalDay(DAY, { learned: "Pretend learned on a day without a card" });
+  const { jk, q1, q2 } = await journalDay(DAY, { exercise: true });
+  await ensureCheckinSet(jk, DAY, [q1.id, q2.id]);
+  await saveAnswer(jk, DAY, q1.id, DEVICE, " N/A. ", true);
+  await saveAnswer(jk, DAY, q2.id, DEVICE, "n.a", true);
+  c.set(TITLES_AT);
+  await send(fake, c);
+  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}`);
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect(wire(fake)).not.toContain("Pretend learned on a day without a card");
+  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}\n\nPretend exercise answer`);
+  expect(wire(fake)).not.toContain(q1.text.slice(0, 30));
 });
 
-it("a day un-ticked after it went: its tally deleted, the count follows", async () => {
+it("what she learned and highlights go only with an exercise day", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  await journalDay(DAY, { checkin: true, learned: "Pretend learned on a day without a card" });
+  await highlightOn(DAY, "pretend Pellmoor hill", "Pretend Pellmoor note");
+  c.set(ANSWERS_AT);
+  await send(fake, c);
+  expect(liveNote(fake, DAY)).toMatch(/^Check In\n/);
+  expect(wire(fake)).not.toMatch(/Pretend learned on a day without a card|Pellmoor/);
+});
+
+it("highlights: that day's own, as bullets with her note; a removed one and another day's never go", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  await journalDay(DAY, { exercise: true, learned: "Pretend learned words" });
+  await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
+  await new Promise((r) => setTimeout(r, 5));
+  await highlightOn(DAY, "pretend Quillby stream");
+  await highlightOn(DAY, "pretend Gristlecomb river", "Pretend Gristlecomb note", { removed: true });
+  await highlightOn("2026-11-03", "pretend Pellmoor yesterday");
+  c.set(TITLES_AT);
+  await send(fake, c);
+  expect(wire(fake)).not.toMatch(/Wrenfold|Quillby/);
+  c.set(ANSWERS_AT);
+  await send(fake, c);
+  expect(liveNote(fake, DAY)).toBe(
+    `Mental Health Exercise\n${TITLE}\n\nResearch notes\n• Pretend learned words\n• pretend Wrenfold clouds — Pretend Wrenfold note\n• pretend Quillby stream\n\nPretend exercise answer`,
+  );
+  expect(wire(fake)).not.toMatch(/Gristlecomb|Pellmoor/);
+});
+
+it("a day un-ticked after it went: our row marked deleted; ticked again: the same row shown again", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk, card } = await journalDay(DAY, { exercise: true });
@@ -205,21 +310,31 @@ it("a day un-ticked after it went: its tally deleted, the count follows", async 
   await send(fake, c);
   await saveExerciseMark(jk, DAY, DEVICE, card.id, false);
   await send(fake, c);
-  expect((await tally(fake, "exercise", 1))!.deleted_at).not.toBeNull();
-  expect(fake.todos.get(await habit("exercise"))!.tally).toBe(0);
-});
-
-it("days before copying started never go", async () => {
-  const c = clock(SIGN_IN);
-  await journalDay("2026-11-01", { exercise: true, checkin: true });
-  const fake = await signedIn(c);
-  c.set("2026-11-08T09:00:00");
+  expect(dayRow(fake, DAY)!.deleted_at).not.toBeNull();
+  await saveExerciseMark(jk, DAY, DEVICE, card.id, true);
   await send(fake, c);
-  expect(wire(fake)).not.toMatch(/2026-11-01|Pretend exercise answer/);
-  expect(fake.events.size).toBe(0);
+  expect(fake.days.size).toBe(1);
+  expect(dayRow(fake, DAY)).toMatchObject({ deleted_at: null, note: `Mental Health Exercise\n${TITLE}` });
 });
 
-it("journal locked on this device: no habits, no tallies, and nothing already sent is touched", async () => {
+it("a day she logged by hand in Together is left exactly as she wrote it, and never tried again", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  await journalDay(DAY);
+  const hers = fake.logByHand({ couple_id: COUPLE, challenge_id: CHALLENGE, day: DAY, note: "Pretend note she typed in Together", by: ME });
+  c.set(TITLES_AT);
+  expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 0 });
+  expect(fake.days.size).toBe(1);
+  expect(fake.days.get(String(hers.id))!.note).toBe("Pretend note she typed in Together");
+  expect((await readSent(db))!.byHand).toEqual({ [DAY]: true });
+  const n = dayWrites(fake).length;
+  c.set(ANSWERS_AT);
+  await send(fake, c);
+  expect(dayWrites(fake).length).toBe(n);
+  expect(fake.days.get(String(hers.id))!.note).toBe("Pretend note she typed in Together");
+});
+
+it("journal locked on this device: nothing sent, and nothing already sent is touched", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   await journalDay(DAY);
@@ -230,103 +345,55 @@ it("journal locked on this device: no habits, no tallies, and nothing already se
   c.set(ANSWERS_AT);
   await send(fake, c);
   expect(restCalls(fake).length).toBe(n);
-  expect(fake.liveTallies(await habit("exercise"))).toHaveLength(1);
+  expect(liveDays(fake)).toHaveLength(1);
 });
 
-it("a refused delete is set aside as \"couldn't be hidden\", not \"couldn't be copied\"", async () => {
+it("a refused overwrite of a day with answers is set aside as \"couldn't be hidden\"; Send now tries again", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk } = await journalDay(DAY, { checkin: true });
   c.set(ANSWERS_AT);
   await send(fake, c);
   await saveSharePrivate(jk, DAY, "checkin", true);
-  fake.inject({ status: 403, body: { code: "42501" }, when: (r) => r.method === "PATCH" && r.url.includes("todo_events") });
+  fake.inject({ status: 403, body: { code: "42501" }, when: (r) => r.method === "PATCH" && r.url.includes("challenge_days") });
   expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 1 });
   expect(Object.values((await readSent(db))!.refused)).toEqual([expect.objectContaining({ what: "hide" })]);
   expect(await send(fake, c, true)).toMatchObject({ kind: "ok", refused: 0 }); // Send now tries again
-  expect((await tally(fake, "checkin", 1))!.deleted_at).not.toBeNull();
+  expect(liveNote(fake, DAY)).not.toContain("Pretend check-in answer");
 });
 
-describe("tallies that may be in Together (bug #49)", () => {
-  it("is written down before the insert goes, and forgotten once the insert is confirmed", async () => {
-    const c = clock(SIGN_IN);
-    const fake = await signedIn(c);
-    await journalDay(DAY, { checkin: true });
-    c.set(TITLES_AT);
-    let seenBefore: unknown = null;
-    const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "POST" && String(input).includes("todo_events")) seenBefore = { ...(await readSent(db))!.maybe };
-      return fake.fetch(input, init);
-    }) as typeof fetch;
-    const { sendToTogether } = await import("./sender");
-    expect(await sendToTogether({ fetch: f, now: c.now })).toMatchObject({ kind: "ok" });
-    expect(seenBefore).toEqual({ [await togetherId("tally", `checkin:${DAY}`, 1)]: { key: `checkin:${DAY}`, v: 1 } });
-    expect((await readSent(db))!.maybe).toEqual({});
-  });
-
-  it("a cut-off insert is deleted before anything new goes; one that never reached Together is just forgotten", async () => {
-    const c = clock(SIGN_IN);
-    const fake = await signedIn(c);
-    await journalDay(DAY, { checkin: true });
-    c.set(TITLES_AT);
-    fake.inject({ networkError: true, when: (r) => r.method === "POST" && r.url.includes("todo_events") }); // never reached Together
-    expect(await send(fake, c)).toEqual({ kind: "offline" });
-    expect(Object.keys((await readSent(db))!.maybe!)).toHaveLength(1);
-    const n = fake.requests.length;
-    expect(await send(fake, c)).toMatchObject({ kind: "ok" });
-    const after = fake.requests.slice(n);
-    expect(after[0]!.method).toBe("PATCH"); // the cleanup comes first
-    expect((await readSent(db))!.maybe).toEqual({});
-    expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
-  });
-
-  it("a cleanup Together refuses: nothing new goes, and it's shown as not yet hidden", async () => {
-    const c = clock(SIGN_IN);
-    const fake = await signedIn(c);
-    await journalDay(DAY, { checkin: true });
-    c.set(TITLES_AT);
-    fake.inject({ lostReply: true, when: (r) => r.method === "POST" && r.url.includes("todo_events") });
-    expect(await send(fake, c)).toEqual({ kind: "offline" });
-    fake.inject({ status: 403, body: { code: "42501" }, when: (r) => r.method === "PATCH" });
-    const n = fake.requests.length;
-    expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 1 });
-    expect(fake.requests.slice(n).filter((r) => r.method === "POST")).toHaveLength(0);
-    expect((await readSent(db))!.refused.maybe).toMatchObject({ what: "hide" });
-    expect(await send(fake, c, true)).toMatchObject({ kind: "ok", refused: 0 });
-    expect(fake.liveTallies(await habit("checkin"))).toHaveLength(1);
-  });
+it("bug #49: a day is written down before its insert goes, and recorded once it is confirmed", async () => {
+  const c = clock(SIGN_IN);
+  const fake = await signedIn(c);
+  await journalDay(DAY, { checkin: true });
+  c.set(TITLES_AT);
+  let seenBefore: unknown = null;
+  const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === "POST" && String(input).includes("challenge_days")) seenBefore = { ...(await readSent(db))!.days };
+    return fake.fetch(input, init);
+  }) as typeof fetch;
+  const { sendToTogether } = await import("./sender");
+  expect(await sendToTogether({ fetch: f, now: c.now })).toMatchObject({ kind: "ok" });
+  expect(seenBefore).toEqual({ [DAY]: { hash: "", live: true, parts: { exercise: "answers", checkin: "answers" } } });
+  expect((await readSent(db))!.days![DAY]).toMatchObject({ live: true, parts: { checkin: "titles" } });
+  expect((await readSent(db))!.days![DAY]!.hash).not.toBe("");
 });
 
-describe("Together v1 (Esme, 2026-11-06): highlights never go", () => {
-  it("a day's highlights (passage and note) never go: not at 3am, not with the answers, not another day's", async () => {
-    const c = clock(SIGN_IN);
-    const fake = await signedIn(c);
-    await journalDay(DAY, { exercise: true });
-    await highlightOn(DAY, "pretend Wrenfold clouds", "Pretend Wrenfold note");
-    await highlightOn("2026-11-03", "pretend Pellmoor yesterday");
-    for (const at of [TITLES_AT, ANSWERS_AT, "2026-11-10T09:00:00"]) {
-      c.set(at);
-      await send(fake, c);
-    }
-    expect((await tally(fake, "exercise", 2))!.note).toBe(`${TITLE}\nPretend exercise answer`);
-    expect(wire(fake)).not.toMatch(/Wrenfold|Pellmoor|Highlighted learnings/);
-  });
-});
-
-
-it("bug #59: a whole kind that can't be read (the card file won't open here): a day ticked private is still hidden", async () => {
+it("bug #59: a whole part that can't be read (the card file won't open here): a day ticked private is still hidden", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk } = await journalDay(DAY, { exercise: true });
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect(String((await tally(fake, "exercise", 1))!.note)).toContain("Pretend exercise answer");
+  expect(liveNote(fake, DAY)).toContain("Pretend exercise answer");
   const other = await keyFor("fake-journal-some-other-key");
   const cards = (await db.journal.get("cards"))!;
   await db.journal.put({ ...cards, fp: other.fp, ...(await sealJson(other.key, { v: 1 }, journalAad("cards"))) });
+  const n = dayWrites(fake).length;
+  await send(fake, c);
+  expect(dayWrites(fake).length).toBe(n); // not private: left as it is
   await saveSharePrivate(jk, DAY, "exercise", true);
   await send(fake, c);
-  const live = fake.liveTallies(await habit("exercise"));
-  expect(live).toHaveLength(1);
-  expect(String(live[0]!.note ?? "")).not.toContain("Pretend exercise answer");
+  expect(liveDays(fake)).toHaveLength(1);
+  expect(liveNote(fake, DAY)).toBe("Mental Health Exercise");
 });

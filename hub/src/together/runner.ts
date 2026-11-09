@@ -29,8 +29,15 @@ export class TogetherRunner {
 
   constructor(
     private readonly send: (opts: { retryRefused?: boolean }) => Promise<SendOutcome>,
-    /** Answers are held after a Replace (the record says so): runs must not wait for a sync. */
-    private readonly held: () => Promise<boolean> = async () => (await readSent(appDb))?.waitingRestore === true,
+    /**
+     * Runs must not wait for a sync (the record says so): answers held after a Replace, a backfill
+     * that stopped at its limit, or past days' answers due since the last run.
+     */
+    private readonly held: () => Promise<boolean> = async () => {
+      const s = await readSent(appDb);
+      if (!s) return false;
+      return s.waitingRestore === true || s.backlog === true || (s.pastUntil !== undefined && (s.lastSentAt ?? 0) < s.pastUntil && Date.now() >= s.pastUntil);
+    },
   ) {}
 
   /** The last run started because answers were held (bug #68), for the once-a-minute limit. */

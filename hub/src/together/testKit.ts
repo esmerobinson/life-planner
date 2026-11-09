@@ -8,6 +8,12 @@ export const PARTNER = "00000000-0000-4000-8000-0000000000b0";
 export const COUPLE = "00000000-0000-4000-8000-00000000c0c0";
 export const EMAIL = "esme-pretend@example.test";
 export const PASSWORD = "pretend-together-password-7";
+/** Her challenge in the fake Together (the same id as hers; the name as before the rename). */
+export const CHALLENGE = "bpd-research";
+/** Oliver's own challenge in the same couple: never written to. */
+export const PARTNER_CHALLENGE = "pretend-partner-challenge";
+/** Another couple's challenge with her challenge's name: never seen. */
+export const OTHER_COUPLE = "00000000-0000-4000-8000-00000000c0c1";
 
 export async function emptyDb(): Promise<void> {
   await Promise.all([db.items.clear(), db.goals.clear(), db.files.clear(), db.journal.clear(), db.syncMeta.clear(), db.pending.clear(), db.quarantine.clear()]);
@@ -30,8 +36,23 @@ export function fakeTogether(c: Clock): FakeSupabase {
   fake.now = c.now;
   fake.addUser(EMAIL, PASSWORD, ME, COUPLE);
   fake.addUser("partner-pretend@example.test", "pretend-partner-password", PARTNER, COUPLE);
+  fake.addChallenge({ id: PARTNER_CHALLENGE, couple_id: COUPLE, name: "Pretend partner challenge", for_user: PARTNER });
+  fake.addChallenge({ id: CHALLENGE, couple_id: COUPLE, name: "BPD research", for_user: ME });
+  fake.addChallenge({ id: "pretend-other-couple-challenge", couple_id: OTHER_COUPLE, name: "BPD research", for_user: null });
   return fake;
 }
+
+/** Her challenge's row for a day in the fake Together (deleted or not). */
+export const dayRow = (fake: FakeSupabase, day: string) => fake.dayRow(CHALLENGE, day);
+/** Her challenge's note for a day, when the row isn't deleted. */
+export const liveNote = (fake: FakeSupabase, day: string): string | undefined => {
+  const r = fake.dayRow(CHALLENGE, day);
+  return r && !r.deleted_at ? String(r.note) : undefined;
+};
+/** Her challenge's rows that aren't deleted. */
+export const liveDays = (fake: FakeSupabase) => fake.liveDays(CHALLENGE);
+/** Every request that wrote a day row. */
+export const dayWrites = (fake: FakeSupabase) => fake.requests.filter((r) => r.url.includes("/rest/v1/challenge_days") && r.method !== "GET");
 
 export async function signedIn(c: Clock): Promise<FakeSupabase> {
   const fake = fakeTogether(c);
