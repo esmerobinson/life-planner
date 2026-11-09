@@ -1546,7 +1546,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             // Behind other windows: it saves, then reloads onto the new files, on the same page.
             selfTestPretendInFront = false
             post()
-            let reloaded = await waitUntil(seconds: 10) {
+            // Long enough for one retry (AppVersion.retryInterval): the first try can find a save
+            // still landing, as the self-test page is hidden and its timers run slowly.
+            let reloaded = await waitUntil(seconds: AppVersion.retryInterval + 12) {
                 self.pageWebBuild == "selftest-new-web" && self.readStatus()["state"] as? String == "current"
             }
             let after = try await js("""
