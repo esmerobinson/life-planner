@@ -244,6 +244,33 @@ export const FAKE_CARD_FILE_CHECKLIST = {
 };
 
 /**
+ * A FICTIONAL file with one card that asks for every part kind (for the Together note's example
+ * day), and a second plain card. Every word is made up.
+ */
+export const FAKE_CARD_FILE_ALL_PARTS = {
+  app: "esmeworld",
+  kind: "exercise-cards",
+  version: 2,
+  source: "A pretend workbook of every shape (test fixture)",
+  cards: [
+    pretendCard("all-001", 1, "Pretend noticing the wave", {
+      parts: [
+        { prompt: "What happened, in your own pretend words?", kind: "text" },
+        { prompt: "Three pretend places you felt it", kind: "list", count: 3 },
+        { prompt: "Pretend feelings and what set them off", kind: "table", columns: ["Feeling", "Set off by", "How strong"], rows: 3 },
+        { prompt: "How pretend-calm are you now?", kind: "scale", min: 1, max: 5, minLabel: "Not at all", maxLabel: "Very" },
+        { prompt: "Pretend sleep log", kind: "tracker", days: 3, fields: ["Hours", "Mood"] },
+        { prompt: "A pretend chain of events", kind: "chain", steps: ["What set it off", "What I felt", "What I did"] },
+        { prompt: "Which pretend skills did you try?", kind: "checklist", items: ["Pretend paced breathing", "Pretend cold water", "Pretend half smile"], options: ["Yes", "Partly", "No"], note: "How it went (optional)" },
+        { prompt: "How loud is the pretend feeling?", kind: "rating" },
+        { prompt: "Pretend best next step", kind: "choice", options: ["Rest", "Talk to someone", "Go outside"] },
+      ],
+    }),
+    pretendCard("all-002", 2, "Pretend second card", {}),
+  ],
+};
+
+/**
  * A FICTIONAL two-book file shaped like hers (the books' ids "bpd" and "dbt", each in chapters):
  * every title and word is made up. The first book has 4 days in 2 chapters; the second 3 cards
  * in 2 chapters; plus one optional reading card (never counted).

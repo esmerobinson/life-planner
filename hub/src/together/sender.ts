@@ -39,7 +39,7 @@ import type { JournalKey } from "../journal/crypto";
 import { loadJournalKey } from "../journal/keyStore";
 import { coupleOf, normaliseTogetherUrl, refreshSession, rest, signInWithPassword, validTogetherUrl, type CallResult, type Fetch } from "./client";
 import { togetherId } from "./ids";
-import { PART_HEADINGS, PARTS, readJournalDays, type DayNote, type DayNotes, type JournalDays, type Part } from "./journalNotes";
+import { dayNote, PART_HEADINGS, PART_SUMMARY, PARTS, readJournalDays, type DayNote, type DayNotes, type JournalDays, type Part } from "./journalNotes";
 import {
   readAuth, readSent, saveSent, TOGETHER_META, TOGETHER_SENT_META, withTogetherLock,
   type SentDay, type TogetherAuth, type TogetherSent,
@@ -559,16 +559,17 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
   /** The note that may go right now (the ticks are read again each time: bug #42). */
   const want = async (): Promise<Want> => {
     const ticks = await readSharePrivate(ctx.jk!, date);
-    const out: string[] = [];
+    const out: { summary: string; text: string }[] = [];
     const held: SentDay["parts"] = {};
     if (constrained) {
       if (!rec?.live || !PARTS.some((p) => rec.parts[p] === "answers" && ticks[p])) return "skip";
       // Hidden: every part with titles and questions only (a part that wouldn't open: its heading).
       for (const p of PARTS) {
         const v = parts[p];
-        const text = v && v !== "unknown" ? v.note.titles : rec.parts[p] ? PART_HEADINGS[p] : "";
+        const known = v && v !== "unknown" ? v.note : null;
+        const text = known ? known.titles : rec.parts[p] ? PART_HEADINGS[p] : "";
         if (text) {
-          out.push(text);
+          out.push({ summary: known?.summary || PART_SUMMARY[p], text });
           held[p] = "titles";
         }
       }
@@ -580,11 +581,12 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
         const full = due && !ticks[p] && !v.partial; // never answers from a part that only partly opens
         const text = full ? v.note.full : v.note.titles;
         if (!text) continue;
-        out.push(text);
+        out.push({ summary: v.note.summary, text });
         held[p] = full && v.note.full !== v.note.titles ? "answers" : "titles";
       }
     }
-    return out.length ? { note: out.join("\n\n"), parts: held } : null;
+    // One summary line first (titles only, kept on a private day), then the parts.
+    return out.length ? { note: dayNote(out), parts: held } : null;
   };
 
   const first = await want();

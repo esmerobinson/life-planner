@@ -56,7 +56,7 @@ describe("the backfill: every day from her first, past days' answers 24 h after 
     await saveSharePrivate(jk, PAST_1, "checkin", true);
     c.set("2026-11-08T10:00:00");
     await send(fake, c);
-    expect(liveNote(fake, PAST_1)).toMatch(/^Mental Health Exercise\n/);
+    expect(liveNote(fake, PAST_1)).toMatch(/\n## Mental Health Exercise\n/);
     expect(JSON.stringify(fake.requests)).not.toMatch(/Pretend exercise answer|Pretend check-in answer/);
   });
 

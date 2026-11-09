@@ -49,7 +49,7 @@ vi.mock("../together/journalNotes", async (importOriginal) => {
         const extra = leak.mode === "learned"
           ? (await repo.listLearned(args[0], "9999-12-31")).map((x) => x.text).join("\n")
           : (await repo.listHighlights(args[0])).highlights.map((h) => h.note).join("\n");
-        if (extra) days.exercise.notes.set(d, { titles: note.titles, full: `${note.full}\n\n${extra}` });
+        if (extra) days.exercise.notes.set(d, { ...note, full: `${note.full}\n\n${extra}` });
       }
       return days;
     },
@@ -118,16 +118,21 @@ const Q = `**${PROMPTS[0]!.text}**`;
 /** A day's note as the sender builds it: each part titles only (true), with an answer (a string), or absent. */
 function note(p: { ex?: true | string; research?: string[]; ci?: true | string }): string {
   const parts: string[] = [];
+  const summary: string[] = [];
   if (p.ex !== undefined) {
-    const blocks = [`Mental Health Exercise\n${TITLE}`];
+    summary.push(TITLE);
+    const blocks = [`## Mental Health Exercise\n${TITLE}`];
     if (typeof p.ex === "string") {
-      if (p.research?.length) blocks.push(["Research notes", ...p.research.map((b) => `• ${b}`)].join("\n"));
+      if (p.research?.length) blocks.push(["## Research notes", ...p.research.map((b) => `• ${b}`)].join("\n"));
       blocks.push(p.ex);
     }
     parts.push(blocks.join("\n\n"));
   }
-  if (p.ci !== undefined) parts.push(typeof p.ci === "string" ? `Check In\n${Q}\n${p.ci}` : `Check In\n${Q}`);
-  return parts.join("\n\n");
+  if (p.ci !== undefined) {
+    summary.push("Check In");
+    parts.push(typeof p.ci === "string" ? `## Check In\n${Q}\n${p.ci}` : `## Check In\n${Q}`);
+  }
+  return [summary.join(" · "), ...parts].join("\n\n");
 }
 const wire = (fake: FakeSupabase) => JSON.stringify(fake.requests);
 /** Every write to Together since `from` (any table). */
@@ -347,7 +352,7 @@ describe("scope: a recorder over every request, many days, two devices, a Replac
     expect(all.length).toBeGreaterThan(0);
     for (const p of all) {
       const allowed = new Set([
-        "", "Mental Health Exercise", "Check In", "Research notes", TITLE, Q,
+        "", "## Mental Health Exercise", "## Check In", "## Research notes", TITLE, Q, `${TITLE} · Check In`, "Check In",
         `Pretend ${NAME[p.day]} exercise answer`, `Pretend ${NAME[p.day]} edited exercise answer`, `Pretend ${NAME[p.day]} check-in answer`,
       ]);
       const r = RESEARCH[p.day] ?? [];

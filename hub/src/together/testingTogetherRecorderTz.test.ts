@@ -41,10 +41,10 @@ vi.mock("./journalNotes", async (importOriginal) => {
       const [, today] = args;
       const morningOnly = "2026-11-05";
       if (mode.leak === "morning-date" && days.checkin && morningOnly < today) {
-        days.checkin.notes.set(morningOnly, { titles: "Check In\n**Pretend question**", full: "Check In\n**Pretend question**" });
+        days.checkin.notes.set(morningOnly, { titles: "## Check In\n**Pretend question**", full: "## Check In\n**Pretend question**", summary: "Check In" });
       }
       if (mode.leak === "morning-text" && days.exercise) {
-        for (const [d, n] of days.exercise.notes) days.exercise.notes.set(d, { titles: n.titles, full: `${n.full}\n\nPretend "morning" page,\nline two` });
+        for (const [d, n] of days.exercise.notes) days.exercise.notes.set(d, { ...n, full: `${n.full}\n\nPretend "morning" page,\nline two` });
       }
       return days;
     },

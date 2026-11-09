@@ -106,7 +106,7 @@ it("at the day change: one row for the day (both parts), titles and questions on
   expect(liveDays(fake)).toHaveLength(1);
   expect(dayRow(fake, DAY)).toMatchObject({
     id: await togetherId("day", `${CHALLENGE}:${DAY}`, 1), couple_id: COUPLE, challenge_id: CHALLENGE, day: DAY, by: ME, deleted_at: null,
-    note: `Mental Health Exercise\n${TITLE}\n\nCheck In\n**${q1.text}**`,
+    note: `${TITLE} · Check In\n\n## Mental Health Exercise\n${TITLE}\n\n## Check In\n**${q1.text}**`,
   });
   expect(wire(fake)).not.toMatch(/Pretend exercise answer|Pretend check-in answer|Pretend learned words|Research notes/);
   expect(wire(fake)).not.toContain(q2.text.slice(0, 30)); // a skipped question isn't one she answered
@@ -124,7 +124,7 @@ it("24 hours later: the same row's note is overwritten with her answers and rese
   await send(fake, c);
   expect(fake.days.size).toBe(1);
   expect(liveNote(fake, DAY)).toBe(
-    `Mental Health Exercise\n${TITLE}\n\nResearch notes\n• Pretend learned words\n• Pretend second line\n\nPretend exercise answer\n\nCheck In\n**${q1.text}**\nPretend check-in answer`,
+    `${TITLE} · Check In\n\n## Mental Health Exercise\n${TITLE}\n\n## Research notes\n• Pretend learned words\n• Pretend second line\n\nPretend exercise answer\n\n## Check In\n**${q1.text}**\nPretend check-in answer`,
   );
   expect(dayWrites(fake).map((r) => r.method)).toEqual(["POST", "PATCH"]);
 });
@@ -151,7 +151,7 @@ it("one part private: only the other part's answers go", async () => {
   await saveSharePrivate(jk, DAY, "exercise", true);
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}\n\nCheck In\n**${q1.text}**\nPretend check-in answer`);
+  expect(liveNote(fake, DAY)).toBe(`${TITLE} · Check In\n\n## Mental Health Exercise\n${TITLE}\n\n## Check In\n**${q1.text}**\nPretend check-in answer`);
 });
 
 it("a tick from another device that arrives after the titles went (the race): the answers never go", async () => {
@@ -178,7 +178,7 @@ it("ticked private after the answers went: the note is overwritten with titles o
   await saveSharePrivate(jk, DAY, "exercise", true);
   await send(fake, c);
   expect(fake.days.size).toBe(1);
-  expect(dayRow(fake, DAY)).toMatchObject({ note: `Mental Health Exercise\n${TITLE}\n\nCheck In\n**${q1.text}**`, deleted_at: null });
+  expect(dayRow(fake, DAY)).toMatchObject({ note: `${TITLE} · Check In\n\n## Mental Health Exercise\n${TITLE}\n\n## Check In\n**${q1.text}**`, deleted_at: null });
   expect(JSON.stringify([...fake.days.values()])).not.toMatch(/Pretend check-in answer|Pretend exercise answer|Pretend learned words/);
 });
 
@@ -193,7 +193,7 @@ it("an insert whose reply was lost, then ticked private: the row there is overwr
   expect((await readSent(db))!.days![DAY]).toMatchObject({ hash: "", live: true });
   await saveSharePrivate(jk, DAY, "checkin", true);
   expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 0 });
-  expect(liveNote(fake, DAY)).toBe(`Check In\n**${q1.text}**`);
+  expect(liveNote(fake, DAY)).toBe(`Check In\n\n## Check In\n**${q1.text}**`);
   expect(fake.days.size).toBe(1);
 });
 
@@ -234,7 +234,7 @@ it("a draft never goes (not even one typed after submitting); an unfinished chec
   await saveAnswer(jk, DAY, q1.id, DEVICE, "Pretend half-done check-in", true);
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}\n\nPretend exercise answer`);
+  expect(liveNote(fake, DAY)).toBe(`${TITLE}\n\n## Mental Health Exercise\n${TITLE}\n\nPretend exercise answer`);
   expect(wire(fake)).not.toMatch(/Pretend later draft|Pretend half-done|Check In/);
 });
 
@@ -255,8 +255,8 @@ it("a card's answers go as bold prompts with her answer below, checklist items i
   c.set(ANSWERS_AT);
   await send(fake, c);
   const note = liveNote(fake, DAY)!;
-  expect(note).toContain(`**${card.parts[0]!.prompt}**\n${PRETEND_FEATURES[0]}: Yes (Pretend note of mine)`);
-  expect(note).toContain(`${PRETEND_FEATURES[1]}: Partly`);
+  expect(note).toContain(`**${card.parts[0]!.prompt}**\n• ${PRETEND_FEATURES[0]}: Yes (Pretend note of mine)`);
+  expect(note).toContain(`\n• ${PRETEND_FEATURES[1]}: Partly`);
 });
 
 it("an n/a answer is left out with its question; a part with nothing left is left out", async () => {
@@ -268,10 +268,10 @@ it("an n/a answer is left out with its question; a part with nothing left is lef
   await saveAnswer(jk, DAY, q2.id, DEVICE, "n.a", true);
   c.set(TITLES_AT);
   await send(fake, c);
-  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}`);
+  expect(liveNote(fake, DAY)).toBe(`${TITLE}\n\n## Mental Health Exercise\n${TITLE}`);
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect(liveNote(fake, DAY)).toBe(`Mental Health Exercise\n${TITLE}\n\nPretend exercise answer`);
+  expect(liveNote(fake, DAY)).toBe(`${TITLE}\n\n## Mental Health Exercise\n${TITLE}\n\nPretend exercise answer`);
   expect(wire(fake)).not.toContain(q1.text.slice(0, 30));
 });
 
@@ -282,7 +282,7 @@ it("what she learned and highlights go only with an exercise day", async () => {
   await highlightOn(DAY, "pretend Pellmoor hill", "Pretend Pellmoor note");
   c.set(ANSWERS_AT);
   await send(fake, c);
-  expect(liveNote(fake, DAY)).toMatch(/^Check In\n/);
+  expect(liveNote(fake, DAY)).toMatch(/^Check In\n\n## Check In\n/);
   expect(wire(fake)).not.toMatch(/Pretend learned on a day without a card|Pellmoor/);
 });
 
@@ -301,7 +301,7 @@ it("highlights: that day's own, as bullets with her note; a removed one and anot
   c.set(ANSWERS_AT);
   await send(fake, c);
   expect(liveNote(fake, DAY)).toBe(
-    `Mental Health Exercise\n${TITLE}\n\nResearch notes\n• Pretend learned words\n• pretend Wrenfold clouds — Pretend Wrenfold note\n• pretend Quillby stream\n\nPretend exercise answer`,
+    `${TITLE}\n\n## Mental Health Exercise\n${TITLE}\n\n## Research notes\n• Pretend learned words\n• pretend Wrenfold clouds — Pretend Wrenfold note\n• pretend Quillby stream\n\nPretend exercise answer`,
   );
   expect(wire(fake)).not.toMatch(/Gristlecomb|Pellmoor/);
 });
@@ -318,7 +318,7 @@ it("a day un-ticked after it went: our row marked deleted; ticked again: the sam
   await saveExerciseMark(jk, DAY, DEVICE, card.id, true);
   await send(fake, c);
   expect(fake.days.size).toBe(1);
-  expect(dayRow(fake, DAY)).toMatchObject({ deleted_at: null, note: `Mental Health Exercise\n${TITLE}` });
+  expect(dayRow(fake, DAY)).toMatchObject({ deleted_at: null, note: `${TITLE}\n\n## Mental Health Exercise\n${TITLE}` });
 });
 
 it("a day she logged by hand in Together is left exactly as she wrote it, and never tried again", async () => {
@@ -399,5 +399,5 @@ it("bug #59: a whole part that can't be read (the card file won't open here): a 
   await saveSharePrivate(jk, DAY, "exercise", true);
   await send(fake, c);
   expect(liveDays(fake)).toHaveLength(1);
-  expect(liveNote(fake, DAY)).toBe("Mental Health Exercise");
+  expect(liveNote(fake, DAY)).toBe("Mental Health Exercise\n\n## Mental Health Exercise"); // the card file won't open: its heading only
 });

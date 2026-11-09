@@ -3,33 +3,39 @@
 // journal repo, with the journal key, which never leaves it. Nothing sealed is sent; only text
 // built here. Each part comes in two shapes: titles and questions only, and with her answers.
 //
-// The note (plain text; Together shows `**…**` as bold and keeps line breaks):
+// The note (plain text; Together shows `## ` headings, `**…**` bold, "• " bullets and keeps line
+// breaks; Esme's rulings, 2026-11-09):
 //
-//   Mental Health Exercise
+//   <summary: the card title(s) · Check In>      (one line: Together's list shows only this)
+//
+//   ## Mental Health Exercise
 //   <card title>
 //
-//   Research notes
+//   ## Research notes
 //   • <her typed "What I learned" words, one bullet per line>
 //   • <each highlight's words> — <her highlight note, if any>
 //
 //   **<question>**
-//   <answer>
+//   <answer, written for its kind: see partAnswerText>
 //
-//   Check In
+//   ## Check In
 //   **<question>**
 //   <answer>
 //
 // - Exercise: a day where any card was ticked done. Its questions are the prompts of the parts
 //   she answered (a single-box card's answer has no question of its own: just the answer). Only
-//   what she submitted, never a draft. Research notes: that day's "What I learned" (the newest
-//   version) and the highlights made that day and not removed (bug #57: that day's own rows).
+//   what she submitted, never a draft. Each part's answer is written using that card's part
+//   definition (its columns, fields, steps and scale labels); without it, plainly. Research
+//   notes: that day's "What I learned" (the newest version) and the highlights made that day and
+//   not removed (bug #57: that day's own rows).
 // - Check-in: a day she finished ("Checked in for today"): each question she answered.
-// - Skipped: any question whose answer is "n/a" (any case or punctuation, Esme 2026-11-09). A
-//   part with nothing left is left out; a day with nothing sends nothing.
+// - Skipped: any question whose answer is "n/a" (any case or punctuation, Esme 2026-11-09), and
+//   n/a lines or cells within an answer. A part with nothing left is left out; a day with nothing
+//   sends nothing.
 // - Every day before `today` (which turns at 3am), back to her first journal day (2026-11-08).
 // - Never read or sent: morning pages (not even dates), photos, drafts, Notes to myself, Hard
-//   moment, stars, the card file beyond the titles and prompts of cards she did, learned words or
-//   highlights of a day with no card done.
+//   moment, stars, the card file beyond the titles and part definitions (prompts, columns,
+//   fields, steps, labels) of cards she did, learned words or highlights of a day with no card.
 
 import { db } from "../data/db";
 import {
@@ -38,7 +44,7 @@ import {
 } from "../data/repo";
 import type { ISODate } from "../domain/types";
 import type { JournalKey } from "../journal/crypto";
-import { trackTitle } from "../journal/exercise";
+import { trackTitle, type CardPart } from "../journal/exercise";
 import type { HighlightEntry } from "../journal/highlights";
 import { PROMPTS } from "../journal/prompts";
 import { checkedIn } from "../journal/rows";
@@ -48,18 +54,23 @@ import { cardTitle } from "../ui/journal/ResponseView";
 export type Part = "exercise" | "checkin";
 export const PARTS: Part[] = ["exercise", "checkin"];
 
-/** The part headings in the note (Esme's layout, 2026-11-09). */
+/** The part headings in the note (Esme's layout and rulings, 2026-11-09). */
 export const PART_HEADINGS: Record<Part, string> = {
-  exercise: "Mental Health Exercise",
-  checkin: "Check In",
+  exercise: "## Mental Health Exercise",
+  checkin: "## Check In",
 };
-export const RESEARCH_HEADING = "Research notes";
+export const RESEARCH_HEADING = "## Research notes";
+/** A part's name in the summary line when it has no card titles. */
+export const PART_SUMMARY: Record<Part, string> = { exercise: "Mental Health Exercise", checkin: "Check In" };
 export const BULLET = "• ";
+const SEP = " · ";
 
 /** One day's part: titles and questions only, and with her answers ("" when nothing is left). */
 export interface DayNote {
   titles: string;
   full: string;
+  /** Its words in the summary line: the card titles (" · "), or "Check In". */
+  summary: string;
 }
 
 /**
@@ -88,6 +99,8 @@ const oneLine = (s: string) => s.replace(/\s*[\r\n]+\s*/g, " ").trim();
 
 /** "n/a", "n.a", "na", "N/A." …: the question is left out with it (Esme, 2026-11-09). */
 export const isNA = (answer: string): boolean => /^n\.?\s*\/?\s*a\.?$/i.test(answer.trim());
+/** Something written that isn't "n/a". */
+const said = (s: unknown): s is string => filled(s) && !isNA(s);
 
 /** A question and her answer (`q` is "" for a single-box card's answer). */
 export interface QA {
@@ -96,7 +109,7 @@ export interface QA {
 }
 
 /** Kept: answered, and not "n/a". */
-const kept = (qas: QA[]) => qas.filter((x) => filled(x.a) && !isNA(x.a)).map((x) => ({ q: clean(x.q), a: clean(x.a) }));
+const kept = (qas: QA[]) => qas.filter((x) => said(x.a)).map((x) => ({ q: clean(x.q), a: clean(x.a) }));
 
 const qaText = (x: QA, answers: boolean) => (x.q ? (answers ? `**${x.q}**\n${x.a}` : `**${x.q}**`) : answers ? x.a : "");
 
@@ -115,7 +128,13 @@ export function researchBullets(learned: string, highlights: { words: string; no
   return [...own, ...hl];
 }
 
-/** The exercise part: titles, research notes, then each card's questions and answers. */
+/** The exercise part's summary: the titles of the cards she did, joined with " · ". */
+export const exerciseSummary = (titles: string[]): string => titles.map(oneLine).filter((t) => t !== "").join(SEP);
+
+/**
+ * The exercise part: its heading and titles, research notes, then each card's questions and
+ * answers (under the card's title in bold when there are several cards).
+ */
 export function exerciseSection(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean): string {
   if (cards.length === 0) return "";
   const blocks = [[PART_HEADINGS.exercise, ...cards.map((c) => clean(c.title))].join("\n")];
@@ -123,7 +142,7 @@ export function exerciseSection(cards: { title: string; qas: QA[] }[], research:
   const many = cards.filter((c) => kept(c.qas).length > 0).length > 1;
   for (const c of cards) {
     const qa = qaBlock(kept(c.qas), answers);
-    if (qa) blocks.push(many ? `${clean(c.title)}\n${qa}` : qa);
+    if (qa) blocks.push(many ? `**${clean(c.title)}**\n${qa}` : qa);
   }
   return blocks.join("\n\n");
 }
@@ -134,33 +153,109 @@ export function checkinSection(qas: QA[], answers: boolean): string {
   return qa ? `${PART_HEADINGS.checkin}\n${qa}` : "";
 }
 
-/** The day's note from its parts (an empty part is left out). */
-export const dayNote = (parts: string[]): string => parts.filter((s) => s.trim() !== "").join("\n\n");
+/**
+ * The day's note: one summary line (Together's list shows only the first line), then each part
+ * that has something (an empty part is left out). "" when nothing is left.
+ */
+export function dayNote(parts: { summary: string; text: string }[]): string {
+  const kept = parts.filter((p) => p.text.trim() !== "");
+  if (kept.length === 0) return "";
+  const summary = kept.map((p) => oneLine(p.summary)).filter((s) => s !== "").join(SEP);
+  return [summary, ...kept.map((p) => p.text)].join("\n\n");
+}
 
-/** One part's answer as plain lines (a checklist with its items, a table's rows cell by cell). */
-function partText(p: PartAnswer): string {
+// ---- one part's answer, written for its kind (Esme, 2026-11-09) ---------------------------------
+
+const bullets = (lines: string[]) => lines.map((l) => `${BULLET}${l}`).join("\n");
+const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const strs = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x : "")) : []);
+const rowsOf = (v: unknown): string[][] => (Array.isArray(v) ? v.map(strs) : []);
+/** "a: b" pairs with something said, joined with " · ". */
+const pairs = (names: (string | undefined)[], values: string[]) =>
+  values
+    .map((v, i) => (said(v) ? (filled(names[i]) ? `${oneLine(names[i]!)}: ${oneLine(v)}` : oneLine(v)) : ""))
+    .filter((s) => s !== "")
+    .join(SEP);
+
+/** As plain as before (no part definition to go by): every value, lines and cells as they are. */
+function plainText(p: PartAnswer): string {
   const v = p.answer;
   if (v === null) return "";
   if (typeof v === "number") return String(v);
-  if (typeof v === "string") return clean(v);
-  if (v.every((x) => typeof x === "string")) return (v as string[]).filter(filled).map(clean).join("\n");
-  return (v as string[][])
-    .map((row) => {
-      if (p.kind === "checklist") {
-        const [item, choice, note] = row;
-        if (!filled(choice) && !filled(note)) return "";
-        return `${clean(item ?? "")}: ${filled(choice) ? clean(choice) : ""}${filled(note) ? ` (${clean(note)})` : ""}`;
-      }
-      return row.filter(filled).map(clean).join(" | ");
-    })
+  if (typeof v === "string") return said(v) ? clean(v) : "";
+  if (v.every((x) => typeof x === "string")) return (v as string[]).filter(said).map(clean).join("\n");
+  return rowsOf(v)
+    .map((row) => row.filter(said).map(oneLine).join(SEP))
     .filter((s) => s !== "")
     .join("\n");
 }
 
+/**
+ * One part's answer as Together shows it, by its kind, using the card's part definition `def`
+ * (columns, fields, steps, scale ends and labels) when there is one. Never drops what she wrote:
+ * without a definition a part that needs one is written plainly. n/a lines and cells are left out.
+ */
+export function partAnswerText(p: PartAnswer, def?: CardPart): string {
+  const v = p.answer;
+  const d = def && def.kind === p.kind ? def : undefined;
+  switch (p.kind) {
+    case "text":
+      return typeof v === "string" && said(v) ? clean(v) : "";
+    case "list":
+      return bullets(strs(v).filter(said).map(oneLine));
+    case "rating":
+      return num(v) ? `${v} out of ${num(d?.max) ? d!.max : 10}` : "";
+    case "choice":
+      return typeof v === "string" && said(v) ? clean(v) : "";
+    case "scale": {
+      if (!num(v)) return "";
+      if (!d || !num(d.min) || !num(d.max)) return plainText(p);
+      const ends = [filled(d.minLabel) ? `${d.min} = ${oneLine(d.minLabel)}` : "", filled(d.maxLabel) ? `${d.max} = ${oneLine(d.maxLabel)}` : ""].filter(Boolean);
+      return `${v} out of ${d.max}${ends.length ? ` (${ends.join(", ")})` : ""}`;
+    }
+    case "chain": {
+      if (!d?.steps) return bullets(strs(v).filter(said).map(oneLine));
+      return bullets(strs(v).map((a, i) => (said(a) ? `${filled(d.steps![i]) ? `${oneLine(d.steps![i]!)}: ` : ""}${oneLine(a)}` : "")).filter((s) => s !== ""));
+    }
+    case "table":
+      return bullets(rowsOf(v).map((row) => pairs(d?.columns ?? [], row)).filter((s) => s !== ""));
+    case "tracker": {
+      if (!d?.fields) return plainText(p);
+      return bullets(
+        rowsOf(v)
+          .map((day, i) => {
+            const got = pairs(d.fields!, day);
+            return got ? `Day ${i + 1}: ${got}` : "";
+          })
+          .filter((s) => s !== ""),
+      );
+    }
+    case "checklist":
+      return bullets(
+        rowsOf(v)
+          .map(([item, choice, note]) => {
+            if (!said(choice) && !said(note)) return "";
+            return `${oneLine(item ?? "")}: ${[said(choice) ? oneLine(choice) : "", said(note) ? `(${oneLine(note)})` : ""].filter(Boolean).join(" ")}`;
+          })
+          .filter((s) => s !== ""),
+      );
+    default:
+      return plainText(p);
+  }
+}
+
+/** The card part an answer answers: the same prompt and kind (its own place first). */
+function defFor(parts: CardPart[] | undefined, p: PartAnswer, i: number): CardPart | undefined {
+  if (!parts) return undefined;
+  const at = parts[i];
+  if (at && at.prompt === p.prompt && at.kind === p.kind) return at;
+  return parts.find((d) => d.prompt === p.prompt && d.kind === p.kind);
+}
+
 /** Her answer to a card: its one text (no question), then each part's prompt with her answer. */
-export function cardQAs(r: Pick<ExerciseResponse, "text" | "parts">): QA[] {
-  const out: QA[] = [{ q: "", a: clean(r.text) }];
-  for (const p of r.parts ?? []) out.push({ q: p.prompt, a: partText(p) });
+export function cardQAs(r: Pick<ExerciseResponse, "text" | "parts">, defs?: CardPart[]): QA[] {
+  const out: QA[] = [{ q: "", a: said(r.text) ? clean(r.text) : "" }];
+  (r.parts ?? []).forEach((p, i) => out.push({ q: p.prompt, a: partAnswerText(p, defFor(defs, p, i)) }));
   return out;
 }
 
@@ -252,16 +347,21 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
     for (const id of cardIds) {
       const card = set?.cards.find((c) => c.id === id);
       // Only what she submitted: a draft never goes.
-      const said = entries.find((e) => e.date === date && e.id === id && e.saved && e.submitted);
+      const entry = entries.find((e) => e.date === date && e.id === id && e.saved && e.submitted);
       const title = card
         ? cardTitle(card, (set && trackTitle(set, card)) || undefined, true)
-        : said
-          ? cardTitle(said, undefined, false)
+        : entry
+          ? cardTitle(entry, undefined, false)
           : "An exercise card";
-      done.push({ title, qas: said ? cardQAs(said) : [] });
+      // Its parts written using the card's own part definitions (when the card is still here).
+      done.push({ title, qas: entry ? cardQAs(entry, card?.parts) : [] });
     }
     const research = researchBullets(learned.text, hl.list);
-    notes.set(date, { titles: exerciseSection(done, [], false), full: exerciseSection(done, research, true) });
+    notes.set(date, {
+      titles: exerciseSection(done, [], false),
+      full: exerciseSection(done, research, true),
+      summary: exerciseSummary(done.map((c) => c.title)),
+    });
   }
   return { notes, unknown, partial };
 }
@@ -287,7 +387,7 @@ async function checkinDays(jk: JournalKey, today: ISODate): Promise<DayNotes> {
     const qas = answeredPrompts(day).map((id) => ({ q: PROMPT_TEXT.get(id) ?? id, a: day.answers.get(id)?.answer ?? "" }));
     const titles = checkinSection(qas, false);
     if (titles === "") continue; // every answer was "n/a": nothing of the check-in goes
-    notes.set(date, { titles, full: checkinSection(qas, true) });
+    notes.set(date, { titles, full: checkinSection(qas, true), summary: PART_SUMMARY.checkin });
   }
   return { notes, unknown, partial };
 }
