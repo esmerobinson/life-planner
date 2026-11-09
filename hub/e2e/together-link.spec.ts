@@ -171,7 +171,7 @@ for (const width of [1280, 390]) {
       await expect.poll(() => days(fake).length).toBe(1);
       const first = days(fake)[0]!;
       expect(first).toMatchObject({ couple_id: COUPLE, challenge_id: CHALLENGE, day, by: ME, deleted_at: null });
-      expect(String(first.note)).toMatch(/^Mental Health Exercise\n.*Pretend first-book one\n\nCheck In\n\*\*/);
+      expect(String(first.note)).toMatch(/^[^\n]*Pretend first-book one · Check In\n\n## Mental Health Exercise\n.*Pretend first-book one\n\n## Check In\n\*\*/);
       expect(String(first.note)).not.toMatch(/Pretend answer|Pretend exercise answer|a wave passes|Research notes/);
 
       // 24 hours after the day ended: the same row now holds her answers and research notes.
@@ -181,9 +181,9 @@ for (const width of [1280, 390]) {
       await expect.poll(() => String(days(fake)[0]!.note)).toContain("Pretend answer 1");
       expect(days(fake)).toHaveLength(1);
       const note = String(days(fake)[0]!.note);
-      expect(note).toContain("Research notes\n• Pretend: a wave passes");
+      expect(note).toContain("## Research notes\n• Pretend: a wave passes");
       expect(note).toContain("Pretend exercise answer");
-      expect(note).toMatch(/\n\nCheck In\n\*\*[^\n]+\*\*\nPretend answer 1/);
+      expect(note).toMatch(/\n\n## Check In\n\*\*[^\n]+\*\*\nPretend answer 1/);
       expect(fake.todos.size + fake.events.size).toBe(0);
 
       // Nothing forbidden went: no to-do, no password after sign-in, no sync passphrase.
