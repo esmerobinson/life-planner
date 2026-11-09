@@ -810,6 +810,20 @@ export interface ExerciseProgress {
   unreadable: number;
 }
 
+/**
+ * The days with an exercise progress row or a card response row this device can't open (their
+ * dates are in clear), so a reader can hold back only those days (Together link review M9).
+ */
+export async function unreadableExerciseDates(jk: JournalKey): Promise<Set<ISODate>> {
+  const out = new Set<ISODate>();
+  for (const row of await db.journal.where("kind").anyOf("exercise", "exercise-entry").toArray()) {
+    if (out.has(row.date)) continue;
+    const o = row.kind === "exercise" ? await openRow(jk, row, "exercise") : await openRow(jk, row, "exercise-entry");
+    if (o.state !== "ok") out.add(row.date);
+  }
+  return out;
+}
+
 /** All exercise progress and stars, from every device's rows (version 1 rows, by day, read as "day-N"). */
 export async function readExerciseProgress(jk: JournalKey): Promise<ExerciseProgress> {
   const marks: ExerciseMark[] = [];

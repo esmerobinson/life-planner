@@ -296,8 +296,11 @@ function eq(u: URL, col: string): string | null {
   return v && v.startsWith("eq.") ? v.slice(3) : null;
 }
 
-/** The row passes every `eq.` filter on these columns that the request has. */
+/** The row passes every `eq.` filter on these columns that the request has, and `deleted_at=is.null`. */
 function matches(row: Row, u: URL, cols: string[]): boolean {
+  const del = u.searchParams.get("deleted_at");
+  if (del !== null && del !== "is.null") throw new Refusal(400, "FAKE_FILTER", "fake: only deleted_at=is.null is understood");
+  if (del === "is.null" && row.deleted_at) return false;
   return cols.every((c) => {
     const v = eq(u, c);
     return v === null || String(row[c]) === v;

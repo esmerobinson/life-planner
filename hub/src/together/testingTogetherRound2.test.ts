@@ -149,11 +149,11 @@ it("#42: ticked private during the retry after a clash (our row already there): 
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk } = await journalDay(DAY, { checkin: true });
-  // Our row for the day is already in Together (from before this record: a Stop, then signing in
-  // again), so the insert clashes and the row is overwritten by id instead. She ticks during that
+  // Our row for the day is already in Together, live (from before this record: say a lost reply on a
+  // device whose record was reset), so the insert clashes and the row is overwritten by id instead. She ticks during that
   // round trip.
   const id = await togetherId("day", `${CHALLENGE}:${DAY}`, 1);
-  fake.days.set(id, { id, couple_id: COUPLE, challenge_id: CHALLENGE, day: DAY, note: "Pretend old note", by: ME, deleted_at: "2026-11-05T00:00:00.000Z" });
+  fake.days.set(id, { id, couple_id: COUPLE, challenge_id: CHALLENGE, day: DAY, note: "Pretend old note", by: ME, deleted_at: null });
   c.set(ANSWERS_AT);
   let tickedAt = -1;
   const f = (async (input: RequestInfo | URL, init?: RequestInit) => {

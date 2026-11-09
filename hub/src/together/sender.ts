@@ -158,6 +158,11 @@ export async function signInToTogether(
       const sent = await readSent(db);
       if (!sent || sent.userId !== auth.userId) {
         await saveSent(db, { ...freshSent(auth.userId, now()), formerSeen: (await formerDeviceIds(db.syncMeta)).length });
+      } else {
+        // Signing in again (after Stop, or a lapsed sign-in): the 24 h to tick any day private
+        // starts again for every day so far, sent or not (review I1). A day already sent with
+        // answers stays as it is meanwhile.
+        await saveSent(db, { ...sent, pastBefore: todayISO(new Date(now())), pastUntil: now() + ANSWERS_DELAY_MS });
       }
     });
     return { kind: "ok" };
@@ -176,8 +181,10 @@ export type StopResult = { kind: "ok" } | { kind: "error"; message: string };
 /**
  * "Stop copying to Together": forgets the sign-in on this device. With `markDeleted`, first marks
  * every day logged in her challenge deleted in Together (never the challenge itself, which is
- * hers), and forgets the record too (review M9). If anything can't be removed, nothing is
- * forgotten and she is told how many (review M2), so she can try again or stop without removing.
+ * hers). The record is kept, its days marked deleted, so signing in again later brings those
+ * same rows back (24 h after that sign-in), never taking them for entries she deleted herself in
+ * Together. If anything can't be removed, the sign-in is kept and she is told how many (review
+ * M2), so she can try again or stop without removing.
  */
 export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean }): Promise<StopResult> {
   const db = appDb;
@@ -203,7 +210,11 @@ export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean })
       if (!(e instanceof Stop)) throw e;
       return { kind: "error", message: e.why === "auth" ? NEEDS_SIGN_IN : SIGN_IN_MESSAGES.offline };
     }
-    await db.syncMeta.delete(TOGETHER_SENT_META);
+    const done = await readSent(db);
+    if (done) {
+      const { removing: _r, ...rest } = done;
+      await saveSent(db, rest);
+    }
     await db.syncMeta.delete(TOGETHER_META);
     return { kind: "ok" };
   });
@@ -438,10 +449,10 @@ class Ctx {
     return r;
   }
 
-  /** PATCH our row for a day, by its fixed id, in her couple. */
-  patchDay(id: string, body: Record<string, unknown>) {
+  /** PATCH our row for a day, by its fixed id, in her couple (with `liveOnly`, only if not deleted). */
+  patchDay(id: string, body: Record<string, unknown>, opts: { liveOnly?: boolean } = {}) {
     this.writes++;
-    return this.patch("challenge_days", `couple_id=eq.${enc(this.auth.coupleId)}&id=eq.${enc(id)}`, body);
+    return this.patch("challenge_days", `couple_id=eq.${enc(this.auth.coupleId)}&id=eq.${enc(id)}${opts.liveOnly ? "&deleted_at=is.null" : ""}`, body);
   }
 }
 
@@ -464,14 +475,12 @@ async function findChallenge(ctx: Ctx): Promise<string | null> {
   if (!sent.challenge) {
     const r = await ctx.call("GET", `challenges?couple_id=eq.${enc(ctx.auth.coupleId)}&select=id,name,for_user`, undefined, "");
     const rows = r.kind === "ok" && Array.isArray(r.body) ? (r.body as { id?: unknown; name?: unknown; for_user?: unknown }[]) : [];
-    // Its known id (confirmed hers), or its name on one that isn't someone else's.
+    // Its known id or its name, on one that is hers or no one's (never someone else's: review M1).
     const mine = rows.filter(
       (c) =>
         typeof c.id === "string" &&
-        (CHALLENGE_IDS.includes(c.id) ||
-          (typeof c.name === "string" &&
-            CHALLENGE_NAMES.includes(c.name.trim().toLowerCase()) &&
-            (c.for_user === undefined || c.for_user === null || c.for_user === ctx.auth.userId))),
+        (CHALLENGE_IDS.includes(c.id) || (typeof c.name === "string" && CHALLENGE_NAMES.includes(c.name.trim().toLowerCase()))) &&
+        (c.for_user === undefined || c.for_user === null || c.for_user === ctx.auth.userId),
     );
     // Its known id first, then one already renamed, then her own, then by id (always the same pick).
     const rank = (c: (typeof mine)[number]) =>
@@ -536,13 +545,17 @@ async function sendDays(ctx: Ctx, journal: JournalDays | null): Promise<void> {
 
 type Want = { note: string; parts: SentDay["parts"] } | null | "skip";
 
-/** Answers may go for this day now (24 h after it ended; a past day, 24 h after sign-in or the update). */
-function answersDue(ctx: Ctx, date: ISODate): boolean {
-  const now = ctx.now();
-  if (!(date < todayISO(new Date(now - ANSWERS_DELAY_MS)))) return false;
+/** The day ended ANSWERS_DELAY_MS ago: its answers' own time. */
+const dayDue = (ctx: Ctx, date: ISODate) => date < todayISO(new Date(ctx.now() - ANSWERS_DELAY_MS));
+
+/** A past day (before the last sign-in, or this update) within the 24 h after it (review I1). */
+function pastHeld(ctx: Ctx, date: ISODate): boolean {
   const { pastBefore, pastUntil } = ctx.sent;
-  return pastBefore === undefined || date >= pastBefore || now >= (pastUntil ?? 0);
+  return pastBefore !== undefined && date < pastBefore && ctx.now() < (pastUntil ?? 0);
 }
+
+/** Its research notes changed less than ANSWERS_DELAY_MS ago (review I2). */
+const researchHeld = (ctx: Ctx, note: DayNote) => (note.researchAt ?? 0) > 0 && ctx.now() < note.researchAt! + ANSWERS_DELAY_MS;
 
 async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): Promise<void> {
   const { sent } = ctx;
@@ -556,37 +569,51 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
     PARTS.some((p) => parts[p] === "unknown" || (partial(p) && rec?.live && rec.parts[p] === "answers")) ||
     (ctx.restoredUnpulled && !!rec?.live && (hasAnswers(rec) || PARTS.every((p) => parts[p] === null)));
 
+  /** Every part with titles and questions only (a part that wouldn't open: its heading). */
+  const titlesOnly = (): Want => {
+    const out: { summary: string; text: string }[] = [];
+    const held: SentDay["parts"] = {};
+    for (const p of PARTS) {
+      const v = parts[p];
+      const known = v && v !== "unknown" ? v.note : null;
+      const text = known ? known.titles : rec?.parts[p] ? PART_HEADINGS[p] : "";
+      if (text) {
+        out.push({ summary: known?.summary || PART_SUMMARY[p], text });
+        held[p] = "titles";
+      }
+    }
+    return out.length ? { note: dayNote(out), parts: held } : null;
+  };
+
   /** The note that may go right now (the ticks are read again each time: bug #42). */
   const want = async (): Promise<Want> => {
     const ticks = await readSharePrivate(ctx.jk!, date);
+    const hide = !!rec?.live && PARTS.some((p) => rec.parts[p] === "answers" && ticks[p]);
+    if (constrained) return hide ? titlesOnly() : "skip";
+    const due = dayDue(ctx, date) && !ctx.restoredUnpulled;
+    const held = (p: Part, v: { note: DayNote }) => (due && pastHeld(ctx, date)) || (p === "exercise" && researchHeld(ctx, v.note));
+    // A part already sent with answers that may not go again yet (a new sign-in's 24 h, research
+    // notes changed late): what went stays, so the day is left as it is unless something is hidden.
+    const keep = !hide && !!rec?.live && rec.hash !== "" &&
+      PARTS.some((p) => {
+        const v = parts[p];
+        return rec.parts[p] === "answers" && !ticks[p] && v && v !== "unknown" && held(p, v);
+      });
+    if (keep) return "skip";
     const out: { summary: string; text: string }[] = [];
-    const held: SentDay["parts"] = {};
-    if (constrained) {
-      if (!rec?.live || !PARTS.some((p) => rec.parts[p] === "answers" && ticks[p])) return "skip";
-      // Hidden: every part with titles and questions only (a part that wouldn't open: its heading).
-      for (const p of PARTS) {
-        const v = parts[p];
-        const known = v && v !== "unknown" ? v.note : null;
-        const text = known ? known.titles : rec.parts[p] ? PART_HEADINGS[p] : "";
-        if (text) {
-          out.push({ summary: known?.summary || PART_SUMMARY[p], text });
-          held[p] = "titles";
-        }
-      }
-    } else {
-      const due = answersDue(ctx, date) && !ctx.restoredUnpulled;
-      for (const p of PARTS) {
-        const v = parts[p];
-        if (!v || v === "unknown") continue;
-        const full = due && !ticks[p] && !v.partial; // never answers from a part that only partly opens
-        const text = full ? v.note.full : v.note.titles;
-        if (!text) continue;
-        out.push({ summary: v.note.summary, text });
-        held[p] = full && v.note.full !== v.note.titles ? "answers" : "titles";
-      }
+    const sentParts: SentDay["parts"] = {};
+    for (const p of PARTS) {
+      const v = parts[p];
+      if (!v || v === "unknown") continue;
+      // Never answers from a part that only partly opens.
+      const full = due && !ticks[p] && !v.partial && !held(p, v);
+      const text = full ? v.note.full : v.note.titles;
+      if (!text) continue;
+      out.push({ summary: v.note.summary, text });
+      sentParts[p] = full && v.note.full !== v.note.titles ? "answers" : "titles";
     }
     // One summary line first (titles only, kept on a private day), then the parts.
-    return out.length ? { note: dayNote(out), parts: held } : null;
+    return out.length ? { note: dayNote(out), parts: sentParts } : null;
   };
 
   const first = await want();
@@ -616,23 +643,43 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
     sent.refused[date] = { hash: h, what };
     await ctx.save();
   };
+  /**
+   * Deleted in Together (by her, most likely): left alone from now on and counted in the box, like
+   * a day she logged by hand (review I3). Answers that may be in it are taken out first: that
+   * only removes text.
+   */
+  const leaveAlone = async (scrub: boolean) => {
+    const t = scrub ? titlesOnly() : null;
+    if (t && t !== "skip") await ctx.patchDay(id, { note: t.note });
+    delete ctx.days[date];
+    (sent.byHand ??= {})[date] = true;
+    delete sent.refused[date];
+    await ctx.save();
+  };
 
   if (rec) {
-    // Our row is (or may be) there: its note is overwritten, a deleted one shown again.
+    // Our row is (or may be) there: its note is overwritten.
     const w = await want();
     if (w === "skip" || w === null) return; // changed meanwhile: next run
     // Its content is unknown while the overwrite is on its way (a reply lost: it may have gone in).
     const before: SentDay = { ...rec, parts: { ...rec.parts } };
     ctx.days[date] = { hash: "", live: true, parts: { exercise: "answers", checkin: "answers" } };
     await ctx.save();
-    // A deleted row (or one whose state is unknown) is shown again.
-    const r = await ctx.patchDay(id, before.live && before.hash !== "" ? { note: w.note } : { note: w.note, deleted_at: null });
+    // Shown again: a row we marked deleted ourselves (a card un-ticked, Stop with removing).
+    // Taken back to titles: may go to a deleted row (it only removes text). Anything else adds or
+    // changes words, so only ever into a row that isn't deleted (review I3).
+    const reviving = !before.live;
+    const removal = !reviving && before.hash !== "" && PARTS.some((p) => before.parts[p] === "answers" && w.parts[p] !== "answers") && !PARTS.some((p) => w.parts[p] === "answers");
+    const r = reviving
+      ? await ctx.patchDay(id, { note: w.note, deleted_at: null })
+      : await ctx.patchDay(id, { note: w.note }, { liveOnly: !removal });
     if (r.kind === "ok") return record(w);
     if (r.code !== "no-row") {
       ctx.days[date] = before; // refused: unchanged in Together
       return setAside(before.live && hasAnswers(before) ? "hide" : "copy");
     }
-    // Never reached Together (a cut-off insert): inserted below.
+    if (!reviving && !removal && before.hash !== "") return leaveAlone(hasAnswers(before));
+    // Never reached Together (a cut-off insert), or not there at all: inserted below.
     delete ctx.days[date];
   }
   if (constrained) return; // only ever hidden: nothing new goes
@@ -645,19 +692,13 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
   const r = await ctx.call("POST", "challenge_days", { id, couple_id: ctx.auth.coupleId, challenge_id: ctx.challengeId, day: date, note: w.note });
   if (r.kind === "ok") return record(w);
   if (isDuplicate(r)) {
-    // Ours from an earlier run (its content unknown), or a day she logged by hand.
+    // Ours from an earlier run (its content unknown), a day she logged by hand, or ours that she
+    // deleted in Together: only a row of ours that isn't deleted is overwritten.
     const again = await want();
     if (again !== "skip" && again !== null) {
-      const p = await ctx.patchDay(id, { note: again.note, deleted_at: null });
+      const p = await ctx.patchDay(id, { note: again.note }, { liveOnly: true });
       if (p.kind === "ok") return record(again);
-      if (p.code === "no-row") {
-        // Hers, written by hand in Together: left exactly as it is, and never tried again.
-        delete ctx.days[date];
-        (sent.byHand ??= {})[date] = true;
-        delete sent.refused[date];
-        await ctx.save();
-        return;
-      }
+      if (p.code === "no-row") return leaveAlone(true); // hers, or deleted by her: left exactly as it is
     }
     return; // still recorded as maybe there: the next run overwrites it
   }

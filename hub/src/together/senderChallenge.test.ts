@@ -166,7 +166,7 @@ describe("an earlier build's habits (two to-dos and their tallies) are marked de
   });
 });
 
-it("Stop with removing: our days marked deleted (never the challenge, never a day she logged by hand), then forgotten", async () => {
+it("Stop with removing: our days marked deleted (never the challenge, never a day she logged by hand), its days kept as deleted", async () => {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   await journalDay("2026-11-02", { checkin: true });
@@ -178,5 +178,5 @@ it("Stop with removing: our days marked deleted (never the challenge, never a da
   expect(dayRow(fake, "2026-11-02")!.deleted_at).not.toBeNull();
   expect(fake.days.get(String(hers.id))!.deleted_at).toBeNull();
   expect(fake.challenges.get(CHALLENGE)!.deleted_at).toBeNull();
-  expect(await readSent(db)).toBeUndefined();
+  expect(Object.values((await readSent(db))!.days ?? {}).filter((d) => d.live)).toEqual([]); // kept, every day marked deleted (review I3)
 });

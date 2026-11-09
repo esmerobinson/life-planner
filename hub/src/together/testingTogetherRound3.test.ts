@@ -100,7 +100,7 @@ function gate(fake: FakeSupabase) {
 // ---- Stop with removing while something hangs ---------------------------------------------------
 
 describe("Stop with removing, while a request hangs", () => {
-  it("during a hung answers write (done in Together): nothing of hers is left live, her challenge kept, record forgotten", async () => {
+  it("during a hung answers write (done in Together): nothing of hers is left live, her challenge kept, the record kept with every day deleted", async () => {
     const { c, fake } = await titlesSent({ exercise: true });
     const h = hangOn(fake, isDayPatch, { applied: true });
     const run = sendToTogether({ fetch: h.fetch, now: c.now });
@@ -109,7 +109,7 @@ describe("Stop with removing, while a request hangs", () => {
     expect((await run).kind).toBe("offline");
     expect(liveCount(fake), "a day is still live in Together").toBe(0);
     expect(onlyDays(fake)).toEqual({ todos: 0, events: 0, challengeDeleted: false });
-    expect(await readSent(db), "the record is forgotten only after Together confirmed").toBeUndefined();
+    expect(Object.values((await readSent(db))!.days ?? {}).filter((d) => d.live)).toEqual([]); // kept, every day marked deleted (review I3)
     expect(await readAuth(db)).toBeUndefined();
   });
 
@@ -162,7 +162,7 @@ describe("after Stop", () => {
     expect(onlyDays(fake)).toEqual({ todos: 0, events: 0, challengeDeleted: false });
   });
 
-  it("Stop WITHOUT removing during a hung answers write, then sign in again: the record is kept, the day is in Together exactly once, with her answers", async () => {
+  it("Stop WITHOUT removing during a hung answers write, then sign in again: the record is kept, the day is in Together exactly once, with her answers 24 h after the new sign-in", async () => {
     const { c, fake } = await titlesSent();
     const h = hangOn(fake, isDayPatch, { applied: true });
     const run = sendToTogether({ fetch: h.fetch, now: c.now });
@@ -172,6 +172,11 @@ describe("after Stop", () => {
     expect((await readSent(db))?.days?.[DAY], "kept for the next sign-in").toBeTruthy();
     c.set("2026-11-10T10:00:00");
     expect(await signInAgain(fake, c)).toEqual({ kind: "ok" });
+    expect((await send(fake, c)).kind).toBe("ok");
+    expect(fake.days.size).toBe(1);
+    // Signing in again restarts the 24 h hold (review I1): titles until 24 h after it, then her answers.
+    expect(liveAnswers(fake)).toHaveLength(0);
+    c.set("2026-11-11T10:00:00");
     expect((await send(fake, c)).kind).toBe("ok");
     expect(fake.days.size).toBe(1);
     expect(liveAnswers(fake)).toHaveLength(1);
@@ -195,7 +200,7 @@ describe("Stop with removing while offline, or refused", () => {
     g.offline = false;
     expect(await stop(g.fetch, c, true)).toEqual({ kind: "ok" });
     expect(liveCount(fake)).toBe(0);
-    expect(await db.syncMeta.get(TOGETHER_SENT_META)).toBeUndefined();
+    expect(Object.values((await readSent(db))!.days ?? {}).filter((d) => d.live)).toEqual([]); // kept, every day marked deleted (review I3)
     expect(await db.syncMeta.get(TOGETHER_META)).toBeUndefined();
   });
 

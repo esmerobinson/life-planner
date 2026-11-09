@@ -220,7 +220,7 @@ describe("#53: Stop with removing cut off at each step", () => {
       expect(state, "the paused runs finished the removal").toEqual({ days: [], todos: 0, challengeDeleted: false });
       // Finish removing: done, forgotten, and nothing more goes after.
       expect(await stop(fake.fetch, c, true)).toEqual({ kind: "ok" });
-      expect(await db.syncMeta.get(TOGETHER_SENT_META)).toBeUndefined();
+      expect(Object.values((await readSent(db))!.days ?? {}).filter((d) => d.live)).toEqual([]); // kept, every day marked deleted (review I3)
       expect(await readAuth(db)).toBeUndefined();
       const n = fake.requests.length;
       expect((await send(fake, c)).kind).toBe("off");

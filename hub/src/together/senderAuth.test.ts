@@ -99,7 +99,7 @@ it("two runs at once on this device: one is busy, never two refreshes", async ()
   expect(fake.requests.filter((r) => r.url.includes("grant_type=refresh_token"))).toHaveLength(1);
 });
 
-it("Stop with \"mark deleted\": our days marked deleted, sign-in and record forgotten; signing in again shows the same row again (no second row)", async () => {
+it("Stop with \"mark deleted\": our days marked deleted, sign-in forgotten, the record kept; signing in again shows the same row again (no second row)", async () => {
   const c = clock(`${DAY}T10:00:00`);
   const fake = await signedIn(c);
   await journalDay(DAY);
@@ -107,7 +107,7 @@ it("Stop with \"mark deleted\": our days marked deleted, sign-in and record forg
   await send(fake, c);
   expect(await stopTogether({ fetch: fake.fetch, now: c.now }, { markDeleted: true })).toEqual({ kind: "ok" });
   expect(await db.syncMeta.get(TOGETHER_META)).toBeUndefined();
-  expect(await db.syncMeta.get(TOGETHER_SENT_META)).toBeUndefined();
+  expect(Object.values((await readSent(db))!.days ?? {}).filter((d) => d.live)).toEqual([]); // kept, every day marked deleted (review I3)
   expect(fake.days.size).toBe(1);
   expect([...fake.days.values()].every((d) => d.deleted_at)).toBe(true);
   expect(fake.todos.size).toBe(0);

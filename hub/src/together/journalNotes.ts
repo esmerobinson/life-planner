@@ -40,6 +40,7 @@
 import { db } from "../data/db";
 import {
   answeredPrompts, highlightRows, listExerciseEntries, readCheckinDay, readExerciseCards, readExerciseProgress, readLearned,
+  unreadableExerciseDates,
   type ExerciseResponse, type PartAnswer,
 } from "../data/repo";
 import type { ISODate } from "../domain/types";
@@ -71,6 +72,11 @@ export interface DayNote {
   full: string;
   /** Its words in the summary line: the card titles (" · "), or "Check In". */
   summary: string;
+  /**
+   * When its research notes (learned words, highlights and their notes) last changed, epoch ms (0:
+   * none). A change made after the day went waits 24 h after it too (review I2).
+   */
+  researchAt?: number;
 }
 
 /**
@@ -283,7 +289,9 @@ async function noteTwins(jk: JournalKey): Promise<Map<string, ISODate>> {
  * the same words too (then it belongs to that day, which she may have ticked private). A removed
  * one is left out. `partial`: a row of the day wouldn't open here.
  */
-async function dayHighlights(jk: JournalKey, date: ISODate, twins: Map<string, ISODate>): Promise<{ list: { words: string; note: string }[]; partial: boolean }> {
+async function dayHighlights(
+  jk: JournalKey, date: ISODate, twins: Map<string, ISODate>,
+): Promise<{ list: { words: string; note: string }[]; partial: boolean; changedAt: number }> {
   const byHid = new Map<string, HighlightEntry[]>();
   let partial = false;
   for (const row of await db.journal.where("date").equals(date).toArray()) {
@@ -307,7 +315,9 @@ async function dayHighlights(jk: JournalKey, date: ISODate, twins: Map<string, I
   }
   // A fixed order, so the note (and its hash) never changes by itself.
   keep.sort((a, b) => a.createdAt - b.createdAt || a.hid.localeCompare(b.hid));
-  return { list: keep.map(({ words, note }) => ({ words, note })), partial };
+  // The newest version that adds or changes words (a removal only takes words out: not counted).
+  const changedAt = Math.max(0, ...[...byHid.values()].flat().filter((v) => !v.deleted).map((v) => v.at));
+  return { list: keep.map(({ words, note }) => ({ words, note })), partial, changedAt };
 }
 
 const PROMPT_TEXT = new Map(PROMPTS.map((p) => [p.id, p.text]));
@@ -323,7 +333,9 @@ export async function readJournalDays(jk: JournalKey, today: ISODate): Promise<J
 async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | null> {
   const progress = await readExerciseProgress(jk);
   const cards = await readExerciseCards(jk);
-  if (progress.unreadable > 0 || (cards.state !== "ok" && cards.state !== "none")) return null;
+  if (cards.state !== "ok" && cards.state !== "none") return null;
+  // A progress or response row that won't open here holds back only its own day (review M9).
+  const bad = progress.unreadable > 0 ? await unreadableExerciseDates(jk) : new Set<ISODate>();
   const set = cards.state === "ok" ? cards.set : null;
   const ids = new Map<ISODate, string[]>();
   for (const m of progress.marks) {
@@ -335,11 +347,13 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
   const notes = new Map<ISODate, DayNote>();
   const unknown = new Set<ISODate>();
   const partial = new Set<ISODate>();
-  if (ids.size === 0) return { notes, unknown, partial };
   const { entries, unreadable } = await listExerciseEntries(jk, today);
-  if (unreadable > 0) return null;
+  if (unreadable > 0) for (const d of await unreadableExerciseDates(jk)) bad.add(d);
+  for (const d of bad) if (d < today) unknown.add(d);
+  if (ids.size === 0) return { notes, unknown, partial };
   const twins = await noteTwins(jk);
   for (const [date, cardIds] of ids) {
+    if (bad.has(date)) continue;
     const learned = await readLearned(jk, date);
     const hl = await dayHighlights(jk, date, twins);
     if (learned.unreadable > 0 || hl.partial) partial.add(date);
@@ -361,6 +375,8 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
       titles: exerciseSection(done, [], false),
       full: exerciseSection(done, research, true),
       summary: exerciseSummary(done.map((c) => c.title)),
+      // (Learned words emptied or removed only take words out: not counted.)
+      researchAt: Math.max(hl.changedAt, ...[learned, ...learned.others].filter((v) => v.text.trim() !== "").map((v) => v.at)),
     });
   }
   return { notes, unknown, partial };

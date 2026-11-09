@@ -21,9 +21,11 @@ export const TOGETHER_WORDS = {
   pastDays: (when: string) => `Past days' answers go on ${when}. Tick any day private before then.`,
   /** A big backfill goes a little at a time. */
   backlog: "Still copying your earlier days. The rest go on the next runs.",
-  /** Days she had already logged by hand in Together. */
+  /** Days she had already logged by hand, or deleted, in Together (left as they are, review I3). */
   byHand: (n: number) =>
-    n === 1 ? "1 day you'd already logged in Together was left as you wrote it." : `${n} days you'd already logged in Together were left as you wrote them.`,
+    n === 1
+      ? "1 day you'd already logged or deleted in Together was left as it is there."
+      : `${n} days you'd already logged or deleted in Together were left as they are there.`,
   /** After a backup was restored here, until sync has caught up (bug #65). */
   restoreWaiting: "Waiting for sync to catch up after restoring a backup. Your answers go once it has (or after 24 hours, if sync stays off).",
   onlyThisDevice: "Sign in on one device only. Only this device copies to Together. Your password isn't kept.",

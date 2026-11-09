@@ -158,7 +158,9 @@ async function hl(day: string, words: string, note = "", device = DEVICE) {
   const text = `A made-up learning text that says ${words} in the middle of it.`;
   const start = text.indexOf(words);
   const anchor = describeAnchor("learn", text, start, start + words.length)!;
-  return createHighlight(jk, day, device, CARD, anchor, note);
+  const hid = await createHighlight(jk, day, device, CARD, anchor, note);
+  await new Promise((r) => setTimeout(r, 2)); // the next one made strictly later (a fixed order)
+  return hid;
 }
 const listed = async (hid: string) => (await listHighlights(jk)).highlights.find((h) => h.hids.includes(hid));
 
@@ -338,8 +340,10 @@ describe("scope: a recorder over every request, many days, two devices, a Replac
       [D4]: note({ ci: `Pretend ${NAME[D4]} check-in answer` }),
       [D6]: note({ ex: `Pretend ${NAME[D6]} exercise answer`, research: ["pretend Yewbarrow cairn — Pretend Yewbarrow note"] }),
     });
-    // D3's research notes went with its answers, before the tick overwrote them.
-    expect((await noteWrites(fake)).some((p) => p.day === D3 && p.note.includes("• Pretend Larkspur second learned\n• pretend Umberlea weir — Pretend Umberlea later note"))).toBe(true);
+    // D3's research notes were changed late (the next day, 12:00): held 24 h after that (review I2),
+    // and the phone's private tick came first, so they never went; D3's check-in answers did.
+    expect((await noteWrites(fake)).some((p) => p.day === D3 && /Larkspur second|Umberlea later note/.test(p.note))).toBe(false);
+    expect((await noteWrites(fake)).some((p) => p.day === D3 && p.note.includes(`Pretend ${NAME[D3]} check-in answer`))).toBe(true);
     expect(JSON.stringify([...fake.days.values()]), "overwritten: D3's answers are nowhere in Together now").not.toMatch(/Cobblewick edited exercise answer|Larkspur second/);
 
     c.set("2026-11-12T10:00:00");
@@ -361,7 +365,8 @@ describe("scope: a recorder over every request, many days, two devices, a Replac
       expect([D1, D2, D3, D4, D6], "a row only for an exercise or check-in day").toContain(p.day);
     }
     expect(all.some((p) => p.day === D5), "a learned/highlight-only day").toBe(false);
-    expect(wire(fake)).toContain(`Pretend ${NAME[D3]} edited exercise answer`); // the answers did go before the tick
+    // D3's exercise waited with its late-changed research notes (review I2): titles only until the tick.
+    expect(wire(fake)).not.toContain(`Pretend ${NAME[D3]} edited exercise answer`);
     for (const r of g.seen) {
       expect(new URL(r.url).origin).toBe(fake.url);
       expect(new URL(r.url).pathname).toMatch(/^\/(auth\/v1\/token|rest\/v1\/(members|challenges|challenge_days))$/);
@@ -434,7 +439,7 @@ describe("research notes (learned words and highlights) on a day that went: they
     expect(JSON.stringify([...fake.days.values()])).not.toMatch(/Kestrelby|Zennor/);
   });
 
-  it("a note added or changed later on a sent day's highlight, and learned words added later: the note follows, once; a replay sends nothing", async () => {
+  it("a note added or changed later on a sent day's highlight, and learned words added later: the note follows 24 h after the change (review I2), once; a replay sends nothing", async () => {
     const { c, fake, D } = await sentDay();
     const hid = await hl(D, "pretend Netherby wall");
     c.set("2026-11-06T03:30:00");
@@ -443,6 +448,9 @@ describe("research notes (learned words and highlights) on a day that went: they
     const from = fake.requests.length;
     await saveHighlightNote(jk, DEVICE, openNoteSession((await listed(hid))!), "Pretend Netherby later note");
     await saveLearned(jk, D, DEVICE, "Pretend Netherby learned later");
+    await send(fake, c);
+    expect(writes(fake, from), "held: the day keeps what went").toEqual([]);
+    c.set("2026-11-07T03:31:00");
     await send(fake, c);
     await send(fake, c, true);
     expect(writes(fake, from)).toHaveLength(1);

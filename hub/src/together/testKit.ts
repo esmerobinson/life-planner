@@ -19,13 +19,28 @@ export async function emptyDb(): Promise<void> {
   await Promise.all([db.items.clear(), db.goals.clear(), db.files.clear(), db.journal.clear(), db.syncMeta.clear(), db.pending.clear(), db.quarantine.clear()]);
 }
 
-/** A settable clock (local time strings, as the app's 3am day uses local time). */
+const realNow = Date.now.bind(Date);
+let dateSpy: { mockRestore(): void } | null = null;
+afterEach(() => {
+  dateSpy?.mockRestore();
+  dateSpy = null;
+});
+
+/**
+ * A settable clock (local time strings, as the app's 3am day uses local time). `now` is the
+ * sender's clock; while it is in use, `Date.now()` (which stamps what the journal saves: learned
+ * words, highlights and their notes) follows it too, moving on in real time from each setting, so
+ * a version written "now" in a test is written at the test's time.
+ */
 export function clock(start: string) {
   let t = new Date(start).getTime();
+  let setAt = realNow();
+  dateSpy?.mockRestore();
+  dateSpy = vi.spyOn(Date, "now").mockImplementation(() => t + (realNow() - setAt));
   return {
     now: () => t,
-    set: (s: string) => void (t = new Date(s).getTime()),
-    advance: (ms: number) => void (t += ms),
+    set: (s: string) => void ((t = new Date(s).getTime()), (setAt = realNow())),
+    advance: (ms: number) => void ((t += ms), (setAt = realNow())),
   };
 }
 
@@ -165,5 +180,6 @@ export async function highlightOn(day: string, words: string, note = "", opts: {
     const h = (await repo.listHighlights(jk)).highlights.find((x) => x.hids.includes(hid))!;
     await repo.removeHighlight(jk, DEVICE, h);
   }
+  await new Promise((r) => setTimeout(r, 2)); // the next one made strictly later (a fixed order)
   return hid;
 }

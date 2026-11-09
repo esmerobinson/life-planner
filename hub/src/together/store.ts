@@ -68,7 +68,7 @@ export interface TogetherSent extends LegacyHabits {
   challengeMissing?: boolean;
   /** By date. */
   days?: Record<ISODate, SentDay>;
-  /** Days she had already logged by hand in Together: left as she wrote them. */
+  /** Days she logged by hand, or deleted our entry for, in Together: left as they are there. */
   byHand?: Record<ISODate, true>;
   /** Set aside after Together refused it (tried again once it changes, or on Send now). */
   refused: Record<string, SetAside>;
