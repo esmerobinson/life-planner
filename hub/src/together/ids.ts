@@ -3,9 +3,9 @@
 //
 //   first 16 bytes of SHA-256("esmeworld-together-v1:" + kind + ":" + id + ":" + version)
 //
-// with the UUID version (8, "custom") and RFC variant bits set. Together accepts any valid UUID
-// and has no default, so one is always sent. A new `version` gives a new row (a tally can't be
-// edited, only deleted, so a change is a new version).
+// with the UUID version (8, "custom") and RFC variant bits set. A day of her challenge is
+// `day` + "<challenge id>:<date>", version 1: one row per day, its note overwritten in place.
+// (`habit` and `tally` ids are only worked out to clean up what an earlier build made.)
 
 export const TOGETHER_ID_PREFIX = "esmeworld-together-v1";
 

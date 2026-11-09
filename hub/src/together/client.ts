@@ -1,6 +1,8 @@
-// Plain REST calls to Together's Supabase (Together link brief §1, §2): password sign-in, refresh,
-// and inserts / updates on `todos` and `todo_events`. Nothing is ever read back except the
-// sign-in itself and her couple id. No secret is ever logged or put in an error message.
+// Plain REST calls to Together's Supabase (Together link brief §1, §2; challenge brief): password
+// sign-in, refresh, her challenge's days (`challenge_days`), its one rename, and marking an
+// earlier build's `todos` / `todo_events` deleted. Nothing is ever read back except the sign-in
+// itself, her couple id and which challenge is hers. No secret is ever logged or put in an error
+// message.
 
 import type { TogetherAuth } from "./store";
 
