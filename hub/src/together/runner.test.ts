@@ -57,3 +57,28 @@ it("while answers are held after a Replace: runs on app start and sync-state cha
   vi.restoreAllMocks();
   stop();
 });
+
+it("the record asks for a run without a sync: a backfill at its limit, or past days' answers due since the last run", async () => {
+  const { db } = await import("../data/db");
+  const { saveSent } = await import("./store");
+  const { emptyDb } = await import("./testKit");
+  await emptyDb();
+  const base = { userId: "u", since: "2026-11-01", salt: "s", refused: {} };
+  const send = vi.fn(async () => ({ kind: "ok" as const, sent: 0, refused: 0 }));
+  const check = async (rec: Record<string, unknown> | null) => {
+    if (rec) await saveSent(db, { ...base, ...rec });
+    else await db.syncMeta.clear();
+    send.mockClear();
+    const r = new TogetherRunner(send);
+    const stop = r.start({ getState: () => ({ status: "off", lastSyncedAt: null }), subscribe: () => () => undefined });
+    await new Promise((res) => setTimeout(res, 20));
+    stop();
+    return send.mock.calls.length;
+  };
+  const now = Date.now();
+  expect(await check(null)).toBe(0);
+  expect(await check({ backlog: true })).toBe(1);
+  expect(await check({ pastUntil: now - 1000, lastSentAt: now - 2000 })).toBe(1); // ran before it passed
+  expect(await check({ pastUntil: now - 1000, lastSentAt: now - 500 })).toBe(0); // already ran since
+  expect(await check({ pastUntil: now + 60_000, lastSentAt: now - 500 })).toBe(0); // not yet
+});

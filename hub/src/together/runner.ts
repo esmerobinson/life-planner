@@ -36,7 +36,8 @@ export class TogetherRunner {
     private readonly held: () => Promise<boolean> = async () => {
       const s = await readSent(appDb);
       if (!s) return false;
-      return s.waitingRestore === true || s.backlog === true || (s.pastUntil !== undefined && (s.lastSentAt ?? 0) < s.pastUntil && Date.now() >= s.pastUntil);
+      const pastDue = s.pastUntil !== undefined && s.lastSentAt !== undefined && s.lastSentAt < s.pastUntil && Date.now() >= s.pastUntil;
+      return s.waitingRestore === true || s.backlog === true || pastDue;
     },
   ) {}
 

@@ -338,7 +338,7 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
     const done = async (copied: boolean) => {
       sent.lastSentAt = now();
       if (copied) sent.lastCopiedAt = sent.lastSentAt;
-      sent.held = false;
+      delete sent.held; // nothing holds new days back any more (a note can be overwritten)
       await ctx.save();
       return { kind: "ok" as const, sent: ctx.sentCount, refused: Object.keys(sent.refused).length };
     };

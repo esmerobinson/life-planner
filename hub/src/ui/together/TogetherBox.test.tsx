@@ -44,14 +44,41 @@ it("never signed in: only what it is and the sign-in form; no Together lines, no
   expect(W.intro).toContain("To-dos never go");
 });
 
-it("signed in: says plainly what goes, the two stages, and that private, editing or removing after sending only hides; nothing about highlights or learned words (v1)", async () => {
+it("signed in: says plainly what goes (her challenge, no habits), the two stages, that private or editing replaces and removing only hides", async () => {
   const { fake } = setup();
   await signIn(fake);
   await screen.findByText(W.copying);
   for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds, W.onlyThisDevice]) expect(screen.getByText(t)).toBeInTheDocument();
+  expect(W.intro).toContain("“Mental Health Work” challenge");
+  expect(document.body.textContent).not.toMatch(/habit/i);
   expect(W.afterDayEnds).toContain("24 hours");
-  expect(W.privateWarning).toMatch(/editing or removing them only hides/);
-  expect(document.body.textContent).not.toMatch(/highlight|learned/i);
+  expect(W.afterDayEnds).toContain("research notes");
+  expect(W.privateWarning).toMatch(/replaces that day's entry/);
+  expect(W.privateWarning).toMatch(/only marked deleted there: it isn't wiped/);
+});
+
+it("signed in: when past days' answers go, in one plain placeholder line (2026-11-08)", async () => {
+  const { fake } = setup();
+  await signIn(fake);
+  await screen.findByText(W.copying);
+  const { readSent } = await import("../../together/store");
+  const until = (await readSent(db))!.pastUntil!;
+  expect(until).toBeGreaterThan(Date.now() + 23 * 3_600_000);
+  const line = await screen.findByText(W.pastDays(new Date(until).toLocaleString()));
+  expect(line).toHaveClass("together-warning"); // magenta placeholder
+  expect(line.textContent).toMatch(/Tick any day private before then/);
+});
+
+it("no challenge found in Together: says so plainly; days she logged by hand and a backlog are said too", async () => {
+  const { fake } = setup();
+  await signIn(fake);
+  await screen.findByText(W.copying);
+  const { readSent, saveSent } = await import("../../together/store");
+  await saveSent(db, { ...(await readSent(db))!, challengeMissing: true, byHand: { "2026-11-01": true, "2026-11-02": true }, backlog: true });
+  expect(await screen.findByText(W.challengeMissing)).toBeInTheDocument();
+  expect(W.challengeMissing).toBe("Couldn't find your “BPD research” challenge in Together.");
+  expect(screen.getByText(W.byHand(2))).toBeInTheDocument();
+  expect(screen.getByText(W.backlog)).toBeInTheDocument();
 });
 
 it("after a backup was restored and sync hasn't caught up: says so (bug #65)", async () => {

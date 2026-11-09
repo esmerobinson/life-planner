@@ -8,13 +8,22 @@ const delay = `${Math.round(ANSWERS_DELAY_MS / 3_600_000)} hours`;
 export const TOGETHER_WORDS = {
   heading: "Together",
   intro:
-    "Copies the days you did a Mental health exercise or the Daily check-in to Together, as two habits. To-dos never go. One way only: nothing comes back from Together.",
+    "Logs your Mental health exercise and Daily check-in in your “Mental Health Work” challenge in Together, one entry a day, back to your first journal day. To-dos never go. One way only: nothing comes back from Together.",
   notEncrypted:
     "Together isn't end-to-end encrypted: Oliver, Supabase and anyone with Together's admin key can read what's copied there.",
-  afterDayEnds: `When a day ends (3am), only the card titles and the questions you answered go. Your answers follow ${delay} later, unless you tick that day's answers private.`,
+  afterDayEnds: `When a day ends (3am), only the card titles and the questions you answered go. Your answers and research notes follow ${delay} later, unless you tick that day's answers private.`,
   /** The brief's plain warning: shown in the Together box and beside every private tick. */
   privateWarning:
-    "Once a day's answers have gone to Together, ticking private, editing or removing them only hides the earlier version in Together: it isn't wiped.",
+    "Ticking a day private or editing it after its answers went replaces that day's entry in Together. A day you remove is only marked deleted there: it isn't wiped.",
+  /** Her challenge isn't in Together (nothing is copied until it is). */
+  challengeMissing: "Couldn't find your “BPD research” challenge in Together.",
+  /** Past days (before the sign-in or the update): when their answers go (2026-11-08). */
+  pastDays: (when: string) => `Past days' answers go on ${when}. Tick any day private before then.`,
+  /** A big backfill goes a little at a time. */
+  backlog: "Still copying your earlier days. The rest go on the next runs.",
+  /** Days she had already logged by hand in Together. */
+  byHand: (n: number) =>
+    n === 1 ? "1 day you'd already logged in Together was left as you wrote it." : `${n} days you'd already logged in Together were left as you wrote them.`,
   /** After a backup was restored here, until sync has caught up (bug #65). */
   restoreWaiting: "Waiting for sync to catch up after restoring a backup. Your answers go once it has (or after 24 hours, if sync stays off).",
   onlyThisDevice: "Sign in on one device only. Only this device copies to Together. Your password isn't kept.",
@@ -43,15 +52,13 @@ export const TOGETHER_WORDS = {
   paused: "Copying is paused: removing what was copied to Together didn't finish. Nothing new goes until you finish removing, or keep copying instead.",
   finishRemoving: "Finish removing",
   cancelRemoving: "Keep copying",
-  /** While a refused clean-up holds new days back. */
-  daysWaiting: "New days are waiting and will be copied once that's sorted.",
   privateHeading: "Keep a day's answers private",
   privateDay: "Day",
   privateExercise: "Mental health exercise: keep that day's answers private",
   privateCheckin: "Daily check-in: keep that day's answers private",
   /** Design pick A (2026-11-05): a tick under the answers. */
   privateTick: "Keep today's answers private",
-  oliverSeesExercise: "Oliver still sees that you did the exercise, and the card's title.",
+  oliverSeesExercise: "Oliver still sees that you did the exercise, the card's title and its questions.",
   oliverSeesCheckin: "Oliver still sees that you checked in, and the questions you answered.",
   notSyncedYet: "Not saved to your other devices yet.",
   privateLocked: "Unlock the journal on this device to change a day's private ticks.",

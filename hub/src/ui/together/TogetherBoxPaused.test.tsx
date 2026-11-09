@@ -4,12 +4,12 @@ import { db } from "../../data/db";
 import { makeRunner } from "../../together/runner";
 import { stopTogether } from "../../together/sender";
 import { readAuth, readSent } from "../../together/store";
-import { clock, emptyDb, journalDay, send, signedIn } from "../../together/testKit";
+import { clock, emptyDb, journalDay, liveDays, send, signedIn } from "../../together/testKit";
 import { TogetherBox } from "./TogetherBox";
 import { TOGETHER_WORDS as W } from "./wording";
 
-// What the box says while copying is paused (a Stop with removing cut off, bug #53) or new days
-// are held back (a refused clean-up). Fake Together only, made-up values.
+// What the box says while copying is paused (a Stop with removing cut off, bug #53), or when an
+// earlier build's habits can't be removed. Fake Together only, made-up values.
 
 beforeEach(emptyDb);
 
@@ -42,20 +42,21 @@ it("Finish removing from the paused box removes the rest and forgets the sign-in
   await userEvent.click(await screen.findByRole("button", { name: W.finishRemoving }));
   expect(await screen.findByText(W.stopped)).toBeInTheDocument();
   expect(await readAuth(db)).toBeUndefined();
-  expect([...fake.events.values()].every((e) => e.deleted_at)).toBe(true);
+  expect(liveDays(fake)).toEqual([]);
 });
 
-it("a refused clean-up: new days are said to be waiting, and \"Last copied\" doesn't move", async () => {
+it("an earlier build's habits that Together won't let be removed: said plainly; days are still copied and "Last copied" moves", async () => {
   const { c, fake } = await copied();
-  const before = (await readSent(db))!.lastCopiedAt;
-  c.set("2026-11-06T03:30:00");
-  fake.inject({ lostReply: true, when: (r) => r.method === "POST" && r.url.includes("/rest/v1/todo_events") });
-  expect((await send(fake, c)).kind).toBe("offline");
-  fake.inject({ status: 400, body: { code: "23514" }, when: (r) => r.method === "PATCH" });
+  const { togetherId } = await import("../../together/ids");
+  const { saveSent } = await import("../../together/store");
+  const tally = await togetherId("tally", "checkin:2026-11-01", 1);
+  await saveSent(db, { ...(await readSent(db))!, tallies: { "checkin:2026-11-01": { v: 1, hash: "x", live: true } } });
+  fake.inject({ status: 400, body: { code: "23514" }, when: (r) => r.method === "PATCH" && r.url.includes(tally) });
+  await journalDay("2026-11-05", { checkin: true });
   c.set("2026-11-06T09:00:00");
-  expect((await send(fake, c)).kind).toBe("ok");
-  expect((await readSent(db))!.lastCopiedAt).toBe(before);
+  expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 1 });
+  expect((await readSent(db))!.lastCopiedAt).toBe(c.now());
+  expect(liveDays(fake).map((d) => d.day)).toEqual(["2026-11-04", "2026-11-05"]);
   render(<TogetherBox runner={makeRunner(fake.fetch)} fetchFn={fake.fetch} />);
-  expect(await screen.findByText(W.daysWaiting)).toBeInTheDocument();
-  expect(screen.getByText(W.lastSent(new Date(before!).toLocaleString()))).toBeInTheDocument();
+  expect(await screen.findByText(W.notHidden(1))).toBeInTheDocument();
 });

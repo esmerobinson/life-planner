@@ -84,7 +84,7 @@ export interface TogetherSent extends LegacyHabits {
   lastSentAt?: number;
   /** The last run that could copy: "Last copied" in the box. */
   lastCopiedAt?: number;
-  /** New days are held back until something is sorted. */
+  /** Earlier builds only (new days held back behind a refused clean-up); cleared on the next run. */
   held?: boolean;
   /** How many former device ids this device had when last looked at: one more means a Replace. */
   formerSeen?: number;

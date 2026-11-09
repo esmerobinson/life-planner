@@ -89,6 +89,7 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
   const notCopied = setAside.filter((r) => r.what === "copy").length;
   const notHidden = setAside.filter((r) => r.what === "hide").length;
   const last = run.last;
+  const byHand = Object.keys(meta?.sent?.byHand ?? {}).length;
 
   return (
     <section className="together-placeholder together-box" aria-labelledby="together-heading">
@@ -103,6 +104,11 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
         </>
       )}
       {auth && meta?.sent?.waitingRestore && <p role="status">{W.restoreWaiting}</p>}
+      {/* PLACEHOLDER lines (magenta, system font): wording and look are the Design session's. */}
+      {auth && meta?.sent?.challengeMissing && <p role="alert" className="together-warning">{W.challengeMissing}</p>}
+      {auth && meta?.sent?.pastUntil !== undefined && Date.now() < meta.sent.pastUntil && (
+        <p role="status" className="together-warning">{W.pastDays(new Date(meta.sent.pastUntil).toLocaleString())}</p>
+      )}
 
       {again && <p role="alert">{W.signInAgain}</p>}
 
@@ -150,7 +156,8 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
           )}
           <p>{W.onlyThisDevice}</p>
           <p>{meta?.sent?.lastCopiedAt ? W.lastSent(new Date(meta.sent.lastCopiedAt).toLocaleString()) : W.notSentYet}</p>
-          {meta?.sent?.held && <p>{W.daysWaiting}</p>}
+          {meta?.sent?.backlog && <p className="together-warning">{W.backlog}</p>}
+          {byHand > 0 && <p className="together-warning">{W.byHand(byHand)}</p>}
           {last?.kind === "offline" && <p role="status">{W.offline}</p>}
           {notHidden > 0 && <p role="alert">{W.notHidden(notHidden)}</p>}
           {notCopied > 0 && <p>{W.setAside(notCopied)}</p>}
