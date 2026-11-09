@@ -358,9 +358,13 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       const journal = jk ? await readJournalDays(jk, today).catch(() => null) : null;
       return { jk, journal };
     });
-    if (snap.jk) {
+    ctx.challengeId = challengeId;
+    if (!snap.jk) {
+      // No journal key here: no tick can be read, so a day that may hold answers we can't vouch
+      // for (a write cut off) is marked deleted; it comes back once the journal is unlocked.
+      await hideUnknownDays(ctx);
+    } else {
       ctx.jk = snap.jk;
-      ctx.challengeId = challengeId;
       if (snap.journal?.earliest && snap.journal.earliest < sent.since) sent.since = snap.journal.earliest;
       ctx.restoredUnpulled = await restoreHold(db, sent, now());
       await sendDays(ctx, snap.journal);
@@ -460,14 +464,18 @@ async function findChallenge(ctx: Ctx): Promise<string | null> {
   if (!sent.challenge) {
     const r = await ctx.call("GET", `challenges?couple_id=eq.${enc(ctx.auth.coupleId)}&select=id,name,for_user`, undefined, "");
     const rows = r.kind === "ok" && Array.isArray(r.body) ? (r.body as { id?: unknown; name?: unknown; for_user?: unknown }[]) : [];
+    // Its known id (confirmed hers), or its name on one that isn't someone else's.
     const mine = rows.filter(
       (c) =>
         typeof c.id === "string" &&
-        (CHALLENGE_IDS.includes(c.id) || (typeof c.name === "string" && CHALLENGE_NAMES.includes(c.name.trim().toLowerCase()))) &&
-        (c.for_user === undefined || c.for_user === null || c.for_user === ctx.auth.userId),
+        (CHALLENGE_IDS.includes(c.id) ||
+          (typeof c.name === "string" &&
+            CHALLENGE_NAMES.includes(c.name.trim().toLowerCase()) &&
+            (c.for_user === undefined || c.for_user === null || c.for_user === ctx.auth.userId))),
     );
-    // The already-renamed one first, then her own, then by id (always the same pick).
-    const rank = (c: (typeof mine)[number]) => (typeof c.name === "string" && c.name.trim() === CHALLENGE_NAME ? 0 : 2) + (c.for_user === ctx.auth.userId ? 0 : 1);
+    // Its known id first, then one already renamed, then her own, then by id (always the same pick).
+    const rank = (c: (typeof mine)[number]) =>
+      (CHALLENGE_IDS.includes(c.id as string) ? 0 : 4) + (typeof c.name === "string" && c.name.trim() === CHALLENGE_NAME ? 0 : 2) + (c.for_user === ctx.auth.userId ? 0 : 1);
     mine.sort((a, b) => rank(a) - rank(b) || String(a.id).localeCompare(String(b.id)));
     const pick = mine[0];
     if (!pick) {
@@ -539,11 +547,13 @@ function answersDue(ctx: Ctx, date: ISODate): boolean {
 async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): Promise<void> {
   const { sent } = ctx;
   const rec = ctx.days[date];
-  // Only ever hidden, never built up: a part that wouldn't open here (bug #59), or, after a
+  const partial = (p: Part) => (parts[p] as { partial?: boolean } | null)?.partial === true;
+  // Only ever hidden, never built up: a part that wouldn't open here, or one that only partly
+  // opens and already went with answers (bug #59: left as it is unless ticked private); after a
   // Replace until sync has caught up, a day already sent with answers (bug #64) or missing from
-  // the restored journal (bug #67).
+  // the restored journal (bug #67). A part that only partly opens otherwise goes titles-only.
   const constrained =
-    PARTS.some((p) => parts[p] === "unknown" || (parts[p] as { partial?: boolean } | null)?.partial) ||
+    PARTS.some((p) => parts[p] === "unknown" || (partial(p) && rec?.live && rec.parts[p] === "answers")) ||
     (ctx.restoredUnpulled && !!rec?.live && (hasAnswers(rec) || PARTS.every((p) => parts[p] === null)));
 
   /** The note that may go right now (the ticks are read again each time: bug #42). */
@@ -567,7 +577,7 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
       for (const p of PARTS) {
         const v = parts[p];
         if (!v || v === "unknown") continue;
-        const full = due && !ticks[p];
+        const full = due && !ticks[p] && !v.partial; // never answers from a part that only partly opens
         const text = full ? v.note.full : v.note.titles;
         if (!text) continue;
         out.push(text);
@@ -592,7 +602,8 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
   }
   const h = await ctx.hash(first.note);
   if (rec?.live && rec.hash === h) return;
-  if (sent.refused[date]?.hash === h) return;
+  // Set aside until it changes or Send now; but hiding answers is tried again every run.
+  if (sent.refused[date]?.hash === h && sent.refused[date].what !== "hide") return;
   const id = await dayId(ctx.challengeId, date);
   const record = async (w: { note: string; parts: SentDay["parts"] }) => {
     ctx.days[date] = { hash: await ctx.hash(w.note), live: true, parts: w.parts };
@@ -608,9 +619,17 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
     // Our row is (or may be) there: its note is overwritten, a deleted one shown again.
     const w = await want();
     if (w === "skip" || w === null) return; // changed meanwhile: next run
-    const r = await ctx.patchDay(id, rec.live ? { note: w.note } : { note: w.note, deleted_at: null });
+    // Its content is unknown while the overwrite is on its way (a reply lost: it may have gone in).
+    const before: SentDay = { ...rec, parts: { ...rec.parts } };
+    ctx.days[date] = { hash: "", live: true, parts: { exercise: "answers", checkin: "answers" } };
+    await ctx.save();
+    // A deleted row (or one whose state is unknown) is shown again.
+    const r = await ctx.patchDay(id, before.live && before.hash !== "" ? { note: w.note } : { note: w.note, deleted_at: null });
     if (r.kind === "ok") return record(w);
-    if (r.code !== "no-row") return setAside(rec.live && hasAnswers(rec) ? "hide" : "copy");
+    if (r.code !== "no-row") {
+      ctx.days[date] = before; // refused: unchanged in Together
+      return setAside(before.live && hasAnswers(before) ? "hide" : "copy");
+    }
     // Never reached Together (a cut-off insert): inserted below.
     delete ctx.days[date];
   }
@@ -642,6 +661,23 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
   }
   delete ctx.days[date]; // refused: it never went in
   await setAside("copy");
+}
+
+/** Marks deleted every day whose note is unknown (a write cut off: it may hold answers). */
+async function hideUnknownDays(ctx: Ctx): Promise<void> {
+  for (const [date, d] of Object.entries(ctx.days)) {
+    if (!d.live || d.hash !== "") continue;
+    if (ctx.writes >= MAX_WRITES_PER_RUN) {
+      ctx.sent.backlog = true;
+      return;
+    }
+    const r = await ctx.patchDay(await dayId(ctx.challengeId, date), { deleted_at: ctx.nowIso() });
+    if (r.kind === "ok" || r.code === "no-row") {
+      d.live = false;
+      delete ctx.sent.refused[date];
+    } else ctx.sent.refused[date] = { hash: "gone", what: "hide" };
+    await ctx.save();
+  }
 }
 
 // ---- an earlier build's habits ---------------------------------------------------------------

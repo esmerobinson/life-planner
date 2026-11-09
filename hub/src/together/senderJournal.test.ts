@@ -64,12 +64,16 @@ it("her challenge is found by name, renamed once to Mental Health Work; Oliver's
 });
 
 it("found under its new name or its id too; no such challenge: nothing goes, and the record says so", async () => {
-  for (const [name, id] of [["  mental health WORK ", "pretend-renamed"], ["Pretend other name", "bpd-research"]] as const) {
+  for (const [name, id, forUser] of [
+    ["  mental health WORK ", "pretend-renamed", ME],
+    ["Pretend other name", "bpd-research", ME],
+    ["BPD research", "bpd-research", null], // its known id: whoever it says it is for
+  ] as const) {
     await emptyDb();
     const c = clock(SIGN_IN);
     const fake = await signedIn(c);
     fake.challenges.delete(CHALLENGE);
-    fake.addChallenge({ id, couple_id: COUPLE, name, for_user: ME });
+    fake.addChallenge({ id, couple_id: COUPLE, name, for_user: forUser });
     await journalDay(DAY);
     c.set(TITLES_AT);
     await send(fake, c);

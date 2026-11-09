@@ -164,12 +164,31 @@ export function cardQAs(r: Pick<ExerciseResponse, "text" | "parts">): QA[] {
   return out;
 }
 
+const twinKey = (v: HighlightEntry) => `${v.at}|${v.note}`;
+
+/**
+ * For each note version written at once onto several days' highlight ids (the note box on the
+ * same words highlighted on two days, shown as one: bug #57), the latest of those days.
+ */
+async function noteTwins(jk: JournalKey): Promise<Map<string, ISODate>> {
+  const latest = new Map<string, ISODate>();
+  for (const row of await db.journal.where("kind").equals("highlight").toArray()) {
+    const o = await highlightRows.open(jk, row);
+    if (o.state !== "ok" || o.entry.note.trim() === "") continue;
+    const k = twinKey(o.entry);
+    if ((latest.get(k) ?? "") < row.date) latest.set(k, row.date);
+  }
+  return latest;
+}
+
 /**
  * The day's highlights (bug #57): read per highlight id, from that day's own rows only, never
- * merged with the same words highlighted on another day. Each id's current note is its newest
- * version still there; a removed one is left out. `partial`: a row of the day wouldn't open here.
+ * merged with the same words highlighted on another day. Each id's note is its newest version
+ * still there with a note, unless that note was written at once onto a later day's highlight of
+ * the same words too (then it belongs to that day, which she may have ticked private). A removed
+ * one is left out. `partial`: a row of the day wouldn't open here.
  */
-async function dayHighlights(jk: JournalKey, date: ISODate): Promise<{ list: { words: string; note: string }[]; partial: boolean }> {
+async function dayHighlights(jk: JournalKey, date: ISODate, twins: Map<string, ISODate>): Promise<{ list: { words: string; note: string }[]; partial: boolean }> {
   const byHid = new Map<string, HighlightEntry[]>();
   let partial = false;
   for (const row of await db.journal.where("date").equals(date).toArray()) {
@@ -188,8 +207,8 @@ async function dayHighlights(jk: JournalKey, date: ISODate): Promise<{ list: { w
     const heads = versions.filter((v) => !versions.some((w) => w !== v && w.seen.includes(v.vid)));
     const live = heads.filter((v) => !v.deleted).sort((a, b) => b.at - a.at || b.vid.localeCompare(a.vid));
     if (live.length === 0) continue;
-    const top = live.find((v) => v.note.trim() !== "") ?? live[0]!;
-    keep.push({ hid, words: top.anchor.exact, note: top.note, createdAt: Math.min(...versions.map((v) => v.createdAt)) });
+    const top = live.find((v) => v.note.trim() !== "" && (twins.get(twinKey(v)) ?? date) === date);
+    keep.push({ hid, words: live[0]!.anchor.exact, note: top?.note ?? "", createdAt: Math.min(...versions.map((v) => v.createdAt)) });
   }
   // A fixed order, so the note (and its hash) never changes by itself.
   keep.sort((a, b) => a.createdAt - b.createdAt || a.hid.localeCompare(b.hid));
@@ -224,9 +243,10 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
   if (ids.size === 0) return { notes, unknown, partial };
   const { entries, unreadable } = await listExerciseEntries(jk, today);
   if (unreadable > 0) return null;
+  const twins = await noteTwins(jk);
   for (const [date, cardIds] of ids) {
     const learned = await readLearned(jk, date);
-    const hl = await dayHighlights(jk, date);
+    const hl = await dayHighlights(jk, date, twins);
     if (learned.unreadable > 0 || hl.partial) partial.add(date);
     const done: { title: string; qas: QA[] }[] = [];
     for (const id of cardIds) {
