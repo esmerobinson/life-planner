@@ -1,29 +1,23 @@
 // ALL wording for the Together link's UI is PROVISIONAL (Esme rewords; the Design session shows
 // options). Kept in one place so it is easy to list and change.
 
-import { ANSWERS_DELAY_MS } from "../../together/sender";
-
-const delay = `${Math.round(ANSWERS_DELAY_MS / 3_600_000)} hours`;
-
 export const TOGETHER_WORDS = {
   heading: "Together",
   intro:
     "Logs your Mental health exercise and Daily check-in in your “Mental Health Work” challenge in Together, one entry a day, back to your first journal day. To-dos never go. One way only: nothing comes back from Together.",
   notEncrypted:
     "Together isn't end-to-end encrypted: Oliver, Supabase and anyone with Together's admin key can read what's copied there.",
-  afterDayEnds: `When a day ends (3am), only the card titles and the questions you answered go. Your answers and research notes follow ${delay} later, unless you tick that day's answers private.`,
+  /** Sending is manual (Esme, 2026-11-09). */
+  howItSends: "Press Send now to copy your Mental health exercise and Daily check-in to Together. Days you tick private send only titles and questions.",
+  /** A press as it goes ("Sent 12 of 30 days"). */
+  progress: (done: number, total: number) => `Sent ${done} of ${total} ${total === 1 ? "day" : "days"}`,
   /** The brief's plain warning: shown in the Together box and beside every private tick. */
   privateWarning:
-    "Ticking a day private or editing it after its answers went replaces that day's entry in Together. A day you remove is only marked deleted there: it isn't wiped.",
+    "Ticking a day private after its answers went replaces that day's entry in Together straight away; an edit replaces it on your next Send now. A day you remove is only marked deleted there: it isn't wiped.",
   /** Her challenge isn't in Together (nothing is copied until it is). */
   challengeMissing: "Couldn't find your “BPD research” challenge in Together.",
-  /** Past days (before the sign-in or the update): when their answers go (2026-11-08). */
-  pastDays: (when: string) => `Past days' answers go on ${when}. Tick any day private before then.`,
-  /** Ends the past-days hold at once (Esme, 2026-11-09), and the line under it. */
-  sendPastNow: "Send past days' answers now",
-  sendPastNowNote: "Your answers for past days go now. Days you ticked private stay private.",
-  /** A big backfill goes a little at a time. */
-  backlog: "Still copying your earlier days. The rest go on the next runs.",
+  /** Hiding many days at once (private ticks, removals) goes a little at a time. */
+  backlog: "Still updating days in Together. The rest follow shortly.",
   /** Days she had already logged by hand, or deleted, in Together (left as they are, review I3). */
   byHand: (n: number) =>
     n === 1

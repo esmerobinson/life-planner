@@ -38,14 +38,20 @@ const stop = (f: typeof fetch, c: Clock, markDeleted: boolean) => stopTogether({
 const signInAgain = (fake: FakeSupabase, c: Clock) =>
   signInToTogether({ fetch: fake.fetch, now: c.now }, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD });
 
-/** Signed in, DAY's check-in (and exercise) done, and its titles-only row in Together. */
+/**
+ * Signed in, DAY's check-in (and exercise) done, and its titles-only row in Together (a press
+ * while ticked private: sending is manual, Esme 2026-11-09); then un-ticked, so the next press is
+ * the answers write.
+ */
 async function titlesSent(opts: { exercise?: boolean } = {}) {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk } = await journalDay(DAY, { checkin: true, exercise: opts.exercise ?? false });
+  for (const p of ["exercise", "checkin"] as const) await saveSharePrivate(jk, DAY, p, true);
   c.set(TITLES_AT);
   expect((await send(fake, c)).kind).toBe("ok");
   expect(liveAnswers(fake)).toHaveLength(0);
+  for (const p of ["exercise", "checkin"] as const) await saveSharePrivate(jk, DAY, p, false);
   c.set(ANSWERS_AT);
   return { c, fake, jk };
 }
@@ -143,18 +149,20 @@ describe("Stop with removing, while a request hangs", () => {
 // ---- signing in again ---------------------------------------------------------------------------
 
 describe("after Stop", () => {
-  it("lost reply, Stop with removing, sign in again weeks later: the same row comes back with titles only, its answers only after the 24 h for past days; one row a day", async () => {
+  it("lost reply, Stop with removing, sign in again weeks later: nothing goes until she presses Send now; then the same row comes back with her answers; one row a day", async () => {
     const { c, fake } = await answersMaybeSent();
     expect(await stop(fake.fetch, c, true)).toEqual({ kind: "ok" });
     expect(liveCount(fake)).toBe(0);
     c.set("2026-11-25T10:00:00");
     expect(await signInAgain(fake, c)).toEqual({ kind: "ok" });
-    expect((await send(fake, c)).kind).toBe("ok");
-    expect(liveAnswers(fake), "no old answers come back at once (past days wait 24 h)").toHaveLength(0);
-    expect(liveCount(fake), "the day is logged again (backfill), titles only").toBe(1);
-    // A new day, sent normally.
+    expect((await sendToTogether({ fetch: fake.fetch, now: c.now, mode: "hide" })).kind).toBe("ok"); // an automatic run
+    expect(liveCount(fake), "nothing comes back without a press").toBe(0);
+    expect((await send(fake, c)).kind).toBe("ok"); // Send now
+    expect(liveCount(fake), "the day is logged again (backfill)").toBe(1);
+    expect(liveAnswers(fake)).toHaveLength(1);
+    // A new day, sent on the next press.
     await journalDay("2026-11-25", { checkin: true });
-    c.set("2026-11-27T03:30:00");
+    c.set("2026-11-25T20:00:00");
     expect((await send(fake, c)).kind).toBe("ok");
     expect(fake.days.size, "one row per day: the same fixed id shown again, never a second").toBe(2);
     expect(liveDays(fake).map((d) => d.day)).toEqual([DAY, "2026-11-25"]);
@@ -162,7 +170,7 @@ describe("after Stop", () => {
     expect(onlyDays(fake)).toEqual({ todos: 0, events: 0, challengeDeleted: false });
   });
 
-  it("Stop WITHOUT removing during a hung answers write, then sign in again: the record is kept, the day is in Together exactly once, with her answers 24 h after the new sign-in", async () => {
+  it("Stop WITHOUT removing during a hung answers write, then sign in again: the record is kept, the day is in Together exactly once, with her answers on the next press", async () => {
     const { c, fake } = await titlesSent();
     const h = hangOn(fake, isDayPatch, { applied: true });
     const run = sendToTogether({ fetch: h.fetch, now: c.now });
@@ -172,11 +180,6 @@ describe("after Stop", () => {
     expect((await readSent(db))?.days?.[DAY], "kept for the next sign-in").toBeTruthy();
     c.set("2026-11-10T10:00:00");
     expect(await signInAgain(fake, c)).toEqual({ kind: "ok" });
-    expect((await send(fake, c)).kind).toBe("ok");
-    expect(fake.days.size).toBe(1);
-    // Signing in again restarts the 24 h hold (review I1): titles until 24 h after it, then her answers.
-    expect(liveAnswers(fake)).toHaveLength(0);
-    c.set("2026-11-11T10:00:00");
     expect((await send(fake, c)).kind).toBe("ok");
     expect(fake.days.size).toBe(1);
     expect(liveAnswers(fake)).toHaveLength(1);
@@ -254,16 +257,17 @@ describe("a maybe-sent day whose overwrite Together refuses", () => {
     expect(liveDays(fake).map((d) => d.day)).toEqual([DAY, "2026-11-05"]);
     expect(await send(fake, c, true)).toMatchObject({ kind: "ok", refused: 0 });
     expect((await readSent(db))!.days![DAY]!.hash).not.toBe("");
-    expect(liveAnswers(fake).map((d) => d.day)).toEqual([DAY]); // DAY's answers (due); 11-05's are still titles only
+    expect(liveAnswers(fake).map((d) => d.day)).toEqual([DAY, "2026-11-05"]); // a press sends both with answers
   });
 
-  it("BUG: ticked private while its overwrite is refused: once Together accepts, the next run overwrites the answers (no Send now needed), never inserting them again", async () => {
+  it("BUG: ticked private while its overwrite is refused: once Together accepts, the next automatic run overwrites the answers (no Send now needed), never inserting them again", async () => {
     const { c, fake, jk } = await answersMaybeSent();
     await saveSharePrivate(jk, DAY, "checkin", true);
     fake.inject({ status: 400, body: { code: "23514", message: "fake: refused" }, when: (r) => isDayPatch(r.method, r.url) });
-    expect((await send(fake, c)).kind).toBe("ok");
+    const auto = () => sendToTogether({ fetch: fake.fetch, now: c.now, mode: "hide" });
+    expect((await auto()).kind).toBe("ok");
     const mark = fake.requests.length;
-    expect((await send(fake, c)).kind).toBe("ok");
+    expect((await auto()).kind).toBe("ok");
     expect(liveAnswers(fake), "her private answers are still live in Together").toHaveLength(0);
     expect(liveCount(fake)).toBe(1);
     expect(fake.requests.slice(mark).filter((r) => isDayInsert(r.method, r.url) && r.body.includes(ANSWER))).toHaveLength(0);
@@ -285,7 +289,7 @@ describe("a run on a device whose journal key can't be read", () => {
     const { c, fake, jk } = await answersMaybeSent();
     await saveSharePrivate(jk, DAY, "checkin", true); // arrives by sync from the phone
     await db.syncMeta.delete(JOURNAL_KEY_META); // e.g. a stored key that came back unreadable
-    expect((await send(fake, c)).kind).toBe("ok");
+    expect((await sendToTogether({ fetch: fake.fetch, now: c.now, mode: "hide" })).kind).toBe("ok"); // an automatic run
     expect(liveAnswers(fake), "her private answers are still live in Together").toHaveLength(0);
   });
 });

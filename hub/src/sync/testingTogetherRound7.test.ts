@@ -1,7 +1,8 @@
 // TESTING (Life Planner - Together Round 7 Testing, 2026-11-06), moved to the challenge model
 // (Esme, 2026-11-09): each day is one row in her "Mental Health Work" challenge, its note holding
-// the Mental health exercise and the Daily check-in (titles and questions at the 3am day change,
-// answers 24 h after the day ends, titles only for a part ticked private). "What I learned today"
+// the Mental health exercise and the Daily check-in. Sending is manual (Esme, 2026-11-09): only
+// "Send now" (a press) sends, every day up to today with answers, titles only for a part ticked
+// private; the automatic runs (after a sync, on opening) only take words out. "What I learned today"
 // and that day's highlights (with their notes) go as research-note bullets in the exercise part,
 // with its answers (the v1 hold lifted, 2026-11-08): never on a private day, never another day's,
 // never on a day with no card done. Also round 7's #64 / #65 (after a Replace a day already sent
@@ -176,12 +177,6 @@ async function day(date: string, name: string, opts: { exercise?: boolean; check
   }
   return { set, card };
 }
-/** Answers due: 24 h after the day ended at 3am (local), i.e. 03:00 two days on. */
-const dueAt = (date: string) => {
-  const d = new Date(`${date}T03:00:00`);
-  d.setDate(d.getDate() + 2);
-  return d.getTime();
-};
 
 // ================================================================ the scope recorder
 
@@ -217,6 +212,7 @@ async function scopeRun() {
   };
   const privateNow = new Set<string>([`exercise:${D2}`, `checkin:${D2}`]);
   let hold = false; // after the Replace, until the pull: no answers at all
+  let automatic = false; // an automatic run (mode "hide"): it only ever takes words out
   let signedInNow = false;
   const forbidden = () => {
     const out = [...NEVER, ...(signedInNow ? [PASSWORD] : [])];
@@ -224,16 +220,27 @@ async function scopeRun() {
       for (const [kind, label] of [["exercise", "exercise"], ["checkin", "check-in"]] as const) {
         const words = d === D3 && kind === "exercise" ? [`Pretend ${name} edited exercise answer`] : [`Pretend ${name} ${label} answer`];
         if (kind === "exercise") words.push(...(RESEARCH[d] ?? []));
-        if (hold || c.now() < dueAt(d) || privateNow.has(`${kind}:${d}`)) out.push(...words);
+        if (hold || automatic || privateNow.has(`${kind}:${d}`)) out.push(...words);
       }
     }
     return out;
   };
   const g = guardedFetch(fake.fetch, forbidden, c.now);
   const env = { fetch: g.fetch, now: c.now };
-  const run = async (at: string, sendNow = false) => {
+  /** "Send now" pressed at `at`. */
+  const press = async (at: string) => {
     c.set(at);
-    expect((await sendToTogether({ ...env, retryRefused: sendNow })).kind, at).toBe("ok");
+    expect((await sendToTogether({ ...env, retryRefused: true, mode: "send" })).kind, at).toBe("ok");
+  };
+  /** An automatic run at `at` (after a sync, on opening): hiding only. */
+  const auto = async (at: string) => {
+    c.set(at);
+    automatic = true;
+    try {
+      expect((await sendToTogether({ ...env, mode: "hide" })).kind, at).toBe("ok");
+    } finally {
+      automatic = false;
+    }
   };
 
   expect(await signInToTogether(env, { url: fake.url, anonKey: fake.anonKey, email: EMAIL, password: PASSWORD })).toEqual({ kind: "ok" });
@@ -253,8 +260,10 @@ async function scopeRun() {
   await saveExerciseDraft(jk, D1, DEVICE, cardRef(set.cards.find((k) => k.id === "b-002")!), "Pretend Zennorwick draft answer");
   await db.items.put({ id: "pretend-r7-todo", kind: "task", title: "Pretend Zennorwick to-do", notes: "Pretend Zennorwick to-do notes", links: [], areaId: "mind", priority: 2, status: "done", completedAt: D1, createdAt: D1, touchedAt: D1 });
   await syncBoth(server, phone);
-  await run(`${D1}T23:00:00`);
-  await run(`${D2}T03:30:00`); // D1 titles
+  await auto(`${D1}T23:00:00`);
+  await auto(`${D2}T03:30:00`);
+  expect(writes(fake, 0), "nothing goes without a press").toEqual([]);
+  await press(`${D2}T09:00:00`); // D1 with answers and research notes
 
   // D2: ticked private (both), with learned words and a highlight note.
   c.set(`${D2}T10:00:00`);
@@ -264,7 +273,7 @@ async function scopeRun() {
   await saveLearned(jk, D2, DEVICE, "Pretend Mistlethwaite learned on a private day");
   await hl(D2, "pretend Thistlebrook bend", "Pretend Thistlebrook private note");
   await syncBoth(server, phone);
-  await run(`${D3}T03:30:00`); // D1 answers and research notes, D2 titles
+  await auto(`${D3}T03:30:00`); // nothing: no press
 
   // D3: learned, the phone's learned words and the phone's highlight with a note (synced here).
   c.set(`${D3}T10:00:00`);
@@ -273,8 +282,8 @@ async function scopeRun() {
   await phoneLearned(phone, D3, "Pretend Orrisford phone learned");
   const phoneHid = await hl(D3, "pretend Umberlea weir", "Pretend Umberlea phone note", PHONE);
   await syncBoth(server, phone);
-  await run(`${D3}T12:00:00`, true); // Send now
-  await run(`${D4}T03:30:00`); // D2 answers due but private; D3 titles
+  await auto(`${D3}T12:00:00`);
+  await auto(`${D4}T03:30:00`); // still no press
 
   // D4: check-in only, with a highlight and learned words (no exercise that day).
   c.set(`${D4}T10:00:00`);
@@ -289,7 +298,8 @@ async function scopeRun() {
   await saveLearned(jk, D3, DEVICE, "Pretend Larkspur second learned", { seen: (await readLearned(jk, D3)).seen });
   await saveHighlightNote(jk, DEVICE, openNoteSession((await listed(phoneHid))!), "Pretend Umberlea later note");
   await syncBoth(server, phone);
-  await run(`${D5}T03:30:00`); // D3 answers (edited) and research notes, D4 titles
+  await press(`${D4}T13:00:00`); // D2 titles (private), D3 with its edited answer and research notes, D4 (today) with its answer
+  await auto(`${D5}T03:30:00`);
 
   // D5: only a highlight and learned words (no exercise, no check-in): no row ever.
   c.set(`${D5}T10:00:00`);
@@ -299,9 +309,11 @@ async function scopeRun() {
   await phoneTick(phone, D3, "exercise", true);
   await syncBoth(server, phone);
   privateNow.add(`exercise:${D3}`);
-  await run(`${D5}T12:00:00`);
-  expect((await liveNotes(fake))[D3], "D3's exercise hidden after the phone's tick").toBe(note({ ex: true, ci: `Pretend ${NAME[D3]} check-in answer` }));
-  await run("2026-11-07T03:30:00"); // D4 answers (check-in)
+  await auto(`${D5}T12:00:00`); // the tick applies by itself, no press: the whole day titles only
+  expect((await liveNotes(fake))[D3], "D3 hidden after the phone's tick").toBe(note({ ex: true, ci: true }));
+  await press(`${D5}T13:00:00`); // D3's check-in answer back; its exercise stays titles only
+  expect((await liveNotes(fake))[D3]).toBe(note({ ex: true, ci: `Pretend ${NAME[D3]} check-in answer` }));
+  await auto("2026-11-07T03:30:00");
 
   // The Replace (sync off), with the backup made before D3's edit and before the phone's tick.
   c.set("2026-11-08T10:00:00");
@@ -310,24 +322,25 @@ async function scopeRun() {
   hold = true;
   await day(D6, NAME[D6]!, { exercise: true });
   await hl(D6, "pretend Yewbarrow cairn", "Pretend Yewbarrow note");
-  for (const at of ["2026-11-08T10:05:00", "2026-11-08T20:00:00", "2026-11-09T03:30:00"]) await run(at, true);
+  for (const at of ["2026-11-08T10:05:00", "2026-11-08T20:00:00", "2026-11-09T03:30:00"]) await press(at);
   expect((await readSent(db))!.waitingRestore, "the box says answers are held").toBe(true);
   // Sync on again; the pull lands.
   c.set("2026-11-09T09:00:00");
   await saveSyncSettings(db, { serverUrl: SERVER, token: TOKEN });
   await ok(db, server);
   hold = false;
-  await run("2026-11-09T10:00:00");
+  await auto("2026-11-09T09:30:00");
+  await press("2026-11-09T10:00:00"); // D6 with answers
   expect((await readSent(db))!.waitingRestore).toBe(false);
-  await run("2026-11-10T03:30:00"); // D6 answers
   const settled = fake.requests.length;
-  for (const at of ["2026-11-10T09:00:00", "2026-11-11T03:30:00", "2026-11-12T03:30:00"]) await run(at, true);
+  for (const at of ["2026-11-10T09:00:00", "2026-11-11T03:30:00"]) await press(at);
+  await auto("2026-11-12T03:30:00");
   expect(writes(fake, settled), "settles: nothing more after the pull").toEqual([]);
   return { c, fake, g, env, server, phone, NAME, RESEARCH, D1, D2, D3, D4, D5, D6 };
 }
 
 describe("scope: a recorder over every request, many days, two devices, a Replace and Stop", () => {
-  it("only exercise / check-in titles, questions and (24 h after the day, not private) answers and that day's research notes ever go; nothing else of the journal", async () => {
+  it("only exercise / check-in titles, questions and (on a press, not private) answers and that day's research notes ever go; nothing else of the journal", async () => {
     const { c, fake, g, env, server, phone, NAME, RESEARCH, D1, D2, D3, D4, D5, D6 } = await scopeRun();
 
     expect(await liveNotes(fake)).toEqual({
@@ -340,9 +353,9 @@ describe("scope: a recorder over every request, many days, two devices, a Replac
       [D4]: note({ ci: `Pretend ${NAME[D4]} check-in answer` }),
       [D6]: note({ ex: `Pretend ${NAME[D6]} exercise answer`, research: ["pretend Yewbarrow cairn — Pretend Yewbarrow note"] }),
     });
-    // D3's research notes were changed late (the next day, 12:00): held 24 h after that (review I2),
-    // and the phone's private tick came first, so they never went; D3's check-in answers did.
-    expect((await noteWrites(fake)).some((p) => p.day === D3 && /Larkspur second|Umberlea later note/.test(p.note))).toBe(false);
+    // D3's newest research notes and edited answer went on the press before the phone's tick; the
+    // tick then overwrote them (by itself, with no press).
+    expect((await noteWrites(fake)).some((p) => p.day === D3 && p.note.includes("• Pretend Larkspur second learned\n• pretend Umberlea weir — Pretend Umberlea later note"))).toBe(true);
     expect((await noteWrites(fake)).some((p) => p.day === D3 && p.note.includes(`Pretend ${NAME[D3]} check-in answer`))).toBe(true);
     expect(JSON.stringify([...fake.days.values()]), "overwritten: D3's answers are nowhere in Together now").not.toMatch(/Cobblewick edited exercise answer|Larkspur second/);
 
@@ -365,8 +378,7 @@ describe("scope: a recorder over every request, many days, two devices, a Replac
       expect([D1, D2, D3, D4, D6], "a row only for an exercise or check-in day").toContain(p.day);
     }
     expect(all.some((p) => p.day === D5), "a learned/highlight-only day").toBe(false);
-    // D3's exercise waited with its late-changed research notes (review I2): titles only until the tick.
-    expect(wire(fake)).not.toContain(`Pretend ${NAME[D3]} edited exercise answer`);
+    expect(wire(fake)).toContain(`Pretend ${NAME[D3]} edited exercise answer`); // went on the press, before the tick
     for (const r of g.seen) {
       expect(new URL(r.url).origin).toBe(fake.url);
       expect(new URL(r.url).pathname).toMatch(/^\/(auth\/v1\/token|rest\/v1\/(members|challenges|challenge_days))$/);
@@ -439,7 +451,7 @@ describe("research notes (learned words and highlights) on a day that went: they
     expect(JSON.stringify([...fake.days.values()])).not.toMatch(/Kestrelby|Zennor/);
   });
 
-  it("a note added or changed later on a sent day's highlight, and learned words added later: the note follows 24 h after the change (review I2), once; a replay sends nothing", async () => {
+  it("a note added or changed later on a sent day's highlight, and learned words added later: nothing by itself; the next press sends them, once; a replay sends nothing", async () => {
     const { c, fake, D } = await sentDay();
     const hid = await hl(D, "pretend Netherby wall");
     c.set("2026-11-06T03:30:00");
@@ -448,10 +460,9 @@ describe("research notes (learned words and highlights) on a day that went: they
     const from = fake.requests.length;
     await saveHighlightNote(jk, DEVICE, openNoteSession((await listed(hid))!), "Pretend Netherby later note");
     await saveLearned(jk, D, DEVICE, "Pretend Netherby learned later");
-    await send(fake, c);
-    expect(writes(fake, from), "held: the day keeps what went").toEqual([]);
-    c.set("2026-11-07T03:31:00");
-    await send(fake, c);
+    await sendToTogether({ fetch: fake.fetch, now: c.now, mode: "hide" }); // an automatic run: adds nothing
+    expect(writes(fake, from), "waits for a press").toEqual([]);
+    await send(fake, c); // the press
     await send(fake, c, true);
     expect(writes(fake, from)).toHaveLength(1);
     expect((await listed(hid))!.note).toBe("Pretend Netherby later note");
@@ -601,7 +612,7 @@ describe("research notes (learned words and highlights) on a day that went: they
 
 // ================================================================ #64 / #65 for answers
 
-/** Day D sent with answers ("final"), the backup holding the older "first" answer; day E written and synced, not due yet at the Replace. */
+/** Days D and E sent with answers on a press (D "final"), the backup holding D's older "first" answer. */
 async function replaceSetUp() {
   const D = "2026-11-04", E = "2026-11-05";
   const c = clock(`${D}T10:00:00`);
@@ -620,16 +631,18 @@ async function replaceSetUp() {
   c.set("2026-11-06T03:30:00");
   await send(fake, c);
   expect((await liveNotes(fake))[D], "set-up: D's answers went, final").toBe(note({ ex: "Pretend Gildersleeve final answer", ci: "Pretend Gildersleeve check-in answer" }));
-  expect((await liveNotes(fake))[E], "set-up: E titles only").toBe(note({ ex: true, ci: true }));
+  expect((await liveNotes(fake))[E], "set-up: E with answers").toBe(note({ ex: "Pretend Heathcote exercise answer", ci: "Pretend Heathcote check-in answer" }));
   return { c, fake, server, phone, file, D, E, card };
 }
 
 describe("#64 / #65: after a Replace, for answers", () => {
-  it("sync off: answers held exactly 24 h from the first run after the Replace; the restored older answer never goes in the gap; the box flag on, then off", async () => {
-    const { c, fake, file, E } = await replaceSetUp();
+  it("sync off: answers held exactly 24 h from the first press after the Replace; the restored older answer never goes in the gap; a day written in the gap goes titles only, its answers at 24 h; the box flag on, then off", async () => {
+    const { c, fake, file } = await replaceSetUp();
+    const F = "2026-11-06";
     await stopSyncing(db);
     c.set("2026-11-06T09:00:00");
     await restoreBackup(file, "replace");
+    await day(F, "Ingleborough", { exercise: true, checkin: true }); // written in the gap
     const from = fake.requests.length;
     await send(fake, c, true); // first run after the Replace: noticed here
     const T = c.now();
@@ -640,17 +653,18 @@ describe("#64 / #65: after a Replace, for answers", () => {
       await send(fake, c, true);
       expect((await readSent(db))!.waitingRestore, `held at +${ms}ms`).toBe(true);
     }
-    expect(writes(fake, from), "nothing at all in the gap (D sent with answers, E's answers due at 11-07 03:00)").toEqual([]);
-    expect(wire(fake)).not.toContain("Pretend Gildersleeve first answer");
-    expect(wire(fake)).not.toContain("Pretend Heathcote");
+    // In the gap: D and E (sent with answers) untouched; F goes titles only, once; no answer at all.
+    expect((await noteWrites(fake, from)).map((p) => p.day), "only F's titles in the gap").toEqual([F]);
+    expect((await liveNotes(fake))[F]).toBe(note({ ex: true, ci: true }));
+    expect(JSON.stringify(fake.requests.slice(from))).not.toMatch(/Gildersleeve|Heathcote|Ingleborough/);
     // Exactly 24 h: held no more.
     const at24 = fake.requests.length;
     c.set(new Date(T).toISOString());
     c.advance(24 * 3_600_000);
     await send(fake, c);
     expect((await readSent(db))!.waitingRestore).toBe(false);
-    expect((await liveNotes(fake))[E], "E's answers go at 24 h").toBe(note({ ex: "Pretend Heathcote exercise answer", ci: "Pretend Heathcote check-in answer" }));
-    expect((await noteWrites(fake, at24)).filter((p) => p.day === E), "E's answers once").toHaveLength(1);
+    expect((await liveNotes(fake))[F], "F's answers go at 24 h").toBe(note({ ex: "Pretend Ingleborough exercise answer", ci: "Pretend Ingleborough check-in answer" }));
+    expect((await noteWrites(fake, at24)).filter((p) => p.day === F), "F's answers once").toHaveLength(1);
     const settled = fake.requests.length;
     await send(fake, c);
     await send(fake, c, true);
@@ -674,7 +688,7 @@ describe("#64 / #65: after a Replace, for answers", () => {
       expect((await readSent(db))!.waitingRestore, `day ${i}`).toBe(true);
     }
     expect(writes(fake, from), "nothing at all while held").toEqual([]);
-    expect(wire(fake)).not.toMatch(/Gildersleeve first answer|Heathcote exercise answer|Heathcote check-in answer/);
+    expect(wire(fake)).not.toMatch(/Gildersleeve first answer/);
     // The phone ticks E's check-in private meanwhile (server only).
     await phoneTick(phone, E, "checkin", true);
     await ok(phone, server);
@@ -685,7 +699,8 @@ describe("#64 / #65: after a Replace, for answers", () => {
     const live = await liveNotes(fake);
     expect(live[D]).toBe(note({ ex: "Pretend Gildersleeve final answer", ci: "Pretend Gildersleeve check-in answer" }));
     expect(live[E], "the phone's tick, pulled, honoured").toBe(note({ ex: "Pretend Heathcote exercise answer", ci: true }));
-    expect(wire(fake)).not.toMatch(/Gildersleeve first answer|Heathcote check-in answer/);
+    expect(wire(fake)).not.toMatch(/Gildersleeve first answer/);
+    expect(JSON.stringify([...fake.days.values()]), "E's check-in answer overwritten").not.toContain("Heathcote check-in answer");
     const once = fake.requests.length;
     for (let i = 0; i < 4; i++) await send(fake, c, i % 2 === 0);
     expect(writes(fake, once), "settled once").toEqual([]);

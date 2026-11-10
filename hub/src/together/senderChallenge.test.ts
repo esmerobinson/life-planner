@@ -2,14 +2,15 @@ import { db } from "../data/db";
 import { saveSharePrivate } from "../data/repo";
 import { addDays } from "../domain/dates";
 import { togetherId } from "./ids";
-import { ANSWERS_DELAY_MS, MAX_WRITES_PER_RUN, stopTogether } from "./sender";
+import { MAX_WRITES_PER_RUN, sendToTogether, stopTogether } from "./sender";
 import { readSent, saveSent, type TogetherSent } from "./store";
 import {
   CHALLENGE, clock, COUPLE, dayRow, dayWrites, emptyDb, journalDay, liveDays, liveNote, ME, send, signedIn,
 } from "./testKit";
 
-// The backfill (2026-11-08), the pace of a big one, an earlier build's habits cleaned up, and Stop
-// with removing, against the fake Together. Made-up days and words.
+// The backfill (2026-11-08: everything from her first day, on a press now), the pace of the
+// automatic hiding runs, an earlier build's habits cleaned up, and Stop with removing, against the
+// fake Together. Made-up days and words.
 
 const DAY = "2026-11-04";
 const SIGN_IN = `${DAY}T10:00:00`;
@@ -18,89 +19,73 @@ const PAST_2 = "2026-10-25";
 
 beforeEach(emptyDb);
 
-describe("the backfill: every day from her first, past days' answers 24 h after sign-in", () => {
-  it("past days go at once with titles; their answers wait 24 h after sign-in; a replay sends nothing", async () => {
+describe("the backfill: every day from her first, on a press", () => {
+  it("one press sends every day from her first, with answers; a replay sends nothing", async () => {
     await journalDay(PAST_1, { exercise: true });
     await journalDay(PAST_2, { checkin: true });
     const c = clock(SIGN_IN);
     const fake = await signedIn(c);
     await journalDay(DAY, { checkin: true });
-    expect((await readSent(db))!).toMatchObject({ pastBefore: DAY, pastUntil: new Date(SIGN_IN).getTime() + ANSWERS_DELAY_MS });
-    await send(fake, c); // the same day as sign-in: past days' titles
-    expect(liveDays(fake).map((d) => d.day)).toEqual([PAST_1, PAST_2]);
-    expect(JSON.stringify(fake.requests)).not.toMatch(/Pretend exercise answer|Pretend check-in answer/);
-    expect((await readSent(db))!.since).toBe(PAST_1);
-    c.set("2026-11-05T09:59:00"); // just under 24 h after sign-in
-    await send(fake, c);
-    expect(JSON.stringify(fake.requests)).not.toMatch(/Pretend exercise answer|Pretend check-in answer/);
+    expect(await send(fake, c)).toMatchObject({ kind: "ok", refused: 0 });
     expect(liveDays(fake).map((d) => d.day)).toEqual([PAST_1, PAST_2, DAY]);
-    c.set("2026-11-05T10:00:00");
-    await send(fake, c);
     expect(liveNote(fake, PAST_1)).toContain("Pretend exercise answer");
     expect(liveNote(fake, PAST_2)).toContain("Pretend check-in answer");
-    expect(liveNote(fake, DAY)).not.toContain("Pretend check-in answer"); // its own 24 h: 3am Nov 6
-    c.set("2026-11-06T03:30:00");
-    await send(fake, c);
-    expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
+    expect(liveNote(fake, DAY)).toContain("Pretend check-in answer"); // today too
+    expect((await readSent(db))!.since).toBe(PAST_1);
     const n = fake.requests.length;
     expect(await send(fake, c)).toMatchObject({ kind: "ok", sent: 0 });
-    expect(fake.requests.length).toBe(n);
+    expect(fake.requests.slice(n).filter((r) => r.method !== "GET")).toEqual([]);
   });
 
-  it("a past day ticked private before the 24 h are up: its answers never go", async () => {
+  it("a past day ticked private before the press: its answers never go", async () => {
     const { jk } = await journalDay(PAST_1, { exercise: true, checkin: true });
+    await saveSharePrivate(jk, PAST_1, "exercise", true);
+    await saveSharePrivate(jk, PAST_1, "checkin", true);
     const c = clock(SIGN_IN);
     const fake = await signedIn(c);
     await send(fake, c);
-    await saveSharePrivate(jk, PAST_1, "exercise", true);
-    await saveSharePrivate(jk, PAST_1, "checkin", true);
     c.set("2026-11-08T10:00:00");
     await send(fake, c);
     expect(liveNote(fake, PAST_1)).toMatch(/\n## Mental Health Exercise\n/);
     expect(JSON.stringify(fake.requests)).not.toMatch(/Pretend exercise answer|Pretend check-in answer/);
   });
 
-  it("a device already signed in (an earlier build's record) widens to her first day, past days held 24 h from the update", async () => {
+  it("a device already signed in (an earlier build's record) widens to her first day; the old holds are forgotten", async () => {
     await journalDay(PAST_1, { checkin: true });
     const c = clock(SIGN_IN);
     const fake = await signedIn(c);
     await journalDay(DAY, { checkin: true });
-    // As an earlier build left it: since the sign-in day, no day record, no past-day hold.
-    const old = (await readSent(db))!;
-    const { days: _d, pastBefore: _p, pastUntil: _u, ...rest } = old;
-    await saveSent(db, { ...rest, since: DAY } as TogetherSent);
-    c.set("2026-11-08T12:00:00"); // the update's first run
+    // As an earlier build left it: since the sign-in day, no day record, a past-days hold.
+    const { days: _d, ...rest } = (await readSent(db))!;
+    await saveSent(db, { ...rest, since: DAY, pastBefore: DAY, pastUntil: c.now() + 86_400_000 } as TogetherSent);
+    c.set("2026-11-04T12:00:00"); // the update's first press
     await send(fake, c);
-    expect((await readSent(db))!).toMatchObject({ since: PAST_1, pastBefore: "2026-11-08", pastUntil: new Date("2026-11-08T12:00:00").getTime() + ANSWERS_DELAY_MS });
-    expect(liveDays(fake).map((d) => d.day)).toEqual([PAST_1, DAY]);
-    expect(JSON.stringify(fake.requests)).not.toContain("Pretend check-in answer"); // DAY is a past day too now
-    c.set("2026-11-09T12:00:00");
-    await send(fake, c);
+    const rec = (await readSent(db))! as TogetherSent & Record<string, unknown>;
+    expect(rec.since).toBe(PAST_1);
+    expect(rec.pastBefore).toBeUndefined();
+    expect(rec.pastUntil).toBeUndefined();
     expect(liveNote(fake, PAST_1)).toContain("Pretend check-in answer");
     expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
   });
 
-  it(`at most ${MAX_WRITES_PER_RUN} rows a run; the rest next run`, async () => {
+  it(`an automatic (hiding) run writes at most ${MAX_WRITES_PER_RUN} rows; the rest on the next one`, async () => {
     const first = "2026-09-01";
     const dates = Array.from({ length: MAX_WRITES_PER_RUN + 5 }, (_, i) => addDays(first, i));
-    for (const d of dates) await journalDay(d, { checkin: true });
+    let jk = null as Awaited<ReturnType<typeof journalDay>>["jk"] | null;
+    for (const d of dates) jk = (await journalDay(d, { checkin: true })).jk;
     const c = clock(SIGN_IN);
     const fake = await signedIn(c);
-    await send(fake, c);
-    expect(dayWrites(fake)).toHaveLength(MAX_WRITES_PER_RUN);
-    expect((await readSent(db))!.backlog).toBe(true);
-    await send(fake, c);
-    expect(liveDays(fake)).toHaveLength(dates.length);
-    expect((await readSent(db))!.backlog).toBe(false);
-    // 24 h on, every day gets its answers over two runs; then a private tick on one hides it.
-    c.set("2026-11-05T10:00:00");
-    await send(fake, c);
-    await send(fake, c);
+    await sendToTogether({ fetch: fake.fetch, now: c.now, mode: "send", batchPauseMs: 0 });
     expect(liveDays(fake).every((d) => String(d.note).includes("Pretend check-in answer"))).toBe(true);
-    const { jk } = await journalDay(dates.at(-1)!, { checkin: false });
-    await saveSharePrivate(jk, dates.at(-1)!, "checkin", true);
-    await send(fake, c);
-    expect(liveNote(fake, dates.at(-1)!)).not.toContain("Pretend check-in answer");
+    for (const d of dates) await saveSharePrivate(jk!, d, "checkin", true);
+    const n = dayWrites(fake).length;
+    const hide = () => sendToTogether({ fetch: fake.fetch, now: c.now, mode: "hide" });
+    await hide();
+    expect(dayWrites(fake).length - n).toBe(MAX_WRITES_PER_RUN);
+    expect((await readSent(db))!.backlog).toBe(true);
+    await hide();
+    expect((await readSent(db))!.backlog).toBe(false);
+    expect(liveDays(fake).some((d) => String(d.note).includes("Pretend check-in answer"))).toBe(false);
   }, 60_000);
 });
 

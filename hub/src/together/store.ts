@@ -72,18 +72,9 @@ export interface TogetherSent extends LegacyHabits {
   byHand?: Record<ISODate, true>;
   /** Set aside after Together refused it (tried again once it changes, or on Send now). */
   refused: Record<string, SetAside>;
-  /**
-   * Days before this one (the sign-in day, or the day this update first ran) are past days: their
-   * answers wait until `pastUntil` (24 h after that moment), so she can tick any old day private.
-   */
-  pastBefore?: ISODate;
-  pastUntil?: number;
-  /**
-   * The last run found a past day whose answers wait only on `pastUntil` (not on a private tick):
-   * the box offers "Send past days' answers now" while that's so.
-   */
-  pastWaiting?: boolean;
-  /** The last run stopped at its limit of writes (a big backfill): the rest goes next run. */
+  /** The last press, as it goes: how many of the days it had to send are done ("Sent N of M days"). */
+  progress?: { done: number; total: number };
+  /** An automatic run (hiding only) stopped at its limit of writes: the rest goes next run. */
   backlog?: boolean;
   /** The last run (any outcome but offline). */
   lastSentAt?: number;

@@ -13,7 +13,7 @@ function fakeSync(): SyncWatch & { set(s: { status: string; lastSyncedAt: number
   };
 }
 
-it("runs after each finished sync run, never during one, and not on an old sync time", async () => {
+it("after each finished sync run (never during one, not on an old sync time): a hiding run only (sending is manual)", async () => {
   const send = vi.fn(async () => ({ kind: "ok" as const, sent: 0, refused: 0 }));
   const r = new TogetherRunner(send);
   const sync = fakeSync();
@@ -23,6 +23,7 @@ it("runs after each finished sync run, never during one, and not on an old sync 
   expect(send).not.toHaveBeenCalled();
   sync.set({ status: "idle", lastSyncedAt: 200 }); // the run finished
   expect(send).toHaveBeenCalledTimes(1);
+  expect(send).toHaveBeenCalledWith({ mode: "hide" });
   sync.set({ status: "error", lastSyncedAt: 200 }); // a failed run: no newer sync time
   expect(send).toHaveBeenCalledTimes(1);
   stop();
@@ -31,21 +32,22 @@ it("runs after each finished sync run, never during one, and not on an old sync 
   await r.getState().running;
 });
 
-it("Send now tries again what was set aside, and keeps the outcome for the box", async () => {
+it("Send now is the one sending run: it sends, tries again what was set aside, and keeps the outcome for the box", async () => {
   const send = vi.fn(async (o: { retryRefused?: boolean }) => ({ kind: "ok" as const, sent: o.retryRefused ? 1 : 0, refused: 0 }));
   const r = new TogetherRunner(send);
   expect(await r.sendNow()).toEqual({ kind: "ok", sent: 1, refused: 0 });
-  expect(send).toHaveBeenCalledWith({ retryRefused: true });
+  expect(send).toHaveBeenCalledWith({ retryRefused: true, mode: "send" });
   expect(r.getState()).toEqual({ running: false, last: { kind: "ok", sent: 1, refused: 0 } });
 });
 
-it("while answers are held after a Replace: runs on app start and sync-state changes without a new sync, at most once a minute (bug #68)", async () => {
+it("when worth it: a hiding run on app start and sync-state changes without a new sync, at most once a minute (bug #68)", async () => {
   let held = true;
   const send = vi.fn(async () => ({ kind: "ok" as const, sent: 0, refused: 0 }));
   const r = new TogetherRunner(send, async () => held);
   const sync = fakeSync();
   const stop = r.start(sync); // the app opening
   await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+  expect(send).toHaveBeenCalledWith({ mode: "hide" });
   sync.set({ status: "idle", lastSyncedAt: 100 }); // a state change, no new sync: within the minute
   await new Promise((res) => setTimeout(res, 10));
   expect(send).toHaveBeenCalledTimes(1);
@@ -58,7 +60,7 @@ it("while answers are held after a Replace: runs on app start and sync-state cha
   stop();
 });
 
-it("the record asks for a run without a sync: a backfill at its limit, or past days' answers due since the last run", async () => {
+it("the record asks for a hiding run without a sync: a day in Together with answers (a tick here may need it hidden), a hiding run at its limit, an unfinished Stop with removing", async () => {
   const { db } = await import("../data/db");
   const { saveSent } = await import("./store");
   const { emptyDb } = await import("./testKit");
@@ -75,10 +77,12 @@ it("the record asks for a run without a sync: a backfill at its limit, or past d
     stop();
     return send.mock.calls.length;
   };
-  const now = Date.now();
   expect(await check(null)).toBe(0);
+  expect(await check({ days: {} })).toBe(0); // nothing sent: nothing to hide
+  expect(await check({ days: { "2026-11-01": { hash: "h", live: true, parts: { checkin: "titles" } } } })).toBe(0);
+  expect(await check({ days: { "2026-11-01": { hash: "h", live: false, parts: { checkin: "answers" } } } })).toBe(0);
+  expect(await check({ days: { "2026-11-01": { hash: "h", live: true, parts: { checkin: "answers" } } } })).toBe(1);
+  expect(send).toHaveBeenCalledWith({ mode: "hide" });
   expect(await check({ backlog: true })).toBe(1);
-  expect(await check({ pastUntil: now - 1000, lastSentAt: now - 2000 })).toBe(1); // ran before it passed
-  expect(await check({ pastUntil: now - 1000, lastSentAt: now - 500 })).toBe(0); // already ran since
-  expect(await check({ pastUntil: now + 60_000, lastSentAt: now - 500 })).toBe(0); // not yet
+  expect(await check({ removing: true })).toBe(1);
 });

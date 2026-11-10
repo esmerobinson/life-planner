@@ -3,7 +3,7 @@ import { todayISO } from "../../domain/dates";
 import { isValidISODate } from "../../domain/dates";
 import type { Fetch } from "../../together/client";
 import { togetherRunner, type TogetherRunner } from "../../together/runner";
-import { cancelStopRemoving, endPastHold, signInToTogether, stopTogether } from "../../together/sender";
+import { cancelStopRemoving, signInToTogether, stopTogether } from "../../together/sender";
 import { useJournalKey } from "../journal/useJournalKey";
 import { PrivateDayTick } from "./PrivateDayTick";
 import { useRunner, useTogetherMeta } from "./useTogether";
@@ -69,18 +69,6 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
     }
   }
 
-  /** Ends the past-days hold now, then sends (nothing else about what goes changes). */
-  async function sendPastNow() {
-    setProblem("");
-    setBusy(true);
-    try {
-      await endPastHold();
-      await runner.sendNow();
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function stop() {
     setProblem("");
     setBusy(true);
@@ -102,6 +90,7 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
   const notHidden = setAside.filter((r) => r.what === "hide").length;
   const last = run.last;
   const byHand = Object.keys(meta?.sent?.byHand ?? {}).length;
+  const progress = meta?.sent?.progress;
 
   return (
     <section className="together-placeholder together-box" aria-labelledby="together-heading">
@@ -111,25 +100,13 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
       {auth && (
         <>
           <p className="together-warning">{W.notEncrypted}</p>
-          <p className="together-warning">{W.afterDayEnds}</p>
+          <p className="together-warning">{W.howItSends}</p>
           <p className="together-warning">{W.privateWarning}</p>
         </>
       )}
       {auth && meta?.sent?.waitingRestore && <p role="status">{W.restoreWaiting}</p>}
       {/* PLACEHOLDER lines (magenta, system font): wording and look are the Design session's. */}
       {auth && meta?.sent?.challengeMissing && <p role="alert" className="together-warning">{W.challengeMissing}</p>}
-      {auth && meta?.sent?.pastUntil !== undefined && Date.now() < meta.sent.pastUntil && (
-        <p role="status" className="together-warning">{W.pastDays(new Date(meta.sent.pastUntil).toLocaleString())}</p>
-      )}
-      {/* While a past day's answers wait only on that hold (Esme, 2026-11-09): end it now. No confirm. */}
-      {signedIn && !meta?.sent?.removing && meta?.sent?.pastWaiting && meta.sent.pastUntil !== undefined && Date.now() < meta.sent.pastUntil && (
-        <div className="together-past-now">
-          <button type="button" className="together-placeholder-button" disabled={busy || run.running} onClick={() => void sendPastNow()}>
-            {W.sendPastNow}
-          </button>
-          <p className="together-warning">{W.sendPastNowNote}</p>
-        </div>
-      )}
 
       {again && <p role="alert">{W.signInAgain}</p>}
 
@@ -177,6 +154,10 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
           )}
           <p>{W.onlyThisDevice}</p>
           <p>{meta?.sent?.lastCopiedAt ? W.lastSent(new Date(meta.sent.lastCopiedAt).toLocaleString()) : W.notSentYet}</p>
+          {/* A press as it goes, or one that stopped part way (placeholder look). */}
+          {progress && progress.total > 0 && (run.running || progress.done < progress.total) && (
+            <p role="status" className="together-warning">{W.progress(progress.done, progress.total)}</p>
+          )}
           {meta?.sent?.backlog && <p className="together-warning">{W.backlog}</p>}
           {byHand > 0 && <p className="together-warning">{W.byHand(byHand)}</p>}
           {last?.kind === "offline" && <p role="status">{W.offline}</p>}

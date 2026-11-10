@@ -4,9 +4,10 @@ import { pageDate } from "./helpers";
 
 /* The Together link in a real browser, against a FAKE Together server (made-up address, key,
    users and words; it never contacts anything real): sign in, do the day's exercise (and write
-   what she learned) and check-in, pass 3am (titles and questions only), then 24 hours more (her
-   answers and research notes), and check the fake holds one row for the day in her challenge
-   (renamed Mental Health Work) and no to-do. The look is a
+   what she learned) and check-in; nothing goes until Send now (sending is manual), which sends
+   the day at once with her answers and research notes; a private tick afterwards is taken out by
+   itself. The fake holds one row for the day in her challenge (renamed Mental Health Work) and no
+   to-do. The look is a
    placeholder. Set SHOTS_DIR to save screenshots. */
 
 const PASS = "fake-journal-e2e-passphrase";
@@ -62,12 +63,6 @@ async function unlocked(page: Page) {
 async function noSidewaysScroll(page: Page) {
   const m = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, w: window.innerWidth }));
   expect(m.s).toBeLessThanOrEqual(m.w);
-}
-
-/** A local time `days` calendar days after `day` (YYYY-MM-DD). */
-function after(day: string, days: number, hour: number, minute = 0): Date {
-  const [y, m, d] = day.split("-").map(Number);
-  return new Date(y!, m! - 1, d! + days, hour, minute);
 }
 
 const days = (fake: FakeSupabase) => fake.dayRows(CHALLENGE);
@@ -155,43 +150,43 @@ for (const width of [1280, 390]) {
       await noSidewaysScroll(page);
       await shoot(page, `together-checkin-tick-${width}`);
 
-      // Send now the same day: her challenge found and renamed, no day yet (the made-up sync
-      // address never answers, so no sync run triggers it).
+      // Nothing goes by itself (sending is manual, Esme 2026-11-09): opening the Sync page sends nothing.
       await page.goto("/sync");
-      await box.getByRole("button", { name: "Send now" }).click();
-      await expect(box.getByText(/^Last copied/)).toBeVisible();
-      await expect.poll(() => fake.challenges.get(CHALLENGE)!.name).toBe("Mental Health Work");
-      expect(fake.todos.size + fake.events.size).toBe(0);
+      await expect(box.getByText("Press Send now to copy your Mental health exercise and Daily check-in to Together. Days you tick private send only titles and questions.")).toBeVisible();
+      await expect(box.getByText(/Past days|Send everything/)).toHaveCount(0);
       expect(days(fake)).toHaveLength(0);
 
-      // Past 3am: one row for the day, titles and questions only.
-      await page.clock.setFixedTime(after(day, 1, 3, 30));
-      await page.reload();
+      // Send now, the same day: her challenge found and renamed, and today's row at once, with her
+      // answers and research notes (no 3am, no 24 h).
       await box.getByRole("button", { name: "Send now" }).click();
+      await expect(box.getByText(/^Last copied/)).toBeVisible();
       await expect.poll(() => days(fake).length).toBe(1);
+      expect(fake.challenges.get(CHALLENGE)!.name).toBe("Mental Health Work");
       const first = days(fake)[0]!;
       expect(first).toMatchObject({ couple_id: COUPLE, challenge_id: CHALLENGE, day, by: ME, deleted_at: null });
-      expect(String(first.note)).toMatch(/^1 exercise · Check In\n\n## Mental Health Exercise\n\n### [^\n]*Pretend first-book one\n\n## Check In\n\*\*/);
-      expect(String(first.note)).not.toMatch(/Pretend answer|Pretend exercise answer|a wave passes|Research notes/);
-
-      // 24 hours after the day ended: the same row now holds her answers and research notes.
-      await page.clock.setFixedTime(after(day, 2, 3, 30));
-      await page.reload();
-      await box.getByRole("button", { name: "Send now" }).click();
-      await expect.poll(() => String(days(fake)[0]!.note)).toContain("Pretend answer 1");
-      expect(days(fake)).toHaveLength(1);
-      const note = String(days(fake)[0]!.note);
-      expect(note).toContain("## Research notes\n• Pretend: a wave passes");
-      expect(note).toContain("Pretend exercise answer");
+      const note = String(first.note);
+      expect(note).toMatch(/^1 exercise · Check In\n\n## Mental Health Exercise\n\n## Research notes\n• Pretend: a wave passes\n\n### [^\n]*Pretend first-book one\nPretend exercise answer\n\n## Check In\n\*\*/);
       expect(note).toMatch(/\n\n## Check In\n\*\*[^\n]+\*\*\nPretend answer 1/);
       expect(fake.todos.size + fake.events.size).toBe(0);
+      await shoot(page, `together-after-answers-${width}`);
+
+      // Ticked private afterwards: taken out by itself (the app opening runs it), no press needed.
+      await page.goto("/journal/check-in");
+      await page.getByLabel("Keep today's answers private").check();
+      await page.goto("/sync");
+      await expect.poll(() => String(days(fake)[0]!.note)).not.toContain("Pretend answer 1");
+      // (Hiding takes the whole day back to titles; the next press puts back what isn't private.)
+      expect(String(days(fake)[0]!.note)).not.toContain("Pretend exercise answer");
+      await box.getByRole("button", { name: "Send now" }).click();
+      await expect.poll(() => String(days(fake)[0]!.note)).toContain("Pretend exercise answer");
+      expect(String(days(fake)[0]!.note)).not.toContain("Pretend answer 1");
+      expect(days(fake)).toHaveLength(1);
 
       // Nothing forbidden went: no to-do, no password after sign-in, no sync passphrase.
       const wire = JSON.stringify(fake.requests.map((r) => ({ url: r.url, headers: r.headers, body: r.body })));
       expect(wire).not.toContain("Pretend to-do that never goes");
       expect(fake.requests.filter((r) => r.body.includes(PASSWORD))).toHaveLength(1);
       expect(wire).not.toContain(PASS);
-      await shoot(page, `together-after-answers-${width}`);
     });
   });
 }

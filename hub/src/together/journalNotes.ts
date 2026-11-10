@@ -32,7 +32,7 @@
 // - Skipped: any question whose answer is "n/a" (any case or punctuation, Esme 2026-11-09), and
 //   n/a lines or cells within an answer. A part with nothing left is left out; a day with nothing
 //   sends nothing.
-// - Every day before `today` (which turns at 3am), back to her first journal day (2026-11-08).
+// - Every day before `before` (the sender passes tomorrow: today goes too), back to her first journal day.
 // - Never read or sent: morning pages (not even dates), photos, drafts, Notes to myself, Hard
 //   moment, stars, the card file beyond the titles and part definitions (prompts, columns,
 //   fields, steps, labels) of cards she did, learned words or highlights of a day with no card.
@@ -72,11 +72,6 @@ export interface DayNote {
   full: string;
   /** Its words in the summary line: "N exercises" (never the titles), or "Check In". */
   summary: string;
-  /**
-   * When its research notes (learned words, highlights and their notes) last changed, epoch ms (0:
-   * none). A change made after the day went waits 24 h after it too (review I2).
-   */
-  researchAt?: number;
 }
 
 /**
@@ -296,7 +291,7 @@ async function noteTwins(jk: JournalKey): Promise<Map<string, ISODate>> {
  */
 async function dayHighlights(
   jk: JournalKey, date: ISODate, twins: Map<string, ISODate>,
-): Promise<{ list: { words: string; note: string }[]; partial: boolean; changedAt: number }> {
+): Promise<{ list: { words: string; note: string }[]; partial: boolean }> {
   const byHid = new Map<string, HighlightEntry[]>();
   let partial = false;
   for (const row of await db.journal.where("date").equals(date).toArray()) {
@@ -320,9 +315,7 @@ async function dayHighlights(
   }
   // A fixed order, so the note (and its hash) never changes by itself.
   keep.sort((a, b) => a.createdAt - b.createdAt || a.hid.localeCompare(b.hid));
-  // The newest version that adds or changes words (a removal only takes words out: not counted).
-  const changedAt = Math.max(0, ...[...byHid.values()].flat().filter((v) => !v.deleted).map((v) => v.at));
-  return { list: keep.map(({ words, note }) => ({ words, note })), partial, changedAt };
+  return { list: keep.map(({ words, note }) => ({ words, note })), partial };
 }
 
 const PROMPT_TEXT = new Map(PROMPTS.map((p) => [p.id, p.text]));
@@ -385,8 +378,6 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
       titles: exerciseSection(done, [], false),
       full: exerciseSection(done, research, true),
       summary: exerciseSummary(done.length),
-      // (Learned words emptied or removed only take words out: not counted.)
-      researchAt: Math.max(hl.changedAt, ...[learned, ...learned.others].filter((v) => v.text.trim() !== "").map((v) => v.at)),
     });
   }
   return { notes, unknown, partial };

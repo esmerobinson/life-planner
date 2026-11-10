@@ -1,14 +1,22 @@
-// When the Together sender runs (Together link brief §2): after each successful sync run (the
-// sync's "last synced" time moves on and no run is in flight), and on "Send now". Never during a
-// sync. Holds the latest outcome for the Together box. The sender itself makes sure only one
-// tab sends at a time, and that only a device that signed in sends at all.
+// When the Together sender runs. Sending is manual (Esme, 2026-11-09): only "Send now" sends
+// (mode "send"). The automatic runs, after each successful sync run (the sync's "last synced"
+// time moves on and no run is in flight) and when the app opens or comes back into view (at most
+// once a minute), only take words out (mode "hide"): a private tick made after sending, a day
+// removed. Never during a sync. Holds the latest outcome for the Together box. The sender itself
+// makes sure only one tab sends at a time, and that only a device that signed in sends at all.
 
 import { db as appDb } from "../data/db";
 import { sendToTogether, type SendOutcome } from "./sender";
 import { readSent } from "./store";
 
-/** While answers are held after a Replace, a run is started at most this often (no storm). */
+/** Automatic (hiding) runs on opening or coming back into view: at most this often (no storm). */
 export const HELD_RUN_GAP_MS = 60_000;
+
+export interface RunOpts {
+  retryRefused?: boolean;
+  /** "send" only from Send now; automatic runs are "hide". */
+  mode: "send" | "hide";
+}
 import type { Fetch } from "./client";
 
 /** The parts of the sync controller the runner watches. */
@@ -28,16 +36,16 @@ export class TogetherRunner {
   private inFlight: Promise<SendOutcome> | null = null;
 
   constructor(
-    private readonly send: (opts: { retryRefused?: boolean }) => Promise<SendOutcome>,
+    private readonly send: (opts: RunOpts) => Promise<SendOutcome>,
     /**
-     * Runs must not wait for a sync (the record says so): answers held after a Replace, a backfill
-     * that stopped at its limit, or past days' answers due since the last run.
+     * An automatic (hiding) run is worth starting without a sync: something is in Together that a
+     * tick made here could need hidden (a day sent with answers), or a hiding run stopped at its
+     * limit, or a stop with removing is unfinished.
      */
     private readonly held: () => Promise<boolean> = async () => {
       const s = await readSent(appDb);
       if (!s) return false;
-      const pastDue = s.pastUntil !== undefined && s.lastSentAt !== undefined && s.lastSentAt < s.pastUntil && Date.now() >= s.pastUntil;
-      return s.waitingRestore === true || s.backlog === true || pastDue;
+      return s.backlog === true || s.removing === true || Object.values(s.days ?? {}).some((d) => d.live && Object.values(d.parts).includes("answers"));
     },
   ) {}
 
@@ -64,7 +72,7 @@ export class TogetherRunner {
       if (s.status === "syncing") return;
       if (s.lastSyncedAt !== null && s.lastSyncedAt !== seen) {
         seen = s.lastSyncedAt;
-        void this.run({});
+        void this.run({ mode: "hide" });
         return;
       }
       void this.runIfHeld();
@@ -85,19 +93,22 @@ export class TogetherRunner {
     if (now - this.lastHeldRun < HELD_RUN_GAP_MS) return;
     if (!(await this.held().catch(() => false))) return;
     this.lastHeldRun = now;
-    await this.run({});
+    await this.run({ mode: "hide" });
   }
 
-  /** "Send now": also tries again what was set aside. */
+  /** "Send now": sends everything new or changed, and tries again what was set aside. */
   sendNow(): Promise<SendOutcome> {
-    return this.run({ retryRefused: true });
+    return this.run({ retryRefused: true, mode: "send" });
   }
 
-  private run(opts: { retryRefused?: boolean }): Promise<SendOutcome> {
+  private run(opts: RunOpts): Promise<SendOutcome> {
     if (this.inFlight) {
       // A sync (or a tick's sync) finished, or Send now was pressed, during this send: one more
-      // run as soon as this one ends, never only after the next sync (bug #43).
-      const want = { retryRefused: !!(this.next?.opts.retryRefused || opts.retryRefused) };
+      // run as soon as this one ends, never only after the next sync (bug #43). A press wins.
+      const want: RunOpts = {
+        retryRefused: !!(this.next?.opts.retryRefused || opts.retryRefused),
+        mode: this.next?.opts.mode === "send" || opts.mode === "send" ? "send" : "hide",
+      };
       if (!this.next) {
         let start!: () => void;
         const ready = new Promise<void>((r) => (start = r));
@@ -113,9 +124,9 @@ export class TogetherRunner {
   }
 
   /** The follow-up run asked for while one was in flight. */
-  private next: { opts: { retryRefused?: boolean }; promise: Promise<SendOutcome>; start: () => void } | null = null;
+  private next: { opts: RunOpts; promise: Promise<SendOutcome>; start: () => void } | null = null;
 
-  private start1(opts: { retryRefused?: boolean }): Promise<SendOutcome> {
+  private start1(opts: RunOpts): Promise<SendOutcome> {
     const p = (async () => {
       this.set({ running: true });
       let out: SendOutcome;
@@ -145,7 +156,7 @@ export class TogetherRunner {
 }
 
 export function makeRunner(fetchFn: Fetch): TogetherRunner {
-  return new TogetherRunner((opts) => sendToTogether({ fetch: fetchFn, retryRefused: opts.retryRefused }));
+  return new TogetherRunner((opts) => sendToTogether({ fetch: fetchFn, retryRefused: opts.retryRefused, mode: opts.mode }));
 }
 
 /** The app's one runner, on the browser's fetch. */

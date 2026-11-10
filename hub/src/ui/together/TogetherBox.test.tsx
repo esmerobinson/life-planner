@@ -39,34 +39,37 @@ it("never signed in: only what it is and the sign-in form; no Together lines, no
   setup();
   expect(screen.getByText(W.intro)).toBeInTheDocument();
   expect(screen.getByText(W.onlyThisDevice)).toBeInTheDocument();
-  for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds]) expect(screen.queryByText(t)).toBeNull();
+  for (const t of [W.privateWarning, W.notEncrypted, W.howItSends]) expect(screen.queryByText(t)).toBeNull();
   expect(screen.queryByText(W.privateHeading)).toBeNull();
   expect(W.intro).toContain("To-dos never go");
 });
 
-it("signed in: says plainly what goes (her challenge, no habits), the two stages, that private or editing replaces and removing only hides", async () => {
+it("signed in: says plainly what goes (her challenge, no habits), that it goes on Send now, that private or editing replaces and removing only hides", async () => {
   const { fake } = setup();
   await signIn(fake);
   await screen.findByText(W.copying);
-  for (const t of [W.privateWarning, W.notEncrypted, W.afterDayEnds, W.onlyThisDevice]) expect(screen.getByText(t)).toBeInTheDocument();
+  for (const t of [W.privateWarning, W.notEncrypted, W.howItSends, W.onlyThisDevice]) expect(screen.getByText(t)).toBeInTheDocument();
+  expect(screen.getByText(W.howItSends)).toHaveClass("together-warning"); // magenta placeholder
   expect(W.intro).toContain("“Mental Health Work” challenge");
   expect(document.body.textContent).not.toMatch(/habit/i);
-  expect(W.afterDayEnds).toContain("24 hours");
-  expect(W.afterDayEnds).toContain("research notes");
+  expect(W.howItSends).toBe("Press Send now to copy your Mental health exercise and Daily check-in to Together. Days you tick private send only titles and questions.");
+  // Sending is manual: nothing about waiting, past days or a second button.
+  expect(document.body.textContent).not.toMatch(/24 hours|Past days|Send everything|Send past/);
   expect(W.privateWarning).toMatch(/replaces that day's entry/);
   expect(W.privateWarning).toMatch(/only marked deleted there: it isn't wiped/);
 });
 
-it("signed in: when past days' answers go, in one plain placeholder line (2026-11-08)", async () => {
+it("a press as it goes, or one that stopped part way: \"Sent N of M days\" (placeholder look); a finished one says nothing more", async () => {
   const { fake } = setup();
   await signIn(fake);
   await screen.findByText(W.copying);
-  const { readSent } = await import("../../together/store");
-  const until = (await readSent(db))!.pastUntil!;
-  expect(until).toBeGreaterThan(Date.now() + 23 * 3_600_000);
-  const line = await screen.findByText(W.pastDays(new Date(until).toLocaleString()));
-  expect(line).toHaveClass("together-warning"); // magenta placeholder
-  expect(line.textContent).toMatch(/Tick any day private before then/);
+  const { readSent, saveSent } = await import("../../together/store");
+  await saveSent(db, { ...(await readSent(db))!, progress: { done: 12, total: 30 } });
+  const line = await screen.findByText("Sent 12 of 30 days");
+  expect(line).toHaveClass("together-warning");
+  await saveSent(db, { ...(await readSent(db))!, progress: { done: 30, total: 30 } });
+  await waitFor(() => expect(screen.queryByText(/^Sent \d+ of \d+ days?$/)).toBeNull());
+  expect(W.progress(1, 1)).toBe("Sent 1 of 1 day");
 });
 
 it("no challenge found in Together: says so plainly; days she logged by hand and a backlog are said too", async () => {

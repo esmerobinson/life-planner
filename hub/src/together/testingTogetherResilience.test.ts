@@ -1,6 +1,6 @@
 // TESTING (Life Planner - Together Link Testing): Together must never block or break sync or the
-// journal. Together unreachable, hung, 401/403, 500, malformed replies, offline at the 3am day
-// change, signed out: the journal still saves at once, sync still syncs, no retry storm, no
+// journal. Together unreachable, hung, 401/403, 500, malformed replies, offline on Send now,
+// signed out: the journal still saves at once, sync still syncs, no retry storm, no
 // unhandled rejection, nothing lost or double-sent when it comes back. Fakes only; every value
 // made up. Tests named "BUG:" were expected to fail on together-link @2a6edb2 (fixed since).
 // Challenge model (2026-11-09): one row per day in her challenge, checked with liveDays / liveNote.
@@ -114,12 +114,12 @@ for (const mode of ["down", "500"] as const) {
     expect(await sendToTogether(env)).toMatchObject({ kind: "ok", sent: 0 }); // replay sends nothing
     expect(liveDays(fake)).toHaveLength(1);
     expect(fake.days.size).toBe(1);
-    // Past the delay already: the answers went straight away (no titles stage needed).
+    // A press sends the answers straight away (no titles stage).
     expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
   });
 }
 
-it("offline at the 3am day change: the titles go once it's back, once", async () => {
+it("offline when she presses Send now: the day goes once it's back and she presses again, once (sending is manual: no titles stage)", async () => {
   const c = clock(SIGN_IN);
   const { fake, sw, env } = await setUp(c);
   c.set("2026-11-05T03:00:30");
@@ -129,7 +129,8 @@ it("offline at the 3am day change: the titles go once it's back, once", async ()
   sw.state.mode = "up";
   expect(await sendToTogether(env)).toMatchObject({ kind: "ok" });
   expect(fake.days.size).toBe(1);
-  expect(JSON.stringify(fake.requests)).not.toContain("Pretend check-in answer");
+  expect(liveNote(fake, DAY)).toContain("Pretend check-in answer");
+  expect(await sendToTogether(env)).toMatchObject({ kind: "ok", sent: 0 });
 });
 
 it("a send cut off half-way (503 on the second day's insert) carries on next run without duplicates", async () => {

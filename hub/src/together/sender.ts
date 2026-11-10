@@ -4,24 +4,24 @@
 // holding both parts (journalNotes.ts). Each row counts towards the challenge exactly like a
 // "Log today" she made by hand. Nothing else goes: no to-dos, no habits. One way only: nothing is
 // read back except her couple id and which challenge is hers.
-// It runs after a sync run has finished (never during one: what it sends is read under the sync
-// lock) and on "Send now", one tab at a time (a Web Lock).
 //
-// When a day goes, in two stages (review C1: a private tick made on another device must never
-// lose the race):
-// 1. After the day ends (the 3am day change): titles and questions only.
-// 2. ANSWERS_DELAY_MS later, and only for a part that isn't ticked private (read again right
-//    before sending): the note is overwritten with her answers and research notes.
-// Past days (before the sign-in, or before this update first ran) wait ANSWERS_DELAY_MS after
-// that moment before their answers go, so she can tick any old day private first (2026-11-08).
+// Sending is manual (Esme, 2026-11-09): only "Send now" sends (mode "send"). Every day up to and
+// including today with anything new or changed goes at once, with her answers and research
+// notes, except a part she ticked private (titles and questions only, the tick read again right
+// before each write). A big press goes in batches until done. The automatic runs (after a sync
+// finishes, on opening; mode "hide") only ever take words out, as soon as possible: a private
+// tick made after sending, a day with nothing left, an earlier build's clean-up. What is read
+// is read under the sync lock (never halfway through a sync run); one tab at a time (a Web Lock).
+// After a Replace, answers wait until sync has caught up (or 24 h with sync off): the journal
+// here may be missing a tick made after the backup.
 //
 // - The note can be overwritten (challenge_days: only `note` and `deleted_at` change), so a
 //   private tick or an edit after sending really replaces the text there.
 // - Every row's id is fixed (ids.ts). created_at / updated_at / by are never sent.
 // - One row per day (unique challenge and day). A day she already logged by hand in Together is
 //   left exactly as she wrote it, and never tried again.
-// - A record per day (store.ts) says what went, so a run sends only what changed. At most
-//   MAX_WRITES_PER_RUN rows are written per run (a big backfill goes over several runs).
+// - A record per day (store.ts) says what went, so a press sends only what changed (a replay
+//   sends nothing). MAX_WRITES_PER_RUN rows per batch.
 // - Offline or a server error: stop, try again next run. One row refused: set aside (counted on
 //   the box), the rest goes on. A 401: one refresh is tried; if that fails too, or a refresh is
 //   refused, stop, forget the tokens and ask her to sign in again. Nothing else is affected.
@@ -33,7 +33,7 @@ import { readSharePrivate } from "../data/repo";
 import { readSyncGate, withSyncLock } from "../data/syncGate";
 import { formerDeviceIds } from "../data/deviceIds";
 import { getDeviceId } from "../sync/engine";
-import { todayISO } from "../domain/dates";
+import { addDays, todayISO } from "../domain/dates";
 import type { ISODate } from "../domain/types";
 import type { JournalKey } from "../journal/crypto";
 import { loadJournalKey } from "../journal/keyStore";
@@ -46,8 +46,8 @@ import {
 } from "./store";
 
 /**
- * How long after a day ends (3am) her answers follow the titles: 24 hours (review C1; approved
- * by Esme 2026-11-05). Until then only the titles and questions are in Together.
+ * After a Replace with sync off, how long answers wait for anything to arrive (restoreHold).
+ * (Earlier builds also held each day's answers this long after it ended; sending is manual now.)
  */
 export const ANSWERS_DELAY_MS = 24 * 60 * 60 * 1000;
 
@@ -76,6 +76,15 @@ export interface SendEnv {
   now?: () => number;
   /** "Send now": rows set aside are tried again. */
   retryRefused?: boolean;
+  /**
+   * "send" (only ever from "Send now", Esme 2026-11-09: sending is manual): every day up to and
+   * including today with anything new or changed goes at once, answers and research notes too,
+   * unless ticked private. "hide" (the automatic runs: after a sync, on opening): only words
+   * taken out, as soon as possible: a private tick, a day removed, an earlier build's clean-up.
+   */
+  mode?: "send" | "hide";
+  /** The pause between batches of a big press (tests: 0). */
+  batchPauseMs?: number;
 }
 
 class Stop extends Error {
@@ -158,11 +167,6 @@ export async function signInToTogether(
       const sent = await readSent(db);
       if (!sent || sent.userId !== auth.userId) {
         await saveSent(db, { ...freshSent(auth.userId, now()), formerSeen: (await formerDeviceIds(db.syncMeta)).length });
-      } else {
-        // Signing in again (after Stop, or a lapsed sign-in): the 24 h to tick any day private
-        // starts again for every day so far, sent or not (review I1). A day already sent with
-        // answers stays as it is meanwhile.
-        await saveSent(db, { ...sent, pastBefore: todayISO(new Date(now())), pastUntil: now() + ANSWERS_DELAY_MS });
       }
     });
     return { kind: "ok" };
@@ -172,8 +176,7 @@ export async function signInToTogether(
 
 function freshSent(userId: string, now: number): TogetherSent {
   const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const today = todayISO(new Date(now));
-  return { userId, since: today, salt, days: {}, refused: {}, pastBefore: today, pastUntil: now + ANSWERS_DELAY_MS };
+  return { userId, since: todayISO(new Date(now)), salt, days: {}, refused: {} };
 }
 
 export type StopResult = { kind: "ok" } | { kind: "error"; message: string };
@@ -222,26 +225,6 @@ export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean })
 }
 
 /** Cancels a paused "Stop copying" with removing: copying carries on from the next run. */
-/**
- * "Send past days' answers now" (Esme, 2026-11-09): ends the past-days hold at once. Only
- * `pastUntil` changes, saved in one step under the Together lock (after any send in flight, so it
- * can't be written back over): private ticks, the 24 h after a day ends for new days, and the
- * 24 h after research notes change (review I2) all still apply. Returns whether a hold was ended;
- * the caller then runs a send.
- */
-export async function endPastHold(now: number = Date.now()): Promise<boolean> {
-  const db = appDb;
-  const out = await withTogetherLock(db, () =>
-    db.transaction("rw", db.syncMeta, async () => {
-      const s = await readSent(db);
-      if (!s || s.pastUntil === undefined || s.pastUntil <= now) return false;
-      await saveSent(db, { ...s, pastUntil: now });
-      return true;
-    }),
-  );
-  return out === true;
-}
-
 export async function cancelStopRemoving(): Promise<void> {
   const db = appDb;
   await withTogetherLock(db, async () => {
@@ -254,16 +237,14 @@ export async function cancelStopRemoving(): Promise<void> {
 }
 
 /**
- * A record from an earlier build, brought up to date: a day record, and past days held for
- * ANSWERS_DELAY_MS from the first run of this update (the backfill, 2026-11-08). Its habits and
- * tallies stay until they have been cleaned up.
+ * A record from an earlier build, brought up to date: a day record; the holds and timers of
+ * earlier builds forgotten (sending is manual now). Its habits and tallies stay until they have
+ * been cleaned up.
  */
-function upgraded(sent: TogetherSent, now: number): TogetherSent {
+function upgraded(sent: TogetherSent, _now: number): TogetherSent {
   sent.days ??= {};
-  if (sent.pastBefore === undefined) {
-    sent.pastBefore = todayISO(new Date(now));
-    sent.pastUntil = now + ANSWERS_DELAY_MS;
-  }
+  const old = sent as unknown as Record<string, unknown>;
+  for (const k of ["pastBefore", "pastUntil", "pastWaiting", "unsent", "earlyUpTo", "earlyAt", "held"]) delete old[k];
   return sent;
 }
 
@@ -368,8 +349,7 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
     const ctx = new Ctx(db, env, auth, sent, null);
     const done = async (copied: boolean) => {
       sent.lastSentAt = now();
-      if (copied) sent.lastCopiedAt = sent.lastSentAt;
-      delete sent.held; // nothing holds new days back any more (a note can be overwritten)
+      if (copied && ctx.mode === "send") sent.lastCopiedAt = sent.lastSentAt;
       await ctx.save();
       return { kind: "ok" as const, sent: ctx.sentCount, refused: Object.keys(sent.refused).length };
     };
@@ -380,13 +360,15 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
     }
     // What an earlier build made (habits, tallies) is marked deleted, once; needs no journal key.
     await cleanUpHabits(ctx);
-    const challengeId = await findChallenge(ctx);
+    // Her challenge is looked up (and renamed) only on a press; a hide needs only days sent before.
+    const challengeId = ctx.mode === "send" ? await findChallenge(ctx) : (sent.challenge?.id ?? null);
     if (!challengeId) return done(false);
     const today = todayISO(new Date(now()));
     // Read under the sync lock, so nothing is read halfway through a sync run.
     const snap = await withSyncLock(db, async () => {
       const jk = await loadJournalKey(db).catch(() => undefined);
-      const journal = jk ? await readJournalDays(jk, today).catch(() => null) : null;
+      // Today too: a press sends it like any other day.
+      const journal = jk ? await readJournalDays(jk, addDays(today, 1)).catch(() => null) : null;
       return { jk, journal };
     });
     ctx.challengeId = challengeId;
@@ -417,8 +399,10 @@ class Ctx {
   writes = 0;
   /** A Replace happened and sync hasn't pulled everything since (bug #58). */
   restoredUnpulled = false;
-  /** A past day's answers were held back by the past-days hold this run (the box's button). */
-  pastWaiting = false;
+  /** What this run may do (SendEnv.mode). */
+  get mode(): "send" | "hide" {
+    return this.env.mode ?? "send";
+  }
   challengeId = "";
   private refreshedAfter401 = false;
   constructor(
@@ -552,35 +536,64 @@ async function sendDays(ctx: Ctx, journal: JournalDays | null): Promise<void> {
   for (const k of [ex, ci]) if (k) for (const d of [...k.notes.keys(), ...k.unknown, ...k.partial]) dates.add(d);
   // A day that holds her answers first (a private tick or an edit never waits behind a backfill).
   const order = [...dates].sort((a, b) => Number(hasAnswers(ctx.days[b])) - Number(hasAnswers(ctx.days[a])) || a.localeCompare(b));
-  const wasWaiting = sent.pastWaiting === true;
+  const views = (date: ISODate): Record<Part, PartView> => {
+    const rec = ctx.days[date];
+    const recorded = (p: Part) => !!rec?.live && !!rec.parts[p];
+    return { exercise: view(ex, date, recorded("exercise")), checkin: view(ci, date, recorded("checkin")) };
+  };
+  // A press: what it will send (every day with something new or changed), for "Sent N of M days".
+  const pending = new Set<ISODate>();
+  if (ctx.mode === "send") {
+    for (const date of order) if (!sent.byHand?.[date] && (await notAllSent(ctx, date, views(date)))) pending.add(date);
+    sent.progress = { done: 0, total: pending.size };
+    await ctx.save();
+  }
   sent.backlog = false;
   for (const date of order) {
     if (ctx.writes >= MAX_WRITES_PER_RUN) {
-      sent.backlog = true;
-      break;
+      if (ctx.mode === "hide") {
+        sent.backlog = true; // the rest on the next automatic run
+        break;
+      }
+      // A press keeps going, in batches, with a pause between them (Together polls every 5 s).
+      await ctx.save();
+      await pause(ctx.env.batchPauseMs ?? BATCH_PAUSE_MS);
+      ctx.writes = 0;
     }
     if (sent.byHand?.[date]) continue;
-    const rec = ctx.days[date];
-    const recorded = (p: Part) => !!rec?.live && !!rec.parts[p];
-    await sendDay(ctx, date, { exercise: view(ex, date, recorded("exercise")), checkin: view(ci, date, recorded("checkin")) });
+    await sendDay(ctx, date, views(date));
+    if (pending.has(date) && sent.progress) {
+      sent.progress.done++;
+      await ctx.save();
+    }
   }
-  // (Days not looked at this run, past its limit, keep what the last run found.)
-  sent.pastWaiting = ctx.pastWaiting || (sent.backlog && wasWaiting);
+}
+
+/** Between batches of a big press. */
+export const BATCH_PAUSE_MS = 1000;
+const pause = (ms: number) => (ms > 0 ? new Promise<void>((r) => setTimeout(r, ms)) : Promise.resolve());
+
+/**
+ * Whether a press would change this day in Together: what it would send (every part with answers
+ * unless ticked private) isn't what's there. Never for a day that can't be built here, or while
+ * answers are held after a Replace (it wouldn't send them either).
+ */
+async function notAllSent(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): Promise<boolean> {
+  if (ctx.restoredUnpulled || PARTS.some((p) => parts[p] === "unknown")) return false;
+  const ticks = await readSharePrivate(ctx.jk!, date);
+  const out: { summary: string; text: string }[] = [];
+  for (const p of PARTS) {
+    const v = parts[p];
+    if (!v || v === "unknown") continue;
+    const text = !ticks[p] && !v.partial ? v.note.full : v.note.titles;
+    if (text) out.push({ summary: v.note.summary, text });
+  }
+  if (out.length === 0) return false;
+  const rec = ctx.days[date];
+  return !rec?.live || rec.hash !== (await ctx.hash(dayNote(out)));
 }
 
 type Want = { note: string; parts: SentDay["parts"] } | null | "skip";
-
-/** The day ended ANSWERS_DELAY_MS ago: its answers' own time. */
-const dayDue = (ctx: Ctx, date: ISODate) => date < todayISO(new Date(ctx.now() - ANSWERS_DELAY_MS));
-
-/** A past day (before the last sign-in, or this update) within the 24 h after it (review I1). */
-function pastHeld(ctx: Ctx, date: ISODate): boolean {
-  const { pastBefore, pastUntil } = ctx.sent;
-  return pastBefore !== undefined && date < pastBefore && ctx.now() < (pastUntil ?? 0);
-}
-
-/** Its research notes changed less than ANSWERS_DELAY_MS ago (review I2). */
-const researchHeld = (ctx: Ctx, note: DayNote) => (note.researchAt ?? 0) > 0 && ctx.now() < note.researchAt! + ANSWERS_DELAY_MS;
 
 async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): Promise<void> {
   const { sent } = ctx;
@@ -601,7 +614,7 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
     for (const p of PARTS) {
       const v = parts[p];
       const known = v && v !== "unknown" ? v.note : null;
-      const text = known ? known.titles : rec?.parts[p] ? PART_HEADINGS[p] : "";
+      const text = known ? known.titles : v === "unknown" && rec?.parts[p] ? PART_HEADINGS[p] : "";
       if (text) {
         out.push({ summary: known?.summary || PART_SUMMARY[p], text });
         held[p] = "titles";
@@ -615,25 +628,22 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
     const ticks = await readSharePrivate(ctx.jk!, date);
     const hide = !!rec?.live && PARTS.some((p) => rec.parts[p] === "answers" && ticks[p]);
     if (constrained) return hide ? titlesOnly() : "skip";
-    const due = dayDue(ctx, date) && !ctx.restoredUnpulled;
-    const held = (p: Part, v: { note: DayNote }) => (due && pastHeld(ctx, date)) || (p === "exercise" && researchHeld(ctx, v.note));
-    // A part already sent with answers that may not go again yet (a new sign-in's 24 h, research
-    // notes changed late): what went stays, so the day is left as it is unless something is hidden.
-    const keep = !hide && !!rec?.live && rec.hash !== "" &&
-      PARTS.some((p) => {
-        const v = parts[p];
-        return rec.parts[p] === "answers" && !ticks[p] && v && v !== "unknown" && held(p, v);
-      });
-    if (keep) return "skip";
+    if (ctx.mode === "hide") {
+      // An automatic run only takes words out: a private tick (titles and questions only) or a
+      // day with nothing left (marked deleted). Anything new waits for "Send now".
+      if (!rec?.live) return "skip";
+      if (PARTS.every((p) => parts[p] === null)) return null;
+      return hide ? titlesOnly() : "skip";
+    }
+    // A press: answers at once (after a Replace, only once sync has caught up).
+    const due = !ctx.restoredUnpulled;
     const out: { summary: string; text: string }[] = [];
     const sentParts: SentDay["parts"] = {};
     for (const p of PARTS) {
       const v = parts[p];
       if (!v || v === "unknown") continue;
       // Never answers from a part that only partly opens.
-      const full = due && !ticks[p] && !v.partial && !held(p, v);
-      // Answers that would go but for the past-days hold: the box offers to send them now.
-      if (due && !ticks[p] && !v.partial && pastHeld(ctx, date) && v.note.full !== v.note.titles) ctx.pastWaiting = true;
+      const full = due && !ticks[p] && !v.partial;
       const text = full ? v.note.full : v.note.titles;
       if (!text) continue;
       out.push({ summary: v.note.summary, text });
@@ -709,7 +719,7 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
     // Never reached Together (a cut-off insert), or not there at all: inserted below.
     delete ctx.days[date];
   }
-  if (constrained) return; // only ever hidden: nothing new goes
+  if (constrained || ctx.mode === "hide") return; // only ever hidden: nothing new goes
   const w = await want();
   if (w === "skip" || w === null) return;
   // Written down before it goes (bug #49): if this request is cut off, it may still be in Together.

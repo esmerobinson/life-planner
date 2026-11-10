@@ -3,8 +3,9 @@
 // Sign in abort the send in flight). A request that is cut off (timed out, or aborted by Stop)
 // may already have been carried out by Together: the reply is what's lost, not the write.
 // Converted to the challenge model (2026-11-09): one `challenge_days` row per day, its note
-// overwritten at the 24 h stage. Fakes only, every value made up. The test named "BUG:" failed
-// on together-challenge @6ecc463 (a lost overwrite reply).
+// overwritten in place; sending is manual ("Send now" sends answers at once), so a titles-only row
+// is set up by a press while the day is ticked private. Fakes only, every value made up. The test
+// named "BUG:" failed on together-challenge @6ecc463 (a lost overwrite reply).
 
 import { saveSharePrivate } from "../data/repo";
 import { REQUEST_TIMEOUT_MS } from "./client";
@@ -16,8 +17,7 @@ import type { FakeSupabase } from "./fakeSupabase";
 const DAY = "2026-11-04";
 const EARLIER = "2026-11-03";
 const SIGN_IN = `${DAY}T10:00:00`;
-const TITLES_AT = "2026-11-05T03:30:00";
-const ANSWERS_AT = "2026-11-06T03:30:00";
+const LATER = "2026-11-06T03:30:00";
 const ANSWER = "Pretend check-in answer"; // journalDay's made-up check-in words
 
 beforeEach(emptyDb);
@@ -33,16 +33,20 @@ function liveAnswers(fake: FakeSupabase) {
 /** Her answers anywhere in Together, deleted rows included. */
 const answersAnywhere = (fake: FakeSupabase) => JSON.stringify([...fake.days.values()]).includes(ANSWER);
 
-/** Signed in, DAY's check-in done, and its titles-only row in Together. */
+/**
+ * Signed in, DAY's check-in done, and its titles-only row in Together (a press while it was
+ * ticked private); then un-ticked, so the next press is the answers write.
+ */
 async function titlesSent() {
   const c = clock(SIGN_IN);
   const fake = await signedIn(c);
   const { jk } = await journalDay(DAY, { checkin: true });
-  c.set(TITLES_AT);
+  await saveSharePrivate(jk, DAY, "checkin", true);
   expect((await send(fake, c)).kind).toBe("ok");
   expect(liveDays(fake)).toHaveLength(1);
   expect(liveAnswers(fake)).toHaveLength(0);
-  c.set(ANSWERS_AT);
+  await saveSharePrivate(jk, DAY, "checkin", false);
+  c.set(LATER);
   return { c, fake, jk };
 }
 
@@ -154,7 +158,7 @@ it("#42: ticked private during the retry after a clash (our row already there): 
   // round trip.
   const id = await togetherId("day", `${CHALLENGE}:${DAY}`, 1);
   fake.days.set(id, { id, couple_id: COUPLE, challenge_id: CHALLENGE, day: DAY, note: "Pretend old note", by: ME, deleted_at: null });
-  c.set(ANSWERS_AT);
+  c.set(LATER);
   let tickedAt = -1;
   const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (tickedAt < 0 && init?.method === "POST" && String(input).includes("challenge_days")) {
@@ -179,10 +183,8 @@ it("#42: un-ticked, then re-ticked during that very send (before the day's write
   const { jk } = await journalDay(DAY, { checkin: true });
   await journalDay(EARLIER, { checkin: true });
   for (const d of [EARLIER, DAY]) await saveSharePrivate(jk, d, "checkin", true);
-  c.set(TITLES_AT);
-  await send(fake, c);
-  c.set(ANSWERS_AT);
-  await send(fake, c);
+  c.set(LATER);
+  await send(fake, c); // a press: both private, titles only
   expect(liveAnswers(fake)).toHaveLength(0);
 
   // Both un-ticked; the run writes EARLIER first; during that round trip she ticks DAY again.

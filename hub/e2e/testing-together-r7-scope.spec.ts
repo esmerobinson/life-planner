@@ -129,7 +129,7 @@ for (const width of [1280, 390]) {
       await page.reload();
       await expect(page.getByLabel(LEARNED_LABEL)).toHaveValue("Pretend Brackwater lesson: a made-up wave passes");
 
-      // Send now: the day, after 3am, and 24 h later.
+      // Send now on the day (it all goes at once: sending is manual), then again on later days (nothing new).
       for (const at of [null, after(day, 1, 3, 30), after(day, 2, 3, 30), after(day, 3, 9, 0)]) {
         if (at) await page.clock.setFixedTime(at);
         await page.goto("/sync");

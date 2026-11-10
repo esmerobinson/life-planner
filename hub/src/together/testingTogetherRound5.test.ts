@@ -131,17 +131,15 @@ describe("after a backup Replace (a new device id)", () => {
   });
 
   it("BUG: \"Send now\" after a Replace, before sync is back on: a day she ticked private after the backup isn't sent", async () => {
-    // A day whose answers aren't due yet when the backup is made; she ticks it private
-    // afterwards (synced to her other devices). Then sync off, Replace with that backup: the
-    // tick isn't in the file. Before turning sync on again (which would bring it back), she
-    // presses Send now on the Sync page once the answers are due.
+    // A day not yet sent when the backup is made; she ticks it private afterwards (synced to
+    // her other devices). Then sync off, Replace with that backup: the tick isn't in the file.
+    // Before turning sync on again (which would bring it back), she presses Send now.
     const D = "2026-11-04";
     const c = clock(`${D}T09:00:00`);
     const fake = await signedIn(c);
     const { jk } = await journalDay(D, { exercise: true, checkin: true });
     await hl(D, "pretend Saltcote harbour", "Pretend Saltcote note");
     c.set("2026-11-05T03:30:00");
-    await send(fake, c); // titles only
     const file = JSON.parse(JSON.stringify(await exportBackup("2026-11-05")));
     await saveSharePrivate(jk, D, "exercise", true);
     await saveSharePrivate(jk, D, "checkin", true);
