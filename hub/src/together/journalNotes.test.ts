@@ -81,7 +81,7 @@ describe("each part kind, written readably", () => {
   });
 });
 
-it("the exercise part: ## heading, title, ## Research notes as bullets, then each question bold with her answer below", () => {
+it("the exercise part: ## heading, ## Research notes as bullets, then the card as a ### block with each question bold and her answer below", () => {
   const research = researchBullets("Pretend first thing\nPretend second thing\n\n  ", [
     { words: "pretend highlighted\nwords", note: "Pretend note" },
     { words: "pretend other words", note: "  " },
@@ -91,7 +91,6 @@ it("the exercise part: ## heading, title, ## Research notes as bullets, then eac
   expect(exerciseSection(cards, research, true)).toBe(
     [
       "## Mental Health Exercise",
-      CARD,
       "",
       "## Research notes",
       "• Pretend first thing",
@@ -99,23 +98,43 @@ it("the exercise part: ## heading, title, ## Research notes as bullets, then eac
       "• pretend highlighted words — Pretend note",
       "• pretend other words",
       "",
+      `### ${CARD}`,
       "Pretend free answer",
       "",
       "**Pretend question one**",
       "Pretend answer one",
     ].join("\n"),
   );
-  // Titles and questions only: no answers, no research notes.
-  expect(exerciseSection(cards, research, false)).toBe(`## Mental Health Exercise\n${CARD}\n\n**Pretend question one**`);
+  // Titles and questions only: no answers, no research notes; the card's block keeps its title.
+  expect(exerciseSection(cards, research, false)).toBe(`## Mental Health Exercise\n\n### ${CARD}\n**Pretend question one**`);
 });
 
-it("two cards: both titles under the heading, each card's answers under its title in bold", () => {
+it("several cards: never listed under the heading; each its own ### block, blank lines between Q&As and between cards; a card with nothing kept keeps its title", () => {
   const cards = [
-    { title: "Pretend card A", qas: [{ q: "Pretend qA", a: "Pretend aA" }] },
+    { title: "Pretend card A", qas: [{ q: "Pretend qA1", a: "Pretend aA1" }, { q: "Pretend qA2", a: "Pretend aA2" }] },
     { title: "Pretend card B", qas: [{ q: "", a: "Pretend aB" }] },
+    { title: "Pretend card C", qas: [{ q: "Pretend qC", a: "n/a" }] },
   ];
   expect(exerciseSection(cards, [], true)).toBe(
-    "## Mental Health Exercise\nPretend card A\nPretend card B\n\n**Pretend card A**\n**Pretend qA**\nPretend aA\n\n**Pretend card B**\nPretend aB",
+    [
+      "## Mental Health Exercise",
+      "",
+      "### Pretend card A",
+      "**Pretend qA1**",
+      "Pretend aA1",
+      "",
+      "**Pretend qA2**",
+      "Pretend aA2",
+      "",
+      "### Pretend card B",
+      "Pretend aB",
+      "",
+      "### Pretend card C",
+    ].join("\n"),
+  );
+  // A titles-only (or private) day: every card's title, with its questions.
+  expect(exerciseSection(cards, ["Pretend bullet"], false)).toBe(
+    "## Mental Health Exercise\n\n### Pretend card A\n**Pretend qA1**\n**Pretend qA2**\n\n### Pretend card B\n\n### Pretend card C",
   );
   expect(exerciseSection([], ["Pretend bullet"], true)).toBe(""); // no card done: nothing, not even research notes
 });
@@ -127,23 +146,28 @@ it("the check-in part: ## heading, then each question bold with her answer; all 
   expect(checkinSection([{ q: "Pretend Q", a: "NA" }], true)).toBe("");
 });
 
-describe("the summary line (Together's list shows only the first line)", () => {
-  const ex = { summary: exerciseSummary(["Pretend card A", "Pretend card B"]), text: "## Mental Health Exercise\nPretend card A\nPretend card B" };
+describe("the summary line (Together's list shows only the first line): a count, never the titles", () => {
+  const ex = { summary: exerciseSummary(6), text: "## Mental Health Exercise\n\n### Pretend card A" };
   const ci = { summary: "Check In", text: "## Check In\n**Q**\nA" };
 
-  it("cards only: their titles joined with ' · '", () => {
-    expect(dayNote([ex, { summary: "Check In", text: "" }]).split("\n")[0]).toBe("Pretend card A · Pretend card B");
+  it("1 exercise / N exercises", () => {
+    expect(exerciseSummary(1)).toBe("1 exercise");
+    expect(exerciseSummary(6)).toBe("6 exercises");
+    expect(exerciseSummary(0)).toBe("");
+  });
+  it("cards only: N exercises", () => {
+    expect(dayNote([ex, { summary: "Check In", text: "" }]).split("\n")[0]).toBe("6 exercises");
   });
   it("check-in only: Check In", () => {
     expect(dayNote([{ summary: "", text: "" }, ci])).toBe("Check In\n\n## Check In\n**Q**\nA");
   });
-  it("both: the titles, then · Check In; one line, no answers", () => {
+  it("both: N exercises · Check In; one line, no titles, no answers", () => {
     const note = dayNote([ex, ci]);
-    expect(note).toBe(`Pretend card A · Pretend card B · Check In\n\n${ex.text}\n\n${ci.text}`);
+    expect(note).toBe(`6 exercises · Check In\n\n${ex.text}\n\n${ci.text}`);
+    expect(note.split("\n")[0]).not.toContain("Pretend card A");
     expect(note.split("\n")[1]).toBe("");
   });
-  it("a title with a line break still makes one line; nothing at all: empty", () => {
-    expect(exerciseSummary(["Pretend\ntitle", " "])).toBe("Pretend title");
+  it("nothing at all: empty", () => {
     expect(dayNote([{ summary: "x", text: " " }])).toBe("");
   });
 });

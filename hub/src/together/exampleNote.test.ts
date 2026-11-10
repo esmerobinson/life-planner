@@ -15,6 +15,8 @@ import { clock, DEVICE, emptyDb, guardedFetch, highlightOn, liveNote, send, sign
 
 const DAY = "2026-11-04";
 const TITLE = "Day 1 · Pretend noticing the wave";
+const TITLE_2 = "Day 2 · Pretend second card";
+const ANSWER_2 = "Pretend: I wrote down three small things that went well.";
 
 beforeEach(emptyDb);
 
@@ -37,6 +39,7 @@ async function exampleDay() {
   ];
   const parts = card.parts.map((p, i) => ({ prompt: p.prompt, kind: p.kind, answer: answers[i]! }) as PartAnswer);
   await submitExerciseEntry(jk, DAY, DEVICE, cardRef(card), parts);
+  await submitExerciseEntry(jk, DAY, DEVICE, cardRef(set.cards[1]!), ANSWER_2); // a second card (one box)
   await saveLearned(jk, DAY, DEVICE, "Pretend: a feeling is a wave, it rises and falls.\nPretend: naming it makes it smaller.");
   await highlightOn(DAY, "pretend the wave passes", "Pretend this helped me most");
   await new Promise((r) => setTimeout(r, 5));
@@ -49,7 +52,7 @@ async function exampleDay() {
   return { jk, card, qs };
 }
 
-it("a full example day: summary line, ## headings, research notes, every part kind written readably, the check-in", async () => {
+it("a full example day: the count summary line, ## headings, research notes, a ### block per card with every part kind written readably, the check-in", async () => {
   const c = clock(`${DAY}T10:00:00`);
   const fake = await signedIn(c);
   const { card, qs } = await exampleDay();
@@ -61,10 +64,9 @@ it("a full example day: summary line, ## headings, research notes, every part ki
   const P = card.parts.map((p) => `**${p.prompt}**`);
   expect(note).toBe(
     [
-      `${TITLE} · Check In`,
+      "2 exercises · Check In",
       "",
       "## Mental Health Exercise",
-      TITLE,
       "",
       "## Research notes",
       "• Pretend: a feeling is a wave, it rises and falls.",
@@ -72,6 +74,7 @@ it("a full example day: summary line, ## headings, research notes, every part ki
       "• pretend the wave passes — Pretend this helped me most",
       "• pretend name it to tame it",
       "",
+      `### ${TITLE}`,
       P[0],
       "Pretend: a message wasn't answered and the feeling rose fast.",
       "Then it eased after a while.",
@@ -106,6 +109,9 @@ it("a full example day: summary line, ## headings, research notes, every part ki
       P[8],
       "Rest",
       "",
+      `### ${TITLE_2}`,
+      ANSWER_2,
+      "",
       "## Check In",
       `**${qs[0]!.text}**`,
       "Pretend: the fridge humming, a soft jumper, the window.",
@@ -126,20 +132,25 @@ it("the same day, ticked private: the summary line stays; titles and questions o
   c.set("2026-11-06T03:30:00");
   await send(fake, c);
   expect(liveNote(fake, DAY)).toBe(
-    [`${TITLE} · Check In`, "", "## Mental Health Exercise", TITLE, "", ...card.parts.map((p) => `**${p.prompt}**`), "", "## Check In", `**${qs[0]!.text}**`, `**${qs[2]!.text}**`].join("\n"),
+    [
+      "2 exercises · Check In", "", "## Mental Health Exercise", "", `### ${TITLE}`, ...card.parts.map((p) => `**${p.prompt}**`), "", `### ${TITLE_2}`, "",
+      "## Check In", `**${qs[0]!.text}**`, `**${qs[2]!.text}**`,
+    ].join("\n"),
   );
   expect(JSON.stringify(fake.requests)).not.toMatch(/Pretend chest|Pretend worry|Research notes|wave passes|fridge humming/);
 });
 
-it("the recorder: of the card file, only the titles and the part definitions (prompts, columns, fields, steps, scale labels) of the card she did go", async () => {
+it("the recorder: of the card file, only the titles (as \"### \" headings) and the part definitions (prompts, columns, fields, steps, scale labels) of the cards she did go", async () => {
   const c = clock(`${DAY}T10:00:00`);
   const fake = await signedIn(c);
   await exampleDay();
   const set = parseCardFile(JSON.stringify(FAKE_CARD_FILE_ALL_PARTS))!;
   const done = set.cards[0]!;
   const forbidden = [
-    set.source, set.cards[1]!.theme,
+    set.source,
     ...set.cards.flatMap((k) => [k.learn, k.try, k.more, k.example, k.book]),
+    // A card she never did: its title and part definition.
+    set.cards[2]!.theme, set.cards[2]!.parts[0]!.prompt, ...set.cards[2]!.parts[0]!.steps!,
     // Her card's own words she didn't pick: options not chosen, the checklist's note placeholder.
     "Talk to someone", "Go outside", done.parts.find((p) => p.kind === "checklist")!.note!,
   ].filter((s) => s && s.length > 3);
@@ -157,4 +168,9 @@ it("the recorder: of the card file, only the titles and the part definitions (pr
     }
   }
   expect(note).not.toContain("What I did");
+  // The titles of the cards she did: only as their own "### " headings, never in the summary line.
+  for (const t of [TITLE, TITLE_2]) {
+    expect(note.split("\n").filter((l) => l.includes(t))).toEqual([`### ${t}`]);
+  }
+  expect(note.split("\n")[0]).toBe("2 exercises · Check In");
 });

@@ -151,9 +151,10 @@ for (const width of [1280, 390]) {
       // One row, in her challenge; research notes only ever with the answers.
       expect(fake.days.size).toBe(1);
       const note = String(fake.dayRow(CHALLENGE, day)!.note);
-      expect(note).toMatch(new RegExp(`^${TITLE}\n\n## Mental Health Exercise\n${TITLE}\n\n## Research notes\n`));
+      expect(note).toMatch(new RegExp(`^1 exercise\n\n## Mental Health Exercise\n\n## Research notes\n`));
       for (const b of RESEARCH) expect(note).toContain(b);
-      for (const line of note.split("\n")) expect(["## Mental Health Exercise", TITLE, "", "## Research notes", ...RESEARCH, "Pretend Abbotsley exercise answer"], line).toContain(line);
+      expect(note).toContain(`\n\n### ${TITLE}\nPretend Abbotsley exercise answer`);
+      for (const line of note.split("\n")) expect(["1 exercise", "## Mental Health Exercise", `### ${TITLE}`, "", "## Research notes", ...RESEARCH, "Pretend Abbotsley exercise answer"], line).toContain(line);
       for (const r of fake.requests.filter((x) => x.url.includes("challenge_days") && x.body.includes("Research notes"))) expect(r.body).toContain("Pretend Abbotsley exercise answer");
       expect(fake.todos.size + fake.events.size).toBe(0);
 

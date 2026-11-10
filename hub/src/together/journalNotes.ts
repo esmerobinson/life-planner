@@ -6,15 +6,15 @@
 // The note (plain text; Together shows `## ` headings, `**…**` bold, "• " bullets and keeps line
 // breaks; Esme's rulings, 2026-11-09):
 //
-//   <summary: the card title(s) · Check In>      (one line: Together's list shows only this)
+//   <summary: "N exercises · Check In">          (one line: Together's list shows only this)
 //
 //   ## Mental Health Exercise
-//   <card title>
 //
 //   ## Research notes
 //   • <her typed "What I learned" words, one bullet per line>
 //   • <each highlight's words> — <her highlight note, if any>
 //
+//   ### <card title>                              (one block per card)
 //   **<question>**
 //   <answer, written for its kind: see partAnswerText>
 //
@@ -70,7 +70,7 @@ const SEP = " · ";
 export interface DayNote {
   titles: string;
   full: string;
-  /** Its words in the summary line: the card titles (" · "), or "Check In". */
+  /** Its words in the summary line: "N exercises" (never the titles), or "Check In". */
   summary: string;
   /**
    * When its research notes (learned words, highlights and their notes) last changed, epoch ms (0:
@@ -135,20 +135,25 @@ export function researchBullets(learned: string, highlights: { words: string; no
 }
 
 /** The exercise part's summary: the titles of the cards she did, joined with " · ". */
-export const exerciseSummary = (titles: string[]): string => titles.map(oneLine).filter((t) => t !== "").join(SEP);
+/** The exercise part's words in the summary line: how many cards she did ("1 exercise", "6 exercises"). */
+export const exerciseSummary = (cards: number): string => (cards <= 0 ? "" : cards === 1 ? "1 exercise" : `${cards} exercises`);
+
+/** A card's own heading in the note. */
+export const CARD_HEADING = "### ";
 
 /**
- * The exercise part: its heading and titles, research notes, then each card's questions and
- * answers (under the card's title in bold when there are several cards).
+ * The exercise part (Esme, 2026-11-09: her days have 5-8 cards): its heading, research notes,
+ * then each card as a block: "### <title>", then its questions and answers (blank lines between
+ * them, and between cards). A card with nothing kept (all n/a), or on a titles-only or private
+ * day, still shows its title (and, titles-only, its questions).
  */
 export function exerciseSection(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean): string {
   if (cards.length === 0) return "";
-  const blocks = [[PART_HEADINGS.exercise, ...cards.map((c) => clean(c.title))].join("\n")];
+  const blocks = [PART_HEADINGS.exercise];
   if (answers && research.length > 0) blocks.push([RESEARCH_HEADING, ...research.map((b) => `${BULLET}${b}`)].join("\n"));
-  const many = cards.filter((c) => kept(c.qas).length > 0).length > 1;
   for (const c of cards) {
     const qa = qaBlock(kept(c.qas), answers);
-    if (qa) blocks.push(many ? `**${clean(c.title)}**\n${qa}` : qa);
+    blocks.push(qa ? `${CARD_HEADING}${oneLine(c.title)}\n${qa}` : `${CARD_HEADING}${oneLine(c.title)}`);
   }
   return blocks.join("\n\n");
 }
@@ -358,7 +363,12 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
     const hl = await dayHighlights(jk, date, twins);
     if (learned.unreadable > 0 || hl.partial) partial.add(date);
     const done: { title: string; qas: QA[] }[] = [];
-    for (const id of cardIds) {
+    // In the card file's order (her books' order), a card no longer in it last: always the same order.
+    const place = (id: string) => {
+      const i = set?.cards.findIndex((c) => c.id === id) ?? -1;
+      return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    for (const id of [...cardIds].sort((a, b) => place(a) - place(b) || a.localeCompare(b))) {
       const card = set?.cards.find((c) => c.id === id);
       // Only what she submitted: a draft never goes.
       const entry = entries.find((e) => e.date === date && e.id === id && e.saved && e.submitted);
@@ -374,7 +384,7 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
     notes.set(date, {
       titles: exerciseSection(done, [], false),
       full: exerciseSection(done, research, true),
-      summary: exerciseSummary(done.map((c) => c.title)),
+      summary: exerciseSummary(done.length),
       // (Learned words emptied or removed only take words out: not counted.)
       researchAt: Math.max(hl.changedAt, ...[learned, ...learned.others].filter((v) => v.text.trim() !== "").map((v) => v.at)),
     });

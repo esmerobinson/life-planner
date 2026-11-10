@@ -120,12 +120,12 @@ function note(p: { ex?: true | string; research?: string[]; ci?: true | string }
   const parts: string[] = [];
   const summary: string[] = [];
   if (p.ex !== undefined) {
-    summary.push(TITLE);
-    const blocks = [`## Mental Health Exercise\n${TITLE}`];
+    summary.push("1 exercise");
+    const blocks = ["## Mental Health Exercise"];
     if (typeof p.ex === "string") {
       if (p.research?.length) blocks.push(["## Research notes", ...p.research.map((b) => `• ${b}`)].join("\n"));
-      blocks.push(p.ex);
-    }
+      blocks.push(`### ${TITLE}\n${p.ex}`);
+    } else blocks.push(`### ${TITLE}`);
     parts.push(blocks.join("\n\n"));
   }
   if (p.ci !== undefined) {
@@ -356,7 +356,7 @@ describe("scope: a recorder over every request, many days, two devices, a Replac
     expect(all.length).toBeGreaterThan(0);
     for (const p of all) {
       const allowed = new Set([
-        "", "## Mental Health Exercise", "## Check In", "## Research notes", TITLE, Q, `${TITLE} · Check In`, "Check In",
+        "", "## Mental Health Exercise", "## Check In", "## Research notes", `### ${TITLE}`, Q, "1 exercise · Check In", "1 exercise", "Check In",
         `Pretend ${NAME[p.day]} exercise answer`, `Pretend ${NAME[p.day]} edited exercise answer`, `Pretend ${NAME[p.day]} check-in answer`,
       ]);
       const r = RESEARCH[p.day] ?? [];

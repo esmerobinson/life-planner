@@ -267,6 +267,7 @@ export const FAKE_CARD_FILE_ALL_PARTS = {
       ],
     }),
     pretendCard("all-002", 2, "Pretend second card", {}),
+    pretendCard("all-003", 3, "Pretend card she never did", { parts: [{ prompt: "Pretend prompt never asked", kind: "chain", steps: ["Pretend step never shown"] }] }),
   ],
 };
 

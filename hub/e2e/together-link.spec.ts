@@ -171,7 +171,7 @@ for (const width of [1280, 390]) {
       await expect.poll(() => days(fake).length).toBe(1);
       const first = days(fake)[0]!;
       expect(first).toMatchObject({ couple_id: COUPLE, challenge_id: CHALLENGE, day, by: ME, deleted_at: null });
-      expect(String(first.note)).toMatch(/^[^\n]*Pretend first-book one · Check In\n\n## Mental Health Exercise\n.*Pretend first-book one\n\n## Check In\n\*\*/);
+      expect(String(first.note)).toMatch(/^1 exercise · Check In\n\n## Mental Health Exercise\n\n### [^\n]*Pretend first-book one\n\n## Check In\n\*\*/);
       expect(String(first.note)).not.toMatch(/Pretend answer|Pretend exercise answer|a wave passes|Research notes/);
 
       // 24 hours after the day ended: the same row now holds her answers and research notes.
