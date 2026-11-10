@@ -19,6 +19,9 @@ export const TOGETHER_WORDS = {
   challengeMissing: "Couldn't find your “BPD research” challenge in Together.",
   /** Past days (before the sign-in or the update): when their answers go (2026-11-08). */
   pastDays: (when: string) => `Past days' answers go on ${when}. Tick any day private before then.`,
+  /** Ends the past-days hold at once (Esme, 2026-11-09), and the line under it. */
+  sendPastNow: "Send past days' answers now",
+  sendPastNowNote: "Your answers for past days go now. Days you ticked private stay private.",
   /** A big backfill goes a little at a time. */
   backlog: "Still copying your earlier days. The rest go on the next runs.",
   /** Days she had already logged by hand, or deleted, in Together (left as they are, review I3). */

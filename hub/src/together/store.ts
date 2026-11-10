@@ -78,6 +78,11 @@ export interface TogetherSent extends LegacyHabits {
    */
   pastBefore?: ISODate;
   pastUntil?: number;
+  /**
+   * The last run found a past day whose answers wait only on `pastUntil` (not on a private tick):
+   * the box offers "Send past days' answers now" while that's so.
+   */
+  pastWaiting?: boolean;
   /** The last run stopped at its limit of writes (a big backfill): the rest goes next run. */
   backlog?: boolean;
   /** The last run (any outcome but offline). */

@@ -3,7 +3,7 @@ import { todayISO } from "../../domain/dates";
 import { isValidISODate } from "../../domain/dates";
 import type { Fetch } from "../../together/client";
 import { togetherRunner, type TogetherRunner } from "../../together/runner";
-import { cancelStopRemoving, signInToTogether, stopTogether } from "../../together/sender";
+import { cancelStopRemoving, endPastHold, signInToTogether, stopTogether } from "../../together/sender";
 import { useJournalKey } from "../journal/useJournalKey";
 import { PrivateDayTick } from "./PrivateDayTick";
 import { useRunner, useTogetherMeta } from "./useTogether";
@@ -69,6 +69,18 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
     }
   }
 
+  /** Ends the past-days hold now, then sends (nothing else about what goes changes). */
+  async function sendPastNow() {
+    setProblem("");
+    setBusy(true);
+    try {
+      await endPastHold();
+      await runner.sendNow();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function stop() {
     setProblem("");
     setBusy(true);
@@ -108,6 +120,15 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
       {auth && meta?.sent?.challengeMissing && <p role="alert" className="together-warning">{W.challengeMissing}</p>}
       {auth && meta?.sent?.pastUntil !== undefined && Date.now() < meta.sent.pastUntil && (
         <p role="status" className="together-warning">{W.pastDays(new Date(meta.sent.pastUntil).toLocaleString())}</p>
+      )}
+      {/* While a past day's answers wait only on that hold (Esme, 2026-11-09): end it now. No confirm. */}
+      {signedIn && !meta?.sent?.removing && meta?.sent?.pastWaiting && meta.sent.pastUntil !== undefined && Date.now() < meta.sent.pastUntil && (
+        <div className="together-past-now">
+          <button type="button" className="together-placeholder-button" disabled={busy || run.running} onClick={() => void sendPastNow()}>
+            {W.sendPastNow}
+          </button>
+          <p className="together-warning">{W.sendPastNowNote}</p>
+        </div>
       )}
 
       {again && <p role="alert">{W.signInAgain}</p>}

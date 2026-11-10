@@ -14,3 +14,9 @@
 .together-placeholder .together-warning {
   color: magenta;
 }
+.together-placeholder .together-placeholder-button {
+  font-family: system-ui, sans-serif;
+  color: magenta;
+  background: none;
+  border: 2px solid magenta;
+}

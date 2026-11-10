@@ -222,6 +222,26 @@ export async function stopTogether(env: SendEnv, opts: { markDeleted: boolean })
 }
 
 /** Cancels a paused "Stop copying" with removing: copying carries on from the next run. */
+/**
+ * "Send past days' answers now" (Esme, 2026-11-09): ends the past-days hold at once. Only
+ * `pastUntil` changes, saved in one step under the Together lock (after any send in flight, so it
+ * can't be written back over): private ticks, the 24 h after a day ends for new days, and the
+ * 24 h after research notes change (review I2) all still apply. Returns whether a hold was ended;
+ * the caller then runs a send.
+ */
+export async function endPastHold(now: number = Date.now()): Promise<boolean> {
+  const db = appDb;
+  const out = await withTogetherLock(db, () =>
+    db.transaction("rw", db.syncMeta, async () => {
+      const s = await readSent(db);
+      if (!s || s.pastUntil === undefined || s.pastUntil <= now) return false;
+      await saveSent(db, { ...s, pastUntil: now });
+      return true;
+    }),
+  );
+  return out === true;
+}
+
 export async function cancelStopRemoving(): Promise<void> {
   const db = appDb;
   await withTogetherLock(db, async () => {
@@ -397,6 +417,8 @@ class Ctx {
   writes = 0;
   /** A Replace happened and sync hasn't pulled everything since (bug #58). */
   restoredUnpulled = false;
+  /** A past day's answers were held back by the past-days hold this run (the box's button). */
+  pastWaiting = false;
   challengeId = "";
   private refreshedAfter401 = false;
   constructor(
@@ -530,6 +552,7 @@ async function sendDays(ctx: Ctx, journal: JournalDays | null): Promise<void> {
   for (const k of [ex, ci]) if (k) for (const d of [...k.notes.keys(), ...k.unknown, ...k.partial]) dates.add(d);
   // A day that holds her answers first (a private tick or an edit never waits behind a backfill).
   const order = [...dates].sort((a, b) => Number(hasAnswers(ctx.days[b])) - Number(hasAnswers(ctx.days[a])) || a.localeCompare(b));
+  const wasWaiting = sent.pastWaiting === true;
   sent.backlog = false;
   for (const date of order) {
     if (ctx.writes >= MAX_WRITES_PER_RUN) {
@@ -541,6 +564,8 @@ async function sendDays(ctx: Ctx, journal: JournalDays | null): Promise<void> {
     const recorded = (p: Part) => !!rec?.live && !!rec.parts[p];
     await sendDay(ctx, date, { exercise: view(ex, date, recorded("exercise")), checkin: view(ci, date, recorded("checkin")) });
   }
+  // (Days not looked at this run, past its limit, keep what the last run found.)
+  sent.pastWaiting = ctx.pastWaiting || (sent.backlog && wasWaiting);
 }
 
 type Want = { note: string; parts: SentDay["parts"] } | null | "skip";
@@ -607,6 +632,8 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
       if (!v || v === "unknown") continue;
       // Never answers from a part that only partly opens.
       const full = due && !ticks[p] && !v.partial && !held(p, v);
+      // Answers that would go but for the past-days hold: the box offers to send them now.
+      if (due && !ticks[p] && !v.partial && pastHeld(ctx, date) && v.note.full !== v.note.titles) ctx.pastWaiting = true;
       const text = full ? v.note.full : v.note.titles;
       if (!text) continue;
       out.push({ summary: v.note.summary, text });
