@@ -71,7 +71,7 @@ for (const width of [1280, 390]) {
   test.describe(`at ${width}px`, () => {
     test.use({ viewport: { width, height: 900 } });
 
-    test("sign in, do the day's exercise and check-in, pass 3am, then 24 hours more: the fake holds the right rows", async ({ page }) => {
+    test("sign in, do the day's exercise and check-in; nothing goes until Send now, which sends the day with answers; a private tick is taken out by itself", async ({ page }) => {
       test.setTimeout(120_000);
       const fake = await routeFake(page);
       const now = new Date();
@@ -107,7 +107,6 @@ for (const width of [1280, 390]) {
       await box.getByRole("button", { name: "Sign in" }).click();
       await expect(box.getByText("Copying to Together from this device.")).toBeVisible();
       await expect(box.getByText(/replaces that day's entry in Together/).first()).toBeVisible();
-      await expect(box.getByText(/^Past days' answers go on .*Tick any day private before then\.$/)).toBeVisible();
       const stored = await page.evaluate(async () => {
         const { db } = await import(/* @vite-ignore */ "/src/data/db.ts" as string);
         return JSON.stringify(await db.syncMeta.toArray());
@@ -172,7 +171,10 @@ for (const width of [1280, 390]) {
 
       // Ticked private afterwards: taken out by itself (the app opening runs it), no press needed.
       await page.goto("/journal/check-in");
-      await page.getByLabel("Keep today's answers private").check();
+      const tick = page.getByRole("checkbox", { name: "Keep today's answers private" });
+      await expect(tick).toBeEnabled();
+      await tick.click(); // saved, then shown checked (a controlled tick)
+      await expect(tick).toBeChecked();
       await page.goto("/sync");
       await expect.poll(() => String(days(fake)[0]!.note)).not.toContain("Pretend answer 1");
       // (Hiding takes the whole day back to titles; the next press puts back what isn't private.)
