@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { RAIN_CODES, RIO, clockLook, devLook, fetchRioWeather, lookFrom, rioHour, useRioLook } from "./look";
 
 const at = (iso: string) => new Date(iso);
@@ -79,6 +79,23 @@ describe("useRioLook", () => {
     const again = renderHook(() => useRioLook());
     expect(again.result.current).toBe("rain"); // from the cache, at once
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again every half hour, never reusing the cache then (review: night could lag up to an hour)", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval"] });
+    vi.setSystemTime(at("2026-11-14T20:40:00Z")); // 17:40 in Rio: still day
+    let isDay = 1;
+    const fetchFn = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ current: { weather_code: 2, is_day: isDay } }))));
+    vi.stubGlobal("fetch", fetchFn);
+    const { result } = renderHook(() => useRioLook());
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+    expect(result.current).toBe("day");
+    isDay = 0; // the sun sets
+    await act(async () => {
+      vi.advanceTimersByTime(30 * 60_000);
+    });
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current).toBe("night"));
   });
 
   it("with the service down, shows Rio's clock", async () => {

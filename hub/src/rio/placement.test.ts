@@ -1,7 +1,7 @@
 import { COLLECTION, STICKERS } from "../farm/catalogue";
 import { farmState, placedRow } from "../farm/state";
 import { SCENES } from "./assets";
-import { HOME, homeOf, layout, sceneState } from "./placement";
+import { HOME, accepts, homeOf, layout, sceneState, stickerTags } from "./placement";
 
 const keysIn = (group: string) => COLLECTION.filter((s) => s.group === group).map((s) => s.key);
 
@@ -33,14 +33,39 @@ describe("where earned stickers sit", () => {
     }
   });
 
-  it("layout fills slots in book order", () => {
-    const slots = SCENES["fazenda/outside"].slots;
-    const { bySlot, overflow } = layout("fazenda/outside", ["hen", "seeds-art", "seeds-mind"]);
-    expect(bySlot.get(slots[0]!.id)).toBe("seeds-mind");
-    expect(bySlot.get(slots[1]!.id)).toBe("seeds-art");
-    expect(bySlot.get(slots[2]!.id)).toBe("hen");
+  it("layout fills the slots that take them, in book order", () => {
+    const { bySlot, overflow } = layout("fazenda/outside", ["haybale", "seeds-art", "seeds-mind"]);
+    expect(bySlot.get("decor-veranda-1")).toBe("seeds-mind");
+    expect(bySlot.get("decor-veranda-2")).toBe("seeds-art");
+    expect(bySlot.get("decor-yard-1")).toBe("haybale");
     expect(bySlot.size).toBe(3);
     expect(overflow).toBe(0);
+  });
+
+  it("a sticker only stands in a slot that takes it (review: no seeds on the hen's spot, no pile-up on the egg slots)", () => {
+    const { bySlot } = layout("fazenda/outside", ["seeds-mind", "hen", "chick", "cow", "lamb", "piglet"]);
+    expect(bySlot.get("hen-1")).toBe("hen");
+    expect(bySlot.get("chick-1")).toBe("chick");
+    expect(bySlot.get("cow-1")).toBe("cow");
+    expect(bySlot.get("sheep-1")).toBe("lamb");
+    expect(bySlot.get("pig-1")).toBe("piglet");
+    expect(bySlot.get("decor-veranda-1")).toBe("seeds-mind");
+    const all = layout("fazenda/outside", COLLECTION.map((s) => s.key)).bySlot;
+    for (const id of ["egg-1", "egg-2", "egg-3", "tool-hook-1", "tool-hook-2", "milk-1", "wool-1"]) expect(all.has(id), id).toBe(false);
+    // Ipanema: pond life on the sand and rocks, never on the barraca's chair spots.
+    const beach = layout("ipanema-beach/outside", COLLECTION.map((s) => s.key)).bySlot;
+    for (const id of ["barraca-1", "barraca-2", "barraca-3", "barraca-4"]) expect(beach.has(id), id).toBe(false);
+  });
+
+  it("every sticker laid out, in every scene, stands in a slot whose accepts take it", () => {
+    for (const id of Object.keys(SCENES) as (keyof typeof SCENES)[]) {
+      const at = new Map(SCENES[id].slots.map((s) => [s.id, s]));
+      const raw = SCENES[id].slots;
+      for (const [slot, key] of layout(id, COLLECTION.map((s) => s.key)).bySlot) {
+        expect(raw.some((s) => s.id === slot)).toBe(true);
+        expect(accepts(at.get(slot)!, stickerTags(key)), `${id} ${slot} ${key}`).toBe(true);
+      }
+    }
   });
 
   it("layout places only the scene's own stickers", () => {
@@ -51,10 +76,10 @@ describe("where earned stickers sit", () => {
   it("overflow counts the extras: every beds and barnyard sticker at the fazenda", () => {
     const all = [...keysIn("beds"), ...keysIn("barnyard")];
     expect(all.length).toBe(68);
-    const slots = SCENES["fazenda/outside"].slots.length;
     const { bySlot, overflow } = layout("fazenda/outside", all);
-    expect(bySlot.size).toBe(slots);
-    expect(overflow).toBe(68 - slots);
+    // 6 animals on their own spots (hen, chick, cow, sheep and lamb, piglet) and the 8 general spots.
+    expect(bySlot.size).toBe(14);
+    expect(overflow).toBe(68 - 14);
   });
 
   it("layout ignores the stored spot: an old phase-1 spot id never moves a sticker", () => {

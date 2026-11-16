@@ -104,8 +104,10 @@ export function useRioLook(): Look {
 
   useEffect(() => {
     let live = true;
-    const ask = async () => {
-      const cached = readCache(Date.now());
+    // On mount a cached answer (this tab, under 30 minutes old) is used; the half-hourly timer
+    // always asks afresh, so the weather (and night, from its day flag) is never over 30 minutes old.
+    const ask = async (fresh: boolean) => {
+      const cached = fresh ? null : readCache(Date.now());
       if (cached) {
         if (live) setWeather(cached);
         return;
@@ -115,8 +117,8 @@ export function useRioLook(): Look {
       if (w) writeCache(w, Date.now());
       setWeather(w);
     };
-    void ask();
-    const t = setInterval(() => void ask(), KEEP_MS);
+    void ask(false);
+    const t = setInterval(() => void ask(true), KEEP_MS);
     return () => {
       live = false;
       clearInterval(t);

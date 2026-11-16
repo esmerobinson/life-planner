@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { COLLECTION } from "../farm/catalogue";
 import * as hooks from "../farm/hooks";
-import { SCENES } from "./assets";
+import { layout } from "./placement";
 import { AreaView } from "./AreaView";
 
 vi.mock("../farm/hooks", async (orig) => {
@@ -47,11 +47,11 @@ describe("an area, outside and inside", () => {
   it("names every sticker drawn, and says how many more wait in the book", () => {
     const beds = COLLECTION.filter((s) => s.group === "beds");
     render(<AreaView area="fazenda" look="day" placed={beds.map((s) => s.key)} onBack={() => undefined} />);
-    const slots = SCENES["fazenda/outside"].slots.length;
+    const shown = layout("fazenda/outside", beds.map((s) => s.key)).bySlot.size;
     const list = screen.getByRole("list", { name: "Stickers here" });
-    expect(within(list).getAllByRole("listitem")).toHaveLength(slots);
+    expect(within(list).getAllByRole("listitem")).toHaveLength(shown);
     expect(within(list).getAllByRole("listitem")[0]).toHaveTextContent(beds[0]!.name);
-    expect(screen.getByText(`${beds.length - slots} more in your sticker book`)).toBeInTheDocument();
+    expect(screen.getByText(`${beds.length - shown} more in your sticker book`)).toBeInTheDocument();
     expect(document.querySelector(".rio-area")).toHaveAttribute("data-state", "full");
   });
 

@@ -85,6 +85,8 @@ export interface Slot {
   anchor?: "top";
   /** Free only in this state (else in every state). */
   state?: string;
+  /** What the slot takes (the pack's sticker tags, e.g. "hen", "pond", "fazenda:decor", "finds:*"). */
+  accepts: string[];
 }
 
 export interface SceneData {
@@ -135,7 +137,7 @@ const SOURCES: Record<SceneId, SceneSource> = {
   "boteco/inside": { file: "later/boteco/inside/inside-slots.json", root: "later/boteco" },
 };
 
-type RawSlot = { id: string; x: number; y: number; anchor?: string; state?: string };
+type RawSlot = { id: string; x: number; y: number; anchor?: string; state?: string; accepts?: string[] };
 interface RawStrip { file: string; json: string }
 interface RawScene {
   scene: [number, number];
@@ -170,7 +172,7 @@ function readBase(raw: RawScene["base"], at: (p: string) => string): SceneData["
 /** Slots as a list, or split into common and per-state lists. */
 function readSlots(raw: RawScene["slots"]): Slot[] {
   const tidy = (s: RawSlot, state?: string): Slot => ({
-    id: s.id, x: s.x, y: s.y, ...(s.anchor === "top" ? { anchor: "top" as const } : {}), ...(state ?? s.state ? { state: state ?? s.state } : {}),
+    id: s.id, x: s.x, y: s.y, accepts: s.accepts ?? [], ...(s.anchor === "top" ? { anchor: "top" as const } : {}), ...(state ?? s.state ? { state: state ?? s.state } : {}),
   });
   if (Array.isArray(raw)) return raw.map((s) => tidy(s));
   return Object.entries(raw).flatMap(([group, list]) => list.map((s) => tidy(s, group === "common" ? undefined : group)));

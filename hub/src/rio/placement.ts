@@ -1,7 +1,8 @@
 // Esme's Rio: where each earned sticker sits. A phase-1 sticker's zone maps to the area that took
-// it over (rio-design.md, "Nothing is lost"); inside its scene, placed stickers fill the slots in
-// book order, one per slot. Nothing about a slot is stored: the old phase-1 spot id is never
-// read, so the move needs no migration and nothing can be lost by it.
+// it over (rio-design.md, "Nothing is lost"); inside its scene, placed stickers take, in book
+// order, the first free slot whose `accepts` (the pack's tags) takes them, one per slot. Nothing
+// about a slot is stored: the old phase-1 spot id is never read, so the move needs no migration
+// and nothing can be lost by it.
 
 import { STICKER_BY_KEY } from "../farm/catalogue";
 import { SCENES, type SceneId, type Slot } from "./assets";
@@ -30,6 +31,42 @@ export const HOME_BY_SET: Record<string, Home> = {
   "lane/Hedgerow": { area: "tijuca-park", scene: "tijuca-park/inside" },
 };
 
+/**
+ * The pack tags a phase-1 sticker answers to, from the family that took its zone over. Barnyard
+ * animals answer only to their own animal's slots (the pack draws those spots for that animal).
+ */
+const TAGS_BY_GROUP: Record<string, string[]> = {
+  beds: ["fazenda:*", "veg-garden:*", "outdoor"],
+  barnyard: ["fazenda:*", "outdoor"],
+  meadow: ["hedgerow:*", "finds:*"],
+  pond: ["pond"],
+  aquarium: ["fish", "aquarium"],
+  farmhouse: ["boteco:*"],
+};
+const TAGS_BY_SET: Record<string, string[]> = {
+  "lane/Kind notes": ["lagoa-garden:*", "outdoor"],
+  "lane/Hedgerow": ["hedgerow:*", "finds:*"],
+};
+/** Barnyard animals and the pack's animal slots (a lamb on a sheep's spot, a piglet on a pig's). */
+const ANIMAL: Record<string, string> = { hen: "hen", chick: "chick", cow: "cow", sheep: "sheep", lamb: "sheep", piglet: "pig" };
+
+export function stickerTags(stickerKey: string): string[] {
+  const s = STICKER_BY_KEY.get(stickerKey);
+  if (!s) return [];
+  if (s.group === "barnyard" && ANIMAL[s.key]) return [ANIMAL[s.key]!];
+  return TAGS_BY_SET[`${s.group}/${s.set}`] ?? TAGS_BY_GROUP[s.group] ?? [];
+}
+
+/** "a:*" takes any "a:…" (either side); otherwise the tags must be equal. */
+const tagMatch = (slotTag: string, tag: string) =>
+  slotTag === tag ||
+  (slotTag.endsWith(":*") && tag.startsWith(slotTag.slice(0, -1))) ||
+  (tag.endsWith(":*") && slotTag.startsWith(tag.slice(0, -1)));
+
+/** The slot takes a sticker with these tags. */
+export const accepts = (slot: Pick<Slot, "accepts">, tags: readonly string[]): boolean =>
+  slot.accepts.some((a) => tags.some((t) => tagMatch(a, t)));
+
 export function homeOf(stickerKey: string): Home {
   const s = STICKER_BY_KEY.get(stickerKey);
   if (!s) return null;
@@ -52,15 +89,21 @@ export const slotsIn = (scene: SceneId, state: string): Slot[] =>
   SCENES[scene].slots.filter((s) => !s.state || s.state === state);
 
 /**
- * The scene's own placed stickers (of `placed`, any order) in book order, one per slot in slot
- * order; `overflow` is how many more there are than slots (they stay in the book).
+ * The scene's own placed stickers (of `placed`, any order) in book order, each in the first free
+ * slot (slot order) that takes it; `overflow` is how many found no slot (they stay in the book).
  */
 export function layout(scene: SceneId, placed: readonly string[]): { bySlot: Map<string, string>; overflow: number } {
   const mine = placed
     .filter((k) => homeOf(k)?.scene === scene)
     .sort((a, b) => STICKER_BY_KEY.get(a)!.index - STICKER_BY_KEY.get(b)!.index);
-  const slots = slotsIn(scene, sceneState(scene, mine.length));
+  const free = slotsIn(scene, sceneState(scene, mine.length));
   const bySlot = new Map<string, string>();
-  mine.slice(0, slots.length).forEach((k, i) => bySlot.set(slots[i]!.id, k));
-  return { bySlot, overflow: Math.max(0, mine.length - slots.length) };
+  let overflow = 0;
+  for (const k of mine) {
+    const tags = stickerTags(k);
+    const slot = free.find((s) => !bySlot.has(s.id) && accepts(s, tags));
+    if (slot) bySlot.set(slot.id, k);
+    else overflow++;
+  }
+  return { bySlot, overflow };
 }
