@@ -1,8 +1,26 @@
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { pageDate } from "./helpers";
 
-/* Esme's Farm (phase 1) in a real browser, at 1280 and 390. All data is fictional: a fresh
-   browser context per test, so nothing real is touched. */
+/* Esme's Rio (was Esme's Farm, phase 1) in a real browser, at 1280 and 390. All data is
+   fictional: a fresh browser context per test, so nothing real is touched. */
+
+const MAP = JSON.parse(readFileSync(new URL("../src/assets/rio/day1/map/map.json", import.meta.url), "utf8")) as {
+  canvas: [number, number];
+  places: { key: string; hotspot: { rect: [number, number, number, number] } }[];
+};
+const centreOf = (key: string): [number, number] => {
+  const [x, y, w, h] = MAP.places.find((p) => p.key === key)!.hotspot.rect;
+  return [x + w / 2, y + h / 2];
+};
+
+/** A point on the map canvas, from map pixels to the page. */
+async function onMap(page: Page, key: string): Promise<{ x: number; y: number }> {
+  const box = (await page.locator(".rio-map canvas").boundingBox())!;
+  const s = box.width / MAP.canvas[0];
+  const [mx, my] = centreOf(key);
+  return { x: mx * s, y: my * s };
+}
 
 type Row = Record<string, unknown>;
 
@@ -68,17 +86,22 @@ for (const width of [1280, 390]) {
 
     test("the first open starts the farm: Welcome plays in the nook and goes into the book", async ({ page }) => {
       await page.goto("/farm");
-      await expect(page.getByRole("heading", { level: 1, name: "Esme's Farm" })).toBeAttached();
+      await expect(page.getByRole("heading", { level: 1, name: "Esme's Rio" })).toBeAttached();
       await expect.poll(() => farmRow(page, "seen:hi")).not.toBeNull();
       await expect(page.locator("[data-earned]")).toHaveAttribute("data-earned", "1");
-      // The farm is asleep (nothing awake) at a fresh start.
-      await expect(page.locator(".farm-scene")).toHaveAttribute("data-awake", "");
       // Pixel art only at whole-number scales.
-      for (const sel of [".farm-book canvas", ".farm-scene canvas", ".farm-nook canvas"]) {
+      for (const sel of [".farm-book canvas", ".farm-nook canvas"]) {
         const p = await pixelated(page, sel);
         expect(p.rendering).toBe("pixelated");
         expect(Number.isInteger(p.scale)).toBe(true);
       }
+      // The map: crisp (a whole number of device pixels per art pixel, or a whole fraction).
+      const m = await pixelated(page, ".rio-map canvas");
+      const dpr = await page.evaluate(() => window.devicePixelRatio);
+      expect(m.rendering).toBe("pixelated");
+      const device = m.scale * dpr;
+      const whole = device >= 1 ? device : 1 / device; // layout rounds to 1/64 px
+      expect(Math.abs(whole - Math.round(whole))).toBeLessThan(0.01);
     });
 
     test("the farm's pixel barn icon is pixel art at a whole-number scale (sidebar, or the phone's Home grid)", async ({ page }) => {
@@ -103,12 +126,17 @@ for (const width of [1280, 390]) {
       await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "0");
       await page.getByRole("button", { name: "Next page" }).click();
       await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "1");
-      await expect(page.locator(".farm-scene")).toHaveAttribute("data-highlight", "beds");
       const ready = page.getByRole("button", { name: "Mind: seeds: ready to place" });
       await ready.click();
       await page.getByRole("button", { name: "Place on the farm" }).click();
-      await expect.poll(() => farmRow(page, "placed:seeds-mind")).toMatchObject({ spot: "seeds-mind" });
+      await expect.poll(() => farmRow(page, "placed:seeds-mind")).toMatchObject({ spot: "rio" });
       await expect(page.getByRole("button", { name: "Mind: seeds: on the farm" })).toBeAttached();
+      // It stands at the fazenda.
+      // The keyboard way in (the canvas has its own test below).
+      await page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Fazenda" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByRole("list", { name: "Stickers here" }).getByText("Mind: seeds")).toBeAttached();
+      await page.getByRole("button", { name: "Back to the map" }).click();
       // A ghost gives a gentle hint.
       await page.getByRole("button", { name: "Mind: sprout: not yet" }).click();
       await expect(page.getByRole("dialog", { name: "Mind: sprout" })).toContainText("3 to-dos ticked off in Mind");
@@ -118,16 +146,42 @@ for (const width of [1280, 390]) {
       }
     });
 
-    test("arrow keys turn the pages; a tap on the farm opens its page", async ({ page }) => {
+    test("arrow keys turn the pages", async ({ page }) => {
       await startedFarm(page);
       await page.goto("/farm");
       await expect(page.locator(".farm-book")).toHaveAttribute("data-show", "closed");
       await page.keyboard.press("ArrowRight");
       await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "0");
-      await page.locator('.farm-zone-hit[data-zone="meadow"]').dispatchEvent("click");
-      await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "3");
-      // The 16-page book (fix round 1): the Meadow fills both pages of its spread.
-      await expect(page.locator(".farm-scene")).toHaveAttribute("data-highlight", "meadow");
+      await page.keyboard.press("ArrowRight");
+      await expect(page.locator(".farm-book")).toHaveAttribute("data-spread", "1");
+    });
+
+    test("the map: whole on screen; a tap opens the Lagoa house (the visit is noted); Barraca says when it opens", async ({ page }) => {
+      await page.goto("/farm");
+      const canvas = page.locator(".rio-map canvas");
+      await expect(canvas).toBeVisible();
+      // No scrolling: the whole map fits the window, and the page never scrolls sideways.
+      const box = (await canvas.boundingBox())!;
+      const vp = page.viewportSize()!;
+      expect(box.width).toBeLessThanOrEqual(vp.width);
+      expect(box.height).toBeLessThanOrEqual(vp.height);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+      // Day one: Barraca is next, with its tooltip on hover.
+      await canvas.scrollIntoViewIfNeeded();
+      await canvas.hover({ position: await onMap(page, "barraca") });
+      await expect(page.locator(".rio-tooltip")).toHaveText("Opens on day 3");
+      await expect(page.locator(".rio-tooltip")).toBeVisible();
+      // A tap on the Lagoa house opens it.
+      await canvas.click({ position: await onMap(page, "lagoa-house") });
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/outside");
+      await expect.poll(() => farmRow(page, "visited:lagoa-house")).toMatchObject({ kind: "visited", area: "lagoa-house" });
+      const sbox = (await page.locator(".rio-area canvas").boundingBox())!;
+      expect(sbox.width).toBeLessThanOrEqual(vp.width);
+      expect(sbox.height).toBeLessThanOrEqual(vp.height);
+      await page.getByRole("button", { name: "Kitchen" }).click();
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/kitchen");
+      await page.getByRole("button", { name: "Back to the map" }).click();
+      await expect(page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Lagoa house" })).toHaveAttribute("data-status", "open");
     });
 
     test("with reduced motion, every animation shows its end frame", async ({ page }) => {

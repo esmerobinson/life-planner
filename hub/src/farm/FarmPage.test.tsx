@@ -4,7 +4,9 @@ import { MemoryRouter } from "react-router-dom";
 import { db } from "../data/db";
 import { renderApp } from "../test/renderApp";
 import { StickerPopIn } from "./PopIn";
+import { COLLECTION } from "./catalogue";
 import { placedRow, seenRow, startRow } from "./state";
+import { spreadOf } from "./world";
 
 // The farm page and nook in the whole app (fictional data). Canvases aren't drawn in the test
 // DOM; what they would show is checked through the page's buttons and data attributes.
@@ -20,7 +22,7 @@ const farmRows = () => db.farm.toArray();
 
 it("opening the farm the first time starts it (a fresh start); the Welcome sticker plays in the nook, then is kept", async () => {
   renderApp("/farm", "2026-11-04");
-  expect(await screen.findByRole("heading", { level: 1, name: "Esme's Farm" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { level: 1, name: "Esme's Rio" })).toBeInTheDocument();
   await waitFor(async () => expect((await farmRows()).some((r) => r.kind === "start" && "date" in r && r.date === "2026-11-04")).toBe(true));
   // The earned moment plays in the nook, then Welcome is seen for good.
   await waitFor(async () => expect(await db.farm.get("seen:hi")).toBeTruthy(), { timeout: 3000 });
@@ -62,15 +64,14 @@ it("the book opens; slots show collected, ready to place (place it), and not yet
   await user.click(await screen.findByRole("button", { name: "Next page" }));
   const ready = await screen.findByRole("button", { name: "Mind: seeds: ready to place" });
   expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", "1");
-  // The farm highlights the beds while their page is open.
-  expect(document.querySelector(".farm-scene")).toHaveAttribute("data-highlight", "beds");
 
   await user.click(screen.getByRole("button", { name: "Mind: sprout: not yet" }));
   expect(screen.getByRole("dialog", { name: "Mind: sprout" })).toHaveTextContent("3 to-dos ticked off in Mind");
 
   await user.click(ready);
   await user.click(within(screen.getByRole("dialog", { name: "Mind: seeds" })).getByRole("button", { name: "Place on the farm" }));
-  await waitFor(async () => expect(await db.farm.get("placed:seeds-mind")).toMatchObject({ spot: "seeds-mind" }));
+  // New placements are in Rio: no fixed phase-1 spot (the slot comes from book order).
+  await waitFor(async () => expect(await db.farm.get("placed:seeds-mind")).toMatchObject({ spot: "rio" }));
   expect(await screen.findByRole("button", { name: "Mind: seeds: on the farm" })).toBeInTheDocument();
 });
 
@@ -87,13 +88,67 @@ it("arrow keys turn the pages", async () => {
   await waitFor(() => expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", "0"));
 });
 
-it("a tap on a farm zone opens the book at its page", async () => {
-  await db.farm.put(startRow("dev-a", "2026-11-02"));
-  renderApp("/farm", "2026-11-04");
-  const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Open the book at the pond" }));
-  await waitFor(() => expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", "5"), { timeout: 3000 });
-  expect(document.querySelector(".farm-scene")).toHaveAttribute("data-highlight", "glasshouse pond");
+describe("Esme's Rio on the farm page", () => {
+  const places = () => screen.findByRole("list", { name: "Places in Rio" });
+
+  /** Turns the book to a zone's spread with the Next page button. */
+  async function turnTo(user: ReturnType<typeof userEvent.setup>, zone: string) {
+    await user.click(await screen.findByRole("button", { name: "Open the book" }));
+    await waitFor(() => expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", "0"));
+    for (let i = 1; i <= spreadOf(zone); i++) {
+      await user.click(screen.getByRole("button", { name: "Next page" }));
+      await waitFor(() => expect(document.querySelector(".farm-book")).toHaveAttribute("data-spread", String(i)));
+    }
+  }
+
+  it("on a fresh farm the map shows; opening the Lagoa house shows it and notes the visit; back, it's no longer new", async () => {
+    renderApp("/farm", "2026-11-04");
+    const user = userEvent.setup();
+    const list = await places();
+    expect(within(list).getAllByRole("button")).toHaveLength(21);
+    const lagoa = within(list).getByRole("button", { name: "Lagoa house" });
+    expect(lagoa).toHaveAttribute("data-status", "new");
+    expect(within(list).getByRole("button", { name: "Barraca" })).toHaveAttribute("data-status", "next");
+    await user.click(lagoa);
+    expect(await screen.findByRole("heading", { level: 2, name: "Lagoa house" })).toBeInTheDocument();
+    await waitFor(async () => expect(await db.farm.get("visited:lagoa-house")).toMatchObject({ area: "lagoa-house", date: "2026-11-04" }));
+    await user.click(screen.getByRole("button", { name: "Back to the map" }));
+    await waitFor(async () => expect(within(await places()).getByRole("button", { name: "Lagoa house" })).toHaveAttribute("data-status", "open"));
+  });
+
+  it("placing an earned pond sticker shows it at Ipanema beach", async () => {
+    await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), seenRow("hi", "2026-11-02"), seenRow("lilypad", "2026-11-03")]);
+    renderApp("/farm", "2026-11-04");
+    const user = userEvent.setup();
+    await turnTo(user, "pond");
+    await user.click(await screen.findByRole("button", { name: "Lily pad: ready to place" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Lily pad" })).getByRole("button", { name: "Place on the farm" }));
+    await waitFor(async () => expect(await db.farm.get("placed:lilypad")).toMatchObject({ spot: "rio" }));
+    await user.click(within(await places()).getByRole("button", { name: "Ipanema beach" }));
+    expect(within(await screen.findByRole("list", { name: "Stickers here" })).getByText("Lily pad")).toBeInTheDocument();
+  });
+
+  it("an earned orchard sticker waits in the book (its place in Rio opens later) and still counts", async () => {
+    const orchard = COLLECTION.find((s) => s.group === "orchard")!;
+    await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), seenRow("hi", "2026-11-02"), seenRow(orchard.key, "2026-11-03")]);
+    renderApp("/farm", "2026-11-04");
+    const user = userEvent.setup();
+    await waitFor(() => expect(document.querySelector("[data-earned]")).toHaveAttribute("data-earned", "2"));
+    await turnTo(user, "orchard");
+    await user.click(await screen.findByRole("button", { name: `${orchard.name}: ready to place` }));
+    const card = screen.getByRole("dialog", { name: orchard.name });
+    expect(card).toHaveTextContent("Its place in Rio opens later");
+    expect(within(card).queryByRole("button", { name: "Place on the farm" })).toBeNull();
+  });
+
+  it("a sticker placed on the old farm stays placed and shows in its Rio area", async () => {
+    await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), placedRow("hen", "hen", "2026-11-03")]);
+    renderApp("/farm", "2026-11-04");
+    const user = userEvent.setup();
+    await user.click(within(await places()).getByRole("button", { name: "Fazenda" }));
+    expect(within(await screen.findByRole("list", { name: "Stickers here" })).getByText("Hen")).toBeInTheDocument();
+    expect(await db.farm.get("placed:hen")).toMatchObject({ spot: "hen" }); // never rewritten
+  });
 });
 
 it("a character's Wardrobe: pick one unlocked accessory (synced)", async () => {

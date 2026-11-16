@@ -116,9 +116,11 @@ export interface BookProps {
   /** The spread on show (null: closed) and, on the phone, which page. */
   onShow: (spread: number | null, half: 0 | 1) => void;
   onPlaced: (key: string) => void;
+  /** A ready sticker can be placed now (its place in Rio is open). */
+  canPlace?: (key: string) => boolean;
 }
 
-export function StickerBook({ view, phone, request, onRequestDone, onShow, onPlaced }: BookProps) {
+export function StickerBook({ view, phone, request, onRequestDone, onShow, onPlaced, canPlace = () => true }: BookProps) {
   const sheets = useSheets(SHEETS);
   const canvas = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -320,6 +322,7 @@ export function StickerBook({ view, phone, request, onRequestDone, onShow, onPla
           <SlotCard
             stickerKey={pickedSlot.sticker}
             state={slotState(pickedSlot.sticker, view)}
+            placeable={canPlace(pickedSlot.sticker)}
             left={Math.min(Math.max(0, (pickedSlot.x - offset) * scale - 40), windowW - 220)}
             top={(pickedSlot.y + SLOT) * scale + 4}
             onPlace={async () => {
@@ -353,8 +356,8 @@ const PAGE_NAMES: Record<string, string> = {
 };
 export const pageName = (group: string): string => PAGE_NAMES[group] ?? group;
 
-function SlotCard({ stickerKey, state, left, top, onPlace, onClose }: {
-  stickerKey: string; state: SlotState; left: number; top: number; onPlace: () => void; onClose: () => void;
+function SlotCard({ stickerKey, state, placeable, left, top, onPlace, onClose }: {
+  stickerKey: string; state: SlotState; placeable: boolean; left: number; top: number; onPlace: () => void; onClose: () => void;
 }) {
   const st = STICKER_BY_KEY.get(stickerKey)!;
   return (
@@ -362,11 +365,13 @@ function SlotCard({ stickerKey, state, left, top, onPlace, onClose }: {
       <p className="farm-pop-title">{st.name}</p>
       {state === "ghost" && <p className="farm-pop-hint">{hintFor(st)}</p>}
       {state === "placed" && <p className="farm-pop-hint">On the farm</p>}
-      {state === "ready" && (
+      {state === "ready" && placeable && (
         <button type="button" className="btn-secondary" onClick={onPlace}>
           Place on the farm
         </button>
       )}
+      {/* PLACEHOLDER WORDING */}
+      {state === "ready" && !placeable && <p className="farm-pop-hint">Its place in Rio opens later</p>}
       <button type="button" className="farm-pop-close" aria-label="Close" onClick={onClose}>×</button>
     </div>
   );

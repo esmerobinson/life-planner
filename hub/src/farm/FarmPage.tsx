@@ -1,20 +1,24 @@
-// Esme's Farm: the one page for the whole game (/farm). The sticker book on top, the farm
-// beneath it; the farm part matching the open page is highlighted. Opening it the first time
-// starts the farm (a fresh start: nothing from before counts).
+// Esme's Rio: the one page for the whole game (/farm). The sticker book on top, Rio beneath it:
+// the map, or the area she opened from it. Opening it the first time starts the game (a fresh
+// start: nothing from before counts).
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { AreaView } from "../rio/AreaView";
+import { areaStatuses } from "../rio/areas";
+import { devLook, useRioLook } from "../rio/look";
+import { homeOf } from "../rio/placement";
+import { RioMap } from "../rio/RioMap";
 import { usePhone } from "../ui/usePhone";
-import { COLLECTION, MANIFEST } from "./catalogue";
+import { COLLECTION, MANIFEST, STICKERS } from "./catalogue";
 import { useFarm, type FarmView } from "./FarmContext";
-import { FarmScene } from "./FarmScene";
 import { useTicker } from "./hooks";
 import { HAPPY_FRAME_MS } from "./motion";
 import { StickerPopIn } from "./PopIn";
 import { ctx2d, drawCharacter, poseFrames, useSheets } from "./sprites";
 import { StickerBook } from "./StickerBook";
 import { CHARACTERS, type CharacterId } from "./state";
-import { ACCESSORIES, NAMES, SPREADS, spreadOf } from "./world";
+import { ACCESSORIES, NAMES, SPREADS, farmDay } from "./world";
 import "./farm.css";
 
 export function FarmPage() {
@@ -23,10 +27,27 @@ export function FarmPage() {
   const [spread, setSpread] = useState<number | null>(null);
   const [half, setHalf] = useState<0 | 1>(1);
   const [request, setRequest] = useState<number | null>(null);
-  const [popKey, setPopKey] = useState<string | null>(null);
   const [who, setWho] = useState<CharacterId | null>(null);
   const [arrivals, setArrivals] = useState<CharacterId[]>([]);
+  const [area, setArea] = useState<string | null>(null);
   const farmRef = useRef<HTMLDivElement>(null);
+  const weather = useRioLook();
+  const look = devLook(useLocation().search) ?? weather;
+
+  const day = view?.state.start ? farmDay(view.state.start, view.today) : 1;
+  const visited = view?.state.visited;
+  const statuses = useMemo(() => areaStatuses(day, visited ?? new Set()), [day, visited]);
+  const placed = view?.state.placed;
+  const placedKeys = useMemo(() => STICKERS.filter((s) => placed?.has(s.key)).map((s) => s.key), [placed]);
+  const canPlace = useCallback((key: string) => {
+    const home = homeOf(key);
+    const s = home ? statuses.get(home.area) : undefined;
+    return s === "open" || s === "new";
+  }, [statuses]);
+  const openArea = useCallback((a: string) => {
+    setArea(a);
+    void view?.markVisited(a).catch(() => undefined);
+  }, [view]);
 
   // The first open starts the farm.
   useEffect(() => {
@@ -62,11 +83,12 @@ export function FarmPage() {
     setHalf(h);
   }, []);
   const onRequestDone = useCallback(() => setRequest(null), []);
+  void setRequest; // the old farm's zone taps opened the book; Rio's map opens areas instead
 
   if (!view) return null;
   return (
     <div className="farm-page">
-      <h1>Esme's Farm</h1>
+      <h1>Esme's Rio</h1>
       <p className="visually-hidden" role="status" data-earned={view.collected}>
         {view.collected} of {COLLECTION.length} stickers
       </p>
@@ -87,21 +109,13 @@ export function FarmPage() {
         request={request}
         onRequestDone={onRequestDone}
         onShow={onShow}
-        onPlaced={(k) => {
-          setPopKey(null);
-          setTimeout(() => setPopKey(k), 0);
-          farmRef.current?.scrollIntoView?.({ block: "nearest" });
-        }}
+        canPlace={canPlace}
+        onPlaced={() => farmRef.current?.scrollIntoView?.({ block: "nearest" })}
       />
-      <div ref={farmRef} className="farm-scene-wrap">
-        <FarmScene
-          view={view}
-          phone={phone}
-          highlight={zones}
-          popKey={popKey}
-          onZone={(z) => setRequest(spreadOf(z))}
-          onCharacter={setWho}
-        />
+      <div ref={farmRef} className="rio-wrap">
+        {area
+          ? <AreaView key={area} area={area} look={look} placed={placedKeys} onBack={() => setArea(null)} />
+          : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
       </div>
       <div className="farm-cast" aria-label="Who lives here">
         {CHARACTERS.filter((c) => view.arrived.has(c)).map((c) => (

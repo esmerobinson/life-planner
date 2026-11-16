@@ -16,12 +16,12 @@ it("the start is set once, on the first open", async () => {
   expect(await db.farm.where("kind").equals("start").count()).toBe(1);
 });
 
-it("placing a sticker puts it at its fixed spot and counts it as seen; placing again changes nothing", async () => {
+it("placing a sticker places it in Rio and counts it as seen; placing again changes nothing", async () => {
   await placeSticker("hen", "2026-11-05");
   const before = await db.farm.get("placed:hen");
   await placeSticker("hen", "2026-11-09");
   const s = await state();
-  expect(s.placed.get("hen")).toBe("hen");
+  expect(s.placed.get("hen")).toBe("rio");
   expect(s.seen.has("hen")).toBe(true);
   expect(await db.farm.get("placed:hen")).toEqual(before);
 });

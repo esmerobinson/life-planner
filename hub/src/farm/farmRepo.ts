@@ -9,7 +9,6 @@ import { STICKER_BY_KEY } from "./catalogue";
 import {
   arrivedRow, outfitRow, placedRow, seenRow, startRow, todayRow, visitedRow, type CharacterId, type FarmRow,
 } from "./state";
-import { spotIdOf } from "./world";
 
 export const listFarmRows = (): Promise<FarmRow[]> => db.farm.toArray();
 
@@ -29,11 +28,17 @@ export async function markSeen(sticker: string, today: ISODate): Promise<void> {
   await db.farm.put(seenRow(sticker, today));
 }
 
-/** She placed a sticker on the farm (at its one fixed spot). Placing is for good. */
+/**
+ * The spot new placements store: "rio". In Esme's Rio a sticker's slot comes from book order in
+ * its area (rio/placement.ts), so no spot is read; rows placed on the phase-1 farm keep theirs.
+ */
+export const RIO_SPOT = "rio";
+
+/** She placed a sticker (in Esme's Rio). Placing is for good. */
 export async function placeSticker(sticker: string, today: ISODate): Promise<void> {
   if (!STICKER_BY_KEY.has(sticker) || (await db.farm.get(`placed:${sticker}`))) return;
   await db.transaction("rw", db.farm, async () => {
-    await db.farm.put(placedRow(sticker, spotIdOf(sticker), today));
+    await db.farm.put(placedRow(sticker, RIO_SPOT, today));
     if (!(await db.farm.get(`seen:${sticker}`))) await db.farm.put(seenRow(sticker, today));
   });
 }

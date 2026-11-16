@@ -85,6 +85,16 @@ function writeCache(w: Weather, now: number): void {
 }
 
 /**
+ * Development builds only: `?look=day|rain|night` forces a look (to check night and rain on
+ * demand). Always null in a real build.
+ */
+export function devLook(search: string, dev: boolean = import.meta.env.DEV): Look | null {
+  if (!dev) return null;
+  const v = new URLSearchParams(search).get("look");
+  return v === "day" || v === "rain" || v === "night" ? v : null;
+}
+
+/**
  * The look to show: the weather (fetched on mount and every 30 minutes, kept for 30 minutes in
  * this tab), with Rio's clock as the fallback, re-read every minute.
  */

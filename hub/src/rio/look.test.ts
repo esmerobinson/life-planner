@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { RAIN_CODES, RIO, clockLook, fetchRioWeather, lookFrom, rioHour, useRioLook } from "./look";
+import { RAIN_CODES, RIO, clockLook, devLook, fetchRioWeather, lookFrom, rioHour, useRioLook } from "./look";
 
 const at = (iso: string) => new Date(iso);
 
@@ -89,5 +89,15 @@ describe("useRioLook", () => {
     expect(result.current).toBe("night");
     await new Promise((r) => setTimeout(r, 20));
     expect(result.current).toBe("night");
+  });
+});
+
+describe("devLook (development builds only: to look at night and rain on demand)", () => {
+  it("reads ?look= in development, and never in a real build", () => {
+    expect(devLook("?look=night", true)).toBe("night");
+    expect(devLook("?look=rain", true)).toBe("rain");
+    expect(devLook("?look=snow", true)).toBeNull();
+    expect(devLook("", true)).toBeNull();
+    expect(devLook("?look=rain", false)).toBeNull();
   });
 });
