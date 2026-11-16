@@ -273,10 +273,10 @@ it("a character's Wardrobe: pick one unlocked accessory (synced)", async () => {
   await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), ...["hi", "seeds-mind", "seeds-art", "seeds-body", "daisy"].map((k) => seenRow(k, "2026-11-03"))]);
   renderApp("/farm", "2026-11-04");
   const user = userEvent.setup();
-  expect(await screen.findByText("Bap has moved in!")).toBeInTheDocument();
+  expect(await screen.findByText("Caetano has moved in!")).toBeInTheDocument();
   await waitFor(async () => expect(await db.farm.get("arrived:bap")).toBeTruthy());
   await openMenu(user, "Friends");
-  await user.click(within(screen.getByLabelText("Who lives here")).getByRole("button", { name: "Bap" }));
+  await user.click(within(screen.getByLabelText("Who lives here")).getByRole("button", { name: "Caetano" }));
   const wardrobe = screen.getByRole("group", { name: "Wardrobe" });
   expect(within(wardrobe).getAllByRole("button").map((b) => b.textContent)).toEqual(["Nothing", "Straw sun hat"]);
   await user.click(within(wardrobe).getByRole("button", { name: "Straw sun hat" }));
@@ -295,7 +295,7 @@ it("outfits: she picks, any time; a new unlock is offered, never put on for her 
   await new Promise((r) => setTimeout(r, 300));
   expect((await farmRows()).filter((r) => r.kind === "outfit")).toEqual([]);
   await openMenu(user, "Friends");
-  await user.click(within(screen.getByLabelText("Who lives here")).getByRole("button", { name: "Bap" }));
+  await user.click(within(screen.getByLabelText("Who lives here")).getByRole("button", { name: "Caetano" }));
   const wardrobe = screen.getByRole("group", { name: "Wardrobe" });
   expect(within(wardrobe).getByRole("button", { name: "Nothing" })).toHaveAttribute("aria-pressed", "true");
   // She picks one, then another, then nothing: each time it's her choice, one at a time.
@@ -318,7 +318,7 @@ it("friends arrive by day too: with no stickers but Welcome, Duvet is there on d
   await waitFor(async () => expect(await db.farm.get("arrived:duvet")).toBeTruthy());
   await openMenu(userEvent.setup(), "Friends");
   expect(within(screen.getByLabelText("Who lives here")).getAllByRole("button").map((b) => b.textContent)).toEqual(
-    ["Mr Cat", "Bap", "Puddle", "Clover", "Crumpet", "Duvet"],
+    ["Mr Cat", "Caetano", "Pupup", "Bebe", "Cereal", "Duvet"],
   );
 });
 

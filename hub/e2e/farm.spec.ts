@@ -265,7 +265,7 @@ for (const width of [1280, 390]) {
       await expect(page).toHaveURL(/\/$/);
     });
 
-    test("Bap takes the nook on the Journal once he has arrived; Mr Cat (domino) everywhere else", async ({ page }) => {
+    test("Caetano (id bap) takes the nook on the Journal once he has arrived; Mr Cat (domino) everywhere else", async ({ page }) => {
       await page.goto("/today");
       await page.waitForLoadState("networkidle");
       const d = await pageDate(page, -2);

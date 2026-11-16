@@ -43,8 +43,8 @@ describe("just earned", () => {
 });
 
 describe("the next friend", () => {
-  it("Bap moves in at 5 stickers or on day 5, whichever comes first", () => {
-    expect(nextFriend(3, 2, new Set(["domino"]))).toEqual({ id: "bap", name: "Bap", at: 5, stickersToGo: 2, daysToGo: 3 });
+  it("Caetano (the frog) moves in at 5 stickers or on day 5, whichever comes first", () => {
+    expect(nextFriend(3, 2, new Set(["domino"]))).toEqual({ id: "bap", name: "Caetano", at: 5, stickersToGo: 2, daysToGo: 3 });
   });
 
   it("skips friends who have already moved in", () => {

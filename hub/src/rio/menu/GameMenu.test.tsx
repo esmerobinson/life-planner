@@ -188,7 +188,7 @@ describe("Noticeboard", () => {
     await user.click(screen.getByRole("button", { name: /Just earned/ }));
     expect(screen.getByRole("tabpanel")).toHaveTextContent("Hen");
     await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Next friend: Bap");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Next friend: Caetano");
     // Phase 2's notes aren't faked: an honest note says they come later.
     expect(screen.getByRole("tabpanel")).toHaveTextContent(/later/i);
   });
