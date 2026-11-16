@@ -15,6 +15,16 @@ export const AREA_SCENES: Record<string, { outside: SceneId; inside: SceneId[] }
   boteco: { outside: "boteco/outside", inside: ["boteco/inside"] },
 };
 
+/**
+ * Inside scenes that open later than their area (rio-design.md's opening order): the sea off
+ * Arpoador opens on day 30 (Esme, 2026-11-16). Until then there is no way in, and its stickers
+ * wait in the book like any place that hasn't opened.
+ */
+export const SCENE_OPENS: Partial<Record<SceneId, number>> = { "ipanema-beach/sea": 30 };
+
+/** The scene is open on this farm day (every other scene opens with its area). */
+export const sceneOpen = (scene: SceneId, day: number): boolean => day >= (SCENE_OPENS[scene] ?? 1);
+
 export type AreaStatus = "open" | "new" | "next" | "locked";
 
 const PLACE = new Map(RIO_MAP.places.map((p) => [p.key, p]));

@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { STICKER_BY_KEY } from "../farm/catalogue";
 import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d, drawFrame, drawSticker, useSheets } from "../farm/sprites";
-import { AREA_SCENES } from "./areas";
+import { AREA_SCENES, sceneOpen } from "./areas";
 import { SCENES, sceneBase, type Look, type SceneId } from "./assets";
 import { useFit, useRioImages } from "./canvas";
 import { layout, sceneState } from "./placement";
@@ -33,14 +33,17 @@ export const SCENE_NAMES: Record<SceneId, string> = {
 const STICKER = 16;
 const STICKER_SHEETS = ["stickers"];
 
-export function AreaView({ area, look, placed, onBack }: {
+export function AreaView({ area, look, day, placed, onBack }: {
   area: string;
   look: Look;
+  /** The farm day: an inside that opens later (the sea, day 30) has no button before then. */
+  day: number;
   /** Every placed sticker (book order); the scene picks its own. */
   placed: readonly string[];
   onBack: () => void;
 }) {
   const scenes = AREA_SCENES[area]!;
+  const insides = scenes.inside.filter((s) => sceneOpen(s, day));
   const [scene, setScene] = useState<SceneId>(scenes.outside);
   const data = SCENES[scene];
   const reduced = useReducedMotion();
@@ -118,10 +121,10 @@ export function AreaView({ area, look, placed, onBack }: {
         <button type="button" className="btn-secondary" onClick={onBack}>Back to the map</button>
         {/* PLACEHOLDER WORDING */}
         {inside && <button type="button" className="btn-secondary" onClick={() => setScene(scenes.outside)}>Outside</button>}
-        {!inside && scenes.inside.length > 0 && (
+        {!inside && insides.length > 0 && (
           // PLACEHOLDER WORDING
           <div className="farm-cast" role="group" aria-label="Go inside">
-            {scenes.inside.map((s) => (
+            {insides.map((s) => (
               <button key={s} type="button" className="btn-secondary" onClick={() => setScene(s)}>{SCENE_NAMES[s]}</button>
             ))}
           </div>

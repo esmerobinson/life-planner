@@ -1,4 +1,4 @@
-import { AREA_SCENES, areaStatuses, opensOn } from "./areas";
+import { AREA_SCENES, areaStatuses, opensOn, sceneOpen } from "./areas";
 import { RIO_MAP } from "./assets";
 
 const none = new Set<string>();
@@ -64,5 +64,13 @@ describe("which areas are open", () => {
     expect(Object.keys(AREA_SCENES).sort()).toEqual(
       ["barraca", "boteco", "clothing-store", "fazenda", "ipanema-beach", "lagoa-house", "tijuca-park"],
     );
+  });
+
+  it("the sea off Arpoador opens on day 30, not with Ipanema beach (Esme, 2026-11-16); other scenes open with their area", () => {
+    expect(sceneOpen("ipanema-beach/sea", 1)).toBe(false);
+    expect(sceneOpen("ipanema-beach/sea", 29)).toBe(false);
+    expect(sceneOpen("ipanema-beach/sea", 30)).toBe(true);
+    expect(sceneOpen("ipanema-beach/outside", 1)).toBe(true);
+    expect(sceneOpen("lagoa-house/kitchen", 1)).toBe(true);
   });
 });

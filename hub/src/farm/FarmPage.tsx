@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AreaView } from "../rio/AreaView";
-import { areaStatuses } from "../rio/areas";
+import { areaStatuses, sceneOpen } from "../rio/areas";
 import { devLook, useRioLook } from "../rio/look";
 import { homeOf } from "../rio/placement";
 import { RioMap } from "../rio/RioMap";
@@ -42,8 +42,8 @@ export function FarmPage() {
   const canPlace = useCallback((key: string) => {
     const home = homeOf(key);
     const s = home ? statuses.get(home.area) : undefined;
-    return s === "open" || s === "new";
-  }, [statuses]);
+    return (s === "open" || s === "new") && sceneOpen(home!.scene, day);
+  }, [statuses, day]);
   const openArea = useCallback((a: string) => {
     setArea(a);
     void view?.markVisited(a).catch(() => undefined);
@@ -105,7 +105,7 @@ export function FarmPage() {
       )}
       <div ref={farmRef} className="rio-wrap">
         {area
-          ? <AreaView key={area} area={area} look={look} placed={placedKeys} onBack={() => setArea(null)} />
+          ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} onBack={() => setArea(null)} />
           : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
       </div>
       <StickerBook

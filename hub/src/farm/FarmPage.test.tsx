@@ -149,6 +149,32 @@ describe("Esme's Rio on the farm page", () => {
     expect(within(card).queryByRole("button", { name: "Place on the farm" })).toBeNull();
   });
 
+  it("an aquarium sticker waits in the book until the sea off Arpoador opens on day 30 (Esme, 2026-11-16)", async () => {
+    const fish = COLLECTION.find((s) => s.group === "aquarium")!;
+    // Fictional: the farm started on 6 October 2026; 3 November is day 29, 4 November day 30.
+    const rows = [startRow("dev-a", "2026-10-06"), seenRow("hi", "2026-10-06"), seenRow(fish.key, "2026-10-07")];
+    await db.farm.bulkPut(rows);
+    const { unmount } = renderApp("/farm", "2026-11-03");
+    let user = userEvent.setup();
+    await turnTo(user, "aquarium");
+    await user.click(await screen.findByRole("button", { name: `${fish.name}: ready to place` }));
+    let card = screen.getByRole("dialog", { name: fish.name });
+    expect(card).toHaveTextContent("Its place in Rio opens later");
+    expect(within(card).queryByRole("button", { name: "Place on the farm" })).toBeNull();
+    unmount();
+
+    renderApp("/farm", "2026-11-04");
+    user = userEvent.setup();
+    await turnTo(user, "aquarium");
+    await user.click(await screen.findByRole("button", { name: `${fish.name}: ready to place` }));
+    card = screen.getByRole("dialog", { name: fish.name });
+    await user.click(within(card).getByRole("button", { name: "Place on the farm" }));
+    await waitFor(async () => expect(await db.farm.get(`placed:${fish.key}`)).toMatchObject({ spot: "rio" }));
+    await user.click(within(await places()).getByRole("button", { name: "Ipanema beach" }));
+    await user.click(await screen.findByRole("button", { name: "The sea off Arpoador" }));
+    expect(within(await screen.findByRole("list", { name: "Stickers here" })).getByText(fish.name)).toBeInTheDocument();
+  });
+
   it("a sticker placed on the old farm stays placed and shows in its Rio area", async () => {
     await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), placedRow("hen", "hen", "2026-11-03")]);
     renderApp("/farm", "2026-11-04");
