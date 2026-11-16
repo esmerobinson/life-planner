@@ -1,11 +1,11 @@
-/* Esme's Rio: the game screen's frame (GameScreen.tsx). The one place the game's layout in the app
-   lives, so the app's theming can restyle it later. On /farm the shell is marked .is-game: the
-   content area loses its page padding, the page never scrolls, and the game fills everything
-   beside the sidebar (the phone: everything under the phone header). Esme chose option A
-   (2026-11-17, esmeworld-notes/mockups/more-rio.html section 2): the sidebar stays as it is, and
-   the edges round the art are the kit's wooden planks (wood-planks, tiled at the UI's scale).
-   Nothing outside the game route is restyled here. The things drawn over the game (the
-   hotbar, an area's buttons, the arrival note) sit on top, in the kit's pieces. */
+/* Esme's Rio: the game screen's frame (GameScreen.tsx), the one place the game's layout in the app
+   lives. Esme, 2026-11-17: "truly full screen with a small border though not just at top and
+   bottom. and then have a back button at the top keep the rest of app UI the same". On /farm the
+   shell leaves out its own chrome (AppShell.tsx) and marks itself .is-game: the page never
+   scrolls and the game takes the whole window, with an even border of the kit's wooden planks
+   (wood-planks tiled at the UI's scale) on all four sides. The border's width is
+   --game-border: 8 UI px, a placeholder until Esme picks (the look isn't final). Nothing
+   outside the game route is restyled here. */
 
 html:has(.app-shell.is-game),
 html:has(.app-shell.is-game) body {
@@ -14,7 +14,9 @@ html:has(.app-shell.is-game) body {
   overscroll-behavior: none;
 }
 
-.app-shell.is-game {
+.app-shell.is-game,
+.app-shell.is-game.is-phone {
+  display: flex;
   height: 100vh;
   height: 100dvh;
   min-height: 0;
@@ -23,6 +25,7 @@ html:has(.app-shell.is-game) body {
 }
 .app-shell.is-game > .app-content {
   position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -30,40 +33,48 @@ html:has(.app-shell.is-game) body {
   padding: 0;
   overflow: hidden;
 }
-.app-shell.is-game .shell-actions {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 25;
-  margin: 0;
-}
-.app-shell.is-game.is-phone {
-  display: flex;
-  flex-direction: column;
-}
-.app-shell.is-game.is-phone > .app-content {
-  flex: 1;
-  padding: env(safe-area-inset-top) 0 0;
-}
-.app-shell.is-game.is-phone .phone-top {
-  padding-left: max(16px, env(safe-area-inset-left));
-  padding-right: max(16px, env(safe-area-inset-right));
-}
 
 .game-screen {
+  --game-border: calc(8 * var(--u, 2px));
   position: relative;
   flex: 1;
   min-height: 0;
+  display: flex;
+  box-sizing: border-box;
+  /* Even on all four sides; a notch or home bar only ever adds to its side. */
+  padding: max(var(--game-border), env(safe-area-inset-top)) max(var(--game-border), env(safe-area-inset-right))
+    max(var(--game-border), env(safe-area-inset-bottom)) max(var(--game-border), env(safe-area-inset-left));
   overflow: hidden;
   background: var(--k-wood-planks) 0 0 / calc(32 * var(--u, 2px)) calc(32 * var(--u, 2px)) repeat;
 }
-.game-screen > .rio-wrap {
+.game-view {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.game-view > .rio-wrap {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
+}
+.game-view .rio-map,
+.game-view .rio-area {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.game-view .rio-map-layer,
+.game-view .rio-area-layer {
+  position: absolute;
+}
+
+/* Back, top left, on top of the game. */
+.rio-hud-top {
+  position: absolute;
+  top: 4em;
+  left: 4em;
+  z-index: 22;
 }
 
 /* ---- on top of the game ---- */
@@ -79,8 +90,9 @@ html:has(.app-shell.is-game) body {
   pointer-events: none;
   z-index: 20;
 }
-.is-phone .rio-hud-bottom {
-  bottom: calc(110px + env(safe-area-inset-bottom));
+/* Clear of the nook, which stands bottom left in the game (Nook.tsx), on a narrow screen. */
+.game-screen[data-layout="narrow"] .rio-hud-bottom {
+  bottom: calc(96px + env(safe-area-inset-bottom));
 }
 .rio-hotbar {
   position: relative;
@@ -97,9 +109,10 @@ html:has(.app-shell.is-game) body {
 }
 
 /* An area's buttons, top left; the overflow line under them. */
+/* Under Back. */
 .rio-area-controls {
   position: absolute;
-  top: 4em;
+  top: 22em;
   left: 4em;
   z-index: 20;
   display: flex;
@@ -122,7 +135,7 @@ html:has(.app-shell.is-game) body {
 /* "<name> has moved in!", top centre in a thin kit frame. */
 .rio-arrival {
   position: absolute;
-  top: 4em;
+  top: 22em; /* under Back */
   left: 0;
   right: 0;
   display: flex;

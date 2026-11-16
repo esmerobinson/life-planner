@@ -51,6 +51,8 @@ export function AppShell() {
   const inboxLabel = inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox";
   const phone = usePhone();
   const location = useLocation();
+  // Esme's Rio is a full-window game (Esme, 2026-11-17): none of the app's own chrome round it.
+  const game = location.pathname === "/farm" || location.pathname === "/farm/";
   // The Mac app's reminders follow every change (does nothing elsewhere).
   useReminderScheduler();
   useNativeNavigate();
@@ -155,15 +157,15 @@ export function AppShell() {
       <PanelProvider>
       <FarmProvider items={items} goals={goals} today={today}>
       {/* /farm is the game: a fixed screen beside the sidebar (rio/GameScreen.tsx, game-screen.css). */}
-      <div className={`app-shell${phone ? " is-phone" : ""}${location.pathname === "/farm" ? " is-game" : ""}`}>
-        {!phone && <Sidebar />}
+      <div className={`app-shell${phone ? " is-phone" : ""}${game ? " is-game" : ""}`}>
+        {!phone && !game && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
-          {phone && <PhoneTopBar inboxLabel={inboxLabel} onSearch={openSearch} />}
+          {phone && !game && <PhoneTopBar inboxLabel={inboxLabel} onSearch={openSearch} />}
           <UpdatePrompt />
           <DbClosedNotice db={db} />
           {/* Always shown (in the phone top bar on phone): on a fresh install it is the only way to reach Import.
               It floats right, so the page's h1 is the first thing on the page (1C: Add left this row). */}
-          {!phone && (
+          {!phone && !game && (
             <div className="shell-actions">
               <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>
             </div>
@@ -183,7 +185,7 @@ export function AppShell() {
               <UndoLine message={undoNote.message} onUndo={() => void undoNow()} takeFocus />
             </div>
           )}
-          <AddButton open={adding} onToggle={toggleAdd} phone={phone} buttonRef={addButton}>
+          {!game && <AddButton open={adding} onToggle={toggleAdd} phone={phone} buttonRef={addButton}>
             {(close) => (
               <QuickAdd
                 key={addOpened}
@@ -210,8 +212,9 @@ export function AppShell() {
                 }}
               />
             )}
-          </AddButton>
-          {phone && <ErrorGuard name="nook"><Nook phone /></ErrorGuard>}
+          </AddButton>}
+          {/* The nook belongs to the game too: in the full-window game it stands bottom left, as on the phone. */}
+          {(phone || game) && <ErrorGuard name="nook"><Nook phone /></ErrorGuard>}
         </main>
       </div>
       </FarmProvider>

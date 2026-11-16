@@ -72,6 +72,32 @@ async function startedFarm(page: Page) {
   ]);
 }
 
+/**
+ * The full-window game (Esme, 2026-11-17): no sidebar, phone header, Inbox or +; an even plank
+ * border on all four sides; every place on the map on screen; nothing scrolls.
+ */
+async function expectFullWindowGame(page: Page) {
+  const vp = page.viewportSize()!;
+  await expect(page.locator(".sidebar")).toHaveCount(0);
+  await expect(page.locator(".phone-top")).toHaveCount(0);
+  await expect(page.locator(".shell-inbox")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add" })).toHaveCount(0);
+  const v = (await page.locator(".game-view").boundingBox())!;
+  const border = [v.x, v.y, vp.width - v.x - v.width, vp.height - v.y - v.height];
+  for (const b of border) expect(Math.abs(b - border[0]!)).toBeLessThanOrEqual(1);
+  expect(border[0]).toBeGreaterThan(0);
+  const box = (await page.locator(".rio-map canvas").boundingBox())!;
+  for (const p of MAP.places) {
+    const at = await onMap(page, p.key);
+    expect(box.x + at.x, p.key).toBeGreaterThanOrEqual(v.x - 0.5);
+    expect(box.x + at.x, p.key).toBeLessThanOrEqual(v.x + v.width + 0.5);
+    expect(box.y + at.y, p.key).toBeGreaterThanOrEqual(v.y - 0.5);
+    expect(box.y + at.y, p.key).toBeLessThanOrEqual(v.y + v.height + 0.5);
+  }
+  expect(await page.evaluate(() => [document.documentElement.scrollHeight - innerHeight, document.documentElement.scrollWidth - innerWidth]))
+    .toEqual([0, 0]);
+}
+
 /** The open menu is whole inside the window and nothing on the page scrolls. */
 async function expectFits(page: Page) {
   const vp = page.viewportSize()!;
@@ -185,18 +211,10 @@ for (const width of [1280, 390]) {
       await page.goto("/farm");
       const canvas = page.locator(".rio-map canvas");
       await expect(canvas).toBeVisible();
-      // A fixed game screen (Esme, 2026-11-17): the whole map on screen, inside the game screen,
-      // and the page never scrolls either way.
-      const box = (await canvas.boundingBox())!;
-      const screenBox = (await page.locator(".game-screen").boundingBox())!;
+      // The game takes the whole window (Esme, 2026-11-17), every place on screen, nothing scrolls.
       const vp = page.viewportSize()!;
+      await expectFullWindowGame(page);
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
-      expect(box.y).toBeGreaterThanOrEqual(screenBox.y);
-      expect(box.width).toBeLessThanOrEqual(vp.width);
-      expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
-      expect(screenBox.y + screenBox.height).toBeLessThanOrEqual(vp.height + 1);
-      expect(await page.evaluate(() => [document.documentElement.scrollHeight - innerHeight, document.documentElement.scrollWidth - innerWidth]))
-        .toEqual([0, 0]);
       // Day one: Barraca is next, with its tooltip on hover.
       await canvas.scrollIntoViewIfNeeded();
       await canvas.hover({ position: await onMap(page, "barraca") });
@@ -207,8 +225,8 @@ for (const width of [1280, 390]) {
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/outside");
       await expect.poll(() => farmRow(page, "visited:lagoa-house")).toMatchObject({ kind: "visited", area: "lagoa-house" });
       const sbox = (await page.locator(".rio-area-layer canvas").boundingBox())!;
-      expect(sbox.width).toBeLessThanOrEqual(vp.width);
-      expect(sbox.y + sbox.height).toBeLessThanOrEqual(vp.height);
+      expect(sbox.x + sbox.width).toBeGreaterThan(0);
+      expect(sbox.y).toBeLessThan(vp.height);
       await page.getByRole("button", { name: "Kitchen" }).click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/kitchen");
       await page.getByRole("button", { name: "Back to the map" }).click();
@@ -230,6 +248,19 @@ for (const width of [1280, 390]) {
       expect(await page.evaluate(() => localStorage.getItem("rio-reduced-motion"))).toBe("off");
     });
 
+    test("Back leaves the game for the page she came from", async ({ page }) => {
+      await page.goto("/goals");
+      await page.locator('.farm-nook a[href="/farm"]').first().click();
+      await expect(page.getByRole("list", { name: "Places in Rio" })).toBeAttached();
+      await page.getByRole("button", { name: "Back" }).click();
+      await expect(page).toHaveURL(/\/goals$/);
+      // Opened directly, Back goes Home.
+      await page.goto("/farm");
+      await page.getByRole("button", { name: "Back" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page).toHaveURL(/\/$/);
+    });
+
     test("Bap takes the nook on the Journal once he has arrived; Mr Cat (domino) everywhere else", async ({ page }) => {
       await page.goto("/today");
       await page.waitForLoadState("networkidle");
@@ -244,5 +275,14 @@ for (const width of [1280, 390]) {
       await expect(page.locator(".farm-nook")).toHaveAttribute("data-host", "domino");
       await expect(page.locator(".farm-nook")).toBeVisible();
     });
+  });
+}
+
+for (const [w, h] of [[2560, 1080], [390, 1300]] as const) {
+  test(`a very ${w > h ? "wide" : "tall"} window (${w}x${h}): the full-window game keeps every place on screen with an even border`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/farm");
+    await expect(page.locator(".rio-map canvas")).toBeVisible();
+    await expectFullWindowGame(page);
   });
 }

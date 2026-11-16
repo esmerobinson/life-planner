@@ -1,5 +1,5 @@
 import { RIO_MAP } from "./assets";
-import { fitScale, hitPlace } from "./mapMath";
+import { MAP_KEEP, coverFit, fitScale, hitPlace, sceneKeep } from "./mapMath";
 
 const CANVAS: [number, number] = [896, 504];
 
@@ -68,5 +68,74 @@ describe("today's map art (re-imported 2026-11-17: bigger landmarks, new Sult, Q
         expect(ay, p.key).toBeLessThanOrEqual(by + bh);
       }
     }
+  });
+});
+
+describe("coverFit: an even border, never trimming what matters (Esme, 2026-11-17)", () => {
+  const CANVAS = RIO_MAP.canvas;
+  const inside = (outer: number, a: number, b: number) => a >= -1e-6 && b <= outer + 1e-6;
+
+  it("the map's keep region holds every place's hotspot and bbox and the Ilha Grande inset", () => {
+    const [kx, ky, kw, kh] = MAP_KEEP;
+    for (const p of RIO_MAP.places) {
+      for (const [x, y, w, h] of [p.bbox, p.hotspot.rect]) {
+        expect(x).toBeGreaterThanOrEqual(kx);
+        expect(y).toBeGreaterThanOrEqual(ky);
+        expect(x + w).toBeLessThanOrEqual(kx + kw);
+        expect(y + h).toBeLessThanOrEqual(ky + kh);
+      }
+    }
+    const [ix, iy, iw, ih] = RIO_MAP.inset.frame_rect;
+    expect(ix + iw).toBeLessThanOrEqual(kx + kw);
+    expect(iy + ih).toBeLessThanOrEqual(ky + kh);
+  });
+
+  it("a view shaped like the keep region: the map covers it, trimming only outside it", () => {
+    const [, , kw, kh] = MAP_KEEP;
+    const f = coverFit({ w: kw * 2, h: kh * 2 }, CANVAS, MAP_KEEP, 1);
+    expect(f).toMatchObject({ mode: "cover", scale: 2 });
+  });
+
+  it("very wide (2560x1080), very tall (390x844) and 1440x900 windows: whatever the mode, nothing that matters is cut", () => {
+    for (const [w, h, dpr] of [[2512, 1032, 1], [374, 828, 3], [1392, 852, 2], [1754, 996, 1]] as const) {
+      const f = coverFit({ w, h }, CANVAS, MAP_KEEP, dpr);
+      const [kx, ky, kw, kh] = MAP_KEEP;
+      expect(inside(w, f.x + kx * f.scale, f.x + (kx + kw) * f.scale)).toBe(true);
+      expect(inside(h, f.y + ky * f.scale, f.y + (ky + kh) * f.scale)).toBe(true);
+      expect(Math.abs(f.scale * dpr - Math.round(f.scale * dpr)) < 1e-9 || Math.abs(1 / (f.scale * dpr) - Math.round(1 / (f.scale * dpr))) < 1e-9).toBe(true);
+    }
+  });
+
+  it("over a sweep of sizes: cover means the art covers the view with the keep region inside; fit means the whole art is inside", () => {
+    for (let w = 300; w <= 2600; w += 37) {
+      for (let h = 300; h <= 1500; h += 41) {
+        for (const dpr of [1, 2, 3]) {
+          const f = coverFit({ w, h }, CANVAS, MAP_KEEP, dpr);
+          const aw = CANVAS[0] * f.scale;
+          const ah = CANVAS[1] * f.scale;
+          if (f.mode === "cover") {
+            expect(f.x).toBeLessThanOrEqual(1e-6);
+            expect(f.y).toBeLessThanOrEqual(1e-6);
+            expect(f.x + aw).toBeGreaterThanOrEqual(w - 1e-6);
+            expect(f.y + ah).toBeGreaterThanOrEqual(h - 1e-6);
+            const [kx, ky, kw, kh] = MAP_KEEP;
+            expect(inside(w, f.x + kx * f.scale, f.x + (kx + kw) * f.scale)).toBe(true);
+            expect(inside(h, f.y + ky * f.scale, f.y + (ky + kh) * f.scale)).toBe(true);
+          } else {
+            expect(f.scale).toBe(fitScale({ w, h }, CANVAS, dpr));
+            expect(inside(w, f.x, f.x + aw)).toBe(true);
+            expect(inside(h, f.y, f.y + ah)).toBe(true);
+          }
+          // Whole device pixels for the offsets too (crisp).
+          expect(Math.abs(f.x * dpr - Math.round(f.x * dpr))).toBeLessThan(1e-6);
+        }
+      }
+    }
+  });
+
+  it("a scene's keep region is its sticker slots", () => {
+    const k = sceneKeep([{ x: 40, y: 60 }, { x: 100, y: 30 }], [320, 180]);
+    expect(k).toEqual([32, 14, 76, 46]);
+    expect(sceneKeep([], [320, 180])).toEqual([0, 0, 320, 180]);
   });
 });

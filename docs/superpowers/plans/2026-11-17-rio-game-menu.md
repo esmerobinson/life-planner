@@ -168,3 +168,18 @@
 - The pixel font has no accented letters: "Jardim Botânico" draws as "Jardim Botanico" (screen readers get the accent).
 - The new "Esme's Rio" book cover isn't shown any more, as the book itself goes (Esme, 2026-11-17).
 - Phones narrower than 390 px fall to 1x (the kit's phone panel is 195 UI px wide at 2x).
+
+---
+
+## v2 (Esme, 2026-11-17, replacing option A): truly full screen
+
+Her words: "The full screen game is best; i think it should be truly full screen with a small border though not just at top and bottom. and then have a back button at the top keep the rest of app UI the same".
+
+### Task 9: Today's map art
+- Re-import with `node scripts/import-rio-pack.mjs <rio-pack>`; test that a tap in the middle of Christ, the Maracanã (flamengo-match), Sult, Quilo and Os Esquilos opens it, and that every marker and tooltip anchor sits on its own place.
+
+### Task 10: The game takes the whole window
+- **AppShell:** on `/farm` (or `/farm/`) no sidebar, phone header, Inbox pill or + button. The nook stays, bottom left as on the phone (ruling: it is part of the game, and the earned moments and glint play there; without it the Welcome sticker could not arrive in the game). Update prompts, the database notice, search and side panel stay.
+- **GameScreen:** the whole window; the UI scale is measured from the whole screen (the border follows the scale, so measuring inside it would loop); an even plank border on all four sides, its width one CSS variable `--game-border` (8 UI px, a placeholder until Esme picks); the game view inside it. A kit word button "Back" (`// PLACEHOLDER WORDING`) at the top left goes back in the app's history if she came from a page, else Home.
+- **Fitting:** `coverFit(box, canvas, keep, dpr): { scale, x, y, mode: "cover" | "fit" }` in `rio/mapMath.ts`. `keep` is never trimmed: for the map, the union of every place's hotspot rect and bbox, the inset's frame and the marker anchors (marker art above them); for an area scene, the union of its sticker slots (a sticker's 16x16 round each). The scale is the largest crisp one (whole device pixels per art pixel, or a whole fraction) at which `keep` fits. If the map at that scale covers the view, it covers it ("cover"), centred on `keep` and clamped to the art's edges; otherwise the whole art fits at `fitScale`, centred, with uneven planks ("fit").
+- Tests: `coverFit` at 1440x900, 2560x1080 and 390x844 and a sweep of sizes: in "cover" the art covers the view and `keep` is inside it; in "fit" the whole art is inside. Page: no sidebar or Inbox or + on `/farm`; Back goes Home when opened directly; Esc still opens the menu and never from a text field (search).

@@ -1,10 +1,10 @@
-// Esme's Rio: loading the pack's pictures and fitting a canvas to the window (shared by the map
-// and the areas). Drawing itself uses farm/sprites.ts's helpers (ctx2d: smoothing off).
+// Esme's Rio: loading the pack's pictures and placing a canvas in the game's view (shared by the
+// map and the areas). Drawing itself uses farm/sprites.ts's helpers (ctx2d: smoothing off).
 
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from "react";
 import { canDraw } from "../farm/sprites";
 import { rioUrl } from "./assets";
-import { fitScale } from "./mapMath";
+import { coverFit, type Cover } from "./mapMath";
 
 const cache = new Map<string, Promise<HTMLImageElement>>();
 
@@ -46,46 +46,32 @@ export function useRioImages(paths: readonly string[]): RioImages | null {
   return images?.key === key ? images.images : null;
 }
 
-/** The page's padding below the content (the same as above it; the map keeps clear of it). */
-function pageGap(el: HTMLElement): number {
-  const content = el.closest(".app-content");
-  if (!content) return 0;
-  return parseFloat(getComputedStyle(content).paddingTop) || 0;
-}
-
-/** How far down the page `el` starts (whatever sits above it: the page title, a banner). */
-const pageTop = (el: HTMLElement): number => el.getBoundingClientRect().top + (window.scrollY || 0);
-
 /**
- * The CSS scale at which `canvas` fits both the width of `ref`'s parent and the window's height
- * below where `ref` starts on the page (less `reserve` CSS px for what sits with it on screen),
- * at the largest crisp size: so it is whole on screen as the page opens, with no scrolling.
+ * Where a canvas of `canvas` art pixels sits in the game's view (rio/GameScreen.tsx's
+ * .game-view; outside the game, its parent and the window's height): at a crisp scale, covering
+ * the view so the plank border stays even, never trimming `keep` (mapMath.ts coverFit).
  */
-export function useFit(ref: RefObject<HTMLElement | null>, canvas: [number, number], reserve = 0): number {
-  const [box, setBox] = useState({ w: canvas[0], h: canvas[1], dpr: 1 });
+export function useCover(ref: RefObject<HTMLElement | null>, canvas: [number, number], keep: [number, number, number, number]): Cover {
+  const [box, setBox] = useState({ w: 0, h: 0, dpr: 1 });
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // In the game screen (rio/GameScreen.tsx) the art fits the screen itself.
-    const screen = el.closest<HTMLElement>(".game-screen");
+    const view = el.closest<HTMLElement>(".game-view");
     const measure = () => {
-      const host = el.parentElement ?? el;
-      const next = screen
-        ? { w: screen.clientWidth, h: screen.clientHeight - reserve, dpr: window.devicePixelRatio || 1 }
-        : { w: host.clientWidth, h: window.innerHeight - pageTop(el) - pageGap(el) - reserve, dpr: window.devicePixelRatio || 1 };
+      const next = view
+        ? { w: view.clientWidth, h: view.clientHeight, dpr: window.devicePixelRatio || 1 }
+        : { w: el.parentElement?.clientWidth ?? 0, h: window.innerHeight, dpr: window.devicePixelRatio || 1 };
       setBox((b) => (b.w === next.w && b.h === next.h && b.dpr === next.dpr ? b : next));
     };
     measure();
     window.addEventListener("resize", measure);
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    ro?.observe(screen ?? el.parentElement ?? el);
-    // What sits above it can change height (a banner comes and goes): the page's size changes too.
-    const page = el.closest(".app-content");
-    if (page) ro?.observe(page);
+    ro?.observe(view ?? el.parentElement ?? el);
     return () => {
       window.removeEventListener("resize", measure);
       ro?.disconnect();
     };
-  }, [ref, reserve]);
-  return fitScale(box, canvas, box.dpr);
+  }, [ref]);
+  const [kx, ky, kw, kh] = keep;
+  return useMemo(() => coverFit(box, canvas, [kx, ky, kw, kh], box.dpr), [box, canvas, kx, ky, kw, kh]);
 }

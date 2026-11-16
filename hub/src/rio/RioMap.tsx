@@ -1,4 +1,5 @@
-// Esme's Rio: the map. One canvas at the largest crisp size that fits the window (never scrolls),
+// Esme's Rio: the map. One canvas at a crisp size, covering the game's view without trimming any
+// place (or, if it can't, the whole map fitted: mapMath.ts coverFit); it never scrolls. Drawn
 // drawn as map.json says: the base for the look, the boat route, each place's open or locked
 // layer, then the markers (the padlock on the next place, NEW until the first visit). A hidden
 // list of buttons mirrors it for the keyboard and screen readers.
@@ -8,8 +9,8 @@ import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d } from "../farm/sprites";
 import { opensOn, type AreaStatus } from "./areas";
 import { MAP_DIR, RIO_MAP, mapBase, mapLayer, mapLook, type Look } from "./assets";
-import { useFit, useRioImages, type RioImages } from "./canvas";
-import { hitPlace } from "./mapMath";
+import { useCover, useRioImages, type RioImages } from "./canvas";
+import { MAP_KEEP, hitPlace } from "./mapMath";
 
 const [W, H] = RIO_MAP.canvas;
 const PLACE = new Map(RIO_MAP.places.map((p) => [p.key, p]));
@@ -74,7 +75,8 @@ export function RioMap({ statuses, look, onOpen }: {
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const scale = useFit(wrap, RIO_MAP.canvas);
+  const fit = useCover(wrap, RIO_MAP.canvas, MAP_KEEP);
+  const scale = fit.scale;
   const files = useMemo(() => filesFor(look), [look]);
   const images = useRioImages(files);
   const [hover, setHover] = useState<string | null>(null);
@@ -105,8 +107,8 @@ export function RioMap({ statuses, look, onOpen }: {
   const tipAt = tipKey ? PLACE.get(tipKey)?.tooltip_anchor : undefined;
 
   return (
-    <div className="rio-map" ref={wrap} data-look={look}>
-      <div className="rio-map-layer" style={{ width: W * scale, height: H * scale }}>
+    <div className="rio-map" ref={wrap} data-look={look} data-fit={fit.mode}>
+      <div className="rio-map-layer" style={{ left: fit.x, top: fit.y, width: W * scale, height: H * scale }}>
         <canvas
           ref={canvas}
           width={W}

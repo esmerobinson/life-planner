@@ -9,7 +9,8 @@ import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d, drawFrame, drawSticker, useSheets } from "../farm/sprites";
 import { AREA_SCENES, sceneOpen } from "./areas";
 import { SCENES, sceneBase, type Look, type SceneId } from "./assets";
-import { useFit, useRioImages } from "./canvas";
+import { useCover, useRioImages } from "./canvas";
+import { sceneKeep } from "./mapMath";
 import { TextButton } from "./menu/pieces";
 import { layout, sceneState } from "./placement";
 import { BitmapText } from "./ui/BitmapText";
@@ -69,8 +70,10 @@ export function AreaView({ area, look, day, placed, onBack }: {
 
   const wrap = useRef<HTMLDivElement>(null);
   const { u } = useUi();
-  // The buttons sit on top of the game (the game screen), so the scene takes the whole screen.
-  const scale = useFit(wrap, data.scene);
+  // The buttons sit on top of the game; the scene covers the view, never trimming a sticker slot.
+  const keep = useMemo(() => sceneKeep(data.slots, data.scene), [data]);
+  const fit = useCover(wrap, data.scene, keep);
+  const scale = fit.scale;
   const canvas = useRef<HTMLCanvasElement>(null);
 
   const drawn = useMemo(() => {
@@ -116,7 +119,7 @@ export function AreaView({ area, look, day, placed, onBack }: {
 
   const inside = scene !== scenes.outside;
   return (
-    <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook}>
+    <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook} data-fit={fit.mode}>
       <h2 className="visually-hidden">{SCENE_NAMES[scene]}</h2>
       {/* On top of the game, in the kit's word buttons. */}
       <div className="rio-area-controls" style={{ fontSize: `${u}px` }}>
@@ -131,7 +134,7 @@ export function AreaView({ area, look, day, placed, onBack }: {
           </div>
         )}
       </div>
-      <div className="rio-area-layer" style={{ width: data.scene[0] * scale, height: data.scene[1] * scale }}>
+      <div className="rio-area-layer" style={{ left: fit.x, top: fit.y, width: data.scene[0] * scale, height: data.scene[1] * scale }}>
         <canvas ref={canvas} width={data.scene[0]} height={data.scene[1]} className="farm-px"
           style={{ width: data.scene[0] * scale, height: data.scene[1] * scale }} aria-hidden="true" />
       </div>

@@ -1,8 +1,8 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { db } from "../data/db";
-import { renderApp } from "../test/renderApp";
+import { currentUrl, renderApp } from "../test/renderApp";
 import { StickerPopIn } from "./PopIn";
 import { COLLECTION } from "./catalogue";
 import { placedRow, seenRow, startRow } from "./state";
@@ -63,6 +63,28 @@ async function collectionAt(user: ReturnType<typeof userEvent.setup>, area: stri
   for (let i = 0; i < nextPages; i++) await user.click(screen.getByRole("button", { name: "Next page" }));
 }
 
+it("the game takes the whole window: no sidebar, Inbox or +; Back goes Home when she opened it directly (Esme, 2026-11-17)", async () => {
+  renderApp("/farm", "2026-11-04");
+  const user = userEvent.setup();
+  await screen.findByRole("list", { name: "Places in Rio" });
+  expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
+  expect(screen.queryByRole("link", { name: /^Inbox/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+  // The nook stays with the game (its moments play there).
+  expect(document.querySelector(".farm-nook")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Back" }));
+  await waitFor(() => expect(currentUrl).toBe("/"));
+  expect(await screen.findByRole("navigation", { name: "Main" })).toBeInTheDocument();
+});
+
+it("Back returns to the page she came from", async () => {
+  renderApp(["/goals", "/farm"], "2026-11-04");
+  const user = userEvent.setup();
+  await screen.findByRole("list", { name: "Places in Rio" });
+  await user.click(screen.getByRole("button", { name: "Back" }));
+  await waitFor(() => expect(currentUrl).toBe("/goals"));
+});
+
 it("there is no sticker book: the game screen holds the map and the menu's hotbar (Esme, 2026-11-17)", async () => {
   renderApp("/farm", "2026-11-04");
   await screen.findByRole("list", { name: "Places in Rio" });
@@ -111,11 +133,13 @@ it("Esc opens the menu and closes it again, focus going back where it was; never
   await user.keyboard("{Escape}");
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull());
   expect(lagoa).toHaveFocus();
-  // Typing somewhere (Add's form): Esc is the form's, not the menu's.
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  // Typing somewhere (the search box): Esc is the search's, not the menu's.
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  const search = await screen.findByRole("dialog");
   await waitFor(() => expect(document.activeElement?.tagName).toMatch(/INPUT|TEXTAREA/));
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull();
+  expect(search).toBeTruthy();
 });
 
 it("/farm?menu=noticeboard opens the menu on the Noticeboard", async () => {

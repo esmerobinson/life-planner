@@ -30,7 +30,7 @@
 
 /* ---- the menu's stage, centred in the game screen over the mockups' dim ---- */
 .rio-menu-dim {
-  position: absolute;
+  position: fixed; /* over the whole window, the plank border too */
   inset: 0;
   z-index: 30;
   display: flex;
