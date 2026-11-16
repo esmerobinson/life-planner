@@ -1,0 +1,336 @@
+/* Esme's Rio: the game menu and the game's UI pieces, copied from the approved kit's own mockup
+   styles (art/options/esme-ui/src/page.css, "GAME STAGE"): 1em = one UI pixel (font-size is the
+   whole-number scale), every piece a --k-<name> image (pieces.tsx kitVars), nine-slice pieces
+   as border-images at the slices kit.json gives. Colours: only the kit's (kit.json ui ramp and
+   the mockups' fills and text colours); the dim behind the menu is the mockups' .dim. Motion:
+   the mockups' own (the "!" bob, the hover nudge); none with reduced motion (.is-still). */
+
+.rio-ui,
+.rio-ui * {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.rio-ui button {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+.rio-ui .bt {
+  display: block;
+  line-height: 0;
+}
+.rio-ui .bt canvas {
+  display: block;
+}
+
+/* ---- the menu's stage, centred in the game screen over the mockups' dim ---- */
+.rio-menu-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 12, 24, 0.5);
+}
+.rio-menu {
+  position: relative;
+  flex: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.rio-menu .a,
+.rio-ui .a {
+  position: absolute;
+}
+
+/* ---- pieces (page.css) ---- */
+.rio-ui .k {
+  position: absolute;
+  display: block;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+.rio-ui .k-placeholder {
+  background: var(--placeholder, #ff00ff);
+}
+.rio-ui .pnl {
+  position: absolute;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 6em 7em 6em 6em;
+  border-image-source: var(--k-panel);
+  border-image-slice: 6 7 6 6;
+  border-image-width: 6em 7em 6em 6em;
+  border-image-repeat: stretch;
+  background: linear-gradient(#ffcb7b, #f5b66e 55%, #e9a665) padding-box;
+}
+.rio-ui .pnl-inner {
+  position: absolute;
+}
+.rio-ui .thin {
+  position: absolute;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 3em;
+  border-image: var(--k-frame-thin) 3 / 3em stretch;
+  background: #ffcb7b padding-box;
+}
+.rio-ui .tip {
+  position: absolute;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 3em 4em 4em 3em;
+  border-image: var(--k-tooltip) 3 4 4 3 / 3em 4em 4em 3em stretch;
+  background: #ffcb7b padding-box;
+  filter: drop-shadow(3em 3em 0 rgba(30, 10, 10, 0.35));
+  z-index: 40;
+  padding: 2em 0 3em 1em; /* with the border: text 4 in and 5 down, as tipHTML places it */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.rio-ui .tip.docked {
+  filter: none;
+}
+.rio-ui .tipdiv {
+  display: block;
+  align-self: stretch;
+  margin: 1em -1em 3em -1em;
+  height: 4em;
+  background: var(--k-tooltip-divider) 0 0 / 100% 100%;
+}
+.rio-ui .tip-row {
+  display: flex;
+  align-items: center;
+  gap: 4em;
+  margin-top: 1em;
+}
+.rio-ui .rowbtn {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.rio-ui .kit-row {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 4em;
+  border-image: var(--k-row) 4 / 4em stretch;
+  background: #ffcb7b padding-box;
+  pointer-events: none;
+}
+.rio-ui .rowbtn:hover > .kit-row,
+.rio-ui .rowbtn[aria-pressed="true"] > .kit-row,
+.rio-ui .rowbtn[aria-checked="true"] > .kit-row {
+  border-image-source: var(--k-row-hover);
+  background: #e9a665 padding-box;
+}
+.rio-ui .btn {
+  position: absolute;
+  cursor: pointer;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  border: 0;
+  padding: 0;
+  transition: transform 0.08s;
+}
+.rio-ui .btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.06);
+}
+.rio-ui .btn:active {
+  transform: scale(0.96);
+}
+.rio-ui .btn.close:hover {
+  background-image: var(--k-btn-close-hover) !important;
+}
+.rio-ui .btn:disabled {
+  visibility: hidden;
+}
+.rio-ui .tbtn {
+  position: absolute;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 3em;
+  border-image: var(--k-btn-text) 3 / 3em stretch;
+  background: #f99305 padding-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2em;
+}
+.rio-ui .tbtn.flow {
+  position: relative;
+}
+.rio-ui .tbtn:hover {
+  border-image-source: var(--k-btn-text-hover);
+  background: #ffb94a padding-box;
+}
+.rio-ui .slot {
+  position: absolute;
+  width: 16em;
+  height: 16em;
+  background: var(--k-slot) 0 0 / 100% 100%;
+}
+.rio-ui .selq {
+  position: absolute;
+  width: 18em;
+  height: 18em;
+  margin: -1em 0 0 -1em;
+  background: var(--k-slot-selected) 0 0 / 100% 100%;
+  pointer-events: none;
+}
+.rio-ui .stk {
+  position: absolute;
+  width: 16em;
+  height: 16em;
+  background-image: var(--k-stickers);
+  background-size: var(--stk-sheet-w) 16em;
+  background-repeat: no-repeat;
+}
+.rio-ui .stk.ghost {
+  background-image: var(--k-ghosts);
+}
+.rio-ui .cell {
+  position: absolute;
+  width: 16em;
+  height: 16em;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.rio-ui .cell.lg {
+  width: 20em;
+  height: 20em;
+  background: var(--k-slot-lg) 0 0 / 100% 100%;
+}
+.rio-ui .cell:hover,
+.rio-ui .cell.on {
+  z-index: 5;
+}
+.rio-ui .cell:hover > .stk,
+.rio-ui .cell.on > .stk {
+  transform: scale(1.12);
+}
+.rio-ui .cell.lg:hover,
+.rio-ui .cell.lg.on {
+  background-image: var(--k-slot-lg-hover);
+}
+.rio-ui .cell:focus-visible,
+.rio-ui .tab:focus-visible,
+.rio-ui .stab:focus-visible,
+.rio-ui .rowbtn:focus-visible,
+.rio-ui .btn:focus-visible,
+.rio-ui .tbtn:focus-visible {
+  outline: 1em solid #fff3d6;
+}
+.rio-ui .cell .bt {
+  position: absolute;
+}
+.rio-ui .bang {
+  position: absolute;
+  width: 12em;
+  height: 14em;
+  background: var(--k-emote-bang) 0 0 / 100% 100%;
+  pointer-events: none;
+  animation: rio-bob 1s steps(2) infinite;
+}
+@keyframes rio-bob {
+  50% {
+    transform: translateY(-1em);
+  }
+}
+.rio-ui .tab {
+  position: absolute;
+  width: 18em;
+  height: 18em;
+  padding: 0;
+  border: 0;
+  background: var(--k-tab) 0 0 / 100% 100%;
+  cursor: pointer;
+  transition: top 0.08s;
+}
+.rio-ui .tab.on {
+  background-image: var(--k-tab-active);
+  z-index: 7;
+}
+.rio-ui .tab > .k,
+.rio-ui .stab > .k {
+  width: 12em;
+  height: 12em;
+}
+.rio-ui .tab.small > .k {
+  width: 12em;
+  height: 12em;
+}
+.rio-ui .stab {
+  position: absolute;
+  width: 18em;
+  height: 18em;
+  padding: 0;
+  border: 0;
+  background: var(--k-tab-side) 0 0 / 100% 100%;
+  cursor: pointer;
+  transition: left 0.08s;
+}
+.rio-ui .stab.on {
+  background-image: var(--k-tab-side-active);
+  z-index: 7;
+}
+.rio-ui .tab.locked > .k,
+.rio-ui .stab.locked > .k {
+  filter: grayscale(1) brightness(0.75) opacity(0.55);
+}
+
+/* Reduced motion (the device's, or her choice in Settings): nothing moves. */
+.rio-ui.is-still .bang,
+.rio-ui.is-still .btn,
+.rio-ui.is-still .cell,
+.rio-ui.is-still .tab,
+.rio-ui.is-still .stab {
+  animation: none;
+  transition: none;
+}
+.rio-ui.is-still .btn:hover,
+.rio-ui.is-still .btn:active {
+  transform: none;
+}
+
+/* The tab's own content sits over the panel, but never over the tab row (clicks go through). */
+.rio-menu [role="tabpanel"] {
+  pointer-events: none;
+}
+.rio-menu [role="tabpanel"] > * {
+  pointer-events: auto;
+}
+
+/* A note, open (noteDetailHTML): its picture centred, the heading, then the body, in a column. */
+.rio-ui .note-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 4em;
+  box-sizing: border-box;
+}
+.rio-ui .note-detail .note-icon,
+.rio-ui .note-detail .note-pic {
+  position: static;
+  margin-bottom: 4em;
+}
+.rio-ui .note-detail .note-slots {
+  position: relative;
+  height: 16em;
+  margin-top: 6em;
+}
+.rio-ui .note-detail .note-body {
+  align-self: flex-start;
+  margin: 8em 0 0 10em;
+}
