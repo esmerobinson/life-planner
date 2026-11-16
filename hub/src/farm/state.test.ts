@@ -1,5 +1,5 @@
 import {
-  arrivedRow, farmState, outfitRow, placedRow, seenRow, startRow, todayRow, validFarm,
+  EMPTY_FARM, arrivedRow, farmState, outfitRow, placedRow, seenRow, startRow, todayRow, validFarm, visitedRow,
 } from "./state";
 
 describe("validFarm", () => {
@@ -11,6 +11,8 @@ describe("validFarm", () => {
     ["outfit", outfitRow("domino", "A1")],
     ["outfit (none)", outfitRow("domino", null)],
     ["today", todayRow("2026-11-04")],
+    ["visited", visitedRow("lagoa-house", "2026-11-14")],
+    ["visited (as written)", { id: "visited:lagoa-house", kind: "visited", area: "lagoa-house", date: "2026-11-14" }],
     ["with a stamp", { ...seenRow("hi", "2026-11-04"), updatedAt: 5 }],
   ])("accepts a %s row", (_n, row) => {
     expect(validFarm(row)).toBe(true);
@@ -28,6 +30,10 @@ describe("validFarm", () => {
     ["a today row for another day", { id: "today:2026-11-04", kind: "today", date: "2026-11-05" }],
     ["a bad stamp", { ...seenRow("hi", "2026-11-04"), updatedAt: -1 }],
     ["an upper-case sticker key", { id: "seen:Hi", kind: "seen", sticker: "Hi", date: "2026-11-04" }],
+    ["a visited row whose id names another area", { id: "visited:fazenda", kind: "visited", area: "lagoa-house", date: "2026-11-14" }],
+    ["a visited row with a bad area key", { id: "visited:Lagoa House", kind: "visited", area: "Lagoa House", date: "2026-11-14" }],
+    ["a visited row with an extra field", { ...visitedRow("lagoa-house", "2026-11-14"), note: "x" }],
+    ["a visited row with a bad date", { id: "visited:lagoa-house", kind: "visited", area: "lagoa-house", date: "2026-02-30" }],
   ])("refuses %s", (_n, row) => {
     expect(validFarm(row)).toBe(false);
   });
@@ -38,6 +44,8 @@ describe("farmState", () => {
     const s = farmState([]);
     expect(s.start).toBeNull();
     expect(s.seen.size).toBe(0);
+    expect(s.visited.size).toBe(0);
+    expect(EMPTY_FARM.visited.size).toBe(0);
   });
 
   it("starts on the EARLIEST device's start (a later device never moves it later)", () => {
@@ -62,5 +70,19 @@ describe("farmState", () => {
     expect(s.outfits.get("bap")).toBe("H4");
     expect(s.outfits.get("domino")).toBeNull();
     expect(s.todayDone).toEqual(["2026-11-04", "2026-11-06"]);
+  });
+
+  it("visited rows fill `visited` and change nothing else (review focus 4)", () => {
+    const phase1 = [
+      startRow("mac", "2026-11-04"), seenRow("hi", "2026-11-04"), placedRow("hen", "hen", "2026-11-05"),
+      arrivedRow("bap", "2026-11-05"), outfitRow("bap", "H4"), todayRow("2026-11-06"),
+    ];
+    const before = farmState(phase1);
+    const after = farmState([...phase1, visitedRow("lagoa-house", "2026-11-14"), visitedRow("fazenda", "2026-11-15"),
+      { id: "visited:Bad", kind: "visited", area: "Bad", date: "2026-11-14" }]);
+    const { visited: _v1, ...rest1 } = before;
+    const { visited, ...rest2 } = after;
+    expect(rest2).toEqual(rest1);
+    expect([...visited].sort()).toEqual(["fazenda", "lagoa-house"]);
   });
 });

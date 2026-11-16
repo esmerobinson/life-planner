@@ -11,13 +11,14 @@
 //   outfit:<character>   the accessory she picked for that character (null: none)
 //   today:<date>         Today's list was seen finished that day (not derivable afterwards:
 //                        what was on a past day's list isn't kept)
+//   visited:<area>       she has opened that area of Esme's Rio (the map's NEW badge goes)
 //
 // No database import here, so the change tracker and validators can use it without a cycle.
 
 import { isValidISODate } from "../domain/dates";
 import type { ISODate } from "../domain/types";
 
-export const FARM_KINDS = ["start", "seen", "placed", "arrived", "outfit", "today"] as const;
+export const FARM_KINDS = ["start", "seen", "placed", "arrived", "outfit", "today", "visited"] as const;
 export type FarmKind = (typeof FARM_KINDS)[number];
 
 /** The six characters, in arrival order. */
@@ -35,9 +36,10 @@ export interface PlacedRow extends Base { kind: "placed"; sticker: string; spot:
 export interface ArrivedRow extends Base { kind: "arrived"; character: CharacterId; date: ISODate }
 export interface OutfitRow extends Base { kind: "outfit"; character: CharacterId; item: string | null }
 export interface TodayRow extends Base { kind: "today"; date: ISODate }
-export type FarmRow = StartRow | SeenRow | PlacedRow | ArrivedRow | OutfitRow | TodayRow;
+export interface VisitedRow extends Base { kind: "visited"; area: string; date: ISODate }
+export type FarmRow = StartRow | SeenRow | PlacedRow | ArrivedRow | OutfitRow | TodayRow | VisitedRow;
 
-/** Sticker keys and spot ids: lower-case words and dashes (a later pack may add more). */
+/** Sticker keys, spot ids and Rio area keys: lower-case words and dashes (a later pack may add more). */
 const KEY = /^[a-z0-9][a-z0-9-]{0,47}$/;
 /** Device ids, as the sync engine makes them. */
 const DEVICE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -76,6 +78,9 @@ export function validFarm(r: unknown): r is FarmRow {
         only(r, ["id", "kind", "character", "item", "updatedAt"]);
     case "today":
       return isDate(r.date) && suffix === r.date && only(r, ["id", "kind", "date", "updatedAt"]);
+    case "visited":
+      return isStr(r.area) && KEY.test(r.area) && suffix === r.area && isDate(r.date) &&
+        only(r, ["id", "kind", "area", "date", "updatedAt"]);
     default:
       return false;
   }
@@ -92,6 +97,7 @@ export const arrivedRow = (character: CharacterId, date: ISODate): ArrivedRow =>
 export const outfitRow = (character: CharacterId, item: string | null): OutfitRow =>
   ({ id: `outfit:${character}`, kind: "outfit", character, item });
 export const todayRow = (date: ISODate): TodayRow => ({ id: `today:${date}`, kind: "today", date });
+export const visitedRow = (area: string, date: ISODate): VisitedRow => ({ id: `visited:${area}`, kind: "visited", area, date });
 
 // ---- the state, read from the rows ---------------------------------------------------------
 
@@ -105,10 +111,12 @@ export interface FarmState {
   outfits: ReadonlyMap<CharacterId, string | null>;
   /** Days Today's list was seen finished. */
   todayDone: readonly ISODate[];
+  /** Rio areas she has opened. */
+  visited: ReadonlySet<string>;
 }
 
 export const EMPTY_FARM: FarmState = {
-  start: null, seen: new Set(), placed: new Map(), arrived: new Set(), outfits: new Map(), todayDone: [],
+  start: null, seen: new Set(), placed: new Map(), arrived: new Set(), outfits: new Map(), todayDone: [], visited: new Set(),
 };
 
 /** The farm state from its rows (rows that aren't valid are ignored). */
@@ -119,6 +127,7 @@ export function farmState(rows: readonly unknown[]): FarmState {
   const arrived = new Set<CharacterId>();
   const outfits = new Map<CharacterId, string | null>();
   const todayDone: ISODate[] = [];
+  const visited = new Set<string>();
   for (const r of rows) {
     if (!validFarm(r)) continue;
     if (r.kind === "start") starts.push(r.date);
@@ -126,9 +135,10 @@ export function farmState(rows: readonly unknown[]): FarmState {
     else if (r.kind === "placed") placed.set(r.sticker, r.spot);
     else if (r.kind === "arrived") arrived.add(r.character);
     else if (r.kind === "outfit") outfits.set(r.character, r.item);
+    else if (r.kind === "visited") visited.add(r.area);
     else todayDone.push(r.date);
   }
   todayDone.sort();
   const start = starts.length ? starts.sort()[0]! : null;
-  return { start, seen, placed, arrived, outfits, todayDone };
+  return { start, seen, placed, arrived, outfits, todayDone, visited };
 }

@@ -46,6 +46,8 @@ export interface FarmView {
   place: (sticker: string) => Promise<void>;
   markArrived: (c: CharacterId) => Promise<void>;
   setOutfit: (c: CharacterId, item: string | null) => Promise<void>;
+  /** She opened an area of Esme's Rio. */
+  markVisited: (area: string) => Promise<void>;
 }
 
 const FarmContext = createContext<FarmView | null>(null);
@@ -224,6 +226,7 @@ function FarmEngine({ items: listItems, goals, today, onView }: { items: Item[];
       place: (k) => repo.placeSticker(k, today),
       markArrived: (ch) => repo.markArrived(ch, today),
       setOutfit: repo.setOutfit,
+      markVisited: (area) => repo.markVisited(area, today),
     }),
     [rows, today, state, c, earned, earnedSet, collected, arrived, awake, unlocked, queue, journal, farmZones, setFarmZones, glint],
   );

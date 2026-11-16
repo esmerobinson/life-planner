@@ -1,5 +1,5 @@
 import { db } from "../data/db";
-import { ensureStart, markArrived, markSeen, placeSticker, recordTodayDone, setOutfit } from "./farmRepo";
+import { ensureStart, markArrived, markSeen, markVisited, placeSticker, recordTodayDone, setOutfit } from "./farmRepo";
 import { farmState } from "./state";
 
 beforeEach(async () => {
@@ -46,4 +46,19 @@ it("seen, arrivals, outfits and finished Today days, each a synced change", asyn
   expect(s.outfits.get("bap")).toBeNull();
   expect(s.todayDone).toEqual(["2026-11-05"]);
   expect(await db.pending.where("table").equals("farm").count()).toBe(4);
+});
+
+it("visiting an area is noted once (for the map's NEW badge); unknown areas are never written", async () => {
+  await markVisited("lagoa-house", "2026-11-14");
+  const first = await db.farm.get("visited:lagoa-house");
+  await markVisited("lagoa-house", "2026-11-15");
+  expect(await db.farm.where("kind").equals("visited").count()).toBe(1);
+  expect(await db.farm.get("visited:lagoa-house")).toEqual(first);
+  expect(first).toMatchObject({ kind: "visited", area: "lagoa-house", date: "2026-11-14" });
+  await markVisited("atlantis", "2026-11-14");
+  await markVisited("Lagoa House", "2026-11-14");
+  expect(await db.farm.where("kind").equals("visited").count()).toBe(1);
+  expect((await state()).visited).toEqual(new Set(["lagoa-house"]));
+  // A synced change, like every farm write.
+  expect(await db.pending.get(["farm", "visited:lagoa-house"])).toBeTruthy();
 });
