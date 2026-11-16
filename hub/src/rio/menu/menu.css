@@ -8,7 +8,6 @@
 .rio-ui,
 .rio-ui * {
   image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 /* The app's soft-pill buttons (styles/controls.css) never reach the game's kit pieces. */
 .rio-ui button,
