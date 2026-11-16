@@ -13,6 +13,13 @@ export const AREA_SCENES: Record<string, { outside: SceneId; inside: SceneId[] }
   "clothing-store": { outside: "clothing-store/outside", inside: ["clothing-store/inside"] },
   "tijuca-park": { outside: "tijuca-park/outside", inside: ["tijuca-park/inside"] },
   boteco: { outside: "boteco/outside", inside: ["boteco/inside"] },
+  // Phase 2a: drawn since phase 1. The museum stays closed until it has its Rio night and rain.
+  "zona-sul": { outside: "zona-sul/outside", inside: ["zona-sul/inside"] },
+  "jardim-botanico": { outside: "jardim-botanico/outside", inside: ["jardim-botanico/inside"] },
+  quilo: { outside: "quilo/outside", inside: ["quilo/inside"] },
+  sult: { outside: "sult/outside", inside: ["sult/inside"] },
+  "santa-teresa": { outside: "santa-teresa/outside", inside: ["santa-teresa/inside"] },
+  "os-esquilos": { outside: "os-esquilos/outside", inside: ["os-esquilos/inside"] },
 };
 
 /**

@@ -28,11 +28,26 @@ describe("which areas are open", () => {
     expect(s.get("clothing-store")).toBe("next");
   });
 
-  it("day 12: Zona Sul (no art yet) stays locked; next is the earliest area with art not yet open", () => {
+  it("day 12: Zona Sul (drawn for phase 2a) is new; next is the earliest area with art not yet open", () => {
     const s = areaStatuses(12, none);
-    expect(s.get("zona-sul")).toBe("locked");
+    expect(s.get("zona-sul")).toBe("new");
     expect(s.get("tijuca-park")).toBe("new");
-    expect(s.get("boteco")).toBe("next");
+    expect(s.get("jardim-botanico")).toBe("next");
+  });
+
+  it("day 14: the Jardim Botanico opens; the museum (no Rio night or rain yet) stays locked; the Quilo is next", () => {
+    const s = areaStatuses(14, none);
+    expect(s.get("jardim-botanico")).toBe("new");
+    expect(s.get("museum")).toBe("locked");
+    expect(s.get("quilo")).toBe("next");
+  });
+
+  it("day 165: Os Esquilos opens, the last area with art, and nothing is next", () => {
+    const s = areaStatuses(165, none);
+    expect(s.get("os-esquilos")).toBe("new");
+    expect(s.get("santa-teresa")).toBe("new");
+    expect([...s.values()].filter((v) => v === "next")).toHaveLength(0);
+    expect(areaStatuses(164, none).get("os-esquilos")).toBe("next");
   });
 
   it("Christ the Redeemer is never next or open while another area with an opening day is locked", () => {
@@ -54,7 +69,19 @@ describe("which areas are open", () => {
     expect(opensOn("barraca")).toBe(3);
     expect(opensOn("boteco")).toBe(45);
     expect(opensOn("christ-the-redeemer")).toBeNull();
-    expect(opensOn("zona-sul")).toBeNull();
+    expect(opensOn("museum")).toBeNull();
+  });
+
+  it("opensOn: the phase-2a areas open on their days (rio-design.md, map.json)", () => {
+    expect(opensOn("zona-sul")).toBe(10);
+    expect(opensOn("jardim-botanico")).toBe(14);
+    expect(opensOn("quilo")).toBe(30);
+    expect(opensOn("sult")).toBe(90);
+    expect(opensOn("santa-teresa")).toBe(105);
+    expect(opensOn("os-esquilos")).toBe(165);
+    for (const k of ["zona-sul", "jardim-botanico", "quilo", "sult", "santa-teresa", "os-esquilos"]) {
+      expect(AREA_SCENES[k]).toEqual({ outside: `${k}/outside`, inside: [`${k}/inside`] });
+    }
   });
 
   it("every area with art has an outside scene and its insides", () => {
@@ -62,7 +89,8 @@ describe("which areas are open", () => {
     expect(AREA_SCENES.fazenda).toEqual({ outside: "fazenda/outside", inside: [] });
     expect(AREA_SCENES.barraca).toEqual({ outside: "ipanema-beach/outside", inside: ["barraca/inside"] });
     expect(Object.keys(AREA_SCENES).sort()).toEqual(
-      ["barraca", "boteco", "clothing-store", "fazenda", "ipanema-beach", "lagoa-house", "tijuca-park"],
+      ["barraca", "boteco", "clothing-store", "fazenda", "ipanema-beach", "jardim-botanico", "lagoa-house", "os-esquilos", "quilo",
+        "santa-teresa", "sult", "tijuca-park", "zona-sul"],
     );
   });
 
