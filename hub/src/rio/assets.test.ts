@@ -17,7 +17,7 @@ describe("the Rio art pack is bundled", () => {
 
   it("every scene base file is bundled", () => {
     const ids = Object.keys(SCENES) as SceneId[];
-    expect(ids.length).toBe(26);
+    expect(ids.length).toBe(28);
     for (const id of ids) {
       const s = SCENES[id];
       expect(Object.keys(s.base).length, id).toBeGreaterThan(0);
@@ -164,5 +164,39 @@ describe("the new sea off Arpoador replaces the rough first sea", () => {
     expect(sea.underlay!.count).toBe(4);
     expect(sea.underlay!.ms).toBe(160);
     for (const state of ["start", "full"]) for (const look of LOOKS) expect(rioUrl(sea.underlay!.strips[state]![look]!), `${state} ${look}`).not.toBe("");
+  });
+});
+
+describe("the museum (day art from the esme pack, Rio night and rain from week3/museum-looks)", () => {
+  it("the plaza is open: the summer day with its open doors stamped, night and rain drawn open", () => {
+    const out = SCENES["museum/outside"];
+    expect(Object.keys(out.base)).toEqual(["open"]);
+    expect(out.base.open!.day).toBe("esme-pack/week2-4/museum/location/plaza-summer.png");
+    expect(out.base.open!.night).toBe("week3/museum-looks/location/plaza-summer-open-night.png");
+    expect(out.stamps!.day).toEqual([{ file: "esme-pack/week2-4/museum/location/museum-doors-open.png", at: [152, 72] }]);
+    expect(out.stamps!.night ?? []).toEqual([]);
+    expect(out.slots).toHaveLength(11);
+    expect(out.tint).toBe(true);
+  });
+
+  it("the hall: summer by day, its night and rain, 27 display slots, the case glass over the finds", () => {
+    const hall = SCENES["museum/inside"];
+    expect(hall.scene).toEqual([352, 224]);
+    expect(hall.base.start!.rain).toBe("week3/museum-looks/inside/hall-summer-rain.png");
+    expect(hall.slots).toHaveLength(27);
+    expect(hall.slots.find((s) => s.id === "dais")).toMatchObject({ x: 176, y: 139, accepts: ["museum", "finds"] });
+    expect(hall.glass!.at).toHaveLength(4);
+    expect(rioUrl(hall.glass!.file)).not.toBe("");
+    expect(hall.tint).toBe(true);
+  });
+
+  it("every museum file resolves, with its falling rain", () => {
+    for (const id of ["museum/outside", "museum/inside"] as SceneId[]) {
+      const s = SCENES[id];
+      for (const looks of Object.values(s.base)) for (const look of LOOKS) expect(rioUrl(looks[look]!), `${id} ${look}`).not.toBe("");
+      for (const st of Object.values(s.stamps ?? {})) for (const x of st) expect(rioUrl(x.file)).not.toBe("");
+      expect(rioUrl(s.rainOverlay!.strip!.file), id).not.toBe("");
+      expect(s.rainOverlay!.strip!.count).toBe(4);
+    }
   });
 });

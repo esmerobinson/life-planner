@@ -23,6 +23,18 @@ const AREAS = [
   "later/os-esquilos",
   "later/santa-teresa",
   "later/arpoador-sea",
+  "week3/museum-looks",
+];
+// The museum's day art is the finished esme pack's (summer = the Rio day), beside the rio pack; only
+// what the Rio museum reads (its night and rain are week3/museum-looks).
+const MUSEUM_DAY = "esme-pack/week2-4/museum";
+const MUSEUM_DAY_FILES = [
+  "location/plaza-summer.png",
+  "location/museum-doors-open.png",
+  "location/plaza-slots.json",
+  "inside/hall-summer.png",
+  "inside/room-hall.json",
+  "inside/pieces/case-glass.png",
 ];
 const SKIP = [
   /\/previews\//, /\/_scratch\//, /REVIEW-ONLY/, /\/no-esme\//,
@@ -58,5 +70,13 @@ for (const area of AREAS) {
     count++;
     bytes += statSync(file).size;
   }
+}
+for (const f of MUSEUM_DAY_FILES) {
+  const from = join(pack, "..", MUSEUM_DAY, f);
+  const to = join(out, MUSEUM_DAY, f);
+  mkdirSync(dirname(to), { recursive: true });
+  copyFileSync(from, to);
+  count++;
+  bytes += statSync(from).size;
 }
 console.log(`${count} files, ${(bytes / 1024 / 1024).toFixed(2)} MB`);

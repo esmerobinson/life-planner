@@ -35,11 +35,16 @@ describe("which areas are open", () => {
     expect(s.get("jardim-botanico")).toBe("next");
   });
 
-  it("day 14: the Jardim Botanico opens; the museum (no Rio night or rain yet) stays locked; the Quilo is next", () => {
+  it("day 14: the Jardim Botanico opens; the museum is next", () => {
     const s = areaStatuses(14, none);
     expect(s.get("jardim-botanico")).toBe("new");
-    expect(s.get("museum")).toBe("locked");
-    expect(s.get("quilo")).toBe("next");
+    expect(s.get("museum")).toBe("next");
+  });
+
+  it("day 21: the museum opens, outside and its hall", () => {
+    expect(areaStatuses(20, none).get("museum")).toBe("next");
+    expect(areaStatuses(21, none).get("museum")).toBe("new");
+    expect(AREA_SCENES.museum).toEqual({ outside: "museum/outside", inside: ["museum/inside"] });
   });
 
   it("day 165: Os Esquilos opens, the last area with art, and nothing is next", () => {
@@ -69,7 +74,7 @@ describe("which areas are open", () => {
     expect(opensOn("barraca")).toBe(3);
     expect(opensOn("boteco")).toBe(45);
     expect(opensOn("christ-the-redeemer")).toBeNull();
-    expect(opensOn("museum")).toBeNull();
+    expect(opensOn("museum")).toBe(21); // its Rio night and rain landed 2026-11-17
   });
 
   it("opensOn: the phase-2a areas open on their days (rio-design.md, map.json)", () => {
@@ -89,7 +94,7 @@ describe("which areas are open", () => {
     expect(AREA_SCENES.fazenda).toEqual({ outside: "fazenda/outside", inside: [] });
     expect(AREA_SCENES.barraca).toEqual({ outside: "ipanema-beach/outside", inside: ["barraca/inside"] });
     expect(Object.keys(AREA_SCENES).sort()).toEqual(
-      ["barraca", "boteco", "clothing-store", "fazenda", "ipanema-beach", "jardim-botanico", "lagoa-house", "os-esquilos", "quilo",
+      ["barraca", "boteco", "clothing-store", "fazenda", "ipanema-beach", "jardim-botanico", "lagoa-house", "museum", "os-esquilos", "quilo",
         "santa-teresa", "sult", "tijuca-park", "zona-sul"],
     );
   });

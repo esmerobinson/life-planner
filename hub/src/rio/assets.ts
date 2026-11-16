@@ -92,7 +92,8 @@ export type SceneId =
   | "quilo/outside" | "quilo/inside"
   | "sult/outside" | "sult/inside"
   | "os-esquilos/outside" | "os-esquilos/inside"
-  | "santa-teresa/outside" | "santa-teresa/inside";
+  | "santa-teresa/outside" | "santa-teresa/inside"
+  | "museum/outside" | "museum/inside";
 
 export interface Slot {
   id: string;
@@ -125,6 +126,12 @@ export interface SceneData {
   slots: Slot[];
   /** The falling rain, drawn over everything while the look is rain. */
   rainOverlay?: { frames?: string[]; strip?: { file: string; count: number; size: [number, number] }; ms: number };
+  /** Small pictures stamped on the base in a look (the museum's open doors by day). */
+  stamps?: Partial<Record<Look, { file: string; at: [number, number] }[]>>;
+  /** Glass drawn over the placed stickers (the museum's case glints). */
+  glass?: { file: string; at: [number, number][] };
+  /** Placed stickers (and the glass) take the look's colours (tint.ts), as the museum's README asks. */
+  tint?: boolean;
   /** Under the stickers, over the base: a strip per state and look (the sea's caustics). */
   underlay?: { strips: Record<string, Partial<Record<Look, string>>>; count: number; size: [number, number]; ms: number };
   /** The boteco's bar TV: frames per look at `at` (the base already shows frame 0). */
@@ -150,7 +157,7 @@ interface SceneSource {
 }
 
 const IPANEMA_RAIN_MS = 120; // ipanema-slots.json looks.rain: "about 120 ms a frame"
-const SOURCES: Record<SceneId, SceneSource> = {
+const SOURCES: Record<Exclude<SceneId, "museum/outside" | "museum/inside">, SceneSource> = {
   "lagoa-house/outside": { file: "day1/lagoa-house/outside/sticker-slots.json", root: "day1/lagoa-house" },
   "lagoa-house/living": { file: "day1/lagoa-house/inside/living-slots.json", root: "day1/lagoa-house" },
   "lagoa-house/bedroom": { file: "day1/lagoa-house/inside/bedroom-slots.json", root: "day1/lagoa-house" },
@@ -288,9 +295,48 @@ function readScene(src: SceneSource): SceneData {
   return data;
 }
 
-export const SCENES: Record<SceneId, SceneData> = Object.fromEntries(
-  (Object.entries(SOURCES) as [SceneId, SceneSource][]).map(([id, src]) => [id, readScene(src)]),
-) as Record<SceneId, SceneData>;
+// ---- the museum: day from the esme pack (summer is the Rio day), night and rain from week3 ----
+
+const MUSEUM_DAY = "esme-pack/week2-4/museum";
+const MUSEUM_LOOKS = "week3/museum-looks";
+type RawStreaks = { file: string; frame: [number, number]; frames: number; frame_ms: number };
+const streaks = (name: "plaza" | "hall"): SceneData["rainOverlay"] => {
+  const j = readJson<RawStreaks>(`${MUSEUM_LOOKS}/rain/${name}-rain-streaks.json`);
+  return { strip: { file: `${MUSEUM_LOOKS}/${j.file}`, count: j.frames, size: j.frame }, ms: j.frame_ms };
+};
+
+function museumOutside(): SceneData {
+  const raw = readJson<{ scene: [number, number]; states: { open: { stamps: { file: string; x: number; y: number }[] } }; slots: RawSlot[] }>(
+    `${MUSEUM_DAY}/location/plaza-slots.json`);
+  return {
+    scene: raw.scene,
+    // She only reaches the plaza once it's open: the doors stand open.
+    base: { open: { day: `${MUSEUM_DAY}/location/plaza-summer.png`, night: `${MUSEUM_LOOKS}/location/plaza-summer-open-night.png`, rain: `${MUSEUM_LOOKS}/location/plaza-summer-open-rain.png` } },
+    stamps: { day: raw.states.open.stamps.map((st) => ({ file: `${MUSEUM_DAY}/${st.file}`, at: [st.x, st.y] as [number, number] })) },
+    slots: readSlots(raw.slots),
+    rainOverlay: streaks("plaza"),
+    tint: true,
+  };
+}
+
+function museumInside(): SceneData {
+  const raw = readJson<{ size_px: [number, number]; display_slots: { id: string; foot: [number, number]; accepts: string[] }[]; case_glass: { file: string; at: [number, number][] } }>(
+    `${MUSEUM_DAY}/inside/room-hall.json`);
+  return {
+    scene: raw.size_px,
+    base: { start: { day: `${MUSEUM_DAY}/inside/hall-summer.png`, night: `${MUSEUM_LOOKS}/inside/hall-summer-night.png`, rain: `${MUSEUM_LOOKS}/inside/hall-summer-rain.png` } },
+    slots: raw.display_slots.map((d) => ({ id: d.id, x: d.foot[0], y: d.foot[1], accepts: d.accepts })),
+    glass: { file: `${MUSEUM_DAY}/${raw.case_glass.file}`, at: raw.case_glass.at },
+    rainOverlay: streaks("hall"),
+    tint: true,
+  };
+}
+
+export const SCENES: Record<SceneId, SceneData> = {
+  ...(Object.fromEntries((Object.entries(SOURCES) as [SceneId, SceneSource][]).map(([id, src]) => [id, readScene(src)])) as Record<SceneId, SceneData>),
+  "museum/outside": museumOutside(),
+  "museum/inside": museumInside(),
+};
 
 /** A scene's base for a state and look: night and day as drawn; rain falls back to day where a scene has none. */
 export function sceneBase(id: SceneId, state: string, look: Look): string {

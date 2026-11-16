@@ -74,6 +74,9 @@ export function scenePlan(scene: SceneId, placed: readonly string[], counts: Rio
       plan.covers = Math.floor(plan.books / SANTA_TERESA_COVER_EVERY);
       return plan;
     }
+    case "museum": // one drawn state per scene (the plaza open, the hall)
+      plan.state = Object.keys(SCENES[scene].base)[0]!;
+      return plan;
     case "zona-sul":
       plan.state = ZONA_SUL_STATE;
       return plan;

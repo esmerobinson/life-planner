@@ -1,0 +1,107 @@
+{
+ "pack": "rio-pack week3",
+ "area": "museum-looks",
+ "name": "Museum: Rio night and rain looks",
+ "opens_day": 21,
+ "base_season": "summer (the sunny Rio day base of the finished museum; winter/spring/autumn are not used in Rio)",
+ "day": {
+  "plaza": "art/final/esme-pack/week2-4/museum/location/plaza-summer.png (+ ribbon, sign, doors-open stamps)",
+  "hall": "art/final/esme-pack/week2-4/museum/inside/hall-summer.png (hall-furnished-summer is composed in sources: the 22-find preview, on summer)"
+ },
+ "scenes": {
+  "plaza-summer": {
+   "size": [
+    320,
+    192
+   ],
+   "day": "art/final/esme-pack/week2-4/museum (summer base)",
+   "night": "location/plaza-summer-night.png",
+   "rain": "location/plaza-summer-rain.png",
+   "saturation": {
+    "day": 0.565,
+    "night": 0.595,
+    "rain": 0.692
+   }
+  },
+  "plaza-summer-opening-soon": {
+   "size": [
+    320,
+    192
+   ],
+   "day": "art/final/esme-pack/week2-4/museum (summer base)",
+   "night": "location/plaza-summer-opening-soon-night.png",
+   "rain": "location/plaza-summer-opening-soon-rain.png",
+   "saturation": {
+    "day": 0.567,
+    "night": 0.597,
+    "rain": 0.699
+   }
+  },
+  "plaza-summer-open": {
+   "size": [
+    320,
+    192
+   ],
+   "day": "art/final/esme-pack/week2-4/museum (summer base)",
+   "night": "location/plaza-summer-open-night.png",
+   "rain": "location/plaza-summer-open-rain.png",
+   "saturation": {
+    "day": 0.565,
+    "night": 0.596,
+    "rain": 0.699
+   }
+  },
+  "hall-summer": {
+   "size": [
+    352,
+    224
+   ],
+   "day": "art/final/esme-pack/week2-4/museum (summer base)",
+   "night": "inside/hall-summer-night.png",
+   "rain": "inside/hall-summer-rain.png",
+   "saturation": {
+    "day": 0.642,
+    "night": 0.76,
+    "rain": 0.664
+   }
+  },
+  "hall-furnished-summer": {
+   "size": [
+    352,
+    224
+   ],
+   "day": "art/final/esme-pack/week2-4/museum (summer base)",
+   "night": "inside/hall-furnished-summer-night.png",
+   "rain": "inside/hall-furnished-summer-rain.png",
+   "saturation": {
+    "day": 0.632,
+    "night": 0.752,
+    "rain": 0.654
+   }
+  }
+ },
+ "plaza_states": {
+  "opening-soon": "plaza-summer-opening-soon-{look}.png (ribbon + chalk sign baked in)",
+  "open": "plaza-summer-open-{look}.png (doors open; at night the hall glows and spills onto the steps; in rain honey streaks on the stones)",
+  "base": "plaza-summer-{look}.png (empty, no stamps; stickers go on top as in the day art)"
+ },
+ "rain_overlays": {
+  "plaza": {
+   "strip": "rain/plaza-rain-streaks.png",
+   "json": "rain/plaza-rain-streaks.json"
+  },
+  "hall": {
+   "strip": "rain/hall-rain-streaks.png",
+   "json": "rain/hall-rain-streaks.json"
+  }
+ },
+ "palettes": {
+  "night": "palette-night.json",
+  "rain": "palette-rain.json"
+ },
+ "rules": {
+  "colourful": "average HSV saturation of every night and rain image is at least its day image's (checked, asserted in deliver.py)",
+  "alpha": "hard (0 or 255)"
+ },
+ "sources": "art/sources/rio-pack/museum-looks/ (python3 -I -B deliver.py)"
+}

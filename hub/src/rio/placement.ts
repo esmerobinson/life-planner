@@ -21,7 +21,7 @@ export const HOME: Record<string, Home> = {
   farmhouse: { area: "boteco", scene: "boteco/inside" },
   orchard: { area: "jardim-botanico", scene: "jardim-botanico/outside" }, // the palm avenue (phase 2a)
   glasshouse: { area: "jardim-botanico", scene: "jardim-botanico/inside" }, // the orchid house (phase 2a)
-  museum: null, // the museum: no Rio night or rain art yet
+  museum: { area: "museum", scene: "museum/inside" }, // the hall's displays (phase 2a)
   bonus: null,
 };
 
@@ -46,6 +46,7 @@ const TAGS_BY_GROUP: Record<string, string[]> = {
   // picnic blanket on the tree spots; the glasshouse's plants on the plant spots.
   orchard: ["trees:tree"],
   glasshouse: ["greenhouse:plant"],
+  museum: ["museum"], // the hall's plinths, cases and shelves
 };
 /** Single stickers whose kind differs from their group's. */
 const TAGS_BY_KEY: Record<string, string[]> = {

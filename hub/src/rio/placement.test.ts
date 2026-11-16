@@ -24,12 +24,19 @@ describe("where earned stickers sit", () => {
     expect(homeOf("no-such-sticker")).toBeNull();
   });
 
-  it("a placed museum sticker has no home and no slot (the museum has no Rio night or rain yet)", () => {
-    const museum = keysIn("museum")[0]!;
-    expect(homeOf(museum)).toBeNull();
+  it("museum stickers are displayed in the museum's hall (day 21), every one on a display slot", () => {
+    const museum = keysIn("museum");
+    expect(homeOf("ammonite")).toEqual({ area: "museum", scene: "museum/inside" });
+    expect(homeOf("pressed-daisy")).toEqual({ area: "museum", scene: "museum/inside" });
+    const { bySlot, overflow } = layout("museum/inside", museum);
+    expect(bySlot.size).toBe(museum.length);
+    expect(overflow).toBe(0);
+  });
+
+  it("a bonus sticker has no home and no slot (it stays in the collection)", () => {
     for (const id of Object.keys(SCENES)) {
-      const { bySlot } = layout(id as keyof typeof SCENES, [museum]);
-      expect([...bySlot.values()]).not.toContain(museum);
+      const { bySlot } = layout(id as keyof typeof SCENES, ["cleared-mind"]);
+      expect([...bySlot.values()]).not.toContain("cleared-mind");
     }
   });
 

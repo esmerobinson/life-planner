@@ -1,0 +1,170 @@
+{
+ "location": "museum-plaza",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "base": {
+  "winter": "location/plaza-winter.png",
+  "spring": "location/plaza-spring.png",
+  "summer": "location/plaza-summer.png",
+  "autumn": "location/plaza-autumn.png"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front",
+ "states": {
+  "opening-soon": {
+   "note": "until the museum opens (day 21, or held by a stuck task): stamp both",
+   "stamps": [
+    {
+     "file": "location/museum-ribbon.png",
+     "x": 149,
+     "y": 82
+    },
+    {
+     "file": "location/museum-opening-soon-sign.png",
+     "x": 186,
+     "y": 148
+    }
+   ]
+  },
+  "open": {
+   "note": "once open: the doors stand open onto the lit hall; walking in goes to inside/room-hall.json",
+   "stamps": [
+    {
+     "file": "location/museum-doors-open.png",
+     "x": 152,
+     "y": 72
+    }
+   ]
+  }
+ },
+ "door": {
+  "x": 152,
+  "y": 72,
+  "w": 16,
+  "h": 26,
+  "note": "tap / walk here to go inside when open"
+ },
+ "stairs": {
+  "x": 144,
+  "y": 170,
+  "w": 32,
+  "h": 22,
+  "note": "stone stairs down to the village (map exit)"
+ },
+ "baked": "building, plaza paving and medallion, 4 lamp posts, 2 benches, 2 urns, bushes, cliff and stairs",
+ "slots": [
+  {
+   "id": "statue-centre",
+   "x": 160,
+   "y": 142,
+   "area": "plaza-medallion",
+   "accepts": [
+    "museum-outdoor:statue"
+   ],
+   "note": "the big one: a statue or fountain stands on the compass medallion"
+  },
+  {
+   "id": "statue-left",
+   "x": 102,
+   "y": 122,
+   "area": "plaza",
+   "accepts": [
+    "museum-outdoor:statue",
+    "museum-outdoor:display"
+   ]
+  },
+  {
+   "id": "statue-right",
+   "x": 218,
+   "y": 122,
+   "area": "plaza",
+   "accepts": [
+    "museum-outdoor:statue",
+    "museum-outdoor:display"
+   ]
+  },
+  {
+   "id": "display-1",
+   "x": 86,
+   "y": 160,
+   "area": "plaza",
+   "accepts": [
+    "museum-outdoor:display",
+    "museum-outdoor:statue"
+   ]
+  },
+  {
+   "id": "display-2",
+   "x": 234,
+   "y": 160,
+   "area": "plaza",
+   "accepts": [
+    "museum-outdoor:display",
+    "museum-outdoor:statue"
+   ]
+  },
+  {
+   "id": "display-3",
+   "x": 120,
+   "y": 124,
+   "area": "plaza",
+   "accepts": [
+    "museum-outdoor:display"
+   ]
+  },
+  {
+   "id": "display-4",
+   "x": 200,
+   "y": 124,
+   "area": "plaza",
+   "accepts": [
+    "museum-outdoor:display"
+   ]
+  },
+  {
+   "id": "lawn-left",
+   "x": 26,
+   "y": 128,
+   "area": "lawn",
+   "accepts": [
+    "museum-outdoor:display",
+    "museum-outdoor:statue",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "lawn-right",
+   "x": 296,
+   "y": 128,
+   "area": "lawn",
+   "accepts": [
+    "museum-outdoor:display",
+    "museum-outdoor:statue",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "top-left",
+   "x": 40,
+   "y": 56,
+   "area": "lawn",
+   "accepts": [
+    "museum-outdoor:display",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "top-right",
+   "x": 282,
+   "y": 52,
+   "area": "lawn",
+   "accepts": [
+    "museum-outdoor:display",
+    "outdoor"
+   ]
+  }
+ ]
+}

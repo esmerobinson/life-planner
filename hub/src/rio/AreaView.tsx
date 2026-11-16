@@ -14,6 +14,7 @@ import { sceneKeep } from "./mapMath";
 import { TextButton } from "./menu/pieces";
 import { layout } from "./placement";
 import { NO_COUNTS, scenePlan, type RioCounts } from "./progress";
+import { drawTinted, tintFor } from "./tint";
 import { BitmapText } from "./ui/BitmapText";
 import { useUi } from "./ui/fit";
 
@@ -45,6 +46,8 @@ export const SCENE_NAMES: Record<SceneId, string> = {
   "os-esquilos/inside": "The dining room",
   "santa-teresa/outside": "Santa Teresa",
   "santa-teresa/inside": "The studio",
+  "museum/outside": "Museum",
+  "museum/inside": "The rotunda hall",
 };
 
 const STICKER = 16;
@@ -103,7 +106,10 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   const underlayTick = useTicker(underlay?.ms ?? 1000, !!underlayStrip && !reduced);
   const nightTick = useTicker(NIGHT_TICK_MS, !!nightSide && !reduced);
 
-  const layerFiles = [underlayStrip, ...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
+  // The museum: its open doors by day, the case glass over its finds, and finds in the look's colours.
+  const stampList = data.stamps?.[shownLook] ?? [];
+  const tintPair = data.tint && shownLook !== "day" ? { day: data.base[state]?.day ?? "", look: base } : null;
+  const layerFiles = [...stampList.map((st) => st.file), data.glass?.file ?? "", tintPair?.day ?? "", underlayStrip, ...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
   const files = useMemo(() => [base, ...layerFiles, ...rainFrames, ...tvFrames], [base, layerFiles.join(), rainFrames.join(), tvFrames.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const images = useRioImages(files);
   const sheets = useSheets(STICKER_SHEETS);
@@ -130,16 +136,20 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
     ctx.clearRect(0, 0, w, h);
     const b = images[base];
     if (b) ctx.drawImage(b, 0, 0);
-    const put = (f: string) => {
+    const put = (f: string, x = 0, y = 0) => {
       const i = images[f];
-      if (i) ctx.drawImage(i, 0, 0);
+      if (i) ctx.drawImage(i, x, y);
     };
+    for (const st of stampList) put(st.file, st.at[0], st.at[1]);
+    const dayImg = tintPair ? images[tintPair.day] : undefined;
+    const lookImg = tintPair ? images[tintPair.look] : undefined;
+    const tint = tintPair && dayImg && lookImg ? tintFor(`${tintPair.day}|${tintPair.look}`, dayImg, lookImg) : null;
     if (underlay && underlayStrip) {
       const img = images[underlayStrip];
       if (img) drawFrame(ctx, img, underlay.size[0], underlay.size[1], reduced ? 0 : underlayTick % underlay.count, 0, 0);
     }
-    celebrationFiles.forEach(put);
-    milestoneFiles.forEach(put);
+    for (const f of celebrationFiles) put(f);
+    for (const f of milestoneFiles) put(f);
     // Book n draws spine n at shelf slot n (one that needs a milestone only once it's earned); every fifth hangs a cover.
     if (data.books) {
       const copy = (sheet: string, slots: NonNullable<typeof data.books>["spines"]["slots"], n: number) => {
@@ -159,7 +169,16 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
         if (!st) continue;
         const left = slot.x - STICKER / 2;
         const top = slot.anchor === "top" ? slot.y : slot.y - STICKER + 1;
-        drawSticker(ctx, sheets, st, "sticker", left, top);
+        if (tint) drawTinted(ctx, tint, { x: left, y: top, w: STICKER, h: STICKER }, (c, x, y) => drawSticker(c, sheets, st, "sticker", x, y));
+        else drawSticker(ctx, sheets, st, "sticker", left, top);
+      }
+    }
+    // The museum's case glass over its finds (in the look's colours too).
+    const glass = data.glass ? images[data.glass.file] : undefined;
+    if (data.glass && glass) {
+      for (const [gx, gy] of data.glass.at) {
+        if (tint) drawTinted(ctx, tint, { x: gx, y: gy, w: glass.width, h: glass.height }, (c, x, y) => c.drawImage(glass, x, y));
+        else ctx.drawImage(glass, gx, gy);
       }
     }
     // The bar TV (the base already shows its first frame, so with reduced motion nothing is drawn).
