@@ -1,0 +1,7 @@
+{
+ "name": "Fazenda extras (Rio pack, day 1)",
+ "notes": "No new colours. Day uses the summer palette plus the pack's existing extra ramps: red + vg_terra + ch_rust = the terracotta roof, stone + cream = whitewash, cot_blue = the colonial blue shutters, door and barra, vgg_floor = the veranda's ladrilho tiles, cot_leaf + fam_pine = coffee and jackfruit leaves, mus_garnet + ch_cocoa = coffee cherries drying, mead_stone = granite (falls, terrace walls, rocks), cream + dirt0 = the golden sand, water + fam_aqua = the cove, hol_br_mag = bougainvillea, ch_cloth_red + yel + fam_blue = the hammock and the macaws. Rain (2026-11-14) uses look colours: each day colour's exact rain twin plus 5 rain-only extras (rn_sky0-2, rn_glint, rn_mist), listed in looks/palette-rain.json; night uses only palette-night-v2.json colours.",
+ "ramps": [],
+ "newColoursFound": 0,
+ "newColourNames": []
+}

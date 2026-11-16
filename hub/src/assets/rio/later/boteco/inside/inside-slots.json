@@ -1,0 +1,225 @@
+{
+ "location": "boteco-inside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "inside/boteco-inside-start-day.png",
+   "night": "inside/boteco-inside-start-night.png"
+  },
+  "full": {
+   "day": "inside/boteco-inside-full-day.png",
+   "night": "inside/boteco-inside-full-night.png"
+  }
+ },
+ "base_without_esme": {
+  "full": {
+   "day": "inside/no-esme/boteco-inside-full-day.png",
+   "night": "inside/no-esme/boteco-inside-full-night.png"
+  },
+  "note": "Esme's chair and Mr Cat's stool left empty"
+ },
+ "looks": "day or night (the inside has no rain look: rain days show the day base)",
+ "overlays": {
+  "tv": {
+   "at": [
+    320,
+    23
+   ],
+   "size": [
+    40,
+    16
+   ],
+   "frame_ms": 220,
+   "frames": {
+    "day": [
+     "inside/tv-day-0.png",
+     "inside/tv-day-1.png",
+     "inside/tv-day-2.png"
+    ],
+    "night": [
+     "inside/tv-night-0.png",
+     "inside/tv-night-1.png",
+     "inside/tv-night-2.png"
+    ]
+   },
+   "note": "the bar TV always shows a Brighton and Hove Albion game (blue-and-white stripes, white shorts) against a red side. Loop the frames in order (0, 1, 2) over the full base at 'at', about 220 ms a frame. Each frame is the screen's size and transparent where someone stands in front of it. With reduced motion, show nothing: the base already shows frame 0."
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front; draw stickers after the base",
+ "states": {
+  "start": {
+   "note": "bare counter, a few bottles, empty walls, one table, the owner behind the bar"
+  },
+  "full": {
+   "note": "bottles to the ceiling, photos, pennant, TV and neon, the cook, friends, the samba circle, Esme at a table and Mr Cat on a bar stool"
+  }
+ },
+ "door": {
+  "x": 176,
+  "y": 224,
+  "w": 32,
+  "h": 16,
+  "note": "the street door: back to location/outside-slots.json"
+ },
+ "room": {
+  "floor": [
+   16,
+   100,
+   352,
+   124
+  ],
+  "back_wall": [
+   16,
+   16,
+   352,
+   84
+  ]
+ },
+ "esme_spot": {
+  "esme": [
+   168,
+   188
+  ],
+  "cat": [
+   238,
+   145
+  ],
+  "note": "Esme sits behind the middle table; Mr Cat on the last bar stool"
+ },
+ "baked": "room shell, bar, back bar, stools, tables and chairs, kitchen doorway, fans, fixtures and people per state",
+ "slots": [
+  {
+   "id": "bar-1",
+   "x": 141,
+   "y": 106,
+   "area": "bar",
+   "accepts": [
+    "boteco:bar"
+   ],
+   "note": "on the marble bar top, up to 12x14"
+  },
+  {
+   "id": "bar-2",
+   "x": 201,
+   "y": 106,
+   "area": "bar",
+   "accepts": [
+    "boteco:bar"
+   ]
+  },
+  {
+   "id": "bar-3",
+   "x": 215,
+   "y": 106,
+   "area": "bar",
+   "accepts": [
+    "boteco:bar"
+   ]
+  },
+  {
+   "id": "table-1",
+   "x": 57,
+   "y": 138,
+   "area": "table",
+   "accepts": [
+    "boteco:table"
+   ],
+   "note": "on the window table (there from day one), up to 12x12"
+  },
+  {
+   "id": "sill-1",
+   "x": 70,
+   "y": 67,
+   "area": "windowsill",
+   "accepts": [
+    "boteco:small"
+   ],
+   "note": "on the windowsill (Mr Cat's spot), up to 16x16"
+  },
+  {
+   "id": "wall-1",
+   "x": 274,
+   "y": 94,
+   "area": "wall",
+   "accepts": [
+    "boteco:wall"
+   ],
+   "note": "on the tiles under the chalkboard, up to 20x20"
+  },
+  {
+   "id": "wall-2",
+   "x": 298,
+   "y": 94,
+   "area": "wall",
+   "accepts": [
+    "boteco:wall"
+   ]
+  },
+  {
+   "id": "wall-3",
+   "x": 22,
+   "y": 94,
+   "area": "wall",
+   "accepts": [
+    "boteco:wall"
+   ],
+   "note": "narrow: up to 10x20"
+  },
+  {
+   "id": "floor-1",
+   "x": 40,
+   "y": 206,
+   "area": "floor",
+   "accepts": [
+    "boteco:big",
+    "boteco:small"
+   ],
+   "note": "up to 32x32"
+  },
+  {
+   "id": "floor-2",
+   "x": 136,
+   "y": 214,
+   "area": "floor",
+   "accepts": [
+    "boteco:big",
+    "boteco:small"
+   ]
+  },
+  {
+   "id": "floor-3",
+   "x": 222,
+   "y": 164,
+   "area": "floor",
+   "accepts": [
+    "boteco:big",
+    "boteco:small"
+   ]
+  },
+  {
+   "id": "floor-4",
+   "x": 286,
+   "y": 214,
+   "area": "floor",
+   "accepts": [
+    "boteco:big",
+    "boteco:small"
+   ]
+  },
+  {
+   "id": "floor-5",
+   "x": 350,
+   "y": 150,
+   "area": "floor",
+   "accepts": [
+    "boteco:small"
+   ],
+   "note": "up to 16x24"
+  }
+ ]
+}

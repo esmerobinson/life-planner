@@ -21,6 +21,10 @@ import { SidePanel } from "./SidePanel";
 import { isSearchShortcut, SearchDialog } from "./SearchDialog";
 import { useHubData } from "./useHubData";
 import { syncController } from "../sync";
+import { togetherRunner } from "../together/runner";
+import { FarmProvider } from "../farm/FarmContext";
+import { Nook } from "../farm/Nook";
+import { ErrorGuard } from "./ErrorGuard";
 import { useReminderScheduler } from "../reminders/scheduler";
 import { useNativeNavigate } from "../reminders/nativeNavigate";
 
@@ -98,6 +102,8 @@ export function AppShell() {
   // Automatic sync (does nothing until an address and passphrase are saved on the Sync
   // page). Rows that arrive refresh every view the same way a local write does.
   useEffect(() => syncController.start({ onSynced: () => void changed() }), [changed]);
+  // The Together link copies after each finished sync run (only on a device signed in to it).
+  useEffect(() => togetherRunner.start(syncController), []);
 
   // The shell's Undo line (fix round 1, I-2): e.g. after a project lost its sessions.
   const [undoNote, setUndoNote] = useState<UndoNote | null>(null);
@@ -147,6 +153,7 @@ export function AppShell() {
       <OpenAddContext.Provider value={openAddWith}>
       <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
+      <FarmProvider items={items} goals={goals} today={today}>
       <div className={phone ? "app-shell is-phone" : "app-shell"}>
         {!phone && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
@@ -160,7 +167,10 @@ export function AppShell() {
               <Link to="/inbox" className="btn-secondary shell-inbox">{inboxLabel}</Link>
             </div>
           )}
-          <Outlet />
+          {/* A page that throws while drawing shows this instead; the sidebar and every other page stay (bug #46). */}
+          <ErrorGuard resetOn={location.pathname} name="page" fallback={<PageProblem />}>
+            <Outlet />
+          </ErrorGuard>
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
           {searching && (
             <SearchDialog items={items} goals={goals} today={today} phone={phone} onClose={() => setSearching(false)} />
@@ -200,12 +210,26 @@ export function AppShell() {
               />
             )}
           </AddButton>
+          {phone && <ErrorGuard name="nook"><Nook phone /></ErrorGuard>}
         </main>
       </div>
+      </FarmProvider>
       </PanelProvider>
       </ShellUndoContext.Provider>
       </OpenAddContext.Provider>
       </AddDefaultsContext.Provider>
     </ShellContext.Provider>
+  );
+}
+
+/** Wording provisional (for Esme / Design). */
+function PageProblem() {
+  return (
+    <div role="alert">
+      <p>This page hit a problem. Everything you wrote is saved.</p>
+      <button type="button" className="btn-secondary" onClick={() => window.location.reload()}>
+        Reload
+      </button>
+    </div>
   );
 }

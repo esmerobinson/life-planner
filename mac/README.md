@@ -36,8 +36,41 @@ The result is `mac/build/Esmeworld.app` (ignored by git). The script:
 This copies the app to `~/Applications` (your own Applications folder, never
 `/Applications`). Rebuilding with `--install` replaces the app but not your data.
 It is safe to install while Esmeworld is open: the new copy is made next to the
-old one and then swapped in all at once. The open window keeps running the old
-version until you quit and reopen Esmeworld.
+old one and then swapped in all at once.
+
+### An open Esmeworld moves onto the new version by itself
+
+An open window used to keep running the old version in memory until it was
+quit, so fixes never reached it (bug #39); worse, its old page could load new
+files from the new copy. Now:
+
+- Every build writes two ids into `Info.plist`: `EsmeworldWebBuild` (a hash of
+  the web files) and `EsmeworldShellBuild` (a hash of the app's source, compiler,
+  flags and `Info.plist`). Rebuilding the same thing gives the same ids.
+- The open app compares them with the copy on disk when she comes back to it,
+  when she leaves it, every 2 minutes, and at once when `build.sh --install`
+  tells it (a distributed notification, `world.esme.esmeworld.newVersionInstalled`).
+- First it asks the page to save: `window.esmeworldPrepareReload` runs the same
+  saves as switching away from the app and waits until they are written. Then a
+  new web build reloads the page from the new files, on the same page; a new app
+  build quits and reopens the app, on the same page (behind her other windows if
+  she was in another app).
+- Never while she is typing. With the window in front it waits until nothing
+  has been typed for 30 seconds (and nothing is being composed); with another
+  app in front, or the window hidden or minimized, it goes straight away.
+  Until then it checks again every 10 seconds.
+- A part of the page that loads later and fails to load (an old page asking for
+  files the install replaced) saves and reloads too, at most once a minute.
+- Quitting (Cmd+Q, Quit, closing the window) saves the page first.
+- Nothing is shown on screen apart from the reload itself.
+
+`build.sh --install` then says plainly what happened (`mac/tell-running-app.sh`
+reads back `~/Library/Application Support/Esmeworld/running-build.json`, which
+the app keeps up to date): **UPDATED**, **WAITING** (it will change over as
+soon as she stops typing or switches app), **NOT UPDATED** (an open app from
+before this version, which can't do any of this: quit it with Cmd+Q, after a
+few seconds without typing, and open it again; needed once), or not open. It
+never kills or quits the app.
 Because the app is built on this Mac, macOS normally opens it without a
 warning. If it does refuse, right-click the app in Finder and choose Open.
 
@@ -114,7 +147,7 @@ page's address, which is `esmeworld://app`.
 - Menus: Esmeworld (About, Hide, Quit), Edit (Undo, Redo, Cut, Copy, Paste,
   Select All), View (Reload, Actual Size, Zoom In, Zoom Out), Window (Minimize,
   Zoom, Close). The window remembers its size and position. Closing the window
-  quits the app.
+  quits the app. Quitting saves the page first.
 - Web Inspector, for debugging only: start the app with `ESMEWORLD_DEBUG=1`, or
   run `defaults write world.esme.esmeworld EsmeworldDebug -bool YES` and reopen
   it. Then right-click > Inspect Element, or Safari > Develop.
@@ -139,7 +172,8 @@ app. A new version arrives by rebuilding and reinstalling.
 
 ## Not included yet
 
-- Automatic updates
+- Automatic updates from anywhere but this Mac (an open app does pick up a
+  new local install by itself; see Install)
 - A menu-bar item
 - Sync between the Mac app, browsers and phone
 - Signing with a Developer ID, and notarisation (needed to share the app with
@@ -161,6 +195,19 @@ id, kept in `~/Library/WebKit/world.esme.esmeworld/WebsiteDataStore/5e1f7e57-…
 your data is in `…/WebsiteData`). So it works while Esmeworld is open, and can't
 block on, or change, anything the real app is using. It does not restore or
 save window positions either.
+
+New versions (see "An open Esmeworld moves onto the new version by itself"):
+it checks the build ids are in `Info.plist` and match the page, the reload
+decisions (same, new web build, new app build, unreadable ids), that the page
+has its hooks, that a flush waits for a write still in progress, and that a
+reload is refused while typing. Then it points the app at a copy of its
+`Info.plist` (the bundle itself is never changed), puts a new web build id in
+it and posts the install notification to itself: pretending the window is in
+front just after typing, it must wait (`running-build-selftest.json` says
+`waiting`, no reload); behind other windows it must save and reload onto the
+new id, on the same page. A failed lazy load must reload once and not again.
+It never relaunches (only that decision is checked), and its status file is
+its own, never `running-build.json`.
 
 It counts launches in a database in that store. The first run deletes the
 self-test store (only that one) and must print `launchCount=1`; the second must

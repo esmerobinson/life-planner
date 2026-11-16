@@ -1,0 +1,147 @@
+{
+ "location": "barraca-inside",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front, over the base picture",
+ "base": {
+  "start": {
+   "day": "barraca/barraca-start-day.png",
+   "rain": "barraca/barraca-start-rain.png",
+   "night": "barraca/barraca-start-night.png"
+  },
+  "full": {
+   "day": "barraca/barraca-full-day.png",
+   "rain": "barraca/barraca-full-rain.png",
+   "night": "barraca/barraca-full-night.png"
+  }
+ },
+ "states": {
+  "start": "day 3, just opened: one chair stack, two cups, a small coconut pile",
+  "full": "stocked: three more chair stacks, a full parasol barrel, a coconut heap on the floor, a crate of bottles, bananas, a net of beach toys, two chairs out, a longer menu"
+ },
+ "looks": {
+  "day": "as drawn",
+  "rain": "overcast; the tent keeps the floor dry, the lantern is lit; animate overlays/rain-barraca-{0,1,2}.png (rain only on the sand outside)",
+  "night": "string lights, lantern pool, radio dial glow"
+ },
+ "exit": {
+  "x": 0,
+  "y": 174,
+  "w": 320,
+  "h": 18,
+  "note": "back out onto the beach"
+ },
+ "walkable": {
+  "x": 8,
+  "y": 116,
+  "w": 304,
+  "h": 58,
+  "note": "the sand floor in front of the counter (the deck behind it is the barraqueiro's)"
+ },
+ "slots": [
+  {
+   "id": "floor-1",
+   "x": 40,
+   "y": 158,
+   "area": "sand floor",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "floor-2",
+   "x": 96,
+   "y": 146,
+   "area": "sand floor",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "floor-3",
+   "x": 160,
+   "y": 148,
+   "area": "sand floor",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "floor-4",
+   "x": 200,
+   "y": 164,
+   "area": "sand floor",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "floor-5",
+   "x": 240,
+   "y": 160,
+   "area": "sand floor",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "floor-6",
+   "x": 284,
+   "y": 162,
+   "area": "sand floor",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "floor-7",
+   "x": 128,
+   "y": 146,
+   "area": "on the straw mat",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "outside-1",
+   "x": 120,
+   "y": 186,
+   "area": "the sunlit sand outside the tent",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "outside-2",
+   "x": 236,
+   "y": 186,
+   "area": "the sunlit sand outside the tent",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "counter-1",
+   "x": 104,
+   "y": 92,
+   "area": "counter top",
+   "accepts": [
+    "dishes"
+   ],
+   "note": "(suggestion) a barraca beach-food dish sticker stands on the counter when its recipe is learnt"
+  },
+  {
+   "id": "counter-2",
+   "x": 124,
+   "y": 92,
+   "area": "counter top",
+   "accepts": [
+    "dishes"
+   ]
+  }
+ ]
+}

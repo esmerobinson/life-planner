@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/** Every mounted useHiddenFlush callback, so the Mac app can flush before a reload (bug #39). */
+const hiddenFlushes = new Set<() => unknown>();
+
+/** Runs every mounted save-on-hide now, as if the page were hidden; returns what they return. */
+export function runHiddenFlushes(): unknown[] {
+  const results: unknown[] = [];
+  for (const run of [...hiddenFlushes]) {
+    try {
+      results.push(run());
+    } catch (e) {
+      results.push(Promise.reject(e));
+    }
+  }
+  return results;
+}
+
 /**
  * Calls `flush` when the page is hidden (app switched away, phone locked) or being unloaded:
  * a backgrounded phone app may be ended without any blur or unmount.
@@ -12,11 +28,14 @@ export function useHiddenFlush(flush: () => void): void {
       if (document.visibilityState === "hidden") ref.current();
     };
     const onPageHide = () => ref.current();
+    const run = () => ref.current() as unknown;
     document.addEventListener("visibilitychange", onHidden);
     window.addEventListener("pagehide", onPageHide);
+    hiddenFlushes.add(run);
     return () => {
       document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("pagehide", onPageHide);
+      hiddenFlushes.delete(run);
     };
   }, []);
 }

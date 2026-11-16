@@ -1,0 +1,790 @@
+{
+ "location": "fazenda",
+ "scene": [
+  512,
+  288
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "outside/fazenda-start-day.png",
+   "rain": "outside/fazenda-start-rain.png",
+   "night": "outside/fazenda-start-night.png"
+  },
+  "full": {
+   "day": "outside/fazenda-full-day.png",
+   "rain": "outside/fazenda-full-rain.png",
+   "night": "outside/fazenda-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (any time of day before dark)",
+  "night": "after sunset in Rio until sunrise"
+ },
+ "states": {
+  "start": "day one: the farmhouse, the coop and barn, three beds dug (Mind planted, Writing and Body tilled), green coffee, the jetty and the boat",
+  "full": "all 8 beds lush, coffee heavy with red cherries, coffee drying on the patio, bougainvillea, hibiscus, lanterns along the path, more birds"
+ },
+ "state_note": "the two pictures share every fixed thing (buildings, paths, beds, fences, trees, slots); show 'full' once most fazenda slots are filled",
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front; stickers go over the base and under the rain overlay",
+ "shadows": "outdoors, draw a hard-edged oval ground shadow under each animal (as the barnyard does)",
+ "sticker_looks": "recolour placed stickers by colour name with looks/palette-rain.json (outdoor table) or looks/palette-night.json so they match the base",
+ "beds": {
+  "note": "One bed per life area, the approved veg-garden beds. The base shows the beds at a default stage (start: Mind 3, Writing 2, Body 2, the rest 1; full: all 5). To show a bed's real stage, draw beds/bed-<area>-stages.png (final/esme-pack/day1/veg-garden/) frame <stage-1> at bed_sprite_xy, then its crops at crop_frames_xy (16x32 frames), then the marker (beds/marker-<area>.png) at marker_xy so tall crops never hide it.",
+  "slots": [
+   {
+    "id": "bed-mind",
+    "kind": "bed",
+    "area": "mind",
+    "name": "Mind",
+    "crop": "herbs",
+    "bed_sprite_xy": [
+     228,
+     96
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      232,
+      95
+     ],
+     [
+      248,
+      95
+     ],
+     [
+      264,
+      95
+     ]
+    ],
+    "marker_xy": [
+     228,
+     104
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:herbs"
+    ]
+   },
+   {
+    "id": "bed-writing",
+    "kind": "bed",
+    "area": "writing",
+    "name": "Writing",
+    "crop": "beans",
+    "bed_sprite_xy": [
+     286,
+     96
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      290,
+      95
+     ],
+     [
+      306,
+      95
+     ],
+     [
+      322,
+      95
+     ]
+    ],
+    "marker_xy": [
+     286,
+     104
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:beans"
+    ]
+   },
+   {
+    "id": "bed-art",
+    "kind": "bed",
+    "area": "art",
+    "name": "Art",
+    "crop": "chard",
+    "bed_sprite_xy": [
+     366,
+     96
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      370,
+      95
+     ],
+     [
+      386,
+      95
+     ],
+     [
+      402,
+      95
+     ]
+    ],
+    "marker_xy": [
+     416,
+     104
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:chard"
+    ]
+   },
+   {
+    "id": "bed-content",
+    "kind": "bed",
+    "area": "content",
+    "name": "Content",
+    "crop": "tomato",
+    "bed_sprite_xy": [
+     424,
+     96
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      428,
+      95
+     ],
+     [
+      444,
+      95
+     ],
+     [
+      460,
+      95
+     ]
+    ],
+    "marker_xy": [
+     474,
+     104
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:tomato"
+    ]
+   },
+   {
+    "id": "bed-body",
+    "kind": "bed",
+    "area": "body",
+    "name": "Body",
+    "crop": "carrot",
+    "bed_sprite_xy": [
+     228,
+     140
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      232,
+      139
+     ],
+     [
+      248,
+      139
+     ],
+     [
+      264,
+      139
+     ]
+    ],
+    "marker_xy": [
+     228,
+     148
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:carrot"
+    ]
+   },
+   {
+    "id": "bed-tech",
+    "kind": "bed",
+    "area": "tech",
+    "name": "Tech",
+    "crop": "pumpkin",
+    "bed_sprite_xy": [
+     286,
+     140
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      290,
+      139
+     ],
+     [
+      306,
+      139
+     ],
+     [
+      322,
+      139
+     ]
+    ],
+    "marker_xy": [
+     286,
+     148
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:pumpkin"
+    ]
+   },
+   {
+    "id": "bed-production",
+    "kind": "bed",
+    "area": "production",
+    "name": "Production",
+    "crop": "corn",
+    "bed_sprite_xy": [
+     366,
+     140
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      370,
+      139
+     ],
+     [
+      386,
+      139
+     ],
+     [
+      402,
+      139
+     ]
+    ],
+    "marker_xy": [
+     416,
+     148
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:corn"
+    ]
+   },
+   {
+    "id": "bed-admin",
+    "kind": "bed",
+    "area": "admin",
+    "name": "Admin",
+    "crop": "cabbage",
+    "bed_sprite_xy": [
+     424,
+     140
+    ],
+    "bed_size": [
+     56,
+     40
+    ],
+    "crop_frames_xy": [
+     [
+      428,
+      139
+     ],
+     [
+      444,
+      139
+     ],
+     [
+      460,
+      139
+     ]
+    ],
+    "marker_xy": [
+     474,
+     148
+    ],
+    "accepts": [
+     "veg-garden:bed-stage",
+     "veg-garden:crop:cabbage"
+    ]
+   }
+  ]
+ },
+ "overlays": {
+  "rain": {
+   "file": "outside/rain-overlay.png",
+   "json": "outside/rain-overlay.json"
+  }
+ },
+ "hotspots": [
+  {
+   "id": "farmhouse-door",
+   "x": 216,
+   "y": 64,
+   "w": 14,
+   "h": 27,
+   "goes": "none",
+   "note": "the farmhouse has no inside at launch (no interior was asked for); the veranda is a place to stand"
+  },
+  {
+   "id": "barn-door",
+   "x": 64,
+   "y": 160,
+   "w": 40,
+   "h": 32,
+   "goes": "interior:barn",
+   "note": "the barn interior: barn-small (starter) or barn-big (upgrade), summer pictures"
+  },
+  {
+   "id": "coop-door",
+   "x": 152,
+   "y": 146,
+   "w": 12,
+   "h": 20,
+   "goes": "interior:coop",
+   "note": "the coop interior: coop-small (starter) or coop-big (upgrade), summer pictures"
+  },
+  {
+   "id": "greenhouse-door",
+   "x": 343,
+   "y": 68,
+   "w": 20,
+   "h": 28,
+   "goes": "interior:greenhouse",
+   "note": "the greenhouse interior (summer pictures)"
+  },
+  {
+   "id": "shed-door",
+   "x": 430,
+   "y": 68,
+   "w": 16,
+   "h": 24,
+   "goes": "none",
+   "note": "tools hang on the shed's hooks (tool-hook slots)"
+  },
+  {
+   "id": "drop-box",
+   "x": 234,
+   "y": 236,
+   "w": 16,
+   "h": 22,
+   "goes": "ui:sell",
+   "note": "the drop box at the gate: drop produce in, coins arrive overnight"
+  },
+  {
+   "id": "boat",
+   "x": 218,
+   "y": 261,
+   "w": 60,
+   "h": 28,
+   "goes": "map",
+   "note": "the boat at the jetty: the ferry back to Rio (the map)"
+  },
+  {
+   "id": "jetty",
+   "x": 198,
+   "y": 253,
+   "w": 16,
+   "h": 35,
+   "goes": "none",
+   "note": "walk down the jetty to the boat"
+  },
+  {
+   "id": "bonfire",
+   "x": 104,
+   "y": 260,
+   "w": 16,
+   "h": 8,
+   "goes": "none",
+   "note": "the beach fire: lit in the night look"
+  }
+ ],
+ "lamps": [
+  {
+   "kind": "veranda",
+   "x": 166,
+   "y": 65
+  },
+  {
+   "kind": "veranda",
+   "x": 194,
+   "y": 65
+  },
+  {
+   "kind": "veranda",
+   "x": 223,
+   "y": 65
+  },
+  {
+   "kind": "veranda",
+   "x": 250,
+   "y": 65
+  },
+  {
+   "kind": "veranda",
+   "x": 278,
+   "y": 65
+  },
+  {
+   "kind": "post",
+   "x": 192,
+   "y": 133
+  },
+  {
+   "kind": "post",
+   "x": 220,
+   "y": 175
+  },
+  {
+   "kind": "post",
+   "x": 192,
+   "y": 215
+  },
+  {
+   "kind": "post",
+   "x": 222,
+   "y": 233
+  }
+ ],
+ "baked": "jungle, waterfall and pool, coffee terraces and bushes, farmhouse with veranda and hammock, barn, coop and run, paddock fences and furniture, greenhouse, tool shed, water butt, beds and markers, drying patio, fruit trees (jackfruit, mango, papaya, bananas), beach, gate with the drop box, jetty, boat, bonfire pit, birds",
+ "slots": [
+  {
+   "id": "hen-1",
+   "x": 124,
+   "y": 176,
+   "facing": "right",
+   "area": "hen-run",
+   "accepts": [
+    "hen"
+   ]
+  },
+  {
+   "id": "hen-2",
+   "x": 152,
+   "y": 178,
+   "facing": "left",
+   "area": "hen-run",
+   "accepts": [
+    "hen"
+   ]
+  },
+  {
+   "id": "hen-3",
+   "x": 180,
+   "y": 176,
+   "facing": "left",
+   "area": "hen-run",
+   "accepts": [
+    "hen"
+   ]
+  },
+  {
+   "id": "hen-4",
+   "x": 238,
+   "y": 204,
+   "facing": "left",
+   "area": "yard",
+   "accepts": [
+    "hen"
+   ]
+  },
+  {
+   "id": "chick-1",
+   "x": 136,
+   "y": 178,
+   "facing": "right",
+   "area": "hen-run",
+   "accepts": [
+    "chick"
+   ],
+   "follows": "hen-1"
+  },
+  {
+   "id": "chick-2",
+   "x": 164,
+   "y": 179,
+   "facing": "left",
+   "area": "hen-run",
+   "accepts": [
+    "chick"
+   ],
+   "follows": "hen-2"
+  },
+  {
+   "id": "chick-3",
+   "x": 250,
+   "y": 206,
+   "facing": "left",
+   "area": "yard",
+   "accepts": [
+    "chick"
+   ],
+   "follows": "hen-4"
+  },
+  {
+   "id": "egg-1",
+   "x": 120,
+   "y": 170,
+   "facing": "down",
+   "area": "nest-box",
+   "accepts": [
+    "egg-white",
+    "egg-brown"
+   ]
+  },
+  {
+   "id": "egg-2",
+   "x": 127,
+   "y": 170,
+   "facing": "down",
+   "area": "nest-box",
+   "accepts": [
+    "egg-white",
+    "egg-brown"
+   ]
+  },
+  {
+   "id": "egg-3",
+   "x": 172,
+   "y": 172,
+   "facing": "down",
+   "area": "hen-run",
+   "accepts": [
+    "egg-white",
+    "egg-brown"
+   ]
+  },
+  {
+   "id": "cow-1",
+   "x": 32,
+   "y": 238,
+   "facing": "right",
+   "area": "paddock",
+   "accepts": [
+    "cow",
+    "cow-bw"
+   ]
+  },
+  {
+   "id": "cow-2",
+   "x": 102,
+   "y": 227,
+   "facing": "left",
+   "area": "paddock",
+   "accepts": [
+    "cow",
+    "cow-bw"
+   ]
+  },
+  {
+   "id": "sheep-1",
+   "x": 84,
+   "y": 239,
+   "facing": "right",
+   "area": "paddock",
+   "accepts": [
+    "sheep"
+   ]
+  },
+  {
+   "id": "sheep-2",
+   "x": 58,
+   "y": 226,
+   "facing": "left",
+   "area": "paddock",
+   "accepts": [
+    "sheep"
+   ]
+  },
+  {
+   "id": "pig-1",
+   "x": 148,
+   "y": 237,
+   "facing": "right",
+   "area": "paddock-wallow",
+   "accepts": [
+    "pig"
+   ]
+  },
+  {
+   "id": "pig-2",
+   "x": 178,
+   "y": 240,
+   "facing": "left",
+   "area": "paddock-wallow",
+   "accepts": [
+    "pig"
+   ]
+  },
+  {
+   "id": "milk-1",
+   "x": 64,
+   "y": 200,
+   "facing": "down",
+   "area": "barn-door",
+   "accepts": [
+    "milk-bottle",
+    "milk-pail"
+   ]
+  },
+  {
+   "id": "milk-2",
+   "x": 106,
+   "y": 200,
+   "facing": "down",
+   "area": "barn-door",
+   "accepts": [
+    "milk-bottle",
+    "milk-pail"
+   ]
+  },
+  {
+   "id": "wool-1",
+   "x": 36,
+   "y": 200,
+   "facing": "down",
+   "area": "barn-side",
+   "accepts": [
+    "wool-bundle"
+   ]
+  },
+  {
+   "id": "tool-hook-1",
+   "x": 456,
+   "y": 79,
+   "facing": "down",
+   "area": "shed-hook",
+   "accepts": [
+    "tool"
+   ],
+   "note": "a 16x16 tool sticker hangs here (top-left = x - 8, y - 15)"
+  },
+  {
+   "id": "tool-hook-2",
+   "x": 462,
+   "y": 79,
+   "facing": "down",
+   "area": "shed-hook",
+   "accepts": [
+    "tool"
+   ],
+   "note": "a 16x16 tool sticker hangs here (top-left = x - 8, y - 15)"
+  },
+  {
+   "id": "decor-veranda-1",
+   "x": 176,
+   "y": 99,
+   "facing": "down",
+   "area": "veranda",
+   "accepts": [
+    "fazenda:decor",
+    "outdoor",
+    "furniture"
+   ],
+   "note": "on the veranda floor, left bay"
+  },
+  {
+   "id": "decor-veranda-2",
+   "x": 272,
+   "y": 99,
+   "facing": "down",
+   "area": "veranda",
+   "accepts": [
+    "fazenda:decor",
+    "outdoor",
+    "furniture"
+   ],
+   "note": "on the veranda floor under the hammock (moved from x 258 for the bigger rocking chairs, Furniture scale 2026-11-14)"
+  },
+  {
+   "id": "decor-yard-1",
+   "x": 176,
+   "y": 128,
+   "facing": "down",
+   "area": "yard",
+   "accepts": [
+    "fazenda:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "decor-patio",
+   "x": 300,
+   "y": 232,
+   "facing": "down",
+   "area": "patio",
+   "accepts": [
+    "fazenda:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "decor-beach-1",
+   "x": 152,
+   "y": 274,
+   "facing": "down",
+   "area": "beach",
+   "accepts": [
+    "fazenda:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "decor-beach-2",
+   "x": 300,
+   "y": 262,
+   "facing": "down",
+   "area": "beach",
+   "accepts": [
+    "fazenda:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "decor-garden",
+   "x": 486,
+   "y": 140,
+   "facing": "down",
+   "area": "garden-edge",
+   "accepts": [
+    "fazenda:decor",
+    "veg-garden:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "decor-terrace",
+   "x": 128,
+   "y": 46,
+   "facing": "down",
+   "area": "coffee-terrace",
+   "accepts": [
+    "fazenda:decor",
+    "fazenda:plant"
+   ],
+   "note": "end of the top coffee row"
+  }
+ ]
+}

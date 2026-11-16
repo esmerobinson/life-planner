@@ -1,0 +1,50 @@
+{
+ "name": "Esme World Rio pack: Ipanema extras",
+ "notes": "New ramps for this batch (need Esme's OK). Everything else uses existing names: summer palette, fam_*, pnd_*, ch_*, mead_*, cot_*.",
+ "ramps": [
+  {
+   "name": "ipa_seabed",
+   "use": "sand seen through clear water (the sea floor off Arpoador); light to dark",
+   "colours": [
+    [
+     "ipa_seabed0",
+     "#e6f0c2"
+    ],
+    [
+     "ipa_seabed1",
+     "#bcd9a8"
+    ],
+    [
+     "ipa_seabed2",
+     "#86b892"
+    ],
+    [
+     "ipa_seabed3",
+     "#56907e"
+    ]
+   ]
+  },
+  {
+   "name": "ipa_coral",
+   "use": "sea fans, coralline crust on the rocks and anemone bases (the sea off Arpoador); light to dark",
+   "colours": [
+    [
+     "ipa_coral0",
+     "#ffc2a8"
+    ],
+    [
+     "ipa_coral1",
+     "#ff7f6e"
+    ],
+    [
+     "ipa_coral2",
+     "#d94c5c"
+    ],
+    [
+     "ipa_coral3",
+     "#9a2e4e"
+    ]
+   ]
+  }
+ ]
+}

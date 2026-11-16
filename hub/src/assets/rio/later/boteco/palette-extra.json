@@ -1,0 +1,9 @@
+{
+ "name": "Rio pack: boteco extras",
+ "notes": "Three short ramps for things that light up. By day only bot_neon0 is seen (the unlit glass tubes of the neon sign); the rest are used by the night light overlay.",
+ "ramps": [
+  {"name": "bot_neon", "colours": [["bot_neon0", "#ffd9ef"], ["bot_neon1", "#ff5cc8"], ["bot_neon2", "#c42a9a"]]},
+  {"name": "bot_cyan", "colours": [["bot_cyan0", "#d2fcff"], ["bot_cyan1", "#4fe6ff"], ["bot_cyan2", "#2493d6"]]},
+  {"name": "bot_glow", "colours": [["bot_glow0", "#fff6c2"], ["bot_glow1", "#ffd36b"], ["bot_glow2", "#ff9f43"]]}
+ ]
+}

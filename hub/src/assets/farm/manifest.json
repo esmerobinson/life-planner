@@ -1,0 +1,7668 @@
+{
+ "project": "Esme's Farm",
+ "version": "phase-1 art pack, 2026-11-04",
+ "palette": {
+  "ink": "#3a412f",
+  "olive": "#51553d",
+  "sage": "#a09f88",
+  "cream": "#e9e3d6",
+  "paper": "#e3ddcd",
+  "stone": "#d4d1c3",
+  "page": "#e2e8ff",
+  "purple": "#b693ec",
+  "blue": "#9eb4e6",
+  "gold": "#ecca7d",
+  "terra": "#d59770",
+  "yellow": "#e8dd6e",
+  "brown": "#90825b",
+  "pink": "#e6aeaf",
+  "mint": "#a3d5c2",
+  "red": "#bf6564",
+  "roomyellow": "#e2cd5b",
+  "lime": "#cedb6e",
+  "green": "#98c293",
+  "orange": "#e39876",
+  "sky": "#a6ced6",
+  "coral": "#df7e6f",
+  "violet": "#9285c5"
+ },
+ "rules": {
+  "scaling": "Whole-number scales only (1x, 2x, 3x); image-rendering: pixelated.",
+  "timing": "No timing or easing is set anywhere; frame durations in the JSON are Aseprite's 100 ms placeholder. Esme chooses.",
+  "colours": "App palette only (see palette)."
+ },
+ "assets": [
+  {
+   "name": "char-domino",
+   "png": "char-domino.png",
+   "json": "char-domino.json",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 13,
+   "tags": [
+    {
+     "name": "idle",
+     "from": 0,
+     "to": 3
+    },
+    {
+     "name": "sleep",
+     "from": 4,
+     "to": 7
+    },
+    {
+     "name": "happy",
+     "from": 8,
+     "to": 10
+    },
+    {
+     "name": "encourage",
+     "from": 11,
+     "to": 12
+    }
+   ],
+   "display": {
+    "nook": "2x (64 px)",
+    "farm": "1x on the 2x farm",
+    "book/moments": "2x"
+   },
+   "notes": "Domino: tuxedo kitten, your companion (day 1). Body box 24x24 at (4,6) inside each 32x32 frame. 'idle' frames 2 and 'sleep' frames 2-3 bob the head down 1px.",
+   "character": "Domino",
+   "body_box_offset": [
+    4,
+    6
+   ],
+   "loops": {
+    "idle": true,
+    "sleep": true,
+    "happy": false,
+    "encourage": false,
+    "sit": true
+   }
+  },
+  {
+   "name": "char-bap",
+   "png": "char-bap.png",
+   "json": "char-bap.json",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 13,
+   "tags": [
+    {
+     "name": "idle",
+     "from": 0,
+     "to": 3
+    },
+    {
+     "name": "sleep",
+     "from": 4,
+     "to": 7
+    },
+    {
+     "name": "happy",
+     "from": 8,
+     "to": 10
+    },
+    {
+     "name": "sit",
+     "from": 11,
+     "to": 12
+    }
+   ],
+   "display": {
+    "nook": "2x (64 px)",
+    "farm": "1x on the 2x farm",
+    "book/moments": "2x"
+   },
+   "notes": "Bap: frog, still and patient (5 stickers). Bap sits on his lily pad (drawn into every frame). Body box 24x24 at (4,4); pad at (0,24).",
+   "character": "Bap",
+   "body_box_offset": [
+    4,
+    4
+   ],
+   "loops": {
+    "idle": true,
+    "sleep": true,
+    "happy": false,
+    "encourage": false,
+    "sit": true
+   }
+  },
+  {
+   "name": "char-puddle",
+   "png": "char-puddle.png",
+   "json": "char-puddle.json",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 13,
+   "tags": [
+    {
+     "name": "idle",
+     "from": 0,
+     "to": 3
+    },
+    {
+     "name": "sleep",
+     "from": 4,
+     "to": 7
+    },
+    {
+     "name": "happy",
+     "from": 8,
+     "to": 10
+    },
+    {
+     "name": "encourage",
+     "from": 11,
+     "to": 12
+    }
+   ],
+   "display": {
+    "nook": "2x (64 px)",
+    "farm": "1x on the 2x farm",
+    "book/moments": "2x"
+   },
+   "notes": "Puddle: puppy (20). Body box 24x24 at (4,6) inside each 32x32 frame. 'idle' frames 2 and 'sleep' frames 2-3 bob the head down 1px.",
+   "character": "Puddle",
+   "body_box_offset": [
+    4,
+    6
+   ],
+   "loops": {
+    "idle": true,
+    "sleep": true,
+    "happy": false,
+    "encourage": false,
+    "sit": true
+   }
+  },
+  {
+   "name": "char-clover",
+   "png": "char-clover.png",
+   "json": "char-clover.json",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 13,
+   "tags": [
+    {
+     "name": "idle",
+     "from": 0,
+     "to": 3
+    },
+    {
+     "name": "sleep",
+     "from": 4,
+     "to": 7
+    },
+    {
+     "name": "happy",
+     "from": 8,
+     "to": 10
+    },
+    {
+     "name": "encourage",
+     "from": 11,
+     "to": 12
+    }
+   ],
+   "display": {
+    "nook": "2x (64 px)",
+    "farm": "1x on the 2x farm",
+    "book/moments": "2x"
+   },
+   "notes": "Clover: bunny (45). Body box 24x24 at (4,6) inside each 32x32 frame. 'idle' frames 2 and 'sleep' frames 2-3 bob the head down 1px.",
+   "character": "Clover",
+   "body_box_offset": [
+    4,
+    6
+   ],
+   "loops": {
+    "idle": true,
+    "sleep": true,
+    "happy": false,
+    "encourage": false,
+    "sit": true
+   }
+  },
+  {
+   "name": "char-crumpet",
+   "png": "char-crumpet.png",
+   "json": "char-crumpet.json",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 13,
+   "tags": [
+    {
+     "name": "idle",
+     "from": 0,
+     "to": 3
+    },
+    {
+     "name": "sleep",
+     "from": 4,
+     "to": 7
+    },
+    {
+     "name": "happy",
+     "from": 8,
+     "to": 10
+    },
+    {
+     "name": "encourage",
+     "from": 11,
+     "to": 12
+    }
+   ],
+   "display": {
+    "nook": "2x (64 px)",
+    "farm": "1x on the 2x farm",
+    "book/moments": "2x"
+   },
+   "notes": "Crumpet: barn tabby (80). Body box 24x24 at (4,6) inside each 32x32 frame. 'idle' frames 2 and 'sleep' frames 2-3 bob the head down 1px.",
+   "character": "Crumpet",
+   "body_box_offset": [
+    4,
+    6
+   ],
+   "loops": {
+    "idle": true,
+    "sleep": true,
+    "happy": false,
+    "encourage": false,
+    "sit": true
+   }
+  },
+  {
+   "name": "char-duvet",
+   "png": "char-duvet.png",
+   "json": "char-duvet.json",
+   "frame": [
+    32,
+    32
+   ],
+   "frames": 13,
+   "tags": [
+    {
+     "name": "idle",
+     "from": 0,
+     "to": 3
+    },
+    {
+     "name": "sleep",
+     "from": 4,
+     "to": 7
+    },
+    {
+     "name": "happy",
+     "from": 8,
+     "to": 10
+    },
+    {
+     "name": "encourage",
+     "from": 11,
+     "to": 12
+    }
+   ],
+   "display": {
+    "nook": "2x (64 px)",
+    "farm": "1x on the 2x farm",
+    "book/moments": "2x"
+   },
+   "notes": "Duvet: fluffy cat, museum curator (120). Body box 24x24 at (4,6) inside each 32x32 frame. 'idle' frames 2 and 'sleep' frames 2-3 bob the head down 1px.",
+   "character": "Duvet",
+   "body_box_offset": [
+    4,
+    6
+   ],
+   "loops": {
+    "idle": true,
+    "sleep": true,
+    "happy": false,
+    "encourage": false,
+    "sit": true
+   }
+  },
+  {
+   "name": "acc-domino",
+   "png": "acc-domino.png",
+   "json": "acc-domino.json",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 20,
+   "tags": [
+    {
+     "name": "A1",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "A2",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "A3",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "A4",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "A5",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "A6",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "A7",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "A8",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "A9",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "A10",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "A11",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "H1",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "H2",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "H3",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "H4",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "H5",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "H6",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "H7",
+     "from": 17,
+     "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
+    }
+   ],
+   "display": "same scale as the character",
+   "notes": "Accessory overlays for Domino: draw at the character's body-box offset, above the body. On frames where the head bobs, move head items (hats, crowns, ear flowers, spectacles) down 1px too.",
+   "items": [
+    {
+     "code": "A1",
+     "name": "Straw sun hat",
+     "unlock": "5 stickers"
+    },
+    {
+     "code": "A2",
+     "name": "Neckerchief",
+     "unlock": "15 stickers"
+    },
+    {
+     "code": "A3",
+     "name": "Little watering can",
+     "unlock": "30 stickers"
+    },
+    {
+     "code": "A4",
+     "name": "Flower behind the ear",
+     "unlock": "45 stickers"
+    },
+    {
+     "code": "A5",
+     "name": "Gardening apron",
+     "unlock": "60 stickers"
+    },
+    {
+     "code": "A6",
+     "name": "Flower crown",
+     "unlock": "80 stickers"
+    },
+    {
+     "code": "A7",
+     "name": "Best-outfit rosette",
+     "unlock": "100 stickers"
+    },
+    {
+     "code": "A8",
+     "name": "Daisy chain",
+     "unlock": "spring"
+    },
+    {
+     "code": "A9",
+     "name": "Scarf",
+     "unlock": "autumn"
+    },
+    {
+     "code": "A10",
+     "name": "Bobble hat",
+     "unlock": "winter"
+    },
+    {
+     "code": "A11",
+     "name": "Wellies",
+     "unlock": "rainy days (idea)"
+    },
+    {
+     "code": "H1",
+     "name": "Seed-packet bandana",
+     "unlock": "host: beds"
+    },
+    {
+     "code": "H2",
+     "name": "Bee headband",
+     "unlock": "host: meadow"
+    },
+    {
+     "code": "H3",
+     "name": "Flat cap",
+     "unlock": "host: orchard"
+    },
+    {
+     "code": "H4",
+     "name": "Lily-pad hat",
+     "unlock": "host: pond"
+    },
+    {
+     "code": "H5",
+     "name": "Flowerpot hat",
+     "unlock": "host: glasshouse"
+    },
+    {
+     "code": "H6",
+     "name": "Tea-cosy hat",
+     "unlock": "host: farmhouse"
+    },
+    {
+     "code": "H7",
+     "name": "Museum spectacles",
+     "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "175 stickers (the whole collection)"
+    }
+   ]
+  },
+  {
+   "name": "acc-bap",
+   "png": "acc-bap.png",
+   "json": "acc-bap.json",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 20,
+   "tags": [
+    {
+     "name": "A1",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "A2",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "A3",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "A4",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "A5",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "A6",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "A7",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "A8",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "A9",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "A10",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "A11",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "H1",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "H2",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "H3",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "H4",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "H5",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "H6",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "H7",
+     "from": 17,
+     "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
+    }
+   ],
+   "display": "same scale as the character",
+   "notes": "Accessory overlays for Bap: draw at the character's body-box offset, above the body. On frames where the head bobs, move head items (hats, crowns, ear flowers, spectacles) down 1px too.",
+   "items": [
+    {
+     "code": "A1",
+     "name": "Straw sun hat",
+     "unlock": "5 stickers"
+    },
+    {
+     "code": "A2",
+     "name": "Neckerchief",
+     "unlock": "15 stickers"
+    },
+    {
+     "code": "A3",
+     "name": "Little watering can",
+     "unlock": "30 stickers"
+    },
+    {
+     "code": "A4",
+     "name": "Flower behind the ear",
+     "unlock": "45 stickers"
+    },
+    {
+     "code": "A5",
+     "name": "Gardening apron",
+     "unlock": "60 stickers"
+    },
+    {
+     "code": "A6",
+     "name": "Flower crown",
+     "unlock": "80 stickers"
+    },
+    {
+     "code": "A7",
+     "name": "Best-outfit rosette",
+     "unlock": "100 stickers"
+    },
+    {
+     "code": "A8",
+     "name": "Daisy chain",
+     "unlock": "spring"
+    },
+    {
+     "code": "A9",
+     "name": "Scarf",
+     "unlock": "autumn"
+    },
+    {
+     "code": "A10",
+     "name": "Bobble hat",
+     "unlock": "winter"
+    },
+    {
+     "code": "A11",
+     "name": "Wellies",
+     "unlock": "rainy days (idea)"
+    },
+    {
+     "code": "H1",
+     "name": "Seed-packet bandana",
+     "unlock": "host: beds"
+    },
+    {
+     "code": "H2",
+     "name": "Bee headband",
+     "unlock": "host: meadow"
+    },
+    {
+     "code": "H3",
+     "name": "Flat cap",
+     "unlock": "host: orchard"
+    },
+    {
+     "code": "H4",
+     "name": "Lily-pad hat",
+     "unlock": "host: pond"
+    },
+    {
+     "code": "H5",
+     "name": "Flowerpot hat",
+     "unlock": "host: glasshouse"
+    },
+    {
+     "code": "H6",
+     "name": "Tea-cosy hat",
+     "unlock": "host: farmhouse"
+    },
+    {
+     "code": "H7",
+     "name": "Museum spectacles",
+     "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "175 stickers (the whole collection)"
+    }
+   ]
+  },
+  {
+   "name": "acc-puddle",
+   "png": "acc-puddle.png",
+   "json": "acc-puddle.json",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 20,
+   "tags": [
+    {
+     "name": "A1",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "A2",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "A3",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "A4",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "A5",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "A6",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "A7",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "A8",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "A9",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "A10",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "A11",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "H1",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "H2",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "H3",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "H4",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "H5",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "H6",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "H7",
+     "from": 17,
+     "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
+    }
+   ],
+   "display": "same scale as the character",
+   "notes": "Accessory overlays for Puddle: draw at the character's body-box offset, above the body. On frames where the head bobs, move head items (hats, crowns, ear flowers, spectacles) down 1px too.",
+   "items": [
+    {
+     "code": "A1",
+     "name": "Straw sun hat",
+     "unlock": "5 stickers"
+    },
+    {
+     "code": "A2",
+     "name": "Neckerchief",
+     "unlock": "15 stickers"
+    },
+    {
+     "code": "A3",
+     "name": "Little watering can",
+     "unlock": "30 stickers"
+    },
+    {
+     "code": "A4",
+     "name": "Flower behind the ear",
+     "unlock": "45 stickers"
+    },
+    {
+     "code": "A5",
+     "name": "Gardening apron",
+     "unlock": "60 stickers"
+    },
+    {
+     "code": "A6",
+     "name": "Flower crown",
+     "unlock": "80 stickers"
+    },
+    {
+     "code": "A7",
+     "name": "Best-outfit rosette",
+     "unlock": "100 stickers"
+    },
+    {
+     "code": "A8",
+     "name": "Daisy chain",
+     "unlock": "spring"
+    },
+    {
+     "code": "A9",
+     "name": "Scarf",
+     "unlock": "autumn"
+    },
+    {
+     "code": "A10",
+     "name": "Bobble hat",
+     "unlock": "winter"
+    },
+    {
+     "code": "A11",
+     "name": "Wellies",
+     "unlock": "rainy days (idea)"
+    },
+    {
+     "code": "H1",
+     "name": "Seed-packet bandana",
+     "unlock": "host: beds"
+    },
+    {
+     "code": "H2",
+     "name": "Bee headband",
+     "unlock": "host: meadow"
+    },
+    {
+     "code": "H3",
+     "name": "Flat cap",
+     "unlock": "host: orchard"
+    },
+    {
+     "code": "H4",
+     "name": "Lily-pad hat",
+     "unlock": "host: pond"
+    },
+    {
+     "code": "H5",
+     "name": "Flowerpot hat",
+     "unlock": "host: glasshouse"
+    },
+    {
+     "code": "H6",
+     "name": "Tea-cosy hat",
+     "unlock": "host: farmhouse"
+    },
+    {
+     "code": "H7",
+     "name": "Museum spectacles",
+     "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "175 stickers (the whole collection)"
+    }
+   ]
+  },
+  {
+   "name": "acc-clover",
+   "png": "acc-clover.png",
+   "json": "acc-clover.json",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 20,
+   "tags": [
+    {
+     "name": "A1",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "A2",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "A3",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "A4",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "A5",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "A6",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "A7",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "A8",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "A9",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "A10",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "A11",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "H1",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "H2",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "H3",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "H4",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "H5",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "H6",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "H7",
+     "from": 17,
+     "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
+    }
+   ],
+   "display": "same scale as the character",
+   "notes": "Accessory overlays for Clover: draw at the character's body-box offset, above the body. On frames where the head bobs, move head items (hats, crowns, ear flowers, spectacles) down 1px too.",
+   "items": [
+    {
+     "code": "A1",
+     "name": "Straw sun hat",
+     "unlock": "5 stickers"
+    },
+    {
+     "code": "A2",
+     "name": "Neckerchief",
+     "unlock": "15 stickers"
+    },
+    {
+     "code": "A3",
+     "name": "Little watering can",
+     "unlock": "30 stickers"
+    },
+    {
+     "code": "A4",
+     "name": "Flower behind the ear",
+     "unlock": "45 stickers"
+    },
+    {
+     "code": "A5",
+     "name": "Gardening apron",
+     "unlock": "60 stickers"
+    },
+    {
+     "code": "A6",
+     "name": "Flower crown",
+     "unlock": "80 stickers"
+    },
+    {
+     "code": "A7",
+     "name": "Best-outfit rosette",
+     "unlock": "100 stickers"
+    },
+    {
+     "code": "A8",
+     "name": "Daisy chain",
+     "unlock": "spring"
+    },
+    {
+     "code": "A9",
+     "name": "Scarf",
+     "unlock": "autumn"
+    },
+    {
+     "code": "A10",
+     "name": "Bobble hat",
+     "unlock": "winter"
+    },
+    {
+     "code": "A11",
+     "name": "Wellies",
+     "unlock": "rainy days (idea)"
+    },
+    {
+     "code": "H1",
+     "name": "Seed-packet bandana",
+     "unlock": "host: beds"
+    },
+    {
+     "code": "H2",
+     "name": "Bee headband",
+     "unlock": "host: meadow"
+    },
+    {
+     "code": "H3",
+     "name": "Flat cap",
+     "unlock": "host: orchard"
+    },
+    {
+     "code": "H4",
+     "name": "Lily-pad hat",
+     "unlock": "host: pond"
+    },
+    {
+     "code": "H5",
+     "name": "Flowerpot hat",
+     "unlock": "host: glasshouse"
+    },
+    {
+     "code": "H6",
+     "name": "Tea-cosy hat",
+     "unlock": "host: farmhouse"
+    },
+    {
+     "code": "H7",
+     "name": "Museum spectacles",
+     "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "175 stickers (the whole collection)"
+    }
+   ]
+  },
+  {
+   "name": "acc-crumpet",
+   "png": "acc-crumpet.png",
+   "json": "acc-crumpet.json",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 20,
+   "tags": [
+    {
+     "name": "A1",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "A2",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "A3",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "A4",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "A5",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "A6",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "A7",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "A8",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "A9",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "A10",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "A11",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "H1",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "H2",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "H3",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "H4",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "H5",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "H6",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "H7",
+     "from": 17,
+     "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
+    }
+   ],
+   "display": "same scale as the character",
+   "notes": "Accessory overlays for Crumpet: draw at the character's body-box offset, above the body. On frames where the head bobs, move head items (hats, crowns, ear flowers, spectacles) down 1px too.",
+   "items": [
+    {
+     "code": "A1",
+     "name": "Straw sun hat",
+     "unlock": "5 stickers"
+    },
+    {
+     "code": "A2",
+     "name": "Neckerchief",
+     "unlock": "15 stickers"
+    },
+    {
+     "code": "A3",
+     "name": "Little watering can",
+     "unlock": "30 stickers"
+    },
+    {
+     "code": "A4",
+     "name": "Flower behind the ear",
+     "unlock": "45 stickers"
+    },
+    {
+     "code": "A5",
+     "name": "Gardening apron",
+     "unlock": "60 stickers"
+    },
+    {
+     "code": "A6",
+     "name": "Flower crown",
+     "unlock": "80 stickers"
+    },
+    {
+     "code": "A7",
+     "name": "Best-outfit rosette",
+     "unlock": "100 stickers"
+    },
+    {
+     "code": "A8",
+     "name": "Daisy chain",
+     "unlock": "spring"
+    },
+    {
+     "code": "A9",
+     "name": "Scarf",
+     "unlock": "autumn"
+    },
+    {
+     "code": "A10",
+     "name": "Bobble hat",
+     "unlock": "winter"
+    },
+    {
+     "code": "A11",
+     "name": "Wellies",
+     "unlock": "rainy days (idea)"
+    },
+    {
+     "code": "H1",
+     "name": "Seed-packet bandana",
+     "unlock": "host: beds"
+    },
+    {
+     "code": "H2",
+     "name": "Bee headband",
+     "unlock": "host: meadow"
+    },
+    {
+     "code": "H3",
+     "name": "Flat cap",
+     "unlock": "host: orchard"
+    },
+    {
+     "code": "H4",
+     "name": "Lily-pad hat",
+     "unlock": "host: pond"
+    },
+    {
+     "code": "H5",
+     "name": "Flowerpot hat",
+     "unlock": "host: glasshouse"
+    },
+    {
+     "code": "H6",
+     "name": "Tea-cosy hat",
+     "unlock": "host: farmhouse"
+    },
+    {
+     "code": "H7",
+     "name": "Museum spectacles",
+     "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "175 stickers (the whole collection)"
+    }
+   ]
+  },
+  {
+   "name": "acc-duvet",
+   "png": "acc-duvet.png",
+   "json": "acc-duvet.json",
+   "frame": [
+    24,
+    24
+   ],
+   "frames": 20,
+   "tags": [
+    {
+     "name": "A1",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "A2",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "A3",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "A4",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "A5",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "A6",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "A7",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "A8",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "A9",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "A10",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "A11",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "H1",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "H2",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "H3",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "H4",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "H5",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "H6",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "H7",
+     "from": 17,
+     "to": 17
+    },
+    {
+     "name": "A12",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A13",
+     "from": 19,
+     "to": 19
+    }
+   ],
+   "display": "same scale as the character",
+   "notes": "Accessory overlays for Duvet: draw at the character's body-box offset, above the body. On frames where the head bobs, move head items (hats, crowns, ear flowers, spectacles) down 1px too.",
+   "items": [
+    {
+     "code": "A1",
+     "name": "Straw sun hat",
+     "unlock": "5 stickers"
+    },
+    {
+     "code": "A2",
+     "name": "Neckerchief",
+     "unlock": "15 stickers"
+    },
+    {
+     "code": "A3",
+     "name": "Little watering can",
+     "unlock": "30 stickers"
+    },
+    {
+     "code": "A4",
+     "name": "Flower behind the ear",
+     "unlock": "45 stickers"
+    },
+    {
+     "code": "A5",
+     "name": "Gardening apron",
+     "unlock": "60 stickers"
+    },
+    {
+     "code": "A6",
+     "name": "Flower crown",
+     "unlock": "80 stickers"
+    },
+    {
+     "code": "A7",
+     "name": "Best-outfit rosette",
+     "unlock": "100 stickers"
+    },
+    {
+     "code": "A8",
+     "name": "Daisy chain",
+     "unlock": "spring"
+    },
+    {
+     "code": "A9",
+     "name": "Scarf",
+     "unlock": "autumn"
+    },
+    {
+     "code": "A10",
+     "name": "Bobble hat",
+     "unlock": "winter"
+    },
+    {
+     "code": "A11",
+     "name": "Wellies",
+     "unlock": "rainy days (idea)"
+    },
+    {
+     "code": "H1",
+     "name": "Seed-packet bandana",
+     "unlock": "host: beds"
+    },
+    {
+     "code": "H2",
+     "name": "Bee headband",
+     "unlock": "host: meadow"
+    },
+    {
+     "code": "H3",
+     "name": "Flat cap",
+     "unlock": "host: orchard"
+    },
+    {
+     "code": "H4",
+     "name": "Lily-pad hat",
+     "unlock": "host: pond"
+    },
+    {
+     "code": "H5",
+     "name": "Flowerpot hat",
+     "unlock": "host: glasshouse"
+    },
+    {
+     "code": "H6",
+     "name": "Tea-cosy hat",
+     "unlock": "host: farmhouse"
+    },
+    {
+     "code": "H7",
+     "name": "Museum spectacles",
+     "unlock": "host: museum (Duvet)"
+    },
+    {
+     "code": "A12",
+     "name": "Little satchel",
+     "unlock": "130 stickers"
+    },
+    {
+     "code": "A13",
+     "name": "Golden crown",
+     "unlock": "175 stickers (the whole collection)"
+    }
+   ]
+  },
+  {
+   "name": "book-cover",
+   "png": "book-cover.png",
+   "json": "book-cover.json",
+   "frame": [
+    120,
+    152
+   ],
+   "frames": 1,
+   "tags": [
+    {
+     "name": "cover",
+     "from": 0,
+     "to": 0
+    }
+   ],
+   "display": "3x on Mac (360x456); fit to width on phone",
+   "notes": "Closed book, T2 storybook lettering: ESME'S FARM. Shown on the right half of the spread when closed."
+  },
+  {
+   "name": "book-pages",
+   "png": "book-pages.png",
+   "json": "book-pages.json",
+   "frame": [
+    116,
+    152
+   ],
+   "frames": 18,
+   "tags": [
+    {
+     "name": "endpaper",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "contents",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "page-1",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "page-2",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "page-3",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "page-4",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "page-5",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "page-6",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "page-7",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "page-8",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "page-9",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "page-10",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "page-11",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "page-12",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "page-13",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "page-14",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "page-15",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "page-16",
+     "from": 17,
+     "to": 17
+    }
+   ],
+   "display": "3x on Mac (a spread = 696x456)",
+   "notes": "Half-page images: even index = left page, odd = right page (index 0 endpaper + 1 contents form the first spread). Each page already has its ribbon banner, set labels (without counts) and is ready for slots. The app draws: the count after each label (pixel font atlas, ink), and for every slot one of: slot-empty + ghost, slot-filled + sticker, slot-filled + sticker + ready-to-place peel. Positions are in pages[] below (page-local pixels).",
+   "pages": [
+    {
+     "page": 1,
+     "side": "left",
+     "group": "beds",
+     "slots": [
+      {
+       "sticker": "seeds-mind",
+       "name": "seeds",
+       "x": 13,
+       "y": 36,
+       "set": "Mind bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-mind",
+       "name": "sprout",
+       "x": 32,
+       "y": 36,
+       "set": "Mind bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "herbsprout",
+       "name": "seedling",
+       "x": 51,
+       "y": 36,
+       "set": "Mind bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "chamomile",
+       "name": "first crop",
+       "x": 70,
+       "y": 36,
+       "set": "Mind bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "herbbundle",
+       "name": "full basket",
+       "x": 89,
+       "y": 36,
+       "set": "Mind bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "moth",
+       "name": "critter visitor",
+       "x": 13,
+       "y": 55,
+       "set": "Mind bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-mind",
+       "name": "prize-size crop",
+       "x": 32,
+       "y": 55,
+       "set": "Mind bed",
+       "milestone": 60
+      },
+      {
+       "sticker": "seeds-writing",
+       "name": "seeds",
+       "x": 13,
+       "y": 86,
+       "set": "Writing bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-writing",
+       "name": "sprout",
+       "x": 32,
+       "y": 86,
+       "set": "Writing bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "shootcane",
+       "name": "seedling",
+       "x": 51,
+       "y": 86,
+       "set": "Writing bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "peapod",
+       "name": "first crop",
+       "x": 70,
+       "y": 86,
+       "set": "Writing bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "beanbasket",
+       "name": "full basket",
+       "x": 89,
+       "y": 86,
+       "set": "Writing bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "ladybird",
+       "name": "critter visitor",
+       "x": 13,
+       "y": 105,
+       "set": "Writing bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-writing",
+       "name": "prize-size crop",
+       "x": 32,
+       "y": 105,
+       "set": "Writing bed",
+       "milestone": 60
+      }
+     ],
+     "labels": [
+      {
+       "set": "Mind bed",
+       "x": 14,
+       "y": 28,
+       "count_x": 55,
+       "earned_by": "to-dos in Mind"
+      },
+      {
+       "set": "Writing bed",
+       "x": 14,
+       "y": 78,
+       "count_x": 68,
+       "earned_by": "to-dos in Writing"
+      }
+     ]
+    },
+    {
+     "page": 2,
+     "side": "right",
+     "group": "beds",
+     "slots": [
+      {
+       "sticker": "seeds-art",
+       "name": "seeds",
+       "x": 9,
+       "y": 36,
+       "set": "Art bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-art",
+       "name": "sprout",
+       "x": 28,
+       "y": 36,
+       "set": "Art bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "leafyshoot",
+       "name": "seedling",
+       "x": 47,
+       "y": 36,
+       "set": "Art bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "radish",
+       "name": "first crop",
+       "x": 66,
+       "y": 36,
+       "set": "Art bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "chard",
+       "name": "full basket",
+       "x": 85,
+       "y": 36,
+       "set": "Art bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "butterfly",
+       "name": "critter visitor",
+       "x": 9,
+       "y": 55,
+       "set": "Art bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-art",
+       "name": "prize-size crop",
+       "x": 28,
+       "y": 55,
+       "set": "Art bed",
+       "milestone": 60
+      },
+      {
+       "sticker": "seeds-content",
+       "name": "seeds",
+       "x": 9,
+       "y": 86,
+       "set": "Content bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-content",
+       "name": "sprout",
+       "x": 28,
+       "y": 86,
+       "set": "Content bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "sproutsoil",
+       "name": "seedling",
+       "x": 47,
+       "y": 86,
+       "set": "Content bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "tomato",
+       "name": "first crop",
+       "x": 66,
+       "y": 86,
+       "set": "Content bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "truss",
+       "name": "full basket",
+       "x": 85,
+       "y": 86,
+       "set": "Content bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "caterpillar",
+       "name": "critter visitor",
+       "x": 9,
+       "y": 105,
+       "set": "Content bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-content",
+       "name": "prize-size crop",
+       "x": 28,
+       "y": 105,
+       "set": "Content bed",
+       "milestone": 60
+      }
+     ],
+     "labels": [
+      {
+       "set": "Art bed",
+       "x": 10,
+       "y": 28,
+       "count_x": 45,
+       "earned_by": "to-dos in Art"
+      },
+      {
+       "set": "Content bed",
+       "x": 10,
+       "y": 78,
+       "count_x": 64,
+       "earned_by": "to-dos in Content"
+      }
+     ]
+    },
+    {
+     "page": 3,
+     "side": "left",
+     "group": "beds",
+     "slots": [
+      {
+       "sticker": "seeds-body",
+       "name": "seeds",
+       "x": 13,
+       "y": 36,
+       "set": "Body bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-body",
+       "name": "sprout",
+       "x": 32,
+       "y": 36,
+       "set": "Body bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "carrottops",
+       "name": "seedling",
+       "x": 51,
+       "y": 36,
+       "set": "Body bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "carrot",
+       "name": "first crop",
+       "x": 70,
+       "y": 36,
+       "set": "Body bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "potatosack",
+       "name": "full basket",
+       "x": 89,
+       "y": 36,
+       "set": "Body bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "rabbit",
+       "name": "critter visitor",
+       "x": 13,
+       "y": 55,
+       "set": "Body bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-body",
+       "name": "prize-size crop",
+       "x": 32,
+       "y": 55,
+       "set": "Body bed",
+       "milestone": 60
+      },
+      {
+       "sticker": "seeds-tech",
+       "name": "seeds",
+       "x": 13,
+       "y": 86,
+       "set": "Tech bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-tech",
+       "name": "sprout",
+       "x": 32,
+       "y": 86,
+       "set": "Tech bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "vine",
+       "name": "seedling",
+       "x": 51,
+       "y": 86,
+       "set": "Tech bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "smallpumpkin",
+       "name": "first crop",
+       "x": 70,
+       "y": 86,
+       "set": "Tech bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "oct",
+       "name": "full basket",
+       "x": 89,
+       "y": 86,
+       "set": "Tech bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "hedgehog",
+       "name": "critter visitor",
+       "x": 13,
+       "y": 105,
+       "set": "Tech bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-tech",
+       "name": "prize-size crop",
+       "x": 32,
+       "y": 105,
+       "set": "Tech bed",
+       "milestone": 60
+      }
+     ],
+     "labels": [
+      {
+       "set": "Body bed",
+       "x": 14,
+       "y": 28,
+       "count_x": 54,
+       "earned_by": "to-dos in Body"
+      },
+      {
+       "set": "Tech bed",
+       "x": 14,
+       "y": 78,
+       "count_x": 54,
+       "earned_by": "to-dos in Tech"
+      }
+     ]
+    },
+    {
+     "page": 4,
+     "side": "right",
+     "group": "beds",
+     "slots": [
+      {
+       "sticker": "seeds-production",
+       "name": "seeds",
+       "x": 9,
+       "y": 36,
+       "set": "Production bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-production",
+       "name": "sprout",
+       "x": 28,
+       "y": 36,
+       "set": "Production bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "cornshoot",
+       "name": "seedling",
+       "x": 47,
+       "y": 36,
+       "set": "Production bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "corn",
+       "name": "first crop",
+       "x": 66,
+       "y": 36,
+       "set": "Production bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "wheat",
+       "name": "full basket",
+       "x": 85,
+       "y": 36,
+       "set": "Production bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "fieldmouse",
+       "name": "critter visitor",
+       "x": 9,
+       "y": 55,
+       "set": "Production bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-production",
+       "name": "prize-size crop",
+       "x": 28,
+       "y": 55,
+       "set": "Production bed",
+       "milestone": 60
+      },
+      {
+       "sticker": "seeds-admin",
+       "name": "seeds",
+       "x": 9,
+       "y": 86,
+       "set": "Admin bed",
+       "milestone": 1
+      },
+      {
+       "sticker": "sprout-admin",
+       "name": "sprout",
+       "x": 28,
+       "y": 86,
+       "set": "Admin bed",
+       "milestone": 3
+      },
+      {
+       "sticker": "lettuce",
+       "name": "seedling",
+       "x": 47,
+       "y": 86,
+       "set": "Admin bed",
+       "milestone": 5
+      },
+      {
+       "sticker": "cabbage",
+       "name": "first crop",
+       "x": 66,
+       "y": 86,
+       "set": "Admin bed",
+       "milestone": 10
+      },
+      {
+       "sticker": "onions",
+       "name": "full basket",
+       "x": 85,
+       "y": 86,
+       "set": "Admin bed",
+       "milestone": 25
+      },
+      {
+       "sticker": "earthworm",
+       "name": "critter visitor",
+       "x": 9,
+       "y": 105,
+       "set": "Admin bed",
+       "milestone": 40
+      },
+      {
+       "sticker": "prize-admin",
+       "name": "prize-size crop",
+       "x": 28,
+       "y": 105,
+       "set": "Admin bed",
+       "milestone": 60
+      }
+     ],
+     "labels": [
+      {
+       "set": "Production bed",
+       "x": 10,
+       "y": 28,
+       "count_x": 79,
+       "earned_by": "to-dos in Production"
+      },
+      {
+       "set": "Admin bed",
+       "x": 10,
+       "y": 78,
+       "count_x": 56,
+       "earned_by": "to-dos in Admin"
+      }
+     ]
+    },
+    {
+     "page": 5,
+     "side": "left",
+     "group": "meadow",
+     "slots": [
+      {
+       "sticker": "daisy",
+       "name": "Daisy",
+       "x": 13,
+       "y": 36,
+       "set": "Bee things",
+       "milestone": 1
+      },
+      {
+       "sticker": "buttercup",
+       "name": "Buttercup",
+       "x": 32,
+       "y": 36,
+       "set": "Bee things",
+       "milestone": 3
+      },
+      {
+       "sticker": "grasshopper",
+       "name": "Grasshopper",
+       "x": 51,
+       "y": 36,
+       "set": "Bee things",
+       "milestone": 5
+      },
+      {
+       "sticker": "bee",
+       "name": "Honeybee",
+       "x": 70,
+       "y": 36,
+       "set": "Bee things",
+       "milestone": 10
+      },
+      {
+       "sticker": "skep",
+       "name": "Beehive",
+       "x": 89,
+       "y": 36,
+       "set": "Bee things",
+       "milestone": 15
+      },
+      {
+       "sticker": "honey",
+       "name": "Honey jar",
+       "x": 13,
+       "y": 55,
+       "set": "Bee things",
+       "milestone": 25
+      },
+      {
+       "sticker": "sunflower",
+       "name": "Sunflower",
+       "x": 32,
+       "y": 55,
+       "set": "Bee things",
+       "milestone": 40
+      },
+      {
+       "sticker": "second-hive",
+       "name": "Second hive",
+       "x": 51,
+       "y": 55,
+       "set": "Bee things",
+       "milestone": 60
+      },
+      {
+       "sticker": "dandelion",
+       "name": "Dandelion",
+       "x": 13,
+       "y": 86,
+       "set": "Hedge flowers",
+       "milestone": 1
+      },
+      {
+       "sticker": "clover4",
+       "name": "Clover",
+       "x": 32,
+       "y": 86,
+       "set": "Hedge flowers",
+       "milestone": 4
+      },
+      {
+       "sticker": "poppy",
+       "name": "Poppy",
+       "x": 51,
+       "y": 86,
+       "set": "Hedge flowers",
+       "milestone": 8
+      },
+      {
+       "sticker": "foxglove",
+       "name": "Foxglove",
+       "x": 70,
+       "y": 86,
+       "set": "Hedge flowers",
+       "milestone": 12
+      },
+      {
+       "sticker": "lavender",
+       "name": "Lavender",
+       "x": 89,
+       "y": 86,
+       "set": "Hedge flowers",
+       "milestone": 26
+      },
+      {
+       "sticker": "bluebell",
+       "name": "Bluebells",
+       "x": 13,
+       "y": 105,
+       "set": "Hedge flowers",
+       "milestone": 52
+      }
+     ],
+     "labels": [
+      {
+       "set": "Bee things",
+       "x": 14,
+       "y": 28,
+       "count_x": 63,
+       "earned_by": "days Today's list finished"
+      },
+      {
+       "set": "Hedge flowers",
+       "x": 14,
+       "y": 78,
+       "count_x": 81,
+       "earned_by": "weeks with a habit ticked"
+      }
+     ]
+    },
+    {
+     "page": 6,
+     "side": "right",
+     "group": "meadow",
+     "slots": [
+      {
+       "sticker": "full-month",
+       "name": "Full month",
+       "x": 9,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "100% month"
+      },
+      {
+       "sticker": "oak-2",
+       "name": "Acorn, split",
+       "x": 28,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "2 months 80%+"
+      },
+      {
+       "sticker": "oak-3",
+       "name": "Oak seedling",
+       "x": 47,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "3 months 80%+"
+      },
+      {
+       "sticker": "oak-6",
+       "name": "Young oak",
+       "x": 66,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "6 months 80%+"
+      },
+      {
+       "sticker": "oak-12",
+       "name": "Great oak",
+       "x": 85,
+       "y": 36,
+       "set": "Seasons kept",
+       "milestone": "12 months 80%+"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Seasons kept",
+       "x": 10,
+       "y": 28,
+       "count_x": 70,
+       "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+"
+      }
+     ]
+    },
+    {
+     "page": 7,
+     "side": "left",
+     "group": "barnyard",
+     "slots": [
+      {
+       "sticker": "hen",
+       "name": "Hen",
+       "x": 13,
+       "y": 36,
+       "set": "Animals",
+       "milestone": 1
+      },
+      {
+       "sticker": "egg-nest",
+       "name": "Egg nest",
+       "x": 32,
+       "y": 36,
+       "set": "Animals",
+       "milestone": 10
+      },
+      {
+       "sticker": "chick",
+       "name": "Chick",
+       "x": 51,
+       "y": 36,
+       "set": "Animals",
+       "milestone": 25
+      },
+      {
+       "sticker": "piglet",
+       "name": "Piglet",
+       "x": 70,
+       "y": 36,
+       "set": "Animals",
+       "milestone": 50
+      },
+      {
+       "sticker": "cow",
+       "name": "Cow",
+       "x": 89,
+       "y": 36,
+       "set": "Animals",
+       "milestone": 75
+      },
+      {
+       "sticker": "milk-churn",
+       "name": "Milk churn",
+       "x": 13,
+       "y": 55,
+       "set": "Animals",
+       "milestone": 100
+      },
+      {
+       "sticker": "sheep",
+       "name": "Sheep",
+       "x": 32,
+       "y": 55,
+       "set": "Animals",
+       "milestone": 150
+      },
+      {
+       "sticker": "lamb",
+       "name": "Lamb",
+       "x": 51,
+       "y": 55,
+       "set": "Animals",
+       "milestone": 200
+      },
+      {
+       "sticker": "haybale",
+       "name": "Hay bale",
+       "x": 13,
+       "y": 86,
+       "set": "Barn things",
+       "milestone": 1
+      },
+      {
+       "sticker": "feed-trough",
+       "name": "Feed trough",
+       "x": 32,
+       "y": 86,
+       "set": "Barn things",
+       "milestone": 3
+      },
+      {
+       "sticker": "weathervane",
+       "name": "Weathervane",
+       "x": 51,
+       "y": 86,
+       "set": "Barn things",
+       "milestone": 6
+      },
+      {
+       "sticker": "barn-lantern",
+       "name": "Barn lantern",
+       "x": 70,
+       "y": 86,
+       "set": "Barn things",
+       "milestone": 12
+      }
+     ],
+     "labels": [
+      {
+       "set": "Animals",
+       "x": 14,
+       "y": 28,
+       "count_x": 52,
+       "earned_by": "habit sessions"
+      },
+      {
+       "set": "Barn things",
+       "x": 14,
+       "y": 78,
+       "count_x": 68,
+       "earned_by": "habit months finished"
+      }
+     ]
+    },
+    {
+     "page": 8,
+     "side": "right",
+     "group": "orchard",
+     "slots": [
+      {
+       "sticker": "sapling",
+       "name": "Sapling",
+       "x": 9,
+       "y": 36,
+       "set": "Fruit trees",
+       "milestone": 1
+      },
+      {
+       "sticker": "may",
+       "name": "Blossom branch",
+       "x": 28,
+       "y": 36,
+       "set": "Fruit trees",
+       "milestone": 2
+      },
+      {
+       "sticker": "sep",
+       "name": "Apple",
+       "x": 47,
+       "y": 36,
+       "set": "Fruit trees",
+       "milestone": 4
+      },
+      {
+       "sticker": "pear",
+       "name": "Pear",
+       "x": 66,
+       "y": 36,
+       "set": "Fruit trees",
+       "milestone": 6
+      },
+      {
+       "sticker": "plum",
+       "name": "Plum",
+       "x": 85,
+       "y": 36,
+       "set": "Fruit trees",
+       "milestone": 9
+      },
+      {
+       "sticker": "cherries",
+       "name": "Cherry",
+       "x": 9,
+       "y": 55,
+       "set": "Fruit trees",
+       "milestone": 12
+      },
+      {
+       "sticker": "peach-tree",
+       "name": "Peach tree",
+       "x": 28,
+       "y": 55,
+       "set": "Fruit trees",
+       "milestone": 18
+      },
+      {
+       "sticker": "tree-swing",
+       "name": "Tree swing",
+       "x": 9,
+       "y": 86,
+       "set": "Under the trees",
+       "milestone": 1
+      },
+      {
+       "sticker": "picnic-blanket",
+       "name": "Picnic blanket",
+       "x": 28,
+       "y": 86,
+       "set": "Under the trees",
+       "milestone": 3
+      }
+     ],
+     "labels": [
+      {
+       "set": "Fruit trees",
+       "x": 10,
+       "y": 28,
+       "count_x": 63,
+       "earned_by": "monthly goals hit"
+      },
+      {
+       "set": "Under the trees",
+       "x": 10,
+       "y": 78,
+       "count_x": 82,
+       "earned_by": "whole goals completed"
+      }
+     ]
+    },
+    {
+     "page": 9,
+     "side": "left",
+     "group": "glasshouse",
+     "slots": [
+      {
+       "sticker": "seedtray",
+       "name": "Seed tray",
+       "x": 13,
+       "y": 36,
+       "set": "Glasshouse",
+       "milestone": 1
+      },
+      {
+       "sticker": "seedling",
+       "name": "Seedling pot",
+       "x": 32,
+       "y": 36,
+       "set": "Glasshouse",
+       "milestone": 3
+      },
+      {
+       "sticker": "wateringcan",
+       "name": "Watering can",
+       "x": 51,
+       "y": 36,
+       "set": "Glasshouse",
+       "milestone": 5
+      },
+      {
+       "sticker": "geranium",
+       "name": "Geranium",
+       "x": 70,
+       "y": 36,
+       "set": "Glasshouse",
+       "milestone": 10
+      },
+      {
+       "sticker": "cactus",
+       "name": "Cactus",
+       "x": 89,
+       "y": 36,
+       "set": "Glasshouse",
+       "milestone": 15
+      },
+      {
+       "sticker": "fern",
+       "name": "Fern",
+       "x": 13,
+       "y": 55,
+       "set": "Glasshouse",
+       "milestone": 25
+      },
+      {
+       "sticker": "sweet-peas",
+       "name": "Sweet peas",
+       "x": 32,
+       "y": 55,
+       "set": "Glasshouse",
+       "milestone": 40
+      },
+      {
+       "sticker": "hanging-basket",
+       "name": "Hanging basket",
+       "x": 51,
+       "y": 55,
+       "set": "Glasshouse",
+       "milestone": 50
+      },
+      {
+       "sticker": "orchid",
+       "name": "Orchid",
+       "x": 70,
+       "y": 55,
+       "set": "Glasshouse",
+       "milestone": 75
+      },
+      {
+       "sticker": "lemontree",
+       "name": "Lemon tree",
+       "x": 89,
+       "y": 55,
+       "set": "Glasshouse",
+       "milestone": 100
+      },
+      {
+       "sticker": "fig-tree",
+       "name": "Fig tree",
+       "x": 13,
+       "y": 74,
+       "set": "Glasshouse",
+       "milestone": 125
+      },
+      {
+       "sticker": "roof-vine",
+       "name": "Vine over the roof",
+       "x": 32,
+       "y": 74,
+       "set": "Glasshouse",
+       "milestone": 150
+      }
+     ],
+     "labels": [
+      {
+       "set": "Glasshouse",
+       "x": 14,
+       "y": 28,
+       "count_x": 67,
+       "earned_by": "mornings with morning pages"
+      }
+     ]
+    },
+    {
+     "page": 10,
+     "side": "right",
+     "group": "pond",
+     "slots": [
+      {
+       "sticker": "lilypad",
+       "name": "Lily pad",
+       "x": 9,
+       "y": 36,
+       "set": "Lily pads",
+       "milestone": 1
+      },
+      {
+       "sticker": "pebble",
+       "name": "Pebbles",
+       "x": 28,
+       "y": 36,
+       "set": "Lily pads",
+       "milestone": 5
+      },
+      {
+       "sticker": "cattail",
+       "name": "Reeds",
+       "x": 47,
+       "y": 36,
+       "set": "Lily pads",
+       "milestone": 10
+      },
+      {
+       "sticker": "frogspawn",
+       "name": "Frogspawn",
+       "x": 66,
+       "y": 36,
+       "set": "Lily pads",
+       "milestone": 25
+      },
+      {
+       "sticker": "snail",
+       "name": "Pond snail",
+       "x": 85,
+       "y": 36,
+       "set": "Lily pads",
+       "milestone": 50
+      },
+      {
+       "sticker": "dragonfly",
+       "name": "Dragonfly",
+       "x": 9,
+       "y": 55,
+       "set": "Lily pads",
+       "milestone": 75
+      },
+      {
+       "sticker": "waterlily",
+       "name": "Water lily in flower",
+       "x": 28,
+       "y": 55,
+       "set": "Lily pads",
+       "milestone": 100
+      },
+      {
+       "sticker": "steppingstone",
+       "name": "Stepping stone",
+       "x": 9,
+       "y": 86,
+       "set": "Water's edge",
+       "milestone": 1
+      },
+      {
+       "sticker": "newt",
+       "name": "Newt",
+       "x": 28,
+       "y": 86,
+       "set": "Water's edge",
+       "milestone": 3
+      },
+      {
+       "sticker": "duckling",
+       "name": "Duck",
+       "x": 47,
+       "y": 86,
+       "set": "Water's edge",
+       "milestone": 5
+      },
+      {
+       "sticker": "ducklings",
+       "name": "Ducklings",
+       "x": 66,
+       "y": 86,
+       "set": "Water's edge",
+       "milestone": 10
+      },
+      {
+       "sticker": "moorhen",
+       "name": "Moorhen",
+       "x": 85,
+       "y": 86,
+       "set": "Water's edge",
+       "milestone": 25
+      },
+      {
+       "sticker": "kingfisher",
+       "name": "Kingfisher",
+       "x": 9,
+       "y": 105,
+       "set": "Water's edge",
+       "milestone": 50
+      },
+      {
+       "sticker": "willow",
+       "name": "Willow",
+       "x": 28,
+       "y": 105,
+       "set": "Water's edge",
+       "milestone": 75
+      }
+     ],
+     "labels": [
+      {
+       "set": "Lily pads",
+       "x": 10,
+       "y": 28,
+       "count_x": 54,
+       "earned_by": "days checked in"
+      },
+      {
+       "set": "Water's edge",
+       "x": 10,
+       "y": 78,
+       "count_x": 68,
+       "earned_by": "days with a mental health exercise (1/day)"
+      }
+     ]
+    },
+    {
+     "page": 11,
+     "side": "left",
+     "group": "aquarium",
+     "slots": [
+      {
+       "sticker": "minnow",
+       "name": "Minnow",
+       "x": 13,
+       "y": 36,
+       "set": "Stream fish",
+       "milestone": 1
+      },
+      {
+       "sticker": "stickleback",
+       "name": "Stickleback",
+       "x": 32,
+       "y": 36,
+       "set": "Stream fish",
+       "milestone": 3
+      },
+      {
+       "sticker": "roach",
+       "name": "Roach",
+       "x": 51,
+       "y": 36,
+       "set": "Stream fish",
+       "milestone": 6
+      },
+      {
+       "sticker": "perch",
+       "name": "Perch",
+       "x": 70,
+       "y": 36,
+       "set": "Stream fish",
+       "milestone": 10
+      },
+      {
+       "sticker": "carp",
+       "name": "Carp",
+       "x": 89,
+       "y": 36,
+       "set": "Stream fish",
+       "milestone": 15
+      },
+      {
+       "sticker": "trout",
+       "name": "Trout",
+       "x": 13,
+       "y": 55,
+       "set": "Stream fish",
+       "milestone": 20
+      },
+      {
+       "sticker": "eel",
+       "name": "Eel",
+       "x": 32,
+       "y": 55,
+       "set": "Stream fish",
+       "milestone": 25
+      },
+      {
+       "sticker": "koi",
+       "name": "Koi",
+       "x": 51,
+       "y": 55,
+       "set": "Stream fish",
+       "milestone": 30
+      },
+      {
+       "sticker": "moonfish",
+       "name": "Moonfish (DBT, all 12)",
+       "x": 13,
+       "y": 86,
+       "set": "Rare fish",
+       "milestone": "DBT done"
+      },
+      {
+       "sticker": "golden-carp",
+       "name": "Golden carp (BPD, all 22)",
+       "x": 32,
+       "y": 86,
+       "set": "Rare fish",
+       "milestone": "BPD done"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Stream fish",
+       "x": 14,
+       "y": 28,
+       "count_x": 69,
+       "earned_by": "workbook chapters (34: BPD 22, DBT 12)"
+      },
+      {
+       "set": "Rare fish",
+       "x": 14,
+       "y": 78,
+       "count_x": 59,
+       "earned_by": "a whole workbook finished"
+      }
+     ]
+    },
+    {
+     "page": 12,
+     "side": "right",
+     "group": "farmhouse",
+     "slots": [
+      {
+       "sticker": "lantern",
+       "name": "Lantern",
+       "x": 9,
+       "y": 36,
+       "set": "Kitchen",
+       "milestone": 1
+      },
+      {
+       "sticker": "teapot",
+       "name": "Teapot",
+       "x": 28,
+       "y": 36,
+       "set": "Kitchen",
+       "milestone": 4
+      },
+      {
+       "sticker": "quilt",
+       "name": "Quilt",
+       "x": 47,
+       "y": 36,
+       "set": "Kitchen",
+       "milestone": 8
+      },
+      {
+       "sticker": "rocking-chair",
+       "name": "Rocking chair",
+       "x": 66,
+       "y": 36,
+       "set": "Kitchen",
+       "milestone": 12
+      },
+      {
+       "sticker": "dresser",
+       "name": "Dresser",
+       "x": 85,
+       "y": 36,
+       "set": "Kitchen",
+       "milestone": 26
+      },
+      {
+       "sticker": "old-clock",
+       "name": "Old clock",
+       "x": 9,
+       "y": 55,
+       "set": "Kitchen",
+       "milestone": 52
+      },
+      {
+       "sticker": "jam",
+       "name": "Jam jar",
+       "x": 9,
+       "y": 86,
+       "set": "Harvest table",
+       "milestone": 1
+      },
+      {
+       "sticker": "harvestbasket",
+       "name": "Harvest basket",
+       "x": 28,
+       "y": 86,
+       "set": "Harvest table",
+       "milestone": 3
+      },
+      {
+       "sticker": "pie",
+       "name": "Pie",
+       "x": 47,
+       "y": 86,
+       "set": "Harvest table",
+       "milestone": 6
+      },
+      {
+       "sticker": "bunting",
+       "name": "Bunting",
+       "x": 66,
+       "y": 86,
+       "set": "Harvest table",
+       "milestone": 9
+      },
+      {
+       "sticker": "bigtable",
+       "name": "Big table laid",
+       "x": 85,
+       "y": 86,
+       "set": "Harvest table",
+       "milestone": 12
+      }
+     ],
+     "labels": [
+      {
+       "set": "Kitchen",
+       "x": 10,
+       "y": 28,
+       "count_x": 46,
+       "earned_by": "weekly reviews"
+      },
+      {
+       "set": "Harvest table",
+       "x": 10,
+       "y": 78,
+       "count_x": 74,
+       "earned_by": "monthly reviews"
+      }
+     ]
+    },
+    {
+     "page": 13,
+     "side": "left",
+     "group": "museum",
+     "slots": [
+      {
+       "sticker": "pressed-daisy",
+       "name": "Pressed daisy",
+       "x": 13,
+       "y": 36,
+       "set": "Pressed and bound",
+       "milestone": 1
+      },
+      {
+       "sticker": "ribbon",
+       "name": "Bookmark",
+       "x": 32,
+       "y": 36,
+       "set": "Pressed and bound",
+       "milestone": 3
+      },
+      {
+       "sticker": "old-map",
+       "name": "Old map",
+       "x": 51,
+       "y": 36,
+       "set": "Pressed and bound",
+       "milestone": 6
+      },
+      {
+       "sticker": "fern-specimen",
+       "name": "Fern specimen",
+       "x": 70,
+       "y": 36,
+       "set": "Pressed and bound",
+       "milestone": 10
+      },
+      {
+       "sticker": "feather-collection",
+       "name": "Feather collection",
+       "x": 89,
+       "y": 36,
+       "set": "Pressed and bound",
+       "milestone": 15
+      },
+      {
+       "sticker": "illuminated-book",
+       "name": "Illuminated book",
+       "x": 13,
+       "y": 55,
+       "set": "Pressed and bound",
+       "milestone": 20
+      },
+      {
+       "sticker": "ammonite",
+       "name": "Ammonite",
+       "x": 13,
+       "y": 86,
+       "set": "Dug up",
+       "milestone": 1
+      },
+      {
+       "sticker": "trilobite",
+       "name": "Trilobite",
+       "x": 32,
+       "y": 86,
+       "set": "Dug up",
+       "milestone": 2
+      },
+      {
+       "sticker": "fossil-leaf",
+       "name": "Fossil leaf",
+       "x": 51,
+       "y": 86,
+       "set": "Dug up",
+       "milestone": 3
+      },
+      {
+       "sticker": "geode",
+       "name": "Geode",
+       "x": 70,
+       "y": 86,
+       "set": "Dug up",
+       "milestone": 5
+      },
+      {
+       "sticker": "oldkey",
+       "name": "Old key",
+       "x": 89,
+       "y": 86,
+       "set": "Dug up",
+       "milestone": 8
+      },
+      {
+       "sticker": "footprint-fossil",
+       "name": "Footprint fossil",
+       "x": 13,
+       "y": 105,
+       "set": "Dug up",
+       "milestone": 12
+      }
+     ],
+     "labels": [
+      {
+       "set": "Pressed and bound",
+       "x": 14,
+       "y": 28,
+       "count_x": 98,
+       "earned_by": "Reading-list books"
+      },
+      {
+       "set": "Dug up",
+       "x": 14,
+       "y": 78,
+       "count_x": 45,
+       "earned_by": "projects finished"
+      }
+     ]
+    },
+    {
+     "page": 14,
+     "side": "right",
+     "group": "lane",
+     "slots": [
+      {
+       "sticker": "hi",
+       "name": "Welcome",
+       "x": 9,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "day one"
+      },
+      {
+       "sticker": "door",
+       "name": "Welcome back",
+       "x": 28,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "3+ days away"
+      },
+      {
+       "sticker": "steps",
+       "name": "Back again",
+       "x": 47,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "3rd return"
+      },
+      {
+       "sticker": "always-welcome",
+       "name": "Always welcome",
+       "x": 66,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "5th return"
+      },
+      {
+       "sticker": "ok",
+       "name": "Late still counts",
+       "x": 85,
+       "y": 36,
+       "set": "Kind notes",
+       "milestone": "a late tick"
+      },
+      {
+       "sticker": "feather",
+       "name": "Short pages still count",
+       "x": 9,
+       "y": 55,
+       "set": "Kind notes",
+       "milestone": "short pages"
+      },
+      {
+       "sticker": "candle",
+       "name": "Light left on",
+       "x": 28,
+       "y": 55,
+       "set": "Kind notes",
+       "milestone": "check-in after a gap"
+      },
+      {
+       "sticker": "back-to-it",
+       "name": "Back to it",
+       "x": 47,
+       "y": 55,
+       "set": "Kind notes",
+       "milestone": "habit again after a week off"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Kind notes",
+       "x": 10,
+       "y": 28,
+       "count_x": 59,
+       "earned_by": "each once"
+      }
+     ]
+    },
+    {
+     "page": 15,
+     "side": "left",
+     "group": "lane",
+     "slots": [
+      {
+       "sticker": "robin",
+       "name": "January robin",
+       "x": 13,
+       "y": 36,
+       "set": "Hedgerow",
+       "milestone": "Jan"
+      },
+      {
+       "sticker": "feb",
+       "name": "February snowdrop",
+       "x": 32,
+       "y": 36,
+       "set": "Hedgerow",
+       "milestone": "Feb"
+      },
+      {
+       "sticker": "mar",
+       "name": "March daffodil",
+       "x": 51,
+       "y": 36,
+       "set": "Hedgerow",
+       "milestone": "Mar"
+      },
+      {
+       "sticker": "welliespuddle",
+       "name": "April wellies",
+       "x": 70,
+       "y": 36,
+       "set": "Hedgerow",
+       "milestone": "Apr"
+      },
+      {
+       "sticker": "bloom",
+       "name": "May blossom",
+       "x": 89,
+       "y": 36,
+       "set": "Hedgerow",
+       "milestone": "May"
+      },
+      {
+       "sticker": "jun",
+       "name": "June strawberry",
+       "x": 13,
+       "y": 55,
+       "set": "Hedgerow",
+       "milestone": "Jun"
+      },
+      {
+       "sticker": "hay-cart",
+       "name": "July hay cart",
+       "x": 32,
+       "y": 55,
+       "set": "Hedgerow",
+       "milestone": "Jul"
+      },
+      {
+       "sticker": "blackberries",
+       "name": "August blackberries",
+       "x": 51,
+       "y": 55,
+       "set": "Hedgerow",
+       "milestone": "Aug"
+      },
+      {
+       "sticker": "conker",
+       "name": "September conker",
+       "x": 70,
+       "y": 55,
+       "set": "Hedgerow",
+       "milestone": "Sep"
+      },
+      {
+       "sticker": "toadstool",
+       "name": "October toadstool",
+       "x": 89,
+       "y": 55,
+       "set": "Hedgerow",
+       "milestone": "Oct"
+      },
+      {
+       "sticker": "nov",
+       "name": "November leaf",
+       "x": 13,
+       "y": 74,
+       "set": "Hedgerow",
+       "milestone": "Nov"
+      },
+      {
+       "sticker": "holly",
+       "name": "December holly",
+       "x": 32,
+       "y": 74,
+       "set": "Hedgerow",
+       "milestone": "Dec"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Hedgerow",
+       "x": 14,
+       "y": 28,
+       "count_x": 58,
+       "earned_by": "did anything that month"
+      }
+     ]
+    },
+    {
+     "page": 16,
+     "side": "right",
+     "group": "bonus",
+     "slots": [
+      {
+       "sticker": "cleared-mind",
+       "name": "area cleared",
+       "x": 9,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-writing",
+       "name": "area cleared",
+       "x": 28,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-art",
+       "name": "area cleared",
+       "x": 47,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-content",
+       "name": "area cleared",
+       "x": 66,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-body",
+       "name": "area cleared",
+       "x": 85,
+       "y": 36,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-tech",
+       "name": "area cleared",
+       "x": 9,
+       "y": 55,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-production",
+       "name": "area cleared",
+       "x": 28,
+       "y": 55,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      },
+      {
+       "sticker": "cleared-admin",
+       "name": "area cleared",
+       "x": 47,
+       "y": 55,
+       "set": "Area cleared",
+       "milestone": "month cleared"
+      }
+     ],
+     "labels": [
+      {
+       "set": "Area cleared",
+       "x": 10,
+       "y": 28,
+       "count_x": 71,
+       "earned_by": "every task due in that area done in a month (repeatable: xN badge)"
+      }
+     ]
+    }
+   ],
+   "contents_rows": [
+    {
+     "group": "beds",
+     "y": 30,
+     "count_right_x": 102,
+     "page": 1
+    },
+    {
+     "group": "meadow",
+     "y": 39,
+     "count_right_x": 102,
+     "page": 5
+    },
+    {
+     "group": "barnyard",
+     "y": 48,
+     "count_right_x": 102,
+     "page": 7
+    },
+    {
+     "group": "orchard",
+     "y": 57,
+     "count_right_x": 102,
+     "page": 8
+    },
+    {
+     "group": "glasshouse",
+     "y": 66,
+     "count_right_x": 102,
+     "page": 9
+    },
+    {
+     "group": "pond",
+     "y": 75,
+     "count_right_x": 102,
+     "page": 10
+    },
+    {
+     "group": "aquarium",
+     "y": 84,
+     "count_right_x": 102,
+     "page": 11
+    },
+    {
+     "group": "farmhouse",
+     "y": 93,
+     "count_right_x": 102,
+     "page": 12
+    },
+    {
+     "group": "museum",
+     "y": 102,
+     "count_right_x": 102,
+     "page": 13
+    },
+    {
+     "group": "lane",
+     "y": 111,
+     "count_right_x": 102,
+     "page": 14
+    },
+    {
+     "group": "bonus",
+     "y": 120,
+     "count_right_x": 102,
+     "page": 16,
+     "count_format": "{n} (bonus, not in the total)"
+    }
+   ],
+   "contents_total_plate": {
+    "box": [
+     24,
+     130,
+     88,
+     141
+    ],
+    "text_centre_x": 56,
+    "text_y": 134,
+    "colour": "#df7e6f",
+    "format": "{n} OF 175",
+    "font": "font-small",
+    "max_text_width": 41,
+    "note": "Centre the text on text_centre_x (width = sum of glyph widths + 1 per gap - 1; the widest, all-collected text fits between the ornaments). When all are collected: same text, and the plate's two gold ornaments may glint (fx-sparkle)."
+   },
+   "spread_size": [
+    232,
+    152
+   ],
+   "slot": {
+    "size": 17,
+    "sticker_offset": [
+     1,
+     1
+    ]
+   }
+  },
+  {
+   "name": "book-turn",
+   "png": "book-turn.png",
+   "json": "book-turn.json",
+   "frame": [
+    232,
+    152
+   ],
+   "frames": 9,
+   "tags": [
+    {
+     "name": "cover-lift",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "cover-upright",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "cover-land",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "page-lift",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "page-upright",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "page-land",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "page-lift-back",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "page-upright-back",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "page-land-back",
+     "from": 8,
+     "to": 8
+    }
+   ],
+   "display": "same scale as the book",
+   "notes": "Full-spread overlays drawn over the two half pages. Opening: cover-lift, cover-upright, cover-land over (empty left, contents right), then the open spread. Turning forward: show old left + new right under page-lift/upright/land, then the new spread. Backward: the -back frames, with new left + old right underneath."
+  },
+  {
+   "name": "book-spreads-reference",
+   "png": "book-spreads-reference.png",
+   "json": "book-spreads-reference.json",
+   "frame": [
+    232,
+    152
+   ],
+   "frames": 11,
+   "tags": [
+    {
+     "name": "closed",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "contents",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "contents-total-example",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "pages-1-2",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "pages-3-4",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "pages-5-6",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "pages-7-8",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "pages-9-10",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "pages-11-12",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "pages-13-14",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "pages-15-16",
+     "from": 10,
+     "to": 10
+    }
+   ],
+   "display": "reference only",
+   "notes": "Pre-rendered spreads for checking the layout (pages without stickers or counts)."
+  },
+  {
+   "name": "book-slot",
+   "png": "book-slot.png",
+   "json": "book-slot.json",
+   "frame": [
+    19,
+    19
+   ],
+   "frames": 4,
+   "tags": [
+    {
+     "name": "empty",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "filled",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "ready-peel",
+     "from": 2,
+     "to": 3
+    }
+   ],
+   "display": "same scale as the book",
+   "notes": "Draw at a slot's (x, y). empty = dashed frame (then the sticker's ghost at +1,+1); filled = paper square (then the sticker at +1,+1); ready-peel (2-frame loop) goes over a filled slot whose sticker is earned but not yet placed on the farm."
+  },
+  {
+   "name": "font-small",
+   "png": "font-small.png",
+   "json": "font-small.json",
+   "frame": [
+    5,
+    5
+   ],
+   "frames": 45,
+   "tags": [
+    {
+     "name": " ",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "&",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "'",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "(",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": ")",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": ",",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "-",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": ".",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "/",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "0",
+     "from": 9,
+     "to": 9
+    },
+    {
+     "name": "1",
+     "from": 10,
+     "to": 10
+    },
+    {
+     "name": "2",
+     "from": 11,
+     "to": 11
+    },
+    {
+     "name": "3",
+     "from": 12,
+     "to": 12
+    },
+    {
+     "name": "4",
+     "from": 13,
+     "to": 13
+    },
+    {
+     "name": "5",
+     "from": 14,
+     "to": 14
+    },
+    {
+     "name": "6",
+     "from": 15,
+     "to": 15
+    },
+    {
+     "name": "7",
+     "from": 16,
+     "to": 16
+    },
+    {
+     "name": "8",
+     "from": 17,
+     "to": 17
+    },
+    {
+     "name": "9",
+     "from": 18,
+     "to": 18
+    },
+    {
+     "name": "A",
+     "from": 19,
+     "to": 19
+    },
+    {
+     "name": "B",
+     "from": 20,
+     "to": 20
+    },
+    {
+     "name": "C",
+     "from": 21,
+     "to": 21
+    },
+    {
+     "name": "D",
+     "from": 22,
+     "to": 22
+    },
+    {
+     "name": "E",
+     "from": 23,
+     "to": 23
+    },
+    {
+     "name": "F",
+     "from": 24,
+     "to": 24
+    },
+    {
+     "name": "G",
+     "from": 25,
+     "to": 25
+    },
+    {
+     "name": "H",
+     "from": 26,
+     "to": 26
+    },
+    {
+     "name": "I",
+     "from": 27,
+     "to": 27
+    },
+    {
+     "name": "J",
+     "from": 28,
+     "to": 28
+    },
+    {
+     "name": "K",
+     "from": 29,
+     "to": 29
+    },
+    {
+     "name": "L",
+     "from": 30,
+     "to": 30
+    },
+    {
+     "name": "M",
+     "from": 31,
+     "to": 31
+    },
+    {
+     "name": "N",
+     "from": 32,
+     "to": 32
+    },
+    {
+     "name": "O",
+     "from": 33,
+     "to": 33
+    },
+    {
+     "name": "P",
+     "from": 34,
+     "to": 34
+    },
+    {
+     "name": "Q",
+     "from": 35,
+     "to": 35
+    },
+    {
+     "name": "R",
+     "from": 36,
+     "to": 36
+    },
+    {
+     "name": "S",
+     "from": 37,
+     "to": 37
+    },
+    {
+     "name": "T",
+     "from": 38,
+     "to": 38
+    },
+    {
+     "name": "U",
+     "from": 39,
+     "to": 39
+    },
+    {
+     "name": "V",
+     "from": 40,
+     "to": 40
+    },
+    {
+     "name": "W",
+     "from": 41,
+     "to": 41
+    },
+    {
+     "name": "X",
+     "from": 42,
+     "to": 42
+    },
+    {
+     "name": "Y",
+     "from": 43,
+     "to": 43
+    },
+    {
+     "name": "Z",
+     "from": 44,
+     "to": 44
+    }
+   ],
+   "display": "same scale as the book",
+   "notes": "4x5 pixel font for counts and labels in the book (uppercase, digits, / - ' . , & ( )). Advance = glyph width + 1.",
+   "glyph_widths": {
+    " ": 2,
+    "&": 3,
+    "'": 1,
+    "(": 2,
+    ")": 2,
+    ",": 2,
+    "-": 3,
+    ".": 1,
+    "/": 4,
+    "0": 4,
+    "1": 2,
+    "2": 4,
+    "3": 4,
+    "4": 4,
+    "5": 4,
+    "6": 4,
+    "7": 4,
+    "8": 4,
+    "9": 4,
+    "A": 4,
+    "B": 4,
+    "C": 4,
+    "D": 4,
+    "E": 4,
+    "F": 4,
+    "G": 4,
+    "H": 4,
+    "I": 3,
+    "J": 4,
+    "K": 4,
+    "L": 4,
+    "M": 5,
+    "N": 4,
+    "O": 4,
+    "P": 4,
+    "Q": 4,
+    "R": 4,
+    "S": 4,
+    "T": 3,
+    "U": 4,
+    "V": 4,
+    "W": 5,
+    "X": 4,
+    "Y": 3,
+    "Z": 4
+   }
+  },
+  {
+   "name": "stickers",
+   "png": "stickers.png",
+   "json": "stickers.json",
+   "frame": [
+    16,
+    16
+   ],
+   "frames": 183,
+   "tags": [
+    {
+     "name": "beds:Mind bed",
+     "from": 0,
+     "to": 6
+    },
+    {
+     "name": "beds:Writing bed",
+     "from": 7,
+     "to": 13
+    },
+    {
+     "name": "beds:Art bed",
+     "from": 14,
+     "to": 20
+    },
+    {
+     "name": "beds:Content bed",
+     "from": 21,
+     "to": 27
+    },
+    {
+     "name": "beds:Body bed",
+     "from": 28,
+     "to": 34
+    },
+    {
+     "name": "beds:Tech bed",
+     "from": 35,
+     "to": 41
+    },
+    {
+     "name": "beds:Production bed",
+     "from": 42,
+     "to": 48
+    },
+    {
+     "name": "beds:Admin bed",
+     "from": 49,
+     "to": 55
+    },
+    {
+     "name": "meadow:Bee things",
+     "from": 56,
+     "to": 63
+    },
+    {
+     "name": "meadow:Hedge flowers",
+     "from": 64,
+     "to": 69
+    },
+    {
+     "name": "meadow:Seasons kept",
+     "from": 70,
+     "to": 74
+    },
+    {
+     "name": "barnyard:Animals",
+     "from": 75,
+     "to": 82
+    },
+    {
+     "name": "barnyard:Barn things",
+     "from": 83,
+     "to": 86
+    },
+    {
+     "name": "orchard:Fruit trees",
+     "from": 87,
+     "to": 93
+    },
+    {
+     "name": "orchard:Under the trees",
+     "from": 94,
+     "to": 95
+    },
+    {
+     "name": "glasshouse:Glasshouse",
+     "from": 96,
+     "to": 107
+    },
+    {
+     "name": "pond:Lily pads",
+     "from": 108,
+     "to": 114
+    },
+    {
+     "name": "pond:Water's edge",
+     "from": 115,
+     "to": 121
+    },
+    {
+     "name": "aquarium:Stream fish",
+     "from": 122,
+     "to": 129
+    },
+    {
+     "name": "aquarium:Rare fish",
+     "from": 130,
+     "to": 131
+    },
+    {
+     "name": "farmhouse:Kitchen",
+     "from": 132,
+     "to": 137
+    },
+    {
+     "name": "farmhouse:Harvest table",
+     "from": 138,
+     "to": 142
+    },
+    {
+     "name": "museum:Pressed and bound",
+     "from": 143,
+     "to": 148
+    },
+    {
+     "name": "museum:Dug up",
+     "from": 149,
+     "to": 154
+    },
+    {
+     "name": "lane:Kind notes",
+     "from": 155,
+     "to": 162
+    },
+    {
+     "name": "lane:Hedgerow",
+     "from": 163,
+     "to": 174
+    },
+    {
+     "name": "bonus:Area cleared",
+     "from": 175,
+     "to": 182
+    }
+   ],
+   "display": "2x in the nook and monthly review (32 px); book scale in the book",
+   "notes": "All 175 stickers in book order. Tags = group:set.",
+   "stickers": [
+    {
+     "index": 0,
+     "key": "seeds-mind",
+     "name": "Mind: seeds",
+     "group": "beds",
+     "set": "Mind bed",
+     "earned_by": "to-dos in Mind",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 1,
+     "key": "sprout-mind",
+     "name": "Mind: sprout",
+     "group": "beds",
+     "set": "Mind bed",
+     "earned_by": "to-dos in Mind",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 2,
+     "key": "herbsprout",
+     "name": "Mind: seedling",
+     "group": "beds",
+     "set": "Mind bed",
+     "earned_by": "to-dos in Mind",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 3,
+     "key": "chamomile",
+     "name": "Mind: first crop",
+     "group": "beds",
+     "set": "Mind bed",
+     "earned_by": "to-dos in Mind",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 4,
+     "key": "herbbundle",
+     "name": "Mind: full basket",
+     "group": "beds",
+     "set": "Mind bed",
+     "earned_by": "to-dos in Mind",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 5,
+     "key": "moth",
+     "name": "Mind: critter visitor",
+     "group": "beds",
+     "set": "Mind bed",
+     "earned_by": "to-dos in Mind",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 6,
+     "key": "prize-mind",
+     "name": "Mind: prize-size crop",
+     "group": "beds",
+     "set": "Mind bed",
+     "earned_by": "to-dos in Mind",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 7,
+     "key": "seeds-writing",
+     "name": "Writing: seeds",
+     "group": "beds",
+     "set": "Writing bed",
+     "earned_by": "to-dos in Writing",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 8,
+     "key": "sprout-writing",
+     "name": "Writing: sprout",
+     "group": "beds",
+     "set": "Writing bed",
+     "earned_by": "to-dos in Writing",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 9,
+     "key": "shootcane",
+     "name": "Writing: seedling",
+     "group": "beds",
+     "set": "Writing bed",
+     "earned_by": "to-dos in Writing",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 10,
+     "key": "peapod",
+     "name": "Writing: first crop",
+     "group": "beds",
+     "set": "Writing bed",
+     "earned_by": "to-dos in Writing",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 11,
+     "key": "beanbasket",
+     "name": "Writing: full basket",
+     "group": "beds",
+     "set": "Writing bed",
+     "earned_by": "to-dos in Writing",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 12,
+     "key": "ladybird",
+     "name": "Writing: critter visitor",
+     "group": "beds",
+     "set": "Writing bed",
+     "earned_by": "to-dos in Writing",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 13,
+     "key": "prize-writing",
+     "name": "Writing: prize-size crop",
+     "group": "beds",
+     "set": "Writing bed",
+     "earned_by": "to-dos in Writing",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 14,
+     "key": "seeds-art",
+     "name": "Art: seeds",
+     "group": "beds",
+     "set": "Art bed",
+     "earned_by": "to-dos in Art",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 15,
+     "key": "sprout-art",
+     "name": "Art: sprout",
+     "group": "beds",
+     "set": "Art bed",
+     "earned_by": "to-dos in Art",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 16,
+     "key": "leafyshoot",
+     "name": "Art: seedling",
+     "group": "beds",
+     "set": "Art bed",
+     "earned_by": "to-dos in Art",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 17,
+     "key": "radish",
+     "name": "Art: first crop",
+     "group": "beds",
+     "set": "Art bed",
+     "earned_by": "to-dos in Art",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 18,
+     "key": "chard",
+     "name": "Art: full basket",
+     "group": "beds",
+     "set": "Art bed",
+     "earned_by": "to-dos in Art",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 19,
+     "key": "butterfly",
+     "name": "Art: critter visitor",
+     "group": "beds",
+     "set": "Art bed",
+     "earned_by": "to-dos in Art",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 20,
+     "key": "prize-art",
+     "name": "Art: prize-size crop",
+     "group": "beds",
+     "set": "Art bed",
+     "earned_by": "to-dos in Art",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 21,
+     "key": "seeds-content",
+     "name": "Content: seeds",
+     "group": "beds",
+     "set": "Content bed",
+     "earned_by": "to-dos in Content",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 22,
+     "key": "sprout-content",
+     "name": "Content: sprout",
+     "group": "beds",
+     "set": "Content bed",
+     "earned_by": "to-dos in Content",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 23,
+     "key": "sproutsoil",
+     "name": "Content: seedling",
+     "group": "beds",
+     "set": "Content bed",
+     "earned_by": "to-dos in Content",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 24,
+     "key": "tomato",
+     "name": "Content: first crop",
+     "group": "beds",
+     "set": "Content bed",
+     "earned_by": "to-dos in Content",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 25,
+     "key": "truss",
+     "name": "Content: full basket",
+     "group": "beds",
+     "set": "Content bed",
+     "earned_by": "to-dos in Content",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 26,
+     "key": "caterpillar",
+     "name": "Content: critter visitor",
+     "group": "beds",
+     "set": "Content bed",
+     "earned_by": "to-dos in Content",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 27,
+     "key": "prize-content",
+     "name": "Content: prize-size crop",
+     "group": "beds",
+     "set": "Content bed",
+     "earned_by": "to-dos in Content",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 28,
+     "key": "seeds-body",
+     "name": "Body: seeds",
+     "group": "beds",
+     "set": "Body bed",
+     "earned_by": "to-dos in Body",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 29,
+     "key": "sprout-body",
+     "name": "Body: sprout",
+     "group": "beds",
+     "set": "Body bed",
+     "earned_by": "to-dos in Body",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 30,
+     "key": "carrottops",
+     "name": "Body: seedling",
+     "group": "beds",
+     "set": "Body bed",
+     "earned_by": "to-dos in Body",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 31,
+     "key": "carrot",
+     "name": "Body: first crop",
+     "group": "beds",
+     "set": "Body bed",
+     "earned_by": "to-dos in Body",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 32,
+     "key": "potatosack",
+     "name": "Body: full basket",
+     "group": "beds",
+     "set": "Body bed",
+     "earned_by": "to-dos in Body",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 33,
+     "key": "rabbit",
+     "name": "Body: critter visitor",
+     "group": "beds",
+     "set": "Body bed",
+     "earned_by": "to-dos in Body",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 34,
+     "key": "prize-body",
+     "name": "Body: prize-size crop",
+     "group": "beds",
+     "set": "Body bed",
+     "earned_by": "to-dos in Body",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 35,
+     "key": "seeds-tech",
+     "name": "Tech: seeds",
+     "group": "beds",
+     "set": "Tech bed",
+     "earned_by": "to-dos in Tech",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 36,
+     "key": "sprout-tech",
+     "name": "Tech: sprout",
+     "group": "beds",
+     "set": "Tech bed",
+     "earned_by": "to-dos in Tech",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 37,
+     "key": "vine",
+     "name": "Tech: seedling",
+     "group": "beds",
+     "set": "Tech bed",
+     "earned_by": "to-dos in Tech",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 38,
+     "key": "smallpumpkin",
+     "name": "Tech: first crop",
+     "group": "beds",
+     "set": "Tech bed",
+     "earned_by": "to-dos in Tech",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 39,
+     "key": "oct",
+     "name": "Tech: full basket",
+     "group": "beds",
+     "set": "Tech bed",
+     "earned_by": "to-dos in Tech",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 40,
+     "key": "hedgehog",
+     "name": "Tech: critter visitor",
+     "group": "beds",
+     "set": "Tech bed",
+     "earned_by": "to-dos in Tech",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 41,
+     "key": "prize-tech",
+     "name": "Tech: prize-size crop",
+     "group": "beds",
+     "set": "Tech bed",
+     "earned_by": "to-dos in Tech",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 42,
+     "key": "seeds-production",
+     "name": "Production: seeds",
+     "group": "beds",
+     "set": "Production bed",
+     "earned_by": "to-dos in Production",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 43,
+     "key": "sprout-production",
+     "name": "Production: sprout",
+     "group": "beds",
+     "set": "Production bed",
+     "earned_by": "to-dos in Production",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 44,
+     "key": "cornshoot",
+     "name": "Production: seedling",
+     "group": "beds",
+     "set": "Production bed",
+     "earned_by": "to-dos in Production",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 45,
+     "key": "corn",
+     "name": "Production: first crop",
+     "group": "beds",
+     "set": "Production bed",
+     "earned_by": "to-dos in Production",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 46,
+     "key": "wheat",
+     "name": "Production: full basket",
+     "group": "beds",
+     "set": "Production bed",
+     "earned_by": "to-dos in Production",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 47,
+     "key": "fieldmouse",
+     "name": "Production: critter visitor",
+     "group": "beds",
+     "set": "Production bed",
+     "earned_by": "to-dos in Production",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 48,
+     "key": "prize-production",
+     "name": "Production: prize-size crop",
+     "group": "beds",
+     "set": "Production bed",
+     "earned_by": "to-dos in Production",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 49,
+     "key": "seeds-admin",
+     "name": "Admin: seeds",
+     "group": "beds",
+     "set": "Admin bed",
+     "earned_by": "to-dos in Admin",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 50,
+     "key": "sprout-admin",
+     "name": "Admin: sprout",
+     "group": "beds",
+     "set": "Admin bed",
+     "earned_by": "to-dos in Admin",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 51,
+     "key": "lettuce",
+     "name": "Admin: seedling",
+     "group": "beds",
+     "set": "Admin bed",
+     "earned_by": "to-dos in Admin",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 52,
+     "key": "cabbage",
+     "name": "Admin: first crop",
+     "group": "beds",
+     "set": "Admin bed",
+     "earned_by": "to-dos in Admin",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 53,
+     "key": "onions",
+     "name": "Admin: full basket",
+     "group": "beds",
+     "set": "Admin bed",
+     "earned_by": "to-dos in Admin",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 54,
+     "key": "earthworm",
+     "name": "Admin: critter visitor",
+     "group": "beds",
+     "set": "Admin bed",
+     "earned_by": "to-dos in Admin",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 55,
+     "key": "prize-admin",
+     "name": "Admin: prize-size crop",
+     "group": "beds",
+     "set": "Admin bed",
+     "earned_by": "to-dos in Admin",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 56,
+     "key": "daisy",
+     "name": "Daisy",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 57,
+     "key": "buttercup",
+     "name": "Buttercup",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 58,
+     "key": "grasshopper",
+     "name": "Grasshopper",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 5,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 59,
+     "key": "bee",
+     "name": "Honeybee",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 60,
+     "key": "skep",
+     "name": "Beehive",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 15,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 61,
+     "key": "honey",
+     "name": "Honey jar",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 62,
+     "key": "sunflower",
+     "name": "Sunflower",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 40,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 63,
+     "key": "second-hive",
+     "name": "Second hive",
+     "group": "meadow",
+     "set": "Bee things",
+     "earned_by": "days Today's list finished",
+     "milestone": 60,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 64,
+     "key": "dandelion",
+     "name": "Dandelion",
+     "group": "meadow",
+     "set": "Hedge flowers",
+     "earned_by": "weeks with a habit ticked",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 65,
+     "key": "clover4",
+     "name": "Clover",
+     "group": "meadow",
+     "set": "Hedge flowers",
+     "earned_by": "weeks with a habit ticked",
+     "milestone": 4,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 66,
+     "key": "poppy",
+     "name": "Poppy",
+     "group": "meadow",
+     "set": "Hedge flowers",
+     "earned_by": "weeks with a habit ticked",
+     "milestone": 8,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 67,
+     "key": "foxglove",
+     "name": "Foxglove",
+     "group": "meadow",
+     "set": "Hedge flowers",
+     "earned_by": "weeks with a habit ticked",
+     "milestone": 12,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 68,
+     "key": "lavender",
+     "name": "Lavender",
+     "group": "meadow",
+     "set": "Hedge flowers",
+     "earned_by": "weeks with a habit ticked",
+     "milestone": 26,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 69,
+     "key": "bluebell",
+     "name": "Bluebells",
+     "group": "meadow",
+     "set": "Hedge flowers",
+     "earned_by": "weeks with a habit ticked",
+     "milestone": 52,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 70,
+     "key": "full-month",
+     "name": "Full month",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "100% month",
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 71,
+     "key": "oak-2",
+     "name": "Acorn, split",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "2 months 80%+",
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 72,
+     "key": "oak-3",
+     "name": "Oak seedling",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "3 months 80%+",
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 73,
+     "key": "oak-6",
+     "name": "Young oak",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "6 months 80%+",
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 74,
+     "key": "oak-12",
+     "name": "Great oak",
+     "group": "meadow",
+     "set": "Seasons kept",
+     "earned_by": "a habit kept: 100% of a month, or months in a row at 80%+",
+     "milestone": "12 months 80%+",
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 75,
+     "key": "hen",
+     "name": "Hen",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 76,
+     "key": "egg-nest",
+     "name": "Egg nest",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 10,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 77,
+     "key": "chick",
+     "name": "Chick",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 25,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 78,
+     "key": "piglet",
+     "name": "Piglet",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 50,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 79,
+     "key": "cow",
+     "name": "Cow",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 75,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 80,
+     "key": "milk-churn",
+     "name": "Milk churn",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 100,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 81,
+     "key": "sheep",
+     "name": "Sheep",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 150,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 82,
+     "key": "lamb",
+     "name": "Lamb",
+     "group": "barnyard",
+     "set": "Animals",
+     "earned_by": "habit sessions",
+     "milestone": 200,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 83,
+     "key": "haybale",
+     "name": "Hay bale",
+     "group": "barnyard",
+     "set": "Barn things",
+     "earned_by": "habit months finished",
+     "milestone": 1,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 84,
+     "key": "feed-trough",
+     "name": "Feed trough",
+     "group": "barnyard",
+     "set": "Barn things",
+     "earned_by": "habit months finished",
+     "milestone": 3,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 85,
+     "key": "weathervane",
+     "name": "Weathervane",
+     "group": "barnyard",
+     "set": "Barn things",
+     "earned_by": "habit months finished",
+     "milestone": 6,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 86,
+     "key": "barn-lantern",
+     "name": "Barn lantern",
+     "group": "barnyard",
+     "set": "Barn things",
+     "earned_by": "habit months finished",
+     "milestone": 12,
+     "tier": "everyday",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 87,
+     "key": "sapling",
+     "name": "Sapling",
+     "group": "orchard",
+     "set": "Fruit trees",
+     "earned_by": "monthly goals hit",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 88,
+     "key": "may",
+     "name": "Blossom branch",
+     "group": "orchard",
+     "set": "Fruit trees",
+     "earned_by": "monthly goals hit",
+     "milestone": 2,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 89,
+     "key": "sep",
+     "name": "Apple",
+     "group": "orchard",
+     "set": "Fruit trees",
+     "earned_by": "monthly goals hit",
+     "milestone": 4,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 90,
+     "key": "pear",
+     "name": "Pear",
+     "group": "orchard",
+     "set": "Fruit trees",
+     "earned_by": "monthly goals hit",
+     "milestone": 6,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 91,
+     "key": "plum",
+     "name": "Plum",
+     "group": "orchard",
+     "set": "Fruit trees",
+     "earned_by": "monthly goals hit",
+     "milestone": 9,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 92,
+     "key": "cherries",
+     "name": "Cherry",
+     "group": "orchard",
+     "set": "Fruit trees",
+     "earned_by": "monthly goals hit",
+     "milestone": 12,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 93,
+     "key": "peach-tree",
+     "name": "Peach tree",
+     "group": "orchard",
+     "set": "Fruit trees",
+     "earned_by": "monthly goals hit",
+     "milestone": 18,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 94,
+     "key": "tree-swing",
+     "name": "Tree swing",
+     "group": "orchard",
+     "set": "Under the trees",
+     "earned_by": "whole goals completed",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 95,
+     "key": "picnic-blanket",
+     "name": "Picnic blanket",
+     "group": "orchard",
+     "set": "Under the trees",
+     "earned_by": "whole goals completed",
+     "milestone": 3,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 96,
+     "key": "seedtray",
+     "name": "Seed tray",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 97,
+     "key": "seedling",
+     "name": "Seedling pot",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 3,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 98,
+     "key": "wateringcan",
+     "name": "Watering can",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 5,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 99,
+     "key": "geranium",
+     "name": "Geranium",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 10,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 100,
+     "key": "cactus",
+     "name": "Cactus",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 15,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 101,
+     "key": "fern",
+     "name": "Fern",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 25,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 102,
+     "key": "sweet-peas",
+     "name": "Sweet peas",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 40,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 103,
+     "key": "hanging-basket",
+     "name": "Hanging basket",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 50,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 104,
+     "key": "orchid",
+     "name": "Orchid",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 75,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 105,
+     "key": "lemontree",
+     "name": "Lemon tree",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 100,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 106,
+     "key": "fig-tree",
+     "name": "Fig tree",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 125,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 107,
+     "key": "roof-vine",
+     "name": "Vine over the roof",
+     "group": "glasshouse",
+     "set": "Glasshouse",
+     "earned_by": "mornings with morning pages",
+     "milestone": 150,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 108,
+     "key": "lilypad",
+     "name": "Lily pad",
+     "group": "pond",
+     "set": "Lily pads",
+     "earned_by": "days checked in",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 109,
+     "key": "pebble",
+     "name": "Pebbles",
+     "group": "pond",
+     "set": "Lily pads",
+     "earned_by": "days checked in",
+     "milestone": 5,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 110,
+     "key": "cattail",
+     "name": "Reeds",
+     "group": "pond",
+     "set": "Lily pads",
+     "earned_by": "days checked in",
+     "milestone": 10,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 111,
+     "key": "frogspawn",
+     "name": "Frogspawn",
+     "group": "pond",
+     "set": "Lily pads",
+     "earned_by": "days checked in",
+     "milestone": 25,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 112,
+     "key": "snail",
+     "name": "Pond snail",
+     "group": "pond",
+     "set": "Lily pads",
+     "earned_by": "days checked in",
+     "milestone": 50,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 113,
+     "key": "dragonfly",
+     "name": "Dragonfly",
+     "group": "pond",
+     "set": "Lily pads",
+     "earned_by": "days checked in",
+     "milestone": 75,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 114,
+     "key": "waterlily",
+     "name": "Water lily in flower",
+     "group": "pond",
+     "set": "Lily pads",
+     "earned_by": "days checked in",
+     "milestone": 100,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 115,
+     "key": "steppingstone",
+     "name": "Stepping stone",
+     "group": "pond",
+     "set": "Water's edge",
+     "earned_by": "days with a mental health exercise (1/day)",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 116,
+     "key": "newt",
+     "name": "Newt",
+     "group": "pond",
+     "set": "Water's edge",
+     "earned_by": "days with a mental health exercise (1/day)",
+     "milestone": 3,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 117,
+     "key": "duckling",
+     "name": "Duck",
+     "group": "pond",
+     "set": "Water's edge",
+     "earned_by": "days with a mental health exercise (1/day)",
+     "milestone": 5,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 118,
+     "key": "ducklings",
+     "name": "Ducklings",
+     "group": "pond",
+     "set": "Water's edge",
+     "earned_by": "days with a mental health exercise (1/day)",
+     "milestone": 10,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 119,
+     "key": "moorhen",
+     "name": "Moorhen",
+     "group": "pond",
+     "set": "Water's edge",
+     "earned_by": "days with a mental health exercise (1/day)",
+     "milestone": 25,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 120,
+     "key": "kingfisher",
+     "name": "Kingfisher",
+     "group": "pond",
+     "set": "Water's edge",
+     "earned_by": "days with a mental health exercise (1/day)",
+     "milestone": 50,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 121,
+     "key": "willow",
+     "name": "Willow",
+     "group": "pond",
+     "set": "Water's edge",
+     "earned_by": "days with a mental health exercise (1/day)",
+     "milestone": 75,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 122,
+     "key": "minnow",
+     "name": "Minnow",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 123,
+     "key": "stickleback",
+     "name": "Stickleback",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 3,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 124,
+     "key": "roach",
+     "name": "Roach",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 6,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 125,
+     "key": "perch",
+     "name": "Perch",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 10,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 126,
+     "key": "carp",
+     "name": "Carp",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 15,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 127,
+     "key": "trout",
+     "name": "Trout",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 20,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 128,
+     "key": "eel",
+     "name": "Eel",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 25,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 129,
+     "key": "koi",
+     "name": "Koi",
+     "group": "aquarium",
+     "set": "Stream fish",
+     "earned_by": "workbook chapters (34: BPD 22, DBT 12)",
+     "milestone": 30,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 130,
+     "key": "moonfish",
+     "name": "Moonfish (DBT, all 12)",
+     "group": "aquarium",
+     "set": "Rare fish",
+     "earned_by": "a whole workbook finished",
+     "milestone": "DBT done",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 131,
+     "key": "golden-carp",
+     "name": "Golden carp (BPD, all 22)",
+     "group": "aquarium",
+     "set": "Rare fish",
+     "earned_by": "a whole workbook finished",
+     "milestone": "BPD done",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 132,
+     "key": "lantern",
+     "name": "Lantern",
+     "group": "farmhouse",
+     "set": "Kitchen",
+     "earned_by": "weekly reviews",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 133,
+     "key": "teapot",
+     "name": "Teapot",
+     "group": "farmhouse",
+     "set": "Kitchen",
+     "earned_by": "weekly reviews",
+     "milestone": 4,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 134,
+     "key": "quilt",
+     "name": "Quilt",
+     "group": "farmhouse",
+     "set": "Kitchen",
+     "earned_by": "weekly reviews",
+     "milestone": 8,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 135,
+     "key": "rocking-chair",
+     "name": "Rocking chair",
+     "group": "farmhouse",
+     "set": "Kitchen",
+     "earned_by": "weekly reviews",
+     "milestone": 12,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 136,
+     "key": "dresser",
+     "name": "Dresser",
+     "group": "farmhouse",
+     "set": "Kitchen",
+     "earned_by": "weekly reviews",
+     "milestone": 26,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 137,
+     "key": "old-clock",
+     "name": "Old clock",
+     "group": "farmhouse",
+     "set": "Kitchen",
+     "earned_by": "weekly reviews",
+     "milestone": 52,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 138,
+     "key": "jam",
+     "name": "Jam jar",
+     "group": "farmhouse",
+     "set": "Harvest table",
+     "earned_by": "monthly reviews",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 139,
+     "key": "harvestbasket",
+     "name": "Harvest basket",
+     "group": "farmhouse",
+     "set": "Harvest table",
+     "earned_by": "monthly reviews",
+     "milestone": 3,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 140,
+     "key": "pie",
+     "name": "Pie",
+     "group": "farmhouse",
+     "set": "Harvest table",
+     "earned_by": "monthly reviews",
+     "milestone": 6,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 141,
+     "key": "bunting",
+     "name": "Bunting",
+     "group": "farmhouse",
+     "set": "Harvest table",
+     "earned_by": "monthly reviews",
+     "milestone": 9,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 142,
+     "key": "bigtable",
+     "name": "Big table laid",
+     "group": "farmhouse",
+     "set": "Harvest table",
+     "earned_by": "monthly reviews",
+     "milestone": 12,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 143,
+     "key": "pressed-daisy",
+     "name": "Pressed daisy",
+     "group": "museum",
+     "set": "Pressed and bound",
+     "earned_by": "Reading-list books",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 144,
+     "key": "ribbon",
+     "name": "Bookmark",
+     "group": "museum",
+     "set": "Pressed and bound",
+     "earned_by": "Reading-list books",
+     "milestone": 3,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 145,
+     "key": "old-map",
+     "name": "Old map",
+     "group": "museum",
+     "set": "Pressed and bound",
+     "earned_by": "Reading-list books",
+     "milestone": 6,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 146,
+     "key": "fern-specimen",
+     "name": "Fern specimen",
+     "group": "museum",
+     "set": "Pressed and bound",
+     "earned_by": "Reading-list books",
+     "milestone": 10,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 147,
+     "key": "feather-collection",
+     "name": "Feather collection",
+     "group": "museum",
+     "set": "Pressed and bound",
+     "earned_by": "Reading-list books",
+     "milestone": 15,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 148,
+     "key": "illuminated-book",
+     "name": "Illuminated book",
+     "group": "museum",
+     "set": "Pressed and bound",
+     "earned_by": "Reading-list books",
+     "milestone": 20,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 149,
+     "key": "ammonite",
+     "name": "Ammonite",
+     "group": "museum",
+     "set": "Dug up",
+     "earned_by": "projects finished",
+     "milestone": 1,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 150,
+     "key": "trilobite",
+     "name": "Trilobite",
+     "group": "museum",
+     "set": "Dug up",
+     "earned_by": "projects finished",
+     "milestone": 2,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 151,
+     "key": "fossil-leaf",
+     "name": "Fossil leaf",
+     "group": "museum",
+     "set": "Dug up",
+     "earned_by": "projects finished",
+     "milestone": 3,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 152,
+     "key": "geode",
+     "name": "Geode",
+     "group": "museum",
+     "set": "Dug up",
+     "earned_by": "projects finished",
+     "milestone": 5,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 153,
+     "key": "oldkey",
+     "name": "Old key",
+     "group": "museum",
+     "set": "Dug up",
+     "earned_by": "projects finished",
+     "milestone": 8,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 154,
+     "key": "footprint-fossil",
+     "name": "Footprint fossil",
+     "group": "museum",
+     "set": "Dug up",
+     "earned_by": "projects finished",
+     "milestone": 12,
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 155,
+     "key": "hi",
+     "name": "Welcome",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "day one",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 156,
+     "key": "door",
+     "name": "Welcome back",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "3+ days away",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 157,
+     "key": "steps",
+     "name": "Back again",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "3rd return",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 158,
+     "key": "always-welcome",
+     "name": "Always welcome",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "5th return",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 159,
+     "key": "ok",
+     "name": "Late still counts",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "a late tick",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 160,
+     "key": "feather",
+     "name": "Short pages still count",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "short pages",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 161,
+     "key": "candle",
+     "name": "Light left on",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "check-in after a gap",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 162,
+     "key": "back-to-it",
+     "name": "Back to it",
+     "group": "lane",
+     "set": "Kind notes",
+     "earned_by": "each once",
+     "milestone": "habit again after a week off",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 163,
+     "key": "robin",
+     "name": "January robin",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Jan",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 164,
+     "key": "feb",
+     "name": "February snowdrop",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Feb",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 165,
+     "key": "mar",
+     "name": "March daffodil",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Mar",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 166,
+     "key": "welliespuddle",
+     "name": "April wellies",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Apr",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 167,
+     "key": "bloom",
+     "name": "May blossom",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "May",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 168,
+     "key": "jun",
+     "name": "June strawberry",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Jun",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 169,
+     "key": "hay-cart",
+     "name": "July hay cart",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Jul",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 170,
+     "key": "blackberries",
+     "name": "August blackberries",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Aug",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 171,
+     "key": "conker",
+     "name": "September conker",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Sep",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 172,
+     "key": "toadstool",
+     "name": "October toadstool",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Oct",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 173,
+     "key": "nov",
+     "name": "November leaf",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Nov",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 174,
+     "key": "holly",
+     "name": "December holly",
+     "group": "lane",
+     "set": "Hedgerow",
+     "earned_by": "did anything that month",
+     "milestone": "Dec",
+     "tier": "special",
+     "counts_toward_total": true,
+     "repeatable": false
+    },
+    {
+     "index": 175,
+     "key": "cleared-mind",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 176,
+     "key": "cleared-writing",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 177,
+     "key": "cleared-art",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 178,
+     "key": "cleared-content",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 179,
+     "key": "cleared-body",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 180,
+     "key": "cleared-tech",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 181,
+     "key": "cleared-production",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    },
+    {
+     "index": 182,
+     "key": "cleared-admin",
+     "name": "area cleared",
+     "group": "bonus",
+     "set": "Area cleared",
+     "earned_by": "every task due in that area done in a month (repeatable: xN badge)",
+     "milestone": "month cleared",
+     "tier": "bonus",
+     "counts_toward_total": false,
+     "repeatable": true
+    }
+   ]
+  },
+  {
+   "name": "stickers-ghost",
+   "png": "stickers-ghost.png",
+   "json": "stickers-ghost.json",
+   "frame": [
+    16,
+    16
+   ],
+   "frames": 183,
+   "tags": [
+    {
+     "name": "beds:Mind bed",
+     "from": 0,
+     "to": 6
+    },
+    {
+     "name": "beds:Writing bed",
+     "from": 7,
+     "to": 13
+    },
+    {
+     "name": "beds:Art bed",
+     "from": 14,
+     "to": 20
+    },
+    {
+     "name": "beds:Content bed",
+     "from": 21,
+     "to": 27
+    },
+    {
+     "name": "beds:Body bed",
+     "from": 28,
+     "to": 34
+    },
+    {
+     "name": "beds:Tech bed",
+     "from": 35,
+     "to": 41
+    },
+    {
+     "name": "beds:Production bed",
+     "from": 42,
+     "to": 48
+    },
+    {
+     "name": "beds:Admin bed",
+     "from": 49,
+     "to": 55
+    },
+    {
+     "name": "meadow:Bee things",
+     "from": 56,
+     "to": 63
+    },
+    {
+     "name": "meadow:Hedge flowers",
+     "from": 64,
+     "to": 69
+    },
+    {
+     "name": "meadow:Seasons kept",
+     "from": 70,
+     "to": 74
+    },
+    {
+     "name": "barnyard:Animals",
+     "from": 75,
+     "to": 82
+    },
+    {
+     "name": "barnyard:Barn things",
+     "from": 83,
+     "to": 86
+    },
+    {
+     "name": "orchard:Fruit trees",
+     "from": 87,
+     "to": 93
+    },
+    {
+     "name": "orchard:Under the trees",
+     "from": 94,
+     "to": 95
+    },
+    {
+     "name": "glasshouse:Glasshouse",
+     "from": 96,
+     "to": 107
+    },
+    {
+     "name": "pond:Lily pads",
+     "from": 108,
+     "to": 114
+    },
+    {
+     "name": "pond:Water's edge",
+     "from": 115,
+     "to": 121
+    },
+    {
+     "name": "aquarium:Stream fish",
+     "from": 122,
+     "to": 129
+    },
+    {
+     "name": "aquarium:Rare fish",
+     "from": 130,
+     "to": 131
+    },
+    {
+     "name": "farmhouse:Kitchen",
+     "from": 132,
+     "to": 137
+    },
+    {
+     "name": "farmhouse:Harvest table",
+     "from": 138,
+     "to": 142
+    },
+    {
+     "name": "museum:Pressed and bound",
+     "from": 143,
+     "to": 148
+    },
+    {
+     "name": "museum:Dug up",
+     "from": 149,
+     "to": 154
+    },
+    {
+     "name": "lane:Kind notes",
+     "from": 155,
+     "to": 162
+    },
+    {
+     "name": "lane:Hedgerow",
+     "from": 163,
+     "to": 174
+    },
+    {
+     "name": "bonus:Area cleared",
+     "from": 175,
+     "to": 182
+    }
+   ],
+   "display": "same as stickers",
+   "notes": "Still-to-collect outlines (sage), same order as stickers."
+  },
+  {
+   "name": "stickers-diecut",
+   "png": "stickers-diecut.png",
+   "json": "stickers-diecut.json",
+   "frame": [
+    18,
+    18
+   ],
+   "frames": 183,
+   "tags": [
+    {
+     "name": "beds:Mind bed",
+     "from": 0,
+     "to": 6
+    },
+    {
+     "name": "beds:Writing bed",
+     "from": 7,
+     "to": 13
+    },
+    {
+     "name": "beds:Art bed",
+     "from": 14,
+     "to": 20
+    },
+    {
+     "name": "beds:Content bed",
+     "from": 21,
+     "to": 27
+    },
+    {
+     "name": "beds:Body bed",
+     "from": 28,
+     "to": 34
+    },
+    {
+     "name": "beds:Tech bed",
+     "from": 35,
+     "to": 41
+    },
+    {
+     "name": "beds:Production bed",
+     "from": 42,
+     "to": 48
+    },
+    {
+     "name": "beds:Admin bed",
+     "from": 49,
+     "to": 55
+    },
+    {
+     "name": "meadow:Bee things",
+     "from": 56,
+     "to": 63
+    },
+    {
+     "name": "meadow:Hedge flowers",
+     "from": 64,
+     "to": 69
+    },
+    {
+     "name": "meadow:Seasons kept",
+     "from": 70,
+     "to": 74
+    },
+    {
+     "name": "barnyard:Animals",
+     "from": 75,
+     "to": 82
+    },
+    {
+     "name": "barnyard:Barn things",
+     "from": 83,
+     "to": 86
+    },
+    {
+     "name": "orchard:Fruit trees",
+     "from": 87,
+     "to": 93
+    },
+    {
+     "name": "orchard:Under the trees",
+     "from": 94,
+     "to": 95
+    },
+    {
+     "name": "glasshouse:Glasshouse",
+     "from": 96,
+     "to": 107
+    },
+    {
+     "name": "pond:Lily pads",
+     "from": 108,
+     "to": 114
+    },
+    {
+     "name": "pond:Water's edge",
+     "from": 115,
+     "to": 121
+    },
+    {
+     "name": "aquarium:Stream fish",
+     "from": 122,
+     "to": 129
+    },
+    {
+     "name": "aquarium:Rare fish",
+     "from": 130,
+     "to": 131
+    },
+    {
+     "name": "farmhouse:Kitchen",
+     "from": 132,
+     "to": 137
+    },
+    {
+     "name": "farmhouse:Harvest table",
+     "from": 138,
+     "to": 142
+    },
+    {
+     "name": "museum:Pressed and bound",
+     "from": 143,
+     "to": 148
+    },
+    {
+     "name": "museum:Dug up",
+     "from": 149,
+     "to": 154
+    },
+    {
+     "name": "lane:Kind notes",
+     "from": 155,
+     "to": 162
+    },
+    {
+     "name": "lane:Hedgerow",
+     "from": 163,
+     "to": 174
+    },
+    {
+     "name": "bonus:Area cleared",
+     "from": 175,
+     "to": 182
+    }
+   ],
+   "display": "same as stickers",
+   "notes": "Each sticker with a 1px cream die-cut rim, for the earned moment, the flight into the book and the monthly pop-in. Same order."
+  },
+  {
+   "name": "farm-base",
+   "png": "farm-base.png",
+   "json": "farm-base.json",
+   "frame": [
+    504,
+    276
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "awake",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "asleep",
+     "from": 1,
+     "to": 1
+    }
+   ],
+   "display": "1x fits the Mac panel (504x276) or 2x (1008x552) where there's room; on phone pan to the highlighted zone at 2x",
+   "notes": "The whole farm (504x276) with no characters, no stickers and bare beds. Draw 'asleep', then for each awake zone copy the 'awake' pixels inside that zone's mask. Then layers: farm-beds, placed stickers (sticker-spots.json, sorted by z), the museum door, characters.",
+   "fade_map_asleep": {
+    "#3a412f": "#51553d",
+    "#e9e3d6": "#e3ddcd",
+    "#e3ddcd": "#d4d1c3",
+    "#d4d1c3": "#d4d1c3",
+    "#a09f88": "#a09f88",
+    "#d59770": "#a09f88",
+    "#e6aeaf": "#d4d1c3",
+    "#df7e6f": "#a09f88",
+    "#bf6564": "#a09f88",
+    "#e39876": "#a09f88",
+    "#90825b": "#a09f88",
+    "#ecca7d": "#d4d1c3",
+    "#e8dd6e": "#d4d1c3",
+    "#e2cd5b": "#d4d1c3",
+    "#cedb6e": "#d4d1c3",
+    "#98c293": "#a09f88",
+    "#a3d5c2": "#d4d1c3",
+    "#a6ced6": "#d4d1c3",
+    "#9eb4e6": "#d4d1c3",
+    "#9285c5": "#a09f88",
+    "#b693ec": "#d4d1c3",
+    "#e2e8ff": "#d4d1c3",
+    "#51553d": "#51553d"
+   },
+   "dim_map_highlight": {
+    "dark_to": "#d4d1c3",
+    "light_to": "#e3ddcd",
+    "dark_colours": [
+     "#3a412f",
+     "#51553d",
+     "#90825b",
+     "#9285c5",
+     "#98c293",
+     "#9eb4e6",
+     "#a09f88",
+     "#bf6564",
+     "#d59770",
+     "#df7e6f"
+    ]
+   },
+   "highlight_rule": "When a book page is open: every pixel outside its zone mask(s) -> stone if in dark_colours else paper (placed stickers and characters too); then draw that zone's outline overlay."
+  },
+  {
+   "name": "farm-zone-masks",
+   "png": "farm-zone-masks.png",
+   "json": "farm-zone-masks.json",
+   "frame": [
+    504,
+    276
+   ],
+   "frames": 10,
+   "tags": [
+    {
+     "name": "orchard",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "farmhouse",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "museum",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "barnyard",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "beds",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "glasshouse",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "pond",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "aquarium",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "meadow",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "lane",
+     "from": 9,
+     "to": 9
+    }
+   ],
+   "display": "same as farm-base",
+   "notes": "One frame per zone: ink where the zone is (zones don't overlap). For waking, highlighting and tap targets.",
+   "zones": [
+    "orchard",
+    "farmhouse",
+    "museum",
+    "barnyard",
+    "beds",
+    "glasshouse",
+    "pond",
+    "aquarium",
+    "meadow",
+    "lane"
+   ],
+   "bboxes": {
+    "orchard": [
+     12,
+     22,
+     167,
+     109
+    ],
+    "farmhouse": [
+     173,
+     19,
+     279,
+     110
+    ],
+    "museum": [
+     267,
+     20,
+     312,
+     83
+    ],
+    "barnyard": [
+     309,
+     18,
+     487,
+     107
+    ],
+    "beds": [
+     18,
+     106,
+     199,
+     198
+    ],
+    "glasshouse": [
+     181,
+     110,
+     305,
+     204
+    ],
+    "pond": [
+     261,
+     132,
+     424,
+     228
+    ],
+    "aquarium": [
+     382,
+     134,
+     453,
+     182
+    ],
+    "meadow": [
+     196,
+     185,
+     500,
+     260
+    ],
+    "lane": [
+     1,
+     191,
+     215,
+     266
+    ]
+   },
+   "wake_rule": "v2: a zone wakes at about half its stickers placed."
+  },
+  {
+   "name": "farm-zone-outlines",
+   "png": "farm-zone-outlines.png",
+   "json": "farm-zone-outlines.json",
+   "frame": [
+    504,
+    276
+   ],
+   "frames": 10,
+   "tags": [
+    {
+     "name": "orchard",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "farmhouse",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "museum",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "barnyard",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "beds",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "glasshouse",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "pond",
+     "from": 6,
+     "to": 6
+    },
+    {
+     "name": "aquarium",
+     "from": 7,
+     "to": 7
+    },
+    {
+     "name": "meadow",
+     "from": 8,
+     "to": 8
+    },
+    {
+     "name": "lane",
+     "from": 9,
+     "to": 9
+    }
+   ],
+   "display": "same as farm-base",
+   "notes": "Dashed gold/ink outline per zone, drawn on top when its page is open."
+  },
+  {
+   "name": "farm-beds",
+   "png": "farm-beds.png",
+   "json": "farm-beds.json",
+   "frame": [
+    26,
+    16
+   ],
+   "frames": 48,
+   "tags": [
+    {
+     "name": "Mind",
+     "from": 0,
+     "to": 5
+    },
+    {
+     "name": "Writing",
+     "from": 6,
+     "to": 11
+    },
+    {
+     "name": "Art",
+     "from": 12,
+     "to": 17
+    },
+    {
+     "name": "Content",
+     "from": 18,
+     "to": 23
+    },
+    {
+     "name": "Body",
+     "from": 24,
+     "to": 29
+    },
+    {
+     "name": "Tech",
+     "from": 30,
+     "to": 35
+    },
+    {
+     "name": "Production",
+     "from": 36,
+     "to": 41
+    },
+    {
+     "name": "Admin",
+     "from": 42,
+     "to": 47
+    }
+   ],
+   "display": "same as farm-base",
+   "notes": "8 beds x 6 stages (0 bare .. 5 full; stages at 1/5/10/25/40 to-dos in that area; re-spaced 2026-11-04, was 50). Draw at bed_positions[area], under placed stickers. The sprout (3) and prize-crop (60) stickers stand in front of their bed; the critter (40) visits the bed (sticker-spots.json).",
+   "bed_positions": {
+    "Mind": [
+     27,
+     108
+    ],
+    "Writing": [
+     69,
+     108
+    ],
+    "Art": [
+     111,
+     108
+    ],
+    "Content": [
+     153,
+     108
+    ],
+    "Body": [
+     27,
+     148
+    ],
+    "Tech": [
+     69,
+     148
+    ],
+    "Production": [
+     111,
+     148
+    ],
+    "Admin": [
+     153,
+     148
+    ]
+   },
+   "order": [
+    "Mind",
+    "Writing",
+    "Art",
+    "Content",
+    "Body",
+    "Tech",
+    "Production",
+    "Admin"
+   ],
+   "stage_at": [
+    1,
+    5,
+    10,
+    25,
+    40
+   ]
+  },
+  {
+   "name": "farm-museum-door",
+   "png": "farm-museum-door.png",
+   "json": "farm-museum-door.json",
+   "frame": [
+    41,
+    47
+   ],
+   "frames": 1,
+   "tags": [
+    {
+     "name": "closed",
+     "from": 0,
+     "to": 0
+    }
+   ],
+   "display": "same as farm-base",
+   "notes": "Draw over the farm at (276, 26) until Duvet arrives (120 stickers).",
+   "position": [
+    276,
+    26
+   ]
+  },
+  {
+   "name": "sticker-spots",
+   "json": "sticker-spots.json",
+   "frames": 183,
+   "notes": "175 collection stickers + 8 bonus. Fixed farm / interior spot for every sticker, with z-order, layer and facing. No overlaps (checked); each farm spot lies inside its zone."
+  },
+  {
+   "name": "farm-preview",
+   "png": "farm-preview.png",
+   "json": "farm-preview.json",
+   "frame": [
+    504,
+    276
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "all-placed",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "half-placed",
+     "from": 1,
+     "to": 1
+    }
+   ],
+   "display": "reference only",
+   "notes": "Check renders: every sticker placed at its spot with everyone home; and the first half of every set placed (before Duvet, museum closed)."
+  },
+  {
+   "name": "interior-museum",
+   "png": "interior-museum.png",
+   "json": "interior-museum.json",
+   "frame": [
+    200,
+    96
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "ghosts",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "all-placed",
+     "from": 1,
+     "to": 1
+    }
+   ],
+   "display": "2x or 3x beneath the book on the Museum pages",
+   "notes": "Museum interior (phase 3 per v2, drawn now). Frame 0: every spot as a ghost outline; frame 1: reference with every find and Duvet in his spectacles. Spots in sticker-spots.json (scene museum-interior). Curator Duvet stands at (86, 62)."
+  },
+  {
+   "name": "interior-aquarium",
+   "png": "interior-aquarium.png",
+   "json": "interior-aquarium.json",
+   "frame": [
+    200,
+    96
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "ghosts",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "all-placed",
+     "from": 1,
+     "to": 1
+    }
+   ],
+   "display": "2x or 3x beneath the book on the Aquarium pages",
+   "notes": "Aquarium interior. Frame 0: ghosts; frame 1: every fish (rare fish in the round tank) and Bap on his pad at (68, 60). Spots in sticker-spots.json."
+  },
+  {
+   "name": "ui-book-icon",
+   "png": "ui-book-icon.png",
+   "json": "ui-book-icon.json",
+   "frame": [
+    16,
+    16
+   ],
+   "frames": 3,
+   "tags": [
+    {
+     "name": "idle",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "glint",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "bump",
+     "from": 2,
+     "to": 2
+    }
+   ],
+   "display": "2x in the nook (32 px)",
+   "notes": "The little leather book beside the companion in the nook. 'bump' = draw 1px higher. 'glint' = a new sticker arrived (no badge, no number)."
+  },
+  {
+   "name": "fx-sparkle",
+   "png": "fx-sparkle.png",
+   "json": "fx-sparkle.json",
+   "frame": [
+    30,
+    30
+   ],
+   "frames": 3,
+   "tags": [
+    {
+     "name": "burst",
+     "from": 0,
+     "to": 2
+    }
+   ],
+   "display": "same scale as what it surrounds",
+   "notes": "Generic shine / stick / pop: centre it on the sticker. Frames: burst, burst (shifted), clear."
+  },
+  {
+   "name": "moment-earned-nook",
+   "png": "moment-earned-nook.png",
+   "json": "moment-earned-nook.json",
+   "frame": [
+    80,
+    40
+   ],
+   "frames": 6,
+   "tags": [
+    {
+     "name": "arrive",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "present",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "shine",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "fly",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "book-bump",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "glint",
+     "from": 5,
+     "to": 5
+    }
+   ],
+   "display": "2x (160x80) in the nook",
+   "notes": "Reference composite (Domino + a sticker + the book icon). In the app, build it from char-domino (idle, happy), stickers-diecut, fx-sparkle and ui-book-icon: 1 arrive, 2 present (happy hop, sticker above), 3 shine (fx-sparkle), 4 fly towards the book, 5 book bumps, 6 glint. Journal stickers wait until she leaves the Journal."
+  },
+  {
+   "name": "moment-into-book",
+   "png": "moment-into-book.png",
+   "json": "moment-into-book.json",
+   "frame": [
+    64,
+    52
+   ],
+   "frames": 5,
+   "tags": [
+    {
+     "name": "arrive",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "drift",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "line-up",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "stick",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "settled",
+     "from": 4,
+     "to": 4
+    }
+   ],
+   "display": "same scale as the book",
+   "notes": "Reference: the die-cut sticker flies in (path and timing are Esme's), sticks with fx-sparkle, settles into the slot (slot-filled + sticker)."
+  },
+  {
+   "name": "moment-monthly-popin",
+   "png": "moment-monthly-popin.png",
+   "json": "moment-monthly-popin.json",
+   "frame": [
+    116,
+    91
+   ],
+   "frames": 7,
+   "tags": [
+    {
+     "name": "step-0",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "step-1",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "step-2",
+     "from": 2,
+     "to": 2
+    },
+    {
+     "name": "step-3",
+     "from": 3,
+     "to": 3
+    },
+    {
+     "name": "step-4",
+     "from": 4,
+     "to": 4
+    },
+    {
+     "name": "step-5",
+     "from": 5,
+     "to": 5
+    },
+    {
+     "name": "step-6",
+     "from": 6,
+     "to": 6
+    }
+   ],
+   "display": "same scale as the book",
+   "notes": "Reference: every sticker pops in one by one (Esme's choice), each with fx-sparkle on arrival; drawn frames only, no smooth scaling."
+  },
+  {
+   "name": "moment-ready-to-place",
+   "png": "moment-ready-to-place.png",
+   "json": "moment-ready-to-place.json",
+   "frame": [
+    19,
+    19
+   ],
+   "frames": 2,
+   "tags": [
+    {
+     "name": "ready",
+     "from": 0,
+     "to": 1
+    }
+   ],
+   "display": "same scale as the book",
+   "notes": "The 'ready to place' corner: loop these two frames over a filled slot until she places the sticker on the farm herself (fixed spots)."
+  },
+  {
+   "name": "badge-count",
+   "png": "badge-count.png",
+   "json": "badge-count.json",
+   "frame": [
+    9,
+    7
+   ],
+   "frames": 1,
+   "tags": [
+    {
+     "name": "template",
+     "from": 0,
+     "to": 0
+    }
+   ],
+   "display": "same scale as the sticker it sits on",
+   "notes": "xN counter for repeatable (Bonus) stickers, shown from x2. Draw left cap, then the middle column repeated for the digits' width (font-small, ink, 1px gap between glyphs), then the right cap. Text at (left cap width, 1). Bottom-right pixel of the badge = (sticker x + 17, sticker y + 17), both in the book slot and on the farm; it draws above the sticker (farm: same z + 0.5).",
+   "height": 7,
+   "left_w": 6,
+   "right_w": 2,
+   "text_offset": [
+    6,
+    1
+   ],
+   "text_colour": "#3a412f",
+   "anchor": "bottom-right at sticker (x+17, y+17)",
+   "show_from": 2,
+   "slices": {
+    "left_cap": [
+     0,
+     5
+    ],
+    "middle_column": 6,
+    "right_cap": [
+     7,
+     8
+    ]
+   }
+  },
+  {
+   "name": "badge-count-examples",
+   "png": "badge-count-examples.png",
+   "json": "badge-count-examples.json",
+   "frame": [
+    40,
+    26
+   ],
+   "frames": 3,
+   "tags": [
+    {
+     "name": "example-x2",
+     "from": 0,
+     "to": 0
+    },
+    {
+     "name": "example-x12",
+     "from": 1,
+     "to": 1
+    },
+    {
+     "name": "example-x100",
+     "from": 2,
+     "to": 2
+    }
+   ],
+   "display": "reference only",
+   "notes": "x2, x12, x100 on the Body 'area cleared' sticker."
+  },
+  {
+   "name": "esmes-farm-icon",
+   "svg": "esmes-farm-icon.svg",
+   "png_pixel_option": "esmes-farm-icon-pixel.png",
+   "display": {
+    "sidebar": "pixel png at 1x (24px) centred on the 28px tile",
+    "phone_grid": "pixel png at 2x (48px) on the 62px tile",
+    "rule": "whole-number scale only, image-rendering: pixelated"
+   },
+   "chosen": "pixel (Esme, 4 Nov)",
+   "tile_colour": {
+    "colour": "#e2cd5b",
+    "status": "chosen by Esme (yellow tile)"
+   },
+   "notes": "Sidebar style: 32 viewBox, ink #3a412f strokes 2.4, round caps/joins. Gambrel barn, cross-braced door, hay-loft window, sprout. Preview: mock-rows/farm-icon.html."
+  }
+ ],
+ "farm_character_spots": {
+  "domino": {
+   "frame_topleft": [
+    182,
+    90
+   ],
+   "body_box": [
+    186,
+    96,
+    24,
+    24
+   ],
+   "z": 120,
+   "zone": "beds"
+  },
+  "bap": {
+   "frame_topleft": [
+    314,
+    146
+   ],
+   "body_box": [
+    318,
+    150,
+    24,
+    24
+   ],
+   "z": 174,
+   "zone": "pond"
+  },
+  "puddle": {
+   "frame_topleft": [
+    96,
+    186
+   ],
+   "body_box": [
+    100,
+    192,
+    24,
+    24
+   ],
+   "z": 216,
+   "zone": "lane (farm stand)"
+  },
+  "clover": {
+   "frame_topleft": [
+    296,
+    124
+   ],
+   "body_box": [
+    300,
+    130,
+    24,
+    24
+   ],
+   "z": 154,
+   "zone": "glasshouse"
+  },
+  "crumpet": {
+   "frame_topleft": [
+    436,
+    64
+   ],
+   "body_box": [
+    440,
+    70,
+    24,
+    24
+   ],
+   "z": 94,
+   "zone": "barnyard"
+  },
+  "duvet": {
+   "frame_topleft": [
+    290,
+    56
+   ],
+   "body_box": [
+    294,
+    62,
+    24,
+    24
+   ],
+   "z": 86,
+   "zone": "museum"
+  }
+ },
+ "arrivals": [
+  {
+   "character": "Domino",
+   "at_stickers": 0,
+   "home": "Vegetable beds and orchard",
+   "hosts": "companion everywhere; Farm page"
+  },
+  {
+   "character": "Bap",
+   "at_stickers": 5,
+   "home": "Pond, later the aquarium",
+   "hosts": "Journal: check-in and exercises"
+  },
+  {
+   "character": "Puddle",
+   "at_stickers": 20,
+   "home": "Meadow and hives; runs the farm stand",
+   "hosts": "Sticker book; the stand"
+  },
+  {
+   "character": "Clover",
+   "at_stickers": 45,
+   "home": "Glasshouse",
+   "hosts": "Journal: morning pages"
+  },
+  {
+   "character": "Crumpet",
+   "at_stickers": 80,
+   "home": "Barnyard and farmhouse",
+   "hosts": "Reviews"
+  },
+  {
+   "character": "Duvet",
+   "at_stickers": 120,
+   "home": "Museum (curator)",
+   "hosts": "Reading list"
+  }
+ ],
+ "nook_hosts": {
+  "default": "Domino",
+  "Journal (check-in, exercises)": "Bap",
+  "Journal (morning pages)": "Clover",
+  "Sticker book": "Puddle",
+  "Reviews": "Crumpet",
+  "Reading list": "Duvet",
+  "Farm page": "Domino"
+ },
+ "book": {
+  "title": "ESME'S FARM",
+  "lettering": "T2 storybook",
+  "spread": [
+   232,
+   152
+  ],
+  "pages": 16,
+  "stickers": 183,
+  "groups": [
+   "beds",
+   "meadow",
+   "barnyard",
+   "orchard",
+   "glasshouse",
+   "pond",
+   "aquarium",
+   "farmhouse",
+   "museum",
+   "lane",
+   "bonus"
+  ],
+  "total_for_completion": 175,
+  "bonus": "Bonus page (last): Area cleared x8, repeatable with the xN badge; not counted in the total or in accessory thresholds."
+ },
+ "decisions": "tmp/decisions-record.md (Game section, 2026-11-04)",
+ "accessory_thresholds": {
+  "A12": {
+   "name": "Little satchel",
+   "at_stickers": 130,
+   "all_characters": true
+  },
+  "A13": {
+   "name": "Golden crown",
+   "at_stickers": 175,
+   "all_characters": true,
+   "note": "The whole collection (Esme, 4 Nov). Bonus stickers do not count. Replaces any hat while worn (same head anchor)."
+  }
+ }
+}

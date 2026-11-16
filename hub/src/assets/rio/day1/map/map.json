@@ -1,0 +1,2215 @@
+{
+ "name": "Esme World Rio map",
+ "canvas": [
+  896,
+  504
+ ],
+ "display": {
+  "scaling": "The whole map always fits the window: draw the canvas at the largest whole-number device-pixel scale that fits, with no scrolling and no panning (Esme's ruling, 2026-11-14). Never a fractional scale. Panel and tab chrome go around the map, so fit map plus chrome. Phone layouts are on hold (a phone would need pinch-to-zoom).",
+  "scroll": false,
+  "integer_scale_only": true,
+  "image_rendering": "pixelated",
+  "reference_sizes": {
+   "1x": [
+    896,
+    504
+   ],
+   "2x": [
+    1792,
+    1008
+   ],
+   "3x": [
+    2688,
+    1512
+   ]
+  }
+ },
+ "units": "1x pixels, origin top-left; bbox/rect = [x, y, w, h]; polygon = [[x, y], ...]",
+ "looks": {
+  "day": "daytime art (full colour)",
+  "night": "the approved colourful blue-hour night. The app picks the look from Rio's real clock.",
+  "rain": "rainy day: the day art in a colourful tropical downpour (Esme: rain must never desaturate). Hues kept, greens deeper, wet sheen and puddles, grey-violet cloud round the peaks. Draw layers/rain-streaks-{0..3}.png on top (above places and events, under markers)."
+ },
+ "look_files": {
+  "day": {
+   "base": "map-base-day.png",
+   "all_open": "map-all-open-day.png",
+   "day1": "map-day1-day.png"
+  },
+  "night": {
+   "base": "map-base-night.png",
+   "all_open": "map-all-open-night.png",
+   "day1": "map-day1-night.png"
+  },
+  "rain": {
+   "base": "map-base-rain.png",
+   "all_open": "map-all-open-rain.png",
+   "day1": "map-day1-rain.png"
+  }
+ },
+ "draw_order": [
+  "base",
+  "boat-route",
+  "christ-the-redeemer",
+  "parque-lage",
+  "jardim-botanico",
+  "dois-irmaos",
+  "rocinha",
+  "tijuca-park",
+  "os-esquilos",
+  "flamengo-match",
+  "santa-teresa",
+  "museum",
+  "lagoa-house",
+  "clothing-store",
+  "sult",
+  "copacabana-palace",
+  "ipanema-beach",
+  "barraca",
+  "zona-sul",
+  "boteco",
+  "quilo",
+  "ipanema-penthouse",
+  "fazenda",
+  "markers"
+ ],
+ "draw_order_note": "boat-route first (it lies on the sea, under the places), then the places in this order. Each place is its layer for its state; the base already carries the inset's frame.",
+ "states": {
+  "open": "draw layers/<key>-open-<look>.png",
+  "locked": "draw layers/<key>-locked-<look>.png (greyed, under cloud) + markers/marker-locked.png at marker_anchor, only on the NEXT place to open",
+  "stuck": "locked layer + markers/marker-stuck.png at marker_anchor (opening held by the stuck-task rule; replaces the padlock)",
+  "new": "open layer + markers/marker-new.png at marker_anchor for the first visit after opening"
+ },
+ "markers": {
+  "locked": {
+   "file": "markers/marker-locked.png",
+   "anchor": "bottom-centre"
+  },
+  "stuck": {
+   "file": "markers/marker-stuck.png",
+   "anchor": "bottom-centre"
+  },
+  "new": {
+   "file": "markers/marker-new.png",
+   "anchor": "bottom-centre"
+  },
+  "here": {
+   "file": "markers/marker-here.png",
+   "anchor": "bottom-centre (pin tip)",
+   "default_position": [
+    531,
+    458
+   ],
+   "positions": {
+    "christ-the-redeemer": [
+     469,
+     219
+    ],
+    "parque-lage": [
+     469,
+     316
+    ],
+    "jardim-botanico": [
+     360,
+     297
+    ],
+    "dois-irmaos": [
+     266,
+     354
+    ],
+    "rocinha": [
+     196,
+     412
+    ],
+    "tijuca-park": [
+     98,
+     270
+    ],
+    "os-esquilos": [
+     40,
+     319
+    ],
+    "flamengo-match": [
+     333,
+     38
+    ],
+    "santa-teresa": [
+     618,
+     146
+    ],
+    "museum": [
+     746,
+     97
+    ],
+    "lagoa-house": [
+     542,
+     306
+    ],
+    "clothing-store": [
+     495,
+     381
+    ],
+    "sult": [
+     675,
+     295
+    ],
+    "copacabana-palace": [
+     715,
+     334
+    ],
+    "ipanema-beach": [
+     560,
+     470
+    ],
+    "barraca": [
+     498,
+     466
+    ],
+    "zona-sul": [
+     375,
+     413
+    ],
+    "boteco": [
+     489,
+     428
+    ],
+    "quilo": [
+     563,
+     437
+    ],
+    "ipanema-penthouse": [
+     531,
+     414
+    ],
+    "fazenda": [
+     802,
+     412
+    ]
+   }
+  }
+ },
+ "hit_test_order": [
+  "barraca",
+  "quilo",
+  "zona-sul",
+  "ipanema-penthouse",
+  "sult",
+  "clothing-store",
+  "boteco",
+  "museum",
+  "parque-lage",
+  "copacabana-palace",
+  "jardim-botanico",
+  "santa-teresa",
+  "os-esquilos",
+  "tijuca-park",
+  "flamengo-match",
+  "lagoa-house",
+  "ipanema-beach",
+  "rocinha",
+  "christ-the-redeemer",
+  "dois-irmaos",
+  "fazenda"
+ ],
+ "hit_test_note": "test hotspots smallest first (the places near Ipanema overlap their neighbours' rectangles)",
+ "opening_order_note": "opens_day follows the opening-order table in rio-design.md (a suggestion until Esme rules). christ-the-redeemer has no day: it opens last, after every other place. The sea off Arpoador opens on day 30 inside ipanema-beach; it is not a separate layer.",
+ "places": [
+  {
+   "key": "christ-the-redeemer",
+   "name": "Christ the Redeemer",
+   "opens_day": null,
+   "opens": "last",
+   "opens_note": "after every other place has opened",
+   "layers": {
+    "day": {
+     "open": "layers/christ-the-redeemer-open-day.png",
+     "locked": "layers/christ-the-redeemer-locked-day.png"
+    },
+    "night": {
+     "open": "layers/christ-the-redeemer-open-night.png",
+     "locked": "layers/christ-the-redeemer-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/christ-the-redeemer-open-rain.png",
+     "locked": "layers/christ-the-redeemer-locked-rain.png"
+    }
+   },
+   "bbox": [
+    425,
+    207,
+    125,
+    102
+   ],
+   "bbox_night": [
+    416,
+    192,
+    141,
+    121
+   ],
+   "hotspot": {
+    "rect": [
+     423,
+     205,
+     129,
+     106
+    ],
+    "polygon": [
+     [
+      444,
+      205
+     ],
+     [
+      531,
+      205
+     ],
+     [
+      552,
+      226
+     ],
+     [
+      552,
+      290
+     ],
+     [
+      531,
+      311
+     ],
+     [
+      444,
+      311
+     ],
+     [
+      423,
+      290
+     ],
+     [
+      423,
+      226
+     ]
+    ]
+   },
+   "marker_anchor": [
+    469,
+    205
+   ],
+   "tooltip_anchor": [
+    469,
+    205
+   ],
+   "bbox_rain": [
+    425,
+    207,
+    125,
+    102
+   ]
+  },
+  {
+   "key": "parque-lage",
+   "name": "Parque Lage",
+   "opens_day": 120,
+   "layers": {
+    "day": {
+     "open": "layers/parque-lage-open-day.png",
+     "locked": "layers/parque-lage-locked-day.png"
+    },
+    "night": {
+     "open": "layers/parque-lage-open-night.png",
+     "locked": "layers/parque-lage-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/parque-lage-open-rain.png",
+     "locked": "layers/parque-lage-locked-rain.png"
+    }
+   },
+   "bbox": [
+    439,
+    298,
+    66,
+    36
+   ],
+   "bbox_night": [
+    439,
+    298,
+    74,
+    39
+   ],
+   "hotspot": {
+    "rect": [
+     437,
+     296,
+     70,
+     40
+    ],
+    "polygon": [
+     [
+      445,
+      296
+     ],
+     [
+      499,
+      296
+     ],
+     [
+      507,
+      304
+     ],
+     [
+      507,
+      328
+     ],
+     [
+      499,
+      336
+     ],
+     [
+      445,
+      336
+     ],
+     [
+      437,
+      328
+     ],
+     [
+      437,
+      304
+     ]
+    ]
+   },
+   "marker_anchor": [
+    469,
+    302
+   ],
+   "tooltip_anchor": [
+    469,
+    302
+   ],
+   "bbox_rain": [
+    439,
+    298,
+    66,
+    36
+   ]
+  },
+  {
+   "key": "jardim-botanico",
+   "name": "Jardim Botânico",
+   "opens_day": 14,
+   "layers": {
+    "day": {
+     "open": "layers/jardim-botanico-open-day.png",
+     "locked": "layers/jardim-botanico-locked-day.png"
+    },
+    "night": {
+     "open": "layers/jardim-botanico-open-night.png",
+     "locked": "layers/jardim-botanico-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/jardim-botanico-open-rain.png",
+     "locked": "layers/jardim-botanico-locked-rain.png"
+    }
+   },
+   "bbox": [
+    348,
+    284,
+    52,
+    58
+   ],
+   "bbox_night": [
+    333,
+    268,
+    78,
+    79
+   ],
+   "hotspot": {
+    "rect": [
+     346,
+     282,
+     56,
+     62
+    ],
+    "polygon": [
+     [
+      357,
+      282
+     ],
+     [
+      391,
+      282
+     ],
+     [
+      402,
+      293
+     ],
+     [
+      402,
+      333
+     ],
+     [
+      391,
+      344
+     ],
+     [
+      357,
+      344
+     ],
+     [
+      346,
+      333
+     ],
+     [
+      346,
+      293
+     ]
+    ]
+   },
+   "marker_anchor": [
+    360,
+    283
+   ],
+   "tooltip_anchor": [
+    360,
+    283
+   ],
+   "bbox_rain": [
+    348,
+    284,
+    52,
+    58
+   ]
+  },
+  {
+   "key": "dois-irmaos",
+   "name": "Dois Irmãos",
+   "opens_day": 75,
+   "layers": {
+    "day": {
+     "open": "layers/dois-irmaos-open-day.png",
+     "locked": "layers/dois-irmaos-locked-day.png"
+    },
+    "night": {
+     "open": "layers/dois-irmaos-open-night.png",
+     "locked": "layers/dois-irmaos-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/dois-irmaos-open-rain.png",
+     "locked": "layers/dois-irmaos-locked-rain.png"
+    }
+   },
+   "bbox": [
+    219,
+    341,
+    110,
+    138
+   ],
+   "bbox_night": [
+    219,
+    326,
+    110,
+    169
+   ],
+   "hotspot": {
+    "rect": [
+     217,
+     339,
+     114,
+     142
+    ],
+    "polygon": [
+     [
+      239,
+      339
+     ],
+     [
+      309,
+      339
+     ],
+     [
+      331,
+      361
+     ],
+     [
+      331,
+      459
+     ],
+     [
+      309,
+      481
+     ],
+     [
+      239,
+      481
+     ],
+     [
+      217,
+      459
+     ],
+     [
+      217,
+      361
+     ]
+    ]
+   },
+   "marker_anchor": [
+    266,
+    340
+   ],
+   "tooltip_anchor": [
+    266,
+    340
+   ],
+   "bbox_rain": [
+    219,
+    341,
+    110,
+    138
+   ]
+  },
+  {
+   "key": "rocinha",
+   "name": "Rocinha",
+   "opens_day": 135,
+   "layers": {
+    "day": {
+     "open": "layers/rocinha-open-day.png",
+     "locked": "layers/rocinha-locked-day.png"
+    },
+    "night": {
+     "open": "layers/rocinha-open-night.png",
+     "locked": "layers/rocinha-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/rocinha-open-rain.png",
+     "locked": "layers/rocinha-locked-rain.png"
+    }
+   },
+   "bbox": [
+    136,
+    384,
+    115,
+    92
+   ],
+   "bbox_night": [
+    121,
+    376,
+    130,
+    109
+   ],
+   "hotspot": {
+    "rect": [
+     134,
+     382,
+     119,
+     96
+    ],
+    "polygon": [
+     [
+      153,
+      382
+     ],
+     [
+      234,
+      382
+     ],
+     [
+      253,
+      401
+     ],
+     [
+      253,
+      459
+     ],
+     [
+      234,
+      478
+     ],
+     [
+      153,
+      478
+     ],
+     [
+      134,
+      459
+     ],
+     [
+      134,
+      401
+     ]
+    ]
+   },
+   "marker_anchor": [
+    196,
+    398
+   ],
+   "tooltip_anchor": [
+    196,
+    398
+   ],
+   "bbox_rain": [
+    136,
+    384,
+    115,
+    92
+   ]
+  },
+  {
+   "key": "tijuca-park",
+   "name": "Tijuca park",
+   "opens_day": 7,
+   "layers": {
+    "day": {
+     "open": "layers/tijuca-park-open-day.png",
+     "locked": "layers/tijuca-park-locked-day.png"
+    },
+    "night": {
+     "open": "layers/tijuca-park-open-night.png",
+     "locked": "layers/tijuca-park-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/tijuca-park-open-rain.png",
+     "locked": "layers/tijuca-park-locked-rain.png"
+    }
+   },
+   "bbox": [
+    80,
+    257,
+    61,
+    71
+   ],
+   "bbox_night": [
+    68,
+    257,
+    73,
+    78
+   ],
+   "hotspot": {
+    "rect": [
+     78,
+     255,
+     65,
+     75
+    ],
+    "polygon": [
+     [
+      91,
+      255
+     ],
+     [
+      130,
+      255
+     ],
+     [
+      143,
+      268
+     ],
+     [
+      143,
+      317
+     ],
+     [
+      130,
+      330
+     ],
+     [
+      91,
+      330
+     ],
+     [
+      78,
+      317
+     ],
+     [
+      78,
+      268
+     ]
+    ]
+   },
+   "marker_anchor": [
+    98,
+    256
+   ],
+   "tooltip_anchor": [
+    98,
+    256
+   ],
+   "bbox_rain": [
+    80,
+    257,
+    61,
+    71
+   ]
+  },
+  {
+   "key": "os-esquilos",
+   "name": "Os Esquilos",
+   "opens_day": 165,
+   "layers": {
+    "day": {
+     "open": "layers/os-esquilos-open-day.png",
+     "locked": "layers/os-esquilos-locked-day.png"
+    },
+    "night": {
+     "open": "layers/os-esquilos-open-night.png",
+     "locked": "layers/os-esquilos-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/os-esquilos-open-rain.png",
+     "locked": "layers/os-esquilos-locked-rain.png"
+    }
+   },
+   "bbox": [
+    15,
+    286,
+    60,
+    69
+   ],
+   "bbox_night": [
+    11,
+    278,
+    70,
+    91
+   ],
+   "hotspot": {
+    "rect": [
+     13,
+     284,
+     64,
+     73
+    ],
+    "polygon": [
+     [
+      25,
+      284
+     ],
+     [
+      65,
+      284
+     ],
+     [
+      77,
+      296
+     ],
+     [
+      77,
+      345
+     ],
+     [
+      65,
+      357
+     ],
+     [
+      25,
+      357
+     ],
+     [
+      13,
+      345
+     ],
+     [
+      13,
+      296
+     ]
+    ]
+   },
+   "marker_anchor": [
+    40,
+    305
+   ],
+   "tooltip_anchor": [
+    40,
+    305
+   ],
+   "bbox_rain": [
+    15,
+    286,
+    60,
+    69
+   ]
+  },
+  {
+   "key": "flamengo-match",
+   "name": "Flamengo match",
+   "opens_day": 60,
+   "layers": {
+    "day": {
+     "open": "layers/flamengo-match-open-day.png",
+     "locked": "layers/flamengo-match-locked-day.png"
+    },
+    "night": {
+     "open": "layers/flamengo-match-open-night.png",
+     "locked": "layers/flamengo-match-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/flamengo-match-open-rain.png",
+     "locked": "layers/flamengo-match-locked-rain.png"
+    }
+   },
+   "bbox": [
+    292,
+    24,
+    81,
+    57
+   ],
+   "bbox_night": [
+    276,
+    12,
+    113,
+    77
+   ],
+   "hotspot": {
+    "rect": [
+     290,
+     22,
+     85,
+     61
+    ],
+    "polygon": [
+     [
+      302,
+      22
+     ],
+     [
+      363,
+      22
+     ],
+     [
+      375,
+      34
+     ],
+     [
+      375,
+      71
+     ],
+     [
+      363,
+      83
+     ],
+     [
+      302,
+      83
+     ],
+     [
+      290,
+      71
+     ],
+     [
+      290,
+      34
+     ]
+    ]
+   },
+   "marker_anchor": [
+    333,
+    24
+   ],
+   "tooltip_anchor": [
+    333,
+    24
+   ],
+   "bbox_rain": [
+    292,
+    24,
+    81,
+    57
+   ]
+  },
+  {
+   "key": "santa-teresa",
+   "name": "Santa Teresa",
+   "opens_day": 105,
+   "layers": {
+    "day": {
+     "open": "layers/santa-teresa-open-day.png",
+     "locked": "layers/santa-teresa-locked-day.png"
+    },
+    "night": {
+     "open": "layers/santa-teresa-open-night.png",
+     "locked": "layers/santa-teresa-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/santa-teresa-open-rain.png",
+     "locked": "layers/santa-teresa-locked-rain.png"
+    }
+   },
+   "bbox": [
+    578,
+    131,
+    80,
+    51
+   ],
+   "bbox_night": [
+    568,
+    122,
+    106,
+    73
+   ],
+   "hotspot": {
+    "rect": [
+     576,
+     129,
+     84,
+     55
+    ],
+    "polygon": [
+     [
+      587,
+      129
+     ],
+     [
+      649,
+      129
+     ],
+     [
+      660,
+      140
+     ],
+     [
+      660,
+      173
+     ],
+     [
+      649,
+      184
+     ],
+     [
+      587,
+      184
+     ],
+     [
+      576,
+      173
+     ],
+     [
+      576,
+      140
+     ]
+    ]
+   },
+   "marker_anchor": [
+    618,
+    132
+   ],
+   "tooltip_anchor": [
+    618,
+    132
+   ],
+   "bbox_rain": [
+    578,
+    131,
+    80,
+    51
+   ]
+  },
+  {
+   "key": "museum",
+   "name": "Museum",
+   "opens_day": 21,
+   "layers": {
+    "day": {
+     "open": "layers/museum-open-day.png",
+     "locked": "layers/museum-locked-day.png"
+    },
+    "night": {
+     "open": "layers/museum-open-night.png",
+     "locked": "layers/museum-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/museum-open-rain.png",
+     "locked": "layers/museum-locked-rain.png"
+    }
+   },
+   "bbox": [
+    720,
+    84,
+    51,
+    40
+   ],
+   "bbox_night": [
+    705,
+    68,
+    80,
+    71
+   ],
+   "hotspot": {
+    "rect": [
+     718,
+     82,
+     55,
+     44
+    ],
+    "polygon": [
+     [
+      726,
+      82
+     ],
+     [
+      765,
+      82
+     ],
+     [
+      773,
+      90
+     ],
+     [
+      773,
+      118
+     ],
+     [
+      765,
+      126
+     ],
+     [
+      726,
+      126
+     ],
+     [
+      718,
+      118
+     ],
+     [
+      718,
+      90
+     ]
+    ]
+   },
+   "marker_anchor": [
+    746,
+    83
+   ],
+   "tooltip_anchor": [
+    746,
+    83
+   ],
+   "bbox_rain": [
+    720,
+    84,
+    51,
+    40
+   ]
+  },
+  {
+   "key": "lagoa-house",
+   "name": "Lagoa house",
+   "opens_day": 1,
+   "layers": {
+    "day": {
+     "open": "layers/lagoa-house-open-day.png",
+     "locked": "layers/lagoa-house-locked-day.png"
+    },
+    "night": {
+     "open": "layers/lagoa-house-open-night.png",
+     "locked": "layers/lagoa-house-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/lagoa-house-open-rain.png",
+     "locked": "layers/lagoa-house-locked-rain.png"
+    }
+   },
+   "bbox": [
+    502,
+    290,
+    78,
+    107
+   ],
+   "bbox_night": [
+    502,
+    290,
+    91,
+    109
+   ],
+   "hotspot": {
+    "rect": [
+     500,
+     288,
+     82,
+     111
+    ],
+    "polygon": [
+     [
+      516,
+      288
+     ],
+     [
+      566,
+      288
+     ],
+     [
+      582,
+      304
+     ],
+     [
+      582,
+      383
+     ],
+     [
+      566,
+      399
+     ],
+     [
+      516,
+      399
+     ],
+     [
+      500,
+      383
+     ],
+     [
+      500,
+      304
+     ]
+    ]
+   },
+   "marker_anchor": [
+    542,
+    292
+   ],
+   "tooltip_anchor": [
+    542,
+    292
+   ],
+   "bbox_rain": [
+    502,
+    290,
+    78,
+    107
+   ]
+  },
+  {
+   "key": "clothing-store",
+   "name": "Clothing store",
+   "opens_day": 5,
+   "layers": {
+    "day": {
+     "open": "layers/clothing-store-open-day.png",
+     "locked": "layers/clothing-store-locked-day.png"
+    },
+    "night": {
+     "open": "layers/clothing-store-open-night.png",
+     "locked": "layers/clothing-store-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/clothing-store-open-rain.png",
+     "locked": "layers/clothing-store-locked-rain.png"
+    }
+   },
+   "bbox": [
+    473,
+    368,
+    51,
+    32
+   ],
+   "bbox_night": [
+    473,
+    368,
+    51,
+    33
+   ],
+   "hotspot": {
+    "rect": [
+     471,
+     366,
+     55,
+     36
+    ],
+    "polygon": [
+     [
+      478,
+      366
+     ],
+     [
+      519,
+      366
+     ],
+     [
+      526,
+      373
+     ],
+     [
+      526,
+      395
+     ],
+     [
+      519,
+      402
+     ],
+     [
+      478,
+      402
+     ],
+     [
+      471,
+      395
+     ],
+     [
+      471,
+      373
+     ]
+    ]
+   },
+   "marker_anchor": [
+    495,
+    367
+   ],
+   "tooltip_anchor": [
+    495,
+    367
+   ],
+   "bbox_rain": [
+    473,
+    368,
+    51,
+    32
+   ]
+  },
+  {
+   "key": "sult",
+   "name": "Sult",
+   "opens_day": 90,
+   "layers": {
+    "day": {
+     "open": "layers/sult-open-day.png",
+     "locked": "layers/sult-locked-day.png"
+    },
+    "night": {
+     "open": "layers/sult-open-night.png",
+     "locked": "layers/sult-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/sult-open-rain.png",
+     "locked": "layers/sult-locked-rain.png"
+    }
+   },
+   "bbox": [
+    660,
+    271,
+    32,
+    50
+   ],
+   "bbox_night": [
+    660,
+    271,
+    37,
+    50
+   ],
+   "hotspot": {
+    "rect": [
+     658,
+     269,
+     36,
+     54
+    ],
+    "polygon": [
+     [
+      665,
+      269
+     ],
+     [
+      687,
+      269
+     ],
+     [
+      694,
+      276
+     ],
+     [
+      694,
+      316
+     ],
+     [
+      687,
+      323
+     ],
+     [
+      665,
+      323
+     ],
+     [
+      658,
+      316
+     ],
+     [
+      658,
+      276
+     ]
+    ]
+   },
+   "marker_anchor": [
+    675,
+    281
+   ],
+   "tooltip_anchor": [
+    675,
+    281
+   ],
+   "bbox_rain": [
+    660,
+    271,
+    32,
+    50
+   ]
+  },
+  {
+   "key": "copacabana-palace",
+   "name": "Copacabana Palace",
+   "opens_day": 180,
+   "layers": {
+    "day": {
+     "open": "layers/copacabana-palace-open-day.png",
+     "locked": "layers/copacabana-palace-locked-day.png"
+    },
+    "night": {
+     "open": "layers/copacabana-palace-open-night.png",
+     "locked": "layers/copacabana-palace-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/copacabana-palace-open-rain.png",
+     "locked": "layers/copacabana-palace-locked-rain.png"
+    }
+   },
+   "bbox": [
+    684,
+    321,
+    64,
+    44
+   ],
+   "bbox_night": [
+    684,
+    320,
+    64,
+    47
+   ],
+   "hotspot": {
+    "rect": [
+     682,
+     319,
+     68,
+     48
+    ],
+    "polygon": [
+     [
+      691,
+      319
+     ],
+     [
+      741,
+      319
+     ],
+     [
+      750,
+      328
+     ],
+     [
+      750,
+      358
+     ],
+     [
+      741,
+      367
+     ],
+     [
+      691,
+      367
+     ],
+     [
+      682,
+      358
+     ],
+     [
+      682,
+      328
+     ]
+    ]
+   },
+   "marker_anchor": [
+    715,
+    320
+   ],
+   "tooltip_anchor": [
+    715,
+    320
+   ],
+   "bbox_rain": [
+    684,
+    321,
+    64,
+    44
+   ]
+  },
+  {
+   "key": "ipanema-beach",
+   "name": "Ipanema beach",
+   "opens_day": 1,
+   "layers": {
+    "day": {
+     "open": "layers/ipanema-beach-open-day.png",
+     "locked": "layers/ipanema-beach-locked-day.png"
+    },
+    "night": {
+     "open": "layers/ipanema-beach-open-night.png",
+     "locked": "layers/ipanema-beach-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/ipanema-beach-open-rain.png",
+     "locked": "layers/ipanema-beach-locked-rain.png"
+    }
+   },
+   "bbox": [
+    447,
+    441,
+    181,
+    54
+   ],
+   "bbox_night": [
+    447,
+    441,
+    196,
+    63
+   ],
+   "hotspot": {
+    "rect": [
+     445,
+     439,
+     185,
+     58
+    ],
+    "polygon": [
+     [
+      456,
+      439
+     ],
+     [
+      619,
+      439
+     ],
+     [
+      630,
+      450
+     ],
+     [
+      630,
+      486
+     ],
+     [
+      619,
+      497
+     ],
+     [
+      456,
+      497
+     ],
+     [
+      445,
+      486
+     ],
+     [
+      445,
+      450
+     ]
+    ]
+   },
+   "marker_anchor": [
+    560,
+    456
+   ],
+   "tooltip_anchor": [
+    560,
+    456
+   ],
+   "bbox_rain": [
+    447,
+    441,
+    181,
+    54
+   ]
+  },
+  {
+   "key": "barraca",
+   "name": "Barraca",
+   "opens_day": 3,
+   "layers": {
+    "day": {
+     "open": "layers/barraca-open-day.png",
+     "locked": "layers/barraca-locked-day.png"
+    },
+    "night": {
+     "open": "layers/barraca-open-night.png",
+     "locked": "layers/barraca-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/barraca-open-rain.png",
+     "locked": "layers/barraca-locked-rain.png"
+    }
+   },
+   "bbox": [
+    486,
+    453,
+    36,
+    23
+   ],
+   "bbox_night": [
+    486,
+    453,
+    36,
+    23
+   ],
+   "hotspot": {
+    "rect": [
+     484,
+     451,
+     40,
+     27
+    ],
+    "polygon": [
+     [
+      489,
+      451
+     ],
+     [
+      519,
+      451
+     ],
+     [
+      524,
+      456
+     ],
+     [
+      524,
+      473
+     ],
+     [
+      519,
+      478
+     ],
+     [
+      489,
+      478
+     ],
+     [
+      484,
+      473
+     ],
+     [
+      484,
+      456
+     ]
+    ]
+   },
+   "marker_anchor": [
+    498,
+    452
+   ],
+   "tooltip_anchor": [
+    498,
+    452
+   ],
+   "bbox_rain": [
+    486,
+    453,
+    36,
+    23
+   ]
+  },
+  {
+   "key": "zona-sul",
+   "name": "Zona Sul",
+   "opens_day": 10,
+   "layers": {
+    "day": {
+     "open": "layers/zona-sul-open-day.png",
+     "locked": "layers/zona-sul-locked-day.png"
+    },
+    "night": {
+     "open": "layers/zona-sul-open-night.png",
+     "locked": "layers/zona-sul-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/zona-sul-open-rain.png",
+     "locked": "layers/zona-sul-locked-rain.png"
+    }
+   },
+   "bbox": [
+    352,
+    400,
+    46,
+    33
+   ],
+   "bbox_night": [
+    345,
+    388,
+    60,
+    53
+   ],
+   "hotspot": {
+    "rect": [
+     350,
+     398,
+     50,
+     37
+    ],
+    "polygon": [
+     [
+      357,
+      398
+     ],
+     [
+      393,
+      398
+     ],
+     [
+      400,
+      405
+     ],
+     [
+      400,
+      428
+     ],
+     [
+      393,
+      435
+     ],
+     [
+      357,
+      435
+     ],
+     [
+      350,
+      428
+     ],
+     [
+      350,
+      405
+     ]
+    ]
+   },
+   "marker_anchor": [
+    375,
+    399
+   ],
+   "tooltip_anchor": [
+    375,
+    399
+   ],
+   "bbox_rain": [
+    352,
+    400,
+    46,
+    33
+   ]
+  },
+  {
+   "key": "boteco",
+   "name": "Boteco",
+   "opens_day": 45,
+   "layers": {
+    "day": {
+     "open": "layers/boteco-open-day.png",
+     "locked": "layers/boteco-locked-day.png"
+    },
+    "night": {
+     "open": "layers/boteco-open-night.png",
+     "locked": "layers/boteco-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/boteco-open-rain.png",
+     "locked": "layers/boteco-locked-rain.png"
+    }
+   },
+   "bbox": [
+    458,
+    405,
+    42,
+    46
+   ],
+   "bbox_night": [
+    456,
+    404,
+    44,
+    47
+   ],
+   "hotspot": {
+    "rect": [
+     456,
+     403,
+     46,
+     50
+    ],
+    "polygon": [
+     [
+      465,
+      403
+     ],
+     [
+      493,
+      403
+     ],
+     [
+      502,
+      412
+     ],
+     [
+      502,
+      444
+     ],
+     [
+      493,
+      453
+     ],
+     [
+      465,
+      453
+     ],
+     [
+      456,
+      444
+     ],
+     [
+      456,
+      412
+     ]
+    ]
+   },
+   "marker_anchor": [
+    489,
+    414
+   ],
+   "tooltip_anchor": [
+    489,
+    414
+   ],
+   "bbox_rain": [
+    458,
+    405,
+    42,
+    46
+   ]
+  },
+  {
+   "key": "quilo",
+   "name": "Quilo",
+   "opens_day": 30,
+   "layers": {
+    "day": {
+     "open": "layers/quilo-open-day.png",
+     "locked": "layers/quilo-locked-day.png"
+    },
+    "night": {
+     "open": "layers/quilo-open-night.png",
+     "locked": "layers/quilo-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/quilo-open-rain.png",
+     "locked": "layers/quilo-locked-rain.png"
+    }
+   },
+   "bbox": [
+    546,
+    424,
+    38,
+    29
+   ],
+   "bbox_night": [
+    546,
+    422,
+    41,
+    32
+   ],
+   "hotspot": {
+    "rect": [
+     544,
+     422,
+     42,
+     33
+    ],
+    "polygon": [
+     [
+      550,
+      422
+     ],
+     [
+      580,
+      422
+     ],
+     [
+      586,
+      428
+     ],
+     [
+      586,
+      449
+     ],
+     [
+      580,
+      455
+     ],
+     [
+      550,
+      455
+     ],
+     [
+      544,
+      449
+     ],
+     [
+      544,
+      428
+     ]
+    ]
+   },
+   "marker_anchor": [
+    563,
+    423
+   ],
+   "tooltip_anchor": [
+    563,
+    423
+   ],
+   "bbox_rain": [
+    546,
+    424,
+    38,
+    29
+   ]
+  },
+  {
+   "key": "ipanema-penthouse",
+   "name": "Ipanema penthouse",
+   "opens_day": 150,
+   "layers": {
+    "day": {
+     "open": "layers/ipanema-penthouse-open-day.png",
+     "locked": "layers/ipanema-penthouse-locked-day.png"
+    },
+    "night": {
+     "open": "layers/ipanema-penthouse-open-night.png",
+     "locked": "layers/ipanema-penthouse-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/ipanema-penthouse-open-rain.png",
+     "locked": "layers/ipanema-penthouse-locked-rain.png"
+    }
+   },
+   "bbox": [
+    516,
+    401,
+    30,
+    51
+   ],
+   "bbox_night": [
+    512,
+    396,
+    38,
+    58
+   ],
+   "hotspot": {
+    "rect": [
+     514,
+     399,
+     34,
+     55
+    ],
+    "polygon": [
+     [
+      520,
+      399
+     ],
+     [
+      542,
+      399
+     ],
+     [
+      548,
+      405
+     ],
+     [
+      548,
+      448
+     ],
+     [
+      542,
+      454
+     ],
+     [
+      520,
+      454
+     ],
+     [
+      514,
+      448
+     ],
+     [
+      514,
+      405
+     ]
+    ]
+   },
+   "marker_anchor": [
+    531,
+    400
+   ],
+   "tooltip_anchor": [
+    531,
+    400
+   ],
+   "bbox_rain": [
+    516,
+    401,
+    30,
+    51
+   ]
+  },
+  {
+   "key": "fazenda",
+   "name": "Fazenda",
+   "opens_day": 1,
+   "layers": {
+    "day": {
+     "open": "layers/fazenda-open-day.png",
+     "locked": "layers/fazenda-locked-day.png"
+    },
+    "night": {
+     "open": "layers/fazenda-open-night.png",
+     "locked": "layers/fazenda-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/fazenda-open-rain.png",
+     "locked": "layers/fazenda-locked-rain.png"
+    }
+   },
+   "bbox": [
+    716,
+    402,
+    172,
+    96
+   ],
+   "bbox_night": [
+    703,
+    386,
+    192,
+    117
+   ],
+   "hotspot": {
+    "rect": [
+     714,
+     400,
+     176,
+     100
+    ],
+    "polygon": [
+     [
+      734,
+      400
+     ],
+     [
+      870,
+      400
+     ],
+     [
+      890,
+      420
+     ],
+     [
+      890,
+      480
+     ],
+     [
+      870,
+      500
+     ],
+     [
+      734,
+      500
+     ],
+     [
+      714,
+      480
+     ],
+     [
+      714,
+      420
+     ]
+    ]
+   },
+   "marker_anchor": [
+    802,
+    398
+   ],
+   "tooltip_anchor": [
+    802,
+    398
+   ],
+   "bbox_rain": [
+    716,
+    402,
+    172,
+    96
+   ]
+  }
+ ],
+ "inset": {
+  "key": "fazenda",
+  "name": "Fazenda on Ilha Grande",
+  "rect": [
+   716,
+   402,
+   172,
+   96
+  ],
+  "frame_rect": [
+   712,
+   398,
+   180,
+   104
+  ],
+  "note": "the inset is the fazenda layer; its frame is part of the base. Tap the inset to open the fazenda.",
+  "opens_day": 1
+ },
+ "boat_route": {
+  "key": "boat-route",
+  "name": "Boat to Ilha Grande",
+  "opens_day": 1,
+  "links": "fazenda",
+  "layers": {
+   "day": {
+    "open": "layers/boat-route-open-day.png",
+    "locked": "layers/boat-route-locked-day.png"
+   },
+   "night": {
+    "open": "layers/boat-route-open-night.png",
+    "locked": "layers/boat-route-locked-night.png"
+   },
+   "rain": {
+    "open": "layers/boat-route-open-rain.png",
+    "locked": "layers/boat-route-locked-rain.png"
+   }
+  },
+  "bbox": [
+   632,
+   458,
+   78,
+   33
+  ],
+  "bbox_night": [
+   632,
+   458,
+   78,
+   41
+  ],
+  "hotspot": {
+   "rect": [
+    630,
+    456,
+    82,
+    37
+   ],
+   "polygon": [
+    [
+     637,
+     456
+    ],
+    [
+     705,
+     456
+    ],
+    [
+     712,
+     463
+    ],
+    [
+     712,
+     486
+    ],
+    [
+     705,
+     493
+    ],
+    [
+     637,
+     493
+    ],
+    [
+     630,
+     486
+    ],
+    [
+     630,
+     463
+    ]
+   ]
+  },
+  "note": "the dotted route from Ipanema to the inset with a little boat. It opens and locks with the fazenda (day 1). Tapping it can open the fazenda; it is listed last in hit_test_order terms (not in hit_test_order itself).",
+  "bbox_rain": [
+   632,
+   458,
+   78,
+   33
+  ]
+ },
+ "weather": {
+  "rain": {
+   "look": "rain",
+   "overlay": {
+    "frames": [
+     "layers/rain-streaks-0.png",
+     "layers/rain-streaks-1.png",
+     "layers/rain-streaks-2.png",
+     "layers/rain-streaks-3.png"
+    ],
+    "frame_ms": 110,
+    "loop": true,
+    "draw": "after the places and any event overlay, before the markers",
+    "contents": "falling rain plus splash rings on the sea and the Lagoa; transparent elsewhere"
+   },
+   "when": "Rio's real weather says rain and it is daytime: draw the rain look plus the overlay.",
+   "rain_at_night": "draw the night look plus the same rain overlay (there is no separate night-rain art yet)",
+   "footprints": "each rain layer has exactly its day layer's footprint, so bbox_rain == bbox and the day hotspots hold"
+  }
+ },
+ "events": [
+  {
+   "key": "carnaval",
+   "name": "Carnaval",
+   "kind": "takeover",
+   "dates": {
+    "from": "02-01",
+    "to": "02-15",
+    "rule": "every year, the first half of February (Esme's ruling); the city and every place get dressed"
+   },
+   "layers": {
+    "day": "events/carnaval-day.png",
+    "night": "events/carnaval-night.png"
+   },
+   "rain": "on a rainy day draw the day overlay over the rain look",
+   "contents": "bloco crowds with standards in Ipanema, Leblon, Copacabana, Lapa, Santa Teresa, Botafogo and Centro; confetti and serpentinas over the city; green-and-yellow and multicolour bunting along the main streets; a samba-school float and its alas on the Sambodromo avenue near Centro; a trio electrico on Copacabana's beachfront. At night the bunting carries gold bulbs and the costumes, float, trio and confetti glow in the night palette's lights."
+  },
+  {
+   "key": "reveillon",
+   "name": "Réveillon",
+   "kind": "takeover",
+   "dates": {
+    "from": "12-31",
+    "to": "12-31",
+    "night_runs_until": "01-01 06:00 Rio time",
+    "rule": "Rio New Year: the day look all of 31 December, the night look (the hero) from dusk until the morning of 1 January"
+   },
+   "layers": {
+    "day": "events/reveillon-day.png",
+    "night": "events/reveillon-night.png"
+   },
+   "animation": {
+    "night": {
+     "frames": [
+      "events/reveillon-fireworks-0.png",
+      "events/reveillon-fireworks-1.png",
+      "events/reveillon-fireworks-2.png",
+      "events/reveillon-fireworks-3.png"
+     ],
+     "frame_ms": 160,
+     "loop": true,
+     "draw": "right after events/reveillon-night.png"
+    }
+   },
+   "rain": "on a rainy day draw the day overlay over the rain look; at night the fireworks still play",
+   "contents": "day: Copacabana, Ipanema and Leblon sand filling up with people in white, white flowers at the waterline, Iemanja's offering boat, boats gathering in the bay. Night: the sand packed in white, candles and flowers along the waterline, the offering boat, boats with lights and their reflections, and fireworks over the Copacabana bay (4 frames)."
+  }
+ ],
+ "events_note": "Holiday overlays: transparent, full canvas (896x504), hard alpha. Draw the active event's layer for the current look after the last place layer and before the markers (and before the rain overlay when it rains). They sit over open and locked places alike: on a takeover the whole city celebrates. draw_order is unchanged."
+}

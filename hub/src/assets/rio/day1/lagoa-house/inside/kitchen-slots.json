@@ -1,0 +1,177 @@
+{
+ "room": "lagoa-kitchen",
+ "name": "Kitchen (ground floor)",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "inside/kitchen-start-day.png",
+   "rain": "inside/kitchen-start-rain.png",
+   "night": "inside/kitchen-start-night.png"
+  },
+  "full": {
+   "day": "inside/kitchen-full-day.png",
+   "rain": "inside/kitchen-full-rain.png",
+   "night": "inside/kitchen-full-night.png"
+  }
+ },
+ "states": {
+  "start": "day one",
+  "full": "everything unlocked"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "rugs first, then everything by foot y (then x); characters sort with them",
+ "slot_state": "a slot with \"state\" is free only in that state; every other slot is free in both",
+ "sticker_looks": "recolour placed stickers by colour name with looks/palette-rain.json (use the indoor table) or looks/palette-night.json",
+ "walkable": {
+  "start": [
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "001111111000000000000000",
+   "001111111111111111111110",
+   "010000011111111111111110",
+   "010000011100000001111110",
+   "010000011100000001111110",
+   "010000011100000001111010",
+   "000111111110000011111010",
+   "000111111111111111111110",
+   "000111111111111111111110",
+   "000000000000000000000000"
+  ],
+  "full": [
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "000000000000000000000000",
+   "001111111000000000000000",
+   "001111111111111111111110",
+   "010000011111111111111110",
+   "010000011100000001111110",
+   "010000011100000001111110",
+   "010000011100000001111010",
+   "000011111110000011111010",
+   "000011111111111111001110",
+   "000011111111111111001110",
+   "000000000000000000000000"
+  ]
+ },
+ "walkable_note": "one string per tile row (0 = blocked: walls, border, furniture; 1 = floor). A floor sticker placed on a slot blocks its own footprint.",
+ "exits": [
+  {
+   "id": "door",
+   "tile": [
+    11,
+    14
+   ],
+   "goes": "outside",
+   "note": "the door notch, bottom centre"
+  },
+  {
+   "id": "garden",
+   "x": 60,
+   "y": 21,
+   "w": 68,
+   "h": 58,
+   "goes": "outside"
+  }
+ ],
+ "rain_overlay": {
+  "file": "inside/kitchen-rain-overlay.png",
+  "json": "inside/kitchen-rain-overlay.json"
+ },
+ "lamps": [
+  {
+   "kind": "lantern",
+   "x": 66,
+   "y": 103
+  },
+  {
+   "kind": "hood",
+   "x": 248,
+   "y": 58
+  }
+ ],
+ "slots": [
+  {
+   "id": "floor-left",
+   "x": 130,
+   "y": 200,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "floor-right",
+   "x": 290,
+   "y": 210,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "floor-centre",
+   "x": 220,
+   "y": 214,
+   "area": "floor",
+   "accepts": [
+    "lagoa-decor:floor"
+   ]
+  },
+  {
+   "id": "counter-right",
+   "x": 306,
+   "y": 75,
+   "area": "counter",
+   "accepts": [
+    "kitchen-tool"
+   ],
+   "state": "start",
+   "note": "the counter end, free in start (the wood oven stands here in full)"
+  },
+  {
+   "id": "counter-left",
+   "x": 186,
+   "y": 75,
+   "area": "counter",
+   "accepts": [
+    "kitchen-tool"
+   ],
+   "state": "start",
+   "note": "free in start; full shows the coffee, moka, blender and mixer here"
+  },
+  {
+   "id": "island",
+   "x": 200,
+   "y": 128,
+   "area": "island",
+   "accepts": [
+    "kitchen-tool",
+    "lagoa-decor:small"
+   ],
+   "note": "on the island top, left of the dish"
+  },
+  {
+   "id": "wall-shelf",
+   "x": 284,
+   "y": 39,
+   "area": "shelf",
+   "accepts": [
+    "lagoa-decor:small"
+   ],
+   "note": "the short shelf right of the hood"
+  }
+ ]
+}

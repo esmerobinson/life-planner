@@ -140,7 +140,7 @@ export function NotesToMyself({ jk, today, deviceId }: { jk: JournalKey; today: 
     typed.current.delete(e.id);
     setEditing(null);
     await landing.catch(() => undefined);
-    await clearNoteDraft(jk, deviceId, e.id).catch(() => undefined);
+    await clearNoteDraft(jk, deviceId, e.id, e.seen).catch(() => undefined);
   }
   async function remove(e: Editing) {
     await deleteNote(jk, deviceId, e.id, e.seen);

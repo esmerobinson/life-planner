@@ -111,7 +111,8 @@ describe("C1: a typo never seals anything", () => {
     expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("needs-passphrase");
     expect(await confirmJournalKey(d)).toBe("locked");
     expect(await loadCandidate(d)).toBeUndefined();
-    expect((await d.syncMeta.get(JOURNAL_RETIRED_META))!.value).toHaveLength(1);
+    // A candidate never sealed anything, so it is dropped, not kept for repair (re-key review M1).
+    expect(await d.syncMeta.get(JOURNAL_RETIRED_META)).toBeUndefined();
   });
 
   it("a refusal landing between token save and key store (the Save race): the late candidate can never confirm", async () => {
@@ -191,7 +192,11 @@ describe("unlock journal", () => {
     await saveSyncSettings(d, { serverUrl: SERVER, token });
     await syncOnce({ db: d, fetch: server.fetch });
     expect(await unlockJournal(d, TYPO)).toBe("wrong");
-    expect(await unlockJournal(d, PASS)).toBe("ok"); // accepted already: confirmed at once
+    // Accepted BEFORE it was typed: that acceptance may be stale (bug #4), so the next sync decides.
+    expect(await unlockJournal(d, PASS)).toBe("checking");
+    expect(await d.journal.get(VERIFIER_ID)).toBeUndefined();
+    await syncOnce({ db: d, fetch: server.fetch });
+    expect(await confirmJournalKey(d)).toBe("confirmed");
     expect(await d.journal.get(VERIFIER_ID)).toBeTruthy();
   });
 

@@ -32,7 +32,10 @@ async function ready(page: Page, yesterdayDraft?: string) {
     const exercise = await at("/src/journal/exercise.ts");
     const { db } = await at("/src/data/db.ts");
     await engine.saveSyncSettings(db, { serverUrl: "https://sync.example.test", token: await token.deriveToken(pass) });
-    await db.syncMeta.put({ key: "acceptedToken", value: (await db.syncMeta.get("token")).value });
+    // The journal was set up on another device: its check row is here (an acceptance
+    // recorded before the key is typed no longer confirms it, bug #4).
+    const jkey = await at("/src/test/journalKey.ts");
+    await db.journal.put(await jkey.verifierRow(await jkey.keyFor(pass)));
     await keys.unlockJournal(db, pass);
     const meta = (await db.syncMeta.get(keys.JOURNAL_KEY_META)).value;
     const jk = { key: meta.key, mac: meta.mac, fp: meta.fp };
@@ -90,18 +93,25 @@ for (const width of [1280, 390]) {
       await page.getByRole("button", { name: "Open yesterday's page" }).click();
       await expect(box).toHaveValue("Pretend unfinished words from yesterday");
       await page.getByRole("button", { name: "I'm done" }).click();
+      // The late page closes once "I'm done" has saved (MorningPages awaits it before onFinished).
+      await expect(page.getByText("Finishing yesterday's page")).toHaveCount(0);
       await expect(page.getByLabel("Today's morning page")).toHaveValue("");
       await expect(page.getByRole("button", { name: "Open yesterday's page" })).toHaveCount(0);
       await expect(page.getByText("Yesterday's unfinished page is saved.")).toHaveCount(0);
       await sideways(page);
       await shoot(page, `yesterday-finished-${width}`);
-      // Filed under yesterday's date, not today's.
-      const dates = await page.evaluate(async () => {
-        const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
-        const { db } = await at("/src/data/db.ts");
-        return (await db.journal.where("kind").equals("page").toArray()).map((r: { date: string }) => r.date);
-      });
-      expect(dates).toEqual([await pageDate(page, -1)]);
+      // Filed under yesterday's date, not today's. Polled: the checks above already hold while
+      // "I'm done" is still saving (today's box was empty and the offer hidden all along).
+      const yesterday = await pageDate(page, -1);
+      await expect
+        .poll(() =>
+          page.evaluate(async () => {
+            const at = (path: string): Promise<any> => import(/* @vite-ignore */ path);
+            const { db } = await at("/src/data/db.ts");
+            return (await db.journal.where("kind").equals("page").toArray()).map((r: { date: string }) => r.date);
+          }),
+        )
+        .toEqual([yesterday]);
     });
 
     test("Cancel in a goal's Edit puts its month goals back", async ({ page }) => {

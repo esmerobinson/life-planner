@@ -26,9 +26,10 @@ export const DEFAULT_CHUNK_BYTES = 1_900_000;
 /**
  * The synced tables. "files": pictures on pages (base64 JPEG rows, kept under 1 MB by the
  * app). "journal": end-to-end encrypted journal entries (the server only ever sees `id`,
- * `kind`, `date`, `iv` and the ciphertext `ct`; it cannot read them).
+ * `kind`, `date`, `iv` and the ciphertext `ct`; it cannot read them). "farm": Esme's Farm's
+ * own state (start day, stickers seen and placed, arrivals, outfits); tiny rows.
  */
-const TABLES = new Set(["items", "goals", "files", "journal"]);
+const TABLES = new Set(["items", "goals", "files", "journal", "farm"]);
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 export interface ValidChange {

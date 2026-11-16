@@ -300,6 +300,10 @@ const JOURNAL_KIND_LIST: readonly string[] = JOURNAL_KINDS;
 const SUFFIX = /^[A-Za-z0-9_-]{1,64}$/;
 /** One chunk of the exercise card set: `cards:<0..999>`. */
 const CARDS_CHUNK = /^cards:(0|[1-9][0-9]{0,2})$/;
+/** A keywrap row's id: `keywrap:<16 hex kekFp>`. */
+const KEYWRAP_ID = /^keywrap:[0-9a-f]{16}$/;
+/** A highlight version's suffix: `<16 hex hid>_<deviceId>_<8 hex vid>` (at most 64, like every suffix). */
+const HIGHLIGHT_SUFFIX = /^(?=.{1,64}$)[0-9a-f]{16}_[A-Za-z0-9-]{1,37}_[0-9a-f]{8}$/;
 /** A per-device answer's suffix: `<12 hex promptKey>:<deviceId>`. */
 const ANSWER_SUFFIX = /^[0-9a-f]{12}:[A-Za-z0-9_-]{8,64}$/;
 
@@ -313,6 +317,7 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
       // The card set's manifest is `cards`; its chunks `cards:0`, `cards:1`, …
       return suffix === undefined ? kind : `${kind}:${suffix}`;
     case "stars":
+    case "keywrap":
       return `${kind}:${suffix ?? ""}`;
     case "set":
     case "morning":
@@ -325,9 +330,15 @@ export function journalId(kind: JournalRow["kind"], date: string, suffix?: strin
 
 /** The id rule for one row: the id matches its kind and day (and a part has a plain suffix). */
 function validJournalId(kind: JournalRow["kind"], date: string, id: string): boolean {
+  // One version of a highlight: `highlight:<date>:<16 hex hid>_<deviceId>_<8 hex vid>` (highlightRepo.ts).
+  if (kind === "highlight") return id.startsWith(`highlight:${date}:`) && HIGHLIGHT_SUFFIX.test(id.slice(`highlight:${date}:`.length));
   if (kind === "stars") return id.startsWith("stars:") && SUFFIX.test(id.slice("stars:".length));
   if (kind === "cards") return id === "cards" || CARDS_CHUNK.test(id);
-  if (["page", "photo", "draft", "answer", "exercise", "exercise-entry", "note", "note-read"].includes(kind)) {
+  // A passphrase's wrap is named only by its key-wrap key's fingerprint.
+  if (kind === "keywrap") return KEYWRAP_ID.test(id);
+  // A private tick is one row per part of the day (Together link).
+  if (kind === "share") return id === `share:${date}:exercise` || id === `share:${date}:checkin`;
+  if (["page", "photo", "draft", "answer", "exercise", "exercise-entry", "note", "note-read", "learned"].includes(kind)) {
     const prefix = `${kind}:${date}:`;
     if (!id.startsWith(prefix)) return false;
     const rest = id.slice(prefix.length);

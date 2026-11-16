@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  deriveJournalKey, deriveJournalKeyAndFp, fromBase64, promptKey, IV_BYTES, JOURNAL_ITERATIONS, JOURNAL_SALT, openBytes, openJson, sealBytes, sealJson, toBase64,
+  deriveJournalKey, deriveJournalKeyAndFp, deriveJournalSecret, deriveKeyWrapKey, fromBase64, generateDeviceWrapKey, journalKeyFromSecret,
+  KEYWRAP_SALT, promptKey, IV_BYTES, JOURNAL_ITERATIONS, JOURNAL_SALT, openBytes, openJson, sealBytes, sealJson, toBase64,
 } from "./crypto";
 
 // Fixed vector, computed independently with Node's crypto module (not WebCrypto):
@@ -108,5 +109,50 @@ describe("sealing and opening", () => {
   it("a wrong key never opens", async () => {
     const sealed = await sealJson(await deriveJournalKey("pretend one"), { text: "Pretend" }, "x");
     await expect(openJson(await deriveJournalKey("pretend two"), sealed, "x")).rejects.toThrow();
+  });
+});
+
+// Journal re-key (bugs #3, #4; journal-rekey brief): the journal SECRET S (the same PBKDF2 bits
+// the key is made from) and a passphrase's KEY-WRAP key (KEK), with its own salt.
+describe("journal secret and key-wrap key", () => {
+  // node: pbkdf2Sync("correct horse battery staple", "esmeworld-keywrap-v1", 200000, 32, "sha256")
+  //     = 361f5752e0a909a9e34ef53641b9f76376c49d7f1152342bf0b7c65977cfac06
+  //   fp: createHmac("sha256", <that>).update("esmeworld-keywrap-fp").digest("hex").slice(0, 16)
+  //   AES-256-GCM, iv 000102030405060708090a0b, AAD "journal|keywrap:x", plaintext {"pretend":"wrap"}
+  const WRAP_VECTOR = { fp: "4c208fea155f94ff", ct: "oELuLT094Zdzn4qBEIXlISSs5pThTjJ6JtraStihRCoohg==", aad: "journal|keywrap:x" };
+
+  it("S is the journal key's own bits: a key made from S opens what the passphrase's key sealed, same fingerprint", async () => {
+    const s = await deriveJournalSecret(VECTOR.passphrase);
+    expect(s).toHaveLength(32);
+    expect([...s].map((b) => b.toString(16).padStart(2, "0")).join("")).toBe(
+      "e409de515940ee228d66946d55446b90fae0c1923ca3ef4b4ecd586f643e2d12",
+    );
+    const jk = await journalKeyFromSecret(s);
+    expect(jk.fp).toBe("768feba679209ed9");
+    expect(await openJson(jk.key, { iv: VECTOR.iv, ct: VECTOR.ct }, VECTOR.aad)).toEqual({ pretend: "words" });
+    expect(await promptKey(jk, "M1")).toBe("bae6397a2f99");
+    expect(jk.key.extractable).toBe(false);
+    expect(jk.mac.extractable).toBe(false);
+  });
+
+  it("the KEK has its own salt and fingerprint (vector from Node), is never the journal key, and can't be exported", async () => {
+    expect(KEYWRAP_SALT).toBe("esmeworld-keywrap-v1");
+    const kek = await deriveKeyWrapKey(VECTOR.passphrase);
+    expect(kek.fp).toBe(WRAP_VECTOR.fp);
+    expect(await openJson(kek.key, { iv: VECTOR.iv, ct: WRAP_VECTOR.ct }, WRAP_VECTOR.aad)).toEqual({ pretend: "wrap" });
+    expect(kek.key.extractable).toBe(false);
+    await expect(crypto.subtle.exportKey("raw", kek.key)).rejects.toThrow();
+    const jk = await deriveJournalKeyAndFp(VECTOR.passphrase);
+    expect(kek.fp).not.toBe(jk.fp);
+    await expect(openJson(jk.key, { iv: VECTOR.iv, ct: WRAP_VECTOR.ct }, WRAP_VECTOR.aad)).rejects.toThrow();
+  });
+
+  it("a device wrap key is a fresh non-extractable AES-GCM key", async () => {
+    const a = await generateDeviceWrapKey();
+    const b = await generateDeviceWrapKey();
+    expect(a.extractable).toBe(false);
+    const sealed = await sealBytes(a, Uint8Array.from([1, 2, 3]), "device-secret|x");
+    expect(await openBytes(a, sealed, "device-secret|x")).toEqual(Uint8Array.from([1, 2, 3]));
+    await expect(openBytes(b, sealed, "device-secret|x")).rejects.toThrow();
   });
 });

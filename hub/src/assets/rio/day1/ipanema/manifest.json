@@ -1,0 +1,188 @@
+{
+ "pack": "Esme World Rio, day one: Ipanema beach (outside), the barraca's inside, the sea off Arpoador",
+ "notes": "1x RGBA PNGs, hard alpha 0/255, listed colours only. Bases carry no stickers and no player; previews/ show stickers on their slots and Esme with Mr Cat for scale. Paths are relative to this folder.",
+ "scenes": [
+  {
+   "key": "ipanema-beach",
+   "kind": "outside",
+   "area": "Ipanema beach",
+   "opensOnDay": 1,
+   "size": [
+    352,
+    192
+   ],
+   "states": [
+    "stage1",
+    "stage2",
+    "stage3"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "files": {
+    "stage1": {
+     "day": "location/ipanema-stage1-day.png",
+     "rain": "location/ipanema-stage1-rain.png",
+     "night": "location/ipanema-stage1-night.png"
+    },
+    "stage2": {
+     "day": "location/ipanema-stage2-day.png",
+     "rain": "location/ipanema-stage2-rain.png",
+     "night": "location/ipanema-stage2-night.png"
+    },
+    "stage3": {
+     "day": "location/ipanema-stage3-day.png",
+     "rain": "location/ipanema-stage3-rain.png",
+     "night": "location/ipanema-stage3-night.png"
+    }
+   },
+   "overlays": {
+    "rain": [
+     "overlays/rain-beach-0.png",
+     "overlays/rain-beach-1.png",
+     "overlays/rain-beach-2.png"
+    ]
+   },
+   "slots": "location/ipanema-slots.json",
+   "previews": {
+    "stage1": {
+     "day": "previews/ipanema-stage1-day@3.png",
+     "rain": "previews/ipanema-stage1-rain@3.png",
+     "night": "previews/ipanema-stage1-night@3.png"
+    },
+    "stage2": {
+     "day": "previews/ipanema-stage2-day@3.png",
+     "rain": "previews/ipanema-stage2-rain@3.png",
+     "night": "previews/ipanema-stage2-night@3.png"
+    },
+    "stage3": {
+     "day": "previews/ipanema-stage3-day@3.png",
+     "rain": "previews/ipanema-stage3-rain@3.png",
+     "night": "previews/ipanema-stage3-night@3.png"
+    }
+   }
+  },
+  {
+   "key": "barraca-inside",
+   "kind": "inside",
+   "area": "Barraca (under the tent)",
+   "opensOnDay": 3,
+   "size": [
+    320,
+    192
+   ],
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "files": {
+    "start": {
+     "day": "barraca/barraca-start-day.png",
+     "rain": "barraca/barraca-start-rain.png",
+     "night": "barraca/barraca-start-night.png"
+    },
+    "full": {
+     "day": "barraca/barraca-full-day.png",
+     "rain": "barraca/barraca-full-rain.png",
+     "night": "barraca/barraca-full-night.png"
+    }
+   },
+   "overlays": {
+    "rain": [
+     "overlays/rain-barraca-0.png",
+     "overlays/rain-barraca-1.png",
+     "overlays/rain-barraca-2.png"
+    ]
+   },
+   "slots": "barraca/barraca-slots.json",
+   "previews": {
+    "start": {
+     "day": "previews/barraca-start-day@3.png",
+     "rain": "previews/barraca-start-rain@3.png",
+     "night": "previews/barraca-start-night@3.png"
+    },
+    "full": {
+     "day": "previews/barraca-full-day@3.png",
+     "rain": "previews/barraca-full-rain@3.png",
+     "night": "previews/barraca-full-night@3.png"
+    }
+   }
+  },
+  {
+   "key": "sea-off-arpoador",
+   "kind": "inside",
+   "area": "Ipanema beach (inside): the sea off Arpoador",
+   "opensOnDay": 30,
+   "size": [
+    320,
+    192
+   ],
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night"
+   ],
+   "files": {
+    "start": {
+     "day": "sea/sea-start-day.png",
+     "night": "sea/sea-start-night.png"
+    },
+    "full": {
+     "day": "sea/sea-full-day.png",
+     "night": "sea/sea-full-night.png"
+    }
+   },
+   "slots": "sea/sea-slots.json",
+   "previews": {
+    "start": {
+     "day": "previews/sea-start-day@3.png",
+     "night": "previews/sea-start-night@3.png"
+    },
+    "full": {
+     "day": "previews/sea-full-day@3.png",
+     "night": "previews/sea-full-night@3.png"
+    }
+   },
+   "note": "a simple first version, drawn now; finish it before day 30"
+  }
+ ],
+ "stickersShownInPreviews": [
+  "aquarium-castle",
+  "aquarium-ribbon-weed",
+  "aquarium-treasure-chest",
+  "fish-angelfish",
+  "fish-pufferfish",
+  "fish-sardine",
+  "outdoor-beach-chair",
+  "outdoor-cooler",
+  "outdoor-lounger",
+  "outdoor-umbrella",
+  "pond-crab",
+  "pond-seashell",
+  "pond-urchin"
+ ],
+ "tidyUp": {
+  "date": "2026-11-14",
+  "changes": [
+   "beach night: moonlit warm mauve-blue sand ('sand:<name>' labels) with golden lamp pools on it, soft dithered edges",
+   "barraca night and rain: no big oval; the lantern glows, small soft pools on the counter and the sand in front, moonlit sand floor",
+   "people: the barraqueiro (Thiago) and the rain walkers (Duda, Dona Celia) are Rio townsfolk (sources/rio-pack/townsfolk/folk.py)",
+   "the sea: varied kelp, dithered depth seams, currents and specks, caustic nets, small rocks and shells, urchins, a seahorse, a crab"
+  ]
+ },
+ "palette": {
+  "extra": "palette-extra.json",
+  "night": "sources/rio-pack/ipanema/palette-night.json",
+  "rain": "sources/rio-pack/ipanema/palette-rain.json"
+ }
+}

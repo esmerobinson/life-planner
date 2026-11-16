@@ -48,6 +48,8 @@ for (const width of [1280, 390]) {
       await expect(list).toBeVisible();
       const icon = list.locator("img.pixel-icon");
       await expect(icon).toBeVisible();
+      // Wait until the picture has loaded before measuring it (a busy machine measured 0 once).
+      await expect.poll(() => icon.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBe(16);
       // The pixel book: 16px, pixelated, and really the sprite (16×16 pixels, not a placeholder).
       const look = await icon.evaluate((el: HTMLImageElement) => ({
         w: el.getBoundingClientRect().width,

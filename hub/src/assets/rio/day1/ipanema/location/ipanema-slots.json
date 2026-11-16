@@ -1,0 +1,165 @@
+{
+ "location": "ipanema-beach",
+ "scene": [
+  352,
+  192
+ ],
+ "tile": 16,
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front, over the base picture",
+ "base": {
+  "stage1": {
+   "day": "location/ipanema-stage1-day.png",
+   "rain": "location/ipanema-stage1-rain.png",
+   "night": "location/ipanema-stage1-night.png"
+  },
+  "stage2": {
+   "day": "location/ipanema-stage2-day.png",
+   "rain": "location/ipanema-stage2-rain.png",
+   "night": "location/ipanema-stage2-night.png"
+  },
+  "stage3": {
+   "day": "location/ipanema-stage3-day.png",
+   "rain": "location/ipanema-stage3-rain.png",
+   "night": "location/ipanema-stage3-night.png"
+  }
+ },
+ "stages": {
+  "stage1": "just arrived: bare timber barraca frame, broken calcadao, 3 of 8 lamps work",
+  "stage2": "getting going: the striped barraca opens, volleyball court, Posto 9, parasols, bike rack, all but one lamp",
+  "stage3": "fully developed: two parasol clusters with a clear path between, surf rack, mate cart, bunting, the Reveillon flower boat, kites (day), every lamp lit"
+ },
+ "looks": {
+  "day": "as drawn",
+  "rain": "rain palette (day hues, a little darker, cool sky light), lamps lit, wet-sand sheen and reflections, puddles, rain rings; parasols furled, chairs folded, loungers stood on end, towels packed; two walkers; animate overlays/rain-beach-{0,1,2}.png on top (about 120 ms a frame)",
+  "night": "night palette + glow; parasols furled; lamps, reflections, barraca string lights, cyan surf and stars are baked in"
+ },
+ "hotspots": {
+  "barraca": {
+   "x": 16,
+   "y": 80,
+   "w": 60,
+   "h": 28,
+   "note": "walk in to go under the tent (barraca/), once the Barraca is open (day 3)"
+  },
+  "sea": {
+   "x": 300,
+   "y": 140,
+   "w": 52,
+   "h": 40,
+   "note": "the water by Arpoador: the sea off Arpoador (sea/), once open (day 30)"
+  },
+  "promenade": {
+   "x": 0,
+   "y": 19,
+   "w": 352,
+   "h": 36,
+   "note": "the calcadao (map exit along it)"
+  }
+ },
+ "walkable_note": "sand from y 58 to the tideline (about y 140), the calcadao (y 19-54); not the rock",
+ "slots": [
+  {
+   "id": "tideline-1",
+   "x": 104,
+   "y": 142,
+   "area": "wet sand",
+   "accepts": [
+    "pond"
+   ]
+  },
+  {
+   "id": "tideline-2",
+   "x": 182,
+   "y": 147,
+   "area": "wet sand",
+   "accepts": [
+    "pond"
+   ]
+  },
+  {
+   "id": "tideline-3",
+   "x": 268,
+   "y": 146,
+   "area": "wet sand",
+   "accepts": [
+    "pond"
+   ]
+  },
+  {
+   "id": "sand-1",
+   "x": 130,
+   "y": 130,
+   "area": "dry sand",
+   "accepts": [
+    "pond",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "sand-2",
+   "x": 172,
+   "y": 76,
+   "area": "dry sand by the promenade",
+   "accepts": [
+    "pond",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "rock-pool",
+   "x": 334,
+   "y": 114,
+   "area": "Arpoador rock pool",
+   "accepts": [
+    "pond"
+   ],
+   "note": "urchins, crabs and shells sit on the rock by the pool"
+  },
+  {
+   "id": "rock-ledge",
+   "x": 310,
+   "y": 146,
+   "area": "Arpoador, low ledge at the waterline",
+   "accepts": [
+    "pond"
+   ]
+  },
+  {
+   "id": "barraca-1",
+   "x": 10,
+   "y": 124,
+   "area": "in front of the barraca",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "barraca-2",
+   "x": 62,
+   "y": 121,
+   "area": "beside the barraca",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "barraca-3",
+   "x": 114,
+   "y": 118,
+   "area": "between the barraca and the court",
+   "accepts": [
+    "outdoor"
+   ]
+  },
+  {
+   "id": "barraca-4",
+   "x": 112,
+   "y": 99,
+   "area": "by the palm, beside the court",
+   "accepts": [
+    "outdoor"
+   ]
+  }
+ ]
+}

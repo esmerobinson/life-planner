@@ -1,0 +1,469 @@
+{
+ "name": "Rio pack: the boteco (later area, opens day 45)",
+ "family": "saloon (the farmhouse zone's stickers come here)",
+ "tile": 16,
+ "scene": [
+  384,
+  240
+ ],
+ "locations": [
+  {
+   "key": "boteco-outside",
+   "slots": "location/outside-slots.json"
+  },
+  {
+   "key": "boteco-inside",
+   "slots": "inside/inside-slots.json"
+  }
+ ],
+ "files": [
+  {
+   "file": "location/boteco-outside-start-day.png",
+   "scene": "outside",
+   "state": "start",
+   "look": "day",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/boteco-outside-start-night.png",
+   "scene": "outside",
+   "state": "start",
+   "look": "night",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/boteco-outside-start-rain.png",
+   "scene": "outside",
+   "state": "start",
+   "look": "rain",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "inside/boteco-inside-start-day.png",
+   "scene": "inside",
+   "state": "start",
+   "look": "day",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "inside/boteco-inside-start-night.png",
+   "scene": "inside",
+   "state": "start",
+   "look": "night",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/boteco-outside-full-day.png",
+   "scene": "outside",
+   "state": "full",
+   "look": "day",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/no-esme/boteco-outside-full-day.png",
+   "scene": "outside",
+   "state": "full",
+   "look": "day",
+   "size": [
+    384,
+    240
+   ],
+   "without": "Esme and Mr Cat"
+  },
+  {
+   "file": "location/boteco-outside-full-night.png",
+   "scene": "outside",
+   "state": "full",
+   "look": "night",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/no-esme/boteco-outside-full-night.png",
+   "scene": "outside",
+   "state": "full",
+   "look": "night",
+   "size": [
+    384,
+    240
+   ],
+   "without": "Esme and Mr Cat"
+  },
+  {
+   "file": "location/boteco-outside-full-rain.png",
+   "scene": "outside",
+   "state": "full",
+   "look": "rain",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/no-esme/boteco-outside-full-rain.png",
+   "scene": "outside",
+   "state": "full",
+   "look": "rain",
+   "size": [
+    384,
+    240
+   ],
+   "without": "Esme and Mr Cat"
+  },
+  {
+   "file": "inside/boteco-inside-full-day.png",
+   "scene": "inside",
+   "state": "full",
+   "look": "day",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "inside/no-esme/boteco-inside-full-day.png",
+   "scene": "inside",
+   "state": "full",
+   "look": "day",
+   "size": [
+    384,
+    240
+   ],
+   "without": "Esme and Mr Cat"
+  },
+  {
+   "file": "inside/boteco-inside-full-night.png",
+   "scene": "inside",
+   "state": "full",
+   "look": "night",
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "inside/no-esme/boteco-inside-full-night.png",
+   "scene": "inside",
+   "state": "full",
+   "look": "night",
+   "size": [
+    384,
+    240
+   ],
+   "without": "Esme and Mr Cat"
+  },
+  {
+   "file": "location/rain-streaks-0.png",
+   "scene": "outside",
+   "overlay": "rain",
+   "frame": 0,
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/rain-streaks-1.png",
+   "scene": "outside",
+   "overlay": "rain",
+   "frame": 1,
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/rain-streaks-2.png",
+   "scene": "outside",
+   "overlay": "rain",
+   "frame": 2,
+   "size": [
+    384,
+    240
+   ]
+  },
+  {
+   "file": "location/tv-day-0.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "day",
+   "frame": 0,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-day-1.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "day",
+   "frame": 1,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-day-2.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "day",
+   "frame": 2,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-night-0.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "night",
+   "frame": 0,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-night-1.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "night",
+   "frame": 1,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-night-2.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "night",
+   "frame": 2,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-rain-0.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "rain",
+   "frame": 0,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-rain-1.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "rain",
+   "frame": 1,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "location/tv-rain-2.png",
+   "scene": "outside",
+   "overlay": "tv",
+   "look": "rain",
+   "frame": 2,
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ]
+  },
+  {
+   "file": "inside/tv-day-0.png",
+   "scene": "inside",
+   "overlay": "tv",
+   "look": "day",
+   "frame": 0,
+   "at": [
+    320,
+    23
+   ],
+   "size": [
+    40,
+    16
+   ]
+  },
+  {
+   "file": "inside/tv-day-1.png",
+   "scene": "inside",
+   "overlay": "tv",
+   "look": "day",
+   "frame": 1,
+   "at": [
+    320,
+    23
+   ],
+   "size": [
+    40,
+    16
+   ]
+  },
+  {
+   "file": "inside/tv-day-2.png",
+   "scene": "inside",
+   "overlay": "tv",
+   "look": "day",
+   "frame": 2,
+   "at": [
+    320,
+    23
+   ],
+   "size": [
+    40,
+    16
+   ]
+  },
+  {
+   "file": "inside/tv-night-0.png",
+   "scene": "inside",
+   "overlay": "tv",
+   "look": "night",
+   "frame": 0,
+   "at": [
+    320,
+    23
+   ],
+   "size": [
+    40,
+    16
+   ]
+  },
+  {
+   "file": "inside/tv-night-1.png",
+   "scene": "inside",
+   "overlay": "tv",
+   "look": "night",
+   "frame": 1,
+   "at": [
+    320,
+    23
+   ],
+   "size": [
+    40,
+    16
+   ]
+  },
+  {
+   "file": "inside/tv-night-2.png",
+   "scene": "inside",
+   "overlay": "tv",
+   "look": "night",
+   "frame": 2,
+   "at": [
+    320,
+    23
+   ],
+   "size": [
+    40,
+    16
+   ]
+  }
+ ],
+ "palettes": {
+  "extra": "palette-extra.json",
+  "night": "palette-night.json",
+  "rain": "palette-rain.json",
+  "colour_names_used": 215
+ },
+ "previews": [
+  "boteco-all@2.png",
+  "boteco-inside-full-day@3.png",
+  "boteco-inside-full-night@3.png",
+  "boteco-inside-start-day@3.png",
+  "boteco-inside-start-night@3.png",
+  "boteco-outside-full-day@3.png",
+  "boteco-outside-full-night@3.png",
+  "boteco-outside-full-rain-with-streaks@3.png",
+  "boteco-outside-full-rain@2.gif",
+  "boteco-outside-full-rain@3.png",
+  "boteco-outside-start-day@3.png",
+  "boteco-outside-start-night@3.png",
+  "boteco-outside-start-rain-with-streaks@3.png",
+  "boteco-outside-start-rain@2.gif",
+  "boteco-outside-start-rain@3.png",
+  "inside-slots-start@3.png",
+  "inside-slots@3.png",
+  "outside-slots-start@3.png",
+  "outside-slots@3.png"
+ ],
+ "tidyUp": {
+  "date": "2026-11-14",
+  "changes": [
+   "people other than Esme and Mr Cat are the Rio townsfolk (sources/rio-pack/townsfolk/folk.py): own faces, bodies, heights, hair",
+   "inside night: cosy DUSK room with small soft dithered lamp pools (candles, bar, fan lamps, bulbs, kitchen); Mr Cat stays black and white",
+   "palette-night.json gains a DUSK table; no new palette-extra colours",
+   "Furniture scale: yellow tables 22x19 (front edge 8 px up), stools 12x10, inside tables 28x20, bar stools 14x14",
+   "Rain colour: a colourful tropical downpour (looks.rain_rgb), wet gloss, coloured reflections, the lamp lit",
+   "TV: a big bar TV (42x19 inside, 34x20 through the bay) always showing a Brighton and Hove Albion game, 3-frame overlays"
+  ]
+ }
+}

@@ -1,0 +1,220 @@
+{
+ "location": "clothing-store-outside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "base": {
+  "start-day": "outside/outside-start-day.png",
+  "start-night": "outside/outside-start-night.png",
+  "start-rain": "outside/outside-start-rain.png",
+  "full-day": "outside/outside-full-day.png",
+  "full-night": "outside/outside-full-night.png",
+  "full-rain": "outside/outside-full-rain.png"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1 (anchor 'top': top-centre instead)",
+ "draw_order": "sort every sticker by foot y (then x), back to front; window slots draw before anything on the forecourt",
+ "door": {
+  "x": 196,
+  "y": 96,
+  "w": 26,
+  "h": 54,
+  "note": "walk in here: goes to inside"
+ },
+ "exit": {
+  "x": 120,
+  "y": 230,
+  "w": 180,
+  "h": 10,
+  "note": "the forecourt runs off the bottom edge (map exit)"
+ },
+ "baked": {
+  "start": "the pavilion, 2 dressed mannequins + a bare form + boxes and a ladder, hats in the right window, a short sale rack, the passer-by, palms, bikes (1), a pedal swan (1), lamps",
+  "full": "start + 6 dressed mannequins, a full sale rack, bunting, a coffee cart and cafe table, a second bike and swan, Esme in her new dress and Mr Cat (in rain: Esme under an umbrella, Mr Cat under the awning)"
+ },
+ "slots": [
+  {
+   "id": "window-left-1",
+   "x": 124,
+   "y": 137,
+   "area": "shop-window",
+   "accepts": [
+    "clothing:outfit"
+   ],
+   "note": "a mannequin's spot (start: 3-4 hold the bare form and the boxes)"
+  },
+  {
+   "id": "window-left-2",
+   "x": 142,
+   "y": 137,
+   "area": "shop-window",
+   "accepts": [
+    "clothing:outfit"
+   ],
+   "note": "a mannequin's spot (start: 3-4 hold the bare form and the boxes)"
+  },
+  {
+   "id": "window-left-3",
+   "x": 160,
+   "y": 137,
+   "area": "shop-window",
+   "accepts": [
+    "clothing:outfit"
+   ],
+   "note": "a mannequin's spot (start: 3-4 hold the bare form and the boxes)"
+  },
+  {
+   "id": "window-left-4",
+   "x": 178,
+   "y": 137,
+   "area": "shop-window",
+   "accepts": [
+    "clothing:outfit"
+   ],
+   "note": "a mannequin's spot (start: 3-4 hold the bare form and the boxes)"
+  },
+  {
+   "id": "window-right-1",
+   "x": 241,
+   "y": 137,
+   "area": "shop-window",
+   "accepts": [
+    "clothing:outfit",
+    "clothing:accessory"
+   ]
+  },
+  {
+   "id": "window-right-2",
+   "x": 261,
+   "y": 137,
+   "area": "shop-window",
+   "accepts": [
+    "clothing:outfit",
+    "clothing:accessory"
+   ]
+  },
+  {
+   "id": "sale-rack-1",
+   "x": 268,
+   "y": 155,
+   "anchor": "top",
+   "area": "sale-rack",
+   "accepts": [
+    "clothing:hanging"
+   ],
+   "note": "hook point on the rail: draw the piece with its top-centre here"
+  },
+  {
+   "id": "sale-rack-2",
+   "x": 278,
+   "y": 155,
+   "anchor": "top",
+   "area": "sale-rack",
+   "accepts": [
+    "clothing:hanging"
+   ],
+   "note": "hook point on the rail: draw the piece with its top-centre here"
+  },
+  {
+   "id": "sale-rack-3",
+   "x": 288,
+   "y": 155,
+   "anchor": "top",
+   "area": "sale-rack",
+   "accepts": [
+    "clothing:hanging"
+   ],
+   "note": "hook point on the rail: draw the piece with its top-centre here"
+  },
+  {
+   "id": "sale-rack-4",
+   "x": 298,
+   "y": 155,
+   "anchor": "top",
+   "area": "sale-rack",
+   "accepts": [
+    "clothing:hanging"
+   ],
+   "note": "hook point on the rail: draw the piece with its top-centre here"
+  },
+  {
+   "id": "forecourt-1",
+   "x": 148,
+   "y": 200,
+   "area": "forecourt",
+   "accepts": [
+    "clothing-store-outdoor:decor",
+    "clothing:outfit"
+   ]
+  },
+  {
+   "id": "forecourt-2",
+   "x": 194,
+   "y": 228,
+   "area": "forecourt",
+   "accepts": [
+    "clothing-store-outdoor:decor",
+    "clothing:outfit"
+   ]
+  },
+  {
+   "id": "forecourt-3",
+   "x": 290,
+   "y": 212,
+   "area": "forecourt",
+   "accepts": [
+    "clothing-store-outdoor:decor",
+    "clothing:outfit"
+   ]
+  },
+  {
+   "id": "forecourt-4",
+   "x": 316,
+   "y": 200,
+   "area": "forecourt",
+   "accepts": [
+    "clothing-store-outdoor:decor",
+    "clothing:outfit"
+   ]
+  },
+  {
+   "id": "forecourt-5",
+   "x": 226,
+   "y": 204,
+   "area": "forecourt",
+   "accepts": [
+    "clothing-store-outdoor:decor",
+    "clothing:outfit"
+   ]
+  },
+  {
+   "id": "forecourt-6",
+   "x": 240,
+   "y": 236,
+   "area": "forecourt",
+   "accepts": [
+    "clothing-store-outdoor:decor",
+    "clothing:outfit"
+   ]
+  },
+  {
+   "id": "lawn-1",
+   "x": 30,
+   "y": 236,
+   "area": "lawn",
+   "accepts": [
+    "clothing-store-outdoor:decor"
+   ]
+  },
+  {
+   "id": "lawn-2",
+   "x": 366,
+   "y": 130,
+   "area": "lawn",
+   "accepts": [
+    "clothing-store-outdoor:decor"
+   ]
+  }
+ ]
+}

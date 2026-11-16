@@ -83,6 +83,22 @@ describe("POST /v1/sync: writing", () => {
     expect(JSON.parse((await storedRows())[0]!.data)).toEqual({ ct: "c" });
   });
 
+  it("accepts the farm table (Esme's Farm state) and returns its rows to other devices", async () => {
+    const seen = { id: "seen:hi", kind: "seen", sticker: "hi", date: "2026-11-04" };
+    const body = await syncOk(DEVICE_A, 0, [change(seen.id, T0 - 1, seen, "farm"), change("same", T0 - 1, { t: "i" }, "items")]);
+    expect(body).toMatchObject({ applied: 2, ignored: 0 });
+    expect((await storedRows()).map((r) => [r.tbl, r.id])).toEqual([["farm", "seen:hi"], ["items", "same"]]);
+    const pulled = await pullAll(DEVICE_B);
+    expect(pulled.changes).toContainEqual({ table: "farm", id: seen.id, updatedAt: T0 - 1, data: seen });
+  });
+
+  it("farm rows merge by last write wins like every table", async () => {
+    await syncOk(DEVICE_A, 0, [change("outfit:bap", 100, { item: "A1" }, "farm")]);
+    expect(await syncOk(DEVICE_B, 0, [change("outfit:bap", 99, { item: "H4" }, "farm")])).toMatchObject({ applied: 0, ignored: 1 });
+    expect(await syncOk(DEVICE_B, 0, [change("outfit:bap", 101, { item: null }, "farm")])).toMatchObject({ applied: 1 });
+    expect(JSON.parse((await storedRows())[0]!.data)).toEqual({ item: null });
+  });
+
   it("a picture row just under 700 KB of JPEG (about 933,000 base64 characters) fits the row cap and pulls alone", async () => {
     const big = (id: string) => ({ id, mime: "image/jpeg", data: "A".repeat(933_336), width: 1600, height: 1200, createdAt: "2026-10-28" });
     await syncOk(DEVICE_A, 0, [change("b1", T0 - 2, big("b1"), "files")]);
@@ -438,6 +454,7 @@ describe("POST /v1/sync: validation", () => {
   const cases: Array<[string, unknown, string]> = [
     ["bad table name", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "diary")] }, "bad_change"],
     ["journal table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Journal")] }, "bad_change"],
+    ["farm table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Farm")] }, "bad_change"],
     ["table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Items")] }, "bad_change"],
     ["files table name with different case", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("x", 1, {}, "Files")] }, "bad_change"],
     ["empty id", { deviceId: DEVICE_A, cursor: 0, changes: [good(), change("", 1)] }, "bad_change"],

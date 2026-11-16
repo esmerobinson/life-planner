@@ -1,0 +1,125 @@
+{
+ "pack": "rio-pack",
+ "batch": "day1",
+ "location": "fazenda",
+ "notes": "The fazenda on Ilha Grande: the outside in two states (start, full) and three looks (day, rain, night). Bases ship without stickers (animals, produce, crops are placed from the slots). The insides are the pack's existing barn, coop and greenhouse interiors in their summer pictures (not redrawn).",
+ "looks": {
+  "day": "sunny",
+  "rain": "Rio's weather says rain",
+  "night": "after sunset in Rio"
+ },
+ "lookPalettes": {
+  "rain": "looks/palette-rain.json",
+  "night": "looks/palette-night.json"
+ },
+ "locations": [
+  {
+   "key": "fazenda",
+   "name": "The fazenda on Ilha Grande",
+   "kind": "outdoor",
+   "size": [
+    512,
+    288
+   ],
+   "tile": 16,
+   "opensDay": 1,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "outside/fazenda-start-day.png",
+     "rain": "outside/fazenda-start-rain.png",
+     "night": "outside/fazenda-start-night.png"
+    },
+    "full": {
+     "day": "outside/fazenda-full-day.png",
+     "rain": "outside/fazenda-full-rain.png",
+     "night": "outside/fazenda-full-night.png"
+    }
+   },
+   "slots": "outside/sticker-slots.json",
+   "slotCount": 37,
+   "bedCount": 8,
+   "rainOverlay": "outside/rain-overlay.png"
+  }
+ ],
+ "interiors": [
+  {
+   "key": "barn-small",
+   "from": "esme-pack/day1/barnyard",
+   "file": "../../../esme-pack/day1/barnyard/interiors/barn-small-summer.png",
+   "slots": "../../../esme-pack/day1/barnyard/interiors/barn-small-slots.json",
+   "door": "barn-door",
+   "note": "starter barn"
+  },
+  {
+   "key": "barn-big",
+   "from": "esme-pack/day1/barnyard",
+   "file": "../../../esme-pack/day1/barnyard/interiors/barn-big-summer.png",
+   "slots": "../../../esme-pack/day1/barnyard/interiors/barn-big-slots.json",
+   "door": "barn-door",
+   "note": "upgrade 1"
+  },
+  {
+   "key": "coop-small",
+   "from": "esme-pack/day1/barnyard",
+   "file": "../../../esme-pack/day1/barnyard/interiors/coop-small-summer.png",
+   "slots": "../../../esme-pack/day1/barnyard/interiors/coop-small-slots.json",
+   "door": "coop-door",
+   "note": "starter coop"
+  },
+  {
+   "key": "coop-big",
+   "from": "esme-pack/day1/barnyard",
+   "file": "../../../esme-pack/day1/barnyard/interiors/coop-big-summer.png",
+   "slots": "../../../esme-pack/day1/barnyard/interiors/coop-big-slots.json",
+   "door": "coop-door",
+   "note": "upgrade 1"
+  },
+  {
+   "key": "greenhouse",
+   "from": "esme-pack/day1/veg-garden",
+   "file": {
+    "empty": "../../../esme-pack/day1/veg-garden/greenhouse/greenhouse-empty-summer.png",
+    "full": "../../../esme-pack/day1/veg-garden/greenhouse/greenhouse-full-summer.png"
+   },
+   "slots": "../../../esme-pack/day1/veg-garden/greenhouse/greenhouse.json",
+   "door": "greenhouse-door"
+  }
+ ],
+ "pieces": [
+  {
+   "key": "fazenda-rain",
+   "file": "outside/rain-overlay.png",
+   "sticker": false,
+   "note": "4-frame rain overlay with ripples on the cove, the plunge pool and the puddles"
+  }
+ ],
+ "stickerFamilies": {
+  "hen": "barnyard animals",
+  "chick": "barnyard animals",
+  "cow": "barnyard animals",
+  "cow-bw": "barnyard animals",
+  "sheep": "barnyard animals",
+  "pig": "barnyard animals",
+  "egg-white": "farm produce",
+  "egg-brown": "farm produce",
+  "milk-bottle": "farm produce",
+  "milk-pail": "farm produce",
+  "wool-bundle": "farm produce",
+  "veg-garden:bed-stage": "the bed's growth stage (veg-garden beds)",
+  "veg-garden:crop:<crop>": "that bed's crop stickers (veg-garden crops)",
+  "tool": "tools (veg-garden tools, hung on the shed)",
+  "fazenda:decor": "fazenda decor (Rio stickers for this area, as they are drawn)",
+  "fazenda:plant": "fazenda plants",
+  "outdoor": "any outdoor sticker",
+  "furniture": "the furniture family"
+ }
+}

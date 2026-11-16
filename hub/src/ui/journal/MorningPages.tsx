@@ -50,11 +50,11 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const [done, setDone] = useState<Set<ISODate> | null>(null);
   const [day, setDay] = useState<MorningDay | null>(null);
   // This device's newest page left unfinished on an earlier day (yesterday's, or older).
-  const [unfinished, setUnfinished] = useState<{ date: ISODate; text: string } | null>(null);
+  const [unfinished, setUnfinished] = useState<{ date: ISODate; text: string; from?: string } | null>(null);
   // Yesterday's page opened for finishing: the day it was started (fixed, even if midnight
   // passes) and, in lateText, its words as they are typed (the box is re-made when the day
   // is re-read, and must come back with them).
-  const [finishing, setFinishing] = useState<{ date: ISODate } | null>(null);
+  const [finishing, setFinishing] = useState<{ date: ISODate; from?: string } | null>(null);
   const lateText = useRef("");
   const [month, setMonth] = useState(today.slice(0, 7));
   // Left open past 3am into a new month, the calendar moves with the box (bug #18).
@@ -63,12 +63,17 @@ export function MorningPages({ jk, today, deviceId }: Props) {
   const [adding, setAdding] = useState(false);
   // A finished page starts a fresh box (a later page that day is a page of its own).
   const [page, setPage] = useState(0);
+  // The box number `day` was read for: a later box opens empty, unless the day read since says
+  // there are words of hers it hasn't shown (a draft from before a Replace, restore-safe I1).
+  const pageNow = useRef(0);
+  const [dayFor, setDayFor] = useState(-1);
   const fileInput = useRef<HTMLInputElement>(null);
   const latest = useRef(0);
   const guardFail = useRef<() => void>(() => undefined);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
+    const forPage = pageNow.current;
     try {
       const [d, t, y] = await Promise.all([
         listMorningDone(jk),
@@ -78,6 +83,7 @@ export function MorningPages({ jk, today, deviceId }: Props) {
       if (id !== latest.current) return;
       setDone(d);
       setDay(t);
+      setDayFor(forPage);
       setUnfinished(y);
     } catch {
       if (id === latest.current) guardFail.current();
@@ -139,7 +145,7 @@ export function MorningPages({ jk, today, deviceId }: Props) {
             className="btn-secondary"
             onClick={() => {
               lateText.current = unfinished.text;
-              setFinishing({ date: unfinished.date });
+              setFinishing({ date: unfinished.date, from: unfinished.from });
             }}
           >
             {unfinished.date === addDays(today, -1) ? "Open yesterday's page" : "Open that page"}
@@ -158,6 +164,7 @@ export function MorningPages({ jk, today, deviceId }: Props) {
             late
             deviceId={deviceId}
             initialDraft={lateText.current}
+            draftFrom={finishing.from}
             onText={(t) => (lateText.current = t)}
             onFinished={() => {
               setFinishing(null); // back to today's own, untouched box
@@ -178,8 +185,10 @@ export function MorningPages({ jk, today, deviceId }: Props) {
           jk={jk}
           date={today}
           deviceId={deviceId}
-          initialDraft={page === 0 ? day.draft : ""}
+          initialDraft={page === 0 || (dayFor === page && day.draftFrom) ? day.draft : ""}
+          draftFrom={page === 0 || dayFor === page ? day.draftFrom : undefined}
           onFinished={() => {
+            pageNow.current += 1;
             setPage((n) => n + 1);
             void load();
           }}
@@ -287,7 +296,7 @@ function ProofPhoto({ jk, id }: { jk: JournalKey; id: string }) {
  * it saves the draft and asks the app to look at the clock (review I1).
  */
 function WritingView({
-  jk, date: startDate, late = false, deviceId, initialDraft, onText, onFinished, photoButton,
+  jk, date: startDate, late = false, deviceId, initialDraft, draftFrom, onText, onFinished, photoButton,
 }: {
   jk: JournalKey;
   date: ISODate;
@@ -295,6 +304,8 @@ function WritingView({
   late?: boolean;
   deviceId: string;
   initialDraft: string;
+  /** The former-id draft the words came from (MorningDay.draftFrom): passed with each save. */
+  draftFrom?: string;
   /** Told the words as they change (so a box that is re-made can come back with them). */
   onText?: (text: string) => void;
   onFinished: () => void;
@@ -310,6 +321,18 @@ function WritingView({
   // Every write in order, so a draft save can never land after "I'm done".
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const finished = useRef(false);
+  // Nothing typed yet: words of hers that turn up for this box meanwhile (a draft from before a
+  // Replace, synced in after she finished the day's page: restore-safe I1) open in it.
+  const touched = useRef(false);
+  const from = useRef(draftFrom);
+  useEffect(() => {
+    if (touched.current || finished.current || latest.current !== "" || initialDraft === "") return;
+    latest.current = initialDraft;
+    saved.current = initialDraft;
+    from.current = draftFrom;
+    setText(initialDraft);
+    onText?.(initialDraft);
+  }, [initialDraft, draftFrom, onText]);
 
   const enqueue = useCallback(<T,>(op: () => Promise<T>): Promise<T> => {
     const next = queue.current.then(op, op);
@@ -323,7 +346,7 @@ function WritingView({
     const draft = latest.current;
     if (finished.current || draft === saved.current) return;
     saved.current = draft;
-    void enqueue(() => saveMorningDraft(jk, date, deviceId, draft)).catch(() => {
+    void enqueue(() => saveMorningDraft(jk, date, deviceId, draft, from.current)).catch(() => {
       if (saved.current === draft) saved.current = "\u0000unsaved"; // the next save tries again
       setProblem(SAVE_PROBLEM);
     });
@@ -334,6 +357,7 @@ function WritingView({
   useHiddenFlush(saveDraft);
 
   function onChange(value: string) {
+    touched.current = true;
     latest.current = value;
     onText?.(value);
     setText(value);

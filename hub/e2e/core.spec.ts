@@ -55,6 +55,8 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(page.getByLabel("Inbox items").getByRole("listitem")).toHaveCount(3);
     await expect(page.getByRole("list", { name: "Overdue" }).getByText("Overdue pretend errand")).toBeVisible();
     await expect(page.getByText("4 to sort")).toBeVisible();
+    await expect(page.getByLabel("Inbox items").getByText("Overdue pretend errand")).toHaveCount(0);
+    await expect(page.getByText("Overdue pretend errand")).toHaveCount(1);
     await page.getByRole("link", { name: "Sort one by one" }).click();
     const card = page.getByRole("region", { name: "Item to sort" });
     const plan: Record<string, string> = {

@@ -63,6 +63,8 @@ interface Doc {
   lowTitle: string;
   lowExtra: string[];
   lowNotes: string;
+  /** When it was made: newer things come first (Esme, 2026-11-05). */
+  made: ISODate;
 }
 
 const areaName = (id: string) => (id === "inbox" ? "Inbox" : (AREA_CHOICES.find((a) => a.id === id)?.label ?? id));
@@ -149,7 +151,7 @@ function itemDoc(it: Item, today: ISODate): Doc {
   const notes = plainNotes(it.notes ?? "");
   return {
     id: it.id, group, noun, title: it.title, extra, notes, meta, tile: it.areaId, areaLabel: area,
-    lowTitle: fold(it.title), lowExtra: extra.map(fold), lowNotes: fold(notes),
+    lowTitle: fold(it.title), lowExtra: extra.map(fold), lowNotes: fold(notes), made: it.createdAt,
   };
 }
 
@@ -159,7 +161,7 @@ function goalDoc(g: Goal, today: ISODate): Doc {
   return {
     id: g.id, group: "goals", noun: "goal", title: g.title, extra: [], notes, tile: g.areaId, areaLabel: area,
     meta: `Goal · ${area}${g.deadline ? ` · By ${shortDate(g.deadline, today)}` : ""}`,
-    lowTitle: fold(g.title), lowExtra: [], lowNotes: fold(notes),
+    lowTitle: fold(g.title), lowExtra: [], lowNotes: fold(notes), made: g.createdAt,
   };
 }
 
@@ -176,7 +178,8 @@ const allIn = (words: string[], texts: string[]) => words.every((w) => texts.som
 /**
  * The results for `query`: a doc whose title (or author / session titles) holds every word is
  * in its type's group; one that needs its page notes for some word is in Notes. Within a group,
- * titles that start with the first word come first, then the rest as they were. Each group
+ * titles that start with the first word come first, then newest first (made later, or later in
+ * the lists on the same day). Each group
  * keeps its first `cap` results (Infinity for "See all") and counts the rest; only the rows
  * kept get a second line cut for them.
  */
@@ -196,7 +199,7 @@ export function searchIndex(index: Doc[], query: string, cap = GROUP_CAP, capFor
   return GROUPS.flatMap((g) => {
     const list = found.get(g);
     if (!list) return [];
-    const kept = list.sort((a, b) => a.rank - b.rank || a.i - b.i).slice(0, capFor?.(g) ?? cap);
+    const kept = list.sort((a, b) => a.rank - b.rank || b.d.made.localeCompare(a.d.made) || b.i - a.i).slice(0, capFor?.(g) ?? cap);
     return [{ group: g, total: list.length, hits: kept.map(({ d }) => toHit(d, g, words)) }];
   });
 }

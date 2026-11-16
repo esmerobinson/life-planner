@@ -1,9 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { listGoals, listItems, tickItem, untickItem } from "../data/repo";
-import { pickToday, tickedOffToday, withTickedOff } from "../domain/triage";
-import { monthlyProgress } from "../domain/progress";
-import type { Goal, ISODate, Item } from "../domain/types";
-import { isActive } from "../domain/goalCounts";
+import { tickedOffToday, todayList } from "../domain/triage";
+import type { ISODate, Item } from "../domain/types";
 import { CELEBRATION_MS, canCelebrate, centreOf, confettiBurst, starPop, textCentreOf, type Point } from "./celebrate";
 import { CelebrationStatus } from "./CelebrationStatus";
 import { DoneSection } from "./DoneSection";
@@ -11,20 +9,6 @@ import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow } from "./TaskRow";
 import { useHubData } from "./useHubData";
-
-/** Completions this month per goal id, as pickToday expects. */
-function thisMonthDoneFor(goals: Goal[], items: Item[], today: ISODate): Record<string, number> {
-  return Object.fromEntries(goals.map((g) => [g.id, monthlyProgress(g, items, today)?.done ?? 0]));
-}
-
-/**
- * Habits and started projects ticked today stay, crossed out, at the bottom of their list;
- * a to-do done today moves to the "Done today" dropdown. Inactive goals don't count (goals redesign).
- */
-function todayLists(items: Item[], goals: Goal[], today: ISODate) {
-  const active = goals.filter(isActive);
-  return withTickedOff(pickToday(items, active, today, thisMonthDoneFor(active, items, today)), items, today);
-}
 
 /**
  * Today's list, on Home (there is no separate Today page since 2026-11-04). `lead` comes first
@@ -54,7 +38,10 @@ export function TodayPanel({
     return () => clearTimeout(t);
   }, [celebrating]);
 
-  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => todayLists(items, goals, today), [items, goals, today]);
+  // Habits and started projects ticked today stay, crossed out, at the bottom of their list;
+  // a to-do done today moves to the "Done today" dropdown. Inactive goals don't count (goals redesign).
+  // One todayList() for Home and the world (domain/triage).
+  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => todayList(items, goals, today), [items, goals, today]);
 
   /**
    * After a saved tick: confetti from the Today heading when it left nothing unticked on the
@@ -67,7 +54,7 @@ export function TodayPanel({
     if (onList && canCelebrate()) {
       try {
         const [i, g] = await Promise.all([listItems(), listGoals()]);
-        const now = todayLists(i, g, today);
+        const now = todayList(i, g, today);
         cleared = [...now.rhythm, ...now.picks].every((x) => tickedOffToday(x, today));
       } catch {
         // stars instead
@@ -132,10 +119,12 @@ export function TodayPanel({
         )}
         {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
         {doneToday.length > 0 && <DoneSection title="Done today" items={doneToday} today={today} onUndo={untick} />}
+        {/* Only things due in the next few days that didn't fit: anything due today or overdue is
+            always on the list above (Esme, 2026-11-06). Wording provisional, for Esme / Design. */}
         {alsoDue.length > 0 && (
           <details>
-            <summary>Also due</summary>
-            <ul aria-label="Also due" className="strip-list">{alsoDue.map(row)}</ul>
+            <summary>Due in the next few days</summary>
+            <ul aria-label="Due in the next few days" className="strip-list">{alsoDue.map(row)}</ul>
           </details>
         )}
       </div>

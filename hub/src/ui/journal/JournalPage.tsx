@@ -15,12 +15,15 @@ import { ReadOnlyTick, type TickState } from "./JournalStrip";
 import { loadTimeout } from "./loadTimeout";
 import { MentalHealthExercise } from "./MentalHealthExercise";
 import { MorningPages } from "./MorningPages";
+import { OldPassphrasePrompt } from "./OldPassphrasePrompt";
 import { ReadBack } from "./ReadBack";
 import { JOURNAL_TABS, TAB_FOR_HASH, tabPath, ticks, type JournalTabId, type TickingTabId } from "./tabs";
 import { HARD_MOMENT, HardMomentView, NotesToMyself } from "./NotesToMyself";
 import { useJournalKey } from "./useJournalKey";
 import { useJournalRows } from "./useJournalRows";
 import { usePhone } from "../usePhone";
+import { LearnedToday } from "../together/LearnedToday";
+import { PrivateDayTick } from "../together/PrivateDayTick";
 
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
@@ -31,6 +34,16 @@ export const CANT_OPEN_JOURNAL = "Can't open your journal on this device right n
  * that used the macOS keychain, 2026-11-02). Shown above the passphrase field. Nothing is deleted.
  */
 export const UNLOCK_AGAIN_LINE = "Unlock your journal once more with your passphrase.";
+/**
+ * Placeholder wording (Esme may reword; journal-rekey report): accurate for both passphrases
+ * after a sync passphrase change (the old one always opens the journal; the new one once a
+ * device where the journal is open has taken it).
+ */
+export const UNLOCK_LINE =
+  "Your journal is private to you. Type your sync passphrase, or scan a pairing code, to open it on this device. If you changed the passphrase, your old one still works, and the new one works once you've typed it on a device where the journal is open.";
+/** Placeholder wording (Esme may reword): a passphrase that opens neither the journal nor a wrap. */
+export const WRONG_PASSPHRASE_LINE =
+  "That passphrase doesn't open your journal. If you've just changed it, type the new one first on a device where the journal is open, or use your old one. Try again.";
 /** WebCrypto threw while reading or storing the journal key (Mac app). Nothing is deleted. */
 export const KEYCHAIN_LINE =
   "This Mac's keychain didn't let Esmeworld open your journal key. Quit and reopen Esmeworld, enter your Mac login password and choose Always Allow.";
@@ -148,14 +161,18 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           })}
         </nav>
       </div>
+      {open && <OldPassphrasePrompt db={db} className="journal-card" />}
       {open && (
         <section className="journal-card journal-panel" aria-labelledby="journal-panel-heading">
           <h2 id="journal-panel-heading" className="visually-hidden">
             {current.title}
           </h2>
           {tab === "exercise" && <MentalHealthExercise jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "exercise" && <LearnedToday jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "exercise" && <PrivateDayTick jk={open.jk} date={today} part="exercise" />}
           {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "check-in" && <PrivateDayTick jk={open.jk} date={today} part="checkin" />}
           {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
           {tab === "notes" && <NotesToMyself jk={open.jk} today={today} deviceId={open.deviceId} />}
         </section>
@@ -190,7 +207,7 @@ function useDeviceId(): DeviceView & { retry: () => void } {
 }
 
 const PROBLEMS: Record<Exclude<UnlockResult, "ok" | "checking"> | "failed" | "keychain", React.ReactNode> = {
-  wrong: "That isn't the journal's passphrase. Try again.",
+  wrong: WRONG_PASSPHRASE_LINE,
   "no-sync": (
     <>
       Set up sync on this device first, then unlock the journal here. <Link to="/sync">Sync</Link>
@@ -245,7 +262,7 @@ function UnlockJournal({ again = false }: { again?: boolean }) {
       <p>
         {again
           ? UNLOCK_AGAIN_LINE
-          : "Your journal is private to you. Type your sync passphrase, or scan a pairing code, to open it on this device."}
+          : UNLOCK_LINE}
       </p>
       <form onSubmit={(e) => void submit(e)}>
         <label className="form-field">

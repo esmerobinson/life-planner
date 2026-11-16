@@ -1,0 +1,265 @@
+{
+ "room": "tijuca-park-glade",
+ "name": "Tijuca park: the hidden glade",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "inside/tijuca-inside-start-day.png",
+   "rain": "inside/tijuca-inside-start-rain.png",
+   "night": "inside/tijuca-inside-start-night.png"
+  },
+  "full": {
+   "day": "inside/tijuca-inside-full-day.png",
+   "rain": "inside/tijuca-inside-full-rain.png",
+   "night": "inside/tijuca-inside-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "states": {
+  "start": "the fig, the grotto with one candle, the spring and stream, the hollow log",
+  "full": "a hammock between two trees, three paper lanterns, flowers at the grotto, orchids and bromeliads, wildlife"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame (16x16); draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort stickers by foot y (then x); characters sort with them",
+ "sticker_looks": "as outside",
+ "overlays": {
+  "rain": {
+   "file": "inside/tijuca-inside-rain-overlay.png",
+   "json": "inside/tijuca-inside-rain-overlay.json"
+  }
+ },
+ "exits": [
+  {
+   "id": "path",
+   "x": 136,
+   "y": 176,
+   "w": 32,
+   "h": 16,
+   "goes": "outside",
+   "note": "the faint path at the bottom: back to the Cascatinha clearing"
+  }
+ ],
+ "hotspots": [
+  {
+   "id": "grotto",
+   "x": 196,
+   "y": 56,
+   "w": 36,
+   "h": 42,
+   "goes": "none",
+   "note": "the little grotto with its candles and spring"
+  },
+  {
+   "id": "hammock",
+   "x": 262,
+   "y": 92,
+   "w": 46,
+   "h": 22,
+   "goes": "sit",
+   "state": "full"
+  },
+  {
+   "id": "hollow-log",
+   "x": 12,
+   "y": 152,
+   "w": 72,
+   "h": 24,
+   "goes": "none"
+  }
+ ],
+ "walkable": [
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "01100000111110011110",
+  "01111111111111001110",
+  "01111111111111101110",
+  "00000111111111110110",
+  "00000111111111110110",
+  "01111111111111110110"
+ ],
+ "walkable_note": "suggested (1 = the glade floor and the path; 0 = trunks, roots' base, the grotto, water, the canopy)",
+ "lamps": [
+  {
+   "kind": "lantern",
+   "x": 71,
+   "y": 87
+  },
+  {
+   "kind": "lantern",
+   "x": 287,
+   "y": 65
+  },
+  {
+   "kind": "lantern",
+   "x": 233,
+   "y": 47
+  }
+ ],
+ "slots": [
+  {
+   "id": "fig-root-left",
+   "x": 36,
+   "y": 124,
+   "area": "branch",
+   "accepts": [
+    "hedgerow:animal",
+    "hedgerow:bird"
+   ],
+   "note": "on the fig's big root, left"
+  },
+  {
+   "id": "fig-root-front",
+   "x": 140,
+   "y": 126,
+   "area": "branch",
+   "accepts": [
+    "hedgerow:animal",
+    "hedgerow:bird",
+    "hedgerow:insect"
+   ]
+  },
+  {
+   "id": "fig-hollow",
+   "x": 90,
+   "y": 75,
+   "area": "branch",
+   "accepts": [
+    "hedgerow:animal",
+    "hedgerow:bird"
+   ],
+   "note": "in the hollow in the fig's trunk"
+  },
+  {
+   "id": "aerial-root",
+   "x": 126,
+   "y": 60,
+   "area": "branch",
+   "accepts": [
+    "hedgerow:animal",
+    "hedgerow:insect"
+   ],
+   "note": "hanging on the aerial roots"
+  },
+  {
+   "id": "right-tree",
+   "x": 264,
+   "y": 86,
+   "area": "branch",
+   "accepts": [
+    "hedgerow:bird",
+    "hedgerow:animal"
+   ],
+   "note": "on the left hammock tree, above the hammock"
+  },
+  {
+   "id": "grotto-top",
+   "x": 214,
+   "y": 36,
+   "area": "branch",
+   "accepts": [
+    "hedgerow:bird",
+    "hedgerow:animal",
+    "hedgerow:plant"
+   ],
+   "note": "on the grotto's mossy top"
+  },
+  {
+   "id": "grotto-shelf",
+   "x": 206,
+   "y": 86,
+   "area": "shelf",
+   "accepts": [
+    "finds:*",
+    "hedgerow:plant"
+   ],
+   "note": "small things only: on the niche's shelf beside the candle"
+  },
+  {
+   "id": "log-top",
+   "x": 36,
+   "y": 156,
+   "area": "ground",
+   "accepts": [
+    "hedgerow:animal",
+    "hedgerow:insect",
+    "finds:*"
+   ],
+   "note": "on the hollow log"
+  },
+  {
+   "id": "path",
+   "x": 164,
+   "y": 168,
+   "area": "path",
+   "accepts": [
+    "hedgerow:animal",
+    "finds:*"
+   ]
+  },
+  {
+   "id": "glade-floor",
+   "x": 120,
+   "y": 180,
+   "area": "ground",
+   "accepts": [
+    "hedgerow:animal",
+    "hedgerow:plant",
+    "finds:*"
+   ]
+  },
+  {
+   "id": "flowers",
+   "x": 228,
+   "y": 158,
+   "area": "flowers",
+   "accepts": [
+    "hedgerow:insect",
+    "hedgerow:plant"
+   ]
+  },
+  {
+   "id": "basin",
+   "x": 214,
+   "y": 104,
+   "area": "water",
+   "accepts": [
+    "hedgerow:water",
+    "hedgerow:bird"
+   ],
+   "note": "at the spring's stone basin"
+  },
+  {
+   "id": "stream-stone",
+   "x": 258,
+   "y": 152,
+   "area": "water",
+   "accepts": [
+    "hedgerow:water",
+    "hedgerow:bird",
+    "hedgerow:animal"
+   ]
+  },
+  {
+   "id": "fern-right",
+   "x": 296,
+   "y": 176,
+   "area": "ground",
+   "accepts": [
+    "hedgerow:animal",
+    "hedgerow:plant"
+   ]
+  }
+ ]
+}

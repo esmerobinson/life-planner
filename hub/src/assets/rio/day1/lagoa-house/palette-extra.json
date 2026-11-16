@@ -1,0 +1,6 @@
+{
+ "name": "Lagoa house extras (Rio pack, day 1)",
+ "notes": "No new colours. Day uses the summer palette and the existing extra ramps exactly as the Rio kitchen does (stone = concrete, mus_teal + fam_aqua = verdigris, cot_* = warm wood, mead_stone = terrazzo and terrace, vg_teal = the pool, w24_cu = copper, ch_rust = leather, ch_oat = linen), plus the pack's map greys (map_grey, map_fog) for the falling-rain overlay. Night outside uses the Rio map's palette-night-v2.json colours only (twins, nl_* lights, lagoa/sea/dusk ramps, glow twins); night inside uses those plus existing pack palette colours (e.g. the ch_navy ramp for the terrazzo, v2's flood ramp for lamplit stone). Rain (2026-11-14) uses look colours: each day colour's exact rain twin plus 5 rain-only extras (rn_sky0-2, rn_glint, rn_mist), all listed in looks/palette-rain.json, like the night twins; they are not pack palette colours.",
+ "ramps": [],
+ "newColoursFound": 0
+}

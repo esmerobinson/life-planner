@@ -1,0 +1,144 @@
+{
+ "location": "sea-off-arpoador",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front, over the base picture",
+ "base": {
+  "start": {
+   "day": "sea/sea-start-day.png",
+   "night": "sea/sea-start-night.png"
+  },
+  "full": {
+   "day": "sea/sea-full-day.png",
+   "night": "sea/sea-full-night.png"
+  }
+ },
+ "states": {
+  "start": "rocks, sand, three kelp strands, a few grass tufts",
+  "full": "more kelp, sea fans, anemones, starfish, an old anchor, bubbles, a little school"
+ },
+ "looks": {
+  "day": "as drawn",
+  "night": "night sea ramps, moonlit surface and shafts, plankton, glowing anemones"
+ },
+ "swim_note": "fish slots ('accepts': fish) are free-swimming: the game may bob them 1 px or drift them a few px left and right; no shadow",
+ "slots": [
+  {
+   "id": "swim-1",
+   "x": 92,
+   "y": 58,
+   "area": "open water",
+   "accepts": [
+    "fish"
+   ]
+  },
+  {
+   "id": "swim-2",
+   "x": 150,
+   "y": 40,
+   "area": "open water",
+   "accepts": [
+    "fish"
+   ]
+  },
+  {
+   "id": "swim-3",
+   "x": 196,
+   "y": 70,
+   "area": "open water",
+   "accepts": [
+    "fish"
+   ]
+  },
+  {
+   "id": "swim-4",
+   "x": 132,
+   "y": 96,
+   "area": "open water",
+   "accepts": [
+    "fish"
+   ]
+  },
+  {
+   "id": "swim-5",
+   "x": 176,
+   "y": 120,
+   "area": "open water, low",
+   "accepts": [
+    "fish"
+   ]
+  },
+  {
+   "id": "swim-6",
+   "x": 236,
+   "y": 44,
+   "area": "open water by the rock",
+   "accepts": [
+    "fish"
+   ]
+  },
+  {
+   "id": "swim-7",
+   "x": 56,
+   "y": 86,
+   "area": "over the reef",
+   "accepts": [
+    "fish"
+   ]
+  },
+  {
+   "id": "floor-1",
+   "x": 146,
+   "y": 180,
+   "area": "sandy floor",
+   "accepts": [
+    "aquarium",
+    "pond"
+   ]
+  },
+  {
+   "id": "floor-2",
+   "x": 200,
+   "y": 182,
+   "area": "sandy floor",
+   "accepts": [
+    "aquarium",
+    "pond"
+   ]
+  },
+  {
+   "id": "floor-3",
+   "x": 96,
+   "y": 184,
+   "area": "sandy floor",
+   "accepts": [
+    "aquarium",
+    "pond"
+   ]
+  },
+  {
+   "id": "reef-1",
+   "x": 30,
+   "y": 92,
+   "area": "top of the left reef",
+   "accepts": [
+    "aquarium",
+    "pond"
+   ]
+  },
+  {
+   "id": "reef-2",
+   "x": 276,
+   "y": 26,
+   "area": "Arpoador's ledge",
+   "accepts": [
+    "aquarium",
+    "pond"
+   ]
+  }
+ ]
+}

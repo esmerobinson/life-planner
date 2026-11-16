@@ -35,7 +35,10 @@ async function livedIn(page: Page) {
       const exercise = await at("/src/journal/exercise.ts");
       const { db } = await at("/src/data/db.ts");
       await engine.saveSyncSettings(db, { serverUrl: "https://sync.example.test", token: await token.deriveToken(pass) });
-      await db.syncMeta.put({ key: "acceptedToken", value: (await db.syncMeta.get("token")).value });
+      // The journal was set up on another device: its check row is here (an acceptance
+      // recorded before the key is typed no longer confirms it, bug #4).
+      const jkey = await at("/src/test/journalKey.ts");
+      await db.journal.put(await jkey.verifierRow(await jkey.keyFor(pass)));
       await keys.unlockJournal(db, pass);
       const jk = (await keys.loadJournalKey(db))!;
       const other = "e2e-pretend-other-device";
@@ -128,10 +131,11 @@ async function walk(page: Page, w: number) {
   await shot("check-in");
 
   // Read back (2026-11-05, option B): four tiles filling the tab's width, 4 across on a wide
-  // window and 2 across on the phone; each opens its part.
+  // window and 2 across on the phone; each opens its part. Highlights (2026-11-06) is a fifth
+  // tile after them (provisional placement), on the next row.
   await page.getByRole("link", { name: "Read back", exact: true }).click();
   const tiles = page.locator("button.journal-readback-tile");
-  await expect(tiles).toHaveCount(4);
+  await expect(tiles).toHaveCount(5);
   await expect(tiles.nth(1)).toHaveText(/^Morning pages51 ready to read · 4 opening later$/);
   const boxes = (await Promise.all([0, 1, 2, 3].map((i) => tiles.nth(i).boundingBox()))).map((b) => b!);
   expect(new Set(boxes.map((b) => Math.round(b.y))).size).toBe(w >= 1000 ? 1 : 2);

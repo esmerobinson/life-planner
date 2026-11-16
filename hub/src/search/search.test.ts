@@ -87,12 +87,13 @@ describe("searching items, books, projects, goals and notes", () => {
     const r = searchIndex(index, "market");
     expect(r.map((g) => g.group)).toEqual(["todos", "projects", "ideas", "books", "goals", "notes"]);
     const todos = r.find((g) => g.group === "todos")!;
+    // Newest first (Esme, 2026-11-05); all made the same day, so later in the lists comes first.
     expect(todos.hits.map((h) => h.title)).toEqual([
-      "Draw the pretend market stall", "Ask about the pretend market", "Pretend market done long ago",
+      "Pretend market done long ago", "Ask about the pretend market", "Draw the pretend market stall",
     ]);
-    expect(todos.hits[0].meta).toBe("To-do · Art · Due Fri 6 Nov");
+    expect(todos.hits[2].meta).toBe("To-do · Art · Due Fri 6 Nov");
     expect(todos.hits[1].meta).toBe("Inbox");
-    expect(todos.hits[2].meta).toBe("To-do · Art · Done");
+    expect(todos.hits[0].meta).toBe("To-do · Art · Done");
   });
 
   it("books are found by author too, with their status in the meta line", () => {
@@ -178,4 +179,33 @@ describe("searching the journal (decrypted, in memory)", () => {
     const fresh: JournalDoc = { id: "j4", kind: "morning", date: "2026-10-29", title: "Morning pages", text: "pretend market" };
     expect(searchJournal([...docs, fresh], "market", TODAY).map((h) => h.id)).not.toContain("j4");
   });
+
+describe("search order (Esme, 2026-11-05: newest first)", () => {
+  it("within a group, newer things come before older ones, also on the same day", () => {
+    const index = buildIndex(
+      [
+        item({ id: "a", title: "Pretend market stall", createdAt: "2026-09-01" }),
+        item({ id: "b", title: "Pretend market list", createdAt: "2026-11-01" }),
+        item({ id: "c", title: "Pretend market map", createdAt: "2026-10-01" }),
+        item({ id: "d", title: "Pretend market sign", createdAt: "2026-11-01" }),
+      ],
+      [],
+      "2026-11-05",
+    );
+    const [todos] = searchIndex(index, "market");
+    expect(todos!.hits.map((h) => h.title)).toEqual([
+      "Pretend market sign", "Pretend market list", "Pretend market map", "Pretend market stall",
+    ]);
+  });
+
+  it("the first 8 shown before See all are the newest", () => {
+    const items = Array.from({ length: 12 }, (_, k) =>
+      item({ id: `x${k}`, title: `Pretend lamp ${k}`, createdAt: `2026-10-${String(k + 10).padStart(2, "0")}` }),
+    );
+    const [todos] = searchIndex(buildIndex(items, [], "2026-11-05"), "lamp");
+    expect(todos!.total).toBe(12);
+    expect(todos!.hits[0]!.title).toBe("Pretend lamp 11");
+    expect(todos!.hits.map((h) => h.title)).not.toContain("Pretend lamp 0");
+  });
+});
 });

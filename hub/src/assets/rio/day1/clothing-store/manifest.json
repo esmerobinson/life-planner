@@ -1,0 +1,92 @@
+{
+ "pack": "rio-pack day1",
+ "area": "clothing-store",
+ "name": "The clothing store, by the Lagoa",
+ "notes": "Outside 384x240 (24x15 tiles), inside 320x192 (20x12 tiles), 16 px tiles, 3/4 top-down, light from the top-left. States start/full; looks day/night (+ rain outside). Hard alpha; day images use palette colours only.",
+ "locations": [
+  {
+   "key": "clothing-store-outside",
+   "name": "The boutique on the shore",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "outside/outside-start-day.png",
+    "start-night": "outside/outside-start-night.png",
+    "start-rain": "outside/outside-start-rain.png",
+    "full-day": "outside/outside-full-day.png",
+    "full-night": "outside/outside-full-night.png",
+    "full-rain": "outside/outside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "outside/outside-rain-streaks-0.png",
+      "outside/outside-rain-streaks-1.png",
+      "outside/outside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110,
+     "note": "draw on top of everything (stickers too) while it rains, looping"
+    }
+   },
+   "slots": "outside/outside-slots.json"
+  },
+  {
+   "key": "clothing-store-inside",
+   "name": "The rails and fitting room",
+   "kind": "interior",
+   "size": [
+    320,
+    192
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night"
+   ],
+   "base": {
+    "start-day": "inside/inside-start-day.png",
+    "start-night": "inside/inside-start-night.png",
+    "full-day": "inside/inside-full-day.png",
+    "full-night": "inside/inside-full-night.png"
+   },
+   "rain": "inside has no rain look: on rainy days show day (or night) as usual",
+   "slots": "inside/inside-slots.json"
+  }
+ ],
+ "looks": {
+  "day": "default",
+  "night": "after dark (Rio local time)",
+  "rain": "outside only, when Rio is rainy; add the streak overlay"
+ },
+ "characters": "Esme (shipped body, long hair; the store's pink pineapple dress is her shipped tee+skirt layers recoloured into a print) and Mr Cat (shipped) are baked into outside-full-* and inside-*: Esme at the mirror, Mr Cat asleep on his cushion. The passer-by is Rosa, one of the Rio townsfolk (art/sources/rio-pack/townsfolk/folk.py), drawn new.",
+ "tidyUp": {
+  "date": "2026-11-14",
+  "changes": [
+   "inside night: cosy blue-violet and teal dusk with small soft dithered pools under the three pendants; lamps glow; Mr Cat stays black and white",
+   "the passer-by outside is a townsperson (Rosa) with her own face and body, not a recoloured Esme"
+  ]
+ },
+ "palettes": {
+  "extra": "palette-extra.json",
+  "night": "palette-night.json",
+  "rain": "palette-rain.json"
+ },
+ "sources": "art/sources/rio-pack/clothing-store/ (python3 -I -B deliver.py)"
+}

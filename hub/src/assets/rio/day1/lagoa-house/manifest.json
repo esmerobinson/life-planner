@@ -1,0 +1,182 @@
+{
+ "pack": "rio-pack",
+ "batch": "day1",
+ "location": "lagoa-house",
+ "notes": "The Lagoa house: the house and garden outside and three rooms inside (living room, bedroom, kitchen), each in two states (start, full) and three looks (day, rain, night). Bases ship without stickers or characters.",
+ "looks": {
+  "day": "sunny",
+  "rain": "Rio's weather says rain",
+  "night": "after sunset in Rio"
+ },
+ "lookPalettes": {
+  "rain": "looks/palette-rain.json",
+  "night": "looks/palette-night.json"
+ },
+ "locations": [
+  {
+   "key": "lagoa-house-garden",
+   "name": "Lagoa house: the house and garden",
+   "kind": "outdoor",
+   "size": [
+    384,
+    256
+   ],
+   "tile": 16,
+   "opensDay": 1,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "outside/outside-start-day.png",
+     "rain": "outside/outside-start-rain.png",
+     "night": "outside/outside-start-night.png"
+    },
+    "full": {
+     "day": "outside/outside-full-day.png",
+     "rain": "outside/outside-full-rain.png",
+     "night": "outside/outside-full-night.png"
+    }
+   },
+   "slots": "outside/sticker-slots.json",
+   "slotCount": 17,
+   "rainOverlay": "outside/rain-overlay.png"
+  },
+  {
+   "key": "lagoa-living",
+   "name": "Lagoa house: living room (ground floor)",
+   "kind": "interior",
+   "size": [
+    320,
+    192
+   ],
+   "tile": 16,
+   "opensDay": 1,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "inside/living-start-day.png",
+     "rain": "inside/living-start-rain.png",
+     "night": "inside/living-start-night.png"
+    },
+    "full": {
+     "day": "inside/living-full-day.png",
+     "rain": "inside/living-full-rain.png",
+     "night": "inside/living-full-night.png"
+    }
+   },
+   "slots": "inside/living-slots.json",
+   "slotCount": 10,
+   "rainOverlay": "inside/living-rain-overlay.png"
+  },
+  {
+   "key": "lagoa-bedroom",
+   "name": "Lagoa house: bedroom (upper floor)",
+   "kind": "interior",
+   "size": [
+    320,
+    192
+   ],
+   "tile": 16,
+   "opensDay": 1,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "inside/bedroom-start-day.png",
+     "rain": "inside/bedroom-start-rain.png",
+     "night": "inside/bedroom-start-night.png"
+    },
+    "full": {
+     "day": "inside/bedroom-full-day.png",
+     "rain": "inside/bedroom-full-rain.png",
+     "night": "inside/bedroom-full-night.png"
+    }
+   },
+   "slots": "inside/bedroom-slots.json",
+   "slotCount": 8,
+   "rainOverlay": "inside/bedroom-rain-overlay.png"
+  },
+  {
+   "key": "lagoa-kitchen",
+   "name": "Lagoa house: kitchen (ground floor)",
+   "kind": "interior",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "opensDay": 1,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "inside/kitchen-start-day.png",
+     "rain": "inside/kitchen-start-rain.png",
+     "night": "inside/kitchen-start-night.png"
+    },
+    "full": {
+     "day": "inside/kitchen-full-day.png",
+     "rain": "inside/kitchen-full-rain.png",
+     "night": "inside/kitchen-full-night.png"
+    }
+   },
+   "slots": "inside/kitchen-slots.json",
+   "slotCount": 7,
+   "rainOverlay": "inside/kitchen-rain-overlay.png"
+  }
+ ],
+ "pieces": [
+  {
+   "key": "lagoa-letterbox-letter",
+   "file": "outside/letterbox-letter.png",
+   "sticker": false,
+   "note": "overlay: a kind note is waiting"
+  },
+  {
+   "key": "lagoa-rain",
+   "file": "outside/rain-overlay.png",
+   "sticker": false,
+   "note": "4-frame rain overlay; each room has its own (window-only) version in inside/"
+  }
+ ],
+ "stickerFamilies": {
+  "lagoa-garden:plant": "garden plants (the garden family)",
+  "lagoa-garden:decor": "garden decor (the cottage decor family, outdoors)",
+  "lagoa-decor:floor": "indoor decor that stands on the floor",
+  "lagoa-decor:plant": "indoor plants",
+  "lagoa-decor:wall": "pictures, mirrors and hangings",
+  "lagoa-decor:small": "small things for table tops",
+  "furniture": "the furniture family",
+  "kitchen-tool": "the kitchen tools family",
+  "outdoor": "any outdoor sticker"
+ }
+}
