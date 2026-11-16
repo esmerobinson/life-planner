@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { MENU_TABS } from "../menu/GameMenu";
 import { KIT, kitUrl } from "./kit";
 import { glyphOf, measure, wrapText } from "./font";
 
@@ -44,4 +45,13 @@ describe("the body pixel font", () => {
     expect(wrapText("one two three", measure("one two"))).toEqual(["one two", "three"]);
     expect(wrapText("one\ntwo", 1000)).toEqual(["one", "two"]);
   });
+});
+
+it("the menu's gear and recipe-book tab icons are bundled (rio-pack tab-icons), so no tab is a placeholder", () => {
+  for (const name of ["ic-tab-settings", "ic-tab-recipes"]) {
+    expect(kitUrl(name), name).not.toBe("");
+    expect(KIT[name]).toMatchObject({ w: 12, h: 12 });
+  }
+  expect(MENU_TABS.every((t) => t.icon && KIT[t.icon])).toBe(true);
+  expect(readdirSync("src/assets/rio-ui/tab-icons").sort()).toEqual(["ic-tab-recipes.png", "ic-tab-settings.png"]);
 });

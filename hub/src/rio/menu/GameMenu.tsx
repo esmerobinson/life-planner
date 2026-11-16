@@ -21,15 +21,15 @@ import "./menu.css";
 
 export type MenuTab = "map" | "collection" | "noticeboard" | "wardrobe" | "recipes" | "friends" | "settings";
 
-/** The tabs, in order, with the kit's icon for each (null: the kit has none yet, a placeholder). */
+/** The tabs, in order, with the kit's icon for each (Recipes and Settings: drawn for Rio, 2026-11-17). */
 export const MENU_TABS: readonly { key: MenuTab; label: string; icon: string | null }[] = [
   { key: "map", label: "Map", icon: "icon-map" },
   { key: "collection", label: "Collection", icon: "icon-book" },
   { key: "noticeboard", label: "Noticeboard", icon: "icon-noticeboard" },
   { key: "wardrobe", label: "Wardrobe", icon: "icon-wardrobe" },
-  { key: "recipes", label: "Recipes", icon: null },
+  { key: "recipes", label: "Recipes", icon: "ic-tab-recipes" },
   { key: "friends", label: "Friends", icon: "icon-friends" },
-  { key: "settings", label: "Settings", icon: null },
+  { key: "settings", label: "Settings", icon: "ic-tab-settings" },
 ]; // PLACEHOLDER WORDING (tab names)
 
 export interface TabProps {

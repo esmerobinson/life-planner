@@ -7,6 +7,8 @@ import rawKit from "../../assets/rio-ui/kit/kit.json";
 import { canDraw } from "../../farm/sprites";
 
 const URLS = import.meta.glob("../../assets/rio-ui/kit/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+/** The menu's tab icons drawn for Rio (rio-pack day1/ui/tab-icons): 12x12, the kit's tab-icon size. */
+const TAB_ICON_URLS = import.meta.glob("../../assets/rio-ui/tab-icons/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 
 export interface KitPiece {
   w: number;
@@ -16,10 +18,15 @@ export interface KitPiece {
   frame_w?: number;
 }
 
-export const KIT = (rawKit as unknown as { pieces: Record<string, KitPiece> }).pieces;
+const TAB_ICONS: Record<string, KitPiece> = Object.fromEntries(
+  Object.keys(TAB_ICON_URLS).map((p) => [p.replace(/^.*\/(.+)\.png$/, "$1"), { w: 12, h: 12 }]),
+);
 
-/** The bundled URL of a kit piece, "" if the kit has none by that name. */
-export const kitUrl = (name: string): string => URLS[`../../assets/rio-ui/kit/${name}.png`] ?? "";
+export const KIT: Record<string, KitPiece> = { ...(rawKit as unknown as { pieces: Record<string, KitPiece> }).pieces, ...TAB_ICONS };
+
+/** The bundled URL of a kit piece (or a Rio tab icon), "" if there is none by that name. */
+export const kitUrl = (name: string): string =>
+  URLS[`../../assets/rio-ui/kit/${name}.png`] ?? TAB_ICON_URLS[`../../assets/rio-ui/tab-icons/${name}.png`] ?? "";
 
 /** The kit's text colours, as its mockups use them (esme-ui src/screens_c_more.js CC, core.js). */
 export const INK = {

@@ -1,6 +1,8 @@
 // Copies the approved Esme World UI kit (art/options/esme-ui) into the app (src/assets/rio-ui/):
 // the kit's pieces and kit.json, and the body pixel font (font-small) with its metrics.
-// Usage: node scripts/import-rio-ui.mjs <esme-ui dir>
+// Usage: node scripts/import-rio-ui.mjs <esme-ui dir> [<rio-pack>/day1/ui/tab-icons]
+// The optional second folder adds the menu's tab icons drawn for Rio (gear, recipe book): only its
+// own *.png files, never previews/ or src/.
 // Never the review/ folder, samples or previews; never the screen-specific extra-* pieces.
 
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
@@ -8,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const kitDir = process.argv[2];
+const tabIconsDir = process.argv[3];
 if (!kitDir) {
   console.error("Usage: node scripts/import-rio-ui.mjs <esme-ui dir>");
   process.exit(1);
@@ -30,4 +33,13 @@ for (const rel of files) {
   copyFileSync(join(kitDir, rel), to);
   bytes += statSync(to).size;
 }
-console.log(`${files.length} files, ${(bytes / 1024).toFixed(1)} KB`);
+let tabIcons = 0;
+if (tabIconsDir) {
+  mkdirSync(join(out, "tab-icons"), { recursive: true });
+  for (const f of readdirSync(tabIconsDir).filter((n) => n.endsWith(".png"))) {
+    copyFileSync(join(tabIconsDir, f), join(out, "tab-icons", f));
+    bytes += statSync(join(out, "tab-icons", f)).size;
+    tabIcons++;
+  }
+}
+console.log(`${files.length + tabIcons} files, ${(bytes / 1024).toFixed(1)} KB`);
