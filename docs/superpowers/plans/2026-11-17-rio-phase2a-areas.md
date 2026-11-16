@@ -122,6 +122,43 @@
 - [ ] **Step 3:** Rebase on `origin/rio-menu`, then the full checks (Global Constraints). Re-run Highlights, TestingTogetherRound7 and the sync controller test alone if they flake, and say so.
 - [ ] **Step 4:** Push `rio-areas`; one fresh reviewer (opus) via superpowers:requesting-code-review; fix what's real; re-check; push.
 
+---
+
+## Added 2026-11-17 (coordinator: more finished art landed)
+
+Run Tasks 7–9 after Task 5; Task 6 (browser, screenshots, full checks, push, review) runs last and covers them too (screenshots of the museum, the new sea and the Flamengo match).
+
+### Task 7: The new sea off Arpoador
+
+**Files:** Modify `hub/scripts/import-rio-pack.mjs` (add `later/arpoador-sea`), `hub/src/rio/assets.ts`, `hub/src/rio/placement.ts`, `hub/src/rio/AreaView.tsx`; Test `assets.test.ts`, `placement.test.ts`, `AreaView.test.tsx`
+
+**Interfaces:**
+- `SOURCES["ipanema-beach/sea"]` reads `later/arpoador-sea/scenes/arpoador-sea-slots.json` (root `later/arpoador-sea`); the rough `day1/ipanema/sea/` files stay bundled but unread. Still opens on day 30 (`SCENE_OPENS`).
+- `SceneData.underlay?: { strips: Record<string, Partial<Record<Look, string>>>; count: number; size: [number, number]; ms: number }` (state → look → strip): the caustics, drawn over the base and under the stickers; frame 0 with reduced motion. The sea's rain is `overlays/arpoador-rain.png` (4 frames, 110 ms).
+- Aquarium tags: stream fish → `["fish:fish"]`; the "Rare fish" set (moonfish, golden carp: a whole workbook finished) → `["fish:rare"]`, the showcase the README names for exactly those.
+- [ ] Tests: the sea's base is the arpoador start/full in each look; 18 slots; every aquarium sticker placed stands on a slot that accepts it, the 8 stream fish on `swim-*`, the moonfish and golden carp on `rare-*`; caustics strips resolve; `sceneOpen("ipanema-beach/sea", 29)` still false. Run (FAIL), implement, run (PASS). Commit "Rio phase 2a: the new sea off Arpoador".
+
+### Task 8: The museum opens on day 21
+
+**Files:** Modify the import script (copy, from `<pack>/../esme-pack/week2-4/museum/`, only `location/plaza-summer.png`, `location/museum-doors-open.png`, `location/plaza-slots.json`, `inside/hall-summer.png`, `inside/room-hall.json`, `inside/pieces/case-glass.png`, to the same relative path under `src/assets/rio/`; and `week3/museum-looks/`), `assets.ts`, `areas.ts`, `placement.ts`, `AreaView.tsx`; Test the same files.
+
+**Interfaces:**
+- `"museum/outside"` (320×192): one state `open`: day = `plaza-summer.png` with the stamp `museum-doors-open.png` at (152, 72); night and rain = `plaza-summer-open-{night,rain}.png`; rain strip `rain/plaza-rain-streaks`. Slots: the plaza's 11 (`museum-outdoor:*`; nothing places there yet).
+- `"museum/inside"` (352×224): one state `start`: `hall-summer.png`, `hall-summer-{night,rain}.png`; rain strip `rain/hall-rain-streaks`; slots = `room-hall.json` `display_slots` (foot → x, y; accepts `museum`, `finds`); `glass: { file, at[] }` drawn over the stickers.
+- `SceneData.stamps?: Partial<Record<Look, { file: string; at: [number, number] }[]>>`, `SceneData.glass?`, `SceneData.tint?: Partial<Record<"rain" | "night", string>>` (the looks' palette JSON): placed stickers and the case glass are recoloured at runtime by exact colour to the look's twin (`tintImage(img, map)`, cached per sticker and look), as the museum README asks.
+- `AREA_SCENES.museum = { outside: "museum/outside", inside: ["museum/inside"] }`; `HOME.museum = { area: "museum", scene: "museum/inside" }`, tags `["museum"]`.
+- [ ] Tests: `opensOn("museum") === 21`; day 21 museum new; `homeOf("ammonite")` is the hall; all 12 museum stickers lay out on display slots (27); the outside day has the doors stamp and night/rain don't; `tintMap` parses the palette into day→look colour pairs and `recolour` maps an exact colour and leaves others. Run (FAIL), implement, run (PASS). Commit "Rio phase 2a: the museum opens on day 21, with its finds on display".
+
+### Task 9: The Flamengo match opens on day 60
+
+**Files:** import script (`later/flamengo`, skipping `stickers/`), `assets.ts`, `areas.ts`, `progress.ts`, `thresholds.ts`, `AreaView.tsx`; Test the same.
+
+**Interfaces:**
+- `"flamengo-match/outside" | "flamengo-match/inside"` (root `later/flamengo`); `SceneData.goal?: { frames: Partial<Record<Look, string[]>>; ms: 140 }` (inside: `goal/inside-goal-<look>-{0..3}.png`). Nothing triggers the goal in 2a (weekly reviews aren't built); a dev-only `?goal=1` plays it for screenshots, never with reduced motion.
+- `AREA_SCENES["flamengo-match"]`, opens on day 60. `RioCounts.weeklyReviews` (the `weekly-reviews` counter; not built, so 0); `FLAMENGO_FULL_WEEKLY_REVIEWS = 4` (README's suggestion) `// DEFAULT: Esme to confirm`.
+- Farmhouse stickers stay at the boteco: the README says the match takes over the theatre family (no phase-1 zone), and says nothing of the farmhouse.
+- [ ] Tests: `opensOn("flamengo-match") === 60`; both scenes' bases and goal frames resolve; 4 weekly reviews → full, 3 → start; `homeOf("lantern")` still the boteco. Run (FAIL), implement, run (PASS). Commit "Rio phase 2a: the Flamengo match opens on day 60".
+
 ## Known limits to tell Esme (not bugs)
 - Zona Sul's shelves stay bare and its stage stays at opening day until errands and Admin to-dos drive it (phase 2b).
 - The Quilo stays quiet (start) until recipes exist; Sult and Os Esquilos fill only with their counters (no goal stickers stand there yet: the v3 goal family is phase 2b).
