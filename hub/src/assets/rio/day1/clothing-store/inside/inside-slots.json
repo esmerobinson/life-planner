@@ -1,0 +1,422 @@
+{
+ "location": "clothing-store-inside",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "base": {
+  "start-day": "inside/inside-start-day.png",
+  "start-night": "inside/inside-start-night.png",
+  "full-day": "inside/inside-full-day.png",
+  "full-night": "inside/inside-full-night.png"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame (anchor 'top': top-centre, for pieces hanging from a rail or hook)",
+ "draw_order": "sort by foot y (then x); hanging pieces draw right after their rail",
+ "door": {
+  "x": 196,
+  "y": 176,
+  "w": 32,
+  "h": 16,
+  "note": "walk out here: back to outside"
+ },
+ "walkable": {
+  "x": 16,
+  "y": 72,
+  "w": 288,
+  "h": 104,
+  "note": "floor rectangle; fixtures block their footprints"
+ },
+ "slots": {
+  "common": [
+   {
+    "id": "shelf-hats-1",
+    "x": 106,
+    "y": 39,
+    "area": "shelf",
+    "accepts": [
+     "clothing:hat"
+    ]
+   },
+   {
+    "id": "shelf-shoes-1",
+    "x": 105,
+    "y": 73,
+    "area": "shelf",
+    "accepts": [
+     "clothing:shoes"
+    ]
+   },
+   {
+    "id": "shelf-hats-2",
+    "x": 130,
+    "y": 39,
+    "area": "shelf",
+    "accepts": [
+     "clothing:hat"
+    ]
+   },
+   {
+    "id": "shelf-shoes-2",
+    "x": 127,
+    "y": 73,
+    "area": "shelf",
+    "accepts": [
+     "clothing:shoes"
+    ]
+   },
+   {
+    "id": "shelf-hats-3",
+    "x": 154,
+    "y": 39,
+    "area": "shelf",
+    "accepts": [
+     "clothing:hat"
+    ]
+   },
+   {
+    "id": "shelf-shoes-3",
+    "x": 149,
+    "y": 73,
+    "area": "shelf",
+    "accepts": [
+     "clothing:shoes"
+    ]
+   },
+   {
+    "id": "shelf-bags-1",
+    "x": 105,
+    "y": 57,
+    "area": "shelf",
+    "accepts": [
+     "clothing:bag"
+    ]
+   },
+   {
+    "id": "shelf-bags-2",
+    "x": 122,
+    "y": 57,
+    "area": "shelf",
+    "accepts": [
+     "clothing:bag"
+    ]
+   },
+   {
+    "id": "shelf-bags-3",
+    "x": 139,
+    "y": 57,
+    "area": "shelf",
+    "accepts": [
+     "clothing:bag"
+    ]
+   },
+   {
+    "id": "shelf-bags-4",
+    "x": 156,
+    "y": 57,
+    "area": "shelf",
+    "accepts": [
+     "clothing:bag"
+    ]
+   },
+   {
+    "id": "table-1",
+    "x": 112,
+    "y": 128,
+    "area": "table",
+    "accepts": [
+     "clothing:folded"
+    ]
+   },
+   {
+    "id": "table-2",
+    "x": 127,
+    "y": 128,
+    "area": "table",
+    "accepts": [
+     "clothing:folded"
+    ]
+   },
+   {
+    "id": "table-3",
+    "x": 142,
+    "y": 128,
+    "area": "table",
+    "accepts": [
+     "clothing:folded"
+    ]
+   },
+   {
+    "id": "till-jewellery-1",
+    "x": 246,
+    "y": 128,
+    "area": "till",
+    "accepts": [
+     "clothing:jewellery"
+    ]
+   },
+   {
+    "id": "till-jewellery-2",
+    "x": 278,
+    "y": 136,
+    "area": "till",
+    "accepts": [
+     "clothing:jewellery"
+    ]
+   },
+   {
+    "id": "fitting-hook",
+    "x": 248,
+    "y": 29,
+    "anchor": "top",
+    "area": "fitting-room",
+    "accepts": [
+     "clothing:hanging",
+     "clothing:new"
+    ],
+    "note": "the piece being tried on hangs here"
+   },
+   {
+    "id": "try-on",
+    "x": 203,
+    "y": 118,
+    "area": "mirror",
+    "accepts": [
+     "character"
+    ],
+    "note": "Esme's spot in front of the mirror (facing up); her reflection is at x 202, y 82 facing down"
+   },
+   {
+    "id": "floor-1",
+    "x": 224,
+    "y": 152,
+    "area": "floor",
+    "accepts": [
+     "clothing-store:decor",
+     "furniture"
+    ]
+   },
+   {
+    "id": "floor-2",
+    "x": 120,
+    "y": 168,
+    "area": "floor",
+    "accepts": [
+     "clothing-store:decor",
+     "furniture"
+    ]
+   },
+   {
+    "id": "floor-3",
+    "x": 290,
+    "y": 100,
+    "area": "floor",
+    "accepts": [
+     "clothing-store:decor",
+     "furniture"
+    ],
+    "note": "start only (table 2 sits here in full)"
+   },
+   {
+    "id": "wall-1",
+    "x": 176,
+    "y": 46,
+    "area": "wall",
+    "accepts": [
+     "clothing-store:wall"
+    ],
+    "note": "narrow: wall pieces up to 12 px wide"
+   },
+   {
+    "id": "wall-2",
+    "x": 228,
+    "y": 46,
+    "area": "wall",
+    "accepts": [
+     "clothing-store:wall"
+    ],
+    "note": "narrow: wall pieces up to 10 px wide"
+   }
+  ],
+  "start": [
+   {
+    "id": "rail-warm-1",
+    "x": 28,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-warm",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-mixed-1",
+    "x": 64,
+    "y": 119,
+    "anchor": "top",
+    "area": "rail-mixed",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   }
+  ],
+  "full": [
+   {
+    "id": "rail-warm-1",
+    "x": 28,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-warm",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-warm-2",
+    "x": 38,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-warm",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-warm-3",
+    "x": 48,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-warm",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-warm-4",
+    "x": 58,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-warm",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-cool-1",
+    "x": 96,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-cool",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-cool-2",
+    "x": 106,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-cool",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-cool-3",
+    "x": 116,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-cool",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-cool-4",
+    "x": 126,
+    "y": 75,
+    "anchor": "top",
+    "area": "rail-cool",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-mixed-1",
+    "x": 64,
+    "y": 119,
+    "anchor": "top",
+    "area": "rail-mixed",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-mixed-2",
+    "x": 74,
+    "y": 119,
+    "anchor": "top",
+    "area": "rail-mixed",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-mixed-3",
+    "x": 84,
+    "y": 119,
+    "anchor": "top",
+    "area": "rail-mixed",
+    "accepts": [
+     "clothing:hanging"
+    ],
+    "note": "hook on the rail bar"
+   },
+   {
+    "id": "rail-new-arrivals-1",
+    "x": 156,
+    "y": 139,
+    "anchor": "top",
+    "area": "rail-new-arrivals",
+    "accepts": [
+     "clothing:new"
+    ],
+    "note": "hook on the rail bar: new pieces arrive here"
+   },
+   {
+    "id": "rail-new-arrivals-2",
+    "x": 166,
+    "y": 139,
+    "anchor": "top",
+    "area": "rail-new-arrivals",
+    "accepts": [
+     "clothing:new"
+    ],
+    "note": "hook on the rail bar: new pieces arrive here"
+   },
+   {
+    "id": "rail-new-arrivals-3",
+    "x": 176,
+    "y": 139,
+    "anchor": "top",
+    "area": "rail-new-arrivals",
+    "accepts": [
+     "clothing:new"
+    ],
+    "note": "hook on the rail bar: new pieces arrive here"
+   }
+  ]
+ }
+}

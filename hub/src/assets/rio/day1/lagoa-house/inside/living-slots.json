@@ -1,0 +1,208 @@
+{
+ "room": "lagoa-living",
+ "name": "Living room (ground floor)",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "inside/living-start-day.png",
+   "rain": "inside/living-start-rain.png",
+   "night": "inside/living-start-night.png"
+  },
+  "full": {
+   "day": "inside/living-full-day.png",
+   "rain": "inside/living-full-rain.png",
+   "night": "inside/living-full-night.png"
+  }
+ },
+ "states": {
+  "start": "day one",
+  "full": "everything unlocked"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "rugs first, then everything by foot y (then x); characters sort with them",
+ "slot_state": "a slot with \"state\" is free only in that state; every other slot is free in both",
+ "sticker_looks": "recolour placed stickers by colour name with looks/palette-rain.json (use the indoor table) or looks/palette-night.json",
+ "walkable": {
+  "start": [
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00111111100110011110",
+   "00111111111111111110",
+   "01111110000011111110",
+   "01111111111111101110",
+   "00011111111100101110",
+   "00011111111111111110",
+   "00000000000000000000"
+  ],
+  "full": [
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00111001000010011110",
+   "00111111111111111110",
+   "01111110000010111110",
+   "01111111000111111110",
+   "00001001111100111110",
+   "00001111111111111010",
+   "00000000000000000000"
+  ]
+ },
+ "walkable_note": "one string per tile row (0 = blocked: walls, border, furniture; 1 = floor). A floor sticker placed on a slot blocks its own footprint.",
+ "exits": [
+  {
+   "id": "door",
+   "tile": [
+    9,
+    11
+   ],
+   "goes": "outside",
+   "note": "the door notch, bottom centre"
+  },
+  {
+   "id": "stairs",
+   "x": 280,
+   "y": 18,
+   "w": 24,
+   "h": 20,
+   "goes": "inside/bedroom",
+   "note": "the top of the floating stair"
+  },
+  {
+   "id": "garden",
+   "x": 50,
+   "y": 21,
+   "w": 62,
+   "h": 58,
+   "goes": "outside",
+   "note": "the open glass wall onto the pool terrace"
+  }
+ ],
+ "rain_overlay": {
+  "file": "inside/living-rain-overlay.png",
+  "json": "inside/living-rain-overlay.json"
+ },
+ "lamps": [
+  {
+   "kind": "lantern",
+   "x": 64,
+   "y": 112
+  }
+ ],
+ "slots": [
+  {
+   "id": "floor-left",
+   "x": 60,
+   "y": 150,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "floor-front-left",
+   "x": 100,
+   "y": 168,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "floor-front-right",
+   "x": 226,
+   "y": 168,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor"
+   ]
+  },
+  {
+   "id": "floor-right",
+   "x": 250,
+   "y": 118,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "floor-window",
+   "x": 70,
+   "y": 104,
+   "area": "floor",
+   "accepts": [
+    "lagoa-decor:plant",
+    "lagoa-decor:floor"
+   ],
+   "note": "in the sun by the open wall"
+  },
+  {
+   "id": "corner-right",
+   "x": 290,
+   "y": 104,
+   "area": "floor",
+   "accepts": [
+    "lagoa-decor:plant",
+    "lagoa-decor:floor"
+   ]
+  },
+  {
+   "id": "wall-print",
+   "x": 226,
+   "y": 50,
+   "area": "wall",
+   "accepts": [
+    "lagoa-decor:wall"
+   ],
+   "note": "hangs on the slatted screen under the stair (max 24x20); foot = bottom-centre"
+  },
+  {
+   "id": "wall-left",
+   "x": 128,
+   "y": 48,
+   "area": "wall",
+   "accepts": [
+    "lagoa-decor:wall"
+   ],
+   "note": "max 16x20, beside the print"
+  },
+  {
+   "id": "tabletop",
+   "x": 166,
+   "y": 137,
+   "area": "table",
+   "accepts": [
+    "lagoa-decor:small"
+   ],
+   "state": "full",
+   "note": "on the coffee table (full); small things up to 12x12"
+  },
+  {
+   "id": "sideboard-top",
+   "x": 186,
+   "y": 61,
+   "area": "table",
+   "accepts": [
+    "lagoa-decor:small"
+   ],
+   "state": "full",
+   "note": "on the sideboard, right of the speaker (full)"
+  }
+ ]
+}

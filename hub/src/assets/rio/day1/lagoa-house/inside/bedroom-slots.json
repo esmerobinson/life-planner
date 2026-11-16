@@ -1,0 +1,184 @@
+{
+ "room": "lagoa-bedroom",
+ "name": "Bedroom (upper floor)",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "inside/bedroom-start-day.png",
+   "rain": "inside/bedroom-start-rain.png",
+   "night": "inside/bedroom-start-night.png"
+  },
+  "full": {
+   "day": "inside/bedroom-full-day.png",
+   "rain": "inside/bedroom-full-rain.png",
+   "night": "inside/bedroom-full-night.png"
+  }
+ },
+ "states": {
+  "start": "day one",
+  "full": "everything unlocked"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "rugs first, then everything by foot y (then x); characters sort with them",
+ "slot_state": "a slot with \"state\" is free only in that state; every other slot is free in both",
+ "sticker_looks": "recolour placed stickers by colour name with looks/palette-rain.json (use the indoor table) or looks/palette-night.json",
+ "walkable": {
+  "start": [
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "01111111000001110000",
+   "00011111100001111110",
+   "00011111100001111110",
+   "01111111111111010110",
+   "01111111111111111110",
+   "01111111111111111110",
+   "00000000000000000000"
+  ],
+  "full": [
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "00000000000000000000",
+   "01111101000000000000",
+   "01001111100001111110",
+   "01001111100001111110",
+   "01111111111111111110",
+   "01111011111111110000",
+   "01111111111111110000",
+   "00000000000000000000"
+  ]
+ },
+ "walkable_note": "one string per tile row (0 = blocked: walls, border, furniture; 1 = floor). A floor sticker placed on a slot blocks its own footprint.",
+ "exits": [
+  {
+   "id": "door",
+   "tile": [
+    9,
+    11
+   ],
+   "goes": "outside",
+   "note": "the door notch, bottom centre"
+  },
+  {
+   "id": "terrace",
+   "x": 16,
+   "y": 21,
+   "w": 70,
+   "h": 58,
+   "goes": "outside",
+   "note": "the open terrace door (the steps lead down to the garden)"
+  }
+ ],
+ "rain_overlay": {
+  "file": "inside/bedroom-rain-overlay.png",
+  "json": "inside/bedroom-rain-overlay.json"
+ },
+ "lamps": [
+  {
+   "kind": "lamp",
+   "x": 140,
+   "y": 72
+  },
+  {
+   "kind": "lantern",
+   "x": 96,
+   "y": 106
+  }
+ ],
+ "slots": [
+  {
+   "id": "floor-window",
+   "x": 58,
+   "y": 166,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "floor-centre",
+   "x": 130,
+   "y": 170,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor"
+   ]
+  },
+  {
+   "id": "floor-right",
+   "x": 290,
+   "y": 118,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "floor-front-right",
+   "x": 250,
+   "y": 170,
+   "area": "floor",
+   "accepts": [
+    "furniture",
+    "lagoa-decor:floor",
+    "lagoa-decor:plant"
+   ]
+  },
+  {
+   "id": "bedfoot",
+   "x": 180,
+   "y": 168,
+   "area": "floor",
+   "accepts": [
+    "lagoa-decor:floor",
+    "furniture"
+   ],
+   "note": "a bench or chest at the foot of the bed"
+  },
+  {
+   "id": "wall-left",
+   "x": 140,
+   "y": 50,
+   "area": "wall",
+   "accepts": [
+    "lagoa-decor:wall"
+   ],
+   "note": "on the slats left of the bed (max 16x20)"
+  },
+  {
+   "id": "nightstand",
+   "x": 219,
+   "y": 77,
+   "area": "table",
+   "accepts": [
+    "lagoa-decor:small"
+   ],
+   "state": "start",
+   "note": "the right nightstand spot is empty in start (full has a lamp there)"
+  },
+  {
+   "id": "desk",
+   "x": 44,
+   "y": 101,
+   "area": "table",
+   "accepts": [
+    "lagoa-decor:small"
+   ],
+   "state": "full",
+   "note": "on the desk (full)"
+  }
+ ]
+}

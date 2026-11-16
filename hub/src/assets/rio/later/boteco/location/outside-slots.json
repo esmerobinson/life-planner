@@ -1,0 +1,285 @@
+{
+ "location": "boteco-outside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "location/boteco-outside-start-day.png",
+   "night": "location/boteco-outside-start-night.png",
+   "rain": "location/boteco-outside-start-rain.png"
+  },
+  "full": {
+   "day": "location/boteco-outside-full-day.png",
+   "night": "location/boteco-outside-full-night.png",
+   "rain": "location/boteco-outside-full-rain.png"
+  }
+ },
+ "base_without_esme": {
+  "full": {
+   "day": "location/no-esme/boteco-outside-full-day.png",
+   "night": "location/no-esme/boteco-outside-full-night.png",
+   "rain": "location/no-esme/boteco-outside-full-rain.png"
+  },
+  "note": "the same scenes with Esme and Mr Cat left out, for when the game draws her itself"
+ },
+ "looks": "Pick the base by state and look. Look follows Rio's weather and clock: night after dark (rain at night shows the night base), rain when it is raining in the day, day otherwise.",
+ "overlays": {
+  "rain": {
+   "frames": [
+    "location/rain-streaks-0.png",
+    "location/rain-streaks-1.png",
+    "location/rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "transparent 384x240 frames; loop them over the rain base. They leave the dry band under the awning clear."
+  },
+  "tv": {
+   "at": [
+    204,
+    82
+   ],
+   "size": [
+    32,
+    17
+   ],
+   "frame_ms": 220,
+   "frames": {
+    "day": [
+     "location/tv-day-0.png",
+     "location/tv-day-1.png",
+     "location/tv-day-2.png"
+    ],
+    "night": [
+     "location/tv-night-0.png",
+     "location/tv-night-1.png",
+     "location/tv-night-2.png"
+    ],
+    "rain": [
+     "location/tv-rain-0.png",
+     "location/tv-rain-1.png",
+     "location/tv-rain-2.png"
+    ]
+   },
+   "note": "the bar TV always shows a Brighton and Hove Albion game (blue-and-white stripes, white shorts) against a red side. Loop the frames in order (0, 1, 2) over the full base at 'at', about 220 ms a frame. Each frame is the screen's size and transparent where someone stands in front of it. With reduced motion, show nothing: the base already shows frame 0."
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front; draw stickers after the base",
+ "states": {
+  "start": {
+   "note": "the boteco has just opened (day 45, or held by a stuck task): shutters half up, one table, the owner sweeping, pigeons"
+  },
+  "full": {
+   "note": "the boteco in full swing: every table out, the roda de samba, the waiter, Esme and Mr Cat. Suggestion: switch when half the boteco stickers are earned (Core to decide)"
+  }
+ },
+ "door": {
+  "x": 280,
+  "y": 76,
+  "w": 20,
+  "h": 42,
+  "note": "the corner door (and the three open bays): walking in goes to inside/inside-slots.json"
+ },
+ "bays": [
+  {
+   "x": 46,
+   "y": 80,
+   "w": 64,
+   "h": 38
+  },
+  {
+   "x": 122,
+   "y": 80,
+   "w": 64,
+   "h": 38
+  },
+  {
+   "x": 198,
+   "y": 80,
+   "w": 64,
+   "h": 38
+  }
+ ],
+ "esme_spot": {
+  "day_night": {
+   "esme": [
+    152,
+    176
+   ],
+   "cat": [
+    168,
+    178
+   ]
+  },
+  "rain": {
+   "esme": [
+    176,
+    124
+   ],
+   "cat": [
+    192,
+    125
+   ]
+  },
+  "note": "feet of Esme and Mr Cat as drawn in the full scenes"
+ },
+ "dry_band": {
+  "x": 34,
+  "y": 118,
+  "w": 240,
+  "h": 8,
+  "note": "under the awning: stays dry in the rain look"
+ },
+ "baked": "building, neighbour's house, pavement, kerb, road, almond tree and ring bench, lamp, orelhao, palm, taxi, crates, chalkboard, tables and stools, people (per state and look)",
+ "slots": [
+  {
+   "id": "balcony-1",
+   "x": 100,
+   "y": 48,
+   "area": "balcony",
+   "accepts": [
+    "boteco-outdoor:small"
+   ],
+   "note": "on the balcony slab, a pot or a birdcage (up to 16x16)"
+  },
+  {
+   "id": "balcony-2",
+   "x": 134,
+   "y": 48,
+   "area": "balcony",
+   "accepts": [
+    "boteco-outdoor:small"
+   ]
+  },
+  {
+   "id": "balcony-3",
+   "x": 174,
+   "y": 48,
+   "area": "balcony",
+   "accepts": [
+    "boteco-outdoor:small"
+   ]
+  },
+  {
+   "id": "balcony-4",
+   "x": 246,
+   "y": 48,
+   "area": "balcony",
+   "accepts": [
+    "boteco-outdoor:small"
+   ]
+  },
+  {
+   "id": "pillar-1",
+   "x": 40,
+   "y": 93,
+   "area": "wall",
+   "accepts": [
+    "boteco-outdoor:wall"
+   ],
+   "note": "hung on a pillar above the tiles (up to 10x12)"
+  },
+  {
+   "id": "pillar-2",
+   "x": 116,
+   "y": 93,
+   "area": "wall",
+   "accepts": [
+    "boteco-outdoor:wall"
+   ]
+  },
+  {
+   "id": "pillar-3",
+   "x": 192,
+   "y": 93,
+   "area": "wall",
+   "accepts": [
+    "boteco-outdoor:wall"
+   ]
+  },
+  {
+   "id": "table-1",
+   "x": 196,
+   "y": 140,
+   "area": "table",
+   "accepts": [
+    "boteco-outdoor:table"
+   ],
+   "note": "on the first yellow table (the one there from day one), up to 12x12"
+  },
+  {
+   "id": "pavement-1",
+   "x": 150,
+   "y": 140,
+   "area": "pavement",
+   "accepts": [
+    "boteco-outdoor:big",
+    "boteco-outdoor:small"
+   ],
+   "note": "by the chalkboard, up to 32x32"
+  },
+  {
+   "id": "pavement-2",
+   "x": 40,
+   "y": 184,
+   "area": "pavement",
+   "accepts": [
+    "boteco-outdoor:small"
+   ],
+   "note": "under the almond tree's crown, up to 16x16"
+  },
+  {
+   "id": "pavement-4",
+   "x": 184,
+   "y": 200,
+   "area": "pavement",
+   "accepts": [
+    "boteco-outdoor:big",
+    "boteco-outdoor:small"
+   ],
+   "note": "by the kerb, up to 32x32"
+  },
+  {
+   "id": "pavement-5",
+   "x": 290,
+   "y": 200,
+   "area": "pavement",
+   "accepts": [
+    "boteco-outdoor:small"
+   ]
+  },
+  {
+   "id": "side-1",
+   "x": 322,
+   "y": 134,
+   "area": "side street",
+   "accepts": [
+    "boteco-outdoor:big",
+    "boteco-outdoor:small"
+   ],
+   "note": "on the side pavement, up to 24x32"
+  },
+  {
+   "id": "road-1",
+   "x": 110,
+   "y": 230,
+   "area": "road",
+   "accepts": [
+    "boteco-outdoor:vehicle"
+   ],
+   "note": "parked at the kerb: a cart, a scooter, a bike (up to 48x28)"
+  },
+  {
+   "id": "road-2",
+   "x": 262,
+   "y": 230,
+   "area": "road",
+   "accepts": [
+    "boteco-outdoor:vehicle"
+   ]
+  }
+ ]
+}

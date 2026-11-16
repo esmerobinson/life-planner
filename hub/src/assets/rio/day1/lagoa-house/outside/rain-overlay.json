@@ -1,0 +1,11 @@
+{
+ "frames": 4,
+ "frame_size": [
+  384,
+  256
+ ],
+ "layout": "frames side by side, left to right",
+ "ms": 110,
+ "loop": true,
+ "draw": "over the rain base, at 0,0, above everything (stickers too)"
+}

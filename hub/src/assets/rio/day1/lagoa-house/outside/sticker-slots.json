@@ -1,0 +1,279 @@
+{
+ "location": "lagoa-house-garden",
+ "scene": [
+  384,
+  256
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "outside/outside-start-day.png",
+   "rain": "outside/outside-start-rain.png",
+   "night": "outside/outside-start-night.png"
+  },
+  "full": {
+   "day": "outside/outside-full-day.png",
+   "rain": "outside/outside-full-rain.png",
+   "night": "outside/outside-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (any time of day before dark)",
+  "night": "after sunset in Rio until sunrise"
+ },
+ "states": {
+  "start": "day one: the house, the pool, a few plants, bare beds with seedlings, moving boxes",
+  "full": "the garden grown: lush beds, planted terraces, lanterns, string lights, hammock, outdoor table, more birds"
+ },
+ "state_note": "show 'start' until the garden family has filled most of its slots; the two pictures share every fixed thing, so the swap never moves the house, paths or slots",
+ "foot": "x, y = bottom-centre pixel of the sticker frame; draw at left = x - w//2, top = y - h + 1",
+ "draw_order": "sort every sticker by foot y (then x), back to front; stickers go over the base and under the rain overlay",
+ "sticker_looks": "recolour placed stickers by colour name with looks/palette-rain.json or looks/palette-night.json so they match the base",
+ "overlays": {
+  "rain": {
+   "file": "outside/rain-overlay.png",
+   "json": "outside/rain-overlay.json"
+  },
+  "letter_waiting": {
+   "file": "outside/letterbox-letter.png",
+   "x": 283,
+   "y": 224,
+   "note": "a kind note is waiting: the letterbox with its letter showing (same spot as the baked letterbox)"
+  }
+ },
+ "hotspots": [
+  {
+   "id": "door-living",
+   "x": 174,
+   "y": 90,
+   "w": 54,
+   "h": 41,
+   "goes": "inside/living",
+   "note": "the open living room on the ground floor"
+  },
+  {
+   "id": "door-kitchen",
+   "x": 104,
+   "y": 91,
+   "w": 65,
+   "h": 40,
+   "goes": "inside/kitchen",
+   "note": "the verdigris sliding doors are the kitchen's open wall"
+  },
+  {
+   "id": "stairs-bedroom",
+   "x": 264,
+   "y": 50,
+   "w": 38,
+   "h": 18,
+   "goes": "inside/bedroom",
+   "note": "the top of the steps, onto the upper terrace"
+  },
+  {
+   "id": "gate",
+   "x": 300,
+   "y": 232,
+   "w": 32,
+   "h": 24,
+   "goes": "map",
+   "note": "the garden gate: back to the Rio map"
+  },
+  {
+   "id": "noticeboard",
+   "x": 339,
+   "y": 210,
+   "w": 34,
+   "h": 22,
+   "goes": "ui:noticeboard"
+  },
+  {
+   "id": "letterbox",
+   "x": 283,
+   "y": 224,
+   "w": 11,
+   "h": 13,
+   "goes": "ui:kind-notes"
+  },
+  {
+   "id": "lagoa-deck",
+   "x": 36,
+   "y": 226,
+   "w": 34,
+   "h": 24,
+   "goes": "none",
+   "note": "the deck at the Lagoa's edge (a place to stand)"
+  }
+ ],
+ "baked": "house, steps, tall wall, pool, terraces, paths, beds, mango tree with the toucan, bananas, the noticeboard, the letterbox, the cobogo front wall and gate, the deck and the Lagoa",
+ "slots": [
+  {
+   "id": "bed-left-1",
+   "x": 36,
+   "y": 180,
+   "area": "bed-left",
+   "accepts": [
+    "lagoa-garden:plant"
+   ]
+  },
+  {
+   "id": "bed-left-2",
+   "x": 58,
+   "y": 194,
+   "area": "bed-left",
+   "accepts": [
+    "lagoa-garden:plant"
+   ]
+  },
+  {
+   "id": "bed-front-1",
+   "x": 176,
+   "y": 210,
+   "area": "bed-front",
+   "accepts": [
+    "lagoa-garden:plant"
+   ]
+  },
+  {
+   "id": "bed-front-2",
+   "x": 224,
+   "y": 208,
+   "area": "bed-front",
+   "accepts": [
+    "lagoa-garden:plant"
+   ]
+  },
+  {
+   "id": "bed-right-1",
+   "x": 344,
+   "y": 206,
+   "area": "bed-right",
+   "accepts": [
+    "lagoa-garden:plant"
+   ]
+  },
+  {
+   "id": "bed-right-2",
+   "x": 370,
+   "y": 202,
+   "area": "bed-right",
+   "accepts": [
+    "lagoa-garden:plant"
+   ]
+  },
+  {
+   "id": "bed-back",
+   "x": 42,
+   "y": 122,
+   "area": "bed-back",
+   "accepts": [
+    "lagoa-garden:plant"
+   ]
+  },
+  {
+   "id": "lawn-left",
+   "x": 22,
+   "y": 144,
+   "area": "lawn",
+   "accepts": [
+    "lagoa-garden:decor",
+    "lagoa-garden:plant",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "lawn-right",
+   "x": 372,
+   "y": 176,
+   "area": "lawn",
+   "accepts": [
+    "lagoa-garden:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "lawn-gate",
+   "x": 262,
+   "y": 246,
+   "area": "lawn",
+   "accepts": [
+    "lagoa-garden:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "lawn-lake",
+   "x": 96,
+   "y": 210,
+   "area": "lawn",
+   "accepts": [
+    "lagoa-garden:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "terrace-1",
+   "x": 118,
+   "y": 146,
+   "area": "terrace",
+   "accepts": [
+    "lagoa-garden:decor",
+    "outdoor",
+    "furniture"
+   ]
+  },
+  {
+   "id": "terrace-2",
+   "x": 226,
+   "y": 146,
+   "area": "terrace",
+   "accepts": [
+    "lagoa-garden:decor",
+    "outdoor",
+    "furniture"
+   ]
+  },
+  {
+   "id": "poolside",
+   "x": 282,
+   "y": 184,
+   "area": "terrace",
+   "accepts": [
+    "lagoa-garden:decor",
+    "outdoor",
+    "furniture"
+   ]
+  },
+  {
+   "id": "deck",
+   "x": 54,
+   "y": 244,
+   "area": "deck",
+   "accepts": [
+    "lagoa-garden:decor",
+    "outdoor"
+   ]
+  },
+  {
+   "id": "upper-terrace",
+   "x": 138,
+   "y": 79,
+   "area": "upper-terrace",
+   "accepts": [
+    "lagoa-garden:decor",
+    "lagoa-garden:plant"
+   ],
+   "note": "on the open loggia, left of the butterfly chair"
+  },
+  {
+   "id": "roof",
+   "x": 230,
+   "y": 33,
+   "area": "roof",
+   "accepts": [
+    "lagoa-garden:plant"
+   ],
+   "note": "small plants only (max 24x16): the roof planter"
+  }
+ ]
+}

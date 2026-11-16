@@ -1,0 +1,7 @@
+{
+ "name": "Tijuca park extras (Rio pack, week 1)",
+ "notes": "Day uses the summer palette and the existing extra ramps as the Lagoa house does: stone (granite), mead_stone (cobbles, the gate, the fig and the giant's bark), wool (the deck's weathered boards), fam_leaf/fam_pine/vg_leaf/grass (the forest), fam_violet + vg_lav (the quaresmeira), mead_pink (orchids), water + pnd_deep + fam_aqua (the falls and pool). Rain uses its own twins of the day colours, listed by name in looks/palette-rain.json (Rain colour 2026-11-14). Night uses only palette-night-v2.json colours.",
+ "ramps": [],
+ "newColoursFound": 0,
+ "ownColoursUsed": []
+}

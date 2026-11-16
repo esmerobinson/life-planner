@@ -1,0 +1,99 @@
+{
+ "pack": "rio-pack",
+ "batch": "week1",
+ "location": "tijuca-park",
+ "opensDay": 7,
+ "notes": "Tijuca park (Parque Nacional da Tijuca): the Cascatinha clearing outside and the hidden glade inside, each in two states (start, full) and three looks (day, rain, night). Bases ship without stickers or Esme.",
+ "role": "wildlife (the hedgerow family 'Tijuca wildlife': marmoset, toucan, blue morpho ...) from habit sessions; monthly finds from doing anything in a month",
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "lookPalettes": {
+  "rain": "looks/palette-rain.json",
+  "night": "looks/palette-night.json"
+ },
+ "locations": [
+  {
+   "key": "tijuca-park-cascatinha",
+   "name": "Tijuca park: the Cascatinha clearing",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "opensDay": 7,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "outside/tijuca-outside-start-day.png",
+     "rain": "outside/tijuca-outside-start-rain.png",
+     "night": "outside/tijuca-outside-start-night.png"
+    },
+    "full": {
+     "day": "outside/tijuca-outside-full-day.png",
+     "rain": "outside/tijuca-outside-full-rain.png",
+     "night": "outside/tijuca-outside-full-night.png"
+    }
+   },
+   "slots": "outside/tijuca-outside-slots.json",
+   "slotCount": 19,
+   "rainOverlay": "outside/tijuca-outside-rain-overlay.png"
+  },
+  {
+   "key": "tijuca-park-glade",
+   "name": "Tijuca park: the hidden glade",
+   "kind": "interior",
+   "size": [
+    320,
+    192
+   ],
+   "tile": 16,
+   "opensDay": 7,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "inside/tijuca-inside-start-day.png",
+     "rain": "inside/tijuca-inside-start-rain.png",
+     "night": "inside/tijuca-inside-start-night.png"
+    },
+    "full": {
+     "day": "inside/tijuca-inside-full-day.png",
+     "rain": "inside/tijuca-inside-full-rain.png",
+     "night": "inside/tijuca-inside-full-night.png"
+    }
+   },
+   "slots": "inside/tijuca-inside-slots.json",
+   "slotCount": 14,
+   "rainOverlay": "inside/tijuca-inside-rain-overlay.png"
+  }
+ ],
+ "stickerAccepts": {
+  "hedgerow:animal": "Tijuca wildlife: animals (marmoset ...)",
+  "hedgerow:bird": "Tijuca wildlife: birds (toucan ...)",
+  "hedgerow:insect": "Tijuca wildlife: insects (blue morpho ...)",
+  "hedgerow:plant": "Tijuca wildlife: plants and flowers",
+  "hedgerow:water": "Tijuca wildlife that lives by water (frogs, kingfishers ...)",
+  "hedgerow:*": "any Tijuca wildlife sticker",
+  "finds:*": "a monthly find"
+ },
+ "stickerNote": "kind comes from the sticker manifest's 'kind' (animal, bird, insect ...); the old meadow and lane stickers that moved here use the same kinds"
+}
