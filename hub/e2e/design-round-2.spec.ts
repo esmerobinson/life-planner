@@ -92,7 +92,7 @@ test("area page: strips, icons, due line, goal card, month count and the done fo
   expect(await late.evaluate((e) => getComputedStyle(e).color)).toBe("rgb(191, 101, 100)");
   const strip = page.getByRole("list", { name: "To-dos" }).getByRole("listitem").first();
   expect(await strip.evaluate((e) => getComputedStyle(e).listStyleType)).toBe("none");
-  expect(await strip.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(227, 221, 205)");
+  expect(await strip.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe("rgb(244, 230, 196)");
   await expect(page.getByRole("link", { name: "Draw every week (pretend)" })).toBeVisible();
   await expect(page.getByText("Done (5)", { exact: true })).toBeVisible();
   await shoot(page, "area-1280");

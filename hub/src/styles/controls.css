@@ -1,12 +1,12 @@
 /* Form controls in the "soft pills" style, mockup A, approved 2026-10-28.
-   Colours come from the tokens in tokens.css (--bar-fill #98c293, --track #d4d1c3,
-   --row #e3ddcd, --text #3a412f). Selectors are element-level on purpose: sidebar
+   Colours come from the tokens in tokens.css (--bar-fill #98c293, --track #e4cfa4,
+   --row #f4e6c4, --text #2d3f83; Ipanema, 2026-11-17). Selectors are element-level on purpose: sidebar
    links are anchors, so nothing here reaches them.
    Not in the mockup, filled in as stated in README "Placeholders you must replace":
    disabled colours (palette greys), no hover, checkbox shape. The focus ring was decided
    2026-11-05 (see its rule below). */
 :root {
-  --control-disabled-text: #a09f88; /* sage, palette value; disabled text, not in mockup A */
+  --control-disabled-text: #5a6389; /* slate (Ipanema muted, 2026-11-17); disabled text */
 }
 
 button {
@@ -23,13 +23,13 @@ button.btn-secondary {
 }
 
 /* Native file inputs: the button part takes the secondary soft pill. Same values as the
-   secondary pill (--track #d4d1c3, --text #3a412f); nothing new. */
+   secondary pill (--track, --text); nothing new. */
 input[type="file"]::file-selector-button {
   padding: 8px 16px;
   border-radius: 999px;
   border: 0;
-  background: #d4d1c3;
-  color: #3a412f;
+  background: var(--track);
+  color: var(--text);
   font: inherit;
   margin-right: 8px;
   cursor: default;
@@ -89,13 +89,14 @@ input[type="checkbox"]:checked {
 }
 
 /* The keyboard focus ring (VISUAL-LANGUAGE.md "Keyboard focus ring (2026-11-05)", mockup
-   docs/design/celebrations.html option A, thin dark green): on :focus-visible everywhere.
+   docs/design/celebrations.html option A, thin dark green; it follows --text, so navy since
+   Ipanema, 2026-11-17): on :focus-visible everywhere.
    The form controls stay listed so they keep the weight the old ring had; rules with a
    stronger selector that set their own outline (a selected card, today's day) keep it, as
    before. :where() keeps the catch-all as light as a single class, so a later
    `outline: none` (the panel's page text) still wins.
-   Builder's call: not inside the dark green sidebar, whose links keep the browser's ring
-   (a #3a412f ring on the #3a412f sidebar could not be seen; the sidebar has no controls). */
+   Builder's call: not inside the sidebar, whose links keep the browser's ring (a --text ring
+   on the dark sidebar could not be seen; the sidebar has no controls). */
 :where(:not(.sidebar *)):focus-visible,
 button:focus-visible,
 input:focus-visible,

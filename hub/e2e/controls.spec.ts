@@ -11,7 +11,7 @@ test("approved soft-pill control styles in real Chrome", async ({ page }) => {
   expect(a.bg).toBe("rgb(152, 194, 147)");
 
   const inbox = page.getByRole("link", { name: "Inbox" }).first();
-  expect(await inbox.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(212, 209, 195)");
+  expect(await inbox.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(228, 207, 164)"); // --track #e4cfa4 (Ipanema)
 
   await add.click();
   const input = page.getByLabel("Title");
@@ -19,9 +19,9 @@ test("approved soft-pill control styles in real Chrome", async ({ page }) => {
     const s = getComputedStyle(el);
     return { bg: s.backgroundColor, r: s.borderTopLeftRadius };
   });
-  expect(i).toEqual({ bg: "rgb(227, 221, 205)", r: "12px" });
+  expect(i).toEqual({ bg: "rgb(244, 230, 196)", r: "12px" });
 
-  // Keyboard focus ring: 2px solid --text (#3a412f), 2px out (2026-11-05).
+  // Keyboard focus ring: 2px solid --text (navy #2d3f83 since Ipanema), 2px out (2026-11-05).
   await page.locator("body").click({ position: { x: 5, y: 5 } });
   for (let n = 0; n < 40; n++) {
     await page.keyboard.press("Tab");
@@ -32,7 +32,7 @@ test("approved soft-pill control styles in real Chrome", async ({ page }) => {
     const s = getComputedStyle(el);
     return { color: s.outlineColor, style: s.outlineStyle, width: s.outlineWidth, offset: s.outlineOffset };
   });
-  expect(ring).toEqual({ color: "rgb(58, 65, 47)", style: "solid", width: "2px", offset: "2px" });
+  expect(ring).toEqual({ color: "rgb(45, 63, 131)", style: "solid", width: "2px", offset: "2px" });
 });
 
 test("sidebar stays pinned after scrolling", async ({ page }) => {

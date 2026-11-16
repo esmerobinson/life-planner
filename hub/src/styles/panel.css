@@ -3,7 +3,7 @@
    tab A (side panel, the detail content) and part 2 tab B (habits), goal.html (top of tab B
    plus the sections of tab A), mockup-phone.html tab A (open task: full screen, round back
    arrow), and the round-3 brief (width 460px / max 92vw, resize 360px to 90vw, padding
-   24px, shadow -6px 0 24px forest green #3a412f at 25% (provisional), a 4px --track grab
+   24px, shadow -6px 0 24px navy #2d3f83 at 25% (provisional), a 4px --track grab
    bar). Colours are tokens or palette values only; type stays system-ui; nothing animates
    (the panel appears without a slide: easing and timing are undecided).
 
@@ -27,7 +27,7 @@
   width: min(460px, 92vw);
   background: var(--panel);
   border-radius: var(--radius-panel) 0 0 var(--radius-panel);
-  box-shadow: -6px 0 24px rgba(58, 65, 47, 0.25); /* provisional, from the brief */
+  box-shadow: -6px 0 24px rgba(45, 63, 131, 0.25); /* provisional, from the brief */
   z-index: 20;
   display: flex;
   outline: none;

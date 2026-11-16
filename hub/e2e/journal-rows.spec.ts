@@ -10,7 +10,7 @@ import { pageDate } from "./helpers";
 
 const PASS = "fake-journal-e2e-passphrase";
 const MINT = "rgb(163, 213, 194)"; // #a3d5c2
-const TEXT = "rgb(58, 65, 47)"; // --text #3a412f
+const TEXT = "rgb(45, 63, 131)"; // --text #2d3f83 (Ipanema, 2026-11-17)
 
 async function shoot(page: Page, name: string, fullPage = true) {
   const dir = process.env.SHOTS_DIR;
@@ -99,7 +99,7 @@ async function homeRows(page: Page, prefix: string) {
   await expect(checkin.getByRole("checkbox")).toHaveAttribute("aria-checked", "false");
   await expect(checkin.getByText("3 days in a row")).toBeAttached();
   await expect(checkin.locator(".streak-day.on")).toHaveCount(3);
-  expect(await checkin.locator(".streak-day:not(.on)").last().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(233, 227, 214)");
+  expect(await checkin.locator(".streak-day:not(.on)").last().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 244, 216)");
   const exercise = row(page, "Mental health exercise");
   await expect(exercise.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
   await expect(exercise.getByText("Day 1 · Pretend weather")).toBeVisible();

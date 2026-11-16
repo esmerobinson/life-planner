@@ -6,7 +6,7 @@
    Choose goals pop-up: .shade, .sheet, .card, .band, .chk). Colours are tokens or palette
    values only: --panel, --row, --track, --sage, --mint (Map mint #a3d5c2), --bar-fill
    (#98c293, the mockups' --green); the pop-up's dimmed page and shadow are the mockup's
-   forest green #3a412f at 35% / 30%. Type stays system-ui; nothing animates.
+   navy #2d3f83 at 35% / 30%. Type stays system-ui; nothing animates.
 
    Builder's calls the mockups don't show (Esme may veto):
    - the "−1" undo next to +1: the "+1" pill's size and shape with no fill, 0.75 opacity;
@@ -415,7 +415,7 @@ button.goal-plan {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(58, 65, 47, 0.35);
+  background: rgba(45, 63, 131, 0.35);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -430,7 +430,7 @@ button.goal-plan {
   /* Scrolling the sheet never scrolls the page behind it (review M7; not a look). */
   overscroll-behavior: contain;
   padding: 22px;
-  box-shadow: 0 10px 40px rgba(58, 65, 47, 0.3);
+  box-shadow: 0 10px 40px rgba(45, 63, 131, 0.3);
 }
 
 .choose-top {

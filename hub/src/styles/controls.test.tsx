@@ -41,9 +41,18 @@ function rule(selector: string, source: string = controls): string {
 describe("controls.css (approved mockup A, soft pills)", () => {
   it("maps the approved colours onto tokens that hold the approved hex values", () => {
     expect(tokens).toContain("--bar-fill: #98c293");
-    expect(tokens).toContain("--track: #d4d1c3");
-    expect(tokens).toContain("--row: #e3ddcd");
-    expect(tokens).toContain("--text: #3a412f");
+    // Ipanema A1 (Esme, 2026-11-17).
+    expect(tokens).toContain("--page: #e6fdfe");
+    expect(tokens).toContain("--sidebar: #3c5fbf");
+    expect(tokens).toContain("--sidebar-item: #2d3f83");
+    expect(tokens).toContain("--sidebar-text: #fff4d8");
+    expect(tokens).toContain("--panel: #fff4d8");
+    expect(tokens).toContain("--track: #e4cfa4");
+    expect(tokens).toContain("--row: #f4e6c4");
+    expect(tokens).toContain("--text: #2d3f83");
+    for (const h of ["#e6fdfe", "#3c5fbf", "#2d3f83", "#fff4d8", "#f4e6c4", "#e4cfa4", "#5a6389"]) {
+      expect(allowed.has(h)).toBe(true);
+    }
   });
 
   it("styles the primary button", () => {
@@ -66,14 +75,13 @@ describe("controls.css (approved mockup A, soft pills)", () => {
       "padding: 8px 16px",
       "border-radius: 999px",
       "border: 0",
-      "background: #d4d1c3",
-      "color: #3a412f",
+      "background: var(--track)",
+      "color: var(--text)",
       "font: inherit",
       "margin-right: 8px",
       "cursor: default",
     ]);
     expect(controls).not.toMatch(/input\[type="file"\]\s*\{/);
-    expect(allowed.has("#d4d1c3") && allowed.has("#3a412f")).toBe(true);
   });
 
   it("styles toggle buttons", () => {
@@ -113,7 +121,7 @@ describe("controls.css (approved mockup A, soft pills)", () => {
     expect(r).toContain("color: var(--control-disabled-text)");
     expect(r).toContain("cursor: default");
     expect(r).not.toContain("opacity");
-    expect(controls).toContain("--control-disabled-text: #a09f88");
+    expect(controls).toContain("--control-disabled-text: #5a6389");
   });
 
   it("focus ring is the thin dark green one (2026-11-05), on :focus-visible everywhere but the sidebar", () => {

@@ -148,7 +148,7 @@ for (const width of [1280, 390]) {
           const doc = document.documentElement;
           return { bottom: b.bottom + scrollY, docBottom: doc.scrollHeight, vh: innerHeight, bg: st.backgroundColor, radius: st.borderTopLeftRadius, w: b.width, contentW: el.parentElement!.clientWidth };
         });
-        expect(s.bg).toBe("rgb(233, 227, 214)"); // --panel
+        expect(s.bg).toBe("rgb(255, 244, 216)"); // --panel
         expect(s.radius).toBe("18px"); // --radius-panel
         // At least down to the window's bottom gutter (24px; 16px on the phone), never short of it.
         expect(s.bottom).toBeGreaterThanOrEqual(s.vh - (phone ? 16 : 24) - 1);
@@ -158,7 +158,7 @@ for (const width of [1280, 390]) {
           expect(s.docBottom).toBeLessThanOrEqual(s.vh + 1);
           // Rows on the sheet stay --row.
           const row = await page.locator(".page-sheet .strip").first().evaluate((el) => getComputedStyle(el).backgroundColor);
-          expect(row).toBe("rgb(227, 221, 205)");
+          expect(row).toBe("rgb(244, 230, 196)");
         }
         await noSidewaysScroll(page);
         await shoot(page, `nbs-${path.slice(1)}-${width}`);

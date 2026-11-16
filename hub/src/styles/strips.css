@@ -2,8 +2,8 @@
    here is copied from Esme's chosen mockup options: round 1 "A · Strips" and round 2
    "1B" (two icons), "2D" (due line), "3A" (goal cards), "4A" (month count and done
    fold-out), plus the round-2 "1A" menu look for the two popovers. Colours are tokens
-   or palette values only (sage #a09f88, Happy Home red #bf6564; the popover shadow is
-   forest green #3a412f at 25%, as in the mockup). Type stays system-ui and nothing
+   or palette values only (sage, now slate #5a6389 since Ipanema 2026-11-17; Happy Home red
+   #bf6564; the popover shadow is the text colour, navy #2d3f83, at 25%). Type stays system-ui and nothing
    animates (the placeholders VISUAL-LANGUAGE.md asks for).
 
    Composition calls the mockups do not show, made by the implementer (Esme may veto):
@@ -13,7 +13,7 @@
      4px below the 30px icon inside a 10px-padded strip);
    - the goal-card title link covers the whole card (one link per card). */
 :root {
-  --sage: #a09f88; /* palette value; tick-box border in the strips mockup */
+  --sage: #5a6389; /* muted: slate (Ipanema, 2026-11-17; was sage #a09f88); tick-box border, sub-lines */
   --late: #bf6564; /* Happy Home red; overdue due line (2D) */
 }
 
@@ -138,7 +138,7 @@ button.icon svg {
   background: var(--panel);
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+  box-shadow: 0 4px 14px rgba(45, 63, 131, 0.25);
   min-width: 190px;
 }
 

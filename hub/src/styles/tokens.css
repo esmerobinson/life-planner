@@ -1,5 +1,11 @@
 /* Where every value here comes from. Nothing below is a final look until Esme says so.
 
+   (0) 2026-11-17: Esme picked "Ipanema A1" (VISUAL-LANGUAGE.md, "App colours: Ipanema"):
+       --page #e6fdfe, --sidebar #3c5fbf, --sidebar-item #2d3f83, --sidebar-text #fff4d8,
+       --panel #fff4d8, --row #f4e6c4, --track #e4cfa4, --text #2d3f83, muted slate #5a6389
+       (--sage, disabled text). These replace the colours named in (a), (b2) and (c) below,
+       which are kept as history; the roles they describe are now hers.
+
    (a) From VISUAL-LANGUAGE.md and the approved option-3 assignment / mockup:
        --page #e2e8ff, --sidebar #3a412f, --sidebar-item #51553d, --panel #e9e3d6,
        --row #e3ddcd, --track #d4d1c3 (approved role assignment); --bar-fill #98c293
@@ -26,14 +32,16 @@
        #d59770 (DIY terracotta) and Admin #90825b (Island Designer brown), and the accent
        colours inside their icons (#98c293, #ecca7d, #df7e6f). */
 :root {
-  --page: #e2e8ff;
-  --sidebar: #3a412f;
-  --sidebar-item: #51553d;
-  --sidebar-text: #e9e3d6;
-  --panel: #e9e3d6;
-  --row: #e3ddcd;
-  --track: #d4d1c3;
-  --text: #3a412f;
+  /* App colours: Ipanema (Esme, 2026-11-17, mockup more-rio, option A1), sampled from the
+     approved Rio day map. Layout, type and spacing unchanged; only these colours moved. */
+  --page: #e6fdfe; /* sea foam */
+  --sidebar: #3c5fbf; /* sea blue */
+  --sidebar-item: #2d3f83; /* navy */
+  --sidebar-text: #fff4d8; /* sand light */
+  --panel: #fff4d8; /* sand light */
+  --row: #f4e6c4; /* sand */
+  --track: #e4cfa4; /* dune */
+  --text: #2d3f83; /* navy */
   --bar-fill: #98c293; /* from approved mockup (option 3) */
   --bar-height: 10px; /* from approved mockup (option 3) */
   --bar-radius: 6px; /* from approved mockup (option 3) */

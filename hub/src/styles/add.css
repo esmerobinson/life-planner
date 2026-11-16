@@ -1,11 +1,11 @@
 /* Add as a round "+" button, bottom right (projects round; mockup add-and-projects.html
    option 1C, Esme: "1c is good but make the button a little smaller"). Values copied from
    the mockup and the app: the button is every button's green (--bar-fill) with the menus'
-   shadow (0 4px 14px forest green #3a412f at 25%, strips.css .pop-menu), 24px from the
+   shadow (0 4px 14px navy #2d3f83 at 25%, strips.css .pop-menu), 24px from the
    window's corner (16px and 28px on a phone); the desktop card is --panel, --radius-panel,
    padding 16px 18px 18px, 440px wide, the same shadow, 16px above the button; the phone
    sheet is --panel with --radius-panel top corners, padding 18px 16px 24px, the Choose
-   goals sheet's shadow, over the Choose goals shade (forest green at 35%); "Add" heading
+   goals sheet's shadow, over the Choose goals shade (navy at 35%); "Add" heading
    20px. Nothing animates (motion is undecided): it just appears.
 
    Calls made by the implementer (Esme may veto):
@@ -28,7 +28,7 @@ button.add-fab {
   line-height: 1;
   display: grid;
   place-items: center;
-  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+  box-shadow: 0 4px 14px rgba(45, 63, 131, 0.25);
 }
 
 .is-phone button.add-fab {
@@ -60,7 +60,7 @@ button.add-fab {
   border-radius: var(--radius-panel);
   /* Spacing pass: a card's padding (--pad-card, 16px all round; was 16px 18px 18px). */
   padding: var(--pad-card);
-  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+  box-shadow: 0 4px 14px rgba(45, 63, 131, 0.25);
 }
 
 .add-head {
@@ -103,7 +103,7 @@ button.add-fab {
   background: var(--panel);
   border-radius: 999px;
   padding: 8px 16px;
-  box-shadow: 0 4px 14px rgba(58, 65, 47, 0.25);
+  box-shadow: 0 4px 14px rgba(45, 63, 131, 0.25);
 }
 
 /* Phone: a sheet from the bottom over a shade. */
@@ -111,7 +111,7 @@ button.add-fab {
   position: fixed;
   inset: 0;
   z-index: 16;
-  background: rgba(58, 65, 47, 0.35);
+  background: rgba(45, 63, 131, 0.35);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -126,5 +126,5 @@ button.add-fab {
   max-height: calc(100% - max(34px, env(safe-area-inset-top)));
   overflow-y: auto;
   overscroll-behavior: contain;
-  box-shadow: 0 10px 40px rgba(58, 65, 47, 0.3);
+  box-shadow: 0 10px 40px rgba(45, 63, 131, 0.3);
 }

@@ -31,11 +31,11 @@ describe("strips.css (design round 2, values from the chosen mockups)", () => {
     expect(tokens).not.toContain("overdue-sticker");
   });
 
-  it("uses only palette colours (sage, Happy Home red) and the mockup's forest-green shadow", () => {
+  it("uses only palette colours (slate muted, Happy Home red) and a navy shadow (Ipanema, 2026-11-17)", () => {
     expect(hexes(code).filter((h) => !allowed.has(h))).toEqual([]);
     expect(code).toContain("--late: #bf6564");
-    expect(code).toContain("--sage: #a09f88");
-    for (const m of code.matchAll(/rgba\(([^)]*)\)/g)) expect(m[1].replace(/\s/g, "")).toBe("58,65,47,0.25");
+    expect(code).toContain("--sage: #5a6389");
+    for (const m of code.matchAll(/rgba\(([^)]*)\)/g)) expect(m[1].replace(/\s/g, "")).toBe("45,63,131,0.25");
     for (const bad of ["transition", "animation", "font-family", "!important"]) expect(code).not.toContain(bad);
   });
 
