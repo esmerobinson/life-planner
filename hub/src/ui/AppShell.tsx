@@ -154,7 +154,8 @@ export function AppShell() {
       <ShellUndoContext.Provider value={setUndoNote}>
       <PanelProvider>
       <FarmProvider items={items} goals={goals} today={today}>
-      <div className={phone ? "app-shell is-phone" : "app-shell"}>
+      {/* /farm is the game: a fixed screen beside the sidebar (rio/GameScreen.tsx, game-screen.css). */}
+      <div className={`app-shell${phone ? " is-phone" : ""}${location.pathname === "/farm" ? " is-game" : ""}`}>
         {!phone && <Sidebar />}
         <main className={phone && phoneTitle(location.pathname) ? "app-content has-bar-title" : "app-content"}>
           {phone && <PhoneTopBar inboxLabel={inboxLabel} onSearch={openSearch} />}

@@ -1,38 +1,46 @@
-// Esme's Rio: the one page for the whole game (/farm). Rio on top (the map, or the area she
-// opened from it), the sticker book below it (Esme, 2026-11-16). Opening it the first time starts the game (a fresh
-// start: nothing from before counts).
+// Esme's Rio: the one page for the whole game (/farm), a fixed game screen (Esme, 2026-11-17): the
+// map, or the area she opened from it, with the kit's hotbar on top to open the game menu (Esc
+// opens and closes it too). The menu's Collection replaced the sticker book ("idk if i want the
+// book at all", 2026-11-17). Opening the page the first time starts the game (a fresh start:
+// nothing from before counts).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AreaView } from "../rio/AreaView";
 import { areaStatuses, sceneOpen } from "../rio/areas";
+import { groupsOf } from "../rio/collection";
+import { GameScreen } from "../rio/GameScreen";
+import { Hotbar } from "../rio/Hotbar";
 import { devLook, useRioLook } from "../rio/look";
+import { GameMenu, MENU_TABS, type MenuTab } from "../rio/menu/GameMenu";
+import { TextButton, em } from "../rio/menu/pieces";
 import { homeOf } from "../rio/placement";
 import { RioMap } from "../rio/RioMap";
-import { usePhone } from "../ui/usePhone";
-import { COLLECTION, MANIFEST, STICKERS } from "./catalogue";
-import { useFarm, type FarmView } from "./FarmContext";
-import { useTicker } from "./hooks";
-import { HAPPY_FRAME_MS } from "./motion";
+import { BitmapText } from "../rio/ui/BitmapText";
+import { useUi } from "../rio/ui/fit";
+import { COLLECTION, STICKERS } from "./catalogue";
+import { CharacterPic } from "./CharacterPic";
+import { useFarm } from "./FarmContext";
+import { isTypingTarget } from "./hooks";
 import { StickerPopIn } from "./PopIn";
-import { ctx2d, drawCharacter, poseFrames, useSheets } from "./sprites";
-import { StickerBook } from "./StickerBook";
 import { CHARACTERS, type CharacterId } from "./state";
-import { ACCESSORIES, NAMES, SPREADS, farmDay } from "./world";
+import { NAMES, farmDay } from "./world";
 import "./farm.css";
+
+const isTab = (t: string | null): t is MenuTab => MENU_TABS.some((m) => m.key === t);
 
 export function FarmPage() {
   const view = useFarm();
-  const phone = usePhone();
-  const [spread, setSpread] = useState<number | null>(null);
-  const [half, setHalf] = useState<0 | 1>(1);
-  const [request, setRequest] = useState<number | null>(null);
-  const [who, setWho] = useState<CharacterId | null>(null);
   const [arrivals, setArrivals] = useState<CharacterId[]>([]);
   const [area, setArea] = useState<string | null>(null);
-  const farmRef = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<MenuTab | null>(null);
+  const [lastTab, setLastTab] = useState<MenuTab>("collection");
+  const [shownArea, setShownArea] = useState<string | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const weather = useRioLook();
-  const look = devLook(useLocation().search) ?? weather;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const look = devLook(location.search) ?? weather;
 
   const day = view?.state.start ? farmDay(view.state.start, view.today) : 1;
   const visited = view?.state.visited;
@@ -49,15 +57,63 @@ export function FarmPage() {
     void view?.markVisited(a).catch(() => undefined);
   }, [view]);
 
-  // The first open starts the farm.
+  const openMenu = useCallback((t: MenuTab) => {
+    if (t === "map") {
+      setMenu(null);
+      setArea(null);
+      return;
+    }
+    if (!menu) opener.current = document.activeElement as HTMLElement | null;
+    setMenu(t);
+    setLastTab(t);
+  }, [menu]);
+  const closeMenu = useCallback(() => {
+    setMenu(null);
+    const back = opener.current;
+    opener.current = null;
+    // Focus goes back where it was (after the menu has gone).
+    setTimeout(() => back?.isConnected && back.focus(), 0);
+  }, []);
+
+  // /farm?menu=<tab> (the nook's collection icon, for one) opens the menu there.
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get("menu");
+    if (!isTab(t)) return;
+    openMenu(t);
+    navigate("/farm", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
+
+  // Esc opens the menu (never while she types, or while another pop-up has it); the menu closes itself.
+  useEffect(() => {
+    if (menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || e.altKey || e.metaKey || e.ctrlKey) return;
+      if (isTypingTarget(document.activeElement) || document.querySelector('[role="dialog"]')) return;
+      e.preventDefault();
+      openMenu(lastTab);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menu, lastTab, openMenu]);
+
+  // The first open starts the game.
   useEffect(() => {
     if (view?.loaded && view.state.start === null) void view.ensureStart();
   }, [view]);
 
-  // Visiting the book clears the nook's glint.
+  // Opening the Collection clears the nook's glint (a sticker went in since she last looked).
   useEffect(() => {
-    if (view?.glint) view.clearGlint();
-  }, [view]);
+    if (menu === "collection" && view?.glint) view.clearGlint();
+  }, [menu, view]);
+
+  // The nook's host follows the Collection's area, as it followed the book's page.
+  const zoneKey = menu === "collection" && shownArea ? groupsOf(shownArea).join() : "";
+  useEffect(() => {
+    view?.setFarmZones(zoneKey ? zoneKey.split(",") : []);
+    return () => view?.setFarmZones([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoneKey, view?.setFarmZones]);
 
   // "<name> has moved in!" the first time (kept on screen while she's here).
   useEffect(() => {
@@ -68,113 +124,44 @@ export function FarmPage() {
     for (const c of fresh) void view.markArrived(c);
   }, [view]);
 
-  const zones = spread === null ? [] : phone && spread > 0
-    ? [SPREADS[spread]!.pages[half]!.group].filter((g): g is string => !!g)
-    : SPREADS[spread]!.zones;
-  const zoneKey = zones.join();
-  useEffect(() => {
-    view?.setFarmZones(zoneKey ? zoneKey.split(",") : []);
-    return () => view?.setFarmZones([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoneKey, view?.setFarmZones]);
-
-  const onShow = useCallback((s: number | null, h: 0 | 1) => {
-    setSpread(s);
-    setHalf(h);
-  }, []);
-  const onRequestDone = useCallback(() => setRequest(null), []);
-  void setRequest; // the old farm's zone taps opened the book; Rio's map opens areas instead
-
   if (!view) return null;
   return (
-    <div className="farm-page">
-      <h1>Esme's Rio</h1>
+    <GameScreen>
+      <h1 className="visually-hidden">Esme's Rio</h1>
       <p className="visually-hidden" role="status" data-earned={view.collected}>
         {view.collected} of {COLLECTION.length} stickers
       </p>
-      {arrivals.length > 0 && (
-        <div className="farm-arrival" role="status">
-          {arrivals.map((c) => (
-            <p key={c} className="farm-arrival-line">
-              <CharacterPic view={view} c={c} pose="happy" />
-              <span>{NAMES[c]} has moved in!</span>
-            </p>
-          ))}
-          <button type="button" className="btn-secondary" onClick={() => setArrivals([])}>OK</button>
-        </div>
-      )}
-      <div ref={farmRef} className="rio-wrap">
+      <div className="rio-wrap">
         {area
           ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} onBack={() => setArea(null)} />
           : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
       </div>
-      <StickerBook
-        view={view}
-        phone={phone}
-        request={request}
-        onRequestDone={onRequestDone}
-        onShow={onShow}
-        canPlace={canPlace}
-        onPlaced={() => farmRef.current?.scrollIntoView?.({ block: "nearest" })}
-      />
-      <div className="farm-cast" aria-label="Who lives here">
-        {CHARACTERS.filter((c) => view.arrived.has(c)).map((c) => (
-          <button key={c} type="button" className="btn-secondary" aria-pressed={who === c} onClick={() => setWho(who === c ? null : c)}>
-            {NAMES[c]}
-          </button>
-        ))}
-      </div>
-      {who && <CharacterPanel view={view} c={who} onClose={() => setWho(null)} />}
-    </div>
+      {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}
+      <Hotbar current={menu ?? (area ? null : "map")} onPick={openMenu} />
+      {/* Only once the game has started and its rows are read: the notes and counts are then true. */}
+      {menu && view.loaded && view.state.start && (
+        <GameMenu view={view} tab={menu} onTab={openMenu} onClose={closeMenu} canPlace={canPlace} day={day} statuses={statuses}
+          startArea={area} onArea={setShownArea} />
+      )}
+    </GameScreen>
   );
 }
 
-const CHAR_SHEETS = [...CHARACTERS.map((c) => `char-${c}`), ...CHARACTERS.map((c) => `acc-${c}`)];
-
-/** A character at 2x, looping a pose, wearing its chosen accessory. */
-function CharacterPic({ view, c, pose = "idle" }: { view: FarmView; c: CharacterId; pose?: "idle" | "happy" }) {
-  const sheets = useSheets(CHAR_SHEETS);
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const tick = useTicker(HAPPY_FRAME_MS);
-  const outfit = view.state.outfits.get(c) ?? null;
-  const acc = outfit && view.unlocked.includes(outfit) ? ACCESSORIES.find((a) => a.code === outfit)?.frame ?? null : null;
-  useEffect(() => {
-    const ctx = ctx2d(canvas.current);
-    if (!ctx || !sheets) return;
-    ctx.clearRect(0, 0, 32, 32);
-    const frames = poseFrames(c, pose);
-    drawCharacter(ctx, sheets, c, frames[tick % frames.length]!, 0, 0, acc);
-  }, [sheets, c, pose, tick, acc]);
-  return <canvas ref={canvas} width={32} height={32} className="farm-px" style={{ width: 64, height: 64 }} aria-hidden="true" />;
-}
-
-function CharacterPanel({ view, c, onClose }: { view: FarmView; c: CharacterId; onClose: () => void }) {
-  const home = MANIFEST.arrivals.find((a) => a.character.toLowerCase() === c)?.home ?? "";
-  const current = view.state.outfits.get(c) ?? null;
-  const items = ACCESSORIES.filter((a) => view.unlocked.includes(a.code));
+/** "<name> has moved in!" in a thin kit frame, top centre, until she presses OK. */
+function Arrivals({ view, who, onDone }: { view: NonNullable<ReturnType<typeof useFarm>>; who: CharacterId[]; onDone: () => void }) {
+  const { u } = useUi();
   return (
-    <section className="farm-character" aria-label={NAMES[c]}>
-      <div className="farm-character-top">
-        <CharacterPic view={view} c={c} />
-        <div>
-          <h2>{NAMES[c]}</h2>
-          <p className="farm-muted">{home}</p>
-        </div>
-        <button type="button" className="farm-pop-close" aria-label="Close" onClick={onClose}>×</button>
-      </div>
-      <h3>Wardrobe</h3>
-      <div className="farm-wardrobe" role="group" aria-label="Wardrobe">
-        <button type="button" className="btn-secondary" aria-pressed={current === null || !items.some((a) => a.code === current)}
-          onClick={() => void view.setOutfit(c, null)}>Nothing</button>
-        {items.map((a) => (
-          <button key={a.code} type="button" className="btn-secondary" aria-pressed={current === a.code} onClick={() => void view.setOutfit(c, a.code)}>
-            {a.name}
-          </button>
+    <div className="rio-arrival" style={{ fontSize: `${u}px` }}>
+      <div className="thin flow" role="status">
+        {who.map((c) => (
+          <p key={c}>
+            <CharacterPic view={view} c={c} pose="happy" size={em(32)} />
+            <BitmapText text={`${NAMES[c]} has moved in!`} heading />
+          </p>
         ))}
+        <TextButton label="OK" w={24} onClick={onDone} />
       </div>
-      {/* PLACEHOLDER WORDING */}
-      {items.length < ACCESSORIES.length && <p className="farm-muted">More things to wear come with more stickers.</p>}
-    </section>
+    </div>
   );
 }
 

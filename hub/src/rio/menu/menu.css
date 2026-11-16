@@ -10,10 +10,16 @@
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
-.rio-ui button {
+/* The app's soft-pill buttons (styles/controls.css) never reach the game's kit pieces. */
+.rio-ui button,
+.rio-ui button[aria-pressed],
+.rio-ui button:disabled {
   font: inherit;
   color: inherit;
   margin: 0;
+  padding: 0;
+  border-radius: 0;
+  min-height: 0;
 }
 .rio-ui .bt {
   display: block;
@@ -305,10 +311,12 @@
 }
 
 /* The tab's own content sits over the panel, but never over the tab row (clicks go through). */
-.rio-menu [role="tabpanel"] {
+.rio-menu [role="tabpanel"],
+.rio-menu .fill {
   pointer-events: none;
 }
-.rio-menu [role="tabpanel"] > * {
+.rio-menu [role="tabpanel"] > :not(.fill),
+.rio-menu .fill > * {
   pointer-events: auto;
 }
 

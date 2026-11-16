@@ -1,0 +1,147 @@
+/* Esme's Rio: the game screen's frame (GameScreen.tsx). The one place the game's layout in the app
+   lives, so the app's theming can restyle it later. On /farm the shell is marked .is-game: the
+   content area loses its page padding, the page never scrolls, and the game fills everything
+   beside the sidebar (the phone: everything under the phone header). Esme chose option A
+   (2026-11-17, esmeworld-notes/mockups/more-rio.html section 2): the sidebar stays as it is, and
+   the edges round the art are the kit's wooden planks (wood-planks, tiled at the UI's scale).
+   Nothing outside the game route is restyled here. The things drawn over the game (the
+   hotbar, an area's buttons, the arrival note) sit on top, in the kit's pieces. */
+
+html:has(.app-shell.is-game),
+html:has(.app-shell.is-game) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app-shell.is-game {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+.app-shell.is-game > .app-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.app-shell.is-game .shell-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 25;
+  margin: 0;
+}
+.app-shell.is-game.is-phone {
+  display: flex;
+  flex-direction: column;
+}
+.app-shell.is-game.is-phone > .app-content {
+  flex: 1;
+  padding: env(safe-area-inset-top) 0 0;
+}
+.app-shell.is-game.is-phone .phone-top {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.game-screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--k-wood-planks) 0 0 / calc(32 * var(--u, 2px)) calc(32 * var(--u, 2px)) repeat;
+}
+.game-screen > .rio-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* ---- on top of the game ---- */
+/* The hotbar (esme-ui core.js hotbar: bottom centre, 2 UI px up). On the phone it sits above the
+   nook and the round + (the room add.css keeps for them). */
+.rio-hud-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 20;
+}
+.is-phone .rio-hud-bottom {
+  bottom: calc(110px + env(safe-area-inset-bottom));
+}
+.rio-hotbar {
+  position: relative;
+  margin-bottom: 2em;
+  pointer-events: auto;
+}
+.rio-ui .slot.hb {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.rio-ui .slot.hb:hover {
+  background-image: var(--k-slot-hover);
+}
+
+/* An area's buttons, top left; the overflow line under them. */
+.rio-area-controls {
+  position: absolute;
+  top: 4em;
+  left: 4em;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4em;
+  max-width: calc(100% - 8em);
+}
+.rio-area-controls [role="group"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4em;
+}
+.rio-area-note {
+  position: absolute;
+  left: 4em;
+  bottom: 30em;
+  z-index: 20;
+}
+
+/* "<name> has moved in!", top centre in a thin kit frame. */
+.rio-arrival {
+  position: absolute;
+  top: 4em;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 21;
+  pointer-events: none;
+}
+.rio-ui .thin.flow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4em;
+  padding: 2em;
+  pointer-events: auto;
+}
+.rio-ui .thin.flow > p {
+  display: flex;
+  align-items: center;
+  gap: 4em;
+  margin: 0;
+}

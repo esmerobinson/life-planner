@@ -56,7 +56,7 @@ export function NoticeboardTab({ view, stage, inner, narrow, day, statuses }: Ta
   if (note) {
     const ic = KIT[note.icon]!;
     return (
-      <div className="a" style={pos(0, 0, stage.w, stage.h)}>
+      <div className="a fill" style={pos(0, 0, stage.w, stage.h)}>
         <ArrowButton dir="left" label="Back" x={narrow ? inner.x + 4 : inner.x - 20} y={narrow ? inner.y + 4 : inner.y - 2} onClick={() => setOpen(null)} />
         <div className="pnl-inner note-detail" style={pos(inner.x, inner.y, inner.w, inner.h)}>
           {note.key === "friend" && friend

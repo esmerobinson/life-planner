@@ -66,19 +66,19 @@ export function useFit(ref: RefObject<HTMLElement | null>, canvas: [number, numb
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // In the game screen (rio/GameScreen.tsx) the art fits the screen itself.
+    const screen = el.closest<HTMLElement>(".game-screen");
     const measure = () => {
       const host = el.parentElement ?? el;
-      const next = {
-        w: host.clientWidth,
-        h: window.innerHeight - pageTop(el) - pageGap(el) - reserve,
-        dpr: window.devicePixelRatio || 1,
-      };
+      const next = screen
+        ? { w: screen.clientWidth, h: screen.clientHeight - reserve, dpr: window.devicePixelRatio || 1 }
+        : { w: host.clientWidth, h: window.innerHeight - pageTop(el) - pageGap(el) - reserve, dpr: window.devicePixelRatio || 1 };
       setBox((b) => (b.w === next.w && b.h === next.h && b.dpr === next.dpr ? b : next));
     };
     measure();
     window.addEventListener("resize", measure);
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    ro?.observe(el.parentElement ?? el);
+    ro?.observe(screen ?? el.parentElement ?? el);
     // What sits above it can change height (a banner comes and goes): the page's size changes too.
     const page = el.closest(".app-content");
     if (page) ro?.observe(page);

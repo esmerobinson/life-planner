@@ -87,7 +87,7 @@ export function CollectionTab({ view, stage, inner, narrow, canPlace, startArea,
   const total = `${view.collected} of ${COLLECTION.length} in all`;
 
   return (
-    <div className="a" style={pos(0, 0, stage.w, stage.h)} onKeyDown={onKeyDown}>
+    <div className="a fill" style={pos(0, 0, stage.w, stage.h)} onKeyDown={onKeyDown}>
       {/* The places: side tabs (the phone: a row of small tabs inside the panel). */}
       <div role="tablist" aria-label="Places in your collection" aria-orientation={narrow ? "horizontal" : "vertical"}>
         {COLLECTION_AREAS.map((a, i) => {
