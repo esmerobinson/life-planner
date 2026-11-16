@@ -85,4 +85,12 @@ describe("farmState", () => {
     expect(rest2).toEqual(rest1);
     expect([...visited].sort()).toEqual(["fazenda", "lagoa-house"]);
   });
+
+  it("keeps the day each sticker went into the collection (the Noticeboard's 'Just earned')", () => {
+    const s = farmState([seenRow("hi", "2026-11-04"), seenRow("hen", "2026-11-06"), placedRow("cow", "rio", "2026-11-07")]);
+    expect(s.seenOn.get("hi")).toBe("2026-11-04");
+    expect(s.seenOn.get("hen")).toBe("2026-11-06");
+    expect(s.seenOn.has("cow")).toBe(false);
+    expect(EMPTY_FARM.seenOn.size).toBe(0);
+  });
 });
