@@ -13,6 +13,8 @@ import { GameScreen } from "../rio/GameScreen";
 import { Hotbar } from "../rio/Hotbar";
 import { devLook, useRioLook } from "../rio/look";
 import { GameMenu, MENU_TABS, type MenuTab } from "../rio/menu/GameMenu";
+import { PhoneCollection } from "../rio/menu/PhoneCollection";
+import { usePhone } from "../ui/usePhone";
 import { TextButton, em } from "../rio/menu/pieces";
 import { homeOf } from "../rio/placement";
 import { RioMap } from "../rio/RioMap";
@@ -31,6 +33,8 @@ const isTab = (t: string | null): t is MenuTab => MENU_TABS.some((m) => m.key ==
 
 export function FarmPage() {
   const view = useFarm();
+  // The phone has no game, only her collection (Esme, 2026-11-17).
+  const phone = usePhone();
   const [arrivals, setArrivals] = useState<CharacterId[]>([]);
   const [area, setArea] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuTab | null>(null);
@@ -86,14 +90,14 @@ export function FarmPage() {
   useEffect(() => {
     const t = new URLSearchParams(location.search).get("menu");
     if (!isTab(t)) return;
-    openMenu(t);
+    if (!phone) openMenu(t);
     navigate("/farm", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
   // Esc opens the menu (never while she types, or while another pop-up has it); the menu closes itself.
   useEffect(() => {
-    if (menu) return;
+    if (menu || phone) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || e.altKey || e.metaKey || e.ctrlKey) return;
       if (isTypingTarget(document.activeElement) || document.querySelector('[role="dialog"]')) return;
@@ -102,17 +106,18 @@ export function FarmPage() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [menu, lastTab, openMenu]);
+  }, [menu, lastTab, openMenu, phone]);
 
   // The first open starts the game.
   useEffect(() => {
     if (view?.loaded && view.state.start === null) void view.ensureStart();
   }, [view]);
 
-  // Opening the Collection clears the nook's glint (a sticker went in since she last looked).
+  // Opening the Collection clears the nook's glint (a sticker went in since she last looked); on the
+  // phone the page is the collection.
   useEffect(() => {
-    if (menu === "collection" && view?.glint) view.clearGlint();
-  }, [menu, view]);
+    if ((phone || menu === "collection") && view?.glint) view.clearGlint();
+  }, [menu, view, phone]);
 
   // The nook's host follows the Collection's area, as it followed the book's page.
   const zoneKey = menu === "collection" && shownArea ? groupsOf(shownArea).join() : "";
@@ -132,6 +137,18 @@ export function FarmPage() {
   }, [view]);
 
   if (!view) return null;
+  if (phone) {
+    return (
+      <GameScreen>
+        <h1 className="visually-hidden">Esme's Rio</h1>
+        <p className="visually-hidden" role="status" data-earned={view.collected}>
+          {view.collected} of {COLLECTION.length} stickers
+        </p>
+        {view.loaded && view.state.start && <PhoneCollection view={view} canPlace={canPlace} />}
+        {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}
+      </GameScreen>
+    );
+  }
   return (
     <GameScreen back={!area}>
       <h1 className="visually-hidden">Esme's Rio</h1>

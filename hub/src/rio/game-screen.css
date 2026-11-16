@@ -69,12 +69,30 @@ html:has(.app-shell.is-game) body {
   position: absolute;
 }
 
-/* Back, top left, on top of the game. */
-.rio-hud-top {
+/* Back (more-rio.html section 2: .back.n-btn): the kit's word button, 4 px of its border art,
+   3 px either side of the small pixel font at 1x, 20 px from the top-left corner, over the game.
+   Its focus ring is the app's own (controls.css), so the app's colours reach it. */
+.rio-ui .game-back {
   position: absolute;
-  top: 4em;
-  left: 4em;
+  top: 20px;
+  left: 20px;
   z-index: 22;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 4px;
+  border-image: var(--k-btn-text) 3 fill stretch;
+  padding: 0 3px;
+  background: none;
+  cursor: pointer;
+}
+.rio-ui .game-back:hover {
+  border-image-source: var(--k-btn-text-hover);
+}
+.rio-ui .game-back:focus-visible {
+  outline: 2px solid var(--placeholder);
+  outline-offset: 2px;
 }
 
 /* ---- on top of the game ---- */
@@ -157,4 +175,14 @@ html:has(.app-shell.is-game) body {
   align-items: center;
   gap: 4em;
   margin: 0;
+}
+
+/* The phone's collection (Esme, 2026-11-17: "no game on phone other than stickers collected UI"):
+   the kit's phone panel, centred in the game's view. */
+.rio-phone-collection {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

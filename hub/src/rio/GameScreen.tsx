@@ -9,7 +9,9 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useReducedMotion } from "../farm/hooks";
-import { TextButton, kitVars } from "./menu/pieces";
+import { kitVars } from "./menu/pieces";
+import { BitmapText } from "./ui/BitmapText";
+import { INK } from "./ui/kit";
 import { UiContext, menuFit } from "./ui/fit";
 import "./menu/menu.css";
 import "./game-screen.css";
@@ -55,14 +57,15 @@ export function GameScreen({ children, back: showBack = true }: { children: Reac
       <div className="game-view">
         <UiContext.Provider value={fit}>
           {children}
-          {showBack && (
-            <div className="rio-hud-top" style={{ fontSize: `${fit.u}px` }}>
-              {/* PLACEHOLDER WORDING */}
-              <TextButton label="Back" onClick={back} />
-            </div>
-          )}
         </UiContext.Provider>
       </div>
+      {/* Small, as the mockup (Esme, 2026-11-17: "back button can be smaller"): the kit's word
+          button with the small pixel font at 1x, 20 px from the corner. PLACEHOLDER WORDING */}
+      {showBack && (
+        <button type="button" className="game-back" onClick={back}>
+          <BitmapText text="Back" px={1} colour={INK.cream} shadow={INK.buttonShadow} />
+        </button>
+      )}
     </div>
   );
 }

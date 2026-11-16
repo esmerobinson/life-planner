@@ -50,11 +50,13 @@ export interface BitmapTextProps {
   lh?: number;
   className?: string;
   style?: CSSProperties;
+  /** CSS px per font pixel, instead of the UI's (the small Back: 1). */
+  px?: number;
 }
 
-export function BitmapText({ text, heading = false, colour = INK.ink, shadow, w, align, lh, className, style }: BitmapTextProps) {
+export function BitmapText({ text, heading = false, colour = INK.ink, shadow, w, align, lh, className, style, px }: BitmapTextProps) {
   const { u, layout } = useUi();
-  const fz = heading ? headPx(u) : bodyPx(u, layout);
+  const fz = px ?? (heading ? headPx(u) : bodyPx(u, layout));
   const canvas = useRef<HTMLCanvasElement>(null);
   const maxW = w ? Math.floor((w * u) / fz) : Infinity;
   const lines = Number.isFinite(maxW) ? wrapText(text, maxW) : text.split("\n");

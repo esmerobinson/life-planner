@@ -123,6 +123,7 @@ for (const width of [1280, 390]) {
     const phone = width === 390;
 
     test("the first open starts the farm: Welcome plays in the nook and goes into the book", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await page.goto("/farm");
       await expect(page.getByRole("heading", { level: 1, name: "Esme's Rio" })).toBeAttached();
       await expect.poll(() => farmRow(page, "seen:hi")).not.toBeNull();
@@ -166,6 +167,7 @@ for (const width of [1280, 390]) {
     });
 
     test("the menu's Collection: place a ready sticker in Rio; a silhouette gives its hint", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await startedFarm(page);
       await page.goto("/farm");
       await page.getByRole("navigation", { name: "Game menu" }).getByRole("button", { name: "Collection" }).click();
@@ -191,6 +193,7 @@ for (const width of [1280, 390]) {
     });
 
     test("the menu by keyboard: Esc opens it, arrows move along the tabs, Enter opens one, Esc closes it", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await startedFarm(page);
       await page.goto("/farm");
       await expect(page.getByRole("list", { name: "Places in Rio" })).toBeAttached();
@@ -212,6 +215,7 @@ for (const width of [1280, 390]) {
     });
 
     test("the map: whole on screen; a tap opens the Lagoa house (the visit is noted); Barraca says when it opens", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await page.goto("/farm");
       const canvas = page.locator(".rio-map canvas");
       await expect(canvas).toBeVisible();
@@ -238,6 +242,7 @@ for (const width of [1280, 390]) {
     });
 
     test("reduced motion: the device's setting by default, or hers in Settings for this device", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await page.emulateMedia({ reducedMotion: "reduce" });
       await startedFarm(page);
       await page.goto("/farm");
@@ -255,14 +260,40 @@ for (const width of [1280, 390]) {
     test("Back leaves the game for the page she came from", async ({ page }) => {
       await page.goto("/goals");
       await page.locator('.farm-nook a[href="/farm"]').first().click();
-      await expect(page.getByRole("list", { name: "Places in Rio" })).toBeAttached();
-      await page.getByRole("button", { name: "Back" }).click();
+      await expect(page.locator(".game-screen")).toBeVisible();
+      await page.getByRole("button", { name: "Back", exact: true }).click();
       await expect(page).toHaveURL(/\/goals$/);
       // Opened directly, Back goes Home.
       await page.goto("/farm");
-      await page.getByRole("button", { name: "Back" }).focus();
+      await page.getByRole("button", { name: "Back", exact: true }).focus();
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/\/$/);
+    });
+
+    test("the phone shows only her collection, full screen: place a sticker; no map, areas or menu", async ({ page }) => {
+      test.skip(!phone, "the phone only");
+      await startedFarm(page);
+      await page.goto("/farm");
+      const col = page.getByRole("region", { name: "Your sticker collection" });
+      await expect(col).toBeVisible();
+      await expect(page.locator(".rio-map")).toHaveCount(0);
+      await expect(page.getByRole("navigation", { name: "Game menu" })).toHaveCount(0);
+      await expect(page.locator(".sidebar, .phone-top")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Back", exact: true })).toBeVisible();
+      // The first open's Welcome still plays in the nook and is kept.
+      await expect.poll(() => farmRow(page, "seen:hi")).not.toBeNull();
+      await col.getByRole("tab", { name: "Fazenda" }).click();
+      await col.getByRole("button", { name: "Mind: seeds: ready to place" }).click();
+      await page.getByRole("dialog", { name: "Mind: seeds" }).getByRole("button", { name: "Place in Rio" }).click();
+      await expect.poll(() => farmRow(page, "placed:seeds-mind")).toMatchObject({ spot: "rio" });
+      // The panel is whole on screen; nothing scrolls.
+      const b = (await col.boundingBox())!;
+      const vp = page.viewportSize()!;
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(vp.width + 0.5);
+      expect(b.y + b.height).toBeLessThanOrEqual(vp.height + 0.5);
+      expect(await page.evaluate(() => [document.documentElement.scrollHeight - innerHeight, document.documentElement.scrollWidth - innerWidth]))
+        .toEqual([0, 0]);
     });
 
     test("Caetano (id bap) takes the nook on the Journal once he has arrived; Mr Cat (domino) everywhere else", async ({ page }) => {
@@ -282,8 +313,8 @@ for (const width of [1280, 390]) {
   });
 }
 
-for (const [w, h] of [[2560, 1080], [390, 1300]] as const) {
-  test(`a very ${w > h ? "wide" : "tall"} window (${w}x${h}): the full-window game keeps every place on screen with an even border`, async ({ page }) => {
+for (const [w, h] of [[2560, 1080]] as const) {
+  test(`a very wide window (${w}x${h}): the full-window game keeps every place on screen with an even border`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/farm");
     await expect(page.locator(".rio-map canvas")).toBeVisible();

@@ -77,6 +77,44 @@ it("the game takes the whole window: no sidebar, Inbox or +; Back goes Home when
   expect(await screen.findByRole("navigation", { name: "Main" })).toBeInTheDocument();
 });
 
+it("Back is the kit's small word button: the small pixel font at 1x (Esme, 2026-11-17: \"back button can be smaller\")", async () => {
+  renderApp("/farm", "2026-11-04");
+  await screen.findByRole("list", { name: "Places in Rio" });
+  const back = screen.getByRole("button", { name: "Back" });
+  expect(back).toHaveClass("game-back");
+  const c = back.querySelector("canvas")!;
+  expect(c.style.width).toBe(`${c.width}px`);
+});
+
+describe("on the phone, only the collection (Esme, 2026-11-17: \"no game on phone other than stickers collected UI\")", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: q.includes("max-width"), media: q, addEventListener: () => undefined, removeEventListener: () => undefined,
+    }));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows her stickers full screen with Back; no map, areas, hotbar or menu tabs", async () => {
+    await db.farm.bulkPut([startRow("dev-a", "2026-11-02"), seenRow("hi", "2026-11-02"), seenRow("lilypad", "2026-11-03")]);
+    renderApp("/farm", "2026-11-04");
+    const user = userEvent.setup();
+    const col = await screen.findByRole("region", { name: "Your sticker collection" });
+    expect(screen.queryByRole("list", { name: "Places in Rio" })).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Game menu" })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "Menu" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    // Placing still works from here.
+    await user.click(within(col).getByRole("tab", { name: "Ipanema beach" }));
+    await user.click(within(col).getByRole("button", { name: "Lily pad: ready to place" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Lily pad" })).getByRole("button", { name: "Place in Rio" }));
+    await waitFor(async () => expect(await db.farm.get("placed:lilypad")).toMatchObject({ spot: "rio" }));
+    // Esc doesn't open a menu here, and the nook (earned moments) is still there.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull();
+    expect(document.querySelector(".farm-nook")).toBeTruthy();
+  });
+});
+
 it("Back returns to the page she came from", async () => {
   renderApp(["/goals", "/farm"], "2026-11-04");
   const user = userEvent.setup();
