@@ -33,6 +33,17 @@ describe("where earned stickers sit", () => {
     }
   });
 
+  it("the sea off Arpoador: stream fish swim, the two workbook fish take the rare showcase", () => {
+    const fish = keysIn("aquarium");
+    const { bySlot, overflow } = layout("ipanema-beach/sea", fish);
+    expect(overflow).toBe(0);
+    for (const [slot, key] of bySlot) {
+      if (key === "moonfish" || key === "golden-carp") expect(slot, key).toMatch(/^rare-/);
+      else expect(slot, key).toMatch(/^swim-/);
+    }
+    expect(bySlot.size).toBe(fish.length);
+  });
+
   it("orchard trees stand outside the Jardim Botanico, the glasshouse in its orchid house", () => {
     expect(homeOf("sapling")).toEqual({ area: "jardim-botanico", scene: "jardim-botanico/outside" });
     expect(homeOf("tree-swing")).toEqual({ area: "jardim-botanico", scene: "jardim-botanico/outside" });

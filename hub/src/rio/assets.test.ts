@@ -153,3 +153,16 @@ describe("phase 2a: the areas drawn since phase 1", () => {
     expect(Object.keys(import.meta.glob("../assets/rio/{week2,later}/*/stickers/**"))).toEqual([]);
   });
 });
+
+describe("the new sea off Arpoador replaces the rough first sea", () => {
+  const sea = SCENES["ipanema-beach/sea"];
+  it("reads the arpoador art: start and full in each look, 18 slots, its rain and its caustics", () => {
+    expect(sea.base.start!.night).toBe("later/arpoador-sea/scenes/arpoador-sea-start-night.png");
+    expect(Object.keys(sea.base)).toEqual(["start", "full"]);
+    expect(sea.slots).toHaveLength(18);
+    expect(sea.rainOverlay!.strip!.file).toBe("later/arpoador-sea/overlays/arpoador-rain.png");
+    expect(sea.underlay!.count).toBe(4);
+    expect(sea.underlay!.ms).toBe(160);
+    for (const state of ["start", "full"]) for (const look of LOOKS) expect(rioUrl(sea.underlay!.strips[state]![look]!), `${state} ${look}`).not.toBe("");
+  });
+});

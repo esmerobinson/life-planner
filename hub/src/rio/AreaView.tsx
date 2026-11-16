@@ -97,9 +97,13 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   const tvFrames = nightSide && !nightSide.baseTv ? [] : data.tv?.frames[shownLook] ?? [];
   const rainTick = useTicker(rain?.ms ?? 1000, !!rain && rainCount > 0 && !reduced);
   const tvTick = useTicker(data.tv?.ms ?? 1000, tvFrames.length > 0 && !reduced);
+  // The sea's caustics: the strip for this state and look, over the base and under the stickers.
+  const underlay = data.underlay;
+  const underlayStrip = underlay ? underlay.strips[state]?.[shownLook] ?? underlay.strips[state]?.day ?? "" : "";
+  const underlayTick = useTicker(underlay?.ms ?? 1000, !!underlayStrip && !reduced);
   const nightTick = useTicker(NIGHT_TICK_MS, !!nightSide && !reduced);
 
-  const layerFiles = [...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
+  const layerFiles = [underlayStrip, ...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
   const files = useMemo(() => [base, ...layerFiles, ...rainFrames, ...tvFrames], [base, layerFiles.join(), rainFrames.join(), tvFrames.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const images = useRioImages(files);
   const sheets = useSheets(STICKER_SHEETS);
@@ -130,6 +134,10 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
       const i = images[f];
       if (i) ctx.drawImage(i, 0, 0);
     };
+    if (underlay && underlayStrip) {
+      const img = images[underlayStrip];
+      if (img) drawFrame(ctx, img, underlay.size[0], underlay.size[1], reduced ? 0 : underlayTick % underlay.count, 0, 0);
+    }
     celebrationFiles.forEach(put);
     milestoneFiles.forEach(put);
     // Book n draws spine n at shelf slot n (one that needs a milestone only once it's earned); every fifth hangs a cover.
@@ -184,7 +192,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
         if (img) ctx.drawImage(img, 0, 0);
       }
     }
-  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick, underlayTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inside = scene !== scenes.outside;
   return (

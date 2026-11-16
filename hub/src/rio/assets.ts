@@ -125,6 +125,8 @@ export interface SceneData {
   slots: Slot[];
   /** The falling rain, drawn over everything while the look is rain. */
   rainOverlay?: { frames?: string[]; strip?: { file: string; count: number; size: [number, number] }; ms: number };
+  /** Under the stickers, over the base: a strip per state and look (the sea's caustics). */
+  underlay?: { strips: Record<string, Partial<Record<Look, string>>>; count: number; size: [number, number]; ms: number };
   /** The boteco's bar TV: frames per look at `at` (the base already shows frame 0). */
   tv?: { at: [number, number]; ms: number; frames: Partial<Record<Look, string[]>> };
   /** Os Esquilos: one layer per whole goal finished, in step order, drawn over the start base. */
@@ -143,6 +145,8 @@ interface SceneSource {
   root: string;
   /** Rain frames the slots file doesn't name (they're in the area's README and manifest). */
   rain?: { frames: string[]; ms: number };
+  /** A separate overlays file (root-relative) with the rain and caustics strips (the sea off Arpoador). */
+  overlays?: string;
 }
 
 const IPANEMA_RAIN_MS = 120; // ipanema-slots.json looks.rain: "about 120 ms a frame"
@@ -160,7 +164,8 @@ const SOURCES: Record<SceneId, SceneSource> = {
     file: "day1/ipanema/barraca/barraca-slots.json", root: "day1/ipanema",
     rain: { frames: [0, 1, 2].map((i) => `overlays/rain-barraca-${i}.png`), ms: IPANEMA_RAIN_MS },
   },
-  "ipanema-beach/sea": { file: "day1/ipanema/sea/sea-slots.json", root: "day1/ipanema" },
+  // The finished sea (2026-11-17) replaces the rough first one in day1/ipanema/sea/ (left bundled, unread).
+  "ipanema-beach/sea": { file: "later/arpoador-sea/scenes/arpoador-sea-slots.json", root: "later/arpoador-sea", overlays: "overlays/arpoador-overlays.json" },
   "clothing-store/outside": {
     file: "day1/clothing-store/outside/outside-slots.json", root: "day1/clothing-store",
     rain: { frames: [0, 1, 2].map((i) => `outside/outside-rain-streaks-${i}.png`), ms: 110 }, // manifest.json overlays.rain
@@ -264,6 +269,16 @@ function readScene(src: SceneSource): SceneData {
     const meta = readJson<{ frames: number; frame_size: [number, number]; ms: number }>(at(rain.json));
     data.rainOverlay = { strip: { file: at(rain.file), count: meta.frames, size: meta.frame_size }, ms: meta.ms };
   } else if (src.rain) data.rainOverlay = { frames: src.rain.frames.map(at), ms: src.rain.ms };
+  if (src.overlays) {
+    type Strip = { frames: number; frame_size: [number, number]; ms: number };
+    const o = readJson<{ caustics?: Strip & { files: Record<string, RawLooks> }; rain?: Strip & { file: string } }>(at(src.overlays));
+    if (o.caustics) {
+      const strips: Record<string, Partial<Record<Look, string>>> = {};
+      for (const [state, looks] of Object.entries(o.caustics.files)) strips[state] = readLooks(looks, at);
+      data.underlay = { strips, count: o.caustics.frames, size: o.caustics.frame_size, ms: o.caustics.ms };
+    }
+    if (o.rain) data.rainOverlay = { strip: { file: at(o.rain.file), count: o.rain.frames, size: o.rain.frame_size }, ms: o.rain.ms };
+  }
   const tv = raw.overlays?.tv;
   if (tv) {
     const frames: NonNullable<SceneData["tv"]>["frames"] = {};

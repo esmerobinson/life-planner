@@ -40,7 +40,7 @@ const TAGS_BY_GROUP: Record<string, string[]> = {
   barnyard: ["fazenda:*", "outdoor"],
   meadow: ["hedgerow:*", "finds:*"],
   pond: ["pond"],
-  aquarium: ["fish", "aquarium"],
+  aquarium: ["fish:fish"], // the sea off Arpoador's swim slots
   farmhouse: ["boteco:*"],
   // The Jardim Botânico's kinds (its manifest's stickerAccepts): fruit trees, the swing and the
   // picnic blanket on the tree spots; the glasshouse's plants on the plant spots.
@@ -49,6 +49,10 @@ const TAGS_BY_GROUP: Record<string, string[]> = {
 };
 /** Single stickers whose kind differs from their group's. */
 const TAGS_BY_KEY: Record<string, string[]> = {
+  // The two workbook fish (a whole workbook finished) take the sea's rare-fish showcase, which the
+  // pack draws for exactly those.
+  moonfish: ["fish:rare"],
+  "golden-carp": ["fish:rare"],
   // The glasshouse's potting things go where the seed packet goes.
   seedtray: ["greenhouse:seeds"],
   seedling: ["greenhouse:seeds"],
@@ -65,7 +69,7 @@ export function stickerTags(stickerKey: string): string[] {
   const s = STICKER_BY_KEY.get(stickerKey);
   if (!s) return [];
   if (s.group === "barnyard" && ANIMAL[s.key]) return [ANIMAL[s.key]!];
-  if (s.group === "glasshouse" && TAGS_BY_KEY[s.key]) return TAGS_BY_KEY[s.key]!;
+  if ((s.group === "glasshouse" || s.group === "aquarium") && TAGS_BY_KEY[s.key]) return TAGS_BY_KEY[s.key]!;
   return TAGS_BY_SET[`${s.group}/${s.set}`] ?? TAGS_BY_GROUP[s.group] ?? [];
 }
 

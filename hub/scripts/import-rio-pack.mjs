@@ -22,6 +22,7 @@ const AREAS = [
   "later/sult",
   "later/os-esquilos",
   "later/santa-teresa",
+  "later/arpoador-sea",
 ];
 const SKIP = [
   /\/previews\//, /\/_scratch\//, /REVIEW-ONLY/, /\/no-esme\//,

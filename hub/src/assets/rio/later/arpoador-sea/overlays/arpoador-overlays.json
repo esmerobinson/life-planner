@@ -1,0 +1,39 @@
+{
+ "caustics": {
+  "frames": 4,
+  "layout": "frames side by side, left to right",
+  "ms": 160,
+  "loop": true,
+  "frame_size": [
+   320,
+   192
+  ],
+  "files": {
+   "start": {
+    "day": "overlays/arpoador-caustics-start-day.png",
+    "rain": "overlays/arpoador-caustics-start-rain.png",
+    "night": "overlays/arpoador-caustics-start-night.png"
+   },
+   "full": {
+    "day": "overlays/arpoador-caustics-full-day.png",
+    "rain": "overlays/arpoador-caustics-full-rain.png",
+    "night": "overlays/arpoador-caustics-full-night.png"
+   }
+  },
+  "draw": "over the base of the same state and look at 0,0, under stickers and fish",
+  "note": "the bright net of light on the sand, the lit rock tops and the shallows; it only lights what is in that picture, so use the strip that matches the base"
+ },
+ "rain": {
+  "frames": 4,
+  "layout": "frames side by side, left to right",
+  "ms": 110,
+  "loop": true,
+  "frame_size": [
+   320,
+   192
+  ],
+  "file": "overlays/arpoador-rain.png",
+  "draw": "over the rain base (either state) at 0,0, above everything",
+  "note": "rain seen from under the water: drops dimple the surface, open into rings and leave a short trail of entry bubbles; nothing falls through the water"
+ }
+}

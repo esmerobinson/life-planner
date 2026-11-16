@@ -1,0 +1,108 @@
+{
+ "pack": "rio-pack",
+ "batch": "later",
+ "location": "arpoador-sea",
+ "opensDay": 30,
+ "notes": "The sea off Arpoador, Ipanema beach's inside (what the aquarium was): one underwater scene in two states (start, full) and three looks (day, rain, night), with a 4-frame caustics overlay and a 4-frame rain overlay. Bases ship without stickers or the player. Replaces the simple first version in day1/ipanema/sea/ (left in place, unchanged).",
+ "role": "workbook chapters fill it: sea fish and river and lake fish (the 'fish' family), beach life (the 'pond' family) and tank pieces (the 'aquarium' family); the rare-fish showcase holds the workbook-complete legendaries. Nothing is ever removed.",
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "lookPalettes": {
+  "rain": "looks/palette-rain.json",
+  "night": "looks/palette-night.json"
+ },
+ "locations": [
+  {
+   "key": "arpoador-sea",
+   "name": "The sea off Arpoador",
+   "kind": "interior",
+   "size": [
+    320,
+    192
+   ],
+   "tile": 16,
+   "opensDay": 30,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "scenes/arpoador-sea-start-day.png",
+     "rain": "scenes/arpoador-sea-start-rain.png",
+     "night": "scenes/arpoador-sea-start-night.png"
+    },
+    "full": {
+     "day": "scenes/arpoador-sea-full-day.png",
+     "rain": "scenes/arpoador-sea-full-rain.png",
+     "night": "scenes/arpoador-sea-full-night.png"
+    }
+   },
+   "slots": "scenes/arpoador-sea-slots.json",
+   "slotCount": 18,
+   "overlays": {
+    "caustics": {
+     "start": {
+      "day": "overlays/arpoador-caustics-start-day.png",
+      "rain": "overlays/arpoador-caustics-start-rain.png",
+      "night": "overlays/arpoador-caustics-start-night.png"
+     },
+     "full": {
+      "day": "overlays/arpoador-caustics-full-day.png",
+      "rain": "overlays/arpoador-caustics-full-rain.png",
+      "night": "overlays/arpoador-caustics-full-night.png"
+     }
+    },
+    "rain": "overlays/arpoador-rain.png",
+    "json": "overlays/arpoador-overlays.json"
+   },
+   "previews": {
+    "start": {
+     "day": "previews/arpoador-sea-start-day@3.png",
+     "rain": "previews/arpoador-sea-start-rain@3.png",
+     "night": "previews/arpoador-sea-start-night@3.png"
+    },
+    "full": {
+     "day": "previews/arpoador-sea-full-day@3.png",
+     "rain": "previews/arpoador-sea-full-rain@3.png",
+     "night": "previews/arpoador-sea-full-night@3.png"
+    }
+   }
+  }
+ ],
+ "stickerAccepts": {
+  "fish:fish": "any fish sticker: the Rio sea fish (sardine, pufferfish, angelfish) and the river and lake fish carried from the pond (esme-pack/week1/pond/stickers/fish)",
+  "pond:animal": "a beach-life animal (crab, urchin; the pond's snail, vole and birds are allowed but odd)",
+  "pond:shell": "a shell (scallop shell)",
+  "pond:*": "any beach-life sticker",
+  "aquarium:tank decor": "a tank piece (ribbon weed, little castle, treasure chest)",
+  "fish:rare / fish:legendary": "the workbook-complete legendaries (not drawn yet; kinds proposed)"
+ },
+ "stickersShownInPreviews": [
+  "aquarium-castle",
+  "aquarium-ribbon-weed",
+  "aquarium-treasure-chest",
+  "fish-angelfish",
+  "fish-arctic-char",
+  "fish-bream",
+  "fish-grayling",
+  "fish-pufferfish",
+  "fish-roach",
+  "fish-rudd",
+  "fish-sardine",
+  "fish-tench",
+  "fish-zander",
+  "pond-crab",
+  "pond-seashell",
+  "pond-snail",
+  "pond-urchin"
+ ]
+}

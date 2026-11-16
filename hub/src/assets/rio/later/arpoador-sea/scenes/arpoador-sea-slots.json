@@ -1,0 +1,290 @@
+{
+ "room": "arpoador-sea",
+ "name": "The sea off Arpoador",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "scenes/arpoador-sea-start-day.png",
+   "rain": "scenes/arpoador-sea-start-rain.png",
+   "night": "scenes/arpoador-sea-start-night.png"
+  },
+  "full": {
+   "day": "scenes/arpoador-sea-full-day.png",
+   "rain": "scenes/arpoador-sea-full-rain.png",
+   "night": "scenes/arpoador-sea-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "states": {
+  "start": "quiet: Arpoador's granite face with barnacles, mussels and two anemones, the coral reef, two sargassum plants, the granite arch, the paddleboard at the surface, a little group of sardines and three reef fish; the octopus's eyes in its crevice",
+  "full": "busy: a big sardine shoal, two green turtles, a spotted eagle ray and a stingray in the sand, the octopus out on the crevice lip, more kelp and seagrass, more corals, sponges, sea fans, anemones, starfish, urchins, a crab, nine reef fish, bubbles, and a snorkeller's legs and fins at the surface"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame (16x16); draw at left = x - 8, top = y - 15",
+ "draw_order": "sort stickers by foot y (then x), back to front, over the base and the caustics overlay",
+ "sticker_looks": "recolour placed stickers by colour name with looks/palette-rain.json / palette-night.json, as the other Rio areas do",
+ "swim_note": "swim slots are free-swimming: the game may bob a fish 1 px or drift it a few px left and right; no shadow. Rock and sand slots sit; the game may add a 1 px sand shadow",
+ "showcase": {
+  "slots": [
+   "rare-1",
+   "rare-2"
+  ],
+  "x": 160,
+  "y": 176,
+  "note": "the rare-fish showcase: under the granite arch, on a pale sand clearing ringed with white stones, in its own sunbeam (a cyan glow ring at night). For the workbook-complete legendaries (one per whole workbook). Until one is earned the clearing stays empty; the ghost of a not-yet-earned legendary may show here"
+ },
+ "overlays": "overlays/arpoador-overlays.json",
+ "exits": [
+  {
+   "id": "surface",
+   "x": 0,
+   "y": 0,
+   "w": 320,
+   "h": 14,
+   "goes": "ipanema-beach",
+   "note": "swim up: back to the beach by Arpoador"
+  }
+ ],
+ "hotspots": [
+  {
+   "id": "octopus-crevice",
+   "x": 280,
+   "y": 96,
+   "w": 24,
+   "h": 16,
+   "goes": "none"
+  },
+  {
+   "id": "showcase",
+   "x": 130,
+   "y": 128,
+   "w": 60,
+   "h": 52,
+   "goes": "none"
+  }
+ ],
+ "player": {
+  "who": "Esme snorkelling (the player; drawn by the app, not baked)",
+  "sprite": {
+   "day": "player/esme-snorkel-day.png",
+   "rain": "player/esme-snorkel-rain.png",
+   "night": "player/esme-snorkel-night.png"
+  },
+  "json": "player/esme-snorkel.json",
+  "anchor": {
+   "x": 172,
+   "y": 37
+  },
+  "draw": "left = x - 26, top = y - 18; above stickers; 4 frames at 180 ms",
+  "note": "just under the surface by the paddleboard's nose, face down, snorkel up through the surface. Her dive torch is lit at night: the warm pool round it is baked into the night bases"
+ },
+ "friend": {
+  "key": "mr-cat",
+  "sheet": "../../../esme-pack/week1/friends/mr-cat.png",
+  "row": "sit_left",
+  "frames": 4,
+  "foot": {
+   "x": 198,
+   "y": {
+    "start": {
+     "day": 19,
+     "rain": 19,
+     "night": 19
+    },
+    "full": {
+     "day": 19,
+     "rain": 19,
+     "night": 19
+    }
+   }
+  },
+  "draw": "left = x - 16, top = y - 31 (y per state and look: the deck's top); recolour by name for rain and night like stickers; his hat / neck accessory sheets line up with the same frame",
+  "note": "Mr Cat sits on the paddleboard, facing left, looking down at Esme"
+ },
+ "slots": [
+  {
+   "id": "swim-1",
+   "x": 36,
+   "y": 98,
+   "area": "over the coral reef",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "swim-2",
+   "x": 66,
+   "y": 66,
+   "area": "open water, sunlit shallows",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "swim-3",
+   "x": 98,
+   "y": 58,
+   "area": "open water under the surface",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "swim-4",
+   "x": 118,
+   "y": 106,
+   "area": "open water, mid",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "swim-5",
+   "x": 206,
+   "y": 88,
+   "area": "open water, mid",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "swim-6",
+   "x": 236,
+   "y": 46,
+   "area": "under the paddleboard",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "swim-7",
+   "x": 210,
+   "y": 128,
+   "area": "by Arpoador's ledge",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "swim-8",
+   "x": 116,
+   "y": 140,
+   "area": "low over the seagrass",
+   "accepts": [
+    "fish:fish"
+   ]
+  },
+  {
+   "id": "rock-1",
+   "x": 22,
+   "y": 123,
+   "area": "top of the reef boulder",
+   "accepts": [
+    "pond:animal",
+    "pond:shell",
+    "aquarium:tank decor"
+   ]
+  },
+  {
+   "id": "rock-2",
+   "x": 264,
+   "y": 116,
+   "area": "Arpoador's low ledge",
+   "accepts": [
+    "pond:animal",
+    "pond:shell",
+    "aquarium:tank decor"
+   ]
+  },
+  {
+   "id": "rock-3",
+   "x": 264,
+   "y": 56,
+   "area": "the barnacle shelf below the waterline",
+   "accepts": [
+    "pond:animal",
+    "pond:shell"
+   ]
+  },
+  {
+   "id": "rock-4",
+   "x": 160,
+   "y": 126,
+   "area": "on top of the granite arch",
+   "accepts": [
+    "pond:animal",
+    "pond:shell",
+    "aquarium:tank decor"
+   ]
+  },
+  {
+   "id": "sand-1",
+   "x": 106,
+   "y": 184,
+   "area": "sandy floor",
+   "accepts": [
+    "pond:*",
+    "aquarium:tank decor"
+   ]
+  },
+  {
+   "id": "sand-2",
+   "x": 214,
+   "y": 186,
+   "area": "sandy floor",
+   "accepts": [
+    "pond:*",
+    "aquarium:tank decor"
+   ]
+  },
+  {
+   "id": "sand-3",
+   "x": 242,
+   "y": 172,
+   "area": "sand at the foot of Arpoador",
+   "accepts": [
+    "pond:*",
+    "aquarium:tank decor"
+   ]
+  },
+  {
+   "id": "sand-4",
+   "x": 132,
+   "y": 190,
+   "area": "sand beside the showcase",
+   "accepts": [
+    "pond:*",
+    "aquarium:tank decor"
+   ]
+  },
+  {
+   "id": "rare-1",
+   "x": 152,
+   "y": 170,
+   "area": "rare-fish showcase, under the arch (left)",
+   "accepts": [
+    "fish:rare",
+    "fish:legendary"
+   ],
+   "showcase": true
+  },
+  {
+   "id": "rare-2",
+   "x": 172,
+   "y": 160,
+   "area": "rare-fish showcase, under the arch (right)",
+   "accepts": [
+    "fish:rare",
+    "fish:legendary"
+   ],
+   "showcase": true
+  }
+ ]
+}
