@@ -160,11 +160,16 @@ for (const width of [1280, 390]) {
       await page.goto("/farm");
       const canvas = page.locator(".rio-map canvas");
       await expect(canvas).toBeVisible();
-      // No scrolling: the whole map fits the window, and the page never scrolls sideways.
+      // No scrolling: the map comes first, above the sticker book (Esme, 2026-11-16), and the
+      // whole of it is on screen as the page opens; the page never scrolls sideways.
       const box = (await canvas.boundingBox())!;
       const vp = page.viewportSize()!;
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.width).toBeLessThanOrEqual(vp.width);
-      expect(box.height).toBeLessThanOrEqual(vp.height);
+      expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
+      const book = (await page.locator(".farm-book").boundingBox())!;
+      expect(book.y).toBeGreaterThanOrEqual(box.y + box.height);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
       // Day one: Barraca is next, with its tooltip on hover.
       await canvas.scrollIntoViewIfNeeded();
@@ -177,7 +182,7 @@ for (const width of [1280, 390]) {
       await expect.poll(() => farmRow(page, "visited:lagoa-house")).toMatchObject({ kind: "visited", area: "lagoa-house" });
       const sbox = (await page.locator(".rio-area canvas").boundingBox())!;
       expect(sbox.width).toBeLessThanOrEqual(vp.width);
-      expect(sbox.height).toBeLessThanOrEqual(vp.height);
+      expect(sbox.y + sbox.height).toBeLessThanOrEqual(vp.height);
       await page.getByRole("button", { name: "Kitchen" }).click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/kitchen");
       await page.getByRole("button", { name: "Back to the map" }).click();

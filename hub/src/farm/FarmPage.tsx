@@ -1,5 +1,5 @@
-// Esme's Rio: the one page for the whole game (/farm). The sticker book on top, Rio beneath it:
-// the map, or the area she opened from it. Opening it the first time starts the game (a fresh
+// Esme's Rio: the one page for the whole game (/farm). Rio on top (the map, or the area she
+// opened from it), the sticker book below it (Esme, 2026-11-16). Opening it the first time starts the game (a fresh
 // start: nothing from before counts).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -103,6 +103,11 @@ export function FarmPage() {
           <button type="button" className="btn-secondary" onClick={() => setArrivals([])}>OK</button>
         </div>
       )}
+      <div ref={farmRef} className="rio-wrap">
+        {area
+          ? <AreaView key={area} area={area} look={look} placed={placedKeys} onBack={() => setArea(null)} />
+          : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
+      </div>
       <StickerBook
         view={view}
         phone={phone}
@@ -112,11 +117,6 @@ export function FarmPage() {
         canPlace={canPlace}
         onPlaced={() => farmRef.current?.scrollIntoView?.({ block: "nearest" })}
       />
-      <div ref={farmRef} className="rio-wrap">
-        {area
-          ? <AreaView key={area} area={area} look={look} placed={placedKeys} onBack={() => setArea(null)} />
-          : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
-      </div>
       <div className="farm-cast" aria-label="Who lives here">
         {CHARACTERS.filter((c) => view.arrived.has(c)).map((c) => (
           <button key={c} type="button" className="btn-secondary" aria-pressed={who === c} onClick={() => setWho(who === c ? null : c)}>

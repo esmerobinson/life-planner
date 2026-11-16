@@ -101,6 +101,14 @@ describe("Esme's Rio on the farm page", () => {
     }
   }
 
+  it("the map comes first and the sticker book follows below it (Esme, 2026-11-16)", async () => {
+    renderApp("/farm", "2026-11-04");
+    const map = (await places()).closest(".rio-wrap")!;
+    const book = document.querySelector(".farm-book")!;
+    expect(map).toBeTruthy();
+    expect(map.compareDocumentPosition(book) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("on a fresh farm the map shows; opening the Lagoa house shows it and notes the visit; back, it's no longer new", async () => {
     renderApp("/farm", "2026-11-04");
     const user = userEvent.setup();

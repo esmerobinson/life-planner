@@ -46,16 +46,20 @@ export function useRioImages(paths: readonly string[]): RioImages | null {
   return images?.key === key ? images.images : null;
 }
 
-/** The vertical padding of the page around the content (the map fits inside it, no scrolling). */
-function pagePadding(el: HTMLElement): number {
+/** The page's padding below the content (the same as above it; the map keeps clear of it). */
+function pageGap(el: HTMLElement): number {
   const content = el.closest(".app-content");
   if (!content) return 0;
-  return 2 * (parseFloat(getComputedStyle(content).paddingTop) || 0);
+  return parseFloat(getComputedStyle(content).paddingTop) || 0;
 }
+
+/** How far down the page `el` starts (whatever sits above it: the page title, a banner). */
+const pageTop = (el: HTMLElement): number => el.getBoundingClientRect().top + (window.scrollY || 0);
 
 /**
  * The CSS scale at which `canvas` fits both the width of `ref`'s parent and the window's height
- * (less `reserve` CSS px for what sits with it on screen), at the largest crisp size.
+ * below where `ref` starts on the page (less `reserve` CSS px for what sits with it on screen),
+ * at the largest crisp size: so it is whole on screen as the page opens, with no scrolling.
  */
 export function useFit(ref: RefObject<HTMLElement | null>, canvas: [number, number], reserve = 0): number {
   const [box, setBox] = useState({ w: canvas[0], h: canvas[1], dpr: 1 });
@@ -64,16 +68,20 @@ export function useFit(ref: RefObject<HTMLElement | null>, canvas: [number, numb
     if (!el) return;
     const measure = () => {
       const host = el.parentElement ?? el;
-      setBox({
+      const next = {
         w: host.clientWidth,
-        h: window.innerHeight - pagePadding(el) - reserve,
+        h: window.innerHeight - pageTop(el) - pageGap(el) - reserve,
         dpr: window.devicePixelRatio || 1,
-      });
+      };
+      setBox((b) => (b.w === next.w && b.h === next.h && b.dpr === next.dpr ? b : next));
     };
     measure();
     window.addEventListener("resize", measure);
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     ro?.observe(el.parentElement ?? el);
+    // What sits above it can change height (a banner comes and goes): the page's size changes too.
+    const page = el.closest(".app-content");
+    if (page) ro?.observe(page);
     return () => {
       window.removeEventListener("resize", measure);
       ro?.disconnect();
