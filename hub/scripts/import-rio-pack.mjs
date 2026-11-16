@@ -1,6 +1,7 @@
 // Copies the finished Rio art pack into the app (src/assets/rio/), keeping relative paths.
 // Usage: node scripts/import-rio-pack.mjs <rio-pack dir>
 // Only the final folders the app reads; never previews, scratch, review-only or no-esme files.
+// The map's holiday events (events/) are left out: phase 1 doesn't show them.
 
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -15,7 +16,7 @@ const AREAS = [
   "week1/tijuca-park",
   "later/boteco",
 ];
-const SKIP = [/\/previews\//, /\/_scratch\//, /REVIEW-ONLY/, /\/no-esme\//];
+const SKIP = [/\/previews\//, /\/_scratch\//, /REVIEW-ONLY/, /\/no-esme\//, /^\/day1\/map\/events\//];
 
 const pack = process.argv[2];
 if (!pack) {

@@ -1,17 +1,18 @@
-import { LOOKS, RIO_MAP, SCENES, mapLayer, rioUrl, type SceneId } from "./assets";
+import { LOOKS, RIO_MAP, SCENES, mapBase, mapLayer, rioUrl, type SceneId } from "./assets";
 
 describe("the Rio art pack is bundled", () => {
   it("every map layer file is bundled", () => {
     for (const p of [...RIO_MAP.places, RIO_MAP.boat_route]) {
-      for (const look of ["day", "night"] as const) {
+      for (const look of ["day", "night", "rain"] as const) {
         for (const state of ["open", "locked"] as const) {
-          const path = p.layers[look][state];
+          const path = mapLayer(p, look, state);
           expect(rioUrl(`day1/map/${path}`), `${p.key} ${state} ${look}`).not.toBe("");
         }
       }
     }
     for (const m of ["locked", "new", "here", "stuck"] as const) expect(rioUrl(`day1/map/${RIO_MAP.markers[m].file}`)).not.toBe("");
-    for (const look of ["day", "night"] as const) expect(rioUrl(`day1/map/${RIO_MAP.look_files[look]!.base}`)).not.toBe("");
+    for (const look of ["day", "night", "rain"] as const) expect(rioUrl(`day1/map/${mapBase(look)}`)).not.toBe("");
+    for (const f of RIO_MAP.weather?.rain?.overlay.frames ?? []) expect(rioUrl(`day1/map/${f}`)).not.toBe("");
   });
 
   it("every scene base file is bundled", () => {
@@ -65,5 +66,18 @@ describe("the Rio art pack is bundled", () => {
     const rain = (lagoa.layers as Record<string, unknown>).rain as { open: string } | undefined;
     expect(mapLayer(lagoa, "rain", "open")).toBe(rain ? rain.open : lagoa.layers.day.open);
     expect(mapLayer(lagoa, "night", "locked")).toBe(lagoa.layers.night.locked);
+  });
+});
+
+describe("the map's rain look (added to the pack 2026-11-15)", () => {
+  it("is used now that the pack has it: rain layers, rain base and the falling rain", () => {
+    const lagoa = RIO_MAP.places.find((p) => p.key === "lagoa-house")!;
+    expect(mapLayer(lagoa, "rain", "open")).toBe("layers/lagoa-house-open-rain.png");
+    expect(mapBase("rain")).toBe("map-base-rain.png");
+    expect(RIO_MAP.weather?.rain?.overlay.frames.length).toBe(4);
+  });
+  it("holiday events are not bundled in phase 1", () => {
+    expect(rioUrl("day1/map/events/carnaval.png")).toBe("");
+    expect(Object.keys(import.meta.glob("../assets/rio/day1/map/events/**"))).toEqual([]);
   });
 });

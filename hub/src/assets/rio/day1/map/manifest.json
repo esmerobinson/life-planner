@@ -7,7 +7,8 @@
  ],
  "looks": [
   "day",
-  "night"
+  "night",
+  "rain"
  ],
  "states": [
   "open",
@@ -25,6 +26,12 @@
    "file": "map-base-night.png",
    "allOpen": "map-all-open-night.png",
    "day1": "map-day1-night.png"
+  },
+  {
+   "look": "rain",
+   "file": "map-base-rain.png",
+   "allOpen": "map-all-open-rain.png",
+   "day1": "map-day1-rain.png"
   }
  ],
  "places": [
@@ -40,6 +47,10 @@
     "night": {
      "open": "layers/christ-the-redeemer-open-night.png",
      "locked": "layers/christ-the-redeemer-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/christ-the-redeemer-open-rain.png",
+     "locked": "layers/christ-the-redeemer-locked-rain.png"
     }
    }
   },
@@ -55,6 +66,10 @@
     "night": {
      "open": "layers/parque-lage-open-night.png",
      "locked": "layers/parque-lage-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/parque-lage-open-rain.png",
+     "locked": "layers/parque-lage-locked-rain.png"
     }
    }
   },
@@ -70,6 +85,10 @@
     "night": {
      "open": "layers/jardim-botanico-open-night.png",
      "locked": "layers/jardim-botanico-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/jardim-botanico-open-rain.png",
+     "locked": "layers/jardim-botanico-locked-rain.png"
     }
    }
   },
@@ -85,6 +104,10 @@
     "night": {
      "open": "layers/dois-irmaos-open-night.png",
      "locked": "layers/dois-irmaos-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/dois-irmaos-open-rain.png",
+     "locked": "layers/dois-irmaos-locked-rain.png"
     }
    }
   },
@@ -100,6 +123,10 @@
     "night": {
      "open": "layers/rocinha-open-night.png",
      "locked": "layers/rocinha-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/rocinha-open-rain.png",
+     "locked": "layers/rocinha-locked-rain.png"
     }
    }
   },
@@ -115,6 +142,10 @@
     "night": {
      "open": "layers/tijuca-park-open-night.png",
      "locked": "layers/tijuca-park-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/tijuca-park-open-rain.png",
+     "locked": "layers/tijuca-park-locked-rain.png"
     }
    }
   },
@@ -130,6 +161,10 @@
     "night": {
      "open": "layers/os-esquilos-open-night.png",
      "locked": "layers/os-esquilos-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/os-esquilos-open-rain.png",
+     "locked": "layers/os-esquilos-locked-rain.png"
     }
    }
   },
@@ -145,6 +180,10 @@
     "night": {
      "open": "layers/flamengo-match-open-night.png",
      "locked": "layers/flamengo-match-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/flamengo-match-open-rain.png",
+     "locked": "layers/flamengo-match-locked-rain.png"
     }
    }
   },
@@ -160,6 +199,10 @@
     "night": {
      "open": "layers/santa-teresa-open-night.png",
      "locked": "layers/santa-teresa-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/santa-teresa-open-rain.png",
+     "locked": "layers/santa-teresa-locked-rain.png"
     }
    }
   },
@@ -175,6 +218,10 @@
     "night": {
      "open": "layers/museum-open-night.png",
      "locked": "layers/museum-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/museum-open-rain.png",
+     "locked": "layers/museum-locked-rain.png"
     }
    }
   },
@@ -190,6 +237,10 @@
     "night": {
      "open": "layers/lagoa-house-open-night.png",
      "locked": "layers/lagoa-house-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/lagoa-house-open-rain.png",
+     "locked": "layers/lagoa-house-locked-rain.png"
     }
    }
   },
@@ -205,6 +256,10 @@
     "night": {
      "open": "layers/clothing-store-open-night.png",
      "locked": "layers/clothing-store-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/clothing-store-open-rain.png",
+     "locked": "layers/clothing-store-locked-rain.png"
     }
    }
   },
@@ -220,6 +275,10 @@
     "night": {
      "open": "layers/sult-open-night.png",
      "locked": "layers/sult-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/sult-open-rain.png",
+     "locked": "layers/sult-locked-rain.png"
     }
    }
   },
@@ -235,6 +294,10 @@
     "night": {
      "open": "layers/copacabana-palace-open-night.png",
      "locked": "layers/copacabana-palace-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/copacabana-palace-open-rain.png",
+     "locked": "layers/copacabana-palace-locked-rain.png"
     }
    }
   },
@@ -250,6 +313,10 @@
     "night": {
      "open": "layers/ipanema-beach-open-night.png",
      "locked": "layers/ipanema-beach-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/ipanema-beach-open-rain.png",
+     "locked": "layers/ipanema-beach-locked-rain.png"
     }
    }
   },
@@ -265,6 +332,10 @@
     "night": {
      "open": "layers/barraca-open-night.png",
      "locked": "layers/barraca-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/barraca-open-rain.png",
+     "locked": "layers/barraca-locked-rain.png"
     }
    }
   },
@@ -280,6 +351,10 @@
     "night": {
      "open": "layers/zona-sul-open-night.png",
      "locked": "layers/zona-sul-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/zona-sul-open-rain.png",
+     "locked": "layers/zona-sul-locked-rain.png"
     }
    }
   },
@@ -295,6 +370,10 @@
     "night": {
      "open": "layers/boteco-open-night.png",
      "locked": "layers/boteco-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/boteco-open-rain.png",
+     "locked": "layers/boteco-locked-rain.png"
     }
    }
   },
@@ -310,6 +389,10 @@
     "night": {
      "open": "layers/quilo-open-night.png",
      "locked": "layers/quilo-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/quilo-open-rain.png",
+     "locked": "layers/quilo-locked-rain.png"
     }
    }
   },
@@ -325,6 +408,10 @@
     "night": {
      "open": "layers/ipanema-penthouse-open-night.png",
      "locked": "layers/ipanema-penthouse-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/ipanema-penthouse-open-rain.png",
+     "locked": "layers/ipanema-penthouse-locked-rain.png"
     }
    }
   },
@@ -340,6 +427,10 @@
     "night": {
      "open": "layers/fazenda-open-night.png",
      "locked": "layers/fazenda-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/fazenda-open-rain.png",
+     "locked": "layers/fazenda-locked-rain.png"
     }
    }
   }
@@ -354,6 +445,10 @@
    "night": {
     "open": "layers/boat-route-open-night.png",
     "locked": "layers/boat-route-locked-night.png"
+   },
+   "rain": {
+    "open": "layers/boat-route-open-rain.png",
+    "locked": "layers/boat-route-locked-rain.png"
    }
   }
  },
@@ -393,18 +488,77 @@
  ],
  "composites": [
   "map-day1-day.png",
-  "map-day1-night.png"
+  "map-day1-night.png",
+  "map-day1-rain.png"
  ],
  "previews": [
   "previews/layers-contact@2.png",
   "previews/map-all-open-day@2.png",
   "previews/map-all-open-night@2.png",
   "previews/map-day1-day@2.png",
-  "previews/map-day1-night@2.png"
+  "previews/map-day1-night@2.png",
+  "previews/map-all-open-rain@2.png",
+  "previews/map-day1-rain@2.png",
+  "previews/map-day1-rain@2.gif",
+  "previews/map-carnaval-day@2.png",
+  "previews/map-carnaval-night@2.png",
+  "previews/map-reveillon-day@2.png",
+  "previews/map-reveillon-night@2.png",
+  "previews/map-reveillon-fireworks@2.gif"
  ],
  "palettes": [
   "palette-night-v2.json"
  ],
  "data": "map.json",
- "layerCount": 88
+ "layerCount": 88,
+ "rainLayerCount": 44,
+ "weatherOverlays": {
+  "rain": [
+   "layers/rain-streaks-0.png",
+   "layers/rain-streaks-1.png",
+   "layers/rain-streaks-2.png",
+   "layers/rain-streaks-3.png"
+  ]
+ },
+ "layerCountNote": "layerCount counts the day and night layers only (unchanged); rainLayerCount adds the rain ones.",
+ "events": [
+  {
+   "key": "carnaval",
+   "dates": {
+    "from": "02-01",
+    "to": "02-15",
+    "rule": "every year, the first half of February (Esme's ruling); the city and every place get dressed"
+   },
+   "files": {
+    "day": "events/carnaval-day.png",
+    "night": "events/carnaval-night.png"
+   }
+  },
+  {
+   "key": "reveillon",
+   "dates": {
+    "from": "12-31",
+    "to": "12-31",
+    "night_runs_until": "01-01 06:00 Rio time",
+    "rule": "Rio New Year: the day look all of 31 December, the night look (the hero) from dusk until the morning of 1 January"
+   },
+   "files": {
+    "day": "events/reveillon-day.png",
+    "night": "events/reveillon-night.png"
+   },
+   "animation": {
+    "night": {
+     "frames": [
+      "events/reveillon-fireworks-0.png",
+      "events/reveillon-fireworks-1.png",
+      "events/reveillon-fireworks-2.png",
+      "events/reveillon-fireworks-3.png"
+     ],
+     "frame_ms": 160,
+     "loop": true,
+     "draw": "right after events/reveillon-night.png"
+    }
+   }
+  }
+ ]
 }

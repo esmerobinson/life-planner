@@ -48,6 +48,8 @@ export interface RioMapData {
   boat_route: Omit<RioPlace, "opens_day" | "marker_anchor" | "tooltip_anchor"> & { opens_day: number; links: string };
   markers: Record<"locked" | "new" | "stuck" | "here", { file: string }>;
   hit_test_order: string[];
+  /** The falling rain over the rain look (after the places, before the markers). */
+  weather?: { rain?: { overlay: { frames: string[]; frame_ms: number } } };
 }
 
 /** map.json (paths in it are relative to day1/map/). `events` (holiday overlays) is ignored in phase 1. */

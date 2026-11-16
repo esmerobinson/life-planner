@@ -4,9 +4,10 @@
 // list of buttons mirrors it for the keyboard and screen readers.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d } from "../farm/sprites";
 import { opensOn, type AreaStatus } from "./areas";
-import { MAP_DIR, RIO_MAP, mapBase, mapLayer, type Look } from "./assets";
+import { MAP_DIR, RIO_MAP, mapBase, mapLayer, mapLook, type Look } from "./assets";
 import { useFit, useRioImages, type RioImages } from "./canvas";
 import { hitPlace } from "./mapMath";
 
@@ -15,6 +16,9 @@ const PLACE = new Map(RIO_MAP.places.map((p) => [p.key, p]));
 const at = (p: string) => `${MAP_DIR}/${p}`;
 
 const isOpen = (s: AreaStatus | undefined) => s === "open" || s === "new";
+const RAIN = RIO_MAP.weather?.rain?.overlay;
+/** The falling rain plays over the map's own rain look (none while the pack has no rain look). */
+const rainsOn = (look: Look) => look === "rain" && mapLook(look, RIO_MAP.look_files) === "rain" && !!RAIN?.frames.length;
 
 /** What a closed place says (PLACEHOLDER WORDING). */
 function tipFor(key: string, status: AreaStatus | undefined): string | null {
@@ -30,10 +34,11 @@ function filesFor(look: Look): string[] {
   for (const p of [...RIO_MAP.places, RIO_MAP.boat_route]) {
     out.push(at(mapLayer(p, look, "open")), at(mapLayer(p, look, "locked")));
   }
+  if (rainsOn(look)) out.push(...RAIN!.frames.map(at));
   return out;
 }
 
-function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, statuses: ReadonlyMap<string, AreaStatus>) {
+function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, statuses: ReadonlyMap<string, AreaStatus>, rainFrame: number | null) {
   ctx.clearRect(0, 0, W, H);
   const put = (path: string, x = 0, y = 0) => {
     const i = img[at(path)];
@@ -53,6 +58,8 @@ function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, stat
       if (s === "new") markers.push({ file: RIO_MAP.markers.new.file, at: p.marker_anchor });
     }
   }
+  // The falling rain: after the places, before the markers (map.json weather.rain).
+  if (rainFrame !== null && RAIN) put(RAIN.frames[rainFrame % RAIN.frames.length]!);
   // Markers last, anchored at their bottom-centre.
   for (const m of markers) {
     const i = img[at(m.file)];
@@ -72,12 +79,15 @@ export function RioMap({ statuses, look, onOpen }: {
   const images = useRioImages(files);
   const [hover, setHover] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const reduced = useReducedMotion();
+  const raining = rainsOn(look) && !reduced;
+  const rainTick = useTicker(RAIN?.frame_ms ?? 1000, raining);
 
   useEffect(() => {
     const ctx = ctx2d(canvas.current);
     if (!ctx || !images) return;
-    drawMap(ctx, images, look, statuses);
-  }, [images, look, statuses]);
+    drawMap(ctx, images, look, statuses, raining ? rainTick : null);
+  }, [images, look, statuses, raining, rainTick]);
 
   const pick = (key: string) => {
     if (isOpen(statuses.get(key))) {

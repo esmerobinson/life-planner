@@ -27,7 +27,8 @@
  "units": "1x pixels, origin top-left; bbox/rect = [x, y, w, h]; polygon = [[x, y], ...]",
  "looks": {
   "day": "daytime art (full colour)",
-  "night": "the approved colourful blue-hour night. The app picks the look from Rio's real clock."
+  "night": "the approved colourful blue-hour night. The app picks the look from Rio's real clock.",
+  "rain": "rainy day: the day art in a colourful tropical downpour (Esme: rain must never desaturate). Hues kept, greens deeper, wet sheen and puddles, grey-violet cloud round the peaks. Draw layers/rain-streaks-{0..3}.png on top (above places and events, under markers)."
  },
  "look_files": {
   "day": {
@@ -39,6 +40,11 @@
    "base": "map-base-night.png",
    "all_open": "map-all-open-night.png",
    "day1": "map-day1-night.png"
+  },
+  "rain": {
+   "base": "map-base-rain.png",
+   "all_open": "map-all-open-rain.png",
+   "day1": "map-day1-rain.png"
   }
  },
  "draw_order": [
@@ -222,6 +228,10 @@
     "night": {
      "open": "layers/christ-the-redeemer-open-night.png",
      "locked": "layers/christ-the-redeemer-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/christ-the-redeemer-open-rain.png",
+     "locked": "layers/christ-the-redeemer-locked-rain.png"
     }
    },
    "bbox": [
@@ -285,6 +295,12 @@
    "tooltip_anchor": [
     469,
     205
+   ],
+   "bbox_rain": [
+    425,
+    207,
+    125,
+    102
    ]
   },
   {
@@ -299,6 +315,10 @@
     "night": {
      "open": "layers/parque-lage-open-night.png",
      "locked": "layers/parque-lage-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/parque-lage-open-rain.png",
+     "locked": "layers/parque-lage-locked-rain.png"
     }
    },
    "bbox": [
@@ -362,6 +382,12 @@
    "tooltip_anchor": [
     469,
     302
+   ],
+   "bbox_rain": [
+    439,
+    298,
+    66,
+    36
    ]
   },
   {
@@ -376,6 +402,10 @@
     "night": {
      "open": "layers/jardim-botanico-open-night.png",
      "locked": "layers/jardim-botanico-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/jardim-botanico-open-rain.png",
+     "locked": "layers/jardim-botanico-locked-rain.png"
     }
    },
    "bbox": [
@@ -439,6 +469,12 @@
    "tooltip_anchor": [
     360,
     283
+   ],
+   "bbox_rain": [
+    348,
+    284,
+    52,
+    58
    ]
   },
   {
@@ -453,6 +489,10 @@
     "night": {
      "open": "layers/dois-irmaos-open-night.png",
      "locked": "layers/dois-irmaos-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/dois-irmaos-open-rain.png",
+     "locked": "layers/dois-irmaos-locked-rain.png"
     }
    },
    "bbox": [
@@ -516,6 +556,12 @@
    "tooltip_anchor": [
     266,
     340
+   ],
+   "bbox_rain": [
+    219,
+    341,
+    110,
+    138
    ]
   },
   {
@@ -530,6 +576,10 @@
     "night": {
      "open": "layers/rocinha-open-night.png",
      "locked": "layers/rocinha-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/rocinha-open-rain.png",
+     "locked": "layers/rocinha-locked-rain.png"
     }
    },
    "bbox": [
@@ -593,6 +643,12 @@
    "tooltip_anchor": [
     196,
     398
+   ],
+   "bbox_rain": [
+    136,
+    384,
+    115,
+    92
    ]
   },
   {
@@ -607,6 +663,10 @@
     "night": {
      "open": "layers/tijuca-park-open-night.png",
      "locked": "layers/tijuca-park-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/tijuca-park-open-rain.png",
+     "locked": "layers/tijuca-park-locked-rain.png"
     }
    },
    "bbox": [
@@ -670,6 +730,12 @@
    "tooltip_anchor": [
     98,
     256
+   ],
+   "bbox_rain": [
+    80,
+    257,
+    61,
+    71
    ]
   },
   {
@@ -684,6 +750,10 @@
     "night": {
      "open": "layers/os-esquilos-open-night.png",
      "locked": "layers/os-esquilos-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/os-esquilos-open-rain.png",
+     "locked": "layers/os-esquilos-locked-rain.png"
     }
    },
    "bbox": [
@@ -747,6 +817,12 @@
    "tooltip_anchor": [
     40,
     305
+   ],
+   "bbox_rain": [
+    15,
+    286,
+    60,
+    69
    ]
   },
   {
@@ -761,6 +837,10 @@
     "night": {
      "open": "layers/flamengo-match-open-night.png",
      "locked": "layers/flamengo-match-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/flamengo-match-open-rain.png",
+     "locked": "layers/flamengo-match-locked-rain.png"
     }
    },
    "bbox": [
@@ -824,6 +904,12 @@
    "tooltip_anchor": [
     333,
     24
+   ],
+   "bbox_rain": [
+    292,
+    24,
+    81,
+    57
    ]
   },
   {
@@ -838,6 +924,10 @@
     "night": {
      "open": "layers/santa-teresa-open-night.png",
      "locked": "layers/santa-teresa-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/santa-teresa-open-rain.png",
+     "locked": "layers/santa-teresa-locked-rain.png"
     }
    },
    "bbox": [
@@ -901,6 +991,12 @@
    "tooltip_anchor": [
     618,
     132
+   ],
+   "bbox_rain": [
+    578,
+    131,
+    80,
+    51
    ]
   },
   {
@@ -915,6 +1011,10 @@
     "night": {
      "open": "layers/museum-open-night.png",
      "locked": "layers/museum-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/museum-open-rain.png",
+     "locked": "layers/museum-locked-rain.png"
     }
    },
    "bbox": [
@@ -978,6 +1078,12 @@
    "tooltip_anchor": [
     746,
     83
+   ],
+   "bbox_rain": [
+    720,
+    84,
+    51,
+    40
    ]
   },
   {
@@ -992,6 +1098,10 @@
     "night": {
      "open": "layers/lagoa-house-open-night.png",
      "locked": "layers/lagoa-house-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/lagoa-house-open-rain.png",
+     "locked": "layers/lagoa-house-locked-rain.png"
     }
    },
    "bbox": [
@@ -1055,6 +1165,12 @@
    "tooltip_anchor": [
     542,
     292
+   ],
+   "bbox_rain": [
+    502,
+    290,
+    78,
+    107
    ]
   },
   {
@@ -1069,6 +1185,10 @@
     "night": {
      "open": "layers/clothing-store-open-night.png",
      "locked": "layers/clothing-store-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/clothing-store-open-rain.png",
+     "locked": "layers/clothing-store-locked-rain.png"
     }
    },
    "bbox": [
@@ -1132,6 +1252,12 @@
    "tooltip_anchor": [
     495,
     367
+   ],
+   "bbox_rain": [
+    473,
+    368,
+    51,
+    32
    ]
   },
   {
@@ -1146,6 +1272,10 @@
     "night": {
      "open": "layers/sult-open-night.png",
      "locked": "layers/sult-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/sult-open-rain.png",
+     "locked": "layers/sult-locked-rain.png"
     }
    },
    "bbox": [
@@ -1209,6 +1339,12 @@
    "tooltip_anchor": [
     675,
     281
+   ],
+   "bbox_rain": [
+    660,
+    271,
+    32,
+    50
    ]
   },
   {
@@ -1223,6 +1359,10 @@
     "night": {
      "open": "layers/copacabana-palace-open-night.png",
      "locked": "layers/copacabana-palace-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/copacabana-palace-open-rain.png",
+     "locked": "layers/copacabana-palace-locked-rain.png"
     }
    },
    "bbox": [
@@ -1286,6 +1426,12 @@
    "tooltip_anchor": [
     715,
     320
+   ],
+   "bbox_rain": [
+    684,
+    321,
+    64,
+    44
    ]
   },
   {
@@ -1300,6 +1446,10 @@
     "night": {
      "open": "layers/ipanema-beach-open-night.png",
      "locked": "layers/ipanema-beach-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/ipanema-beach-open-rain.png",
+     "locked": "layers/ipanema-beach-locked-rain.png"
     }
    },
    "bbox": [
@@ -1363,6 +1513,12 @@
    "tooltip_anchor": [
     560,
     456
+   ],
+   "bbox_rain": [
+    447,
+    441,
+    181,
+    54
    ]
   },
   {
@@ -1377,6 +1533,10 @@
     "night": {
      "open": "layers/barraca-open-night.png",
      "locked": "layers/barraca-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/barraca-open-rain.png",
+     "locked": "layers/barraca-locked-rain.png"
     }
    },
    "bbox": [
@@ -1440,6 +1600,12 @@
    "tooltip_anchor": [
     498,
     452
+   ],
+   "bbox_rain": [
+    486,
+    453,
+    36,
+    23
    ]
   },
   {
@@ -1454,6 +1620,10 @@
     "night": {
      "open": "layers/zona-sul-open-night.png",
      "locked": "layers/zona-sul-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/zona-sul-open-rain.png",
+     "locked": "layers/zona-sul-locked-rain.png"
     }
    },
    "bbox": [
@@ -1517,6 +1687,12 @@
    "tooltip_anchor": [
     375,
     399
+   ],
+   "bbox_rain": [
+    352,
+    400,
+    46,
+    33
    ]
   },
   {
@@ -1531,6 +1707,10 @@
     "night": {
      "open": "layers/boteco-open-night.png",
      "locked": "layers/boteco-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/boteco-open-rain.png",
+     "locked": "layers/boteco-locked-rain.png"
     }
    },
    "bbox": [
@@ -1594,6 +1774,12 @@
    "tooltip_anchor": [
     489,
     414
+   ],
+   "bbox_rain": [
+    458,
+    405,
+    42,
+    46
    ]
   },
   {
@@ -1608,6 +1794,10 @@
     "night": {
      "open": "layers/quilo-open-night.png",
      "locked": "layers/quilo-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/quilo-open-rain.png",
+     "locked": "layers/quilo-locked-rain.png"
     }
    },
    "bbox": [
@@ -1671,6 +1861,12 @@
    "tooltip_anchor": [
     563,
     423
+   ],
+   "bbox_rain": [
+    546,
+    424,
+    38,
+    29
    ]
   },
   {
@@ -1685,6 +1881,10 @@
     "night": {
      "open": "layers/ipanema-penthouse-open-night.png",
      "locked": "layers/ipanema-penthouse-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/ipanema-penthouse-open-rain.png",
+     "locked": "layers/ipanema-penthouse-locked-rain.png"
     }
    },
    "bbox": [
@@ -1748,6 +1948,12 @@
    "tooltip_anchor": [
     531,
     400
+   ],
+   "bbox_rain": [
+    516,
+    401,
+    30,
+    51
    ]
   },
   {
@@ -1762,6 +1968,10 @@
     "night": {
      "open": "layers/fazenda-open-night.png",
      "locked": "layers/fazenda-locked-night.png"
+    },
+    "rain": {
+     "open": "layers/fazenda-open-rain.png",
+     "locked": "layers/fazenda-locked-rain.png"
     }
    },
    "bbox": [
@@ -1825,6 +2035,12 @@
    "tooltip_anchor": [
     802,
     398
+   ],
+   "bbox_rain": [
+    716,
+    402,
+    172,
+    96
    ]
   }
  ],
@@ -1859,6 +2075,10 @@
    "night": {
     "open": "layers/boat-route-open-night.png",
     "locked": "layers/boat-route-locked-night.png"
+   },
+   "rain": {
+    "open": "layers/boat-route-open-rain.png",
+    "locked": "layers/boat-route-locked-rain.png"
    }
   },
   "bbox": [
@@ -1915,6 +2135,81 @@
     ]
    ]
   },
-  "note": "the dotted route from Ipanema to the inset with a little boat. It opens and locks with the fazenda (day 1). Tapping it can open the fazenda; it is listed last in hit_test_order terms (not in hit_test_order itself)."
- }
+  "note": "the dotted route from Ipanema to the inset with a little boat. It opens and locks with the fazenda (day 1). Tapping it can open the fazenda; it is listed last in hit_test_order terms (not in hit_test_order itself).",
+  "bbox_rain": [
+   632,
+   458,
+   78,
+   33
+  ]
+ },
+ "weather": {
+  "rain": {
+   "look": "rain",
+   "overlay": {
+    "frames": [
+     "layers/rain-streaks-0.png",
+     "layers/rain-streaks-1.png",
+     "layers/rain-streaks-2.png",
+     "layers/rain-streaks-3.png"
+    ],
+    "frame_ms": 110,
+    "loop": true,
+    "draw": "after the places and any event overlay, before the markers",
+    "contents": "falling rain plus splash rings on the sea and the Lagoa; transparent elsewhere"
+   },
+   "when": "Rio's real weather says rain and it is daytime: draw the rain look plus the overlay.",
+   "rain_at_night": "draw the night look plus the same rain overlay (there is no separate night-rain art yet)",
+   "footprints": "each rain layer has exactly its day layer's footprint, so bbox_rain == bbox and the day hotspots hold"
+  }
+ },
+ "events": [
+  {
+   "key": "carnaval",
+   "name": "Carnaval",
+   "kind": "takeover",
+   "dates": {
+    "from": "02-01",
+    "to": "02-15",
+    "rule": "every year, the first half of February (Esme's ruling); the city and every place get dressed"
+   },
+   "layers": {
+    "day": "events/carnaval-day.png",
+    "night": "events/carnaval-night.png"
+   },
+   "rain": "on a rainy day draw the day overlay over the rain look",
+   "contents": "bloco crowds with standards in Ipanema, Leblon, Copacabana, Lapa, Santa Teresa, Botafogo and Centro; confetti and serpentinas over the city; green-and-yellow and multicolour bunting along the main streets; a samba-school float and its alas on the Sambodromo avenue near Centro; a trio electrico on Copacabana's beachfront. At night the bunting carries gold bulbs and the costumes, float, trio and confetti glow in the night palette's lights."
+  },
+  {
+   "key": "reveillon",
+   "name": "Réveillon",
+   "kind": "takeover",
+   "dates": {
+    "from": "12-31",
+    "to": "12-31",
+    "night_runs_until": "01-01 06:00 Rio time",
+    "rule": "Rio New Year: the day look all of 31 December, the night look (the hero) from dusk until the morning of 1 January"
+   },
+   "layers": {
+    "day": "events/reveillon-day.png",
+    "night": "events/reveillon-night.png"
+   },
+   "animation": {
+    "night": {
+     "frames": [
+      "events/reveillon-fireworks-0.png",
+      "events/reveillon-fireworks-1.png",
+      "events/reveillon-fireworks-2.png",
+      "events/reveillon-fireworks-3.png"
+     ],
+     "frame_ms": 160,
+     "loop": true,
+     "draw": "right after events/reveillon-night.png"
+    }
+   },
+   "rain": "on a rainy day draw the day overlay over the rain look; at night the fireworks still play",
+   "contents": "day: Copacabana, Ipanema and Leblon sand filling up with people in white, white flowers at the waterline, Iemanja's offering boat, boats gathering in the bay. Night: the sand packed in white, candles and flowers along the waterline, the offering boat, boats with lights and their reflections, and fireworks over the Copacabana bay (4 frames)."
+  }
+ ],
+ "events_note": "Holiday overlays: transparent, full canvas (896x504), hard alpha. Draw the active event's layer for the current look after the last place layer and before the markers (and before the rain overlay when it rains). They sit over open and locked places alike: on a takeover the whole city celebrates. draw_order is unchanged."
 }
