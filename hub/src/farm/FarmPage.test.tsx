@@ -269,6 +269,21 @@ describe("Esme's Rio on the farm page", () => {
     expect(within(card).queryByRole("button", { name: "Place in Rio" })).toBeNull();
   });
 
+  it("from day 14 an orchard sticker is placed at the Jardim Botanico (phase 2a); it was never lost", async () => {
+    // Fictional: the farm started on 22 October 2026, so 4 November is day 14.
+    await db.farm.bulkPut([startRow("dev-a", "2026-10-22"), seenRow("hi", "2026-10-22"), seenRow("sapling", "2026-10-23")]);
+    renderApp("/farm", "2026-11-04");
+    const user = userEvent.setup();
+    await waitFor(async () => expect(within(await places()).getByRole("button", { name: "Jardim Botânico" })).toHaveAttribute("data-status", "new"));
+    await collectionAt(user, "Jardim Botânico");
+    await user.click(await screen.findByRole("button", { name: "Sapling: ready to place" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Sapling" })).getByRole("button", { name: "Place in Rio" }));
+    await waitFor(async () => expect(await db.farm.get("placed:sapling")).toMatchObject({ spot: "rio" }));
+    await user.keyboard("{Escape}{Escape}");
+    await user.click(within(await places()).getByRole("button", { name: "Jardim Botânico" }));
+    expect(within(await screen.findByRole("list", { name: "Stickers here" })).getByText("Sapling")).toBeInTheDocument();
+   }, 15000);
+
   it("an aquarium sticker waits until the sea off Arpoador opens on day 30 (Esme, 2026-11-16)", async () => {
     const fish = COLLECTION.find((s) => s.group === "aquarium")!;
     // Fictional: the farm started on 6 October 2026; 3 November is day 29, 4 November day 30.

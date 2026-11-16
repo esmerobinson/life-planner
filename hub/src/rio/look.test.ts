@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { RAIN_CODES, RIO, clockLook, devLook, fetchRioWeather, lookFrom, rioHour, useRioLook } from "./look";
+import { RAIN_CODES, devDay, devNight, RIO, clockLook, devLook, fetchRioWeather, lookFrom, rioHour, useRioLook } from "./look";
 
 const at = (iso: string) => new Date(iso);
 
@@ -116,5 +116,21 @@ describe("devLook (development builds only: to look at night and rain on demand)
     expect(devLook("?look=snow", true)).toBeNull();
     expect(devLook("", true)).toBeNull();
     expect(devLook("?look=rain", false)).toBeNull();
+  });
+});
+
+describe("dev-only overrides for screenshots", () => {
+  it("?day=N jumps the farm day in dev only", () => {
+    expect(devDay("?day=14", true)).toBe(14);
+    expect(devDay("?day=14", false)).toBeNull();
+    expect(devDay("?day=0", true)).toBeNull();
+    expect(devDay("?day=abc", true)).toBeNull();
+    expect(devDay("", true)).toBeNull();
+  });
+  it("?night=<theme> previews a boteco themed night in dev only", () => {
+    expect(devNight("?night=samba", true)).toBe("samba");
+    expect(devNight("?night=football", true)).toBe("football");
+    expect(devNight("?night=quiz", true)).toBeNull();
+    expect(devNight("?night=samba", false)).toBeNull();
   });
 });

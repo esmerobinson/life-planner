@@ -87,3 +87,63 @@ describe("an area, outside and inside", () => {
     expect(useTicker.mock.calls.every(([, on]) => on === false)).toBe(true);
   });
 });
+
+describe("phase 2a: the new areas", () => {
+  const counts = (c: Partial<{ monthlyGoals: number; wholeGoals: number; readingBooks: number; recipes: number }>) =>
+    ({ monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, ...c });
+  const area = () => document.querySelector(".rio-area")!;
+
+  it("each opens outside, with its inside a button away", async () => {
+    const names: Record<string, [string, string]> = {
+      "zona-sul": ["Zona Sul", "The aisles"], "jardim-botanico": ["Jardim Botânico", "The orchid house"], quilo: ["Quilo", "The buffet"],
+      sult: ["Sult", "The dining room"], "os-esquilos": ["Os Esquilos", "The dining room"], "santa-teresa": ["Santa Teresa", "The studio"],
+    };
+    for (const [key, [out, inside]] of Object.entries(names)) {
+      const { unmount } = render(<AreaView area={key} look="night" day={200} placed={[]} onBack={() => undefined} />);
+      expect(heading()).toBe(out);
+      await userEvent.click(within(screen.getByRole("group", { name: "Go inside" })).getByRole("button", { name: inside }));
+      expect(area()).toHaveAttribute("data-scene", `${key}/inside`);
+      unmount();
+    }
+  });
+
+  it("Os Esquilos lays a celebration piece per whole goal, over its quiet start", () => {
+    render(<AreaView area="os-esquilos" look="day" day={200} placed={[]} counts={counts({ wholeGoals: 3 })} onBack={() => undefined} />);
+    expect(area()).toHaveAttribute("data-celebrations", "3");
+    expect(area()).toHaveAttribute("data-state", "start");
+  });
+
+  it("Santa Teresa's studio shows its milestones and books", async () => {
+    render(<AreaView area="santa-teresa" look="rain" day={200} placed={[]} counts={counts({ readingBooks: 10 })} onBack={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "The studio" }));
+    expect(area()).toHaveAttribute("data-milestones", "reading-lamp second-bookcase rug");
+    expect(area()).toHaveAttribute("data-books", "10");
+  });
+
+  it("Sult is full at seven monthly goals; the Jardim starts quiet", () => {
+    const { unmount } = render(<AreaView area="sult" look="day" day={200} placed={[]} counts={counts({ monthlyGoals: 7 })} onBack={() => undefined} />);
+    expect(area()).toHaveAttribute("data-state", "full");
+    unmount();
+    render(<AreaView area="jardim-botanico" look="day" day={200} placed={[]} onBack={() => undefined} />);
+    expect(area()).toHaveAttribute("data-state", "start");
+  });
+
+  it("orchard trees are named among the Jardim's stickers", () => {
+    render(<AreaView area="jardim-botanico" look="day" day={200} placed={["sapling", "orchid"]} onBack={() => undefined} />);
+    expect(within(screen.getByRole("list", { name: "Stickers here" })).getByText("Sapling")).toBeInTheDocument();
+  });
+
+  it("a themed night (dev preview) shows at the boteco at night only, and stays still with reduced motion", () => {
+    const { unmount } = render(<AreaView area="boteco" look="night" day={200} placed={[]} night="samba" onBack={() => undefined} />);
+    expect(area()).toHaveAttribute("data-night", "samba");
+    expect(useTicker.mock.calls.some(([, on]) => on === true)).toBe(true);
+    unmount();
+    useTicker.mockClear();
+    useReducedMotion.mockReturnValue(true);
+    const r = render(<AreaView area="boteco" look="night" day={200} placed={[]} night="samba" onBack={() => undefined} />);
+    expect(useTicker.mock.calls.every(([, on]) => on === false)).toBe(true);
+    r.unmount();
+    render(<AreaView area="boteco" look="day" day={200} placed={[]} night="samba" onBack={() => undefined} />);
+    expect(area()).not.toHaveAttribute("data-night");
+  });
+});

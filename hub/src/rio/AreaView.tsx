@@ -8,11 +8,12 @@ import { STICKER_BY_KEY } from "../farm/catalogue";
 import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d, drawFrame, drawSticker, useSheets } from "../farm/sprites";
 import { AREA_SCENES, sceneOpen } from "./areas";
-import { SCENES, sceneBase, type Look, type SceneId } from "./assets";
+import { BOTECO_NIGHTS, SCENES, sceneBase, type BotecoNight, type Look, type SceneId } from "./assets";
 import { useCover, useRioImages } from "./canvas";
 import { sceneKeep } from "./mapMath";
 import { TextButton } from "./menu/pieces";
-import { layout, sceneState } from "./placement";
+import { layout } from "./placement";
+import { NO_COUNTS, scenePlan, type RioCounts } from "./progress";
 import { BitmapText } from "./ui/BitmapText";
 import { useUi } from "./ui/fit";
 
@@ -49,13 +50,20 @@ export const SCENE_NAMES: Record<SceneId, string> = {
 const STICKER = 16;
 const STICKER_SHEETS = ["stickers"];
 
-export function AreaView({ area, look, day, placed, onBack }: {
+/** A tick for the themed nights' strips (each strip keeps its own speed from the elapsed time). */
+const NIGHT_TICK_MS = 40;
+
+export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, onBack }: {
   area: string;
   look: Look;
   /** The farm day: an inside that opens later (the sea, day 30) has no button before then. */
   day: number;
   /** Every placed sticker (book order); the scene picks its own. */
   placed: readonly string[];
+  /** Her counters the new areas grow from (progress.ts). */
+  counts?: RioCounts;
+  /** A boteco themed night (dev preview only until bundles trigger them, phase 2b). */
+  night?: BotecoNight | null;
   onBack: () => void;
 }) {
   const scenes = AREA_SCENES[area]!;
@@ -64,19 +72,35 @@ export function AreaView({ area, look, day, placed, onBack }: {
   const data = SCENES[scene];
   const reduced = useReducedMotion();
 
-  const { bySlot, overflow } = useMemo(() => layout(scene, placed), [scene, placed]);
-  const state = sceneState(scene, bySlot.size + overflow);
+  const plan = useMemo(() => scenePlan(scene, placed, counts), [scene, placed, counts]);
+  const state = plan.state;
+  const { bySlot, overflow } = useMemo(() => layout(scene, placed, plan.milestones), [scene, placed, plan.milestones]);
   const base = sceneBase(scene, state, look);
   const shownLook: Look = base === data.base[state]?.[look] ? look : "day";
+  const inLook = (files: Partial<Record<Look, string>>) => files[shownLook] ?? files.day ?? "";
+
+  // Layers over the base, in the pack's draw order: Os Esquilos' celebrations; Santa Teresa's
+  // milestones, then its spines and covers.
+  const celebrationFiles = (data.celebrations ?? []).slice(0, plan.celebrations).map((c) => inLook(c.layers));
+  const milestoneFiles = (data.milestones ?? []).filter((m) => plan.milestones.includes(m.id)).map((m) => inLook(m.overlay));
+  const spineSheet = data.books && plan.books > 0 ? inLook(data.books.spines.sheets) : "";
+  const coverSheet = data.books && plan.covers > 0 ? inLook(data.books.covers.sheets) : "";
+  // A themed night dresses the boteco at night only.
+  const nightSide = night && area === "boteco" && shownLook === "night"
+    ? BOTECO_NIGHTS[night][scene === "boteco/inside" ? "inside" : "outside"]
+    : null;
+  const nightFiles = nightSide ? [nightSide.overlay, ...nightSide.anims.map((a) => a.strip)] : [];
 
   const rain = shownLook === "rain" ? data.rainOverlay : undefined;
   const rainFrames = rain?.frames ?? (rain?.strip ? [rain.strip.file] : []);
   const rainCount = rain?.frames?.length ?? rain?.strip?.count ?? 0;
-  const tvFrames = data.tv?.frames[shownLook] ?? [];
+  const tvFrames = nightSide && !nightSide.baseTv ? [] : data.tv?.frames[shownLook] ?? [];
   const rainTick = useTicker(rain?.ms ?? 1000, !!rain && rainCount > 0 && !reduced);
   const tvTick = useTicker(data.tv?.ms ?? 1000, tvFrames.length > 0 && !reduced);
+  const nightTick = useTicker(NIGHT_TICK_MS, !!nightSide && !reduced);
 
-  const files = useMemo(() => [base, ...rainFrames, ...tvFrames], [base, rainFrames.join(), tvFrames.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const layerFiles = [...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
+  const files = useMemo(() => [base, ...layerFiles, ...rainFrames, ...tvFrames], [base, layerFiles.join(), rainFrames.join(), tvFrames.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const images = useRioImages(files);
   const sheets = useSheets(STICKER_SHEETS);
 
@@ -102,6 +126,25 @@ export function AreaView({ area, look, day, placed, onBack }: {
     ctx.clearRect(0, 0, w, h);
     const b = images[base];
     if (b) ctx.drawImage(b, 0, 0);
+    const put = (f: string) => {
+      const i = images[f];
+      if (i) ctx.drawImage(i, 0, 0);
+    };
+    celebrationFiles.forEach(put);
+    milestoneFiles.forEach(put);
+    // Book n draws spine n at shelf slot n (one that needs a milestone only once it's earned); every fifth hangs a cover.
+    if (data.books) {
+      const copy = (sheet: string, slots: NonNullable<typeof data.books>["spines"]["slots"], n: number) => {
+        const img = images[sheet];
+        if (!img) return;
+        for (const sl of slots.slice(0, n)) {
+          if (sl.requires && !plan.milestones.includes(sl.requires)) continue;
+          ctx.drawImage(img, sl.sx, sl.sy, sl.w, sl.h, sl.x, sl.y, sl.w, sl.h);
+        }
+      };
+      if (spineSheet) copy(spineSheet, data.books.spines.slots, plan.books);
+      if (coverSheet) copy(coverSheet, data.books.covers.slots, plan.covers);
+    }
     if (sheets) {
       for (const { slot, key } of drawn) {
         const st = STICKER_BY_KEY.get(key);
@@ -116,6 +159,20 @@ export function AreaView({ area, look, day, placed, onBack }: {
       const f = images[tvFrames[tvTick % tvFrames.length]!];
       if (f) ctx.drawImage(f, data.tv.at[0], data.tv.at[1]);
     }
+    // A themed night: its overlay (frame 0 of every strip), then the strips playing.
+    if (nightSide) {
+      put(nightSide.overlay);
+      if (!reduced) {
+        const elapsed = nightTick * NIGHT_TICK_MS;
+        for (const a of nightSide.anims) {
+          const img = images[a.strip];
+          if (!img) continue;
+          const step = Math.floor(elapsed / a.ms);
+          if (a.once && step >= a.frames - 1) continue; // its last frame is the overlay's own state
+          drawFrame(ctx, img, a.size[0], a.size[1], a.once ? step : step % a.frames, a.at[0], a.at[1]);
+        }
+      }
+    }
     // The falling rain, over everything (stickers too).
     if (rain && rainCount > 0 && !reduced) {
       const i = rainTick % rainCount;
@@ -127,11 +184,13 @@ export function AreaView({ area, look, day, placed, onBack }: {
         if (img) ctx.drawImage(img, 0, 0);
       }
     }
-  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced]);
+  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inside = scene !== scenes.outside;
   return (
-    <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook} data-fit={fit.mode}>
+    <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook} data-fit={fit.mode}
+      data-celebrations={plan.celebrations} data-milestones={plan.milestones.join(" ")} data-books={plan.books}
+      data-night={nightSide ? night! : undefined}>
       <h2 className="visually-hidden">{SCENE_NAMES[scene]}</h2>
       {/* On top of the game, in the kit's word buttons. */}
       <div className="rio-area-controls" style={{ fontSize: `${u}px` }}>
