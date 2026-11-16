@@ -88,13 +88,41 @@ export function sceneKeep(slots: readonly { x: number; y: number; anchor?: strin
 export interface Cover { scale: number; x: number; y: number; mode: "cover" | "fit" }
 
 /**
- * Where the art sits in a view `box` (CSS px): at the largest crisp scale at which `keep` fits,
+ * Fractional (the desktop; Esme, 2026-11-17: "maybe just make it a bit bigger and borders a bit
+ * smaller"): the scale at which the art just covers the view, if `keep` still fits there (an even
+ * border); else the largest at which `keep` fits, so the art fills the view one way and the
+ * spare room the other way is planks. Never larger than covering needs. Drawn nearest-neighbour.
+ */
+function fractionalFit(box: { w: number; h: number }, canvas: [number, number], keep: Rect, d: number): Cover {
+  const [kx, ky, kw, kh] = keep;
+  if (!(box.w > 0 && box.h > 0)) return { scale: 1, x: 0, y: 0, mode: "fit" };
+  const covering = Math.max(box.w / canvas[0], box.h / canvas[1]);
+  const keepFits = Math.min(kw > 0 ? box.w / kw : Infinity, kh > 0 ? box.h / kh : Infinity);
+  const s = Math.min(covering, keepFits);
+  const aw = canvas[0] * s;
+  const ah = canvas[1] * s;
+  const place = (view: number, art: number, k0: number, k1: number): number => {
+    if (art < view) return Math.round(((view - art) / 2) * d) / d; // the whole art, centred
+    const lo = Math.max(view - art, view - k1 * s);
+    const hi = Math.min(0, -k0 * s);
+    const centred = Math.round((view / 2 - ((k0 + k1) / 2) * s) * d) / d;
+    return Math.min(hi, Math.max(lo, centred));
+  };
+  const x = place(box.w, aw, kx, kx + kw);
+  const y = place(box.h, ah, ky, ky + kh);
+  return { scale: s, x, y, mode: aw >= box.w - EPS && ah >= box.h - EPS ? "cover" : "fit" };
+}
+
+/**
+ * Where the art sits in a view `box` (CSS px). `fractional` (the desktop): fractionalFit. Else
+ * (the phone, unchanged): at the largest crisp scale at which `keep` fits,
  * if the art then covers the view ("cover": the border stays even; centred on `keep`, kept to
  * the art's edges, `keep` whole). Otherwise the whole art fits, centred ("fit": uneven border).
  * Offsets land on whole device pixels.
  */
-export function coverFit(box: { w: number; h: number }, canvas: [number, number], keep: Rect, dpr: number): Cover {
+export function coverFit(box: { w: number; h: number }, canvas: [number, number], keep: Rect, dpr: number, fractional = false): Cover {
   const d = dpr > 0 ? dpr : 1;
+  if (fractional) return fractionalFit(box, canvas, keep, d);
   const [kx, ky, kw, kh] = keep;
   const s = fitScale(box, [kw, kh], d);
   const aw = canvas[0] * s;

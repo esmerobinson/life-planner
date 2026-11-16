@@ -139,3 +139,40 @@ describe("coverFit: an even border, never trimming what matters (Esme, 2026-11-1
     expect(sceneKeep([], [320, 180])).toEqual([0, 0, 320, 180]);
   });
 });
+
+describe("coverFit, fractional (desktop; Esme 2026-11-17: \"a bit bigger and borders a bit smaller\")", () => {
+  const CANVAS = RIO_MAP.canvas;
+  /** The view inside the plank border: the window less 4 UI px a side at the desktop's 3x. */
+  const view = (w: number, h: number) => ({ w: w - 24, h: h - 24 });
+
+  it.each([[1440, 900], [1280, 800], [2560, 1080]])("%ix%i: the largest scale where every place still fits, filling the view in at least one direction", (W, H) => {
+    const box = view(W, H);
+    const f = coverFit(box, CANVAS, MAP_KEEP, 2, true);
+    const [kx, ky, kw, kh] = MAP_KEEP;
+    // Nothing that matters is cut.
+    expect(f.x + kx * f.scale).toBeGreaterThanOrEqual(-1e-6);
+    expect(f.y + ky * f.scale).toBeGreaterThanOrEqual(-1e-6);
+    expect(f.x + (kx + kw) * f.scale).toBeLessThanOrEqual(box.w + 1e-6);
+    expect(f.y + (ky + kh) * f.scale).toBeLessThanOrEqual(box.h + 1e-6);
+    // As big as that allows: the protected area touches the view on one side, or the art covers it all.
+    const cover = Math.max(box.w / CANVAS[0], box.h / CANVAS[1]);
+    expect(f.scale).toBeCloseTo(Math.min(cover, box.w / kw, box.h / kh), 9);
+    // It fills the view edge to edge in at least one direction (the border stays the small one there).
+    const aw = CANVAS[0] * f.scale;
+    const ah = CANVAS[1] * f.scale;
+    expect(aw >= box.w - 1e-6 || ah >= box.h - 1e-6).toBe(true);
+    // Bigger than the crisp fit it replaces.
+    expect(f.scale).toBeGreaterThanOrEqual(fitScale(box, CANVAS, 2));
+  });
+
+  it("a small protected area never zooms past the scale that fills the view", () => {
+    const f = coverFit({ w: 1000, h: 600 }, [320, 180], [150, 80, 16, 16], 2, true);
+    expect(f.scale).toBeCloseTo(Math.max(1000 / 320, 600 / 180), 9);
+    expect(f.mode).toBe("cover");
+  });
+
+  it("an empty box or protected area doesn't break it", () => {
+    expect(Number.isFinite(coverFit({ w: 0, h: 0 }, CANVAS, MAP_KEEP, 2, true).scale)).toBe(true);
+    expect(Number.isFinite(coverFit({ w: 800, h: 600 }, CANVAS, [10, 10, 0, 0], 2, true).x)).toBe(true);
+  });
+});

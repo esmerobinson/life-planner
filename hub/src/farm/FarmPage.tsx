@@ -67,13 +67,20 @@ export function FarmPage() {
     setMenu(t);
     setLastTab(t);
   }, [menu]);
+  const returnTo = useRef<HTMLElement | null>(null);
   const closeMenu = useCallback(() => {
-    setMenu(null);
-    const back = opener.current;
+    returnTo.current = opener.current;
     opener.current = null;
-    // Focus goes back where it was (after the menu has gone).
-    setTimeout(() => back?.isConnected && back.focus(), 0);
+    setMenu(null);
   }, []);
+  // Focus goes back where it was as soon as the menu has gone (not on a timer that could land
+  // after her next key and take focus from where she has moved it).
+  useEffect(() => {
+    if (menu) return;
+    const back = returnTo.current;
+    returnTo.current = null;
+    if (back?.isConnected) back.focus();
+  }, [menu]);
 
   // /farm?menu=<tab> (the nook's collection icon, for one) opens the menu there.
   useEffect(() => {

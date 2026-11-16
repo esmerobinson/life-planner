@@ -53,8 +53,8 @@ export interface BitmapTextProps {
 }
 
 export function BitmapText({ text, heading = false, colour = INK.ink, shadow, w, align, lh, className, style }: BitmapTextProps) {
-  const { u } = useUi();
-  const fz = heading ? headPx(u) : bodyPx(u);
+  const { u, layout } = useUi();
+  const fz = heading ? headPx(u) : bodyPx(u, layout);
   const canvas = useRef<HTMLCanvasElement>(null);
   const maxW = w ? Math.floor((w * u) / fz) : Infinity;
   const lines = Number.isFinite(maxW) ? wrapText(text, maxW) : text.split("\n");

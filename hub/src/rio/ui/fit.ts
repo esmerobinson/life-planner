@@ -21,7 +21,12 @@ export const MENU_STAGE: Record<MenuLayout | "narrowShort", Stage> = {
   narrowShort: { w: 180, h: 230, panel: { x: 2, y: 16, w: 176, h: 214 }, dock: { x: 2, y: 158, w: 176, h: 70 } },
 };
 
-export interface Fit { layout: MenuLayout; u: number; short: boolean }
+/**
+ * `u`: the whole-number scale of the things over the game (Back, the hotbar, an area's buttons).
+ * `menuU`: the menu's scale. On the desktop it grows to the largest that fits the window, fractions
+ * allowed (Esme, 2026-11-17: "a bit bigger"); on the phone it is `u`.
+ */
+export interface Fit { layout: MenuLayout; u: number; short: boolean; menuU: number }
 
 export const stageOf = (f: Pick<Fit, "layout" | "short">): Stage =>
   f.layout === "wide" ? MENU_STAGE.wide : f.short ? MENU_STAGE.narrowShort : MENU_STAGE.narrow;
@@ -30,16 +35,17 @@ const fits = (st: Stage, u: number, vw: number, vh: number) => st.w * u <= vw &&
 
 /** The layout and whole-number scale at which the menu fits a `vw` x `vh` CSS px box. */
 export function menuFit(vw: number, vh: number): Fit {
-  for (const u of [3, 2]) if (fits(MENU_STAGE.wide, u, vw, vh)) return { layout: "wide", u, short: false };
-  for (const u of [3, 2]) if (fits(MENU_STAGE.narrow, u, vw, vh)) return { layout: "narrow", u, short: false };
-  for (const u of [3, 2]) if (fits(MENU_STAGE.narrowShort, u, vw, vh)) return { layout: "narrow", u, short: true };
-  return { layout: "narrow", u: 1, short: true };
+  const wide = MENU_STAGE.wide;
+  for (const u of [3, 2]) if (fits(wide, u, vw, vh)) return { layout: "wide", u, short: false, menuU: Math.min(vw / wide.w, vh / wide.h) };
+  for (const u of [3, 2]) if (fits(MENU_STAGE.narrow, u, vw, vh)) return { layout: "narrow", u, short: false, menuU: u };
+  for (const u of [3, 2]) if (fits(MENU_STAGE.narrowShort, u, vw, vh)) return { layout: "narrow", u, short: true, menuU: u };
+  return { layout: "narrow", u: 1, short: true, menuU: 1 };
 }
 
-/** CSS px per font pixel for body text (core.js: 2 on the 3x desktop, the UI scale on phones). */
-export const bodyPx = (u: number): number => (u === 3 ? 2 : u);
+/** CSS px per font pixel for body text (core.js: two thirds of the UI scale on the desktop, 2 at 3x; the UI scale on phones). */
+export const bodyPx = (u: number, layout: MenuLayout): number => (layout === "wide" ? (u * 2) / 3 : u);
 /** CSS px per font pixel for a heading (core.js: "d" draws at the UI scale). */
 export const headPx = (u: number): number => u;
 
-export const UiContext = createContext<Fit>({ u: 2, layout: "wide", short: false });
+export const UiContext = createContext<Fit>({ u: 3, layout: "wide", short: false, menuU: 3 });
 export const useUi = () => useContext(UiContext);

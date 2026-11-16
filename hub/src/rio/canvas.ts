@@ -51,7 +51,7 @@ export function useRioImages(paths: readonly string[]): RioImages | null {
  * .game-view; outside the game, its parent and the window's height): at a crisp scale, covering
  * the view so the plank border stays even, never trimming `keep` (mapMath.ts coverFit).
  */
-export function useCover(ref: RefObject<HTMLElement | null>, canvas: [number, number], keep: [number, number, number, number]): Cover {
+export function useCover(ref: RefObject<HTMLElement | null>, canvas: [number, number], keep: [number, number, number, number], fractional = false): Cover {
   const [box, setBox] = useState({ w: 0, h: 0, dpr: 1 });
   useLayoutEffect(() => {
     const el = ref.current;
@@ -73,5 +73,5 @@ export function useCover(ref: RefObject<HTMLElement | null>, canvas: [number, nu
     };
   }, [ref]);
   const [kx, ky, kw, kh] = keep;
-  return useMemo(() => coverFit(box, canvas, [kx, ky, kw, kh], box.dpr), [box, canvas, kx, ky, kw, kh]);
+  return useMemo(() => coverFit(box, canvas, [kx, ky, kw, kh], box.dpr, fractional), [box, canvas, kx, ky, kw, kh, fractional]);
 }

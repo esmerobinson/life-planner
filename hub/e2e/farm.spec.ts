@@ -127,21 +127,25 @@ for (const width of [1280, 390]) {
       await expect(page.getByRole("heading", { level: 1, name: "Esme's Rio" })).toBeAttached();
       await expect.poll(() => farmRow(page, "seen:hi")).not.toBeNull();
       await expect(page.locator("[data-earned]")).toHaveAttribute("data-earned", "1");
-      // Pixel art only at whole-number scales (the menu's pixel text too).
+      // Pixel art is never smoothed. The nook stays at a whole-number scale; on the phone the menu's
+      // pixel text and the map do too. On the desktop the map and menu scale by fractions to fill
+      // the window (Esme, 2026-11-17: "a bit bigger"), still nearest-neighbour.
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
       for (const sel of [".rio-menu .bt canvas", ".farm-nook canvas"]) {
         const p = await pixelated(page, sel);
         expect(p.rendering).toBe("pixelated");
-        expect(Number.isInteger(p.scale)).toBe(true);
+        if (phone || sel === ".farm-nook canvas") expect(Number.isInteger(p.scale)).toBe(true);
       }
-      // The map: crisp (a whole number of device pixels per art pixel, or a whole fraction).
       const m = await pixelated(page, ".rio-map canvas");
       const dpr = await page.evaluate(() => window.devicePixelRatio);
       expect(m.rendering).toBe("pixelated");
-      const device = m.scale * dpr;
-      const whole = device >= 1 ? device : 1 / device; // layout rounds to 1/64 px
-      expect(Math.abs(whole - Math.round(whole))).toBeLessThan(0.01);
+      if (phone) {
+        // The phone's map: crisp (a whole number of device pixels per art pixel, or a whole fraction).
+        const device = m.scale * dpr;
+        const whole = device >= 1 ? device : 1 / device; // layout rounds to 1/64 px
+        expect(Math.abs(whole - Math.round(whole))).toBeLessThan(0.01);
+      }
       // The sticker book is gone (Esme, 2026-11-17).
       await expect(page.locator(".farm-book")).toHaveCount(0);
     });
@@ -284,5 +288,28 @@ for (const [w, h] of [[2560, 1080], [390, 1300]] as const) {
     await page.goto("/farm");
     await expect(page.locator(".rio-map canvas")).toBeVisible();
     await expectFullWindowGame(page);
+  });
+}
+
+// Esme, 2026-11-17: "maybe just make it a bit bigger and borders a bit smaller". On the desktop
+// the map scales by fractions (nearest-neighbour) to fill the view edge to edge one way, every
+// place still on screen, and taps still land on their places.
+for (const [w, h] of [[1440, 900], [1280, 800], [2560, 1080]] as const) {
+  test(`${w}x${h}: the map fills the view one way, every place on screen, taps still land`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/farm");
+    const canvas = page.locator(".rio-map canvas");
+    await expect(canvas).toBeVisible();
+    await expectFullWindowGame(page);
+    const v = (await page.locator(".game-view").boundingBox())!;
+    const c = (await canvas.boundingBox())!;
+    expect(c.width >= v.width - 1 || c.height >= v.height - 1).toBe(true);
+    expect(await canvas.evaluate((el) => getComputedStyle(el).imageRendering)).toBe("pixelated");
+    // The plank border is small: 4 UI px at 3x.
+    expect(v.x).toBeLessThanOrEqual(13);
+    await canvas.hover({ position: await onMap(page, "barraca") });
+    await expect(page.locator(".rio-tooltip")).toHaveText("Opens on day 3");
+    await canvas.click({ position: await onMap(page, "lagoa-house") });
+    await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/outside");
   });
 }

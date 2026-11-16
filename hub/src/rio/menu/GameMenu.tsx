@@ -10,7 +10,7 @@ import { useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } fr
 import type { FarmView } from "../../farm/FarmContext";
 import { useReducedMotion } from "../../farm/hooks";
 import type { AreaStatus } from "../areas";
-import { stageOf, useUi, type Box } from "../ui/fit";
+import { UiContext, stageOf, useUi, type Box } from "../ui/fit";
 import { CollectionTab } from "./CollectionTab";
 import { FriendsTab } from "./FriendsTab";
 import { LaterTab } from "./LaterTab";
@@ -61,7 +61,9 @@ export interface GameMenuProps {
 const FOCUSABLE = 'button:not([disabled]):not([tabindex="-1"]), [href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
 
 export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, startArea, onArea }: GameMenuProps) {
-  const fit = useUi();
+  const outer = useUi();
+  // Inside the menu everything is drawn at the menu's own scale (fractional on the desktop).
+  const fit = { ...outer, u: outer.menuU };
   const { u, layout } = fit;
   const narrow = layout === "narrow";
   const stage = stageOf(fit);
@@ -127,6 +129,7 @@ export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, s
   const active = MENU_TABS.findIndex((t) => t.key === shown);
 
   return (
+    <UiContext.Provider value={fit}>
     <div className="rio-menu-dim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={root} className={`rio-menu rio-ui${still ? " is-still" : ""}`} role="dialog" aria-modal="true" aria-label="Menu"
         tabIndex={-1} data-tab={shown} data-layout={layout} onKeyDown={onKeyDown}
@@ -156,5 +159,6 @@ export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, s
         </div>
       </div>
     </div>
+    </UiContext.Provider>
   );
 }

@@ -11,6 +11,7 @@ import { opensOn, type AreaStatus } from "./areas";
 import { MAP_DIR, RIO_MAP, mapBase, mapLayer, mapLook, type Look } from "./assets";
 import { useCover, useRioImages, type RioImages } from "./canvas";
 import { MAP_KEEP, hitPlace } from "./mapMath";
+import { useUi } from "./ui/fit";
 
 const [W, H] = RIO_MAP.canvas;
 const PLACE = new Map(RIO_MAP.places.map((p) => [p.key, p]));
@@ -75,7 +76,8 @@ export function RioMap({ statuses, look, onOpen }: {
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const fit = useCover(wrap, RIO_MAP.canvas, MAP_KEEP);
+  // The desktop scales by fractions to fill the view (Esme, 2026-11-17); the phone stays crisp.
+  const fit = useCover(wrap, RIO_MAP.canvas, MAP_KEEP, useUi().layout === "wide");
   const scale = fit.scale;
   const files = useMemo(() => filesFor(look), [look]);
   const images = useRioImages(files);

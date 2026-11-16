@@ -69,10 +69,10 @@ export function AreaView({ area, look, day, placed, onBack }: {
   const sheets = useSheets(STICKER_SHEETS);
 
   const wrap = useRef<HTMLDivElement>(null);
-  const { u } = useUi();
+  const { u, layout: uiLayout } = useUi();
   // The buttons sit on top of the game; the scene covers the view, never trimming a sticker slot.
   const keep = useMemo(() => sceneKeep(data.slots, data.scene), [data]);
-  const fit = useCover(wrap, data.scene, keep);
+  const fit = useCover(wrap, data.scene, keep, uiLayout === "wide");
   const scale = fit.scale;
   const canvas = useRef<HTMLCanvasElement>(null);
 

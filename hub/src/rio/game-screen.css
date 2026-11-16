@@ -4,7 +4,7 @@
    shell leaves out its own chrome (AppShell.tsx) and marks itself .is-game: the page never
    scrolls and the game takes the whole window, with an even border of the kit's wooden planks
    (wood-planks tiled at the UI's scale) on all four sides. The border's width is
-   --game-border: 8 UI px, a placeholder until Esme picks (the look isn't final). Nothing
+   --game-border: 4 UI px (Esme, 2026-11-17: "borders a bit smaller"; was 8), still not final. Nothing
    outside the game route is restyled here. */
 
 html:has(.app-shell.is-game),
@@ -35,7 +35,7 @@ html:has(.app-shell.is-game) body {
 }
 
 .game-screen {
-  --game-border: calc(8 * var(--u, 2px));
+  --game-border: calc(4 * var(--u, 2px));
   position: relative;
   flex: 1;
   min-height: 0;
