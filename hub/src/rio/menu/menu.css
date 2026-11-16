@@ -341,3 +341,13 @@
   align-self: flex-start;
   margin: 8em 0 0 10em;
 }
+
+/* Help's lines (helpWelcome: a slot with an icon, then the line), flowing with an even gap. */
+.rio-ui .help-lines {
+  display: flex;
+  flex-direction: column;
+}
+.rio-ui .help-line {
+  position: relative;
+  min-height: 16em;
+}

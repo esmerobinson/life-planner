@@ -7,7 +7,7 @@ import { motionPref, setMotionPref, type MotionPref } from "../../farm/motion";
 import { BitmapText } from "../ui/BitmapText";
 import { INK } from "../ui/kit";
 import type { TabProps } from "./GameMenu";
-import { KitIcon, RowButton, pos } from "./pieces";
+import { KitIcon, RowButton, em, pos } from "./pieces";
 
 // PLACEHOLDER WORDING (Settings and Help)
 const MOTION: { pref: MotionPref; label: string }[] = [
@@ -27,7 +27,7 @@ export function SettingsTab({ inner, narrow }: TabProps) {
   const pref = motionPref();
   const colW = narrow ? inner.w - 8 : 96;
   const rowH = 17;
-  const help = narrow ? { x: 4, y: 82, w: inner.w - 8, step: 34 } : { x: 110, y: 4, w: inner.w - 114, step: 30 };
+  const help = narrow ? { x: 4, y: 80, w: inner.w - 8 } : { x: 110, y: 4, w: inner.w - 114 };
 
   return (
     <div className="pnl-inner" style={pos(inner.x, inner.y, inner.w, inner.h)}>
@@ -44,18 +44,18 @@ export function SettingsTab({ inner, narrow }: TabProps) {
       </div>
 
       <BitmapText text="How it works" heading w={help.w} align="center" style={{ position: "absolute", ...pos(help.x, help.y) }} />
-      {HELP.map(([icon, line], i) => {
-        const y = help.y + 16 + i * help.step;
-        return (
-          <div key={icon} className="a" style={pos(help.x, y, help.w, help.step)}>
+      {/* The lines flow down with an even gap (they wrap to different heights). */}
+      <div className="a help-lines" style={{ ...pos(help.x, help.y + 16, help.w), gap: em(narrow ? 6 : 10) }}>
+        {HELP.map(([icon, line]) => (
+          <div key={icon} className="help-line">
             <i className="slot" aria-hidden="true" style={pos(0, 0)}><KitIcon name={icon} x={2} y={2} /></i>
-            <BitmapText text={line} w={help.w - 22} style={{ position: "absolute", ...pos(22, 1) }} />
+            <BitmapText text={line} w={help.w - 22} style={{ marginLeft: em(22), paddingTop: em(1) }} />
           </div>
-        );
-      })}
+        ))}
+      </div>
       {!narrow && (
         <BitmapText text="Esc opens and closes this menu." colour={INK.brown} w={help.w}
-          style={{ position: "absolute", ...pos(help.x, help.y + 16 + HELP.length * help.step) }} />
+          style={{ position: "absolute", ...pos(help.x, help.y + 120) }} />
       )}
     </div>
   );
