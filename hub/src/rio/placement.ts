@@ -19,9 +19,9 @@ export const HOME: Record<string, Home> = {
   pond: { area: "ipanema-beach", scene: "ipanema-beach/outside" },
   aquarium: { area: "ipanema-beach", scene: "ipanema-beach/sea" },
   farmhouse: { area: "boteco", scene: "boteco/inside" },
-  orchard: null, // Jardim Botânico
-  glasshouse: null, // the orchid house
-  museum: null, // the museum
+  orchard: { area: "jardim-botanico", scene: "jardim-botanico/outside" }, // the palm avenue (phase 2a)
+  glasshouse: { area: "jardim-botanico", scene: "jardim-botanico/inside" }, // the orchid house (phase 2a)
+  museum: null, // the museum: no Rio night or rain art yet
   bonus: null,
 };
 
@@ -42,6 +42,17 @@ const TAGS_BY_GROUP: Record<string, string[]> = {
   pond: ["pond"],
   aquarium: ["fish", "aquarium"],
   farmhouse: ["boteco:*"],
+  // The Jardim Botânico's kinds (its manifest's stickerAccepts): fruit trees, the swing and the
+  // picnic blanket on the tree spots; the glasshouse's plants on the plant spots.
+  orchard: ["trees:tree"],
+  glasshouse: ["greenhouse:plant"],
+};
+/** Single stickers whose kind differs from their group's. */
+const TAGS_BY_KEY: Record<string, string[]> = {
+  // The glasshouse's potting things go where the seed packet goes.
+  seedtray: ["greenhouse:seeds"],
+  seedling: ["greenhouse:seeds"],
+  wateringcan: ["greenhouse:seeds"],
 };
 const TAGS_BY_SET: Record<string, string[]> = {
   "lane/Kind notes": ["lagoa-garden:*", "outdoor"],
@@ -54,6 +65,7 @@ export function stickerTags(stickerKey: string): string[] {
   const s = STICKER_BY_KEY.get(stickerKey);
   if (!s) return [];
   if (s.group === "barnyard" && ANIMAL[s.key]) return [ANIMAL[s.key]!];
+  if (s.group === "glasshouse" && TAGS_BY_KEY[s.key]) return TAGS_BY_KEY[s.key]!;
   return TAGS_BY_SET[`${s.group}/${s.set}`] ?? TAGS_BY_GROUP[s.group] ?? [];
 }
 
@@ -84,19 +96,19 @@ export function sceneState(scene: SceneId, placedHere: number): string {
   return placedHere * 2 >= n ? "full" : "start";
 }
 
-/** The slots free in a state. */
-export const slotsIn = (scene: SceneId, state: string): Slot[] =>
-  SCENES[scene].slots.filter((s) => !s.state || s.state === state);
+/** The slots free in a state (a slot that needs a milestone, only once it is earned). */
+export const slotsIn = (scene: SceneId, state: string, milestones: readonly string[] = []): Slot[] =>
+  SCENES[scene].slots.filter((s) => (!s.state || s.state === state) && (!s.requires || milestones.includes(s.requires)));
 
 /**
  * The scene's own placed stickers (of `placed`, any order) in book order, each in the first free
  * slot (slot order) that takes it; `overflow` is how many found no slot (they stay in the book).
  */
-export function layout(scene: SceneId, placed: readonly string[]): { bySlot: Map<string, string>; overflow: number } {
+export function layout(scene: SceneId, placed: readonly string[], milestones: readonly string[] = []): { bySlot: Map<string, string>; overflow: number } {
   const mine = placed
     .filter((k) => homeOf(k)?.scene === scene)
     .sort((a, b) => STICKER_BY_KEY.get(a)!.index - STICKER_BY_KEY.get(b)!.index);
-  const free = slotsIn(scene, sceneState(scene, mine.length));
+  const free = slotsIn(scene, sceneState(scene, mine.length), milestones);
   const bySlot = new Map<string, string>();
   let overflow = 0;
   for (const k of mine) {
