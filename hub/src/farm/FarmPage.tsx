@@ -126,7 +126,7 @@ export function FarmPage() {
 
   if (!view) return null;
   return (
-    <GameScreen>
+    <GameScreen back={!area}>
       <h1 className="visually-hidden">Esme's Rio</h1>
       <p className="visually-hidden" role="status" data-earned={view.collected}>
         {view.collected} of {COLLECTION.length} stickers

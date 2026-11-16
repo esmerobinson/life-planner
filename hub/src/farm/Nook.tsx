@@ -114,7 +114,9 @@ export function Nook({ phone = false }: { phone?: boolean }) {
             <canvas ref={canvas} width={W} height={H} className="farm-px" style={{ width: W * SCALE, height: H * SCALE }} />
           </Link>
           {/* PLACEHOLDER WORDING */}
-          <Link to="/farm?menu=collection" className="farm-nook-book" aria-label="Your sticker collection"
+          {/* Already in the game, it replaces the page rather than stacking another (so Back still leaves). */}
+          <Link to="/farm?menu=collection" replace={location.pathname === "/farm" || location.pathname === "/farm/"}
+            className="farm-nook-book" aria-label="Your sticker collection"
             style={{ left: BOOK_AT[0] * SCALE, top: BOOK_AT[1] * SCALE, width: 16 * SCALE, height: 16 * SCALE }} />
         </span>
       </div>

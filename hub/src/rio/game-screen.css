@@ -109,10 +109,10 @@ html:has(.app-shell.is-game) body {
 }
 
 /* An area's buttons, top left; the overflow line under them. */
-/* Under Back. */
+/* Where Back stands on the map (in an area, "Back to the map" takes its place). */
 .rio-area-controls {
   position: absolute;
-  top: 22em;
+  top: 4em;
   left: 4em;
   z-index: 20;
   display: flex;

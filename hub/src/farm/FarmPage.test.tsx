@@ -85,6 +85,28 @@ it("Back returns to the page she came from", async () => {
   await waitFor(() => expect(currentUrl).toBe("/goals"));
 });
 
+it("Back still leaves the game after the nook's collection icon was used there (review v2)", async () => {
+  await db.farm.put(startRow("dev-a", "2026-11-02"));
+  renderApp(["/goals", "/farm"], "2026-11-04");
+  const user = userEvent.setup();
+  await screen.findByRole("list", { name: "Places in Rio" });
+  await user.click(await screen.findByRole("link", { name: "Your sticker collection" }));
+  await screen.findByRole("dialog", { name: "Menu" });
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull());
+  await user.click(screen.getByRole("button", { name: "Back" }));
+  await waitFor(() => expect(currentUrl).toBe("/goals"));
+});
+
+it("in an area there is one way back, to the map (review v2)", async () => {
+  renderApp("/farm", "2026-11-04");
+  const user = userEvent.setup();
+  await user.click(within(await screen.findByRole("list", { name: "Places in Rio" })).getByRole("button", { name: "Fazenda" }));
+  await screen.findByRole("heading", { level: 2, name: "Fazenda" });
+  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Back to the map" })).toBeInTheDocument();
+});
+
 it("there is no sticker book: the game screen holds the map and the menu's hotbar (Esme, 2026-11-17)", async () => {
   renderApp("/farm", "2026-11-04");
   await screen.findByRole("list", { name: "Places in Rio" });

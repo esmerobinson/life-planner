@@ -14,7 +14,8 @@ import { UiContext, menuFit } from "./ui/fit";
 import "./menu/menu.css";
 import "./game-screen.css";
 
-export function GameScreen({ children }: { children: ReactNode }) {
+/** `back`: false hides the game's Back (in an area, "Back to the map" is the one way back). */
+export function GameScreen({ children, back: showBack = true }: { children: ReactNode; back?: boolean }) {
   // The UI's scale comes from the whole screen (the menu opens over all of it), never from the
   // view inside the border: the border's width follows the scale, so that would go round in circles.
   const screen = useRef<HTMLDivElement>(null);
@@ -54,10 +55,12 @@ export function GameScreen({ children }: { children: ReactNode }) {
       <div className="game-view">
         <UiContext.Provider value={fit}>
           {children}
-          <div className="rio-hud-top" style={{ fontSize: `${fit.u}px` }}>
-            {/* PLACEHOLDER WORDING */}
-            <TextButton label="Back" onClick={back} />
-          </div>
+          {showBack && (
+            <div className="rio-hud-top" style={{ fontSize: `${fit.u}px` }}>
+              {/* PLACEHOLDER WORDING */}
+              <TextButton label="Back" onClick={back} />
+            </div>
+          )}
         </UiContext.Provider>
       </div>
     </div>
