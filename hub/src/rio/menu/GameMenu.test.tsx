@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { COLLECTION, STICKERS } from "../../farm/catalogue";
@@ -71,6 +71,34 @@ it("the Map tab and Esc both close it, back to the city", async () => {
   expect(onClose).toHaveBeenCalledTimes(2);
   await user.click(screen.getByRole("button", { name: "Close" }));
   expect(onClose).toHaveBeenCalledTimes(3);
+});
+
+it("Esc closes it even after a click has left focus on the page behind (review I1)", () => {
+  const onClose = vi.fn();
+  render(<Menu view={fakeView()} onClose={onClose} />);
+  (document.activeElement as HTMLElement | null)?.blur();
+  expect(document.activeElement).toBe(document.body);
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it("Esc on an open sticker card closes the card, not the menu", async () => {
+  const user = userEvent.setup();
+  const onClose = vi.fn();
+  render(<Menu view={fakeView()} onClose={onClose} />);
+  await user.click(screen.getByRole("tab", { name: "Fazenda" }));
+  await user.click(screen.getByRole("button", { name: "Mind: sprout: not yet" }));
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog", { name: "Mind: sprout" })).toBeNull();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+it("Shift+Tab from the open tab stays inside the menu (review I2)", async () => {
+  const user = userEvent.setup();
+  render(<><button type="button">Behind the menu</button><Menu view={fakeView()} /></>);
+  screen.getByRole("tab", { name: "Collection" }).focus();
+  await user.tab({ shift: true });
+  expect(screen.getByRole("dialog", { name: "Menu" }).contains(document.activeElement)).toBe(true);
 });
 
 describe("Collection", () => {

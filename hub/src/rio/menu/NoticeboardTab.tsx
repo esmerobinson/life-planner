@@ -14,6 +14,8 @@ import { weekdayOf } from "../../domain/dates";
 import type { AreaStatus } from "../areas";
 import { nextFriend, nextOpening, recentStickers } from "../notices";
 import { BitmapText } from "../ui/BitmapText";
+import { headPx, useUi } from "../ui/fit";
+import { wrapText } from "../ui/font";
 import { INK, KIT } from "../ui/kit";
 import type { TabProps } from "./GameMenu";
 import { ArrowButton, KitIcon, RowButton, StickerArt, em, pos } from "./pieces";
@@ -31,6 +33,7 @@ export function NoticeboardTab({ view, stage, inner, narrow, day, statuses }: Ta
   day: number; statuses: ReadonlyMap<string, AreaStatus>;
 }) {
   const [open, setOpen] = useState<NoteKey | null>(null);
+  const { u } = useUi();
   const opening = nextOpening(statuses, view.state.start, view.today);
   const recent = recentStickers(view.state.seenOn);
   const friend = nextFriend(stickerTotals(view.earnedSet).friends, day, view.arrived);
@@ -84,7 +87,9 @@ export function NoticeboardTab({ view, stage, inner, narrow, day, statuses }: Ta
         return (
           <RowButton key={n.key} x={0} y={2 + i * 31} w={inner.w} h={rowH} onClick={() => setOpen(n.key)}>
             <KitIcon name={n.icon} x={6 + Math.floor((16 - Math.min(16, ic.w)) / 2)} y={ic.h > 10 ? 8 : 10} />
-            <BitmapText text={n.row} heading w={inner.w - 35} style={{ position: "absolute", ...pos(28, 9) }} />
+            {/* One line sits 9 down (boardHTML); two lines (the phone) start higher so both fit the row. */}
+            <BitmapText text={n.row} heading w={inner.w - 35}
+              style={{ position: "absolute", ...pos(28, wrapText(n.row, Math.floor(((inner.w - 35) * u) / headPx(u))).length > 1 ? 3 : 9) }} />
           </RowButton>
         );
       })}

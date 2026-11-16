@@ -10,7 +10,7 @@ import { useEffect, useId, useRef, type KeyboardEvent as ReactKeyboardEvent } fr
 import type { FarmView } from "../../farm/FarmContext";
 import { useReducedMotion } from "../../farm/hooks";
 import type { AreaStatus } from "../areas";
-import { MENU_STAGE, useUi, type Box } from "../ui/fit";
+import { stageOf, useUi, type Box } from "../ui/fit";
 import { CollectionTab } from "./CollectionTab";
 import { FriendsTab } from "./FriendsTab";
 import { LaterTab } from "./LaterTab";
@@ -57,12 +57,14 @@ export interface GameMenuProps {
   onArea?: (area: string | null) => void;
 }
 
-const FOCUSABLE = 'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
+/** What Tab reaches (a roving tab's tabindex -1 is not: review I2). */
+const FOCUSABLE = 'button:not([disabled]):not([tabindex="-1"]), [href]:not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])';
 
 export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, startArea, onArea }: GameMenuProps) {
-  const { u, layout } = useUi();
+  const fit = useUi();
+  const { u, layout } = fit;
   const narrow = layout === "narrow";
-  const stage = MENU_STAGE[layout];
+  const stage = stageOf(fit);
   const P = stage.panel;
   const inner: Box = { x: P.x + 6, y: P.y + 6, w: P.w - 13, h: P.h - 12 };
   const root = useRef<HTMLDivElement>(null);
@@ -81,6 +83,20 @@ export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, s
     if (shown !== "collection") onArea?.(null);
   }, [shown, onArea]);
 
+  // Esc closes the menu wherever focus is, even after a click left it on the page (review I1);
+  // something inside that uses Esc first (a sticker's card) marks it handled.
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      close.current();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   const pick = (t: MenuTab) => (t === "map" ? onClose() : onTab(t));
 
   const onTabKey = (e: ReactKeyboardEvent, i: number) => {
@@ -92,12 +108,6 @@ export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, s
   };
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      e.preventDefault();
-      onClose();
-      return;
-    }
     if (e.key !== "Tab" || !root.current) return;
     // Tab stays inside the menu while it's open.
     const all = [...root.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
@@ -119,7 +129,9 @@ export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, s
   return (
     <div className="rio-menu-dim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={root} className={`rio-menu rio-ui${still ? " is-still" : ""}`} role="dialog" aria-modal="true" aria-label="Menu"
-        data-tab={shown} data-layout={layout} onKeyDown={onKeyDown}
+        tabIndex={-1} data-tab={shown} data-layout={layout} onKeyDown={onKeyDown}
+        // A click on the panel itself keeps focus in the menu (so Tab stays inside it).
+        onMouseDown={(e) => { if (e.target === e.currentTarget || !(e.target as HTMLElement).closest(FOCUSABLE)) root.current?.focus(); }}
         style={{ ...kitVars(), fontSize: `${u}px`, width: em(stage.w), height: em(stage.h) }}>
         {/* The panel (z 5), then the tabs that bite into it. */}
         <div className="pnl" style={{ ...pos(P.x, P.y, P.w, P.h), zIndex: 5 }} />

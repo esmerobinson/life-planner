@@ -66,17 +66,18 @@ export function CollectionTab({ view, stage, inner, narrow, canPlace, startArea,
     sideRefs.current[to]?.focus();
   };
 
-  // Cells, in the panel's inside: the kit's 20px slots, 10 across (the phone: 17 apart, no slot box).
+  // Cells, in the panel's inside: the kit's 20px slots, 10 across (the phone: 17 apart, no slot
+  // box, 9 across so 2x fits 360 px phones).
   const pitch = narrow ? 17 : 20;
-  const gx = narrow ? 5 : Math.floor((inner.w - 10 * 20) / 2);
+  const across = narrow ? 9 : 10;
+  const gx = Math.floor((inner.w - (across - 1) * pitch - (narrow ? 16 : 20)) / 2);
   const gy = narrow ? 16 : 8;
-  const cells = page.stickers.map((key, i) => ({ key, x: gx + (i % 10) * pitch, y: gy + Math.floor(i / 10) * pitch }));
+  const cells = page.stickers.map((key, i) => ({ key, x: gx + (i % across) * pitch, y: gy + Math.floor(i / across) * pitch }));
   const earnedHere = page.stickers.filter((k) => view.earnedSet.has(k)).length;
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
     if (e.key === "Escape" && picked) {
-      e.stopPropagation();
-      e.preventDefault();
+      e.preventDefault(); // handled: the menu stays open
       setPicked(null);
     }
   };
