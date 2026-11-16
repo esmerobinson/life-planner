@@ -1,7 +1,8 @@
 // Copies the finished Rio art pack into the app (src/assets/rio/), keeping relative paths.
 // Usage: node scripts/import-rio-pack.mjs <rio-pack dir>
 // Only the final folders the app reads; never previews, scratch, review-only or no-esme files.
-// The map's holiday events (events/) are left out: phase 1 doesn't show them.
+// Phase 2a adds the areas drawn since phase 1 (scenes only) and the map's holiday takeovers. Their
+// dish, ingredient and sticker art waits for phase 2b (recipes, Zona Sul's stock, the v3 families).
 
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -15,8 +16,18 @@ const AREAS = [
   "day1/clothing-store",
   "week1/tijuca-park",
   "later/boteco",
+  "week2/zona-sul",
+  "week2/jardim-botanico",
+  "later/quilo",
+  "later/sult",
+  "later/os-esquilos",
+  "later/santa-teresa",
 ];
-const SKIP = [/\/previews\//, /\/_scratch\//, /REVIEW-ONLY/, /\/no-esme\//, /^\/day1\/map\/events\//];
+const SKIP = [
+  /\/previews\//, /\/_scratch\//, /REVIEW-ONLY/, /\/no-esme\//,
+  // Phase 2b: dishes, ingredients and the new areas' stickers are not in the game yet.
+  /^\/(week2|later)\/[^/]+\/(dishes|ingredients|stickers)\//,
+];
 
 const pack = process.argv[2];
 if (!pack) {

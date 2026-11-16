@@ -1,4 +1,4 @@
-import { LOOKS, RIO_MAP, SCENES, mapBase, mapLayer, rioUrl, type SceneId } from "./assets";
+import { BOTECO_NIGHTS, LOOKS, RIO_MAP, SCENES, mapBase, mapLayer, rioUrl, type SceneId } from "./assets";
 
 describe("the Rio art pack is bundled", () => {
   it("every map layer file is bundled", () => {
@@ -17,7 +17,7 @@ describe("the Rio art pack is bundled", () => {
 
   it("every scene base file is bundled", () => {
     const ids = Object.keys(SCENES) as SceneId[];
-    expect(ids.length).toBe(14);
+    expect(ids.length).toBe(26);
     for (const id of ids) {
       const s = SCENES[id];
       expect(Object.keys(s.base).length, id).toBeGreaterThan(0);
@@ -76,8 +76,80 @@ describe("the map's rain look (added to the pack 2026-11-15)", () => {
     expect(mapBase("rain")).toBe("map-base-rain.png");
     expect(RIO_MAP.weather?.rain?.overlay.frames.length).toBe(4);
   });
-  it("holiday events are not bundled in phase 1", () => {
-    expect(rioUrl("day1/map/events/carnaval.png")).toBe("");
-    expect(Object.keys(import.meta.glob("../assets/rio/day1/map/events/**"))).toEqual([]);
+  it("holiday events are bundled (phase 2a): Carnaval and Réveillon, day and night, and the fireworks", () => {
+    expect(RIO_MAP.events.map((e) => e.key)).toEqual(["carnaval", "reveillon"]);
+    for (const e of RIO_MAP.events) {
+      for (const f of [...Object.values(e.layers), ...(e.animation?.night.frames ?? [])]) expect(rioUrl(`day1/map/${f}`), f).not.toBe("");
+    }
+    expect(RIO_MAP.events[1]!.animation!.night.frames).toHaveLength(4);
+  });
+});
+
+const NEW_SCENES: SceneId[] = [
+  "zona-sul/outside", "zona-sul/inside", "jardim-botanico/outside", "jardim-botanico/inside", "quilo/outside", "quilo/inside",
+  "sult/outside", "sult/inside", "os-esquilos/outside", "os-esquilos/inside", "santa-teresa/outside", "santa-teresa/inside",
+];
+
+describe("phase 2a: the areas drawn since phase 1", () => {
+  it("each new scene has every state in day, rain and night, and its falling rain", () => {
+    for (const id of NEW_SCENES) {
+      const s = SCENES[id];
+      expect(Object.keys(s.base).length, id).toBeGreaterThanOrEqual(2);
+      for (const [state, looks] of Object.entries(s.base)) for (const look of LOOKS) expect(rioUrl(looks[look] ?? ""), `${id} ${state} ${look}`).not.toBe("");
+      expect(s.rainOverlay, id).toBeTruthy();
+      expect(s.slots.length, id).toBeGreaterThan(0);
+    }
+    expect(Object.keys(SCENES["zona-sul/inside"].base)).toEqual(["start", "mid", "full"]);
+  });
+
+  it("reads each area's own sticker slots (slots or sticker_slots), ordered slots first", () => {
+    expect(SCENES["jardim-botanico/outside"].slots).toHaveLength(23);
+    expect(SCENES["jardim-botanico/inside"].slots).toHaveLength(17);
+    expect(SCENES["zona-sul/outside"].slots).toHaveLength(13);
+    expect(SCENES["quilo/inside"].slots).toHaveLength(4);
+    expect(SCENES["sult/inside"].slots[0]!.id).toBe("celebration-table");
+    expect(SCENES["sult/inside"].slots[0]!.order).toBe(1);
+    expect(SCENES["santa-teresa/inside"].slots.find((s) => s.id === "window-seat")!.requires).toBe("window-seat");
+    // Phase-1 slots files have no order: their slots keep file order.
+    expect(SCENES["fazenda/outside"].slots.every((s) => s.order === undefined)).toBe(true);
+  });
+
+  it("Os Esquilos has its five celebration layers in each look, in step order", () => {
+    for (const id of ["os-esquilos/outside", "os-esquilos/inside"] as SceneId[]) {
+      const c = SCENES[id].celebrations!;
+      expect(c.map((x) => x.id)).toEqual(["feast-table", "lanterns", "flowers", "roast", "cake"]);
+      for (const x of c) for (const look of LOOKS) expect(rioUrl(x.layers[look] ?? ""), `${id} ${x.id} ${look}`).not.toBe("");
+    }
+  });
+
+  it("Santa Teresa has its milestones, 204 spines and 9 covers", () => {
+    const st = SCENES["santa-teresa/inside"];
+    expect(st.milestones!.map((m) => m.id)).toEqual(["reading-lamp", "second-bookcase", "rug", "cat-bed", "window-seat"]);
+    for (const m of st.milestones!) for (const look of LOOKS) expect(rioUrl(m.overlay[look] ?? ""), `${m.id} ${look}`).not.toBe("");
+    expect(st.books!.spines.slots).toHaveLength(204);
+    expect(st.books!.covers.slots).toHaveLength(9);
+    expect(st.books!.spines.slots[142]).toMatchObject({ n: 143, requires: "second-bookcase" });
+    expect(st.books!.spines.slots[0]).toMatchObject({ n: 1, x: 54, y: 68, w: 3, h: 10, sx: 0, sy: 0 });
+    for (const sheet of [st.books!.spines, st.books!.covers]) for (const look of LOOKS) expect(rioUrl(sheet.sheets[look] ?? "")).not.toBe("");
+  });
+
+  it("the boteco's themed nights are bundled, with their posters", () => {
+    expect(Object.keys(BOTECO_NIGHTS).sort()).toEqual(["football", "funk", "karaoke", "samba"]);
+    for (const [k, n] of Object.entries(BOTECO_NIGHTS)) {
+      expect(rioUrl(n.poster), k).not.toBe("");
+      for (const side of [n.inside, n.outside]) {
+        expect(rioUrl(side.overlay), `${k} overlay`).not.toBe("");
+        for (const a of side.anims) expect(rioUrl(a.strip), `${k} ${a.strip}`).not.toBe("");
+      }
+    }
+    expect(BOTECO_NIGHTS.football.inside.baseTv).toBe(false);
+    expect(BOTECO_NIGHTS.samba.inside.baseTv).toBe(true);
+    expect(BOTECO_NIGHTS.karaoke.inside.anims.find((a) => a.once)!.frames).toBe(5);
+  });
+
+  it("no dish, ingredient or new sticker art is bundled yet (phase 2b)", () => {
+    expect(Object.keys(import.meta.glob("../assets/rio/**/dishes/**"))).toEqual([]);
+    expect(Object.keys(import.meta.glob("../assets/rio/**/ingredients/**"))).toEqual([]);
+    expect(Object.keys(import.meta.glob("../assets/rio/{week2,later}/*/stickers/**"))).toEqual([]);
   });
 });

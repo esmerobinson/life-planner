@@ -1,0 +1,6 @@
+{
+ "name": "Os Esquilos extras (Rio pack, later)",
+ "notes": "No new colours. Day uses the pack palette and the existing extra ramps: cot_trim (the terracotta roof), mead_paper + cream (cream plaster), vg_snow + stone (columns, cloths, white chairs, parasols), tom + ch_rust (the coral wing, the rust-red window frames), vg_terra + ch_rust (the tile floor, pots), fam_blue + vg_snow (azulejos), mud (dark wood furniture, booths, the post, beams), red (booth cushions), hol_br_mag (bougainvillea), fam_olive + cot_honey (the ornate parasol), mead_stone + stone (stone flags), w24_cu (copper), the forest greens as Tijuca park. Caetano's greens come from the shipped character palette (palette-extra-frog.json). Rain and night colours are look colours, listed in palette-rain.json and palette-night.json.",
+ "ramps": [],
+ "newColoursFound": 0
+}

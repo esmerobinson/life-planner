@@ -50,9 +50,19 @@ export interface RioMapData {
   hit_test_order: string[];
   /** The falling rain over the rain look (after the places, before the markers). */
   weather?: { rain?: { overlay: { frames: string[]; frame_ms: number } } };
+  /** Holiday takeovers (Carnaval, Réveillon): dates "MM-DD" in Rio, a layer per look, map-relative. */
+  events: RioEvent[];
 }
 
-/** map.json (paths in it are relative to day1/map/). `events` (holiday overlays) is ignored in phase 1. */
+export interface RioEvent {
+  key: string;
+  name: string;
+  dates: { from: string; to: string; night_runs_until?: string };
+  layers: Record<"day" | "night", string>;
+  animation?: { night: { frames: string[]; frame_ms: number } };
+}
+
+/** map.json (paths in it are relative to day1/map/). */
 export const RIO_MAP = rawMap as unknown as RioMapData;
 export const MAP_DIR = "day1/map";
 
@@ -75,7 +85,14 @@ export type SceneId =
   | "ipanema-beach/outside" | "barraca/inside" | "ipanema-beach/sea"
   | "clothing-store/outside" | "clothing-store/inside"
   | "tijuca-park/outside" | "tijuca-park/inside"
-  | "boteco/outside" | "boteco/inside";
+  | "boteco/outside" | "boteco/inside"
+  // Phase 2a: the areas drawn since phase 1.
+  | "zona-sul/outside" | "zona-sul/inside"
+  | "jardim-botanico/outside" | "jardim-botanico/inside"
+  | "quilo/outside" | "quilo/inside"
+  | "sult/outside" | "sult/inside"
+  | "os-esquilos/outside" | "os-esquilos/inside"
+  | "santa-teresa/outside" | "santa-teresa/inside";
 
 export interface Slot {
   id: string;
@@ -87,6 +104,18 @@ export interface Slot {
   state?: string;
   /** What the slot takes (the pack's sticker tags, e.g. "hen", "pond", "fazenda:decor", "finds:*"). */
   accepts: string[];
+  /** Fill order (lowest first) where the pack gives one; such slots come first. */
+  order?: number;
+  /** Free only once this milestone is earned (Santa Teresa's window seat and second bookcase). */
+  requires?: string;
+}
+
+/** A sheet the app copies small pictures from (Santa Teresa's book spines and framed covers). */
+export interface Sheet {
+  /** Per look, pack-relative. */
+  sheets: Partial<Record<Look, string>>;
+  /** Slot n = book n: copy the sheet's (sx, sy, w, h) to (x, y). */
+  slots: { n: number; x: number; y: number; w: number; h: number; sx: number; sy: number; requires?: string }[];
 }
 
 export interface SceneData {
@@ -98,6 +127,12 @@ export interface SceneData {
   rainOverlay?: { frames?: string[]; strip?: { file: string; count: number; size: [number, number] }; ms: number };
   /** The boteco's bar TV: frames per look at `at` (the base already shows frame 0). */
   tv?: { at: [number, number]; ms: number; frames: Partial<Record<Look, string[]>> };
+  /** Os Esquilos: one layer per whole goal finished, in step order, drawn over the start base. */
+  celebrations?: { id: string; layers: Partial<Record<Look, string>> }[];
+  /** Santa Teresa: milestone overlays (by their order), drawn over the start base. */
+  milestones?: { id: string; overlay: Partial<Record<Look, string>> }[];
+  /** Santa Teresa: the book spines and framed covers that fill its shelves. */
+  books?: { spines: Sheet; covers: Sheet };
   overlays?: unknown;
 }
 
@@ -135,14 +170,34 @@ const SOURCES: Record<SceneId, SceneSource> = {
   "tijuca-park/inside": { file: "week1/tijuca-park/inside/tijuca-inside-slots.json", root: "week1/tijuca-park" },
   "boteco/outside": { file: "later/boteco/location/outside-slots.json", root: "later/boteco" },
   "boteco/inside": { file: "later/boteco/inside/inside-slots.json", root: "later/boteco" },
+  "zona-sul/outside": { file: "week2/zona-sul/outside/outside-slots.json", root: "week2/zona-sul" },
+  "zona-sul/inside": { file: "week2/zona-sul/inside/inside-slots.json", root: "week2/zona-sul" },
+  "jardim-botanico/outside": { file: "week2/jardim-botanico/outside/jardim-outside-slots.json", root: "week2/jardim-botanico" },
+  "jardim-botanico/inside": { file: "week2/jardim-botanico/inside/jardim-inside-slots.json", root: "week2/jardim-botanico" },
+  "quilo/outside": { file: "later/quilo/outside/outside-slots.json", root: "later/quilo" },
+  "quilo/inside": { file: "later/quilo/inside/inside-slots.json", root: "later/quilo" },
+  "sult/outside": { file: "later/sult/outside/outside-slots.json", root: "later/sult" },
+  "sult/inside": { file: "later/sult/inside/inside-slots.json", root: "later/sult" },
+  "os-esquilos/outside": { file: "later/os-esquilos/outside/os-esquilos-outside-slots.json", root: "later/os-esquilos" },
+  "os-esquilos/inside": { file: "later/os-esquilos/inside/os-esquilos-inside-slots.json", root: "later/os-esquilos" },
+  "santa-teresa/outside": { file: "later/santa-teresa/outside/outside-slots.json", root: "later/santa-teresa" },
+  "santa-teresa/inside": { file: "later/santa-teresa/inside/inside-slots.json", root: "later/santa-teresa" },
 };
 
-type RawSlot = { id: string; x: number; y: number; anchor?: string; state?: string; accepts?: string[] };
+type RawSlot = { id: string; x: number; y: number; anchor?: string; state?: string; accepts?: string[]; order?: number; requires?: string };
+type RawLooks = Partial<Record<string, string>>;
+interface RawSheet { sheets: RawLooks; slots: { n: number; x: number; y: number; w: number; h: number; sheet: [number, number]; requires?: string }[] }
 interface RawStrip { file: string; json: string }
 interface RawScene {
   scene: [number, number];
   base: Record<string, string | Record<string, string>>;
-  slots: RawSlot[] | Record<string, RawSlot[]>;
+  /** Some areas name their sticker slots `sticker_slots` (beside dish and ingredient slots, phase 2b). */
+  slots?: RawSlot[] | Record<string, RawSlot[]>;
+  sticker_slots?: RawSlot[];
+  celebrations?: { step: number; id: string; layers: RawLooks }[];
+  milestones?: { id: string; order: number; overlay: RawLooks }[];
+  shelf_slots?: RawSheet;
+  cover_slots?: RawSheet;
   overlays?: {
     rain?: RawStrip | { frames: string[]; frame_ms: number };
     tv?: { at: [number, number]; frame_ms: number; frames: Record<string, string[]> };
@@ -169,19 +224,40 @@ function readBase(raw: RawScene["base"], at: (p: string) => string): SceneData["
   return out;
 }
 
-/** Slots as a list, or split into common and per-state lists. */
-function readSlots(raw: RawScene["slots"]): Slot[] {
+/** Slots as a list, or split into common and per-state lists; slots with an `order` first, by it. */
+function readSlots(raw: NonNullable<RawScene["slots"]>): Slot[] {
   const tidy = (s: RawSlot, state?: string): Slot => ({
     id: s.id, x: s.x, y: s.y, accepts: s.accepts ?? [], ...(s.anchor === "top" ? { anchor: "top" as const } : {}), ...(state ?? s.state ? { state: state ?? s.state } : {}),
+    ...(typeof s.order === "number" ? { order: s.order } : {}), ...(s.requires ? { requires: s.requires } : {}),
   });
-  if (Array.isArray(raw)) return raw.map((s) => tidy(s));
-  return Object.entries(raw).flatMap(([group, list]) => list.map((s) => tidy(s, group === "common" ? undefined : group)));
+  const list = Array.isArray(raw) ? raw.map((s) => tidy(s)) : Object.entries(raw).flatMap(([group, l]) => l.map((s) => tidy(s, group === "common" ? undefined : group)));
+  const ordered = list.filter((s) => s.order !== undefined).sort((a, b) => a.order! - b.order!);
+  return [...ordered, ...list.filter((s) => s.order === undefined)];
 }
+
+/** A per-look file map, pack-relative. */
+function readLooks(raw: RawLooks, at: (p: string) => string): Partial<Record<Look, string>> {
+  const out: Partial<Record<Look, string>> = {};
+  for (const [look, file] of Object.entries(raw)) if (isLook(look) && file) out[look] = at(file);
+  return out;
+}
+
+const readSheet = (raw: RawSheet, at: (p: string) => string): Sheet => ({
+  sheets: readLooks(raw.sheets, at),
+  slots: raw.slots.map((s) => ({ n: s.n, x: s.x, y: s.y, w: s.w, h: s.h, sx: s.sheet[0], sy: s.sheet[1], ...(s.requires ? { requires: s.requires } : {}) })),
+});
 
 function readScene(src: SceneSource): SceneData {
   const raw = readJson<RawScene>(src.file);
   const at = (p: string) => `${src.root}/${p}`;
-  const data: SceneData = { scene: raw.scene, base: readBase(raw.base, at), slots: readSlots(raw.slots), overlays: raw.overlays };
+  const data: SceneData = { scene: raw.scene, base: readBase(raw.base, at), slots: readSlots(raw.slots ?? raw.sticker_slots ?? []), overlays: raw.overlays };
+  if (raw.celebrations) {
+    data.celebrations = [...raw.celebrations].sort((a, b) => a.step - b.step).map((c) => ({ id: c.id, layers: readLooks(c.layers, at) }));
+  }
+  if (raw.milestones) {
+    data.milestones = [...raw.milestones].sort((a, b) => a.order - b.order).map((m) => ({ id: m.id, overlay: readLooks(m.overlay, at) }));
+  }
+  if (raw.shelf_slots && raw.cover_slots) data.books = { spines: readSheet(raw.shelf_slots, at), covers: readSheet(raw.cover_slots, at) };
   const rain = raw.overlays?.rain ?? raw.rain_overlay;
   if (rain && "frames" in rain) data.rainOverlay = { frames: rain.frames.map(at), ms: rain.frame_ms };
   else if (rain) {
@@ -206,3 +282,36 @@ export function sceneBase(id: SceneId, state: string, look: Look): string {
   const looks = SCENES[id].base[state] ?? Object.values(SCENES[id].base)[0]!;
   return looks[look] ?? looks.day!;
 }
+
+// ---- the boteco's themed nights (bundled; nothing triggers them until phase 2b's bundles) ---------
+
+export type BotecoNight = "samba" | "karaoke" | "funk" | "football";
+export const BOTECO_NIGHT_KEYS: readonly BotecoNight[] = ["samba", "karaoke", "funk", "football"];
+
+export interface NightLayer {
+  /** Full-scene overlay at (0, 0) over the full night base, pack-relative. */
+  overlay: string;
+  /** The base's own bar TV plays under it (every night but football). */
+  baseTv: boolean;
+  /** Strips: frame k at `at`; `once` plays once when the scene opens (the karaoke screen coming down). */
+  anims: { strip: string; at: [number, number]; size: [number, number]; frames: number; ms: number; once: boolean }[];
+}
+
+interface RawNightSide {
+  overlay: string;
+  base_tv: boolean;
+  anims: { strip: string; play: string; at: [number, number]; frame_size: [number, number]; frames: number; frame_ms: number }[];
+}
+const NIGHTS_DIR = "later/boteco/themed-nights";
+const rawNights = readJson<{ nights: Record<BotecoNight, { inside: RawNightSide; outside: RawNightSide; poster: { file: string } }> }>(`${NIGHTS_DIR}/manifest.json`).nights;
+const nightAt = (p: string) => `${NIGHTS_DIR}/${p}`;
+const readNightSide = (r: RawNightSide): NightLayer => ({
+  overlay: nightAt(r.overlay),
+  baseTv: r.base_tv,
+  anims: r.anims.map((a) => ({ strip: nightAt(a.strip), at: a.at, size: a.frame_size, frames: a.frames, ms: a.frame_ms, once: a.play.startsWith("once") })),
+});
+
+/** The four themed nights (the pack's manifest), pack-relative. */
+export const BOTECO_NIGHTS: Record<BotecoNight, { inside: NightLayer; outside: NightLayer; poster: string }> = Object.fromEntries(
+  BOTECO_NIGHT_KEYS.map((k) => [k, { inside: readNightSide(rawNights[k].inside), outside: readNightSide(rawNights[k].outside), poster: nightAt(rawNights[k].poster.file) }]),
+) as Record<BotecoNight, { inside: NightLayer; outside: NightLayer; poster: string }>;

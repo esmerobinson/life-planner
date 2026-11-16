@@ -1,0 +1,398 @@
+{
+ "location": "jardim-botanico-avenue",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "outside/jardim-outside-start-day.png",
+   "rain": "outside/jardim-outside-start-rain.png",
+   "night": "outside/jardim-outside-start-night.png"
+  },
+  "full": {
+   "day": "outside/jardim-outside-full-day.png",
+   "rain": "outside/jardim-outside-full-rain.png",
+   "night": "outside/jardim-outside-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "states": {
+  "start": "day 14: the gate, the palm avenue, the fountain, the orchid house, the lily pond with two Victoria pads; the beds mostly bare soil with young plants; one gardener; quiet",
+  "full": "lush: every bed packed with blooms, the pond covered in Victoria pads and flowers, hanging orchids at the glasshouse, more heliconias, bird-of-paradise, bromeliads and agapanthus, visitors on the avenue and the benches, marmosets, the toucan, an egret, a capybara on the pond bank, butterflies"
+ },
+ "state_note": "both states share every fixed thing (gate, avenue, palms, fountain, orchid house, pond, beds, benches, lamps), so the swap never moves a slot and nothing is ever removed. Suggested switch: when the area's two families have filled half its slots.",
+ "foot": "x, y = bottom-centre pixel of the sticker frame (16x16); draw at left = x - 8, top = y - 15",
+ "draw_order": "sort stickers by foot y (then x), back to front; stickers go over the base and under the rain overlay",
+ "sticker_looks": "recolour placed stickers by colour name with looks/palette-rain.json or looks/palette-night.json so they match the base",
+ "overlays": {
+  "rain": {
+   "file": "outside/jardim-outside-rain-overlay.png",
+   "json": "outside/jardim-outside-rain-overlay.json"
+  }
+ },
+ "hotspots": [
+  {
+   "id": "gate",
+   "x": 150,
+   "y": 191,
+   "w": 84,
+   "h": 49,
+   "goes": "map",
+   "note": "the white-pillared gate with its green iron gates: back to the Rio map"
+  },
+  {
+   "id": "orchid-house-door",
+   "x": 58,
+   "y": 81,
+   "w": 20,
+   "h": 37,
+   "goes": "inside",
+   "note": "the glasshouse's double doors: the orchid house"
+  },
+  {
+   "id": "fountain",
+   "x": 160,
+   "y": 88,
+   "w": 64,
+   "h": 52,
+   "goes": "none",
+   "note": "the tiered fountain (Chafariz)"
+  },
+  {
+   "id": "lily-pond",
+   "x": 268,
+   "y": 81,
+   "w": 100,
+   "h": 38,
+   "goes": "none",
+   "note": "the lily pond with the giant Victoria water lilies"
+  },
+  {
+   "id": "bench-sw",
+   "x": 88,
+   "y": 183,
+   "w": 24,
+   "h": 13,
+   "goes": "sit"
+  },
+  {
+   "id": "bench-se",
+   "x": 288,
+   "y": 215,
+   "w": 24,
+   "h": 13,
+   "goes": "sit"
+  },
+  {
+   "id": "bench-pond",
+   "x": 310,
+   "y": 122,
+   "w": 24,
+   "h": 12,
+   "goes": "sit",
+   "note": "faces the pond (seen from behind)"
+  }
+ ],
+ "host": {
+  "x": 192,
+  "y": 166,
+  "note": "where Bebe (the bunny host, being drawn) stands later, on the avenue just south of the fountain; nothing is baked here"
+ },
+ "walkable": [
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000001111111111111111",
+  "000000001111111111000011",
+  "000000001111111111001111",
+  "111111111100001111111111",
+  "111111111100001111111111",
+  "100010001111111111111111",
+  "100010001111111100111111",
+  "111111111111111111111111",
+  "111111111111111101111001",
+  "100011111111111111111111",
+  "000000000011110000000000"
+ ],
+ "walkable_note": "suggested, one string per tile row (1 = the avenue, plaza, side paths and lawns; 0 = forest edge, the glasshouse, the fountain basin, the pond, the beds, the hedges)",
+ "lamps": [
+  {
+   "kind": "post",
+   "x": 164,
+   "y": 155
+  },
+  {
+   "kind": "post",
+   "x": 220,
+   "y": 155
+  },
+  {
+   "kind": "post",
+   "x": 132,
+   "y": 85
+  },
+  {
+   "kind": "post",
+   "x": 252,
+   "y": 91
+  },
+  {
+   "kind": "post",
+   "x": 100,
+   "y": 95
+  },
+  {
+   "kind": "post",
+   "x": 40,
+   "y": 95
+  }
+ ],
+ "baked": "the backdrop (sky, Tijuca's ridges, the Corcovado and the Christ), the forest edge, six imperial palms, the sand avenue and paved plaza, the tiered fountain, the glass orchid house, the lily pond, the beds, benches, iron lamp posts, the gate and hedges, the pink ipe, the bamboo, the big tree, banana, ferns, heliconias, a bird-of-paradise; full adds blooms, pads, visitors and wildlife",
+ "slots": [
+  {
+   "id": "avenue-west",
+   "x": 146,
+   "y": 232,
+   "area": "avenue",
+   "accepts": [
+    "trees:tree"
+   ],
+   "note": "the verge where the west palm row continues"
+  },
+  {
+   "id": "avenue-east",
+   "x": 238,
+   "y": 232,
+   "area": "avenue",
+   "accepts": [
+    "trees:tree"
+   ],
+   "note": "the verge where the east palm row continues"
+  },
+  {
+   "id": "lawn-orchid-house",
+   "x": 150,
+   "y": 112,
+   "area": "lawn",
+   "accepts": [
+    "trees:tree"
+   ],
+   "note": "the lawn by the glasshouse's east end"
+  },
+  {
+   "id": "lawn-pond-west",
+   "x": 258,
+   "y": 150,
+   "area": "lawn",
+   "accepts": [
+    "trees:tree"
+   ],
+   "note": "the lawn between the plaza and the beds"
+  },
+  {
+   "id": "lawn-south-west",
+   "x": 30,
+   "y": 200,
+   "area": "lawn",
+   "accepts": [
+    "trees:tree"
+   ]
+  },
+  {
+   "id": "lawn-south-east",
+   "x": 346,
+   "y": 226,
+   "area": "lawn",
+   "accepts": [
+    "trees:tree"
+   ]
+  },
+  {
+   "id": "lawn-ipe",
+   "x": 268,
+   "y": 226,
+   "area": "lawn",
+   "accepts": [
+    "trees:tree"
+   ],
+   "note": "beside the pink ipe"
+  },
+  {
+   "id": "branch-ne-tree",
+   "x": 342,
+   "y": 52,
+   "area": "branch",
+   "accepts": [
+    "trees:animal",
+    "trees:bird"
+   ],
+   "note": "the big tree's limb over the pond"
+  },
+  {
+   "id": "branch-palm",
+   "x": 146,
+   "y": 74,
+   "area": "branch",
+   "accepts": [
+    "trees:animal",
+    "trees:bird"
+   ],
+   "note": "a palm's crownshaft, far west"
+  },
+  {
+   "id": "branch-ipe",
+   "x": 306,
+   "y": 172,
+   "area": "branch",
+   "accepts": [
+    "trees:animal",
+    "trees:bird"
+   ],
+   "note": "in the pink ipe's crown"
+  },
+  {
+   "id": "bed-west-1",
+   "x": 40,
+   "y": 150,
+   "area": "bed",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "bed-west-2",
+   "x": 100,
+   "y": 150,
+   "area": "bed",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "bed-west-3",
+   "x": 40,
+   "y": 178,
+   "area": "bed",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "bed-west-4",
+   "x": 100,
+   "y": 178,
+   "area": "bed",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "bed-east-1",
+   "x": 274,
+   "y": 168,
+   "area": "bed",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "bed-east-2",
+   "x": 350,
+   "y": 200,
+   "area": "bed",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "door-west",
+   "x": 52,
+   "y": 118,
+   "area": "door",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ],
+   "note": "a pot on the step, left of the glasshouse door"
+  },
+  {
+   "id": "door-east",
+   "x": 86,
+   "y": 118,
+   "area": "door",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ],
+   "note": "a pot on the step, right of the door"
+  },
+  {
+   "id": "fountain-rim",
+   "x": 166,
+   "y": 134,
+   "area": "fountain",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ],
+   "note": "a pot on the fountain's west rim"
+  },
+  {
+   "id": "pond-water-1",
+   "x": 300,
+   "y": 104,
+   "area": "water",
+   "accepts": [
+    "greenhouse:water",
+    "greenhouse:plant"
+   ],
+   "note": "on the pond: a new lily"
+  },
+  {
+   "id": "pond-water-2",
+   "x": 334,
+   "y": 96,
+   "area": "water",
+   "accepts": [
+    "greenhouse:water",
+    "greenhouse:plant"
+   ]
+  },
+  {
+   "id": "pond-bank",
+   "x": 360,
+   "y": 124,
+   "area": "water",
+   "accepts": [
+    "greenhouse:*",
+    "trees:bird"
+   ],
+   "note": "the pond's east rim"
+  },
+  {
+   "id": "bench-sw",
+   "x": 110,
+   "y": 186,
+   "area": "bench",
+   "accepts": [
+    "greenhouse:*",
+    "trees:animal",
+    "trees:bird"
+   ],
+   "note": "on the bench seat (right end)"
+  }
+ ]
+}

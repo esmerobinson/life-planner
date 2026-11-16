@@ -32,6 +32,18 @@ export const SCENE_NAMES: Record<SceneId, string> = {
   "tijuca-park/inside": "The hidden glade",
   "boteco/outside": "Boteco",
   "boteco/inside": "Inside the boteco",
+  "zona-sul/outside": "Zona Sul",
+  "zona-sul/inside": "The aisles",
+  "jardim-botanico/outside": "Jardim Botânico",
+  "jardim-botanico/inside": "The orchid house",
+  "quilo/outside": "Quilo",
+  "quilo/inside": "The buffet",
+  "sult/outside": "Sult",
+  "sult/inside": "The dining room",
+  "os-esquilos/outside": "Os Esquilos",
+  "os-esquilos/inside": "The dining room",
+  "santa-teresa/outside": "Santa Teresa",
+  "santa-teresa/inside": "The studio",
 };
 
 const STICKER = 16;

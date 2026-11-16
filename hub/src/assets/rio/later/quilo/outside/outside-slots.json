@@ -1,0 +1,241 @@
+{
+ "location": "quilo-outside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "outside/outside-start-day.png",
+  "start-night": "outside/outside-start-night.png",
+  "start-rain": "outside/outside-start-rain.png",
+  "full-day": "outside/outside-full-day.png",
+  "full-night": "outside/outside-full-night.png",
+  "full-rain": "outside/outside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "outside/outside-rain-streaks-0.png",
+    "outside/outside-rain-streaks-1.png",
+    "outside/outside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "draw over everything (stickers too) while it rains; the band under the awning stays dry"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 cell; draw the sticker at left = x - 8, top = y - 15",
+ "fill_rule": "Dish slots fill as Quilo stickers (everyday dishes) are earned, one dish per slot, in 'order', and never empty. Only slots whose 'from_stage' is reached are used. When every slot is full, each new dish replaces the oldest one shown, so the room always shows the latest dishes. Slots with hide_at_night are not drawn at night (chairs are up). Draw stickers after the base, sorted by y then x; draw the rain overlay over everything. Outside, the pavement tables are empty in the rain look as drawn, so hide their slots when raining too.",
+ "dish_slots": [
+  {
+   "id": "table-1-2",
+   "x": 91,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "pavement-table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 1
+  },
+  {
+   "id": "juice-1",
+   "x": 308,
+   "y": 109,
+   "w": 16,
+   "h": 16,
+   "group": "juice-counter",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "note": "the counter's shutter is down at night",
+   "order": 2
+  },
+  {
+   "id": "table-2-1",
+   "x": 132,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "pavement-table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 3
+  },
+  {
+   "id": "juice-2",
+   "x": 326,
+   "y": 109,
+   "w": 16,
+   "h": 16,
+   "group": "juice-counter",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "note": "the counter's shutter is down at night",
+   "order": 4
+  },
+  {
+   "id": "table-1-1",
+   "x": 78,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "pavement-table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 5
+  },
+  {
+   "id": "table-2-2",
+   "x": 145,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "pavement-table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 6
+  }
+ ],
+ "special_slots": [
+  {
+   "id": "menu-1",
+   "x": 188,
+   "y": 151,
+   "w": 16,
+   "h": 16,
+   "group": "menu-board",
+   "accepts": [
+    "newest-1"
+   ],
+   "hide_at_night": true,
+   "note": "the A-frame board, pictures only: 1 = newest (taken in at night)"
+  },
+  {
+   "id": "menu-2",
+   "x": 208,
+   "y": 151,
+   "w": 16,
+   "h": 16,
+   "group": "menu-board",
+   "accepts": [
+    "newest-2"
+   ],
+   "hide_at_night": true,
+   "note": "the A-frame board, pictures only: 1 = newest (taken in at night)"
+  }
+ ],
+ "sticker_slots": [
+  {
+   "id": "pavement-1",
+   "x": 104,
+   "y": 186,
+   "area": "pavement",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "pavement-2",
+   "x": 250,
+   "y": 186,
+   "area": "pavement",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "kerb-1",
+   "x": 200,
+   "y": 199,
+   "area": "on the kerb",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "street-1",
+   "x": 140,
+   "y": 232,
+   "area": "street",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  }
+ ],
+ "hotspots": {
+  "tree": {
+   "x": 10,
+   "y": 165,
+   "w": 44,
+   "h": 24,
+   "note": "the tree in its harlequin planter"
+  },
+  "door": {
+   "x": 206,
+   "y": 84,
+   "w": 48,
+   "h": 48,
+   "note": "go inside (the scale is just inside)"
+  },
+  "juice_counter": {
+   "x": 266,
+   "y": 84,
+   "w": 104,
+   "h": 42
+  },
+  "menu_board": {
+   "x": 170,
+   "y": 126,
+   "w": 56,
+   "h": 35
+  },
+  "exit": {
+   "x": 0,
+   "y": 200,
+   "w": 384,
+   "h": 40,
+   "note": "the street (map exit)"
+  },
+  "esme_spot": {
+   "x": 202,
+   "y": 174
+  }
+ },
+ "baked": {
+  "start": "quiet: a few trays in the window, Thiago has just put the menu board out, Seu Jorge eating outside, Camila going in, Vovo Ze at the juice counter",
+  "full": "every tray in the window full, a queue out of the door, four diners outside, two at the juice counter, people walking past, the motoboy (Nando) at his bike, Esme and Mr Cat at the menu board",
+  "night": "closing time: the door shutter half down, the juice shutter down, the window lit with the trays covered, chairs folded up, the bulb string glowing, Lucas heading home, Seu Jorge passing",
+  "rain": "the pavement tables empty; umbrellas on everyone in the open; the queue dry under the awning"
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "frames": 4,
+ "layout": "frames side by side, left to right",
+ "ms": 110,
+ "loop": true,
+ "frame_size": [
+  384,
+  240
+ ],
+ "draw": "over the rain base at 0,0; the rain falls only in the two window panes"
+}

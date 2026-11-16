@@ -1,0 +1,118 @@
+{
+ "location": "sult-outside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "outside/outside-start-day.png",
+  "start-night": "outside/outside-start-night.png",
+  "start-rain": "outside/outside-start-rain.png",
+  "full-day": "outside/outside-full-day.png",
+  "full-night": "outside/outside-full-night.png",
+  "full-rain": "outside/outside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "outside/outside-rain-streaks-0.png",
+    "outside/outside-rain-streaks-1.png",
+    "outside/outside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "draw on top of everything (stickers too) while it rains; the band under the awning stays dry"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker cell; draw at left = x - 8, top = y - 15",
+ "fill_rule": "'aboard' shows the newest Italian dish learned. The ordered slots show the newest goals:* stickers (or dishes when there are no goals yet), newest in order 1. Draw after the base, sorted by y; while it rains draw the streak overlay on top of everything.",
+ "sticker_slots": [
+  {
+   "id": "aboard",
+   "x": 64,
+   "y": 161,
+   "area": "on the chalk A-board",
+   "accepts": [
+    "dishes:italian"
+   ],
+   "role": "newest dish"
+  },
+  {
+   "id": "counter",
+   "x": 140,
+   "y": 108,
+   "area": "on the white counter, seen through the open front",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 1
+  },
+  {
+   "id": "sill-left",
+   "x": 146,
+   "y": 51,
+   "area": "on the left sash window's sill upstairs",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 2
+  },
+  {
+   "id": "sill-right",
+   "x": 238,
+   "y": 51,
+   "area": "on the right sash window's sill upstairs",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 3
+  },
+  {
+   "id": "pavement",
+   "x": 130,
+   "y": 200,
+   "area": "on the stones by the kerb",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 4
+  }
+ ],
+ "hotspots": {
+  "door": {
+   "x": 112,
+   "y": 94,
+   "w": 162,
+   "h": 43,
+   "note": "go inside"
+  },
+  "exit": {
+   "x": 0,
+   "y": 208,
+   "w": 384,
+   "h": 32,
+   "note": "the street (map exit)"
+  },
+  "esme_spot": {
+   "x": 222,
+   "y": 188
+  }
+ },
+ "baked": {
+  "start": "early and quiet: two tables laid under the awning, one couple (Bia and Duda), the waiter (Marcos) in the open front, the jade plant and the A-board",
+  "full": "a full evening: four tables taken (Rosa and Lucas, Dona Celia and Vovo Ze under the awning, Duda and Marcos, Ana and Thiago under the string of bulbs), friends standing and chatting under the awning, a full room through the open front, Esme and Mr Cat arriving. Rain: the two far tables are cleared and people walk in under umbrellas; an umbrella stand in the open front"
+ }
+}

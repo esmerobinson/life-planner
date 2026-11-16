@@ -1,0 +1,147 @@
+{
+ "pack": "rio-pack later",
+ "area": "santa-teresa",
+ "name": "Santa Teresa, the bohemian hilltop",
+ "opens_day": 105,
+ "map": {
+  "key": "santa-teresa",
+  "file": "art/final/rio-pack/day1/map/map.json",
+  "note": "Matches the map's hill pocket south-west of Centro: colourful houses with terracotta roofs, the yellow bonde on its track, the hill's trees. The map was not edited."
+ },
+ "takes_over": "the reading nook family (stickers 'reading'); filled by reading-list books finished",
+ "host": "Caetano (friend-frog, shipped original art) reads on his cushion on a crate of atlases in the studio; he hosts the Journal, the reading list and the museum",
+ "notes": "Outside and inside 384x240 (24x15 tiles), 16 px tiles, 3/4 top-down, light from the top-left. Hard alpha; day images use palette colours only (no new colours). All drawn new for Esme World: no real logos, no readable text, our own tile mosaic and our own Sugarloaf. The name only goes in the tooltip.",
+ "locations": [
+  {
+   "key": "santa-teresa-outside",
+   "name": "The street, the bonde and the lookout",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "outside/outside-start-day.png",
+    "start-night": "outside/outside-start-night.png",
+    "start-rain": "outside/outside-start-rain.png",
+    "full-day": "outside/outside-full-day.png",
+    "full-night": "outside/outside-full-night.png",
+    "full-rain": "outside/outside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "outside/outside-rain-streaks-0.png",
+      "outside/outside-rain-streaks-1.png",
+      "outside/outside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "outside/outside-slots.json"
+  },
+  {
+   "key": "santa-teresa-inside",
+   "name": "The studio-library",
+   "kind": "interior",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "inside/inside-start-day.png",
+    "start-night": "inside/inside-start-night.png",
+    "start-rain": "inside/inside-start-rain.png",
+    "full-day": "inside/inside-full-day.png",
+    "full-night": "inside/inside-full-night.png",
+    "full-rain": "inside/inside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "inside/inside-rain-streaks-0.png",
+      "inside/inside-rain-streaks-1.png",
+      "inside/inside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "inside/inside-slots.json"
+  }
+ ],
+ "stages": {
+  "rule": "The base stage follows reading-list books finished: START from opening day (books fill shelf and cover slots, milestones add furniture; see inside-slots.json fill_rule), FULL once the studio is full (a suggestion: when every first-bookcase slot is filled; the app's call). Outside follows the same stage.",
+  "start": "a quiet studio: nearly empty shelves, a chair, one stack of books; outside a quiet street with the bonde at the stop",
+  "full": "shelves floor to ceiling with books piled on top, every milestone, friends reading and painting; outside the bonde packed, cafe tables full, people browsing"
+ },
+ "books": {
+  "shelf_slots": 204,
+  "first_bookcase": 142,
+  "second_bookcase": 62,
+  "cover_slots": 9,
+  "sheets": "inside/books/",
+  "milestones": [
+   "reading-lamp",
+   "second-bookcase",
+   "rug",
+   "cat-bed",
+   "window-seat"
+  ],
+  "milestone_overlays": "inside/milestones/"
+ },
+ "stickers": {
+  "new": [
+   "stickers/reading-open-novel.png",
+   "stickers/reading-poetry-ribbon.png",
+   "stickers/reading-desk-lamp.png",
+   "stickers/reading-bookends.png",
+   "stickers/reading-armchair.png",
+   "stickers/reading-globe.png",
+   "stickers/reading-typewriter.png",
+   "stickers/reading-tea-and-book.png",
+   "stickers/reading-magnifier.png",
+   "stickers/reading-fern-on-books.png"
+  ],
+  "catalogue": "stickers/stickers.json",
+  "slot_tag": "reading:*"
+ },
+ "looks": {
+  "day": "lunch and afternoon (default)",
+  "night": "after dark (Rio local time)",
+  "rain": "when Rio is rainy; add the streak overlay"
+ },
+ "characters": "Esme, Mr Cat and Caetano are the shipped sprites (kept in their true colours at night). Everyone else is one of the ten Rio townsfolk (art/sources/rio-pack/townsfolk/folk.py) in their own faces.",
+ "reused": {
+  "vinyl": [
+   "art/final/rio-pack/vinyl/props/record-player.png",
+   "art/final/rio-pack/vinyl/props/record-crate.png"
+  ],
+  "sult_props": "bentwood chairs, street lamp, string of bulbs and umbrellas from art/sources/rio-pack/sult/sprops.py (imported)"
+ },
+ "palettes": {
+  "extra": "palette-extra.json",
+  "night": "palette-night.json",
+  "rain": "palette-rain.json"
+ },
+ "sources": "art/sources/rio-pack/santa-teresa/ (python3 -I -B deliver.py)"
+}

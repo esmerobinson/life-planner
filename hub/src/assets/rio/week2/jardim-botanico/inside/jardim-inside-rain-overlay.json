@@ -1,0 +1,12 @@
+{
+ "frames": 4,
+ "layout": "frames side by side, left to right",
+ "ms": 110,
+ "loop": true,
+ "draw": "over the rain base at 0,0, above everything (stickers and characters too)",
+ "frame_size": [
+  320,
+  192
+ ],
+ "note": "only on the glass: rain seen falling outside the back and side walls; it never falls indoors"
+}
