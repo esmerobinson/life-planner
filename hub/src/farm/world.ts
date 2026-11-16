@@ -12,8 +12,9 @@ import { CHARACTERS, type CharacterId } from "./state";
 
 // ---- characters ----------------------------------------------------------------------------
 
+/** Shown names. The tuxedo cat is Mr Cat (Esme renamed Domino, 2026-11-10); its id stays "domino" (synced rows). */
 export const NAMES: Record<CharacterId, string> = {
-  domino: "Domino", bap: "Bap", puddle: "Puddle", clover: "Clover", crumpet: "Crumpet", duvet: "Duvet",
+  domino: "Mr Cat", bap: "Bap", puddle: "Puddle", clover: "Clover", crumpet: "Crumpet", duvet: "Duvet",
 };
 
 /**

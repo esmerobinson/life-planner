@@ -71,7 +71,7 @@ describe("phone layout (below 700px)", () => {
     const apps = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link");
     expect(apps.map((a) => a.textContent)).toEqual([
       "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
-      "Tech projects", "Production", "Journal", "Vision board", "Esme's Farm",
+      "Tech projects", "Production", "Journal", "Vision board", "Esme's Rio",
     ]);
     expect(apps[4]).toHaveAttribute("href", "/area/art");
     expect(screen.getByRole("heading", { level: 2, name: "Today" })).toBeInTheDocument();

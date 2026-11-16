@@ -98,7 +98,7 @@ export function Nook({ phone = false }: { phone?: boolean }) {
   const sticker = moment ? STICKER_BY_KEY.get(moment.key) : undefined;
   return (
     <div className={phone ? (typing ? "farm-nook is-phone is-typing" : "farm-nook is-phone") : "farm-nook"} data-host={host} data-pose={moment ? "happy" : asleep ? "sleep" : "idle"}>
-      <Link to="/farm" className="farm-nook-link" aria-label={`Esme's Farm (${NAMES[host]} is here)`}>
+      <Link to="/farm" className="farm-nook-link" aria-label={`Esme's Rio (${NAMES[host]} is here)`}>
         <canvas ref={canvas} width={W} height={H} className="farm-px" style={{ width: W * SCALE, height: H * SCALE }} />
       </Link>
       <p className="visually-hidden farm-nook-news" aria-live="polite" data-moment={moment?.key ?? ""}>

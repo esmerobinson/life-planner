@@ -47,6 +47,8 @@ it("nothing is written before the farm is opened", async () => {
   await screen.findByRole("heading", { level: 1, name: "Today" });
   expect(await db.farm.count()).toBe(0);
   expect(document.querySelector(".farm-nook")).toHaveAttribute("data-host", "domino");
+  // Shown names: Esme's Rio, and the tuxedo cat is Mr Cat (Esme, 2026-11-10 and 2026-11-16).
+  expect(screen.getByRole("link", { name: "Esme's Rio (Mr Cat is here)" })).toHaveAttribute("href", "/farm");
 });
 
 it("the book opens; slots show collected, ready to place (place it), and not yet (a gentle hint)", async () => {
@@ -222,7 +224,7 @@ it("outfits: she picks, any time; a new unlock is offered, never put on for her 
   expect(within(wardrobe).getByRole("button", { name: "Straw sun hat" })).toHaveAttribute("aria-pressed", "false");
   await user.click(within(wardrobe).getByRole("button", { name: "Nothing" }));
   await waitFor(async () => expect(await db.farm.get("outfit:bap")).toMatchObject({ item: null }));
-  // Domino, never dressed by her, still wears nothing.
+  // Mr Cat (id domino), never dressed by her, still wears nothing.
   expect(await db.farm.get("outfit:domino")).toBeUndefined();
 });
 
@@ -232,7 +234,7 @@ it("friends arrive by day too: with no stickers but Welcome, Duvet is there on d
   renderApp("/farm", "2026-11-03");
   await waitFor(async () => expect(await db.farm.get("arrived:duvet")).toBeTruthy());
   expect(within(screen.getByLabelText("Who lives here")).getAllByRole("button").map((b) => b.textContent)).toEqual(
-    ["Domino", "Bap", "Puddle", "Clover", "Crumpet", "Duvet"],
+    ["Mr Cat", "Bap", "Puddle", "Clover", "Crumpet", "Duvet"],
   );
 });
 

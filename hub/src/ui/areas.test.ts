@@ -14,7 +14,7 @@ describe("areas", () => {
       ["Mind", "/area/mind"], ["Writing", "/area/writing"], ["Art", "/area/art"],
       ["Content", "/area/content"], ["Body", "/area/body"],
       ["Tech projects", "/area/tech"], ["Production", "/area/production"],
-      ["Journal", "/journal"], ["Vision board", "/vision"], ["Esme's Farm", "/farm"],
+      ["Journal", "/journal"], ["Vision board", "/vision"], ["Esme's Rio", "/farm"],
     ]);
   });
 
@@ -42,7 +42,7 @@ describe("areas", () => {
     expect(tile("admin")).toBe("#90825b");
   });
 
-  it("Esme's Farm is the pixel barn on the Room Sketch yellow tile (Esme, 2026-11-04)", () => {
+  it("Esme's Rio (was Esme's Farm, renamed 2026-11-16) is the pixel barn on the Room Sketch yellow tile (Esme, 2026-11-04)", () => {
     const farm = NAV.find((n) => n.id === "farm")!;
     expect(farm.icon).toContain("esmes-farm-icon-pixel");
     expect(farm.tile).toBe("#e2cd5b");

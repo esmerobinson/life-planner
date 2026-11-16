@@ -37,9 +37,10 @@ export const NAV: NavEntry[] = [
   { id: "production", label: "Production", path: "/area/production", icon: production, tile: "#d59770", group: 2 },
   { id: "journal", label: "Journal", path: "/journal", icon: journal, tile: "#9285c5", group: 3 },
   { id: "vision", label: "Vision board", path: "/vision", icon: vision, tile: "#ecca7d", group: 3 },
-  // Esme's Farm: the one entry point for the game. Esme (2026-11-04): the 24px pixel barn on a
-  // Room Sketch yellow tile (roomyellow #e2cd5b, a palette value; this use is her choice).
-  { id: "farm", label: "Esme's Farm", path: "/farm", icon: farmIcon, tile: "#e2cd5b", group: 3 },
+  // Esme's Rio (was Esme's Farm; renamed by Esme, 2026-11-16): the one entry point for the game.
+  // Esme (2026-11-04): the 24px pixel barn on a Room Sketch yellow tile (roomyellow #e2cd5b, a
+  // palette value; this use is her choice).
+  { id: "farm", label: "Esme's Rio", path: "/farm", icon: farmIcon, tile: "#e2cd5b", group: 3 },
 ];
 
 /**

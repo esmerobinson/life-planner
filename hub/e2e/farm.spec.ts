@@ -80,7 +80,7 @@ const pixelated = (page: Page, sel: string) =>
   });
 
 for (const width of [1280, 390]) {
-  test.describe(`Esme's Farm at ${width}px`, () => {
+  test.describe(`Esme's Rio at ${width}px`, () => {
     test.use({ viewport: { width, height: width === 390 ? 844 : 1000 } });
     const phone = width === 390;
 
@@ -198,7 +198,7 @@ for (const width of [1280, 390]) {
       await expect(page.locator(".farm-book")).toHaveAttribute("data-show", "spread", { timeout: 50 });
     });
 
-    test("Bap takes the nook on the Journal once he has arrived; Domino everywhere else", async ({ page }) => {
+    test("Bap takes the nook on the Journal once he has arrived; Mr Cat (domino) everywhere else", async ({ page }) => {
       await page.goto("/today");
       await page.waitForLoadState("networkidle");
       const d = await pageDate(page, -2);

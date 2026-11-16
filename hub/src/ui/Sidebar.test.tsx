@@ -16,7 +16,7 @@ describe("Sidebar", () => {
     const labels = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link").map((a) => a.textContent?.trim());
     expect(labels).toEqual([
       "Home", "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
-      "Tech projects", "Production", "Journal", "Vision board", "Esme's Farm",
+      "Tech projects", "Production", "Journal", "Vision board", "Esme's Rio",
     ]);
   });
 
