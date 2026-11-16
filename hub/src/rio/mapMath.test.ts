@@ -50,3 +50,23 @@ describe("hitPlace", () => {
     expect(hitPlace(0, 0)).toBeNull();
   });
 });
+
+describe("today's map art (re-imported 2026-11-17: bigger landmarks, new Sult, Quilo, Os Esquilos)", () => {
+  const PLACES = new Map(RIO_MAP.places.map((p) => [p.key, p]));
+  it.each(["christ-the-redeemer", "flamengo-match", "sult", "quilo", "os-esquilos"])("a tap in the middle of %s's hotspot opens it", (key) => {
+    const p = PLACES.get(key)!;
+    const [x, y] = p.hotspot.polygon.reduce(([sx, sy], [px, py]) => [sx + px / p.hotspot.polygon.length, sy + py / p.hotspot.polygon.length], [0, 0]);
+    expect(hitPlace(x, y)).toBe(key);
+  });
+  it("every marker and tooltip anchor sits on its own place (within its bbox, the marker at most at its top edge)", () => {
+    for (const p of RIO_MAP.places) {
+      const [bx, by, bw, bh] = p.bbox;
+      for (const [ax, ay] of [p.marker_anchor, p.tooltip_anchor]) {
+        expect(ax, p.key).toBeGreaterThanOrEqual(bx);
+        expect(ax, p.key).toBeLessThanOrEqual(bx + bw);
+        expect(ay, p.key).toBeGreaterThanOrEqual(by - 4);
+        expect(ay, p.key).toBeLessThanOrEqual(by + bh);
+      }
+    }
+  });
+});

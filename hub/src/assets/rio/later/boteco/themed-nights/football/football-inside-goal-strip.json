@@ -1,0 +1,18 @@
+{
+ "file": "football-inside-goal-strip.png",
+ "night": "football",
+ "scene": "inside",
+ "look": "night",
+ "at": [
+  262,
+  22
+ ],
+ "frame_size": [
+  98,
+  184
+ ],
+ "frames": 6,
+ "frame_ms": 240,
+ "play": "loop",
+ "note": "frames run left to right; draw frame k at 'at' over the night's overlay. Transparent pixels show what is under; opaque ones replace it. Frame 0 matches the overlay."
+}
