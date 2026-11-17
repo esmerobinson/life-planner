@@ -62,6 +62,8 @@ async function journalRows(): Promise<{ rows: JournalRow[]; photo: FileRow }> {
     highlight: `0123456789abcdef_${dev}_0a1b2c3d`,
     // Together link: one private tick per part of the day, and one device's learned words.
     share: "exercise", learned: dev,
+    // The daily log and the weekly review: one version each.
+    "day-log": `${dev}_0a1b2c`, "week-review": `${dev}_3d4e5f`,
   };
   const rows: JournalRow[] = [];
   for (const kind of JOURNAL_KINDS) {

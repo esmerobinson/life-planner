@@ -4,6 +4,7 @@
 
 import { isObj, isStr } from "../data/validate";
 import { isHighlightEntry } from "./highlights";
+import { isDayLogEntry, isWeekReviewEntry } from "./routine";
 import { MAX_CARD_DAY, MAX_CARD_ID, MAX_PARTS, PART_KINDS, readStoredSet, type PartKind, type PartValue } from "./exercise";
 
 /** One finished morning page ("I'm done"). Hidden for MORNING_LOCK_DAYS from its date. */
@@ -304,6 +305,9 @@ export const ENTRY_CHECK = {
     Number.isInteger(v.step) && typeof v.finished === "boolean",
   // One version of a highlight (journal/highlights.ts).
   highlight: isHighlightEntry,
+  // One version of a day's daily log, or of a week's review (journal/routine.ts).
+  "day-log": isDayLogEntry,
+  "week-review": isWeekReviewEntry,
 } as const;
 
 /** Words in a text (for "N of 1,000 words"). */

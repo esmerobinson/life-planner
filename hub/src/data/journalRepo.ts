@@ -97,6 +97,19 @@ export const highlightRows = {
   },
 } as const;
 
+/** The daily log's and weekly review's own rows (routineRepo.ts), and only those. */
+export type FormKind = "day-log" | "week-review";
+export const formRows = {
+  open: (jk: JournalKey, row: JournalRow, kind: FormKind) => openRow(jk, row, kind),
+  seal: (jk: JournalKey, kind: FormKind, date: ISODate, suffix: string, entry: unknown) => seal(jk, kind, date, suffix, entry),
+  write: async (jk: JournalKey, kind: FormKind, rows: JournalRow[]) => {
+    if (rows.some((r) => r.kind !== kind || !r.id.startsWith(`${kind}:`) || !validJournal(r))) {
+      throw new Error("Only daily log and weekly review rows are written here.");
+    }
+    return write(jk, rows);
+  },
+} as const;
+
 const rowsOn = (date: ISODate) => db.journal.where("date").equals(date).toArray();
 
 /**
