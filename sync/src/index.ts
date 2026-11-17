@@ -5,6 +5,7 @@
 
 import { configuredHash, presentsValidToken } from "./auth";
 import { corsHeaders, preflightHeaders } from "./cors";
+import { runDueAfterSync, runDueReminders, isDueConfigured, type DueDeps } from "./due/cron";
 import type { Env } from "./env";
 import { exportResponse } from "./export";
 import { errorResponse, HttpError, json, jsonText, MAX_BODY_BYTES, readJsonBody } from "./http";
@@ -23,6 +24,13 @@ export interface Deps {
   upstreamTimeoutMs: number;
   /** Edge cache for parsed boards; undefined means the default cache, null none. */
   boardCache?: Cache | null;
+  /** Fetch for Due's server (Due reminders). */
+  dueFetch: typeof fetch;
+  /**
+   * Work that may finish after the answer is sent (the Worker's ctx.waitUntil). Absent: such
+   * work is skipped (it never delays an answer).
+   */
+  waitUntil?: (work: Promise<unknown>) => void;
 }
 
 const DEFAULT_DEPS: Deps = {
@@ -30,6 +38,7 @@ const DEFAULT_DEPS: Deps = {
   chunkBytes: DEFAULT_CHUNK_BYTES,
   upstreamFetch: (input, init) => fetch(input, init),
   upstreamTimeoutMs: PINTEREST_TIMEOUT_MS,
+  dueFetch: (input, init) => fetch(input, init),
 };
 
 const ROUTES = new Map<string, "GET" | "POST">([
@@ -75,7 +84,13 @@ async function route(path: string, request: Request, env: Env, deps: Deps): Prom
   if (path === "/v1/sync") {
     const body = await readJsonBody(request, MAX_BODY_BYTES);
     const syncRequest = validateSyncRequest(body, deps.now());
-    return jsonText(200, await runSync(env.DB, syncRequest, { chunkBytes: deps.chunkBytes }));
+    const answer = await runSync(env.DB, syncRequest, { chunkBytes: deps.chunkBytes });
+    // Something ticked off (or the Due settings changed): Due catches up after the answer is
+    // sent, never before it, and a failure there never touches the sync.
+    if (syncRequest.touchesDue && deps.waitUntil && isDueConfigured(env)) {
+      deps.waitUntil(runDueAfterSync(env, dueDeps(deps)).catch(() => undefined));
+    }
+    return jsonText(200, answer);
   }
   if (path === "/v1/pinterest-board") {
     return pinterestBoardResponse(new URL(request.url), {
@@ -115,8 +130,19 @@ function finalize(request: Request, response: Response, preflight: boolean): Res
   return response;
 }
 
+const dueDeps = (deps: Pick<Deps, "now" | "dueFetch">): DueDeps => ({ now: deps.now, dueFetch: deps.dueFetch });
+
+/** The cron trigger (wrangler.jsonc): Due reminders. Does nothing until DUE_TOKEN is set. */
+export async function scheduled(env: Env, overrides: Partial<Deps> = {}): Promise<void> {
+  const deps: Deps = { ...DEFAULT_DEPS, ...overrides };
+  await runDueReminders(env, dueDeps(deps));
+}
+
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    return handle(request, env);
+  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return handle(request, env, ctx ? { waitUntil: (work) => ctx.waitUntil(work) } : {});
+  },
+  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): void {
+    ctx.waitUntil(scheduled(env));
   },
 } satisfies ExportedHandler<Env>;
