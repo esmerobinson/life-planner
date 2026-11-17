@@ -126,14 +126,23 @@ async function saveForm<F extends object>(
   // Kept in the session: every later save of the new row still replaces the old one (review M1).
   for (const t of carried) if (!session.seen.includes(t)) session.seen.push(t);
   const seen = [...session.seen, ...carried].filter((x) => x !== id && !x.startsWith(`${id}@`));
-  // Strictly newer than this row's previous write, so a version hidden as <id>@<at> shows again once written to.
+  const settled = (session.settled ?? []).filter((x) => x !== id && !x.startsWith(`${id}@`)).slice(0, 64);
+  // Strictly newer than this row's previous write, so a version hidden as <id>@<at> shows again once
+  // written to; and strictly newer than every version it names (replaces or settles), so which one
+  // shows never depends on the clock (two writes in the same millisecond sorted by a random id).
   const prevAt = (await atOf(jk, kind, id)) ?? 0;
-  const at = Math.max(Date.now(), prevAt + 1);
+  let named = 0;
+  for (const t of [...seen, ...settled]) {
+    const cut = t.lastIndexOf("@");
+    const stamp = cut > 0 ? Number(t.slice(cut + 1)) : NaN;
+    const at = Number.isFinite(stamp) ? stamp : ((await atOf(jk, kind, t)) ?? 0);
+    if (at > named) named = at;
+  }
+  const at = Math.max(Date.now(), prevAt + 1, named + 1);
   const submittedAt = submit ? (session.submittedAt ?? at) : session.submittedAt;
   // The day she pressed Done: kept from the version she edits, else today in the app (3am rule).
   const doneOn = submittedAt === null ? null : (session.doneOn ?? (session.submittedAt === null ? todayISO(new Date(at)) : todayISO(new Date(session.submittedAt))));
   if (submittedAt !== null) session.doneOn = doneOn;
-  const settled = (session.settled ?? []).filter((x) => x !== id && !x.startsWith(`${id}@`)).slice(0, 64);
   const entry = {
     v: 1, ...spec.fields(fields as never), submittedAt, ...(doneOn ? { doneOn } : {}), at,
     ...(seen.length ? { seen } : {}), ...(settled.length ? { settled } : {}),

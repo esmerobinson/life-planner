@@ -225,3 +225,29 @@ describe("settled: a version she chose not to use stays listed, and no longer ho
     expect(day.others.map((o) => [o.fields.schedule, o.settled])).toEqual([["yes", false]]);
   });
 });
+
+describe("ordering never depends on the clock (a version is always later than what it names)", () => {
+  it("the clock frozen: a version settling or replacing another written in the same millisecond still comes after it, every time", async () => {
+    const jk = await key();
+    const frozen = new Date("2026-11-15T20:00:00").getTime();
+    const spy = vi.spyOn(Date, "now").mockReturnValue(frozen);
+    try {
+      for (let i = 0; i < 20; i++) {
+        const date = `2026-10-${String(i + 1).padStart(2, "0")}`;
+        // The box's own words (a session row), then "Use these answers": a new version settling it by its bare id.
+        const typed: FormSession = { date, seen: [], submittedAt: null };
+        typed.version = await saveDayLog(jk, MAC, { ...EMPTY_DAY_LOG, todosNote: `Pretend typed ${i}` }, typed);
+        await saveDayLog(jk, MAC, { ...EMPTY_DAY_LOG, todosNote: `Pretend chosen ${i}` }, { date, seen: [], settled: [typed.version], submittedAt: null });
+        const day = await readDayLog(jk, date);
+        expect(day.fields.todosNote).toBe(`Pretend chosen ${i}`);
+        expect(day.others.map((o) => [o.fields.todosNote, o.settled])).toEqual([[`Pretend typed ${i}`, true]]);
+        // And replacing by `seen` (id@at) in the same millisecond: the newer one is shown, the old one gone.
+        const again = await readDayLog(jk, date);
+        await saveDayLog(jk, MAC, { ...again.fields, scheduleNote: `Pretend edit ${i}` }, { date, seen: again.seen, settled: again.settledTokens, submittedAt: null });
+        expect((await readDayLog(jk, date)).fields.scheduleNote).toBe(`Pretend edit ${i}`);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

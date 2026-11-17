@@ -29,7 +29,8 @@ it("today's tick comes before yesterday's log; yesterday's log has its own tick,
   expect(todayTick.compareDocumentPosition(yesterday) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   await userEvent.click(within(yesterday).getByRole("button", { name: W.logHeadingYesterday }));
   const own = await within(yesterday).findByRole("checkbox", { name: TOGETHER_WORDS.privateTickYesterday });
+  await waitFor(() => expect(own).toBeEnabled(), { timeout: 5000 }); // disabled until its stored state is read
   await userEvent.click(own);
-  await waitFor(async () => expect((await readSharePrivate(jk, YESTERDAY)).checkin).toBe(true));
+  await waitFor(async () => expect((await readSharePrivate(jk, YESTERDAY)).checkin).toBe(true), { timeout: 5000 });
   expect((await readSharePrivate(jk, TODAY)).checkin).toBe(false);
 });

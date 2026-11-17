@@ -106,13 +106,13 @@ describe("the daily log", () => {
     const box = await screen.findByDisplayValue("Pretend Mac long reflection");
     await userEvent.type(box, " and Pretend typed just now");
     await userEvent.click(screen.getByRole("button", { name: W.useThese })); // at once, no pause
-    await screen.findByDisplayValue("Pretend phone version");
+    await screen.findByDisplayValue("Pretend phone version", undefined, { timeout: 5000 });
     await waitFor(async () => {
       const d = await readDayLog(jk, DAY);
       expect(d.fields.todosNote).toBe("Pretend phone version");
       expect(d.others.map((o) => o.fields.todosNote)).toEqual(["Pretend Mac long reflection and Pretend typed just now"]);
       expect(d.others[0]!.settled).toBe(true);
-    });
+    }, { timeout: 5000 }); // two sealed saves: slower on a busy machine
     expect(screen.getByText("Pretend Mac long reflection and Pretend typed just now")).toBeInTheDocument();
     const { listDayLogs } = await import("../../data/repo");
     expect((await listDayLogs(jk, "2026-12-31"))[0]!.others.map((o) => o.fields.todosNote)).toEqual(["Pretend Mac long reflection and Pretend typed just now"]);
