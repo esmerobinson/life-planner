@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { decodeQR } from "qr/decode.js";
 // The same throwaway values as e2e-sync/server.mjs (obviously fake, local server only).
 const E2E_PASSPHRASE = "e2e-fake-passphrase-not-real-0000";
 const E2E_SYNC_PORT = Number(process.env.E2E_SYNC_PORT ?? 8790);
@@ -219,6 +220,93 @@ test("Due settings and a to-do's time sync through the real server; the cron run
   // The cron handler: no DUE_TOKEN here, so it runs and does nothing (no crash, nothing reached).
   const cron = await request.get(`${SYNC_URL}/__scheduled?cron=*/15+*+*+*+*`);
   expect(cron.status()).toBe(200);
+
+  await ctxA.close();
+  await ctxB.close();
+});
+
+/* Pair without the passphrase (2026-11-17), through the real server: A sets up by typing and
+   writes a note to herself; on a later, fresh visit to the Sync page (nothing typed) A shows a
+   code; B pastes it, syncs, reads A's note and writes one A reads. The production build has no
+   /src modules, so the code on screen is read back from its SVG here in the test. */
+
+/** The code on screen: the SVG's squares turned back into pixels and decoded. */
+async function shownCode(page: Page): Promise<string> {
+  const svg = page.locator("svg.pairing-qr");
+  const n = Number((await svg.getAttribute("viewBox"))!.split(" ")[2]);
+  const d = (await svg.locator("path").getAttribute("d"))!;
+  const px = 6;
+  const width = n * px;
+  const data = new Uint8ClampedArray(width * width * 4).fill(255);
+  for (const m of d.matchAll(/M(\d+) (\d+)h1v1h-1z/g)) {
+    const x = Number(m[1]);
+    const y = Number(m[2]);
+    for (let dy = 0; dy < px; dy++)
+      for (let dx = 0; dx < px; dx++) {
+        const i = ((y * px + dy) * width + x * px + dx) * 4;
+        data[i] = data[i + 1] = data[i + 2] = 0;
+      }
+  }
+  return decodeQR({ width, height: width, data });
+}
+
+/** Opens Notes to myself, unlocking with the passphrase if Save's journal step was cut short by leaving the page. */
+async function openNotes(page: Page) {
+  await page.goto("/journal/notes");
+  const unlock = page.getByRole("heading", { name: "Unlock journal" });
+  const notes = page.getByRole("region", { name: "Notes to myself" });
+  await expect(unlock.or(notes.getByRole("button", { name: "+ My own thought" }))).toBeVisible({ timeout: 30_000 });
+  if (await unlock.isVisible()) {
+    await page.getByLabel("Sync passphrase").fill(E2E_PASSPHRASE);
+    await page.getByRole("button", { name: "Unlock" }).click();
+  }
+  return notes;
+}
+
+async function addNote(page: Page, worry: string, steady: string) {
+  const notes = await openNotes(page);
+  await notes.getByRole("button", { name: "+ My own thought" }).click({ timeout: 30_000 });
+  const form = notes.getByRole("form", { name: "Your note" });
+  await form.getByLabel("When I think…").fill(worry);
+  await form.getByLabel("What I know when I'm steady…").fill(steady);
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form).toHaveCount(0);
+}
+
+test("pairing with no passphrase: a code from a fresh Sync page sets up another device, journal included", async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+
+  await setUpSync(a);
+  await addNote(a, "Pretend worry on device A", "Pretend steady words from device A.");
+  await syncNow(a);
+
+  await a.goto("/");
+  await a.goto("/sync");
+  await a.getByRole("button", { name: "Pair another device" }).click();
+  await expect(a.getByRole("img", { name: "Pairing code" })).toBeVisible();
+  const code = await shownCode(a);
+  expect(code).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.http:\/\/127\.0\.0\.1:\d+$/);
+  expect(code).not.toContain(E2E_PASSPHRASE);
+  await a.getByRole("button", { name: "Hide" }).click();
+
+  await b.goto("/sync");
+  await b.getByLabel("Paste pairing code").fill(code);
+  await b.getByRole("button", { name: "Use pairing code" }).click();
+  await expect(b.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
+  await expect(b.getByLabel("Sync address")).toHaveValue(SYNC_URL);
+  const notesB = b.getByRole("region", { name: "Notes to myself" });
+  await b.goto("/journal/notes");
+  await expect(notesB.getByText("Pretend steady words from device A.").first()).toBeVisible({ timeout: 30_000 });
+  await expect(b.getByRole("heading", { name: "Unlock journal" })).toHaveCount(0);
+
+  await addNote(b, "Pretend worry on device B", "Pretend steady words from device B.");
+  await syncNow(b);
+  await syncNow(a);
+  await a.goto("/journal/notes");
+  await expect(a.getByRole("region", { name: "Notes to myself" }).getByText("Pretend steady words from device B.").first()).toBeVisible({ timeout: 30_000 });
 
   await ctxA.close();
   await ctxB.close();
