@@ -44,12 +44,20 @@ export function nextFriday(today: ISODate): ISODate {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
+/** A to-do's "HH:MM" as she reads it: "3:00pm", "9:30am", "12:15am". PROVISIONAL wording. */
+export function timeLabel(time: string): string {
+  const h = Number(time.slice(0, 2));
+  return `${h % 12 === 0 ? 12 : h % 12}:${time.slice(3, 5)}${h < 12 ? "am" : "pm"}`;
+}
+
 /**
- * The small line under a task's title: its due date (late when overdue) and the day it is
- * pinned to (only a pin for today or later; pickToday ignores older pins).
+ * The small line under a task's title: its due date (late when overdue), the day it is
+ * pinned to (only a pin for today or later; pickToday ignores older pins), and its time
+ * (only when it has a day).
  */
-export function dueLine(item: Item, today: ISODate): { due?: string; late?: boolean; on?: string } {
-  const out: { due?: string; late?: boolean; on?: string } = {};
+export function dueLine(item: Item, today: ISODate): { due?: string; late?: boolean; on?: string; time?: string } {
+  const out: { due?: string; late?: boolean; on?: string; time?: string } = {};
+  if (item.time && (item.due !== undefined || item.pinnedDate !== undefined)) out.time = timeLabel(item.time);
   if (item.due !== undefined) {
     const n = daysBetween(today, item.due);
     if (n === 0) out.due = "Due today";

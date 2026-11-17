@@ -41,12 +41,14 @@ export function useTick(today: ISODate, refresh: () => Promise<void>) {
 /** The small line under a task's title (2D): due date, red with how late when overdue; and the pinned day. */
 export function DueLine({ item, today }: { item: Item; today: ISODate }) {
   const line = dueLine(item, today);
-  if (!line.due && !line.on) return null;
+  if (!line.due && !line.on && !line.time) return null;
   return (
     <div className="strip-meta">
       {line.due && <span className={line.late ? "strip-late" : undefined}>{line.due}</span>}
       {line.due && line.on && " · "}
       {line.on && <span>{line.on}</span>}
+      {(line.due || line.on) && line.time && " · "}
+      {line.time && <span className="strip-time">{line.time}</span>}
     </div>
   );
 }

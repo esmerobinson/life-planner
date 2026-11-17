@@ -34,6 +34,13 @@ export interface Item {
   /** When it went into the Bin (status "deleted"). */
   deletedAt?: ISODate;
   pinnedDate?: ISODate;
+  /**
+   * A to-do's time on its day ("HH:MM", 24-hour), for meetings and appointments (Due
+   * reminders, 2026-11-16). Means something only with a day: `pinnedDate` ("Do it on"), else
+   * `due`. The Due reminder goes off its lead before. An older app version keeps it as it is
+   * (its validator ignores fields it doesn't know, and it updates rows field by field).
+   */
+  time?: string;
   weekOf?: ISODate;
   hiddenOn?: ISODate;
   completedAt?: ISODate;

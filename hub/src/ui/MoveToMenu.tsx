@@ -98,7 +98,7 @@ export function MoveToMenu({
         else if (c.to === "idea") {
           await updateItem(
             itemId,
-            { kind: "idea", due: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, sessions: undefined },
+            { kind: "idea", due: undefined, time: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, sessions: undefined },
             today,
           );
         } else await updateItem(itemId, { kind: "task", sessions: undefined }, today);

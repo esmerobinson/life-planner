@@ -7,7 +7,8 @@ import { ProgressBar } from "./ProgressBar";
 import { RepeatBox } from "./RepeatBox";
 import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
-import { dayLabel } from "../domain/display";
+import { dayLabel, timeLabel } from "../domain/display";
+import { isHabit } from "../domain/habits";
 import type { AreaId, Goal, ISODate, Item, Priority } from "../domain/types";
 import { GOAL_AREAS } from "./areas";
 import { areaLabel } from "./GoalProgress";
@@ -24,12 +25,16 @@ import { AUTOSAVE_MS, useDraft } from "./useDraft";
 /** The Type property: a project is a to-do with sessions, a book an idea on the reading list, each shown as its own type. */
 type PanelKind = Item["kind"] | "project" | "book";
 const TYPE_LABEL: Record<PanelKind, string> = { task: "To-do", project: "Project", idea: "Idea", book: "Book" };
+/** PROVISIONAL wording. */
+const NEEDS_A_DAY = "A time needs a day: set Due, or Do it on from the calendar.";
 const kindOf = (it: Item): PanelKind => (isProject(it) ? "project" : isBook(it) ? "book" : it.kind);
 
 interface Fields {
   kind: PanelKind;
   areaId: AreaId;
   due: string;
+  /** A to-do's time ("HH:MM"), or "". */
+  time: string;
   goalId: string;
   priority: Priority;
   milestone: boolean;
@@ -44,6 +49,7 @@ const fieldsOf = (it: Item): Fields => ({
   kind: kindOf(it),
   areaId: it.areaId,
   due: it.due ?? "",
+  time: it.time ?? "",
   goalId: it.goalId ?? "",
   priority: it.priority,
   milestone: it.milestone === true,
@@ -209,12 +215,20 @@ export function ItemPanel({
     if (!inbox && f.kind !== "book" && f.areaId !== was.areaId) patch.areaId = f.areaId;
     if (inbox || (f.kind !== "idea" && f.kind !== "book")) {
       if (f.due !== was.due) patch.due = f.due || undefined;
+      // A time means something only on a day (its "Do it on" day, else its due date).
+      const hasDay = Boolean(f.due) || item.pinnedDate !== undefined;
+      if (f.time && f.time !== was.time && !hasDay) {
+        setFieldError(NEEDS_A_DAY);
+        return;
+      }
+      if (f.time !== was.time) patch.time = f.time || undefined;
+      if (!hasDay && item.time !== undefined) patch.time = undefined;
       if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
       const flag = Boolean(f.goalId && f.milestone);
       if (flag !== was.milestone) patch.milestone = flag ? true : undefined;
     } else if (patch.kind === "idea") {
       // An idea has no due date, repeat or day on Today (as Change to → Idea does).
-      Object.assign(patch, { due: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, milestone: undefined });
+      Object.assign(patch, { due: undefined, time: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, milestone: undefined });
     }
     if (Object.keys(patch).length === 0) {
       setEditing(false);
@@ -374,6 +388,17 @@ export function ItemPanel({
               <input type="date" aria-label={dueKey} value={fields.due} onChange={(e) => setFields({ ...fields, due: e.target.value })} />
             ) : (
               <span>{item.due ? dayLabel(item.due, today) : "None"}</span>
+            )}
+            {/* A plain to-do's time (Due reminders). PROVISIONAL label and placement. */}
+            {(editing ? fields.kind === "task" : item.kind === "task" && !project) && !isHabit(item) && (
+              <>
+                <span className="peek-key">Time</span>
+                {editing ? (
+                  <input type="time" aria-label="Time" value={fields.time} onChange={(e) => setFields({ ...fields, time: e.target.value })} />
+                ) : (
+                  <span>{item.time && (item.due !== undefined || item.pinnedDate !== undefined) ? timeLabel(item.time) : "None"}</span>
+                )}
+              </>
             )}
             {project && (
               <>
