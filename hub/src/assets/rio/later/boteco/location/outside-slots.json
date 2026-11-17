@@ -281,5 +281,35 @@
     "boteco-outdoor:vehicle"
    ]
   }
- ]
+ ],
+ "hotspots": {
+  "door_in": {
+   "rect": [
+    280,
+    76,
+    20,
+    42
+   ],
+   "x": 280,
+   "y": 76,
+   "w": 20,
+   "h": 42,
+   "to": "inside",
+   "label": "Boteco door"
+  },
+  "map_exit": {
+   "rect": [
+    0,
+    208,
+    384,
+    32
+   ],
+   "x": 0,
+   "y": 208,
+   "w": 384,
+   "h": 32,
+   "to": "map",
+   "label": "The street (back to the map)"
+  }
+ }
 }

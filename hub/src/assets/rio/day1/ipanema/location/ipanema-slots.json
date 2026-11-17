@@ -55,6 +55,51 @@
    "w": 352,
    "h": 36,
    "note": "the calcadao (map exit along it)"
+  },
+  "noticeboard": {
+   "rect": [
+    74,
+    23,
+    28,
+    32
+   ],
+   "x": 74,
+   "y": 23,
+   "w": 28,
+   "h": 32,
+   "label": "Noticeboard",
+   "opens": "noticeboard",
+   "note": "the public community board on the promenade between two lamps; walk up and click it"
+  },
+  "barraca_door": {
+   "rect": [
+    16,
+    80,
+    60,
+    28
+   ],
+   "x": 16,
+   "y": 80,
+   "w": 60,
+   "h": 28,
+   "label": "Barraca",
+   "to": "barraca-inside",
+   "note": "the barraca's open front: walk in (once open, day 3)"
+  },
+  "exit": {
+   "rect": [
+    0,
+    10,
+    352,
+    10
+   ],
+   "x": 0,
+   "y": 10,
+   "w": 352,
+   "h": 10,
+   "label": "Back to the map",
+   "to": "map",
+   "note": "the kerb at the top of the calcadao: the street, back to the Rio map"
   }
  },
  "walkable_note": "sand from y 58 to the tideline (about y 140), the calcadao (y 19-54); not the rock",

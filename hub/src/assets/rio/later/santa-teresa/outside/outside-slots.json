@@ -119,6 +119,34 @@
   "esme_spot": {
    "x": 196,
    "y": 226
+  },
+  "door_in": {
+   "rect": [
+    8,
+    52,
+    28,
+    40
+   ],
+   "x": 8,
+   "y": 52,
+   "w": 28,
+   "h": 40,
+   "to": "inside",
+   "label": "Casarao door"
+  },
+  "map_exit": {
+   "rect": [
+    22,
+    207,
+    86,
+    33
+   ],
+   "x": 22,
+   "y": 207,
+   "w": 86,
+   "h": 33,
+   "to": "map",
+   "label": "Tiled steps (back to the map)"
   }
  },
  "baked": {

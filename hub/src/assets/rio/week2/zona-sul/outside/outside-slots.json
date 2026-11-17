@@ -278,6 +278,34 @@
   "esme_spot": {
    "x": 200,
    "y": 176
+  },
+  "door_in": {
+   "rect": [
+    170,
+    80,
+    44,
+    50
+   ],
+   "x": 170,
+   "y": 80,
+   "w": 44,
+   "h": 50,
+   "to": "inside",
+   "label": "Zona Sul sliding doors"
+  },
+  "map_exit": {
+   "rect": [
+    0,
+    200,
+    384,
+    40
+   ],
+   "x": 0,
+   "y": 200,
+   "w": 384,
+   "h": 40,
+   "to": "map",
+   "label": "The street (back to the map)"
   }
  },
  "baked": {
