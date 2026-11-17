@@ -1,4 +1,5 @@
-// Esme's Rio: one area, outside first, with its insides a button away. The scene's base is drawn
+// Esme's Rio: one area, outside first; its doors, stairs and exits lead in, between rooms and back
+// to the map (rio/doors.ts; Esme, 2026-11-17: "hover and click on doors"). The scene's base is drawn
 // for its state (it fills in as stickers are placed there) and the look (Rio's weather and
 // clock); placed stickers stand on their slots (foot point = bottom-centre), back to front by
 // foot y; in the rain the pack's falling rain plays over everything (not with reduced motion).
@@ -8,15 +9,17 @@ import { STICKER_BY_KEY } from "../farm/catalogue";
 import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d, drawFrame, drawSticker, useSheets } from "../farm/sprites";
 import { AREA_SCENES, sceneOpen } from "./areas";
+import { SCENE_AREA, clearOfHotbar, doorsFor, type Door, type DoorMenu } from "./doors";
+import { AREA_HOTBAR_SLOTS, hotbarBox } from "./Hotbar";
 import { BOTECO_NIGHTS, SCENES, sceneBase, type BotecoNight, type Look, type SceneId } from "./assets";
 import { useCover, useRioImages } from "./canvas";
-import { sceneKeep, stickerBox } from "./mapMath";
-import { TextButton } from "./menu/pieces";
+import { doorKeep, sceneKeep, stickerBox } from "./mapMath";
 import { layout } from "./placement";
 import { NO_COUNTS, scenePlan, type RioCounts } from "./progress";
 import { drawTinted, tintFor } from "./tint";
 import { BitmapText } from "./ui/BitmapText";
 import { useUi } from "./ui/fit";
+import { Tip } from "./ui/Tip";
 
 // PLACEHOLDER WORDING (every scene name)
 export const SCENE_NAMES: Record<SceneId, string> = {
@@ -58,11 +61,17 @@ const STICKER_SHEETS = ["stickers"];
 /** A tick for the themed nights' strips (each strip keeps its own speed from the elapsed time). */
 const NIGHT_TICK_MS = 40;
 
-export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, goal = false, onBack }: {
+export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, goal = false, onBack, canEnter, onOpenMenu, onVisit }: {
   area: string;
   look: Look;
-  /** The farm day: an inside that opens later (the sea, day 30) has no button before then. */
+  /** The farm day: a scene that opens later (the sea, day 30) has no door before then. */
   day: number;
+  /** She can go into this scene now (its area is open, and the scene itself): default, by `day` alone. */
+  canEnter?: (scene: SceneId) => boolean;
+  /** A hotspot that opens a menu tab (the beach noticeboard, the fitting room). */
+  onOpenMenu?: (tab: DoorMenu) => void;
+  /** She stepped into another area's scene (the barraca from the beach): it counts as a visit. */
+  onVisit?: (area: string) => void;
   /** Every placed sticker (book order); the scene picks its own. */
   placed: readonly string[];
   /** Her counters the new areas grow from (progress.ts). */
@@ -74,8 +83,10 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   onBack: () => void;
 }) {
   const scenes = AREA_SCENES[area]!;
-  const insides = scenes.inside.filter((s) => sceneOpen(s, day));
   const [scene, setScene] = useState<SceneId>(scenes.outside);
+  const enter = canEnter ?? ((s: SceneId) => sceneOpen(s, day));
+  const doors = doorsFor(scene).filter((d) => d.to === null || d.to === "map" || enter(d.to));
+  const [hoverDoor, setHoverDoor] = useState<string | null>(null);
   const data = SCENES[scene];
   const reduced = useReducedMotion();
 
@@ -137,7 +148,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   }, [bySlot, data]);
 
   // The scene covers the view (an even plank border), never trimming what's drawn there.
-  const [kx, ky, kw, kh] = sceneKeep(drawn.map((d) => stickerBox(d.slot)), data.scene);
+  const [kx, ky, kw, kh] = sceneKeep([...drawn.map((d) => stickerBox(d.slot)), ...doors.map((d) => doorKeep(d.rect))], data.scene);
   const keep = useMemo((): [number, number, number, number] => [kx, ky, kw, kh], [kx, ky, kw, kh]);
   const fit = useCover(wrap, data.scene, keep, uiLayout === "wide");
   const scale = fit.scale;
@@ -231,29 +242,49 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
     }
   }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick, underlayTick, playerTick, goalTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const inside = scene !== scenes.outside;
+  const go = (d: Door) => {
+    setHoverDoor(null);
+    if (d.to === "map") onBack();
+    else if (d.to === null) { if (d.opens) onOpenMenu?.(d.opens); }
+    else {
+      if (SCENE_AREA[d.to] !== SCENE_AREA[scene]) onVisit?.(SCENE_AREA[d.to]);
+      setScene(d.to);
+    }
+  };
+
+  // Where each door stands over the scene (CSS px in the layer); one the hotbar would hide reaches up above it.
+  const bar = hotbarBox(AREA_HOTBAR_SLOTS);
+  const barBox = { left: (fit.view.w - bar.w * u) / 2, right: (fit.view.w + bar.w * u) / 2, top: fit.view.h - (bar.h + bar.below) * u };
+  const doorBoxes = doors.map((d) => {
+    const [x, y, w, h] = d.rect;
+    const r = clearOfHotbar({ x: fit.x + x * scale, y: fit.y + y * scale, w: w * scale, h: h * scale }, barBox, 12 * u);
+    return { door: d, x: r.x - fit.x, y: r.y - fit.y, w: r.w, h: r.h };
+  });
+  const tipDoor = doorBoxes.find((b) => b.door.id === hoverDoor);
+  const room = fit.y + (tipDoor?.y ?? 0) > 30 * u; // room above the door for its label
+
   return (
     <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook} data-fit={fit.mode}
       data-celebrations={plan.celebrations} data-milestones={plan.milestones.join(" ")} data-books={plan.books}
       data-night={nightSide ? night! : undefined} data-player={playerStrip ? "esme" : undefined}
       data-goal={goalFrames.length > 0 ? "true" : undefined}>
       <h2 className="visually-hidden">{SCENE_NAMES[scene]}</h2>
-      {/* On top of the game, in the kit's word buttons. */}
-      <div className="rio-area-controls" style={{ fontSize: `${u}px` }}>
-        {/* PLACEHOLDER WORDING */}
-        <TextButton label="Back to the map" onClick={onBack} />
-        {/* PLACEHOLDER WORDING */}
-        {inside && <TextButton label="Outside" onClick={() => setScene(scenes.outside)} />}
-        {!inside && insides.length > 0 && (
-          // PLACEHOLDER WORDING
-          <div role="group" aria-label="Go inside">
-            {insides.map((s) => <TextButton key={s} label={SCENE_NAMES[s]} onClick={() => setScene(s)} />)}
-          </div>
-        )}
-      </div>
-      <div className="rio-area-layer" style={{ left: fit.x, top: fit.y, width: data.scene[0] * scale, height: data.scene[1] * scale }}>
+      <div className="rio-area-layer" style={{ left: fit.x, top: fit.y, width: data.scene[0] * scale, height: data.scene[1] * scale, ["--art-px" as string]: `${Math.max(1, scale)}px` }}>
         <canvas ref={canvas} width={data.scene[0]} height={data.scene[1]} className="farm-px"
           style={{ width: data.scene[0] * scale, height: data.scene[1] * scale }} aria-hidden="true" />
+        {/* The doors, stairs and exits: hover or focus shows them (a solid kit outline) and their name. */}
+        <nav aria-label="Ways in and out">
+          {doorBoxes.map(({ door: d, x, y, w, h }) => (
+            <button key={d.id} type="button" className="rio-door" aria-label={d.label} data-door={d.id} data-to={d.to ?? d.opens}
+              style={{ left: x, top: y, width: w, height: h }} onClick={() => go(d)}
+              onMouseEnter={() => setHoverDoor(d.id)} onMouseLeave={() => setHoverDoor((h) => (h === d.id ? null : h))}
+              onFocus={() => setHoverDoor(d.id)} onBlur={() => setHoverDoor((h) => (h === d.id ? null : h))} />
+          ))}
+        </nav>
+        {tipDoor && (
+          <Tip lines={[tipDoor.door.label]} side={room ? "above" : "below"}
+            at={{ x: tipDoor.x + tipDoor.w / 2, y: room ? tipDoor.y - 2 * u : tipDoor.y + tipDoor.h + 2 * u }} />
+        )}
       </div>
       {/* PLACEHOLDER WORDING */}
       {overflow > 0 && (

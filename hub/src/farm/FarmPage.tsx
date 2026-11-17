@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AreaView } from "../rio/AreaView";
 import { areaStatuses, sceneOpen } from "../rio/areas";
+import type { SceneId } from "../rio/assets";
+import { SCENE_AREA } from "../rio/doors";
 import { groupsOf } from "../rio/collection";
 import { GameScreen } from "../rio/GameScreen";
 import { Hotbar } from "../rio/Hotbar";
@@ -62,10 +64,18 @@ export function FarmPage() {
     const s = home ? statuses.get(home.area) : undefined;
     return (s === "open" || s === "new") && sceneOpen(home!.scene, day);
   }, [statuses, day]);
-  const openArea = useCallback((a: string) => {
-    setArea(a);
+  const visit = useCallback((a: string) => {
     void view?.markVisited(a).catch(() => undefined);
   }, [view]);
+  const openArea = useCallback((a: string) => {
+    setArea(a);
+    visit(a);
+  }, [visit]);
+  // A door leads into a scene once its area is open, and the scene itself (the sea: day 30).
+  const canEnter = useCallback((scene: SceneId) => {
+    const s = statuses.get(SCENE_AREA[scene]);
+    return (s === "open" || s === "new") && sceneOpen(scene, day);
+  }, [statuses, day]);
 
   const openMenu = useCallback((t: MenuTab) => {
     if (t === "map") {
@@ -163,7 +173,8 @@ export function FarmPage() {
       </p>
       <div className="rio-wrap">
         {area
-          ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} counts={counts} night={night} goal={goal} onBack={() => setArea(null)} />
+          ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} counts={counts} night={night} goal={goal} onBack={() => setArea(null)}
+            canEnter={canEnter} onOpenMenu={openMenu} onVisit={visit} />
           : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
       </div>
       {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}

@@ -17,6 +17,11 @@ const SLOTS: { tab: MenuTab; icon: string; label: string }[] = [
   { tab: "friends", icon: "icon-friends", label: "Friends" },
 ];
 
+/** The hotbar's size in UI px (slots across, the thin frame, 2 above the game's bottom edge). */
+export const hotbarBox = (slots: number) => ({ w: slots * 16 + 6, h: 22, below: 2 });
+/** Slots in an area (the same as on the map). */
+export const AREA_HOTBAR_SLOTS = SLOTS.length;
+
 export function Hotbar({ current, onPick }: { current: MenuTab | null; onPick: (t: MenuTab) => void }) {
   const { u } = useUi();
   const w = SLOTS.length * 16 + 6;

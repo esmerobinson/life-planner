@@ -189,7 +189,8 @@ for (const width of [1280, 390]) {
       await page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Fazenda" }).focus();
       await page.keyboard.press("Enter");
       await expect(page.getByRole("list", { name: "Stickers here" }).getByText("Mind: seeds")).toBeAttached();
-      await page.getByRole("button", { name: "Back to the map" }).click();
+      await page.getByRole("button", { name: "Boat back to Rio" }).click();
+      await expect(page.locator(".rio-map")).toBeVisible();
     });
 
     test("phase 2a: the new areas open on their days and draw their scenes (dev ?day= jumps the farm day)", async ({ page }) => {
@@ -202,7 +203,7 @@ for (const width of [1280, 390]) {
       await places.getByRole("button", { name: "Jardim Botânico" }).focus();
       await page.keyboard.press("Enter");
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "jardim-botanico/outside");
-      await page.getByRole("button", { name: "The orchid house" }).click();
+      await page.getByRole("button", { name: "Orchid house doors" }).click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "jardim-botanico/inside");
       // The scene is drawn (not blank) and nothing scrolls.
       await expect.poll(() => page.locator(".rio-area-layer canvas").evaluate((c) => {
@@ -213,13 +214,35 @@ for (const width of [1280, 390]) {
       })).toBeGreaterThan(1000);
       expect(await page.evaluate(() => [document.documentElement.scrollHeight - innerHeight, document.documentElement.scrollWidth - innerWidth]))
         .toEqual([0, 0]);
-      await page.getByRole("button", { name: "Back to the map" }).click();
+      await page.getByRole("button", { name: "Out to the avenue" }).click();
+      await page.getByRole("button", { name: "Gate (back to the map)" }).click();
+      await expect(page.locator(".rio-map")).toBeVisible();
       // Day 200: every drawn area is open; Christ (drawn last) still waits.
       await page.goto("/farm?day=200");
       for (const name of ["Zona Sul", "Quilo", "Sult", "Santa Teresa", "Os Esquilos", "Museum", "Flamengo match"]) {
         const b = page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name, exact: true });
         await expect(b, name).toHaveAttribute("data-status", /new|open/);
       }
+    });
+
+    test("the noticeboard stands on Ipanema's promenade: clicking it opens the menu's Noticeboard; Tab and Enter reach the doors", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
+      await startedFarm(page);
+      await page.goto("/farm?day=3");
+      await page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Ipanema beach" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "ipanema-beach/outside");
+      await page.getByRole("button", { name: "Noticeboard" }).click();
+      const menu = page.getByRole("dialog", { name: "Menu" });
+      await expect(menu.getByRole("tab", { name: "Noticeboard" })).toHaveAttribute("aria-selected", "true");
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+      // The keyboard way: Tab to the barraca's door, Enter goes in.
+      const barraca = page.getByRole("button", { name: "Barraca" });
+      for (let i = 0; i < 12 && !(await barraca.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+      await expect(barraca).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "barraca/inside");
     });
 
     test("the menu by keyboard: Esc opens it, arrows move along the tabs, Enter opens one, Esc closes it", async ({ page }) => {
@@ -265,8 +288,13 @@ for (const width of [1280, 390]) {
       const sbox = (await page.locator(".rio-area-layer canvas").boundingBox())!;
       expect(sbox.x + sbox.width).toBeGreaterThan(0);
       expect(sbox.y).toBeLessThan(vp.height);
-      await page.getByRole("button", { name: "Kitchen" }).click();
+      // Doors, not buttons (Esme, 2026-11-17): the kitchen's door, named on hover, goes in.
+      const kitchen = page.getByRole("button", { name: "Kitchen" });
+      await kitchen.hover();
+      await expect(page.getByRole("tooltip")).toHaveText("Kitchen");
+      await kitchen.click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/kitchen");
+      await page.getByRole("button", { name: "Garden" }).click();
       await page.getByRole("button", { name: "Back to the map" }).click();
       await expect(page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Lagoa house" })).toHaveAttribute("data-status", "open");
     });

@@ -126,22 +126,27 @@ html:has(.app-shell.is-game) body {
   background-image: var(--k-slot-hover);
 }
 
-/* An area's buttons, top left; the overflow line under them. */
-/* Where Back stands on the map (in an area, "Back to the map" takes its place). */
-.rio-area-controls {
+/* An area's doors, stairs and exits (rio/doors.ts): invisible until she points at one (or tabs to
+   it), then a solid two-tone line, one art pixel each: the kit's ink outside, its cream inside (the
+   kit's text ink and focus-ring cream; one alone vanishes on white walls or dark wood; Esme's
+   light rule: solid, no glow haze), and its name in a small kit tooltip (ui/Tip.tsx). */
+.rio-ui .rio-door {
   position: absolute;
-  top: 4em;
-  left: 4em;
-  z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4em;
-  max-width: calc(100% - 8em);
+  box-sizing: border-box;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
 }
-.rio-area-controls [role="group"] {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4em;
+.rio-ui .rio-door:hover,
+.rio-ui .rio-door:focus-visible {
+  outline: var(--art-px, 3px) solid #56160c;
+  outline-offset: 0;
+  box-shadow: inset 0 0 0 var(--art-px, 3px) #fff3d6;
+}
+.rio-ui .rio-tip {
+  white-space: nowrap;
+  pointer-events: none;
 }
 .rio-area-note {
   position: absolute;

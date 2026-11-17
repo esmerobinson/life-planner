@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { COLLECTION } from "../farm/catalogue";
 import * as hooks from "../farm/hooks";
@@ -20,37 +20,72 @@ beforeEach(() => {
 const heading = () => screen.getByRole("heading", { level: 2 }).textContent;
 
 describe("an area, outside and inside", () => {
-  it("shows the outside first, with a button for each inside; pressing one goes in", async () => {
+  const doors = () => within(screen.getByRole("navigation", { name: "Ways in and out" }));
+
+  it("shows the outside first; its doors and stairs lead into the rooms, the rooms connect, and back out (no buttons)", async () => {
     render(<AreaView area="lagoa-house" look="day" day={1} placed={[]} onBack={() => undefined} />);
     expect(heading()).toBe("Lagoa house");
-    const insides = within(screen.getByRole("group", { name: "Go inside" })).getAllByRole("button");
-    expect(insides.map((b) => b.textContent)).toEqual(["Living room", "Bedroom", "Kitchen"]);
-    await userEvent.click(screen.getByRole("button", { name: "Bedroom" }));
+    expect(screen.queryByRole("group", { name: "Go inside" })).toBeNull();
+    expect(doors().getAllByRole("button").map((b) => b.getAttribute("aria-label")).sort())
+      .toEqual(["Back to the map", "Bedroom", "Kitchen", "Living room", "Living room"]);
+    await userEvent.click(doors().getByRole("button", { name: "Bedroom" }));
     expect(heading()).toBe("Bedroom");
     expect(document.querySelector(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/bedroom");
-    await userEvent.click(screen.getByRole("button", { name: "Outside" }));
+    await userEvent.click(doors().getByRole("button", { name: "Living room" }));
+    expect(heading()).toBe("Living room");
+    await userEvent.click(doors().getByRole("button", { name: "Kitchen" }));
+    expect(heading()).toBe("Kitchen");
+    await userEvent.click(doors().getByRole("button", { name: "Garden" }));
     expect(heading()).toBe("Lagoa house");
+  });
+
+  it("hovering or focusing a door names it in a small tooltip", async () => {
+    render(<AreaView area="lagoa-house" look="day" day={1} placed={[]} onBack={() => undefined} />);
+    await userEvent.hover(doors().getByRole("button", { name: "Kitchen" }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Kitchen");
+    await userEvent.unhover(doors().getByRole("button", { name: "Kitchen" }));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => doors().getAllByRole("button", { name: "Living room" })[0]!.focus());
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Living room");
+  });
+
+  it("a door to a place that isn't open yet isn't there; stepping into another area's scene counts as a visit", async () => {
+    const onVisit = vi.fn();
+    const shut = render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} canEnter={(s) => s !== "barraca/inside"} />);
+    expect(doors().queryByRole("button", { name: "Barraca" })).toBeNull();
+    shut.unmount();
+    render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} onVisit={onVisit} />);
+    await userEvent.click(doors().getByRole("button", { name: "Barraca" }));
+    expect(document.querySelector(".rio-area")).toHaveAttribute("data-scene", "barraca/inside");
+    expect(onVisit).toHaveBeenCalledWith("barraca");
+  });
+
+  it("the beach noticeboard opens the menu's Noticeboard; the store's fitting room, the Wardrobe", async () => {
+    const onOpenMenu = vi.fn();
+    const r = render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} onOpenMenu={onOpenMenu} />);
+    await userEvent.click(doors().getByRole("button", { name: "Noticeboard" }));
+    expect(onOpenMenu).toHaveBeenLastCalledWith("noticeboard");
+    r.unmount();
+    render(<AreaView area="clothing-store" look="day" day={30} placed={[]} onBack={() => undefined} onOpenMenu={onOpenMenu} />);
+    await userEvent.click(doors().getByRole("button", { name: "Shop door" }));
+    await userEvent.click(doors().getByRole("button", { name: "Fitting room" }));
+    expect(onOpenMenu).toHaveBeenLastCalledWith("wardrobe");
   });
 
   it("Ipanema beach: no way into the sea before day 30; on day 30 it's a button away (Esme, 2026-11-16)", async () => {
     const { unmount } = render(<AreaView area="ipanema-beach" look="day" day={29} placed={[]} onBack={() => undefined} />);
-    expect(screen.queryByRole("group", { name: "Go inside" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "The sea off Arpoador" })).toBeNull();
+    expect(doors().queryByRole("button", { name: "Swim out to Arpoador" })).toBeNull();
     unmount();
     render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} />);
-    await userEvent.click(within(screen.getByRole("group", { name: "Go inside" })).getByRole("button", { name: "The sea off Arpoador" }));
+    await userEvent.click(doors().getByRole("button", { name: "Swim out to Arpoador" }));
     expect(document.querySelector(".rio-area")).toHaveAttribute("data-scene", "ipanema-beach/sea");
   });
 
-  it("the fazenda has no inside yet", () => {
-    render(<AreaView area="fazenda" look="day" day={1} placed={[]} onBack={() => undefined} />);
-    expect(screen.queryByRole("group", { name: "Go inside" })).toBeNull();
-  });
-
-  it("Back to the map", async () => {
+  it("the fazenda: its barn, coop and greenhouse wait for their insides; the boat is the way back to the map", async () => {
     const onBack = vi.fn();
     render(<AreaView area="fazenda" look="night" day={1} placed={[]} onBack={onBack} />);
-    await userEvent.click(screen.getByRole("button", { name: "Back to the map" }));
+    expect(doors().getAllByRole("button")).toHaveLength(1);
+    await userEvent.click(doors().getByRole("button", { name: "Boat back to Rio" }));
     expect(onBack).toHaveBeenCalled();
   });
 
@@ -95,13 +130,13 @@ describe("phase 2a: the new areas", () => {
 
   it("each opens outside, with its inside a button away", async () => {
     const names: Record<string, [string, string]> = {
-      "zona-sul": ["Zona Sul", "The aisles"], "jardim-botanico": ["Jardim Botânico", "The orchid house"], quilo: ["Quilo", "The buffet"],
-      sult: ["Sult", "The dining room"], "os-esquilos": ["Os Esquilos", "The dining room"], "santa-teresa": ["Santa Teresa", "The studio"],
+      "zona-sul": ["Zona Sul", "Zona Sul sliding doors"], "jardim-botanico": ["Jardim Botânico", "Orchid house doors"], quilo: ["Quilo", "Quilo door"],
+      sult: ["Sult", "Sult door"], "os-esquilos": ["Os Esquilos", "Blue doors"], "santa-teresa": ["Santa Teresa", "Casarao door"],
     };
     for (const [key, [out, inside]] of Object.entries(names)) {
       const { unmount } = render(<AreaView area={key} look="night" day={200} placed={[]} onBack={() => undefined} />);
       expect(heading()).toBe(out);
-      await userEvent.click(within(screen.getByRole("group", { name: "Go inside" })).getByRole("button", { name: inside }));
+      await userEvent.click(screen.getByRole("button", { name: inside }));
       expect(area()).toHaveAttribute("data-scene", `${key}/inside`);
       unmount();
     }
@@ -115,7 +150,7 @@ describe("phase 2a: the new areas", () => {
 
   it("Santa Teresa's studio shows its milestones and books", async () => {
     render(<AreaView area="santa-teresa" look="rain" day={200} placed={[]} counts={counts({ readingBooks: 10 })} onBack={() => undefined} />);
-    await userEvent.click(screen.getByRole("button", { name: "The studio" }));
+    await userEvent.click(screen.getByRole("button", { name: "Casarao door" }));
     expect(area()).toHaveAttribute("data-milestones", "reading-lamp second-bookcase rug");
     expect(area()).toHaveAttribute("data-books", "10");
   });
@@ -150,7 +185,7 @@ describe("phase 2a: the new areas", () => {
 
 it("Esme swims in the sea off Arpoador (day 30), still with reduced motion", async () => {
   render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} />);
-  await userEvent.click(screen.getByRole("button", { name: "The sea off Arpoador" }));
+  await userEvent.click(screen.getByRole("button", { name: "Swim out to Arpoador" }));
   expect(document.querySelector(".rio-area")).toHaveAttribute("data-player", "esme");
 });
 
@@ -158,10 +193,10 @@ it("the goal moment plays in the stands at a full match only when asked (dev pre
   const full = { monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, weeklyReviews: 4 };
   const { unmount } = render(<AreaView area="flamengo-match" look="night" day={60} placed={[]} counts={full} goal onBack={() => undefined} />);
   expect(document.querySelector(".rio-area")).not.toHaveAttribute("data-goal"); // outside: no goal art
-  await userEvent.click(screen.getByRole("button", { name: "The stands" }));
+  await userEvent.click(screen.getByRole("button", { name: "Stadium gates" }));
   expect(document.querySelector(".rio-area")).toHaveAttribute("data-goal", "true");
   unmount();
   render(<AreaView area="flamengo-match" look="night" day={60} placed={[]} goal onBack={() => undefined} />);
-  await userEvent.click(screen.getByRole("button", { name: "The stands" }));
+  await userEvent.click(screen.getByRole("button", { name: "Stadium gates" }));
   expect(document.querySelector(".rio-area")).not.toHaveAttribute("data-goal"); // start: the goal is drawn for the full stands
 });
