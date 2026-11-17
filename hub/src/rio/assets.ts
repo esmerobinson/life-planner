@@ -126,6 +126,8 @@ export interface SceneData {
   slots: Slot[];
   /** The falling rain, drawn over everything while the look is rain. */
   rainOverlay?: { frames?: string[]; strip?: { file: string; count: number; size: [number, number] }; ms: number };
+  /** Esme herself, drawn by the app (the sea: snorkelling by the board): a strip per look at `at` − `offset`, over the stickers. */
+  player?: { files: Partial<Record<Look, string>>; at: [number, number]; offset: [number, number]; size: [number, number]; count: number; ms: number };
   /** Small pictures stamped on the base in a look (the museum's open doors by day). */
   stamps?: Partial<Record<Look, { file: string; at: [number, number] }[]>>;
   /** Glass drawn over the placed stickers (the museum's case glints). */
@@ -208,6 +210,7 @@ interface RawScene {
   sticker_slots?: RawSlot[];
   celebrations?: { step: number; id: string; layers: RawLooks }[];
   milestones?: { id: string; order: number; overlay: RawLooks }[];
+  player?: { anchor: { x: number; y: number }; json: string };
   shelf_slots?: RawSheet;
   cover_slots?: RawSheet;
   overlays?: {
@@ -276,6 +279,10 @@ function readScene(src: SceneSource): SceneData {
     const meta = readJson<{ frames: number; frame_size: [number, number]; ms: number }>(at(rain.json));
     data.rainOverlay = { strip: { file: at(rain.file), count: meta.frames, size: meta.frame_size }, ms: meta.ms };
   } else if (src.rain) data.rainOverlay = { frames: src.rain.frames.map(at), ms: src.rain.ms };
+  if (raw.player) {
+    const j = readJson<{ frames: number; ms: number; frame_size: [number, number]; anchor: [number, number]; files: RawLooks }>(at(raw.player.json));
+    data.player = { files: readLooks(j.files, at), at: [raw.player.anchor.x, raw.player.anchor.y], offset: j.anchor, size: j.frame_size, count: j.frames, ms: j.ms };
+  }
   if (src.overlays) {
     type Strip = { frames: number; frame_size: [number, number]; ms: number };
     const o = readJson<{ caustics?: Strip & { files: Record<string, RawLooks> }; rain?: Strip & { file: string } }>(at(src.overlays));

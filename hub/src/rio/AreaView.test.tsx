@@ -147,3 +147,9 @@ describe("phase 2a: the new areas", () => {
     expect(area()).not.toHaveAttribute("data-night");
   });
 });
+
+it("Esme swims in the sea off Arpoador (day 30), still with reduced motion", async () => {
+  render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} />);
+  await userEvent.click(screen.getByRole("button", { name: "The sea off Arpoador" }));
+  expect(document.querySelector(".rio-area")).toHaveAttribute("data-player", "esme");
+});

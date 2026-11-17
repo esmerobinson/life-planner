@@ -165,6 +165,11 @@ describe("the new sea off Arpoador replaces the rough first sea", () => {
     expect(sea.underlay!.ms).toBe(160);
     for (const state of ["start", "full"]) for (const look of LOOKS) expect(rioUrl(sea.underlay!.strips[state]![look]!), `${state} ${look}`).not.toBe("");
   });
+
+  it("Esme snorkels by the paddleboard: her own strip per look, drawn by the app", () => {
+    expect(sea.player).toMatchObject({ at: [160, 38], offset: [26, 18], size: [48, 32], count: 4, ms: 180 });
+    for (const look of LOOKS) expect(rioUrl(sea.player!.files[look]!), look).not.toBe("");
+  });
 });
 
 describe("the museum (day art from the esme pack, Rio night and rain from week3/museum-looks)", () => {

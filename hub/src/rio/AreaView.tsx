@@ -104,12 +104,16 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   const underlay = data.underlay;
   const underlayStrip = underlay ? underlay.strips[state]?.[shownLook] ?? underlay.strips[state]?.day ?? "" : "";
   const underlayTick = useTicker(underlay?.ms ?? 1000, !!underlayStrip && !reduced);
+  // Esme herself where the scene draws her (the sea: snorkelling by the board).
+  const player = data.player;
+  const playerStrip = player ? player.files[shownLook] ?? player.files.day ?? "" : "";
+  const playerTick = useTicker(player?.ms ?? 1000, !!playerStrip && !reduced);
   const nightTick = useTicker(NIGHT_TICK_MS, !!nightSide && !reduced);
 
   // The museum: its open doors by day, the case glass over its finds, and finds in the look's colours.
   const stampList = data.stamps?.[shownLook] ?? [];
   const tintPair = data.tint && shownLook !== "day" ? { day: data.base[state]?.day ?? "", look: base } : null;
-  const layerFiles = [...stampList.map((st) => st.file), data.glass?.file ?? "", tintPair?.day ?? "", underlayStrip, ...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
+  const layerFiles = [playerStrip, ...stampList.map((st) => st.file), data.glass?.file ?? "", tintPair?.day ?? "", underlayStrip, ...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
   const files = useMemo(() => [base, ...layerFiles, ...rainFrames, ...tvFrames], [base, layerFiles.join(), rainFrames.join(), tvFrames.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const images = useRioImages(files);
   const sheets = useSheets(STICKER_SHEETS);
@@ -181,6 +185,10 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
         else ctx.drawImage(glass, gx, gy);
       }
     }
+    if (player && playerStrip) {
+      const img = images[playerStrip];
+      if (img) drawFrame(ctx, img, player.size[0], player.size[1], reduced ? 0 : playerTick % player.count, player.at[0] - player.offset[0], player.at[1] - player.offset[1]);
+    }
     // The bar TV (the base already shows its first frame, so with reduced motion nothing is drawn).
     if (data.tv && tvFrames.length > 0 && !reduced) {
       const f = images[tvFrames[tvTick % tvFrames.length]!];
@@ -211,13 +219,13 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
         if (img) ctx.drawImage(img, 0, 0);
       }
     }
-  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick, underlayTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick, underlayTick, playerTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inside = scene !== scenes.outside;
   return (
     <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook} data-fit={fit.mode}
       data-celebrations={plan.celebrations} data-milestones={plan.milestones.join(" ")} data-books={plan.books}
-      data-night={nightSide ? night! : undefined}>
+      data-night={nightSide ? night! : undefined} data-player={playerStrip ? "esme" : undefined}>
       <h2 className="visually-hidden">{SCENE_NAMES[scene]}</h2>
       {/* On top of the game, in the kit's word buttons. */}
       <div className="rio-area-controls" style={{ fontSize: `${u}px` }}>
