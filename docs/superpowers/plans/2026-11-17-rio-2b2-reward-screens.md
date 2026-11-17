@@ -116,6 +116,11 @@
   - `collected` and `stickerTotals` stay phase-1 only.
   - `COLLECTION_AREAS` gains, in opening order, one page per v3 family under its area. It adds the areas not yet listed (barraca, clothing-store, dois-irmaos, rocinha, santa-teresa, flamengo, sult, os-esquilos, copacabana-palace; `placeName` fallback names, `// PLACEHOLDER WORDING`). `areaOfSticker` covers v3 keys.
   - `homeOf(key)` returns a v3 sticker's area and scene when `AREA_SCENES[area]` exists (rio-areas), else null. `stickerTags(key)` = `["<family>:<set>", "<family>:*"]` (the pack's slot tags; adjust to match rio-areas' slot `accepts` and say so in the report).
+  - **The penthouse's slots (`penthouse-decor:*`).** Game Design, 2026-11-17, `// DEFAULT: Esme to confirm`:
+    - Every sticker that carries a `lagoa-decor:<kind>` tag also carries `penthouse-decor:<kind>`, of the same kind (floor, plant, small, wall). So the penthouse is furnished from the same furniture and decor she has earned.
+    - Each sticker sits in **one home at a time**. It's still a single `placed:<sticker>` row, so placing it in the penthouse moves it out of the Lagoa house and leaves that slot empty, and she can move it back any time.
+    - Nothing is bought for the penthouse. Coins buy the penthouse itself (space), never furniture or decor ("never duplicates", 2026-11-09). The balcony churrasco is an overlay event, not stickers (2026-11-16).
+    - Tests: a `lagoa-decor:floor` sticker is accepted by a `penthouse-decor:floor` slot and not by a `penthouse-decor:wall` one; placing it in the penthouse makes `placed` name the penthouse spot and the Lagoa slot shows empty; moving it back works; a sticker with no `lagoa-decor` tag is not accepted.
 - [ ] **Step 1: Failing tests:**
   - (RTL, `FarmProvider` with fake data) Two habit weeks → `v3` holds palm and ipe, `collected` equals the value without v3, and arrivals and `unlocked` are unchanged.
   - `markSeen("trees-ipe")` writes `seen:trees-ipe`.

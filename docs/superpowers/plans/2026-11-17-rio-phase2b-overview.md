@@ -92,6 +92,7 @@ Steady day (5 to-dos, 3 habits, a check-in, an exercise, morning pages, a finish
   - **Seasons: weather and holidays only.** No sticker waits for a season.
   - **Holiday stickers:** anything real during the holiday's week earns the set; a missed one comes back next year (plan 6).
   - **Duvet is retired.** There are five friends: Mr Cat, Caetano, Pupup, Bebe, Cereal.
+  - **The penthouse's decor slots** (`penthouse-decor:*`, art landed 2026-11-17; *DEFAULT: Esme to confirm*): every `lagoa-decor:<kind>` sticker also fits the penthouse; each sticker is in one home at a time and can move between them; nothing is sold for it. See plan 2, Task 3.
 
 1. **Untick on the same day takes the reward back**, until 3am banks the day. After that it's hers for good. *Default: yes.*
 2. **What's an errand?** *Default: any Admin to-do, or any to-do tagged "errand".*
