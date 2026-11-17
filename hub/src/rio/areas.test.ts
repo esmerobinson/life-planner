@@ -47,6 +47,13 @@ describe("which areas are open", () => {
     expect(AREA_SCENES.museum).toEqual({ outside: "museum/outside", inside: ["museum/inside"] });
   });
 
+  it("day 60: the Flamengo match opens", () => {
+    expect(opensOn("flamengo-match")).toBe(60);
+    expect(areaStatuses(59, none).get("flamengo-match")).toBe("next");
+    expect(areaStatuses(60, none).get("flamengo-match")).toBe("new");
+    expect(AREA_SCENES["flamengo-match"]).toEqual({ outside: "flamengo-match/outside", inside: ["flamengo-match/inside"] });
+  });
+
   it("day 165: Os Esquilos opens, the last area with art, and nothing is next", () => {
     const s = areaStatuses(165, none);
     expect(s.get("os-esquilos")).toBe("new");
@@ -94,7 +101,7 @@ describe("which areas are open", () => {
     expect(AREA_SCENES.fazenda).toEqual({ outside: "fazenda/outside", inside: [] });
     expect(AREA_SCENES.barraca).toEqual({ outside: "ipanema-beach/outside", inside: ["barraca/inside"] });
     expect(Object.keys(AREA_SCENES).sort()).toEqual(
-      ["barraca", "boteco", "clothing-store", "fazenda", "ipanema-beach", "jardim-botanico", "lagoa-house", "museum", "os-esquilos", "quilo",
+      ["barraca", "boteco", "clothing-store", "fazenda", "flamengo-match", "ipanema-beach", "jardim-botanico", "lagoa-house", "museum", "os-esquilos", "quilo",
         "santa-teresa", "sult", "tijuca-park", "zona-sul"],
     );
   });

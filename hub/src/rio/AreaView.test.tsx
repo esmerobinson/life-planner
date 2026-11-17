@@ -89,8 +89,8 @@ describe("an area, outside and inside", () => {
 });
 
 describe("phase 2a: the new areas", () => {
-  const counts = (c: Partial<{ monthlyGoals: number; wholeGoals: number; readingBooks: number; recipes: number }>) =>
-    ({ monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, ...c });
+  const counts = (c: Partial<{ monthlyGoals: number; wholeGoals: number; readingBooks: number; recipes: number; weeklyReviews: number }>) =>
+    ({ monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, weeklyReviews: 0, ...c });
   const area = () => document.querySelector(".rio-area")!;
 
   it("each opens outside, with its inside a button away", async () => {
@@ -152,4 +152,16 @@ it("Esme swims in the sea off Arpoador (day 30), still with reduced motion", asy
   render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} />);
   await userEvent.click(screen.getByRole("button", { name: "The sea off Arpoador" }));
   expect(document.querySelector(".rio-area")).toHaveAttribute("data-player", "esme");
+});
+
+it("the goal moment plays in the stands at a full match only when asked (dev preview)", async () => {
+  const full = { monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, weeklyReviews: 4 };
+  const { unmount } = render(<AreaView area="flamengo-match" look="night" day={60} placed={[]} counts={full} goal onBack={() => undefined} />);
+  expect(document.querySelector(".rio-area")).not.toHaveAttribute("data-goal"); // outside: no goal art
+  await userEvent.click(screen.getByRole("button", { name: "The stands" }));
+  expect(document.querySelector(".rio-area")).toHaveAttribute("data-goal", "true");
+  unmount();
+  render(<AreaView area="flamengo-match" look="night" day={60} placed={[]} goal onBack={() => undefined} />);
+  await userEvent.click(screen.getByRole("button", { name: "The stands" }));
+  expect(document.querySelector(".rio-area")).not.toHaveAttribute("data-goal"); // start: the goal is drawn for the full stands
 });

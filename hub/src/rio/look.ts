@@ -148,3 +148,8 @@ export function devNight(search: string, dev: boolean = import.meta.env.DEV): Bo
   const v = new URLSearchParams(search).get("night");
   return (BOTECO_NIGHT_KEYS as readonly string[]).includes(v ?? "") ? (v as BotecoNight) : null;
 }
+
+/** Development builds only: `?goal=1` plays the match's goal moment (weekly reviews will, once built). */
+export function devGoal(search: string, dev: boolean = import.meta.env.DEV): boolean {
+  return dev && new URLSearchParams(search).get("goal") === "1";
+}

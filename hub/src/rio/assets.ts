@@ -93,7 +93,8 @@ export type SceneId =
   | "sult/outside" | "sult/inside"
   | "os-esquilos/outside" | "os-esquilos/inside"
   | "santa-teresa/outside" | "santa-teresa/inside"
-  | "museum/outside" | "museum/inside";
+  | "museum/outside" | "museum/inside"
+  | "flamengo-match/outside" | "flamengo-match/inside";
 
 export interface Slot {
   id: string;
@@ -128,6 +129,8 @@ export interface SceneData {
   rainOverlay?: { frames?: string[]; strip?: { file: string; count: number; size: [number, number] }; ms: number };
   /** Esme herself, drawn by the app (the sea: snorkelling by the board): a strip per look at `at` − `offset`, over the stickers. */
   player?: { files: Partial<Record<Look, string>>; at: [number, number]; offset: [number, number]; size: [number, number]; count: number; ms: number };
+  /** The match's goal moment: whole frames per look (frame 0 is the full base). */
+  goal?: { frames: Partial<Record<Look, string[]>>; ms: number };
   /** Small pictures stamped on the base in a look (the museum's open doors by day). */
   stamps?: Partial<Record<Look, { file: string; at: [number, number] }[]>>;
   /** Glass drawn over the placed stickers (the museum's case glints). */
@@ -196,6 +199,8 @@ const SOURCES: Record<Exclude<SceneId, "museum/outside" | "museum/inside">, Scen
   "os-esquilos/inside": { file: "later/os-esquilos/inside/os-esquilos-inside-slots.json", root: "later/os-esquilos" },
   "santa-teresa/outside": { file: "later/santa-teresa/outside/outside-slots.json", root: "later/santa-teresa" },
   "santa-teresa/inside": { file: "later/santa-teresa/inside/inside-slots.json", root: "later/santa-teresa" },
+  "flamengo-match/outside": { file: "later/flamengo/outside/outside-slots.json", root: "later/flamengo" },
+  "flamengo-match/inside": { file: "later/flamengo/inside/inside-slots.json", root: "later/flamengo" },
 };
 
 type RawSlot = { id: string; x: number; y: number; anchor?: string; state?: string; accepts?: string[]; order?: number; requires?: string };
@@ -211,6 +216,7 @@ interface RawScene {
   celebrations?: { step: number; id: string; layers: RawLooks }[];
   milestones?: { id: string; order: number; overlay: RawLooks }[];
   player?: { anchor: { x: number; y: number }; json: string };
+  animations?: { goal?: { frames: Record<string, string[]>; frame_ms: number } };
   shelf_slots?: RawSheet;
   cover_slots?: RawSheet;
   overlays?: {
@@ -279,6 +285,12 @@ function readScene(src: SceneSource): SceneData {
     const meta = readJson<{ frames: number; frame_size: [number, number]; ms: number }>(at(rain.json));
     data.rainOverlay = { strip: { file: at(rain.file), count: meta.frames, size: meta.frame_size }, ms: meta.ms };
   } else if (src.rain) data.rainOverlay = { frames: src.rain.frames.map(at), ms: src.rain.ms };
+  const goal = raw.animations?.goal;
+  if (goal) {
+    const frames: Partial<Record<Look, string[]>> = {};
+    for (const [look, list] of Object.entries(goal.frames)) if (isLook(look)) frames[look] = list.map(at);
+    data.goal = { frames, ms: goal.frame_ms };
+  }
   if (raw.player) {
     const j = readJson<{ frames: number; ms: number; frame_size: [number, number]; anchor: [number, number]; files: RawLooks }>(at(raw.player.json));
     data.player = { files: readLooks(j.files, at), at: [raw.player.anchor.x, raw.player.anchor.y], offset: j.anchor, size: j.frame_size, count: j.frames, ms: j.ms };

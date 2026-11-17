@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { RAIN_CODES, devDay, devNight, RIO, clockLook, devLook, fetchRioWeather, lookFrom, rioHour, useRioLook } from "./look";
+import { RAIN_CODES, devDay, devGoal, devNight, RIO, clockLook, devLook, fetchRioWeather, lookFrom, rioHour, useRioLook } from "./look";
 
 const at = (iso: string) => new Date(iso);
 
@@ -133,4 +133,10 @@ describe("dev-only overrides for screenshots", () => {
     expect(devNight("?night=quiz", true)).toBeNull();
     expect(devNight("?night=samba", false)).toBeNull();
   });
+});
+
+it("?goal=1 previews the match's goal moment in dev only", () => {
+  expect(devGoal("?goal=1", true)).toBe(true);
+  expect(devGoal("?goal=1", false)).toBe(false);
+  expect(devGoal("", true)).toBe(false);
 });

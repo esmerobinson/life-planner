@@ -1,0 +1,151 @@
+{
+ "pack": "rio-pack later",
+ "area": "flamengo",
+ "name": "Flamengo match at the Maracana",
+ "opens_day": 60,
+ "takes_over": "the movie theatre family (family key 'theatre', familyName 'Flamengo match')",
+ "filled_by": "weekly reviews",
+ "map": {
+  "key": "flamengo-match",
+  "file": "art/final/rio-pack/day1/map/map.json",
+  "note": "matches the enlarged map sprite (2026-11-16): the white roof ring with radial ribs, the grey bowl with white pillars, the red-and-black crowd, striped flags on the rim and the red-and-black banner on the facade. The map was not edited."
+ },
+ "notes": "Outside and inside 384x240 (24x15 tiles), 16 px tiles, 3/4 top-down, light from the top-left. Hard alpha; day images use palette colours only (no new colours). Club colours only: red-and-black hoops and white shorts, no crest, badge, sponsor or readable text (the scoreboard shows numbers only). The confetti and smoke-coloured streamers stand in for flares: no pyro.",
+ "locations": [
+  {
+   "key": "flamengo-outside",
+   "name": "The Maracana from its plaza",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "outside/outside-start-day.png",
+    "start-night": "outside/outside-start-night.png",
+    "start-rain": "outside/outside-start-rain.png",
+    "full-day": "outside/outside-full-day.png",
+    "full-night": "outside/outside-full-night.png",
+    "full-rain": "outside/outside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "outside/outside-rain-streaks-0.png",
+      "outside/outside-rain-streaks-1.png",
+      "outside/outside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "outside/outside-slots.json"
+  },
+  {
+   "key": "flamengo-inside",
+   "name": "The stands (arquibancada)",
+   "kind": "interior",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "inside/inside-start-day.png",
+    "start-night": "inside/inside-start-night.png",
+    "start-rain": "inside/inside-start-rain.png",
+    "full-day": "inside/inside-full-day.png",
+    "full-night": "inside/inside-full-night.png",
+    "full-rain": "inside/inside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "inside/inside-rain-streaks-0.png",
+      "inside/inside-rain-streaks-1.png",
+      "inside/inside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "inside/inside-slots.json",
+   "animations": {
+    "goal": {
+     "frames": {
+      "day": [
+       "inside/goal/inside-goal-day-0.png",
+       "inside/goal/inside-goal-day-1.png",
+       "inside/goal/inside-goal-day-2.png",
+       "inside/goal/inside-goal-day-3.png"
+      ],
+      "night": [
+       "inside/goal/inside-goal-night-0.png",
+       "inside/goal/inside-goal-night-1.png",
+       "inside/goal/inside-goal-night-2.png",
+       "inside/goal/inside-goal-night-3.png"
+      ],
+      "rain": [
+       "inside/goal/inside-goal-rain-0.png",
+       "inside/goal/inside-goal-rain-1.png",
+       "inside/goal/inside-goal-rain-2.png",
+       "inside/goal/inside-goal-rain-3.png"
+      ]
+     },
+     "frame_ms": 140,
+     "state": "full"
+    }
+   }
+  }
+ ],
+ "stages": {
+  "rule": "The stage follows real weekly reviews done: start on opening day, full once the stands are busy (suggestion: 4 weekly reviews, about a month). Each review also fills a match-item slot and plays the goal moment (see inside-slots.json fill_rule).",
+  "start": "a quiet midweek game: half-empty stands, 0-0",
+  "full": "derby day: packed stands, the bandeirao, confetti, a goal celebration, 2-1"
+ },
+ "stickers": {
+  "new": [
+   "stickers/theatre-scarf.png",
+   "stickers/theatre-hand-flag.png",
+   "stickers/theatre-foam-finger.png",
+   "stickers/theatre-ticket-stub.png",
+   "stickers/theatre-whistle.png",
+   "stickers/theatre-churrasquinho.png",
+   "stickers/theatre-beer-cup.png",
+   "stickers/theatre-pipoca.png",
+   "stickers/theatre-biscuit-bag.png",
+   "stickers/theatre-mini-stadium.png"
+  ],
+  "catalogue": "stickers/stickers.json",
+  "existing": "art/final/rio-pack/day1/stickers/theatre/ (shirt, flag, football)"
+ },
+ "looks": {
+  "day": "an afternoon kickoff (default)",
+  "night": "a floodlit night game (Rio local time after dark): the neon pitch",
+  "rain": "when Rio is rainy; add the streak overlay"
+ },
+ "characters": "Esme and Mr Cat are the shipped sprites, baked into the scenes (Esme in both inside stages, both in the full outside). Everyone else is one of the ten Rio townsfolk (art/sources/rio-pack/townsfolk/folk.py) in their own faces, dressed in match colours (or ponchos in the rain); the players and the referee too.",
+ "palettes": {
+  "extra": "palette-extra.json",
+  "night": "palette-night.json",
+  "rain": "palette-rain.json"
+ },
+ "sources": "art/sources/rio-pack/flamengo/ (python3 -I -B deliver.py)"
+}

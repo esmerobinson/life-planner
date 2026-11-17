@@ -26,5 +26,8 @@ export const SANTA_TERESA_FULL_BOOKS = 142; // DEFAULT: Esme to confirm
 /** Zona Sul stays at opening day: its shelves fill from errands and its stages from Admin to-dos in phase 2b. */
 export const ZONA_SUL_STATE = "start"; // DEFAULT: Esme to confirm
 
+/** The Flamengo match turns full at this many weekly reviews (its README's "about a month"; reviews aren't built yet). */
+export const FLAMENGO_FULL_WEEKLY_REVIEWS = 4; // DEFAULT: Esme to confirm
+
 /** The Jardim Botânico turns full once this share of both scenes' slots holds a sticker. */
 export const JARDIM_FULL_SHARE = 0.5; // DEFAULT: Esme to confirm

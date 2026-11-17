@@ -20,6 +20,8 @@ describe("where earned stickers sit", () => {
     expect(homeOf("lilypad")).toEqual({ area: "ipanema-beach", scene: "ipanema-beach/outside" });
     expect(homeOf(keysIn("aquarium")[0]!)).toEqual({ area: "ipanema-beach", scene: "ipanema-beach/sea" });
     expect(homeOf(keysIn("farmhouse")[0]!)).toEqual({ area: "boteco", scene: "boteco/inside" });
+    // The Flamengo match takes over the theatre family (no phase-1 zone): the farmhouse stays at the boteco.
+    expect(homeOf("lantern")).toEqual({ area: "boteco", scene: "boteco/inside" });
     expect(homeOf("cleared-mind")).toBeNull(); // bonus
     expect(homeOf("no-such-sticker")).toBeNull();
   });

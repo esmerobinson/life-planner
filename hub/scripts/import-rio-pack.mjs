@@ -24,6 +24,7 @@ const AREAS = [
   "later/santa-teresa",
   "later/arpoador-sea",
   "week3/museum-looks",
+  "later/flamengo",
 ];
 // The museum's day art is the finished esme pack's (summer = the Rio day), beside the rio pack; only
 // what the Rio museum reads (its night and rain are week3/museum-looks).

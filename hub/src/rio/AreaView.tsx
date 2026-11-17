@@ -48,6 +48,8 @@ export const SCENE_NAMES: Record<SceneId, string> = {
   "santa-teresa/inside": "The studio",
   "museum/outside": "Museum",
   "museum/inside": "The rotunda hall",
+  "flamengo-match/outside": "Flamengo match",
+  "flamengo-match/inside": "The stands",
 };
 
 const STICKER = 16;
@@ -56,7 +58,7 @@ const STICKER_SHEETS = ["stickers"];
 /** A tick for the themed nights' strips (each strip keeps its own speed from the elapsed time). */
 const NIGHT_TICK_MS = 40;
 
-export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, onBack }: {
+export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, goal = false, onBack }: {
   area: string;
   look: Look;
   /** The farm day: an inside that opens later (the sea, day 30) has no button before then. */
@@ -67,6 +69,8 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   counts?: RioCounts;
   /** A boteco themed night (dev preview only until bundles trigger them, phase 2b). */
   night?: BotecoNight | null;
+  /** Play the match's goal moment (dev preview until weekly reviews trigger it). */
+  goal?: boolean;
   onBack: () => void;
 }) {
   const scenes = AREA_SCENES[area]!;
@@ -113,7 +117,10 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   // The museum: its open doors by day, the case glass over its finds, and finds in the look's colours.
   const stampList = data.stamps?.[shownLook] ?? [];
   const tintPair = data.tint && shownLook !== "day" ? { day: data.base[state]?.day ?? "", look: base } : null;
-  const layerFiles = [playerStrip, ...stampList.map((st) => st.file), data.glass?.file ?? "", tintPair?.day ?? "", underlayStrip, ...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
+  // The goal moment: whole frames over the full base (frame 0 is the base itself).
+  const goalFrames = goal && state === "full" && data.goal ? data.goal.frames[shownLook] ?? data.goal.frames.day ?? [] : [];
+  const goalTick = useTicker(data.goal?.ms ?? 1000, goalFrames.length > 0 && !reduced);
+  const layerFiles = [...goalFrames, playerStrip, ...stampList.map((st) => st.file), data.glass?.file ?? "", tintPair?.day ?? "", underlayStrip, ...celebrationFiles, ...milestoneFiles, spineSheet, coverSheet, ...nightFiles].filter(Boolean);
   const files = useMemo(() => [base, ...layerFiles, ...rainFrames, ...tvFrames], [base, layerFiles.join(), rainFrames.join(), tvFrames.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const images = useRioImages(files);
   const sheets = useSheets(STICKER_SHEETS);
@@ -138,7 +145,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
     if (!ctx || !images) return;
     const [w, h] = data.scene;
     ctx.clearRect(0, 0, w, h);
-    const b = images[base];
+    const b = images[goalFrames.length > 0 && !reduced ? goalFrames[goalTick % goalFrames.length]! : base] ?? images[base];
     if (b) ctx.drawImage(b, 0, 0);
     const put = (f: string, x = 0, y = 0) => {
       const i = images[f];
@@ -219,13 +226,14 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
         if (img) ctx.drawImage(img, 0, 0);
       }
     }
-  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick, underlayTick, playerTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [images, sheets, base, drawn, data, rain, rainCount, rainTick, tvFrames, tvTick, reduced, layerFiles.join(), plan, nightSide, nightTick, underlayTick, playerTick, goalTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inside = scene !== scenes.outside;
   return (
     <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook} data-fit={fit.mode}
       data-celebrations={plan.celebrations} data-milestones={plan.milestones.join(" ")} data-books={plan.books}
-      data-night={nightSide ? night! : undefined} data-player={playerStrip ? "esme" : undefined}>
+      data-night={nightSide ? night! : undefined} data-player={playerStrip ? "esme" : undefined}
+      data-goal={goalFrames.length > 0 ? "true" : undefined}>
       <h2 className="visually-hidden">{SCENE_NAMES[scene]}</h2>
       {/* On top of the game, in the kit's word buttons. */}
       <div className="rio-area-controls" style={{ fontSize: `${u}px` }}>

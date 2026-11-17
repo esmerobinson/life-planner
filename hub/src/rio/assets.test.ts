@@ -17,7 +17,7 @@ describe("the Rio art pack is bundled", () => {
 
   it("every scene base file is bundled", () => {
     const ids = Object.keys(SCENES) as SceneId[];
-    expect(ids.length).toBe(28);
+    expect(ids.length).toBe(30);
     for (const id of ids) {
       const s = SCENES[id];
       expect(Object.keys(s.base).length, id).toBeGreaterThan(0);
@@ -202,6 +202,25 @@ describe("the museum (day art from the esme pack, Rio night and rain from week3/
       for (const st of Object.values(s.stamps ?? {})) for (const x of st) expect(rioUrl(x.file)).not.toBe("");
       expect(rioUrl(s.rainOverlay!.strip!.file), id).not.toBe("");
       expect(s.rainOverlay!.strip!.count).toBe(4);
+    }
+  });
+});
+
+describe("the Flamengo match", () => {
+  it("the Maracana and its stands in start and full, each look, with the goal moment's frames", () => {
+    for (const id of ["flamengo-match/outside", "flamengo-match/inside"] as SceneId[]) {
+      const s = SCENES[id];
+      expect(Object.keys(s.base)).toEqual(["start", "full"]);
+      for (const looks of Object.values(s.base)) for (const look of LOOKS) expect(rioUrl(looks[look]!), `${id} ${look}`).not.toBe("");
+      expect(s.rainOverlay!.frames).toHaveLength(3);
+    }
+    expect(SCENES["flamengo-match/outside"].slots).toHaveLength(6);
+    expect(SCENES["flamengo-match/inside"].slots).toHaveLength(8);
+    const goal = SCENES["flamengo-match/inside"].goal!;
+    expect(goal.ms).toBe(140);
+    for (const look of LOOKS) {
+      expect(goal.frames[look]).toHaveLength(4);
+      for (const f of goal.frames[look]!) expect(rioUrl(f)).not.toBe("");
     }
   });
 });

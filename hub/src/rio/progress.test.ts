@@ -2,18 +2,18 @@ import { COLLECTION } from "../farm/catalogue";
 import { SCENES, type SceneId } from "./assets";
 import { layout, sceneState } from "./placement";
 import { rioCounts, scenePlan, type RioCounts } from "./progress";
-import { JARDIM_FULL_SHARE, SANTA_TERESA_FULL_BOOKS, SULT_FULL_MONTHLY_GOALS } from "./thresholds";
+import { FLAMENGO_FULL_WEEKLY_REVIEWS, JARDIM_FULL_SHARE, SANTA_TERESA_FULL_BOOKS, SULT_FULL_MONTHLY_GOALS } from "./thresholds";
 
 // What each phase-2a area shows for her real counters (thresholds.ts holds the defaults).
 
-const zero: RioCounts = { monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0 };
+const zero: RioCounts = { monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, weeklyReviews: 0 };
 const counts = (c: Partial<RioCounts>): RioCounts => ({ ...zero, ...c });
 const keysIn = (group: string) => COLLECTION.filter((s) => s.group === group).map((s) => s.key);
 
 describe("rioCounts", () => {
   it("reads the earning engine's counters, and zeros without them", () => {
     const c = new Map([["monthly-goals", 4], ["whole-goals", 2], ["reading-books", 11]]) as never;
-    expect(rioCounts(c)).toEqual({ monthlyGoals: 4, wholeGoals: 2, readingBooks: 11, recipes: 0 });
+    expect(rioCounts(c)).toEqual({ monthlyGoals: 4, wholeGoals: 2, readingBooks: 11, recipes: 0, weeklyReviews: 0 });
     expect(rioCounts(null)).toEqual(zero);
   });
 });
@@ -71,6 +71,14 @@ describe("scenePlan", () => {
     expect(scenePlan("santa-teresa/outside", [], counts({ readingBooks: 20 }))).toMatchObject({ milestones: [], books: 0, covers: 0 });
   });
 
+  it("the Flamengo match is full at 4 weekly reviews (none yet: reviews aren't built)", () => {
+    expect(FLAMENGO_FULL_WEEKLY_REVIEWS).toBe(4);
+    expect(scenePlan("flamengo-match/inside", [], counts({ weeklyReviews: 3 })).state).toBe("start");
+    expect(scenePlan("flamengo-match/inside", [], counts({ weeklyReviews: 4 })).state).toBe("full");
+    expect(scenePlan("flamengo-match/outside", [], counts({ weeklyReviews: 4 })).state).toBe("full");
+    expect(rioCounts(new Map([["weekly-reviews", 5]]) as never).weeklyReviews).toBe(5);
+  });
+
   it("the Quilo stays quiet until recipes exist; Zona Sul stays at opening day until errands drive it", () => {
     expect(scenePlan("quilo/inside", [], counts({ monthlyGoals: 50, readingBooks: 50 })).state).toBe("start");
     expect(scenePlan("quilo/inside", [], counts({ recipes: 30 })).state).toBe("full");
@@ -81,7 +89,7 @@ describe("scenePlan", () => {
   it("with no counters (game not started, journal locked) every new area draws its start with no layers", () => {
     const none = rioCounts(null);
     for (const id of Object.keys(SCENES) as SceneId[]) {
-      if (!/^(zona-sul|jardim-botanico|quilo|sult|os-esquilos|santa-teresa)\//.test(id)) continue;
+      if (!/^(zona-sul|jardim-botanico|quilo|sult|os-esquilos|santa-teresa|flamengo-match)\//.test(id)) continue;
       expect(scenePlan(id, [], none), id).toEqual({ state: "start", celebrations: 0, milestones: [], books: 0, covers: 0 });
     }
   });

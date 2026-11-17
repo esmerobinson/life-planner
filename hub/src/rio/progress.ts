@@ -7,18 +7,21 @@ import type { Counters } from "../farm/earning";
 import { SCENES, type SceneId } from "./assets";
 import { layout, sceneState } from "./placement";
 import {
-  JARDIM_FULL_SHARE, OS_ESQUILOS_MAX_CELEBRATIONS, QUILO_FULL_RECIPES, SANTA_TERESA_COVER_EVERY, SANTA_TERESA_FULL_BOOKS,
+  FLAMENGO_FULL_WEEKLY_REVIEWS, JARDIM_FULL_SHARE, OS_ESQUILOS_MAX_CELEBRATIONS, QUILO_FULL_RECIPES, SANTA_TERESA_COVER_EVERY, SANTA_TERESA_FULL_BOOKS,
   SANTA_TERESA_MILESTONES, SULT_FULL_MONTHLY_GOALS, ZONA_SUL_STATE,
 } from "./thresholds";
 
-export interface RioCounts { monthlyGoals: number; wholeGoals: number; readingBooks: number; recipes: number }
+export interface RioCounts { monthlyGoals: number; wholeGoals: number; readingBooks: number; recipes: number; weeklyReviews: number }
 
-export const NO_COUNTS: RioCounts = { monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0 };
+export const NO_COUNTS: RioCounts = { monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, weeklyReviews: 0 };
 
 /** The counters the areas read (zeros before the game starts). Recipes don't exist until phase 2b. */
 export function rioCounts(c: Counters | null): RioCounts {
   if (!c) return NO_COUNTS;
-  return { monthlyGoals: c.get("monthly-goals") ?? 0, wholeGoals: c.get("whole-goals") ?? 0, readingBooks: c.get("reading-books") ?? 0, recipes: 0 };
+  return {
+    monthlyGoals: c.get("monthly-goals") ?? 0, wholeGoals: c.get("whole-goals") ?? 0, readingBooks: c.get("reading-books") ?? 0, recipes: 0,
+    weeklyReviews: c.get("weekly-reviews") ?? 0,
+  };
 }
 
 export interface ScenePlan {
@@ -74,6 +77,9 @@ export function scenePlan(scene: SceneId, placed: readonly string[], counts: Rio
       plan.covers = Math.floor(plan.books / SANTA_TERESA_COVER_EVERY);
       return plan;
     }
+    case "flamengo-match":
+      plan.state = counts.weeklyReviews >= FLAMENGO_FULL_WEEKLY_REVIEWS ? "full" : "start";
+      return plan;
     case "museum": // one drawn state per scene (the plaza open, the hall)
       plan.state = Object.keys(SCENES[scene].base)[0]!;
       return plan;
