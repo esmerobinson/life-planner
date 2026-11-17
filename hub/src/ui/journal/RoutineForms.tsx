@@ -1,5 +1,5 @@
 import { liveQuery } from "dexie";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   readDayLog, readWeekReview, removeDayLogVersion, removeWeekReviewVersion, saveDayLog, saveWeekReview, weekOf,
   type DayLogFields, type FormDay, type FormSession, type FormVersion, type WeekReviewFields,
@@ -13,6 +13,7 @@ import {
 } from "../../journal/routine";
 import { AUTOSAVE_MS, useDraft } from "../useDraft";
 import { DoneBox } from "./bits";
+import { RoutineCountHint } from "../DailyRoutine";
 import { ROUTINE_WORDS as W, WEEKDAY_NAMES } from "./routineWording";
 import "./routine.css";
 
@@ -74,6 +75,9 @@ function useForm<F>(read: () => Promise<FormDay<F>>, deps: unknown[]): FormDay<F
  * which she can still change until it is final (review I4). Yesterday's is folded until opened or
  * until something is in it.
  */
+/** The daily log's day, for the routine hint under the schedule question. */
+const LogDate = createContext<ISODate | null>(null);
+
 export function DailyLog({ jk, date, deviceId, yesterday = false, extra }: { jk: JournalKey; date: ISODate; deviceId: string; yesterday?: boolean; extra?: (day: FormDay<DayLogFields>) => ReactNode }) {
   const day = useForm(() => readDayLog(jk, date), [jk, date]);
   const started = !!day && (day.id !== "" || day.others.length > 0);
@@ -84,7 +88,9 @@ export function DailyLog({ jk, date, deviceId, yesterday = false, extra }: { jk:
       fold={yesterday && !started}
       line={yesterday ? W.logYesterdayLine : undefined}
     >
-      {day && <FormBox key={date} jk={jk} deviceId={deviceId} day={day} newDate={date} spec={yesterday ? DAY_LOG_YESTERDAY : DAY_LOG_SPEC} />}
+      <LogDate.Provider value={date}>
+        {day && <FormBox key={date} jk={jk} deviceId={deviceId} day={day} newDate={date} spec={yesterday ? DAY_LOG_YESTERDAY : DAY_LOG_SPEC} />}
+      </LogDate.Provider>
       {day && extra?.(day)}
     </Folded>
   );
@@ -324,9 +330,11 @@ function NoteBox({ label, value, max, onChange, onBlur, hint }: { label: string;
 }
 
 function DayLogBoxes({ value, set, flush }: { value: DayLogFields; set: (f: DayLogFields, now?: boolean) => void; flush: () => void }) {
+  const date = useContext(LogDate);
   return (
     <>
       <ChoiceButtons label={W.schedule} value={value.schedule} onPick={(c) => set({ ...value, schedule: c }, true)} />
+      {date && <RoutineCountHint date={date} words={W.routineHint} />}
       <NoteBox label={W.scheduleNote} value={value.scheduleNote} max={MAX_LOG_NOTE} onChange={(t) => set({ ...value, scheduleNote: t })} onBlur={flush} />
       <ChoiceButtons label={W.todos} value={value.todos} onPick={(c) => set({ ...value, todos: c }, true)} />
       <NoteBox label={W.todosNote} value={value.todosNote} max={MAX_LOG_NOTE} onChange={(t) => set({ ...value, todosNote: t })} onBlur={flush} />

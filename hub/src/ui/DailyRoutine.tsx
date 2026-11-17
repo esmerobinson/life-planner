@@ -351,3 +351,15 @@ function EditStep({
     </li>
   );
 }
+
+/**
+ * Today's routine count for one day, as a small muted line (the daily log shows it under "Stuck
+ * to my daily schedule?" as a hint: it never answers for her). Nothing while loading.
+ */
+export function RoutineCountHint({ date, words }: { date: ISODate; words: (done: number, total: number) => string }) {
+  const { items, loaded } = useHubData(date);
+  const { rows } = useRoutineRows(date);
+  if (!loaded || rows === null) return null;
+  const day = routineDay(routineSteps(rows.steps), items, rows.ticks, date);
+  return day.total > 0 ? <p className="journal-muted routine-hint">{words(day.done, day.total)}</p> : null;
+}

@@ -29,6 +29,19 @@ async function key() {
 const group = (name: string) => screen.getByRole("group", { name });
 
 describe("the daily log", () => {
+  it("shows Today's routine count under \"Stuck to my daily schedule?\" as a hint, never as an answer", async () => {
+    const jk = await key();
+    await db.prefs.bulkPut([
+      { id: `routine-tick:${DAY}:d1`, date: DAY, step: "d1", done: true },
+      { id: `routine-tick:${DAY}:d2`, date: DAY, step: "d2", done: true },
+    ]);
+    render(<DailyLog jk={jk} date={DAY} deviceId={MAC} />);
+    const box = await screen.findByRole("group", { name: W.schedule });
+    expect(await within(box.parentElement!).findByText(W.routineHint(2, 10))).toBeInTheDocument();
+    expect(within(box).getAllByRole("button").every((b) => b.getAttribute("aria-pressed") === "false")).toBe(true);
+    expect((await readDayLog(jk, DAY)).fields.schedule).toBeNull();
+  });
+
   it("a tap saves at once; a note saves after a pause; Done shows it done with Edit; an edit keeps it done", async () => {
     const jk = await key();
     render(<DailyLog jk={jk} date={DAY} deviceId={MAC} />);
