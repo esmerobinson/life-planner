@@ -1,0 +1,18 @@
+{
+ "file": "karaoke-inside-sing-strip.png",
+ "night": "karaoke",
+ "scene": "inside",
+ "look": "night",
+ "at": [
+  113,
+  42
+ ],
+ "frame_size": [
+  96,
+  27
+ ],
+ "frames": 8,
+ "frame_ms": 420,
+ "play": "loop",
+ "note": "frames run left to right; draw frame k at 'at' over the night's overlay. Transparent pixels show what is under; opaque ones replace it. Frame 0 matches the overlay."
+}

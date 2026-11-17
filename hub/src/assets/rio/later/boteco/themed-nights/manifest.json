@@ -1,0 +1,604 @@
+{
+ "location": "boteco",
+ "what": "themed nights: add-on overlays for the full NIGHT bases, inside and outside",
+ "scene": [
+  384,
+  240
+ ],
+ "look": "night",
+ "bases": {
+  "inside": [
+   "inside/boteco-inside-full-night.png",
+   "inside/no-esme/boteco-inside-full-night.png"
+  ],
+  "outside": [
+   "location/boteco-outside-full-night.png",
+   "location/no-esme/boteco-outside-full-night.png"
+  ]
+ },
+ "draw_order": [
+  "the full night base (with or without Esme)",
+  "the base TV overlay frames (location|inside/tv-night-*), EXCEPT on football night",
+  "the night's overlay at (0, 0)",
+  "the night's animation strip frames at their 'at'"
+ ],
+ "reduced_motion": "show the overlay alone: it already holds frame 0 of every animation",
+ "nights": {
+  "samba": {
+   "title": "Samba night (roda de samba)",
+   "inside": {
+    "overlay": "samba/samba-inside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": true,
+    "anims": [
+     {
+      "group": "loop",
+      "strip": "samba/samba-inside-loop-strip.png",
+      "json": "samba/samba-inside-loop-strip.json",
+      "play": "loop",
+      "at": [
+       198,
+       104
+      ],
+      "frame_size": [
+       142,
+       108
+      ],
+      "frames": 4,
+      "frame_ms": 180
+     },
+     {
+      "group": "player",
+      "strip": "samba/samba-inside-player-strip.png",
+      "json": "samba/samba-inside-player-strip.json",
+      "play": "loop",
+      "at": [
+       204,
+       93
+      ],
+      "frame_size": [
+       11,
+       6
+      ],
+      "frames": 4,
+      "frame_ms": 167
+     }
+    ],
+    "record_player": {
+     "foot": [
+      212,
+      109
+     ],
+     "size": [
+      24,
+      24
+     ],
+     "anim": "player",
+     "note": "the vinyl record player (rio-pack/vinyl/props) on the bar, spinning: the 'player' strip loops its 4 frames"
+    },
+    "record_slot": {
+     "at": [
+      194,
+      102
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "note": "tonight's record: draw its 8x8 shelf-mini cover here (vinyl/props/shelf-mini) LAST, after the strips, propped against the player"
+    }
+   },
+   "outside": {
+    "overlay": "samba/samba-outside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": true,
+    "anims": [
+     {
+      "group": "loop",
+      "strip": "samba/samba-outside-loop-strip.png",
+      "json": "samba/samba-outside-loop-strip.json",
+      "play": "loop",
+      "at": [
+       51,
+       149
+      ],
+      "frame_size": [
+       324,
+       91
+      ],
+      "frames": 4,
+      "frame_ms": 180
+     }
+    ]
+   },
+   "poster": {
+    "file": "posters/poster-samba.png",
+    "size": [
+     24,
+     32
+    ],
+    "pin": "the kit pin is part of the poster (top centre)",
+    "record_slot": {
+     "at": [
+      8,
+      20
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "area": [
+      6,
+      18,
+      12,
+      12
+     ],
+     "note": "draw tonight's 8x8 shelf-mini cover here, over the plain disc; 2 px even padding inside its own inset"
+    },
+    "board_note": "posters/board-note-samba.png",
+    "board_note_at": {
+     "location": "lagoa-house outside",
+     "at": [
+      350,
+      216
+     ],
+     "note": "covers the board's second note (the blue-pinned one)"
+    }
+   }
+  },
+  "karaoke": {
+   "title": "Karaoke night",
+   "inside": {
+    "overlay": "karaoke/karaoke-inside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": true,
+    "anims": [
+     {
+      "group": "drop",
+      "strip": "karaoke/karaoke-inside-drop-strip.png",
+      "json": "karaoke/karaoke-inside-drop-strip.json",
+      "play": "once, first",
+      "at": [
+       99,
+       19
+      ],
+      "frame_size": [
+       124,
+       71
+      ],
+      "frames": 5,
+      "frame_ms": 160
+     },
+     {
+      "group": "sing",
+      "strip": "karaoke/karaoke-inside-sing-strip.png",
+      "json": "karaoke/karaoke-inside-sing-strip.json",
+      "play": "loop",
+      "at": [
+       113,
+       42
+      ],
+      "frame_size": [
+       96,
+       27
+      ],
+      "frames": 8,
+      "frame_ms": 420
+     },
+     {
+      "group": "loop",
+      "strip": "karaoke/karaoke-inside-loop-strip.png",
+      "json": "karaoke/karaoke-inside-loop-strip.json",
+      "play": "loop",
+      "at": [
+       262,
+       78
+      ],
+      "frame_size": [
+       91,
+       129
+      ],
+      "frames": 4,
+      "frame_ms": 200
+     },
+     {
+      "group": "player",
+      "strip": "karaoke/karaoke-inside-player-strip.png",
+      "json": "karaoke/karaoke-inside-player-strip.json",
+      "play": "loop",
+      "at": [
+       204,
+       93
+      ],
+      "frame_size": [
+       11,
+       6
+      ],
+      "frames": 4,
+      "frame_ms": 167
+     }
+    ],
+    "record_player": {
+     "foot": [
+      212,
+      109
+     ],
+     "size": [
+      24,
+      24
+     ],
+     "anim": "player",
+     "note": "the vinyl record player (rio-pack/vinyl/props) on the bar, spinning: the 'player' strip loops its 4 frames"
+    },
+    "record_slot": {
+     "at": [
+      194,
+      102
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "note": "tonight's record: draw its 8x8 shelf-mini cover here (vinyl/props/shelf-mini) LAST, after the strips, propped against the player"
+    }
+   },
+   "outside": {
+    "overlay": "karaoke/karaoke-outside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": true,
+    "anims": [
+     {
+      "group": "loop",
+      "strip": "karaoke/karaoke-outside-loop-strip.png",
+      "json": "karaoke/karaoke-outside-loop-strip.json",
+      "play": "loop",
+      "at": [
+       43,
+       118
+      ],
+      "frame_size": [
+       333,
+       119
+      ],
+      "frames": 4,
+      "frame_ms": 200
+     }
+    ]
+   },
+   "poster": {
+    "file": "posters/poster-karaoke.png",
+    "size": [
+     24,
+     32
+    ],
+    "pin": "the kit pin is part of the poster (top centre)",
+    "record_slot": {
+     "at": [
+      8,
+      20
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "area": [
+      6,
+      18,
+      12,
+      12
+     ],
+     "note": "draw tonight's 8x8 shelf-mini cover here, over the plain disc; 2 px even padding inside its own inset"
+    },
+    "board_note": "posters/board-note-karaoke.png",
+    "board_note_at": {
+     "location": "lagoa-house outside",
+     "at": [
+      350,
+      216
+     ],
+     "note": "covers the board's second note (the blue-pinned one)"
+    }
+   }
+  },
+  "funk": {
+   "title": "Baile funk DJ night",
+   "inside": {
+    "overlay": "funk/funk-inside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": true,
+    "anims": [
+     {
+      "group": "beat",
+      "strip": "funk/funk-inside-beat-strip.png",
+      "json": "funk/funk-inside-beat-strip.json",
+      "play": "loop",
+      "at": [
+       198,
+       22
+      ],
+      "frame_size": [
+       160,
+       186
+      ],
+      "frames": 4,
+      "frame_ms": 150
+     },
+     {
+      "group": "player",
+      "strip": "funk/funk-inside-player-strip.png",
+      "json": "funk/funk-inside-player-strip.json",
+      "play": "loop",
+      "at": [
+       204,
+       93
+      ],
+      "frame_size": [
+       11,
+       6
+      ],
+      "frames": 4,
+      "frame_ms": 167
+     }
+    ],
+    "record_player": {
+     "foot": [
+      212,
+      109
+     ],
+     "size": [
+      24,
+      24
+     ],
+     "anim": "player",
+     "note": "the vinyl record player (rio-pack/vinyl/props) on the bar, spinning: the 'player' strip loops its 4 frames"
+    },
+    "record_slot": {
+     "at": [
+      194,
+      102
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "note": "tonight's record: draw its 8x8 shelf-mini cover here (vinyl/props/shelf-mini) LAST, after the strips, propped against the player"
+    }
+   },
+   "outside": {
+    "overlay": "funk/funk-outside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": true,
+    "anims": [
+     {
+      "group": "beat",
+      "strip": "funk/funk-outside-beat-strip.png",
+      "json": "funk/funk-outside-beat-strip.json",
+      "play": "loop",
+      "at": [
+       31,
+       118
+      ],
+      "frame_size": [
+       344,
+       121
+      ],
+      "frames": 4,
+      "frame_ms": 150
+     }
+    ]
+   },
+   "poster": {
+    "file": "posters/poster-funk.png",
+    "size": [
+     24,
+     32
+    ],
+    "pin": "the kit pin is part of the poster (top centre)",
+    "record_slot": {
+     "at": [
+      8,
+      20
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "area": [
+      6,
+      18,
+      12,
+      12
+     ],
+     "note": "draw tonight's 8x8 shelf-mini cover here, over the plain disc; 2 px even padding inside its own inset"
+    },
+    "board_note": "posters/board-note-funk.png",
+    "board_note_at": {
+     "location": "lagoa-house outside",
+     "at": [
+      350,
+      216
+     ],
+     "note": "covers the board's second note (the blue-pinned one)"
+    }
+   }
+  },
+  "football": {
+   "title": "Football night",
+   "inside": {
+    "overlay": "football/football-inside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": false,
+    "anims": [
+     {
+      "group": "goal",
+      "strip": "football/football-inside-goal-strip.png",
+      "json": "football/football-inside-goal-strip.json",
+      "play": "loop",
+      "at": [
+       262,
+       22
+      ],
+      "frame_size": [
+       98,
+       184
+      ],
+      "frames": 6,
+      "frame_ms": 240
+     },
+     {
+      "group": "player",
+      "strip": "football/football-inside-player-strip.png",
+      "json": "football/football-inside-player-strip.json",
+      "play": "loop",
+      "at": [
+       204,
+       93
+      ],
+      "frame_size": [
+       11,
+       6
+      ],
+      "frames": 4,
+      "frame_ms": 167
+     }
+    ],
+    "record_player": {
+     "foot": [
+      212,
+      109
+     ],
+     "size": [
+      24,
+      24
+     ],
+     "anim": "player",
+     "note": "the vinyl record player (rio-pack/vinyl/props) on the bar, spinning: the 'player' strip loops its 4 frames"
+    },
+    "record_slot": {
+     "at": [
+      194,
+      102
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "note": "tonight's record: draw its 8x8 shelf-mini cover here (vinyl/props/shelf-mini) LAST, after the strips, propped against the player"
+    }
+   },
+   "outside": {
+    "overlay": "football/football-outside-night.png",
+    "at": [
+     0,
+     0
+    ],
+    "size": [
+     384,
+     240
+    ],
+    "base_tv": false,
+    "anims": [
+     {
+      "group": "goal",
+      "strip": "football/football-outside-goal-strip.png",
+      "json": "football/football-outside-goal-strip.json",
+      "play": "loop",
+      "at": [
+       31,
+       85
+      ],
+      "frame_size": [
+       350,
+       153
+      ],
+      "frames": 6,
+      "frame_ms": 240
+     }
+    ]
+   },
+   "poster": {
+    "file": "posters/poster-football.png",
+    "size": [
+     24,
+     32
+    ],
+    "pin": "the kit pin is part of the poster (top centre)",
+    "record_slot": {
+     "at": [
+      8,
+      20
+     ],
+     "size": [
+      8,
+      8
+     ],
+     "area": [
+      6,
+      18,
+      12,
+      12
+     ],
+     "note": "draw tonight's 8x8 shelf-mini cover here, over the plain disc; 2 px even padding inside its own inset"
+    },
+    "board_note": "posters/board-note-football.png",
+    "board_note_at": {
+     "location": "lagoa-house outside",
+     "at": [
+      350,
+      216
+     ],
+     "note": "covers the board's second note (the blue-pinned one)"
+    }
+   }
+  }
+ }
+}

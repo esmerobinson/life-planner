@@ -12,9 +12,14 @@ import { CHARACTERS, type CharacterId } from "./state";
 
 // ---- characters ----------------------------------------------------------------------------
 
-/** Shown names. The tuxedo cat is Mr Cat (Esme renamed Domino, 2026-11-10); its id stays "domino" (synced rows). */
+/**
+ * Every friend's shown name, in this one place (display only: ids and stored rows never change).
+ * By animal (Esme, 2026-11-15 and 2026-11-17, "Caetano frog"): the tuxedo cat is Mr Cat, the frog
+ * Caetano, the puppy Pupup, the bunny Bebe, the bear Cereal. Duvet (the blue one) has no Rio
+ * friend (dropped in the design) and keeps its old name.
+ */
 export const NAMES: Record<CharacterId, string> = {
-  domino: "Mr Cat", bap: "Bap", puddle: "Puddle", clover: "Clover", crumpet: "Crumpet", duvet: "Duvet",
+  domino: "Mr Cat", bap: "Caetano", puddle: "Pupup", clover: "Bebe", crumpet: "Cereal", duvet: "Duvet",
 };
 
 /**

@@ -1,0 +1,188 @@
+/* Esme's Rio: the game screen's frame (GameScreen.tsx), the one place the game's layout in the app
+   lives. Esme, 2026-11-17: "truly full screen with a small border though not just at top and
+   bottom. and then have a back button at the top keep the rest of app UI the same". On /farm the
+   shell leaves out its own chrome (AppShell.tsx) and marks itself .is-game: the page never
+   scrolls and the game takes the whole window, with an even border of the kit's wooden planks
+   (wood-planks tiled at the UI's scale) on all four sides. The border's width is
+   --game-border: 4 UI px (Esme, 2026-11-17: "borders a bit smaller"; was 8), still not final. Nothing
+   outside the game route is restyled here. */
+
+html:has(.app-shell.is-game),
+html:has(.app-shell.is-game) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app-shell.is-game,
+.app-shell.is-game.is-phone {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+.app-shell.is-game > .app-content {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.game-screen {
+  --game-border: calc(4 * var(--u, 2px));
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  box-sizing: border-box;
+  /* Even on all four sides; a notch or home bar only ever adds to its side. */
+  padding: max(var(--game-border), env(safe-area-inset-top)) max(var(--game-border), env(safe-area-inset-right))
+    max(var(--game-border), env(safe-area-inset-bottom)) max(var(--game-border), env(safe-area-inset-left));
+  overflow: hidden;
+  background: var(--k-wood-planks) 0 0 / calc(32 * var(--u, 2px)) calc(32 * var(--u, 2px)) repeat;
+}
+.game-view {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.game-view > .rio-wrap {
+  position: absolute;
+  inset: 0;
+}
+.game-view .rio-map,
+.game-view .rio-area {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.game-view .rio-map-layer,
+.game-view .rio-area-layer {
+  position: absolute;
+}
+
+/* Back (more-rio.html section 2: .back.n-btn): the kit's word button, 4 px of its border art,
+   3 px either side of the small pixel font at 1x, 20 px from the top-left corner, over the game.
+   Its focus ring is the app's own (controls.css), so the app's colours reach it. */
+.rio-ui .game-back {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 4px;
+  border-image: var(--k-btn-text) 3 fill stretch;
+  padding: 0 3px;
+  background: none;
+  cursor: pointer;
+}
+.rio-ui .game-back:hover {
+  border-image-source: var(--k-btn-text-hover);
+}
+.rio-ui .game-back:focus-visible {
+  outline: 2px solid var(--placeholder);
+  outline-offset: 2px;
+}
+
+/* ---- on top of the game ---- */
+/* The hotbar (esme-ui core.js hotbar: bottom centre, 2 UI px up). On the phone it sits above the
+   nook and the round + (the room add.css keeps for them). */
+.rio-hud-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 20;
+}
+/* Clear of the nook, which stands bottom left in the game (Nook.tsx), on a narrow screen. */
+.game-screen[data-layout="narrow"] .rio-hud-bottom {
+  bottom: calc(96px + env(safe-area-inset-bottom));
+}
+.rio-hotbar {
+  position: relative;
+  margin-bottom: 2em;
+  pointer-events: auto;
+}
+.rio-ui .slot.hb {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.rio-ui .slot.hb:hover {
+  background-image: var(--k-slot-hover);
+}
+
+/* An area's buttons, top left; the overflow line under them. */
+/* Where Back stands on the map (in an area, "Back to the map" takes its place). */
+.rio-area-controls {
+  position: absolute;
+  top: 4em;
+  left: 4em;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4em;
+  max-width: calc(100% - 8em);
+}
+.rio-area-controls [role="group"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4em;
+}
+.rio-area-note {
+  position: absolute;
+  left: 4em;
+  bottom: 30em;
+  z-index: 20;
+}
+
+/* "<name> has moved in!", top centre in a thin kit frame. */
+.rio-arrival {
+  position: absolute;
+  top: 22em; /* under Back */
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 21;
+  pointer-events: none;
+}
+.rio-ui .thin.flow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4em;
+  padding: 2em;
+  pointer-events: auto;
+}
+.rio-ui .thin.flow > p {
+  display: flex;
+  align-items: center;
+  gap: 4em;
+  margin: 0;
+}
+
+/* The phone's collection (Esme, 2026-11-17: "no game on phone other than stickers collected UI"):
+   the kit's phone panel, centred in the game's view. */
+.rio-phone-collection {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

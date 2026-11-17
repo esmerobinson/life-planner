@@ -3,14 +3,18 @@
 // clock); placed stickers stand on their slots (foot point = bottom-centre), back to front by
 // foot y; in the rain the pack's falling rain plays over everything (not with reduced motion).
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { STICKER_BY_KEY } from "../farm/catalogue";
 import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d, drawFrame, drawSticker, useSheets } from "../farm/sprites";
 import { AREA_SCENES, sceneOpen } from "./areas";
 import { SCENES, sceneBase, type Look, type SceneId } from "./assets";
-import { useFit, useRioImages } from "./canvas";
+import { useCover, useRioImages } from "./canvas";
+import { sceneKeep } from "./mapMath";
+import { TextButton } from "./menu/pieces";
 import { layout, sceneState } from "./placement";
+import { BitmapText } from "./ui/BitmapText";
+import { useUi } from "./ui/fit";
 
 // PLACEHOLDER WORDING (every scene name)
 export const SCENE_NAMES: Record<SceneId, string> = {
@@ -65,10 +69,11 @@ export function AreaView({ area, look, day, placed, onBack }: {
   const sheets = useSheets(STICKER_SHEETS);
 
   const wrap = useRef<HTMLDivElement>(null);
-  const controls = useRef<HTMLDivElement>(null);
-  const [reserve, setReserve] = useState(0);
-  useLayoutEffect(() => setReserve(controls.current?.offsetHeight ?? 0), [scene]);
-  const scale = useFit(wrap, data.scene, reserve);
+  const { u, layout: uiLayout } = useUi();
+  // The buttons sit on top of the game; the scene covers the view, never trimming a sticker slot.
+  const keep = useMemo(() => sceneKeep(data.slots, data.scene), [data]);
+  const fit = useCover(wrap, data.scene, keep, uiLayout === "wide");
+  const scale = fit.scale;
   const canvas = useRef<HTMLCanvasElement>(null);
 
   const drawn = useMemo(() => {
@@ -114,28 +119,31 @@ export function AreaView({ area, look, day, placed, onBack }: {
 
   const inside = scene !== scenes.outside;
   return (
-    <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook}>
+    <div className="rio-area" ref={wrap} data-scene={scene} data-state={state} data-look={shownLook} data-fit={fit.mode}>
       <h2 className="visually-hidden">{SCENE_NAMES[scene]}</h2>
-      <div className="rio-area-controls farm-cast" ref={controls}>
+      {/* On top of the game, in the kit's word buttons. */}
+      <div className="rio-area-controls" style={{ fontSize: `${u}px` }}>
         {/* PLACEHOLDER WORDING */}
-        <button type="button" className="btn-secondary" onClick={onBack}>Back to the map</button>
+        <TextButton label="Back to the map" onClick={onBack} />
         {/* PLACEHOLDER WORDING */}
-        {inside && <button type="button" className="btn-secondary" onClick={() => setScene(scenes.outside)}>Outside</button>}
+        {inside && <TextButton label="Outside" onClick={() => setScene(scenes.outside)} />}
         {!inside && insides.length > 0 && (
           // PLACEHOLDER WORDING
-          <div className="farm-cast" role="group" aria-label="Go inside">
-            {insides.map((s) => (
-              <button key={s} type="button" className="btn-secondary" onClick={() => setScene(s)}>{SCENE_NAMES[s]}</button>
-            ))}
+          <div role="group" aria-label="Go inside">
+            {insides.map((s) => <TextButton key={s} label={SCENE_NAMES[s]} onClick={() => setScene(s)} />)}
           </div>
         )}
       </div>
-      <div className="rio-area-layer" style={{ width: data.scene[0] * scale, height: data.scene[1] * scale }}>
+      <div className="rio-area-layer" style={{ left: fit.x, top: fit.y, width: data.scene[0] * scale, height: data.scene[1] * scale }}>
         <canvas ref={canvas} width={data.scene[0]} height={data.scene[1]} className="farm-px"
           style={{ width: data.scene[0] * scale, height: data.scene[1] * scale }} aria-hidden="true" />
       </div>
       {/* PLACEHOLDER WORDING */}
-      {overflow > 0 && <p className="farm-muted">{overflow} more in your sticker book</p>}
+      {overflow > 0 && (
+        <div className="rio-area-note" style={{ fontSize: `${u}px` }}>
+          <div className="thin flow"><BitmapText text={`${overflow} more in your collection`} /></div>
+        </div>
+      )}
       {/* PLACEHOLDER WORDING (book order) */}
       <ul className="visually-hidden" aria-label="Stickers here">
         {[...bySlot.values()].map((key) => <li key={key}>{STICKER_BY_KEY.get(key)?.name ?? key}</li>)}

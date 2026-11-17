@@ -61,13 +61,13 @@ describe("an area, outside and inside", () => {
     const list = screen.getByRole("list", { name: "Stickers here" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(shown);
     expect(within(list).getAllByRole("listitem")[0]).toHaveTextContent(beds[0]!.name);
-    expect(screen.getByText(`${beds.length - shown} more in your sticker book`)).toBeInTheDocument();
+    expect(screen.getByText(`${beds.length - shown} more in your collection`)).toBeInTheDocument();
     expect(document.querySelector(".rio-area")).toHaveAttribute("data-state", "full");
   });
 
   it("no overflow line when everything fits", () => {
     render(<AreaView area="fazenda" look="day" day={1} placed={["seeds-mind"]} onBack={() => undefined} />);
-    expect(screen.queryByText(/more in your sticker book/)).toBeNull();
+    expect(screen.queryByText(/more in your collection/)).toBeNull();
     expect(document.querySelector(".rio-area")).toHaveAttribute("data-state", "start");
   });
 
