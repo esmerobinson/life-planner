@@ -396,6 +396,32 @@ input[type="file"].page-file {
   margin-top: 8px;
 }
 
+/* "Make it an idea" and "Delete" (Esme's pick A, app design queue 2026-11-17): the mockup's
+   small secondary pills (--track, 6px 14px, 14px text, 6px icon gap), 8px under the chips;
+   Delete carries the mockup's 16px bin glyph. Delete's confirm line takes the same place. */
+.goal-peek-actions {
+  margin-top: 8px;
+}
+
+.goal-peek-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.goal-peek-actions .pill-glyph {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.goal-peek-actions p {
+  margin: 0;
+  flex-basis: 100%;
+}
+
 .goal-peek-bars {
   display: flex;
   flex-direction: column;

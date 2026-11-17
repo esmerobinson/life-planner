@@ -12,6 +12,7 @@ import type { AreaId, CountSource, Goal, ISODate, Item } from "../domain/types";
 import { GOAL_AREAS, NAV } from "./areas";
 import { tickedOffToday } from "../domain/triage";
 import { DoneStrip } from "./DoneSection";
+import { BIN_GLYPH } from "./IconPopover";
 import { areaLabel } from "./GoalProgress";
 import { GoalOverall, goalKindLabel, MonthDots, MonthGoalsBox, type TrackEdit } from "./GoalTile";
 import { PageEditor } from "./PageEditor";
@@ -76,9 +77,9 @@ function sourcesOf(f: Fields, g: Goal): CountSource[] {
 
 /**
  * A goal in the side panel (VISUAL-LANGUAGE.md "Goal view"; goal.html, top of tab B):
- * header (area tile, title, chips), the overall and this-month bars, three stat boxes,
- * why, the goal's tasks as "To come" and "Completed" (milestones are flagged tasks among
- * them), notes, and Delete goal at the bottom. Edit switches the properties into fields;
+ * header (area tile, title, chips, then "Make it an idea" and "Delete" pills), the overall
+ * and this-month bars, three stat boxes, why, the goal's tasks as "To come" and "Completed"
+ * (milestones are flagged tasks among them), and notes. Edit switches the properties into fields;
  * ticking tasks and typing notes work without it.
  */
 export function GoalPanel({
@@ -323,6 +324,28 @@ export function GoalPanel({
     }
   }
 
+  /**
+   * Delete (after its confirm step): the goal to the Bin, restorable there, and the panel closes.
+   * The Undo line brings it straight back (the mockup's "Undo shows by the + button").
+   */
+  async function removeGoal() {
+    const ok = await attempt(() => deleteGoal(goal.id, today));
+    if (!ok) return;
+    panel?.close();
+    await onChanged();
+    undoNote({
+      message: `Moved to the Bin: ${goal.title}`,
+      undo: async () => {
+        try {
+          await restoreGoalFromBin(goal.id, today);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    });
+  }
+
   async function addTask() {
     const title = newTitle.trim();
     // One save at a time: the second click of a double-click must not add the task again.
@@ -457,6 +480,36 @@ export function GoalPanel({
               <span className="chip">{goalKindLabel(goal, today)}</span>
               {cadence && <span className="chip">{cadence}</span>}
             </div>
+            {/* "Make it an idea" and "Delete" under the title and chips (Esme's pick A, app design
+                queue 2026-11-17). Make it an idea is Edit → Type → Idea in one tap (same write,
+                same Undo); Delete keeps its confirm step, then the Bin, with Undo. */}
+            {!asking ? (
+              <div className="goal-peek-actions btn-group">
+                <button type="button" className="btn-secondary" disabled={busy} onClick={() => void toItem(fieldsOf(goal), "idea")}>
+                  Make it an idea
+                </button>
+                <button type="button" className="btn-secondary" aria-label="Delete goal" onClick={() => setAsking(true)}>
+                  {BIN_GLYPH}
+                  Delete
+                </button>
+              </div>
+            ) : (
+              <div className="goal-peek-actions btn-group">
+                <p id="goal-delete-question">Delete this goal? You can restore it from the Bin.</p>
+                <button type="button" onClick={() => void removeGoal()}>
+                  Confirm
+                </button>
+                <button
+                  ref={cancelRef}
+                  type="button"
+                  className="btn-secondary"
+                  aria-describedby="goal-delete-question"
+                  onClick={() => setAsking(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
             <div className="goal-peek-home goal-peek-switches">
               <button
                 type="button"
@@ -580,39 +633,6 @@ export function GoalPanel({
         <h3 className="peek-sec">Notes</h3>
         <PageEditor value={notes.value} onChange={notes.set} onBlur={notes.flush} today={today} maxLength={MAX_GOAL_NOTES} />
       </section>
-      {/* Delete goal: to the Bin (restorable there), after the same confirm step as Empty bin. */}
-      {!asking ? (
-        <p>
-          <button type="button" className="btn-secondary" onClick={() => setAsking(true)}>
-            Delete goal
-          </button>
-        </p>
-      ) : (
-        <div className="btn-group">
-          <p id="goal-delete-question">Delete this goal? You can restore it from the Bin.</p>
-          <button
-            type="button"
-            onClick={() =>
-              void attempt(() => deleteGoal(goal.id, today)).then(async (ok) => {
-                if (!ok) return;
-                panel?.close();
-                await onChanged();
-              })
-            }
-          >
-            Confirm
-          </button>
-          <button
-            ref={cancelRef}
-            type="button"
-            className="btn-secondary"
-            aria-describedby="goal-delete-question"
-            onClick={() => setAsking(false)}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
       </div>
     </div>
   );

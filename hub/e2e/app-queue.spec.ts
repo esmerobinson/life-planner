@@ -136,5 +136,48 @@ for (const width of [1280, 390]) {
       await shoot(page, `3-repeating-week-${width}`, true);
       await noSideways(page);
     });
+
+    test("Goals: Make it an idea and Delete pills under the title and chips; Delete asks, then Undo", async ({ page }) => {
+      await home(page);
+      const made = await pageDate(page, -5);
+      await withRepo(
+        page,
+        { made },
+        `await repo.createGoal({ title: "Finish the pretend short story", areaId: "writing", kind: "practice" }, args.made);
+         await repo.createGoal({ title: "Learn a pretend song", areaId: "art", kind: "practice" }, args.made);`,
+      );
+      await page.goto("/goals");
+      await page.getByRole("link", { name: "Finish the pretend short story" }).click();
+      const panel = page.getByRole("complementary", { name: "Finish the pretend short story" });
+      const pills = panel.locator(".goal-peek-actions");
+      await expect(pills.getByRole("button")).toHaveText(["Make it an idea", "Delete"]);
+      // Under the chips, above the bars.
+      const chips = await panel.locator(".goal-peek-chips").boundingBox();
+      const row = await pills.boundingBox();
+      const bars = await panel.locator(".goal-peek-bars").boundingBox();
+      expect(row!.y).toBeGreaterThan(chips!.y + chips!.height - 1);
+      expect(row!.y + row!.height).toBeLessThan(bars!.y);
+      const del = panel.getByRole("button", { name: "Delete goal" });
+      await expect(del).toHaveCSS("background-color", "rgb(228, 207, 164)");
+      await expect(del).toHaveCSS("padding", "6px 14px");
+      await shoot(page, `4-goal-pills-${width}`);
+      await noSideways(page);
+
+      await del.click();
+      await expect(panel.getByText("Delete this goal? You can restore it from the Bin.")).toBeVisible();
+      await shoot(page, `4-goal-delete-ask-${width}`);
+      await panel.getByRole("button", { name: "Confirm" }).click();
+      await expect(page.getByText("Moved to the Bin: Finish the pretend short story")).toBeVisible();
+      await page.getByRole("button", { name: "Undo" }).click();
+      await expect(page.getByRole("link", { name: "Finish the pretend short story" })).toBeVisible();
+
+      // Make it an idea: one tap; the idea opens; Undo brings the goal back.
+      await page.getByRole("link", { name: "Learn a pretend song" }).click();
+      await page.getByRole("complementary", { name: "Learn a pretend song" }).getByRole("button", { name: "Make it an idea" }).click();
+      await expect(page.getByText("Changed to an idea; the goal is in the Bin")).toBeVisible();
+      await page.getByRole("button", { name: "Undo" }).click();
+      await page.goto("/goals");
+      await expect(page.getByRole("link", { name: "Learn a pretend song" })).toBeVisible();
+    });
   });
 }

@@ -492,7 +492,52 @@ describe("habits in a goal's To come (review M-4)", () => {
   });
 });
 
-describe("Delete goal (at the bottom of the panel)", () => {
+describe("Make it an idea and Delete, at the top of the goal (Esme's pick A, 2026-11-17)", () => {
+  it("sit under the title and chips, before the bars; nothing is left at the bottom", async () => {
+    const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
+    const p = await openGoal(g.id);
+    const head = document.querySelector(".goal-peek-head")!;
+    const pills = head.querySelector(".goal-peek-actions")!;
+    expect([...pills.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Make it an idea", "Delete"]);
+    expect(head.querySelector(".goal-peek-chips")!.compareDocumentPosition(pills) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const b of pills.querySelectorAll("button")) expect(b).toHaveClass("btn-secondary");
+    expect(p.getByRole("button", { name: "Delete goal" }).querySelector("svg")).not.toBeNull(); // the bin glyph
+    expect(p.getAllByRole("button", { name: "Delete goal" })).toHaveLength(1);
+    const notes = p.getByRole("heading", { level: 3, name: "Notes" }).closest("section")!;
+    expect(notes.nextElementSibling).toBeNull();
+  });
+
+  it("Make it an idea: one tap, the same change as Edit → Type → Idea (title, area, notes kept; the goal in the Bin), with Undo", async () => {
+    const g = await createGoal({ title: "Pretend kite", areaId: "art", kind: "practice", notes: "Pretend goal notes" }, TODAY);
+    const p = await openGoal(g.id);
+    await userEvent.click(p.getByRole("button", { name: "Make it an idea" }));
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.status).toBe("deleted"));
+    const [idea] = await db.items.toArray();
+    expect(idea).toMatchObject({ kind: "idea", title: "Pretend kite", areaId: "art", notes: "Pretend goal notes", status: "open" });
+    await vi.waitFor(() => expect(currentUrl).toBe(`/goals?open=${idea.id}`));
+    expect(await screen.findByText("Changed to an idea; the goal is in the Bin")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.status).toBeUndefined());
+    await vi.waitFor(async () => expect((await db.items.get(idea.id))!.status).toBe("deleted"));
+  });
+
+  it("Delete asks first, then the Bin; Undo brings the goal back", async () => {
+    const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
+    const p = await openGoal(g.id);
+    await userEvent.click(p.getByRole("button", { name: "Delete goal" }));
+    // The question takes the pills' place, under the chips.
+    const question = p.getByText("Delete this goal? You can restore it from the Bin.");
+    expect(question.closest(".goal-peek-head")).not.toBeNull();
+    expect(p.queryByRole("button", { name: "Make it an idea" })).toBeNull();
+    await userEvent.click(p.getByRole("button", { name: "Confirm" }));
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.status).toBe("deleted"));
+    expect(await screen.findByText("Moved to the Bin: Pretend goal")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await vi.waitFor(async () => expect((await db.goals.get(g.id))!.status).toBeUndefined());
+  });
+});
+
+describe("Delete goal (the pill at the top of the panel)", () => {
   it("Confirm goes Back exactly one step, even when the stale-?open check closes too", async () => {
     const g = await createGoal({ title: "Pretend goal", areaId: "art", kind: "practice" }, TODAY);
     renderApp(["/inbox", "/goals"], TODAY);
