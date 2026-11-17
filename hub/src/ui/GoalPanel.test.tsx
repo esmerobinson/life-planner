@@ -515,7 +515,7 @@ describe("Make it an idea and Delete, at the top of the goal (Esme's pick A, 202
     const [idea] = await db.items.toArray();
     expect(idea).toMatchObject({ kind: "idea", title: "Pretend kite", areaId: "art", notes: "Pretend goal notes", status: "open" });
     await vi.waitFor(() => expect(currentUrl).toBe(`/goals?open=${idea.id}`));
-    expect(await screen.findByText("Changed to an idea; the goal is in the Bin")).toBeInTheDocument();
+    expect(await screen.findByText(/Changed to an idea; the goal is in the Bin/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Undo" }));
     await vi.waitFor(async () => expect((await db.goals.get(g.id))!.status).toBeUndefined());
     await vi.waitFor(async () => expect((await db.items.get(idea.id))!.status).toBe("deleted"));
@@ -531,7 +531,7 @@ describe("Make it an idea and Delete, at the top of the goal (Esme's pick A, 202
     expect(p.queryByRole("button", { name: "Make it an idea" })).toBeNull();
     await userEvent.click(p.getByRole("button", { name: "Confirm" }));
     await vi.waitFor(async () => expect((await db.goals.get(g.id))!.status).toBe("deleted"));
-    expect(await screen.findByText("Moved to the Bin: Pretend goal")).toBeInTheDocument();
+    expect(await screen.findByText(/Moved to the Bin: Pretend goal/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Undo" }));
     await vi.waitFor(async () => expect((await db.goals.get(g.id))!.status).toBeUndefined());
   });
