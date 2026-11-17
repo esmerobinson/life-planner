@@ -721,6 +721,67 @@ export async function unlockJournal(db: HubDB, passphrase: string): Promise<Unlo
   return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "checking";
 }
 
+// ---- pairing without the passphrase (2026-11-17) ------------------------------------------
+//
+// A v2 pairing code carries this device's copy of S (and its sync token) instead of the
+// passphrase. S is the journal key itself, so a device given it is exactly where typing the
+// passphrase would have put it: the same confirmed key, its own copy of S (so a later
+// passphrase change there needs no old passphrase), and no pending wrap to write (the
+// passphrase it syncs with already opens the journal, directly or through its wrap row).
+// The new device still goes through the usual rules: S is only a CANDIDATE until it opens the
+// synced verifier, or (no verifier anywhere yet) the server accepts the code's token.
+
+/**
+ * This device's copy of S for a pairing code: only for the confirmed key, and only while the
+ * synced verifier still says it is the journal's key. Undefined when there is none (journal
+ * locked here, or a key confirmed before the re-key update: the passphrase is then needed).
+ * The caller wipes it once the code is made.
+ */
+export async function journalSecretForPairing(db: HubDB): Promise<Uint8Array | undefined> {
+  const confirmed = await loadJournalKeyInfo(db);
+  if (!confirmed) return undefined;
+  const verifier = await db.journal.get(VERIFIER_ID);
+  if (verifier && !(await verifierAccepts(confirmed, verifier))) return undefined;
+  return deviceSecret(db, confirmed);
+}
+
+/** S from a pairing code turned into its journal key, or undefined when it isn't 32 bytes. */
+async function fromSecret(s: Uint8Array): Promise<{ jk: JournalKey; s: Uint8Array } | undefined> {
+  if (s.length !== SECRET_BYTES) return undefined;
+  return { jk: await journalKeyFromSecret(s), s };
+}
+
+/**
+ * Sync page, a v2 code: its token was just saved as this device's sync token. Like Save, the
+ * key from its S is only a candidate bound to that token until the verifier (or the server
+ * accepting the token, when no verifier exists yet) confirms it. The caller wipes `s`.
+ */
+export async function saveJournalKeyFromPairing(db: HubDB, s: Uint8Array, token: string): Promise<JournalKeyState> {
+  const m = await fromSecret(s);
+  if (m) await storeCandidate(db, m, token, "since-token-saved");
+  return confirmJournalKey(db);
+}
+
+/**
+ * "Unlock journal" with a v2 code: the same rules as a typed passphrase (unlockJournal), with
+ * the code's S and token in place of what the passphrase would make. The caller wipes `s`.
+ */
+export async function unlockJournalWithSecret(db: HubDB, s: Uint8Array, codeToken: string): Promise<UnlockResult> {
+  const m = await fromSecret(s);
+  if (!m) return "wrong";
+  const verifier = await db.journal.get(VERIFIER_ID);
+  if (verifier) {
+    if (!(await verifierAccepts(m.jk, verifier))) return "wrong";
+    await storeCandidate(db, m, null);
+    return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "wrong";
+  }
+  const token = await meta<string>(db, "token");
+  if (typeof token !== "string" || !token) return "no-sync";
+  if (codeToken !== token) return (await meta<string>(db, ACCEPTED_TOKEN_META)) === token ? "wrong" : "sync-unconfirmed";
+  if (!(await storeCandidate(db, m, token))) return "wrong";
+  return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "checking";
+}
+
 /**
  * Repair pass: rows (and photos) sealed with a key other than the confirmed one are opened
  * with a retired key of the same fingerprint, if this device still has one, and re-sealed
