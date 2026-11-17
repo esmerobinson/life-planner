@@ -26,10 +26,10 @@ device's copy.
 
 ## Quick add on your iPhone home screen
 
-On the phone, the round **+** opens one box, "What's on your mind?", with the
-keyboard up. Type, press Return: it goes into the Inbox and the box is ready
+The round **+** (on the phone and on the Mac) opens one box, "What's on your
+mind?", ready to type (on the phone, with the keyboard up). Type, press Return: it goes into the Inbox and the box is ready
 for the next one. Today, Tomorrow and Time are optional; **More options** opens
-the full Add form. Anything half-typed is kept on the phone until you add it.
+the full Add form. Anything half-typed is kept on the device until you add it.
 
 To get an **Add** icon that opens straight into that box:
 
