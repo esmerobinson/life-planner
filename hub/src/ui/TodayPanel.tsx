@@ -1,15 +1,12 @@
-import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useContext, useMemo, type ReactNode } from "react";
 import { tickItem, untickItem } from "../data/repo";
 import { tickedOffToday, todayList } from "../domain/triage";
 import type { ISODate, Item } from "../domain/types";
-import { CelebrationPlaceholder } from "./CelebrationPlaceholder";
 import { DoneSection } from "./DoneSection";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow } from "./TaskRow";
 import { useHubData } from "./useHubData";
-
-const CELEBRATION_MS = 1500; // invented placeholder duration, to be replaced by Esme's timing
 
 /**
  * Today's list, on Home (there is no separate Today page since 2026-11-04). `lead` comes first
@@ -22,7 +19,6 @@ export function TodayPanel({
 }: { today: ISODate; headingLevel?: 1 | 2; lead?: ReactNode }) {
   const Heading = headingLevel === 2 ? "h2" : "h1";
   const { items, goals, refresh, loaded, error } = useHubData(today);
-  const [celebrating, setCelebrating] = useState(false);
   const { attempt, saveError } = useSaveError();
   const shell = useContext(ShellContext);
 
@@ -32,20 +28,14 @@ export function TodayPanel({
     await shell?.refresh();
   }
 
-  useEffect(() => {
-    if (!celebrating) return;
-    const t = setTimeout(() => setCelebrating(false), CELEBRATION_MS);
-    return () => clearTimeout(t);
-  }, [celebrating]);
-
   // Habits and started projects ticked today stay, crossed out, at the bottom of their list;
   // a to-do done today moves to the "Done today" dropdown.
   // Inactive goals don't count (goals redesign).
   const { rhythm, picks, alsoDue, doneToday } = useMemo(() => todayList(items, goals, today), [items, goals, today]);
 
-  async function tick(id: string): Promise<boolean> {
+  async function tick(id: string, saved?: () => void): Promise<boolean> {
     if (!(await attempt(() => tickItem(id, today)))) return false;
-    setCelebrating(true);
+    saved?.(); // the sparkle, on the ticked box (TaskRow)
     await changed();
     return true;
   }
@@ -87,7 +77,6 @@ export function TodayPanel({
       <Heading>Today</Heading>
       <div className="today-body">
         {lead}
-        {celebrating && <CelebrationPlaceholder />}
         {saveError && <p className="form-message">{saveError}</p>}
         {empty && <p>Nothing planned for today.</p>}
         {rhythm.length > 0 && (

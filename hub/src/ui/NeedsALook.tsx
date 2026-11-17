@@ -3,7 +3,7 @@ import { updateItem } from "../data/repo";
 import { needsALook } from "../domain/attention";
 import type { ISODate, Item } from "../domain/types";
 import { useSaveError } from "./messages";
-import { TaskRow, useTick } from "./TaskRow";
+import { TaskRow, useTick, type TickHandler } from "./TaskRow";
 
 type Kind = "overdue" | "dueSoon" | "stale";
 
@@ -19,7 +19,7 @@ function Row({
 }: {
   item: Item;
   today: ISODate;
-  onTick: (id: string) => Promise<boolean>;
+  onTick: TickHandler;
   onChanged: () => Promise<void>;
 }) {
   const [due, setDue] = useState(item.due ?? "");
@@ -79,11 +79,10 @@ export function NeedsALook({
   onChanged: () => Promise<void>;
 }) {
   const found = needsALook(items, today);
-  const { tick, celebration, message } = useTick(today, onChanged);
+  const { tick, message } = useTick(today, onChanged);
   const total = found.overdue.length + found.dueSoon.length + found.stale.length;
   return (
     <div className="needs-a-look">
-      {celebration}
       {message}
       {total === 0 && <p>Nothing needs a look.</p>}
       {GROUPS.map(({ kind, heading }) =>

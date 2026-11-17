@@ -1,4 +1,7 @@
-/* Confetti and stars are undecided: a magenta box stands in. */
+/*
+ * Sort one by one's "All sorted" moment is undecided: a magenta box stands in. (Ticking a to-do or
+ * habit has its chosen celebration, the pixel sparkle: tickSparkle.ts.)
+ */
 export function CelebrationPlaceholder() {
   return (
     <div

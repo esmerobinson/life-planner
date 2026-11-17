@@ -36,12 +36,12 @@ describe("the Habits box on an area page", () => {
     expect(within(todos).queryByText("Pretend book session")).toBeNull();
   });
 
-  it("ticking a habit: stays in place, struck through, 'Done for today', session counts, celebration; never Done", async () => {
+  it("ticking a habit: stays in place, struck through, 'Done for today', session counts, sparkle; never Done", async () => {
     const h = await habit("Pretend book session");
     renderApp("/area/writing", TODAY);
     const box = await screen.findByRole("region", { name: "Habits" });
     await userEvent.click(within(box).getByRole("checkbox", { name: "Mark done: Pretend book session" }));
-    expect(await screen.findByTestId("celebration-placeholder")).toBeInTheDocument();
+    expect(await screen.findByTestId("tick-sparkle")).toBeInTheDocument();
     expect(await within(box).findByText("Done for today")).toBeInTheDocument();
     const row = within(box).getByRole("checkbox", { name: "Done: Pretend book session" }).closest("li")!;
     expect(row).toHaveClass("crossed");

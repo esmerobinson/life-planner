@@ -458,3 +458,21 @@ h2.journal-row-heading {
   height: 100%;
   background: var(--bar-fill);
 }
+
+/* The tick celebration (Esme, 2026-11-17, option C "Pixel sparkles"; ui/tickSparkle.ts holds the
+   timings). The farm's own fx-sparkle sheet, 3 frames of 30x30, drawn at 2x and kept crisp,
+   centred on each burst's point. The layer sits on the ticked box, over the side panel and the
+   Add sheet, and never takes a click. */
+.tick-sparkle {
+  z-index: 30;
+}
+.tick-sparkle-px {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  image-rendering: pixelated;
+  background: url("../assets/farm/fx-sparkle.png") 0 0 / 180px 60px no-repeat;
+}

@@ -103,12 +103,30 @@ describe("TodayPanel", () => {
     expect(within(row).getByText("On Tue 27 Oct")).toBeInTheDocument();
   });
 
-  it("ticking calls tickItem and shows the celebration placeholder", async () => {
+  it("ticking calls tickItem and plays the sparkle on that strip's tick box (nothing in the list moves)", async () => {
     const it = await task("Tick me", { priority: 1 });
+    await task("Stays", { priority: 1 });
     render(<TodayPanel today={TODAY} />);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Tick me" }));
-    expect(await screen.findByTestId("celebration-placeholder")).toBeInTheDocument();
+    const box = await screen.findByRole("checkbox", { name: "Mark done: Tick me" });
+    box.getBoundingClientRect = () => ({ left: 40, top: 300, width: 22, height: 22 }) as DOMRect;
+    await userEvent.click(box);
+    const sparkle = await screen.findByTestId("tick-sparkle");
+    expect(sparkle.style.left).toBe("51px");
+    expect(sparkle.style.top).toBe("311px");
+    expect(sparkle.parentElement).toBe(document.body); // a layer over the page, not in the list
+    expect(screen.queryByTestId("celebration-placeholder")).toBeNull();
     expect((await db.items.get(it.id))!.status).toBe("done");
+  });
+
+  it("unticking plays nothing", async () => {
+    await task("Tick and untick", { priority: 1, recur: ["tue"] });
+    render(<TodayPanel today={TODAY} />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Tick and untick" }));
+    await screen.findByRole("checkbox", { name: "Done: Tick and untick" });
+    document.querySelectorAll('[data-testid="tick-sparkle"]').forEach((n) => n.remove());
+    await userEvent.click(screen.getByRole("checkbox", { name: "Done: Tick and untick" }));
+    expect(await screen.findByRole("checkbox", { name: "Mark done: Tick and untick" })).not.toBeChecked();
+    expect(screen.queryByTestId("tick-sparkle")).toBeNull();
   });
 
   it("Schedule for Tomorrow removes it from Today and leaves the due date alone", async () => {
@@ -230,7 +248,7 @@ describe("TodayPanel", () => {
       render(<TodayPanel today={TODAY} />);
       await userEvent.click(await screen.findByRole("checkbox", { name: "Mark done: Tick fails" }));
       expect(await screen.findByText(SAVE_LINE)).toBeInTheDocument();
-      expect(screen.queryByTestId("celebration-placeholder")).toBeNull();
+      expect(screen.queryByTestId("tick-sparkle")).toBeNull();
       await act(async () => {
         await new Promise((r) => setTimeout(r, 20));
       });

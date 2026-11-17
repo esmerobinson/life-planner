@@ -31,7 +31,7 @@ export function AreaPage({ today }: { today: ISODate }) {
   const { areaId } = useParams();
   const area = GOAL_AREAS.find((a) => a.id === areaId);
   const { items, goals, refresh, loaded, error } = useHubData(today);
-  const { tick, celebration, message } = useTick(today, refresh);
+  const { tick, message } = useTick(today, refresh);
   const { attempt, saveError } = useSaveError();
   const [view, setView] = useState<View>("all");
   const [archived, setArchived] = useState<Item[]>([]);
@@ -149,7 +149,6 @@ export function AreaPage({ today }: { today: ISODate }) {
           </button>
         ))}
       </div>
-      {celebration}
       {message}
       {saveError && <p className="form-message">{saveError}</p>}
       {empty && <p>Nothing here yet.</p>}

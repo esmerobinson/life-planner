@@ -100,7 +100,7 @@ export function GoalPanel({
   const { sources } = useGoalSources(items);
   const { attempt, saveError } = useSaveError();
   const undoNote = useShellUndo();
-  const { tick, celebration, message } = useTick(today, onChanged);
+  const { tick, message } = useTick(today, onChanged);
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<Fields>(() => fieldsOf(goal));
   const [snapshot, setSnapshot] = useState<Fields>(() => fieldsOf(goal));
@@ -477,7 +477,6 @@ export function GoalPanel({
         </div>
       )}
       {saveError && <p className="form-message">{saveError}</p>}
-      {celebration}
       {message}
       <div className="goal-peek-bars">
         <GoalOverall goal={goal} items={items} today={today} sources={sources} />
