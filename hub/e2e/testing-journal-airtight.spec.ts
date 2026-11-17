@@ -1066,7 +1066,7 @@ const LOG = {
   todos: "Pretend Thimbleroot to-do note: two pretend letters left",
 };
 
-const logBox = (page: Page) => page.getByRole("region", { name: "Daily log" });
+const logBox = (page: Page) => page.getByRole("region", { name: "Daily log", exact: true });
 
 /** The day's log filled in like a person: a tap, a note, a tap, a note, then a click away. */
 async function fillLog(page: Page) {
