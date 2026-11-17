@@ -39,11 +39,12 @@
 
 import { db } from "../data/db";
 import {
-  answeredPrompts, highlightRows, listExerciseEntries, listWeekReviews, readCheckinDay, readExerciseCards, readExerciseProgress, readLearned,
+  answeredPrompts, highlightRows, listExerciseEntries, listWeekReviews, readCheckinDay, readSharePrivate, readExerciseCards, readExerciseProgress, readLearned,
   unreadableExerciseDates, type WeekReviewFields,
   type ExerciseResponse, type PartAnswer,
 } from "../data/repo";
 import type { ISODate } from "../domain/types";
+import { mondayOf } from "../domain/dates";
 import type { JournalKey } from "../journal/crypto";
 import { trackTitle, type CardPart } from "../journal/exercise";
 import type { HighlightEntry } from "../journal/highlights";
@@ -164,7 +165,9 @@ export const CARD_HEADING = "### ";
  * them, and between cards). A card with nothing kept (all n/a), or on a titles-only or private
  * day, still shows its title (and, titles-only, its questions).
  */
-export function exerciseSection(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean, review?: QA[] | null): string {
+export function exerciseSection(
+  cards: { title: string; qas: QA[] }[], research: string[], answers: boolean, review?: QA[] | null, reviewAnswers = answers,
+): string {
   if (cards.length === 0 && !review) return "";
   const blocks = [PART_HEADINGS.exercise];
   if (answers && research.length > 0 && cards.length > 0) blocks.push([RESEARCH_HEADING, ...research.map((b) => `${BULLET}${b}`)].join("\n"));
@@ -174,7 +177,7 @@ export function exerciseSection(cards: { title: string; qas: QA[] }[], research:
   }
   // The weekly review (Mental health work), after the cards: like a card, its heading always.
   if (review) {
-    const qa = qaBlock(kept(review), answers);
+    const qa = qaBlock(kept(review), answers && reviewAnswers);
     blocks.push(qa ? `${REVIEW_HEADING}\n${qa}` : REVIEW_HEADING);
   }
   return blocks.join("\n\n");
@@ -375,12 +378,19 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
   const { entries, unreadable } = await listExerciseEntries(jk, today);
   if (unreadable > 0) for (const d of await unreadableExerciseDates(jk)) bad.add(d);
   for (const d of bad) if (d < today) unknown.add(d);
-  // Each week's review she pressed Done on, on its day (a draft never goes). A week with a review
-  // row that won't open here goes titles-only on that day.
-  const reviews = new Map<ISODate, { qas: QA[]; partial: boolean }>();
+  // Each week's review she pressed Done on, under the day she pressed it (review C1; a draft never
+  // goes). A week with a review row that won't open here goes titles-only on that day. Its words
+  // are held back (questions only) if any day of that week holding a version of it is ticked
+  // private: a version may have been written under that day's tick.
+  const reviews = new Map<ISODate, { qas: QA[]; partial: boolean; words: boolean }>();
+  const reviewRows = await db.journal.where("kind").equals("week-review").toArray();
   for (const r of await listWeekReviews(jk, today)) {
-    if (!r.done || !r.date || !(r.date < today)) continue;
-    reviews.set(r.date, { qas: reviewQAs(r.fields), partial: r.unreadable > 0 });
+    if (!r.done || !r.day || !(r.day < today)) continue;
+    const days = new Set(reviewRows.filter((x) => mondayOf(x.date) === r.week).map((x) => x.date));
+    days.delete(r.day); // the day itself: its own tick decides, as for every part
+    let words = true;
+    for (const d of days) if ((await readSharePrivate(jk, d)).exercise) words = false;
+    reviews.set(r.day, { qas: reviewQAs(r.fields), partial: r.unreadable > 0, words });
   }
   if (ids.size === 0 && reviews.size === 0) return { notes, unknown, partial };
   const twins = await noteTwins(jk);
@@ -414,7 +424,7 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
     const research = researchBullets(learned.text, hl.list);
     notes.set(date, {
       titles: exerciseSection(done, [], false, review?.qas),
-      full: exerciseSection(done, research, true, review?.qas),
+      full: exerciseSection(done, research, true, review?.qas, review?.words ?? true),
       summary: exerciseSummary(done.length, !!review),
     });
   }
