@@ -105,6 +105,12 @@ export interface StoredCandidate extends StoredJournalKey {
   /** Its passphrase's KEK and fingerprint, to look for that passphrase's keywrap row. */
   kek?: CryptoKey;
   kekFp?: string;
+  /**
+   * Made from a pairing code's journal secret (2026-11-17, review I1). The code's token and S
+   * are separate fields, so the server accepting the token says nothing about S: such a
+   * candidate is confirmed ONLY by opening the synced verifier, never by rule (b).
+   */
+  fromCode?: true;
 }
 
 /** A Sync page passphrase's KEK, waiting for the server to accept its token (brief point 4). */
@@ -323,7 +329,7 @@ type Fresh = "since-token-saved" | "from-now";
  */
 async function storeCandidate(
   db: HubDB,
-  m: { jk: JournalKey; s?: Uint8Array; kek?: KeyWrapKey },
+  m: { jk: JournalKey; s?: Uint8Array; kek?: KeyWrapKey; fromCode?: true },
   token: string | null,
   fresh: Fresh = "from-now",
 ): Promise<boolean> {
@@ -339,6 +345,7 @@ async function storeCandidate(
       key: m.jk.key, mac: m.jk.mac, fp: m.jk.fp, token, id: crypto.randomUUID(), seq,
       ...(sealed ? { s: sealed } : {}),
       ...(m.kek ? { kek: m.kek.key, kekFp: m.kek.fp } : {}),
+      ...(m.fromCode ? { fromCode: true as const } : {}),
     };
     await db.syncMeta.put({ key: JOURNAL_CANDIDATE_META, value });
     if (m.kek && token !== null) {
@@ -486,6 +493,14 @@ export async function confirmJournalKey(db: HubDB): Promise<JournalKeyState> {
           await dropCandidateIn(db); // a typo, or a passphrase with no wrap (yet)
         }
       });
+    } else if (!confirmed && c.fromCode) {
+      // A pairing code's key waits for the journal's verifier (review I1). It is dropped only
+      // when sync is stopped here; it never seals anything meanwhile.
+      if (!(await meta<string>(db, "token"))) {
+        await db.transaction("rw", db.syncMeta, async () => {
+          if ((await loadCandidate(db))?.id === c.id) await dropCandidateIn(db);
+        });
+      }
     } else if (!confirmed) {
       const token = await meta<string>(db, "token");
       if (!token || c.token === null || token !== c.token) {
@@ -677,7 +692,7 @@ export async function saveJournalKeyFromSync(db: HubDB, passphrase: string): Pro
   return confirmJournalKey(db);
 }
 
-export type UnlockResult = "ok" | "checking" | "wrong" | "no-sync" | "sync-unconfirmed";
+export type UnlockResult = "ok" | "checking" | "wrong" | "no-sync" | "sync-unconfirmed" | "code-refused";
 
 /**
  * "Unlock journal".
@@ -752,33 +767,54 @@ async function fromSecret(s: Uint8Array): Promise<{ jk: JournalKey; s: Uint8Arra
 }
 
 /**
- * Sync page, a v2 code: its token was just saved as this device's sync token. Like Save, the
- * key from its S is only a candidate bound to that token until the verifier (or the server
- * accepting the token, when no verifier exists yet) confirms it. The caller wipes `s`.
+ * Whether a pairing code's journal secret fits this device (review C1):
+ * - "same": it makes this device's confirmed key (nothing to change);
+ * - "other": this device has a confirmed key with another fingerprint, a verifier here that it
+ *   doesn't open, or a retired key of another fingerprint (the verifier changed under it): the
+ *   code is refused, so a scanned code can never re-seal a journal this device already knows;
+ * - "new": none of that (it may become a candidate, confirmed only by the verifier).
+ */
+export async function pairingJournalCheck(db: HubDB, s: Uint8Array): Promise<"same" | "new" | "other"> {
+  const m = await fromSecret(s);
+  if (!m) return "other";
+  const confirmed = await loadJournalKeyInfo(db);
+  if (confirmed) return confirmed.fp === m.jk.fp ? "same" : "other";
+  if ((await loadRetired(db)).some((r) => r.fp !== m.jk.fp)) return "other";
+  const verifier = await db.journal.get(VERIFIER_ID);
+  if (verifier && !(await verifierAccepts(m.jk, verifier))) return "other";
+  return "new";
+}
+
+/**
+ * Sync page, a v2 code: its token was just saved as this device's sync token. Only when the
+ * secret is "new" here (pairingJournalCheck) does it become a candidate, and that candidate is
+ * confirmed only by opening the synced verifier (review I1). A device that already has a key
+ * is never touched. The caller wipes `s`.
  */
 export async function saveJournalKeyFromPairing(db: HubDB, s: Uint8Array, token: string): Promise<JournalKeyState> {
-  const m = await fromSecret(s);
-  if (m) await storeCandidate(db, m, token, "since-token-saved");
+  if ((await pairingJournalCheck(db, s)) === "new") {
+    const m = await fromSecret(s);
+    if (m) await storeCandidate(db, { ...m, fromCode: true }, token, "since-token-saved");
+  }
   return confirmJournalKey(db);
 }
 
 /**
- * "Unlock journal" with a v2 code: the same rules as a typed passphrase (unlockJournal), with
- * the code's S and token in place of what the passphrase would make. The caller wipes `s`.
+ * "Unlock journal" with a v2 code. The code must be for this device's own sync (the same token:
+ * the caller checks the address) and its secret must fit this journal (pairingJournalCheck);
+ * otherwise "code-refused". With a verifier here it must open it; with none yet it waits as a
+ * candidate for the verifier ("checking"), never confirmed by the token. The caller wipes `s`.
  */
 export async function unlockJournalWithSecret(db: HubDB, s: Uint8Array, codeToken: string): Promise<UnlockResult> {
   const m = await fromSecret(s);
   if (!m) return "wrong";
-  const verifier = await db.journal.get(VERIFIER_ID);
-  if (verifier) {
-    if (!(await verifierAccepts(m.jk, verifier))) return "wrong";
-    await storeCandidate(db, m, null);
-    return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "wrong";
-  }
   const token = await meta<string>(db, "token");
   if (typeof token !== "string" || !token) return "no-sync";
-  if (codeToken !== token) return (await meta<string>(db, ACCEPTED_TOKEN_META)) === token ? "wrong" : "sync-unconfirmed";
-  if (!(await storeCandidate(db, m, token))) return "wrong";
+  if (codeToken !== token) return "code-refused";
+  const fit = await pairingJournalCheck(db, s);
+  if (fit === "other") return (await db.journal.get(VERIFIER_ID)) && !(await loadRetired(db)).length ? "wrong" : "code-refused";
+  if (fit === "same") return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "wrong";
+  if (!(await storeCandidate(db, { ...m, fromCode: true }, null))) return "wrong";
   return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "checking";
 }
 

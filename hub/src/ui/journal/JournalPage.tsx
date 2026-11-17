@@ -52,6 +52,12 @@ export const WRONG_PASSPHRASE_LINE =
   "That passphrase doesn't open your journal. If you've just changed it, type the new one first on a device where the journal is open, or use your old one. Try again.";
 /** Placeholder wording (Esme may reword), 2026-11-17: a v2 pairing code made without the journal. */
 export const CODE_WITHOUT_JOURNAL = "That pairing code doesn't include your journal. Type your passphrase instead.";
+/**
+ * Placeholder wording (Esme may reword), review C1: a code for another sync setup or another
+ * journal key than this device's. Nothing was changed.
+ */
+export const CODE_REFUSED_LINE =
+  "This device can't open your journal with that pairing code, so nothing was changed. Type your passphrase instead.";
 /** WebCrypto threw while reading or storing the journal key (Mac app). Nothing is deleted. */
 export const KEYCHAIN_LINE =
   "This Mac's keychain didn't let Esmeworld open your journal key. Quit and reopen Esmeworld, enter your Mac login password and choose Always Allow.";
@@ -226,6 +232,7 @@ function useDeviceId(): DeviceView & { retry: () => void } {
 const PROBLEMS: Record<Exclude<UnlockResult, "ok" | "checking"> | "failed" | "keychain" | "no-journal", React.ReactNode> = {
   wrong: WRONG_PASSPHRASE_LINE,
   "no-journal": CODE_WITHOUT_JOURNAL,
+  "code-refused": CODE_REFUSED_LINE,
   "no-sync": (
     <>
       Set up sync on this device first, then unlock the journal here. <Link to="/sync">Sync</Link>

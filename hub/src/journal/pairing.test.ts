@@ -6,7 +6,7 @@ import { deriveToken } from "../sync/token";
 import { deriveJournalSecret, deriveKeyWrapKey, journalAad, openJson, sealJson, toBase64, type JournalKey } from "./crypto";
 import {
   confirmJournalKey, giveOldPassphrase, journalNeedsOldPassphrase, journalSecretForPairing, keyWrapId, loadJournalKey,
-  saveJournalKeyFromPairing, saveJournalKeyFromSync, unlockJournalWithSecret,
+  pairingJournalCheck, saveJournalKeyFromPairing, saveJournalKeyFromSync, unlockJournalWithSecret, VERIFIER_ID,
 } from "./keyStore";
 import { confirmedDevice, keyFor, verifierRow } from "../test/journalKey";
 
@@ -195,6 +195,67 @@ describe("a device set up from a v2 code", () => {
   });
 });
 
+describe("a key from a code is confirmed only by the journal's verifier (review I1)", () => {
+  it("a wrong secret with a valid token and no verifier anywhere yet: never confirmed, nothing sealed sent; the Mac stays fine", async () => {
+    const token = await deriveToken(A);
+    const server = new FakeSyncServer(token);
+    const phone = device();
+    await saveSyncSettings(phone, { serverUrl: SERVER, token });
+    const wrong = await deriveJournalSecret(A);
+    wrong[0] ^= 1; // one changed character
+    expect(await saveJournalKeyFromPairing(phone, wrong, token)).toBe("checking");
+    for (let i = 0; i < 2; i++) expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");
+    expect(await confirmJournalKey(phone)).toBe("checking");
+    expect(await loadJournalKey(phone)).toBeUndefined();
+    expect(await phone.journal.count()).toBe(0);
+    expect([...server.rows.values()].filter((r) => r.table === "journal")).toHaveLength(0);
+
+    // The Mac sets up by typing: its verifier wins; the phone drops the wrong key.
+    const { mac } = await macWithPage(server);
+    expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");
+    expect(await confirmJournalKey(phone)).toBe("locked");
+    expect((await syncOnce({ db: mac, fetch: server.fetch })).kind).toBe("ok");
+    expect(await confirmJournalKey(mac)).toBe("confirmed");
+  });
+});
+
+describe("pairingJournalCheck: does a code's secret fit this device's journal?", () => {
+  it("new on a device with no journal key; same for its own key; other for another key", async () => {
+    const fresh = device();
+    expect(await pairingJournalCheck(fresh, await deriveJournalSecret(A))).toBe("new");
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac } = await macWithPage(server);
+    expect(await pairingJournalCheck(mac, await deriveJournalSecret(A))).toBe("same");
+    expect(await pairingJournalCheck(mac, await deriveJournalSecret("pretend-other-journal"))).toBe("other");
+  });
+
+  it("other when a verifier is here that it can't open, or this device retired a different key", async () => {
+    const d = device();
+    await d.journal.put(await verifierRow(await keyFor(A)));
+    expect(await pairingJournalCheck(d, await deriveJournalSecret("pretend-other-journal"))).toBe("other");
+    expect(await pairingJournalCheck(d, await deriveJournalSecret(A))).toBe("new");
+
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac } = await macWithPage(server);
+    const other = "pretend-other-journal";
+    await mac.journal.put({ ...(await verifierRow(await keyFor(other))), updatedAt: Date.now() + 1000 });
+    expect(await confirmJournalKey(mac)).toBe("locked"); // A retired
+    expect(await pairingJournalCheck(mac, await deriveJournalSecret(other))).toBe("other");
+  });
+
+  it("saveJournalKeyFromPairing never touches a device that already has a working key", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac, page } = await macWithPage(server);
+    const before = (await mac.syncMeta.get("journalKey"))!.value;
+    const other = await deriveJournalSecret("pretend-other-journal");
+    expect(await saveJournalKeyFromPairing(mac, other, await deriveToken(A))).toBe("confirmed");
+    expect(await saveJournalKeyFromPairing(mac, await deriveJournalSecret(A), await deriveToken(A))).toBe("confirmed");
+    expect((await mac.syncMeta.get("journalKey"))!.value).toEqual(before);
+    expect(await mac.syncMeta.get("journalCandidate")).toBeUndefined();
+    expect(await readPage(mac, page)).toBe("A pretend page from the Mac.");
+  });
+});
+
 describe("Unlock journal with a v2 code (Journal page)", () => {
   it("opens the journal when its secret opens the verifier; refuses another journal's", async () => {
     const server = new FakeSyncServer(await deriveToken(A));
@@ -209,16 +270,34 @@ describe("Unlock journal with a v2 code (Journal page)", () => {
     expect(await readPage(phone, page)).toBe("A pretend page from the Mac.");
   });
 
-  it("with no verifier yet: needs sync set up with the code's token, then waits for sync to accept it", async () => {
+  it("with no verifier yet: needs sync set up with the code's token, then waits for the journal's verifier (never the token)", async () => {
     const s = await deriveJournalSecret(A);
     const token = await deriveToken(A);
+    const server = new FakeSyncServer(token);
     const d = device();
     expect(await unlockJournalWithSecret(d, s, token)).toBe("no-sync");
     await saveSyncSettings(d, { serverUrl: SERVER, token: await deriveToken(B) });
-    expect(await unlockJournalWithSecret(d, s, token)).toBe("sync-unconfirmed");
+    expect(await unlockJournalWithSecret(d, s, token)).toBe("code-refused"); // not this device's sync
     await saveSyncSettings(d, { serverUrl: SERVER, token });
     expect(await unlockJournalWithSecret(d, s, token)).toBe("checking");
-    expect((await syncOnce({ db: d, fetch: new FakeSyncServer(token).fetch })).kind).toBe("ok");
+    expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("ok");
+    expect(await confirmJournalKey(d)).toBe("checking"); // accepted token alone confirms nothing
+    expect(await d.journal.get(VERIFIER_ID)).toBeUndefined();
+    // The journal's own device sends its verifier: now it opens.
+    await macWithPage(server);
+    expect((await syncOnce({ db: d, fetch: server.fetch })).kind).toBe("ok");
     expect(await confirmJournalKey(d)).toBe("confirmed");
+  });
+
+  it("refused after the verifier changed to another key on this device (its old key is retired)", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac } = await macWithPage(server);
+    const token = await deriveToken(A);
+    // Another key's verifier wins: the Mac's key is retired and the journal locks.
+    const other = "pretend-other-journal";
+    await mac.journal.put({ ...(await verifierRow(await keyFor(other))), updatedAt: Date.now() + 1000 });
+    expect(await confirmJournalKey(mac)).toBe("locked");
+    expect(await unlockJournalWithSecret(mac, await deriveJournalSecret(other), token)).toBe("code-refused");
+    expect(await loadJournalKey(mac)).toBeUndefined();
   });
 });
