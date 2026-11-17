@@ -492,25 +492,26 @@
   "map-day1-rain.png"
  ],
  "previews": [
+  "previews/landmarks-before-after@2.png",
   "previews/layers-contact@2.png",
   "previews/map-all-open-day@2.png",
   "previews/map-all-open-night@2.png",
-  "previews/map-day1-day@2.png",
-  "previews/map-day1-night@2.png",
   "previews/map-all-open-rain@2.png",
-  "previews/map-day1-rain@2.png",
-  "previews/map-day1-rain@2.gif",
   "previews/map-carnaval-day@2.png",
   "previews/map-carnaval-night@2.png",
+  "previews/map-day1-day@2.png",
+  "previews/map-day1-night@2.png",
+  "previews/map-day1-rain@2.png",
   "previews/map-reveillon-day@2.png",
   "previews/map-reveillon-night@2.png",
+  "previews/map-day1-rain@2.gif",
   "previews/map-reveillon-fireworks@2.gif"
  ],
  "palettes": [
   "palette-night-v2.json"
  ],
  "data": "map.json",
- "layerCount": 88,
+ "layerCount": 136,
  "rainLayerCount": 44,
  "weatherOverlays": {
   "rain": [
