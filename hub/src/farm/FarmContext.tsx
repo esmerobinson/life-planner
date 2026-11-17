@@ -13,7 +13,7 @@ import { counters, allEarned, derivedEarned, type Counters, type JournalFacts } 
 import * as repo from "./farmRepo";
 import { readJournalFacts } from "./journalFacts";
 import { EMPTY_FARM, farmState, type CharacterId, type FarmState } from "./state";
-import { arrivedAt, awakeZones, farmDay, momentQueue, stickerTotals, todayListFinished, unlockedAccessories } from "./world";
+import { RETIRED, arrivedAt, awakeZones, farmDay, momentQueue, stickerTotals, todayListFinished, unlockedAccessories } from "./world";
 
 export interface FarmView {
   /** The farm table has been read. */
@@ -183,7 +183,8 @@ function FarmEngine({ items: listItems, goals, today, onView }: { items: Item[];
   // Friends arrive at N stickers or on day N of the farm, whichever comes first (Esme, 2026-11-04).
   // Once moved in, a character stays (review M5), even if fewer stickers show on this device.
   const day = state.start ? farmDay(state.start, today) : 1;
-  const arrived = useMemo(() => new Set([...arrivedAt(friends, day), ...state.arrived]), [friends, day, state.arrived]);
+  // A retired friend's stored row is kept, never shown (Duvet, Esme 2026-11-17).
+  const arrived = useMemo(() => new Set([...arrivedAt(friends, day), ...state.arrived].filter((c) => !RETIRED.has(c))), [friends, day, state.arrived]);
   const awake = useMemo(() => awakeZones(earned), [earned]);
   const unlocked = useMemo(() => unlockedAccessories(friends, awake, earnedSet), [friends, awake, earnedSet]);
   const queue = useMemo(() => momentQueue(derived, state.seen, state.placed, onJournal), [derived, state, onJournal]);
