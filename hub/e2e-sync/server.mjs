@@ -39,7 +39,10 @@ if (isMain) {
   const dev = spawn(
     wrangler,
     ["dev", "--local", "--config", config, "--persist-to", state, "--env-file", vars,
-      "--ip", "127.0.0.1", "--port", String(E2E_SYNC_PORT)],
+      "--ip", "127.0.0.1", "--port", String(E2E_SYNC_PORT),
+      // Lets the e2e check call the cron handler (GET /__scheduled). No DUE_TOKEN is ever set
+      // here, so the Due reminders run must do nothing and reach nothing.
+      "--test-scheduled"],
     { cwd: work, env, stdio: "inherit" },
   );
   const stop = () => dev.kill("SIGTERM");
