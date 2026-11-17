@@ -81,10 +81,19 @@ async function decodeShownCode(page: Page): Promise<string> {
   });
 }
 
-test("Sync page: after Save, Pair another device shows the pairing code; Hide and leaving hide it", async ({ page }) => {
+test("Sync page: after Save, Pair another device shows the pairing code; Hide and leaving hide it; another tap shows it again", async ({ page }) => {
   const asked = await fakeServer(page);
   await saveOnSyncPage(page);
   await expect.poll(() => asked.includes("/v1/sync")).toBe(true);
+  // The journal key is confirmed by that sync: the code carries it (v2, no passphrase in it).
+  await expect
+    .poll(() => page.evaluate(async () => {
+      const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+      const { db } = await at("/src/data/db.ts");
+      const keys = await at("/src/journal/keyStore.ts");
+      return keys.confirmJournalKey(db);
+    }), { timeout: 20_000 })
+    .toBe("confirmed");
   await page.getByRole("button", { name: "Pair another device" }).click();
   const qr = page.getByRole("img", { name: "Pairing code" });
   await expect(qr).toBeVisible();
@@ -92,18 +101,19 @@ test("Sync page: after Save, Pair another device shows the pairing code; Hide an
   expect(box?.width).toBe(240);
   expect(box?.height).toBe(240);
   await expect(page.getByText("Anyone who scans this can open your Esmeworld. Only show it to your own devices.")).toBeVisible();
-  expect(await decodeShownCode(page)).toBe(CODE);
+  const text = await decodeShownCode(page);
+  expect(text).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.https:\/\/sync\.example\.test$/);
+  expect(text).not.toContain(PASS);
   expect(await page.content()).not.toContain(PASS);
   expect(await everythingKept(page)).not.toContain(PASS);
+  expect(await everythingKept(page)).not.toContain(text.slice(18));
   await shoot(page, "pairing-desktop-code");
 
   await expect(page.getByText(/^Hides in [01]:\d\d$/)).toBeVisible();
 
-  // Hidden means forgotten: showing it again needs the passphrase pasted.
+  // Hidden means gone from the screen; showing it again is another deliberate tap.
   const showAgain = async () => {
-    await expect(page.getByRole("button", { name: "Pair another device" })).toHaveCount(0);
-    await page.getByLabel("Passphrase for the pairing code").fill(PASS);
-    await page.getByRole("button", { name: "Show pairing code" }).click();
+    await page.getByRole("button", { name: "Pair another device" }).click();
     await expect(qr).toBeVisible();
   };
   await page.getByRole("button", { name: "Hide" }).click();
@@ -113,13 +123,13 @@ test("Sync page: after Save, Pair another device shows the pairing code; Hide an
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await expect(qr).toHaveCount(0);
   await showAgain();
-  // Leaving the page: gone, and not offered again without the passphrase.
+  // Leaving the page: gone. Coming back, it is offered again at a tap, with nothing typed.
   await page.getByRole("link", { name: "Backup" }).first().click();
   await page.getByRole("link", { name: "Sync", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Pair a device" })).toBeVisible();
   await expect(qr).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Pair another device" })).toHaveCount(0);
-  await expect(page.getByLabel("Passphrase for the pairing code")).toBeVisible();
+  await showAgain();
+  expect(await decodeShownCode(page)).toBe(text);
   expect(await everythingKept(page)).not.toContain(PASS);
 });
 
