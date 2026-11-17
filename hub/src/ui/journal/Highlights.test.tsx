@@ -330,8 +330,8 @@ describe("review I2: every highlight stays reachable", () => {
     renderApp("/journal/read-back", TODAY);
     let part = await openReadBackPart("Highlights");
     const inner = within(part).getAllByRole("listitem").find((li) => li.querySelector(".hl-quote")!.textContent === "made-up hill")!;
-    // Its note and Remove right here.
-    await userEvent.click(within(inner).getByRole("button", { name: NOTE_OR_REMOVE }));
+    // Its note and Remove right here (shown once this device's id has been read).
+    await userEvent.click(await within(inner).findByRole("button", { name: NOTE_OR_REMOVE }));
     const sheet = await screen.findByRole("dialog", { name: "Highlight" });
     await userEvent.clear(within(sheet).getByLabelText(NOTE_LABEL));
     await userEvent.type(within(sheet).getByLabelText(NOTE_LABEL), "Pretend changed in Read back");
@@ -349,7 +349,7 @@ describe("review I2: every highlight stays reachable", () => {
     renderApp("/journal/read-back", TODAY);
     part = await openReadBackPart("Highlights");
     const row = within(part).getAllByRole("listitem").find((li) => li.querySelector(".hl-quote")!.textContent === "made-up hill")!;
-    await userEvent.click(within(row).getByRole("button", { name: NOTE_OR_REMOVE }));
+    await userEvent.click(await within(row).findByRole("button", { name: NOTE_OR_REMOVE }));
     const s2 = await screen.findByRole("dialog", { name: "Highlight" });
     await userEvent.click(within(s2).getByRole("button", { name: REMOVE_HIGHLIGHT }));
     await userEvent.click(within(within(s2).getByRole("group", { name: REMOVE_QUESTION })).getByRole("button", { name: REMOVE_YES }));
@@ -361,7 +361,7 @@ describe("review I2: every highlight stays reachable", () => {
     await createHighlight(jk, TODAY, await ME(), highlightCard(WEATHER, ""), gone, "Pretend kept note");
     renderApp("/journal/read-back", TODAY);
     const part = await openReadBackPart("Highlights");
-    await userEvent.click(within(part).getByRole("button", { name: NOTE_OR_REMOVE }));
+    await userEvent.click(await within(part).findByRole("button", { name: NOTE_OR_REMOVE }));
     const sheet = await screen.findByRole("dialog", { name: "Highlight" });
     await userEvent.click(within(sheet).getByRole("button", { name: REMOVE_HIGHLIGHT }));
     await userEvent.click(within(within(sheet).getByRole("group", { name: REMOVE_QUESTION })).getByRole("button", { name: REMOVE_YES }));
