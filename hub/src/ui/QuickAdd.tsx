@@ -174,7 +174,7 @@ export function QuickAdd({
       }
       if (!deadline) return setMessage("A project needs a deadline.");
     }
-    if (type === "task" && time && !due) return setMessage("A time needs a due day.");
+    if (type === "task" && time && recur.length === 0 && !due) return setMessage("A time needs a due day.");
     if (isBookType && author.trim().length > BOOK_LIMITS.author) {
       return setMessage(`An author is at most ${BOOK_LIMITS.author} characters.`);
     }
@@ -236,7 +236,7 @@ export function QuickAdd({
           ...page,
           ...(goalId ? { goalId } : {}),
           ...(type === "task" && due ? { due } : {}),
-          ...(type === "task" && due && TIME_OF_DAY.test(time) ? { time } : {}),
+          ...(type === "task" && due && recur.length === 0 && TIME_OF_DAY.test(time.slice(0, 5)) ? { time: time.slice(0, 5) } : {}),
           ...(type === "task" && recur.length ? { recur: WEEKDAYS.filter((d) => recur.includes(d)) } : {}),
         },
         today,
@@ -381,11 +381,14 @@ export function QuickAdd({
             <span className="form-label">Due</span>
             <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
           </label>
-          {/* PROVISIONAL label and placement (Due reminders): a meeting's or appointment's time. */}
-          <label className="form-field">
-            <span className="form-label">Time</span>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-          </label>
+          {/* PROVISIONAL label and placement (Due reminders): a meeting's or appointment's time.
+              Not for a repeating to-do (a habit has no day for it). */}
+          {recur.length === 0 && (
+            <label className="form-field">
+              <span className="form-label">Time</span>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </label>
+          )}
           <fieldset className="form-full">
             <legend>Repeats on</legend>
             <div className="form-checks">

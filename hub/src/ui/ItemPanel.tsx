@@ -221,7 +221,7 @@ export function ItemPanel({
         setFieldError(NEEDS_A_DAY);
         return;
       }
-      if (f.time !== was.time) patch.time = f.time || undefined;
+      if (f.time !== was.time) patch.time = f.time.slice(0, 5) || undefined;
       if (!hasDay && item.time !== undefined) patch.time = undefined;
       if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
       const flag = Boolean(f.goalId && f.milestone);

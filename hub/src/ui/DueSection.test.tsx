@@ -9,6 +9,8 @@ import { RemindersPage } from "./RemindersPage";
 
 // The Reminders page's Due section: her settings, saved to the synced prefs row the Worker reads.
 
+afterEach(() => vi.restoreAllMocks());
+
 beforeEach(async () => {
   await db.prefs.clear();
   await db.pending.clear();
@@ -91,6 +93,55 @@ describe("Reminders in Due", () => {
     renderPage();
     const s = await section();
     expect(s.getByLabelText(DUE_WORDS.timeZone)).toHaveValue("Asia/Kolkata");
+  });
+
+  it("a change from another device shows at once, and a change here keeps it (review I5)", async () => {
+    await db.prefs.put(duePrefsRow({ ...DEFAULT_DUE_PREFS, on: true }));
+    renderPage();
+    const s = await section();
+    // The Mac adds lines while this page is open (a sync writes the row).
+    await db.prefs.put(duePrefsRow({ ...DEFAULT_DUE_PREFS, on: true, lines: ["From the Mac"] }));
+    expect(await s.findByText("From the Mac")).toBeInTheDocument();
+    // Then she changes a time here: only that field changes; the Mac's lines stay.
+    await db.prefs.put(duePrefsRow({ ...DEFAULT_DUE_PREFS, on: true, lines: ["From the Mac", "Second from the Mac"] }));
+    fireEvent.change(s.getByLabelText(DUE_WORDS.review), { target: { value: "22:30" } });
+    await vi.waitFor(async () => expect(await stored()).toMatchObject({ review: "22:30", lines: ["From the Mac", "Second from the Mac"] }));
+  });
+
+  it("a field a later version added is kept when she saves here", async () => {
+    await db.prefs.put({ ...duePrefsRow({ ...DEFAULT_DUE_PREFS, on: true }), laterField: 7 } as never);
+    renderPage();
+    const s = await section();
+    fireEvent.change(s.getByLabelText(DUE_WORDS.plan), { target: { value: "07:30" } });
+    await vi.waitFor(async () => expect(await stored()).toMatchObject({ plan: "07:30", laterField: 7 }));
+  });
+
+  it("if the settings can't be read, nothing can be changed (no defaults saved over them)", async () => {
+    vi.spyOn(db.prefs, "get").mockRejectedValue(new Error("pretend read failure"));
+    renderPage();
+    const s = await section();
+    expect(await s.findByRole("alert")).toHaveTextContent(DUE_WORDS.readFailed);
+    expect(s.getByRole("button", { name: `${DUE_WORDS.toggle}: Off` })).toBeDisabled();
+    expect(s.getByLabelText(DUE_WORDS.plan)).toBeDisabled();
+  });
+
+  it("before this device's first sync has finished, it waits for her settings from other devices", async () => {
+    await db.syncMeta.put({ key: "token", value: "f".repeat(64) });
+    renderPage();
+    const s = await section();
+    expect(s.getByText(DUE_WORDS.waiting)).toBeInTheDocument();
+    expect(s.getByRole("button", { name: `${DUE_WORDS.toggle}: Off` })).toBeDisabled();
+    // The settings arrive with the first sync.
+    await db.prefs.put(duePrefsRow({ ...DEFAULT_DUE_PREFS, on: true }));
+    expect(await s.findByRole("button", { name: `${DUE_WORDS.toggle}: On` })).toBeEnabled();
+  });
+
+  it("says plainly that Due also sees when reminders go off and when they're cancelled; shows this device's zone", async () => {
+    renderPage();
+    const s = await section();
+    expect(s.getByRole("note")).toHaveTextContent("when each one goes off");
+    expect(s.getByRole("note")).toHaveTextContent("cancelled");
+    expect(s.getByText(new RegExp(`This device is on ${Intl.DateTimeFormat().resolvedOptions().timeZone.replace("/", "\\/")}`))).toBeInTheDocument();
   });
 
   it("shows what was saved before (from another device too)", async () => {

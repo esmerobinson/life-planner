@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { db } from "../data/db";
@@ -73,6 +73,22 @@ describe("Add form", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add item" }));
     expect(await screen.findByText("A time needs a due day.")).toBeInTheDocument();
     expect(await db.items.count()).toBe(0);
+  });
+
+  it("a repeating to-do has no time field (review M8)", async () => {
+    render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    await userEvent.click(screen.getByLabelText("mon"));
+    expect(screen.queryByLabelText("Time")).toBeNull();
+  });
+
+  it("a time with seconds from the browser is saved as HH:MM (review M8)", async () => {
+    render(<QuickAdd today={TODAY} onAdded={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText("Title"), "Seconds");
+    await userEvent.type(screen.getByLabelText("Due"), "2026-11-18");
+    fireEvent.change(screen.getByLabelText("Time"), { target: { value: "09:30:00" } });
+    await userEvent.click(screen.getByRole("button", { name: "Add item" }));
+    await vi.waitFor(async () => expect(await db.items.count()).toBe(1));
+    expect((await db.items.toArray())[0]!.time).toBe("09:30");
   });
 
   it("an idea has no time field", async () => {
