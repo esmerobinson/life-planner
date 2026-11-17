@@ -96,11 +96,16 @@ export interface TogetherSent extends LegacyHabits {
   removing?: boolean;
   /**
    * The daily log's challenge days (routineChallenges.ts), by `<schedule|todos>:<date>`: "sent"
-   * (it is in Together; insert-only, never changed again) or "maybe" (an insert was cut off).
+   * (it is in Together; insert-only, never changed again), "maybe" (an insert was cut off) or
+   * "hand" (that day was already logged by hand in Together: left as she wrote it).
    */
-  routine?: Record<string, "sent" | "maybe">;
-  /** The daily log's two challenges, once found or made in Together. */
-  routineChallenges?: Partial<Record<"schedule" | "todos", true>>;
+  routine?: Record<string, "sent" | "maybe" | "hand">;
+  /** On the last press, a challenge wasn't ready for her days (missing, not hers, not accepted). */
+  routineWaiting?: "missing" | "not-hers" | "not-accepted";
+  /** On the last press, days of her log that couldn't go until she settles them. */
+  routineHeld?: { versions?: number; unreadable?: number };
+  /** On the last press, challenge days Together refused (tried again on the next press). */
+  routineProblems?: number;
 }
 
 async function meta<T>(db: HubDB, key: string): Promise<T | undefined> {

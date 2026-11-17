@@ -27,6 +27,7 @@ import { usePhone } from "../usePhone";
 import { LearnedToday } from "../together/LearnedToday";
 import { PrivateDayTick } from "../together/PrivateDayTick";
 import { DailyLog, WeeklyReview } from "./RoutineForms";
+import { RoutineDayLine } from "../together/RoutineDayLine";
 
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
@@ -170,8 +171,15 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           {tab === "exercise" && <PrivateDayTick jk={open.jk} date={today} part="exercise" />}
           {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
-          {tab === "check-in" && <DailyLog jk={open.jk} date={today} deviceId={open.deviceId} />}
-          {tab === "check-in" && <DailyLog jk={open.jk} date={addDays(today, -1)} deviceId={open.deviceId} yesterday />}
+          {tab === "check-in" && (
+            <DailyLog jk={open.jk} date={today} deviceId={open.deviceId} extra={(d) => <RoutineDayLine jk={open.jk} date={today} day={d} />} />
+          )}
+          {tab === "check-in" && (
+            <DailyLog
+              jk={open.jk} date={addDays(today, -1)} deviceId={open.deviceId} yesterday
+              extra={(d) => <RoutineDayLine jk={open.jk} date={addDays(today, -1)} day={d} />}
+            />
+          )}
           {tab === "check-in" && <PrivateDayTick jk={open.jk} date={today} part="checkin" />}
           {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
           {tab === "notes" && <NotesToMyself jk={open.jk} today={today} deviceId={open.deviceId} />}

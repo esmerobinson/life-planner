@@ -90,7 +90,7 @@ export class FakeSupabase {
   }
 
   /** A made-up challenge. */
-  addChallenge(c: { id: string; couple_id: string; name: string; for_user?: string | null }): void {
+  addChallenge(c: { id: string; couple_id: string; name: string; for_user?: string | null; accepted_at?: string | null; breaks_on?: string }): void {
     this.challenges.set(c.id, { for_user: null, start: "2026-10-01", goal_days: 10, goal_window_days: 62, deleted_at: null, ...c });
   }
 
@@ -187,6 +187,10 @@ export class FakeSupabase {
     }
     if (table === "challenges" && r.method === "PATCH") return this.patchChallenge(u, parse(r.body), couple, rep);
     if (table === "challenges" && r.method === "POST") return this.insertChallenge(parse(r.body), couple, rep);
+    if (table === "challenge_days" && r.method === "GET") {
+      const rows = [...this.days.values()].filter((d) => d.couple_id === couple && matches(d, u, ["couple_id", "id"]));
+      return json(200, rows.map((d) => pick(d, u)));
+    }
     if (table === "challenge_days" && r.method === "POST") return this.insertDay(parse(r.body), me, couple, rep);
     if (table === "challenge_days" && r.method === "PATCH") return this.patchDay(u, parse(r.body), couple, rep);
     if ((table === "todos" || table === "todo_events") && r.method === "POST") throw new Refusal(403, "42501", "fake: the link never makes to-dos");

@@ -1204,3 +1204,28 @@ test.describe("Weekly review at 1280px", () => {
     await noWordsInClear(page, [REVIEW.well, REVIEW.inWay, REVIEW.ifThen, "Mossgrove"]);
   });
 });
+
+test.describe("Weekly review on a weekday at 1280px (review I3)", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test(`${ENGINE}: on a Thursday, she types, pauses past an autosave and keeps typing without clicking: every key kept`, async ({ page }) => {
+    test.setTimeout(120_000);
+    const thursday = nextSundayNoon();
+    thursday.setDate(thursday.getDate() - 3);
+    await page.clock.install({ time: thursday });
+    await unlocked(page, "/journal/exercise");
+    const s = reviewBox(page);
+    await s.getByRole("button", { name: "Weekly review (any day this week)" }).click();
+    const box = s.getByLabel("What went well?");
+    await box.click();
+    await box.pressSequentially("Pretend Brackenfold first thought", { delay: 25 });
+    await page.waitForTimeout(THINK_MS); // autosaved meanwhile
+    await page.keyboard.type(" and the rest of it", { delay: 25 }); // no click: she just keeps going
+    await expect(box).toBeFocused();
+    await expect(box).toHaveValue("Pretend Brackenfold first thought and the rest of it");
+    await page.waitForTimeout(THINK_MS);
+    await page.reload();
+    await expect(reviewBox(page).getByLabel("What went well?")).toHaveValue("Pretend Brackenfold first thought and the rest of it");
+    await noWordsInClear(page, ["Brackenfold"]);
+  });
+});

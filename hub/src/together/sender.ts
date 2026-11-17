@@ -373,7 +373,7 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       // Today too: a press sends it like any other day.
       const journal = jk ? await readJournalDays(jk, addDays(today, 1)).catch(() => null) : null;
       // The daily logs (only days before today can be final; null: couldn't be read, nothing goes).
-      const logs = jk && ctx.mode === "send" ? await listDayLogs(jk, today).catch(() => null) : null;
+      const logs = jk && ctx.mode === "send" && (env.routineChallenges ?? SEND_ROUTINE_CHALLENGES.on) ? await listDayLogs(jk, today).catch(() => null) : null;
       return { jk, journal, logs };
     });
     ctx.challengeId = challengeId;
@@ -386,7 +386,7 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       if (snap.journal?.earliest && snap.journal.earliest < sent.since) sent.since = snap.journal.earliest;
       ctx.restoredUnpulled = await restoreHold(db, sent, now());
       await sendDays(ctx, snap.journal);
-      if (ctx.mode === "send" && (env.routineChallenges ?? SEND_ROUTINE_CHALLENGES) && snap.logs) {
+      if (ctx.mode === "send" && (env.routineChallenges ?? SEND_ROUTINE_CHALLENGES.on) && snap.logs) {
         await sendRoutineChallenges(ctx, snap.logs, ANSWERS_DELAY_MS, {
           maxWrites: MAX_WRITES_PER_RUN,
           between: () => pause(env.batchPauseMs ?? BATCH_PAUSE_MS),

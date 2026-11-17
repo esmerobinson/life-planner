@@ -7,6 +7,7 @@ import type { JournalKey } from "../../journal/crypto";
 import { syncController, useSyncState } from "../../sync";
 import type { SyncController } from "../../sync/controller";
 import { TOGETHER_META } from "../../together/store";
+import { SEND_ROUTINE_CHALLENGES } from "../../together/routineChallenges";
 import { TOGETHER_WORDS as W } from "./wording";
 import "./together.css";
 
@@ -58,6 +59,7 @@ export function PrivateDayTick({
       {/* What it means for Together, only where Together is in use (never to someone who isn't). */}
       {known && <p>{part === "exercise" ? W.oliverSeesExercise : W.oliverSeesCheckin}</p>}
       {known && <p className="together-warning">{W.privateWarning}</p>}
+      {known && SEND_ROUTINE_CHALLENGES.on && <p className="together-warning">{W.routinePrivateCaveat}</p>}
       {waiting && sync.syncOn && <p role="status">{W.notSyncedYet}</p>}
       {problem && <p role="alert">{problem}</p>}
     </div>

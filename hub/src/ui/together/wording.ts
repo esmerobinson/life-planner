@@ -44,6 +44,37 @@ export const TOGETHER_WORDS = {
   sending: "Sending…",
   stop: "Stop copying to Together",
   stopMarkDeleted: "Also mark everything already copied as deleted in Together",
+  // ---- the daily log's challenges (only while SEND_ROUTINE_CHALLENGES is on; review I5) ----
+  /** In the box: what goes, when, and that it stays. */
+  routineHowItSends:
+    "Your daily log goes too, into its two challenges: each answered question (Yes, Partly or No) and its note, 24 hours after the day ends at 3am. Once a day is there it stays: ticking it private, editing it, or stopping with removing can't take it back.",
+  /** Beside the private ticks and the box's private warning. */
+  routinePrivateCaveat: "Your daily log is different: once a day of it has gone to Together, it can't be hidden or removed.",
+  /** Beside "mark everything already copied as deleted". */
+  routineStopCaveat: "(Your daily log can't be removed from Together.)",
+  /** Its challenges aren't ready in Together: nothing of the daily log goes. */
+  routineWaiting: {
+    missing: "Your daily log isn't going to Together yet: its two challenges aren't there.",
+    "not-hers": "Your daily log isn't going to Together yet: its challenges there aren't set up for you.",
+    "not-accepted": "Your daily log isn't going to Together yet: accept its two challenges in Together first.",
+  } as Record<"missing" | "not-hers" | "not-accepted", string>,
+  /** Days of her daily log held until she settles them. */
+  routineVersions: (n: number) =>
+    n === 1 ? "1 day of your daily log has two versions: choose one in the Journal so it can go." : `${n} days of your daily log have two versions: choose one of each in the Journal so they can go.`,
+  routineUnreadable: (n: number) =>
+    n === 1 ? "1 day of your daily log can't be opened on this device, so it won't go from here." : `${n} days of your daily log can't be opened on this device, so they won't go from here.`,
+  routineProblems: (n: number) =>
+    n === 1 ? "1 daily log answer couldn't be copied. Send now tries it again." : `${n} daily log answers couldn't be copied. Send now tries them again.`,
+  /** Under a day's log box: whether and when that day goes, and why not. */
+  routineDay: {
+    sent: "This day is in Together. It can't be changed there.",
+    next: "This day goes to Together on your next Send now. After that it can't be changed or taken back there.",
+    "not-done": "This day goes to Together once you press Done, 24 hours after it ends (3am).",
+    versions: "This day won't go to Together until you choose one version.",
+    unreadable: "Part of this day can't be opened here, so it won't go to Together from this device.",
+    private: "This day is private: your daily log won't go to Together.",
+    "not-final": "Your answers and notes go to Together 24 hours after this day ends (3am). After that they can't be changed or taken back there.",
+  } as Record<"sent" | "next" | "not-done" | "versions" | "unreadable" | "private" | "not-final", string>,
   stopConfirm: "Stop copying",
   cancel: "Cancel",
   stopped: "Stopped copying to Together on this device.",

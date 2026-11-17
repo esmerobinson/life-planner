@@ -7,6 +7,7 @@ import { cancelStopRemoving, signInToTogether, stopTogether } from "../../togeth
 import { useJournalKey } from "../journal/useJournalKey";
 import { PrivateDayTick } from "./PrivateDayTick";
 import { useRunner, useTogetherMeta } from "./useTogether";
+import { SEND_ROUTINE_CHALLENGES } from "../../together/routineChallenges";
 import { TOGETHER_WORDS as W } from "./wording";
 import "./together.css";
 
@@ -101,8 +102,22 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
         <>
           <p className="together-warning">{W.notEncrypted}</p>
           <p className="together-warning">{W.howItSends}</p>
+          {SEND_ROUTINE_CHALLENGES.on && <p className="together-warning">{W.routineHowItSends}</p>}
           <p className="together-warning">{W.privateWarning}</p>
+          {SEND_ROUTINE_CHALLENGES.on && <p className="together-warning">{W.routinePrivateCaveat}</p>}
         </>
+      )}
+      {auth && SEND_ROUTINE_CHALLENGES.on && meta?.sent?.routineWaiting && (
+        <p role="status" className="together-warning">{W.routineWaiting[meta.sent.routineWaiting]}</p>
+      )}
+      {auth && SEND_ROUTINE_CHALLENGES.on && !!meta?.sent?.routineHeld?.versions && (
+        <p role="status" className="together-warning">{W.routineVersions(meta.sent.routineHeld.versions)}</p>
+      )}
+      {auth && SEND_ROUTINE_CHALLENGES.on && !!meta?.sent?.routineHeld?.unreadable && (
+        <p role="status" className="together-warning">{W.routineUnreadable(meta.sent.routineHeld.unreadable)}</p>
+      )}
+      {auth && SEND_ROUTINE_CHALLENGES.on && !!meta?.sent?.routineProblems && (
+        <p className="together-warning">{W.routineProblems(meta.sent.routineProblems)}</p>
       )}
       {auth && meta?.sent?.waitingRestore && <p role="status">{W.restoreWaiting}</p>}
       {/* PLACEHOLDER lines (magenta, system font): wording and look are the Design session's. */}
@@ -177,6 +192,7 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
             <div role="group" aria-label={W.stop}>
               <label>
                 <input type="checkbox" checked={markDeleted} onChange={(e) => setMarkDeleted(e.target.checked)} /> {W.stopMarkDeleted}
+                {SEND_ROUTINE_CHALLENGES.on && ` ${W.routineStopCaveat}`}
               </label>
               <div className="form-actions">
                 <button type="button" disabled={busy} onClick={() => void stop()}>
