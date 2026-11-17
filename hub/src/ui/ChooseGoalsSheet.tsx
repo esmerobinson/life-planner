@@ -17,6 +17,29 @@ export function byArea(goals: Goal[]): Goal[] {
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
+/** A pop-up sheet's keys: Escape closes it; Tab and Shift+Tab stay inside it. */
+export function sheetKeys(e: KeyboardEvent<HTMLDivElement>, sheet: HTMLDivElement | null, onClose: () => void) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+    return;
+  }
+  if (e.key !== "Tab" || !sheet) return;
+  const all = [...sheet.querySelectorAll<HTMLElement>(FOCUSABLE)];
+  if (all.length === 0) return;
+  const first = all[0]!;
+  const last = all[all.length - 1]!;
+  const at = document.activeElement;
+  if (e.shiftKey && (at === first || at === sheet)) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && at === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 /**
  * "Choose goals" as a pop-up (Esme: "selecting goals can be a tab that pops up";
  * mockup-choose-goals.html): a --panel sheet over a dimmed page, "Goals on Home", "N chosen",
@@ -58,27 +81,7 @@ export function ChooseGoalsSheet({
       });
   }
 
-  function onKey(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      onClose();
-      return;
-    }
-    if (e.key !== "Tab" || !sheet.current) return;
-    const all = [...sheet.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-    if (all.length === 0) return;
-    const first = all[0]!;
-    const last = all[all.length - 1]!;
-    const at = document.activeElement;
-    if (e.shiftKey && (at === first || at === sheet.current)) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && at === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => sheetKeys(e, sheet.current, onClose);
 
   return (
     <div
