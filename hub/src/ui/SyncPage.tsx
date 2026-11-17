@@ -3,15 +3,21 @@ import { syncController, useSyncState } from "../sync";
 import type { SyncController } from "../sync/controller";
 import { DEFAULT_SYNC_URL, getMeta, saveSyncSettings, stopSyncing } from "../sync/engine";
 import { deriveToken } from "../sync/token";
-import { confirmJournalKey, saveJournalKeyFromSync } from "../journal/keyStore";
-import { MAX_PAIRING_PASSPHRASE } from "../pairing/pairingText";
-import { PairingCode, ScanPairingCode, TOO_LONG } from "./Pairing";
+import { confirmJournalKey, giveOldPassphrase, journalSecretForPairing, saveJournalKeyFromPairing, saveJournalKeyFromSync } from "../journal/keyStore";
+import { pairingCodeForDevice } from "../pairing/devicePairing";
+import { MAX_PAIRING_PASSPHRASE, pairingText, type PairingPayload } from "../pairing/pairingText";
+import { CODE_FAILED, PairingCode, ScanPairingCode, SYNC_ONLY_NOTE, TOO_LONG } from "./Pairing";
 import { TogetherBox } from "./together/TogetherBox";
 import { OldPassphrasePrompt } from "./journal/OldPassphrasePrompt";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
   "After several wrong passphrases, sync stops accepting tries for 15 minutes. Wait, then try again.";
+/** Placeholder copy (Esme may reword), 2026-11-17: above the passphrase field for a v1 code. */
+export const PASSPHRASE_CODE_LINE =
+  "Or type your passphrase to show a code made from it. Use this if the other device has an older version of Esmeworld.";
+/** Placeholder copy (Esme may reword): a v2 code whose address isn't https (or this machine). */
+export const BAD_CODE_ADDRESS = "That pairing code's sync address can't be used here.";
 
 /** "Last synced" time: the time today, or the date and time on another day. */
 function when(ms: number): string {
@@ -32,6 +38,9 @@ function validAddress(text: string): boolean {
   }
 }
 
+/** The page or app is in the background (a code made meanwhile is not shown). */
+const backgrounded = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+
 export function SyncPage({ controller = syncController }: { controller?: SyncController }) {
   const state = useSyncState(controller);
   // A saved address (applied below once read) wins; else the build's VITE_SYNC_URL; else the
@@ -43,11 +52,13 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState("");
-  // Pairing (pair a device by QR code). The passphrase saved in THIS page visit, kept only in
-  // memory so "Pair another device" can show it as a code; gone when the page is left.
+  // Pairing (pair a device by QR code). "Pair another device" shows this device's v2 code (its
+  // sync token, address and copy of the journal secret: no passphrase needed). The passphrase
+  // saved in THIS page visit is kept only in memory as a fallback while the journal key is
+  // still being confirmed (a v1 code then); gone when the page is left or a code is hidden.
   const [savedSecret, setSavedSecret] = useState<string | null>(null);
-  // The passphrase whose code is on screen (null: hidden). Also only in memory.
-  const [shownSecret, setShownSecret] = useState<string | null>(null);
+  // The pairing text on screen (null: hidden), and whether it carries the journal. Only in memory.
+  const [shown, setShown] = useState<{ text: string; journal: boolean } | null>(null);
   // "Show pairing code" later: the passphrase pasted for it. Cleared once used.
   const [showField, setShowField] = useState("");
   const [showProblem, setShowProblem] = useState("");
@@ -90,7 +101,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
       setProblem("Enter the passphrase.");
       return;
     }
-    setShownSecret(null);
+    setShown(null);
     setSavedSecret(null);
     // Save stays disabled until the whole save (both derivations) is done, so two Saves never
     // overlap (security re-review, fix round 2).
@@ -123,16 +134,93 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
   }
 
   /**
-   * The code was hidden (Hide, after 60 s, or the app going to the background): the passphrase
-   * is forgotten too, so showing it again needs the passphrase typed or pasted.
+   * A v2 code (2026-11-17): set up from what another device that syncs keeps, no passphrase.
+   * The token and address are saved like Save's; the journal secret becomes a candidate bound
+   * to that token, confirmed only by the verifier (or the server accepting the token).
+   */
+  async function commitCode(code: Extract<PairingPayload, { v: 2 }>) {
+    const secret = code.secret;
+    try {
+      if (busy) return;
+      setNote("");
+      setProblem("");
+      const serverUrl = code.serverUrl ?? DEFAULT_SYNC_URL;
+      if (!validAddress(serverUrl)) {
+        setProblem(BAD_CODE_ADDRESS);
+        return;
+      }
+      setShown(null);
+      setSavedSecret(null);
+      setBusy(true);
+      try {
+        await saveSyncSettings(controller.db, { serverUrl, token: code.token });
+        addressEdited.current = false;
+        setAddress(serverUrl);
+        controller.clearError();
+        await controller.reload();
+        setNote("Saved.");
+      } catch {
+        setProblem("That did not save. Try again.");
+        setBusy(false);
+        return;
+      }
+      const journal = secret ? saveJournalKeyFromPairing(controller.db, secret, code.token).catch(() => undefined) : undefined;
+      const sync = controller.syncNow();
+      try {
+        await journal;
+      } finally {
+        secret?.fill(0);
+        setBusy(false);
+      }
+      await sync;
+      await confirmJournalKey(controller.db).catch(() => undefined);
+    } finally {
+      secret?.fill(0);
+    }
+  }
+
+  /** A scanned or pasted code of either version. */
+  function takeCode(code: PairingPayload) {
+    return code.v === 1 ? commit(code.passphrase) : commitCode(code);
+  }
+
+  /**
+   * "Pair another device": this device's v2 code, made at the tap. Carries the journal when this
+   * device has its copy of the journal secret; otherwise the passphrase saved in this visit (a
+   * v1 code) if there is one, else a sync-only code with a note.
+   */
+  async function pairAnother() {
+    setShowProblem("");
+    let made: Awaited<ReturnType<typeof pairingCodeForDevice>> = null;
+    try {
+      made = await pairingCodeForDevice(controller.db);
+    } catch {
+      made = null;
+    }
+    // Gone to the background while the code was being made: it is not shown behind her back.
+    if (backgrounded()) return;
+    if (made?.journal) setShown(made);
+    else if (savedSecret !== null) setShown({ text: pairingText(savedSecret), journal: true });
+    else if (made) setShown(made);
+    else setShowProblem(CODE_FAILED);
+  }
+
+  /**
+   * The code was hidden (Hide, after 60 s, or the app going to the background): it is
+   * forgotten, and so is any passphrase from this visit. Showing it again is another tap.
    */
   function hideCode() {
-    setShownSecret(null);
+    setShown(null);
     setSavedSecret(null);
     setShowField("");
   }
 
-  /** "Show pairing code" from a pasted passphrase: only the one this device syncs with. */
+  /**
+   * "Show pairing code" from a typed passphrase (a v1 code, which older app versions read):
+   * only the one this device syncs with. When this device has no copy of the journal secret yet
+   * (a key from before the re-key update), the passphrase also stores it, if it gives this
+   * journal's key, so the next "Pair another device" carries the journal by itself.
+   */
   async function showFromField(e: React.FormEvent) {
     e.preventDefault();
     const secret = showField;
@@ -153,13 +241,20 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
       setShowProblem("That didn't work. Try again.");
       return;
     }
-    setShownSecret(secret);
+    if (!backgrounded()) setShown({ text: pairingText(secret), journal: true });
+    try {
+      const have = await journalSecretForPairing(controller.db);
+      if (have) have.fill(0);
+      else await giveOldPassphrase(controller.db, secret);
+    } catch {
+      /* the code is shown either way */
+    }
   }
 
   async function stop() {
     setNote("");
     setProblem("");
-    setShownSecret(null);
+    setShown(null);
     setSavedSecret(null);
     try {
       await stopSyncing(controller.db);
@@ -217,31 +312,33 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
 
       <h2>Pair a device</h2>
       <p>Set up another device without typing: show a pairing code here, then scan it on the other device.</p>
-      {shownSecret !== null ? (
-        <PairingCode passphrase={shownSecret} onHide={hideCode} />
-      ) : savedSecret !== null && canPair ? (
-        <div className="form-actions">
-          <button type="button" className="btn-secondary" onClick={() => setShownSecret(savedSecret)}>
-            Pair another device
-          </button>
-        </div>
+      {shown !== null ? (
+        <PairingCode text={shown.text} note={shown.journal ? undefined : SYNC_ONLY_NOTE} onHide={hideCode} />
       ) : (
         canPair && (
-          <form onSubmit={(e) => void showFromField(e)}>
-            <label className="form-field">
-              <span className="form-label">Passphrase for the pairing code</span>
-              <input type="password" autoComplete="off" value={showField} onChange={(e) => setShowField(e.target.value)} />
-            </label>
+          <>
             <div className="form-actions">
-              <button type="submit" className="btn-secondary" disabled={!showField}>
-                Show pairing code
+              <button type="button" className="btn-secondary" onClick={() => void pairAnother()}>
+                Pair another device
               </button>
             </div>
-            {showProblem && <p role="alert">{showProblem}</p>}
-          </form>
+            <form onSubmit={(e) => void showFromField(e)}>
+              <p>{PASSPHRASE_CODE_LINE}</p>
+              <label className="form-field">
+                <span className="form-label">Passphrase for the pairing code</span>
+                <input type="password" autoComplete="off" value={showField} onChange={(e) => setShowField(e.target.value)} />
+              </label>
+              <div className="form-actions">
+                <button type="submit" className="btn-secondary" disabled={!showField}>
+                  Show pairing code
+                </button>
+              </div>
+              {showProblem && <p role="alert">{showProblem}</p>}
+            </form>
+          </>
         )
       )}
-      <ScanPairingCode busy={busy} onPassphrase={(secret) => commit(secret)} />
+      <ScanPairingCode busy={busy} onCode={takeCode} />
 
       <h2>Status</h2>
       {!state.syncOn && <p>Sync is off on this device.</p>}
