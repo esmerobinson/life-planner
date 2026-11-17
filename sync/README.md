@@ -90,8 +90,11 @@ inside the 60 s lease (`due_lease`), so runs never overlap; at most 40 calls; Du
 401/403 or 429 stops the run (a fixed code is logged) and the next run retries; 3 refusals stop the run
 and Due is left alone for an hour (`due_backoff`); Off with nothing left in Due skips Due entirely
 (`due_off_clean`). Due's state is read up to 8 MB; above 256 KB only our ids of yesterday, today and
-tomorrow are found by text search and parsed (`test/cpu`: 10k reminders and 5k to-dos ≈ 4 ms on an
-M-series Mac). The items query reads only open to-dos that can matter today (≤ 1,500). A sync that
+tomorrow are found by text search (inside the `reminders` array, one pass) and only their objects
+parsed; a full parse is only a logged fallback (`due_reminders_state_fallback`). The zones the app
+offers are worked out by arithmetic (no Intl in a run). `test/cpu` (Node, M-series Mac; a year of Due,
+10k reminders): warm under 2 ms, a cold fresh process about 3 ms (5 ms with nested objects). The items
+query hands the rules at most 300 real candidates, in their own order. A sync that
 ticks something off, bins it, or carries a time, day or deadline (or the `due` row) starts a run
 **after** its answer is sent (`ctx.waitUntil`), at most one a minute (`meta.due_sync_run`, taken
 only once the lease is). The token is only ever in the Authorization header to Due.
