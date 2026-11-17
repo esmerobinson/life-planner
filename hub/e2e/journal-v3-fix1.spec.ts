@@ -82,7 +82,11 @@ for (const width of [1280, 390]) {
       }
       await expect(s.getByText("Checked in for today")).toBeVisible();
       await expect(s.locator(".journal-answers output")).toHaveText(words);
-      await expect(s.getByRole("textbox")).toHaveCount(0);
+      // No boxes of the check-in's own: the only ones on the tab are the daily log's two notes,
+      // its own section under the check-in (yesterday's is folded away).
+      await expect(s.locator('textarea:not(.routine-placeholder textarea), input[type="text"]:not(.routine-placeholder input)')).toHaveCount(0);
+      await expect(s.getByRole("textbox")).toHaveCount(2);
+      await expect(s.getByRole("region", { name: "Daily log", exact: true }).getByRole("textbox")).toHaveCount(2);
       await noSidewaysScroll(page);
       await shoot(page, `fix1-checkin-finished-${width}`);
       await s.getByRole("button", { name: "Edit" }).click();
