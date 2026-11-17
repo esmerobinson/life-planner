@@ -151,7 +151,10 @@ describe("when a day may go", () => {
 
   it("a version she chose not to use (settled, still listed) no longer holds the day: it goes", async () => {
     const { c, fake, jk } = await setUp();
+    const gap = () => new Promise((r) => setTimeout(r, 5)); // each write strictly later
+    await gap();
     await saveDayLog(jk, "device-pretend-phone-1", { ...EMPTY_DAY_LOG, schedule: "yes" }, { date: D, seen: [], submittedAt: null }, true);
+    await gap();
     const day = (await listDayLogs(jk, "2026-11-30"))[0]!;
     const mine = day.others.find((o) => o.fields.scheduleNote === NOTE_S)!;
     await saveDayLog(jk, DEVICE, mine.fields, { date: D, seen: mine.seen, settled: day.seen, submittedAt: mine.submittedAt, doneOn: mine.doneOn });
