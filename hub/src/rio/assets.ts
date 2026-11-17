@@ -7,7 +7,12 @@
 import rawMap from "../assets/rio/day1/map/map.json";
 
 const URLS = import.meta.glob("../assets/rio/**/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
-const JSON_FILES = import.meta.glob("../assets/rio/**/*.json", { eager: true, import: "default" }) as Record<string, unknown>;
+// Only the JSON the app reads goes in the bundle: never the looks' palettes or the packs' manifests
+// (about half a megabyte the app doesn't use), except the themed nights' manifest, which it reads.
+const JSON_FILES = {
+  ...import.meta.glob(["../assets/rio/**/*.json", "!**/palette*.json", "!**/manifest.json"], { eager: true, import: "default" }),
+  ...import.meta.glob("../assets/rio/later/boteco/themed-nights/manifest.json", { eager: true, import: "default" }),
+} as Record<string, unknown>;
 
 /** The bundled URL for a pack-relative path (e.g. "day1/map/map-base-day.png"); "" if missing. */
 export const rioUrl = (path: string): string => URLS[`../assets/rio/${path}`] ?? "";

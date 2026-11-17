@@ -192,6 +192,36 @@ for (const width of [1280, 390]) {
       await page.getByRole("button", { name: "Back to the map" }).click();
     });
 
+    test("phase 2a: the new areas open on their days and draw their scenes (dev ?day= jumps the farm day)", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
+      await startedFarm(page);
+      await page.goto("/farm?day=14");
+      const places = page.getByRole("list", { name: "Places in Rio" });
+      await expect(places.getByRole("button", { name: "Jardim Botânico" })).toHaveAttribute("data-status", "new");
+      await expect(places.getByRole("button", { name: "Museum" })).toHaveAttribute("data-status", "next");
+      await places.getByRole("button", { name: "Jardim Botânico" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "jardim-botanico/outside");
+      await page.getByRole("button", { name: "The orchid house" }).click();
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "jardim-botanico/inside");
+      // The scene is drawn (not blank) and nothing scrolls.
+      await expect.poll(() => page.locator(".rio-area-layer canvas").evaluate((c) => {
+        const x = (c as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, (c as HTMLCanvasElement).width, (c as HTMLCanvasElement).height).data;
+        let n = 0;
+        for (let i = 3; i < x.length; i += 4) if (x[i]! > 0) n++;
+        return n;
+      })).toBeGreaterThan(1000);
+      expect(await page.evaluate(() => [document.documentElement.scrollHeight - innerHeight, document.documentElement.scrollWidth - innerWidth]))
+        .toEqual([0, 0]);
+      await page.getByRole("button", { name: "Back to the map" }).click();
+      // Day 200: every drawn area is open; Christ (drawn last) still waits.
+      await page.goto("/farm?day=200");
+      for (const name of ["Zona Sul", "Quilo", "Sult", "Santa Teresa", "Os Esquilos", "Museum", "Flamengo match"]) {
+        const b = page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name, exact: true });
+        await expect(b, name).toHaveAttribute("data-status", /new|open/);
+      }
+    });
+
     test("the menu by keyboard: Esc opens it, arrows move along the tabs, Enter opens one, Esc closes it", async ({ page }) => {
       test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await startedFarm(page);
