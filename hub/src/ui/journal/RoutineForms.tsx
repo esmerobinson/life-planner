@@ -160,7 +160,7 @@ function FormBox<F extends object>({
   const stored = own ? queued.current!.text : JSON.stringify(spec.normalise(day.fields));
   // Every new session is filed under the box's day (today for the review): a review belongs to the
   // day she pressed Done, or while not done the day she last edited it (review C1).
-  const fresh = (): FormSession => ({ date: newDate, seen: [...day.seen], submittedAt: day.submittedAt, doneOn: day.doneOn });
+  const fresh = (): FormSession => ({ date: newDate, seen: [...day.seen], settled: [...day.settledTokens], submittedAt: day.submittedAt, doneOn: day.doneOn });
 
   const enqueue = (fields: F) => {
     const s = session.current ?? (session.current = fresh());
@@ -204,17 +204,18 @@ function FormBox<F extends object>({
     }
   }
   /**
-   * "Use these answers": they go into the box as a new version that replaces both that version and
-   * the one the box held, so one version is left and the day is settled (review I4). She chose it;
-   * Done stays if either was done (review M6).
+   * "Use these answers": they go into the box as a new version that replaces only that version. The
+   * answers the box held are never hidden (fix round 2, R-C1): they stay listed, read-only, as an
+   * earlier version, marked settled so they no longer hold the day (review I4). Done stays if
+   * either was done (review M6).
    */
   async function use(v: FormVersion<F>) {
     const prev = session.current;
     draft.flush();
-    await queue.current; // anything typed is saved first
+    await queue.current; // anything typed is saved first, as its own version
     // The box's own session row by its bare id (only this device ever writes it, and never again).
-    const seen = [...new Set([...v.seen, ...day.seen, ...(prev?.version ? [prev.version] : [])])];
-    session.current = { date: newDate, seen, submittedAt: v.submittedAt ?? day.submittedAt, doneOn: v.doneOn ?? day.doneOn };
+    const settled = [...new Set([...day.settledTokens, ...day.seen, ...(prev?.version ? [prev.version] : [])])];
+    session.current = { date: newDate, seen: [...v.seen], settled, submittedAt: v.submittedAt ?? day.submittedAt, doneOn: v.doneOn ?? day.doneOn };
     const before = draft.value;
     const text = JSON.stringify(spec.normalise(v.fields));
     draft.set(text);
@@ -270,9 +271,9 @@ function OtherVersions<F>({
     <>
       {versions.map((v) => (
         <div key={v.id} className="routine-other">
-          <p>{mine(v.device) ? W.earlierHere : W.otherDevice}</p>
+          <p>{v.settled ? W.earlierVersion : mine(v.device) ? W.earlierHere : W.otherDevice}</p>
           <View fields={v.fields} />
-          {asking === v.id ? (
+          {v.settled ? null : asking === v.id ? (
             <div role="group" aria-label={W.removeAsk}>
               <p>{W.removeAsk}</p>
               <button type="button" onClick={() => void onRemove(v).then(() => setAsking(null))}>

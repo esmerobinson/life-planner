@@ -37,6 +37,8 @@ export const ROUTINE_WORDS = {
   notSubmitted: "Not done yet",
   otherDevice: "Also saved, from another device:",
   earlierHere: "Also saved, earlier on this device:",
+  /** A version she chose not to use: kept, read-only (fix round 2). */
+  earlierVersion: "Earlier version (you chose the answers above):",
   /** Read back (it doesn't say which device). */
   alsoSaved: "Also saved, another version:",
   useThese: "Use these answers",

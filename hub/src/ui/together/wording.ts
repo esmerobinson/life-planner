@@ -47,33 +47,36 @@ export const TOGETHER_WORDS = {
   // ---- the daily log's challenges (only while SEND_ROUTINE_CHALLENGES is on; review I5) ----
   /** In the box: what goes, when, and that it stays. */
   routineHowItSends:
-    "Your daily log goes too, into its two challenges: each answered question (Yes, Partly or No) and its note, 24 hours after the day ends at 3am. Once a day is there it stays: ticking it private, editing it, or stopping with removing can't take it back.",
+    "Your daily log goes too, into its two challenges: each answered question (Yes, Partly or No) and its note, 24 hours after the day ends at 3am. After that, changes here don't reach Together. Ticking the day private or stopping with removing hides it there, but Oliver's database still keeps the text.",
   /** Beside the private ticks and the box's private warning. */
-  routinePrivateCaveat: "Your daily log is different: once a day of it has gone to Together, it can't be hidden or removed.",
+  routinePrivateCaveat: "Your daily log: if a day of it has already gone, ticking it private hides it in Together, but Oliver's database still keeps the text.",
   /** Beside "mark everything already copied as deleted". */
-  routineStopCaveat: "(Your daily log can't be removed from Together.)",
+  routineStopCaveat: "(Your daily log's days are hidden too, but Oliver's database keeps their text.)",
   /** Its challenges aren't ready in Together: nothing of the daily log goes. */
   routineWaiting: {
     missing: "Your daily log isn't going to Together yet: its two challenges aren't there.",
     "not-hers": "Your daily log isn't going to Together yet: its challenges there aren't set up for you.",
     "not-accepted": "Your daily log isn't going to Together yet: accept its two challenges in Together first.",
-  } as Record<"missing" | "not-hers" | "not-accepted", string>,
+    "not-goal": "Your daily log isn't going to Together yet: its challenges there aren't the kind that keeps a log.",
+  } as Record<"missing" | "not-hers" | "not-accepted" | "not-goal", string>,
   /** Days of her daily log held until she settles them. */
   routineVersions: (n: number) =>
-    n === 1 ? "1 day of your daily log has two versions: choose one in the Journal so it can go." : `${n} days of your daily log have two versions: choose one of each in the Journal so they can go.`,
+    n === 1
+      ? "1 day of your daily log has two versions, so it won't go. Today's and yesterday's can be settled on the Daily check-in tab."
+      : `${n} days of your daily log have two versions, so they won't go. Today's and yesterday's can be settled on the Daily check-in tab.`,
   routineUnreadable: (n: number) =>
     n === 1 ? "1 day of your daily log can't be opened on this device, so it won't go from here." : `${n} days of your daily log can't be opened on this device, so they won't go from here.`,
   routineProblems: (n: number) =>
     n === 1 ? "1 daily log answer couldn't be copied. Send now tries it again." : `${n} daily log answers couldn't be copied. Send now tries them again.`,
   /** Under a day's log box: whether and when that day goes, and why not. */
   routineDay: {
-    sent: "This day is in Together. It can't be changed there.",
-    next: "This day goes to Together on your next Send now. After that it can't be changed or taken back there.",
+    sent: "This day is in Together. Changes here won't reach it; ticking it private hides it there (Oliver's database keeps the text).",
+    next: "This day goes to Together on your next Send now. After that, changes here won't reach it.",
     "not-done": "This day goes to Together once you press Done, 24 hours after it ends (3am).",
     versions: "This day won't go to Together until you choose one version.",
     unreadable: "Part of this day can't be opened here, so it won't go to Together from this device.",
     private: "This day is private: your daily log won't go to Together.",
-    "not-final": "Your answers and notes go to Together 24 hours after this day ends (3am). After that they can't be changed or taken back there.",
+    "not-final": "Your answers and notes go to Together 24 hours after this day ends (3am). After that, changes here won't reach Together.",
   } as Record<"sent" | "next" | "not-done" | "versions" | "unreadable" | "private" | "not-final", string>,
   stopConfirm: "Stop copying",
   cancel: "Cancel",
@@ -88,6 +91,8 @@ export const TOGETHER_WORDS = {
   privateCheckin: "Daily check-in: keep that day's answers private",
   /** Design pick A (2026-11-05): a tick under the answers. */
   privateTick: "Keep today's answers private",
+  /** Under yesterday's daily log: that day's own tick (fix round 2; PROVISIONAL). */
+  privateTickYesterday: "Keep yesterday's answers private",
   oliverSeesExercise: "Oliver still sees that you did the exercise, the card's title and its questions.",
   oliverSeesCheckin: "Oliver still sees that you checked in, and the questions you answered.",
   notSyncedYet: "Not saved to your other devices yet.",

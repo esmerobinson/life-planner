@@ -96,12 +96,13 @@ export interface TogetherSent extends LegacyHabits {
   removing?: boolean;
   /**
    * The daily log's challenge days (routineChallenges.ts), by `<schedule|todos>:<date>`: "sent"
-   * (it is in Together; insert-only, never changed again), "maybe" (an insert was cut off) or
-   * "hand" (that day was already logged by hand in Together: left as she wrote it).
+   * (it is in Together; never edited), "maybe" (an insert was cut off), "hand" (that day was
+   * already logged by hand in Together: left as she wrote it) or "hidden" (marked deleted after a
+   * private tick or Stop with removing; never sent again).
    */
-  routine?: Record<string, "sent" | "maybe" | "hand">;
+  routine?: Record<string, "sent" | "maybe" | "hand" | "hidden">;
   /** On the last press, a challenge wasn't ready for her days (missing, not hers, not accepted). */
-  routineWaiting?: "missing" | "not-hers" | "not-accepted";
+  routineWaiting?: "missing" | "not-hers" | "not-accepted" | "not-goal";
   /** On the last press, days of her log that couldn't go until she settles them. */
   routineHeld?: { versions?: number; unreadable?: number };
   /** On the last press, challenge days Together refused (tried again on the next press). */

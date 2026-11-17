@@ -28,6 +28,7 @@ import { LearnedToday } from "../together/LearnedToday";
 import { PrivateDayTick } from "../together/PrivateDayTick";
 import { DailyLog, WeeklyReview } from "./RoutineForms";
 import { RoutineDayLine } from "../together/RoutineDayLine";
+import { TOGETHER_WORDS } from "../together/wording";
 
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
@@ -174,13 +175,18 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           {tab === "check-in" && (
             <DailyLog jk={open.jk} date={today} deviceId={open.deviceId} extra={(d) => <RoutineDayLine jk={open.jk} date={today} day={d} />} />
           )}
+          {tab === "check-in" && <PrivateDayTick jk={open.jk} date={today} part="checkin" />}
+          {/* Yesterday's log below today's tick, with its own tick for that day (fix round 2, R-I1; placement for Design). */}
           {tab === "check-in" && (
             <DailyLog
               jk={open.jk} date={addDays(today, -1)} deviceId={open.deviceId} yesterday
-              extra={(d) => <RoutineDayLine jk={open.jk} date={addDays(today, -1)} day={d} />}
+              extra={() => (
+                <>
+                  <PrivateDayTick jk={open.jk} date={addDays(today, -1)} part="checkin" label={TOGETHER_WORDS.privateTickYesterday} />
+                </>
+              )}
             />
           )}
-          {tab === "check-in" && <PrivateDayTick jk={open.jk} date={today} part="checkin" />}
           {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
           {tab === "notes" && <NotesToMyself jk={open.jk} today={today} deviceId={open.deviceId} />}
         </section>

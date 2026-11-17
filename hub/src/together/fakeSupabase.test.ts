@@ -118,15 +118,13 @@ describe("the daily log's challenges (Oliver's answer, 2026-11-16)", () => {
     expect((await rest(me.access_token, "POST", "challenges", ch())).status).toBe(409);
   });
 
-  it("their days are insert only: no change and no delete, by anyone", async () => {
+  it("their days: the link may mark one deleted (Oliver's correction), never change its note (stricter than Together)", async () => {
     const { rest, me, partner } = await setup();
     await rest(me.access_token, "POST", "challenges", ch());
     const d = { id: "esme-schedule-2026-11-10", couple_id: COUPLE, challenge_id: "esme-daily-schedule", day: "2026-11-10", note: "Yes" };
     expect((await rest(me.access_token, "POST", "challenge_days", d)).status).toBe(201);
-    for (const t of [me, partner]) {
-      expect((await rest(t.access_token, "PATCH", `challenge_days?id=eq.${d.id}`, { note: "No" })).status).toBe(403);
-      expect((await rest(t.access_token, "PATCH", `challenge_days?id=eq.${d.id}`, { deleted_at: "2026-11-12T00:00:00Z" })).status).toBe(403);
-    }
+    for (const t of [me, partner]) expect((await rest(t.access_token, "PATCH", `challenge_days?id=eq.${d.id}`, { note: "No" })).status).toBe(403);
+    expect((await rest(me.access_token, "PATCH", `challenge_days?id=eq.${d.id}`, { deleted_at: "2026-11-12T00:00:00Z" })).status).toBe(200);
     expect((await rest(me.access_token, "POST", "challenge_days", d)).status).toBe(409);
   });
 });

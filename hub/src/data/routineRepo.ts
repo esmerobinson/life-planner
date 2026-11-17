@@ -39,6 +39,8 @@ export interface FormSession {
   submittedAt: number | null;
   /** The app day she pressed Done (kept from the version she edits). */
   doneOn?: ISODate | null;
+  /** Versions she chose not to use: kept listed, not holding the day (journal/routine.ts). */
+  settled?: string[];
 }
 
 type Spec<F> = { kind: FormKind; rules: FormRules<F>; fields: (e: never) => F; tooLong: (f: F) => boolean };
@@ -75,7 +77,7 @@ async function merged<F>(jk: JournalKey, spec: Spec<F>, rows: JournalRow[]): Pro
     const e = o.entry;
     versions.push({
       id: row.id, date: row.date, device: deviceOf(row), fields: spec.fields(e as never),
-      submittedAt: e.submittedAt, ...(e.doneOn ? { doneOn: e.doneOn } : {}), at: e.at, seen: e.seen ?? [],
+      submittedAt: e.submittedAt, ...(e.doneOn ? { doneOn: e.doneOn } : {}), at: e.at, seen: e.seen ?? [], settled: e.settled ?? [],
     });
   }
   return mergeVersions(versions, unreadable, spec.rules);
@@ -131,7 +133,11 @@ async function saveForm<F extends object>(
   // The day she pressed Done: kept from the version she edits, else today in the app (3am rule).
   const doneOn = submittedAt === null ? null : (session.doneOn ?? (session.submittedAt === null ? todayISO(new Date(at)) : todayISO(new Date(session.submittedAt))));
   if (submittedAt !== null) session.doneOn = doneOn;
-  const entry = { v: 1, ...spec.fields(fields as never), submittedAt, ...(doneOn ? { doneOn } : {}), at, ...(seen.length ? { seen } : {}) };
+  const settled = (session.settled ?? []).filter((x) => x !== id && !x.startsWith(`${id}@`)).slice(0, 64);
+  const entry = {
+    v: 1, ...spec.fields(fields as never), submittedAt, ...(doneOn ? { doneOn } : {}), at,
+    ...(seen.length ? { seen } : {}), ...(settled.length ? { settled } : {}),
+  };
   await formRows.write(jk, kind, [await formRows.seal(jk, kind, date, id.slice(`${kind}:${date}:`.length), entry)]);
   return id;
 }

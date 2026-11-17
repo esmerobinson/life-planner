@@ -57,7 +57,7 @@ it("switched on: the box says it goes for good 24 h after the day ends, and why 
   );
   expect(await screen.findByText(W.routineHowItSends)).toBeInTheDocument();
   expect(W.routineHowItSends).toMatch(/24 hours after the day ends/);
-  expect(W.routineHowItSends).toMatch(/can't take it back/);
+  expect(W.routineHowItSends).toMatch(/hides it there, but Oliver's database still keeps the text/);
   expect(screen.getAllByText(W.routinePrivateCaveat).length).toBeGreaterThanOrEqual(2); // the box and the tick
   expect(screen.getByText(W.routineWaiting["not-accepted"])).toBeInTheDocument();
   expect(screen.getByText(W.routineVersions(2))).toBeInTheDocument();

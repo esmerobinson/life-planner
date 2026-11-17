@@ -56,6 +56,11 @@ interface VersionStamp {
   at: number;
   /** The versions this one replaces (`<row id>@<at>`). */
   seen?: string[];
+  /**
+   * Versions she saw and chose not to use ("Use these answers" on another one, fix round 2): they
+   * stay listed (never hidden), but no longer hold the day back. Same tokens as `seen`.
+   */
+  settled?: string[];
 }
 
 export type DayLogEntry = VersionStamp & DayLogFields;
@@ -70,7 +75,7 @@ const text = (max: number) => (v: unknown) => isStr(v) && v.length <= max;
 const seenOk = (v: unknown) =>
   v === undefined || (Array.isArray(v) && v.length <= 64 && v.every((x) => isStr(x) && x.length <= 256));
 const stampOk = (v: Record<string, unknown>) =>
-  v.v === 1 && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) && seenOk(v.seen) &&
+  v.v === 1 && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) && seenOk(v.seen) && seenOk(v.settled) &&
   (v.doneOn === undefined || (isStr(v.doneOn) && isValidISODate(v.doneOn)));
 
 export function isDayLogEntry(v: unknown): v is DayLogEntry {
@@ -130,9 +135,13 @@ export interface FormVersion<F> {
    * other live version with the same answers (shown once, so replaced together).
    */
   seen: string[];
+  /** Listed, but she chose another version over it: it doesn't hold the day back. */
+  settled?: boolean;
 }
 
 export interface FormDay<F> extends FormVersion<F> {
+  /** The shown version's own `settled` tokens (a new session carries them on). */
+  settledTokens: string[];
   /** Done (she pressed Done on it, or on a version with the same answers) and something answered. */
   done: boolean;
   /**
@@ -157,6 +166,7 @@ export interface RawVersion<F> {
   doneOn?: ISODate;
   at: number;
   seen: string[];
+  settled?: string[];
 }
 
 export interface FormRules<F> {
@@ -180,16 +190,21 @@ export const seenToken = (v: { id: string; at: number }): string => `${v.id}@${v
  * saw it: a later write to that row shows again), and every other live one with different
  * answers. Nothing is ever dropped here: a version is gone only when one she wrote names it.
  */
-export function mergeVersions<F>(versions: RawVersion<F>[], unreadable: number, rules: FormRules<F>): FormDay<F> {
+/** Whether tokens (`<id>@<at>`, or a bare id for every stamp) name a version as it is now. */
+function names(tokens: string[]): (v: { id: string; at: number }) => boolean {
   const bare = new Set<string>();
   const sawAt = new Map<string, number>();
-  for (const t of versions.flatMap((v) => v.seen)) {
+  for (const t of tokens) {
     const cut = t.lastIndexOf("@");
     const at = cut > 0 ? Number(t.slice(cut + 1)) : NaN;
     if (cut > 0 && Number.isFinite(at)) sawAt.set(t.slice(0, cut), Math.max(at, sawAt.get(t.slice(0, cut)) ?? -Infinity));
     else bare.add(t);
   }
-  const replaced = (v: RawVersion<F>) => bare.has(v.id) || (sawAt.get(v.id) ?? -Infinity) >= v.at;
+  return (v) => bare.has(v.id) || (sawAt.get(v.id) ?? -Infinity) >= v.at;
+}
+
+export function mergeVersions<F>(versions: RawVersion<F>[], unreadable: number, rules: FormRules<F>): FormDay<F> {
+  const replaced = names(versions.flatMap((v) => v.seen));
   const live = versions.filter((v) => !replaced(v)).sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
   const same = (f: F) => live.filter((v) => rules.key(v.fields) === rules.key(f));
   const view = (v: RawVersion<F>, done: RawVersion<F> | undefined): FormVersion<F> => ({
@@ -202,16 +217,20 @@ export function mergeVersions<F>(versions: RawVersion<F>[], unreadable: number, 
   const shown: FormVersion<F> = top
     ? view(top, doneOf(top))
     : { id: "", date: "", device: "", fields: rules.empty, submittedAt: null, doneOn: null, at: 0, seen: [] };
+  // Only the version shown settles others (a later write to one shows it as unsettled again).
+  const settledTokens = top?.settled ?? [];
+  const settled = names(settledTokens);
   const keys = new Set([rules.key(shown.fields)]);
   const others: FormVersion<F>[] = [];
   for (const v of live.slice(1)) {
     const k = rules.key(v.fields);
     if (!rules.filled(v.fields) || keys.has(k)) continue;
     keys.add(k);
-    others.push(view(v, v.submittedAt !== null ? v : undefined));
+    // Settled when every live version with these answers was named.
+    others.push({ ...view(v, v.submittedAt !== null ? v : undefined), settled: same(v.fields).every(settled) });
   }
   const done = shown.submittedAt !== null && rules.filled(shown.fields);
-  return { ...shown, done, day: done && shown.doneOn ? shown.doneOn : shown.date, others, unreadable };
+  return { ...shown, settledTokens, done, day: done && shown.doneOn ? shown.doneOn : shown.date, others, unreadable };
 }
 
 // ---- the week ------------------------------------------------------------------------------------

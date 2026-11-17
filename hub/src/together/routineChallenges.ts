@@ -3,8 +3,9 @@
 // goes in as one challenge day: "Yes", "Partly" or "No" (every answer, honestly: Esme, 16 Nov),
 // and her note on the next line.
 //
-// Together's answer (Oliver's agent, 16 Nov 2026): the challenges are `esme-daily-schedule` and
-// `esme-daily-todos`. Their challenge_days are INSERT ONLY: no update and no deleted_at. So:
+// Together's answer (Oliver's agent, 16-17 Nov 2026): the challenges are `esme-daily-schedule` and
+// `esme-daily-todos`, made by Oliver (for Esme, goal, 30 days in 30). The main path stays
+// insert-once-when-final (simplest, nothing to keep in step):
 // - The link NEVER makes the challenges (review C2: once made, their kind and who they are for
 //   can't be changed). Oliver makes them. A day goes only into a challenge that is there, is
 //   Esme's (`for_user`) and is accepted; otherwise nothing goes and the box says why.
@@ -14,6 +15,9 @@
 // - Only with Done, only answered questions, never a private day (either tick; a tick that won't
 //   open counts as private), never a day with another version not settled or a row that won't
 //   open. Everything is read again right before each insert (review I1).
+// - Once sent, a day is never edited. Ticked private afterwards (or Stop with removing), its rows
+//   are marked deleted (Oliver's correction, 17 Nov: deleted_at and an update grant exist): hidden
+//   in Together, the text still in Oliver's database. Never sent again after that.
 // - Every row's id is fixed by the day. Only a true duplicate (that same id already there, checked)
 //   counts as sent; the same day logged by hand in Together is left as she wrote it. Any other
 //   refusal (a 409 for a missing challenge too, review I2) is never counted as sent: tried again
@@ -88,7 +92,8 @@ export function routineDayHold(
   log: FormDay<DayLogFields>, ticks: { exercise: boolean; checkin: boolean }, final: boolean,
 ): RoutineHold | null {
   if (log.unreadable > 0) return "unreadable";
-  if (log.others.length > 0) return "versions";
+  // Another version she hasn't chosen between (one she chose not to use stays listed: settled).
+  if (log.others.some((o) => !o.settled)) return "versions";
   if (!log.done) return "not-done";
   if (ticks.exercise || ticks.checkin) return "private";
   if (!final) return "not-final";
@@ -105,21 +110,54 @@ export interface RoutineCtx {
   now(): number;
   save(): Promise<void>;
   call(method: "GET" | "POST" | "PATCH", path: string, body: unknown, prefer?: string): Promise<CallResult & { kind: "ok" | "refused" }>;
+  /** PATCH exactly one row (refused "no-row" when Together has none). */
+  patch(table: string, filter: string, body: Record<string, unknown>): Promise<CallResult & { kind: "ok" | "refused" }>;
+  nowIso(): string;
+}
+
+/**
+ * Hides days already sent (Oliver's correction, 17 Nov: their rows can be marked deleted): every
+ * day now ticked private (either tick; one that won't open counts as private), or every one with
+ * `all` (Stop with removing). Only `deleted_at` is ever set: the text stays in Oliver's database,
+ * as the box says. A hidden day is never sent again. Runs on every run, switch on or off (it only
+ * takes words out). Returns how many couldn't be hidden (tried again next run).
+ */
+export async function hideRoutineDays(ctx: RoutineCtx, opts: { all?: boolean } = {}): Promise<number> {
+  const record = ctx.sent.routine ?? {};
+  let failed = 0;
+  for (const [k, state] of Object.entries(record)) {
+    if (state !== "sent" && state !== "maybe") continue;
+    const cut = k.indexOf(":");
+    const key = k.slice(0, cut) as RoutineKey;
+    const date = k.slice(cut + 1);
+    if (!opts.all) {
+      if (!ctx.jk) continue;
+      const ticks = await readSharePrivate(ctx.jk, date);
+      if (!ticks.exercise && !ticks.checkin) continue;
+    }
+    const r = await ctx.patch("challenge_days", `couple_id=eq.${enc(ctx.auth.coupleId)}&id=eq.${enc(routineDayId(key, date))}`, { deleted_at: ctx.nowIso() });
+    if (r.kind === "ok" || r.code === "no-row") record[k] = "hidden";
+    else failed++;
+    await ctx.save();
+  }
+  return failed;
 }
 
 const enc = encodeURIComponent;
 
 /** Why a challenge isn't ready for her days ("missing", not hers, not accepted), or null when it is. */
-type ChallengeState = null | "missing" | "not-hers" | "not-accepted";
+type ChallengeState = null | "missing" | "not-hers" | "not-accepted" | "not-goal";
 
 /** Looked up afresh on every press (never trusted from an earlier one, review M3). */
 async function challengeState(ctx: RoutineCtx, key: RoutineKey): Promise<ChallengeState> {
   const { id } = ROUTINE_CHALLENGES[key];
-  const r = await ctx.call("GET", `challenges?couple_id=eq.${enc(ctx.auth.coupleId)}&id=eq.${enc(id)}&select=id,for_user,accepted_at`, undefined, "");
-  const row = r.kind === "ok" && Array.isArray(r.body) ? (r.body[0] as { for_user?: unknown; accepted_at?: unknown } | undefined) : undefined;
+  const r = await ctx.call("GET", `challenges?couple_id=eq.${enc(ctx.auth.coupleId)}&id=eq.${enc(id)}&select=id,for_user,accepted_at,breaks_on`, undefined, "");
+  const row = r.kind === "ok" && Array.isArray(r.body) ? (r.body[0] as { for_user?: unknown; accepted_at?: unknown; breaks_on?: unknown } | undefined) : undefined;
   if (!row) return "missing";
   if (row.for_user !== ctx.auth.userId) return "not-hers";
   if (!row.accepted_at) return "not-accepted";
+  // Only a goal challenge shows its days in Together (review R-M2): never into any other kind.
+  if (row.breaks_on !== "goal") return "not-goal";
   return null;
 }
 
@@ -145,7 +183,7 @@ export async function sendRoutineChallenges(
   const held: { versions?: number; unreadable?: number } = {};
   const due: RoutineDayPayload[] = [];
   for (const log of [...logs].sort((a, b) => a.date.localeCompare(b.date))) {
-    const payloads = routineDayPayloads(log.date, log.fields, ctx.auth.coupleId).filter((p) => !["sent", "hand"].includes(record[`${p.key}:${p.date}`] ?? ""));
+    const payloads = routineDayPayloads(log.date, log.fields, ctx.auth.coupleId).filter((p) => !["sent", "hand", "hidden"].includes(record[`${p.key}:${p.date}`] ?? ""));
     if (payloads.length === 0 && log.done) continue; // already in Together (or nothing answered)
     const hold = routineDayHold(log, await readSharePrivate(jk, log.date), isFinal(log.date, ctx.now(), delayMs));
     if (hold) {

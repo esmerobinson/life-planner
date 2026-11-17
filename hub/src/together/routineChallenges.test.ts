@@ -35,7 +35,7 @@ const routineRequests = (fake: FakeSupabase) =>
 const dayPosts = (fake: FakeSupabase) => fake.requests.filter((r) => r.method === "POST" && r.url.includes("challenge_days") && /esme-/.test(r.body));
 
 /** Oliver's two challenges, as he'd make them: for Esme, accepted by her. */
-function ready(fake: FakeSupabase, extra: { for_user?: string | null; accepted_at?: string | null } = {}) {
+function ready(fake: FakeSupabase, extra: { for_user?: string | null; accepted_at?: string | null; breaks_on?: string } = {}) {
   for (const id of [SCHEDULE, TODOS]) fake.addChallenge({ id, couple_id: COUPLE, name: `Pretend ${id}`, for_user: ME, accepted_at: "2026-11-01T10:00:00Z", breaks_on: "goal", ...extra });
 }
 
@@ -83,6 +83,7 @@ describe("the switch and the challenges (review C2)", () => {
     ["for nobody", (f: FakeSupabase) => ready(f, { for_user: null }), "not-hers"],
     ["for Oliver", (f: FakeSupabase) => ready(f, { for_user: PARTNER }), "not-hers"],
     ["not accepted yet", (f: FakeSupabase) => ready(f, { accepted_at: null }), "not-accepted"],
+    ["not goal challenges (R-M2)", (f: FakeSupabase) => ready(f, { breaks_on: "hit" }), "not-goal"],
   ] as const) {
     it(`the challenges ${what}: nothing goes, nothing is ever made, and the box is told why`, async () => {
       const { c, fake } = await setUp({ challenges: false });
@@ -146,6 +147,17 @@ describe("when a day may go", () => {
     await press(fake, c);
     expect(dayPosts(fake)).toEqual([]);
     expect((await readSent(db))!.routineHeld).toEqual({ versions: 1 });
+  });
+
+  it("a version she chose not to use (settled, still listed) no longer holds the day: it goes", async () => {
+    const { c, fake, jk } = await setUp();
+    await saveDayLog(jk, "device-pretend-phone-1", { ...EMPTY_DAY_LOG, schedule: "yes" }, { date: D, seen: [], submittedAt: null }, true);
+    const day = (await listDayLogs(jk, "2026-11-30"))[0]!;
+    const mine = day.others.find((o) => o.fields.scheduleNote === NOTE_S)!;
+    await saveDayLog(jk, DEVICE, mine.fields, { date: D, seen: mine.seen, settled: day.seen, submittedAt: mine.submittedAt, doneOn: mine.doneOn });
+    expect((await listDayLogs(jk, "2026-11-30"))[0]!.others.map((o) => o.settled)).toEqual([true]);
+    await press(fake, c);
+    expect(fake.liveDays(SCHEDULE).map((r) => r.note)).toEqual([`Partly\n${NOTE_S}`]);
   });
 
   it("once in, never changed: an edit afterwards sends nothing (the fake refuses any change to these days)", async () => {
@@ -231,7 +243,7 @@ describe("read again right before each insert (review I1)", () => {
         sent: { userId: ME, since: D, salt: "00", refused: {} }, auth: { coupleId: COUPLE, userId: ME }, jk, restoredUnpulled: false, writes: 0,
         now: c.now, save: async () => undefined,
         call: async (method: string, path: string, body: unknown) => {
-          if (method === "GET" && path.startsWith("challenges")) return { kind: "ok", body: [{ for_user: ME, accepted_at: "2026-11-01T10:00:00Z" }] };
+          if (method === "GET" && path.startsWith("challenges")) return { kind: "ok", body: [{ for_user: ME, accepted_at: "2026-11-01T10:00:00Z", breaks_on: "goal" }] };
           if (method === "POST") {
             posted.push(body);
             if (first) {
@@ -259,5 +271,47 @@ describe("read again right before each insert (review I1)", () => {
     const arrive = async () => void (await saveDayLog(jk, "device-pretend-phone-1", { ...EMPTY_DAY_LOG, todos: "yes" }, { date: D2, seen: [], submittedAt: null }, true));
     await sendRoutineChallenges(ctx(arrive), await listDayLogs(jk, "2026-11-30"), ANSWERS_DELAY_MS, opts);
     expect(JSON.stringify(posted)).not.toContain(D2);
+  });
+});
+
+describe("after a day has gone: hidden, never edited (Oliver's correction, 17 Nov)", () => {
+  it("ticked private afterwards: the next automatic run marks its rows deleted (only deleted_at; the text stays in Oliver's database); never sent again", async () => {
+    const { c, fake, jk } = await setUp();
+    await press(fake, c);
+    await saveSharePrivate(jk, D, "checkin", true);
+    const n = fake.requests.length;
+    await sendToTogether({ fetch: fake.fetch, now: c.now, mode: "hide" }); // the switch needn't be on to hide
+    const patches = fake.requests.slice(n).filter((r) => r.method === "PATCH" && /esme-/.test(decodeURIComponent(r.url)));
+    expect(patches.map((r) => Object.keys(JSON.parse(r.body)))).toEqual([["deleted_at"], ["deleted_at"]]);
+    expect(fake.liveDays(SCHEDULE)).toEqual([]);
+    expect(fake.dayRow(SCHEDULE, D)!.note).toBe(`Partly\n${NOTE_S}`); // hidden, not wiped: Together keeps it
+    expect((await readSent(db))!.routine).toEqual({ [`schedule:${D}`]: "hidden", [`todos:${D}`]: "hidden" });
+    // Un-ticked again: it stays hidden (never sent again).
+    await saveSharePrivate(jk, D, "checkin", false);
+    const m = dayPosts(fake).length;
+    await press(fake, c);
+    expect(dayPosts(fake).length).toBe(m);
+    expect(fake.liveDays(SCHEDULE)).toEqual([]);
+  });
+
+  it("Stop with removing marks every sent daily-log day deleted too", async () => {
+    const { stopTogether } = await import("./sender");
+    const { c, fake } = await setUp();
+    await press(fake, c);
+    expect(await stopTogether({ fetch: fake.fetch, now: c.now }, { markDeleted: true })).toEqual({ kind: "ok" });
+    expect(fake.liveDays(SCHEDULE)).toEqual([]);
+    expect(fake.liveDays(TODOS)).toEqual([]);
+  });
+
+  it("a later edit here never changes the note there", async () => {
+    const { c, fake, jk } = await setUp();
+    await press(fake, c);
+    const day = (await listDayLogs(jk, "2026-11-30"))[0]!;
+    await saveDayLog(jk, DEVICE, { ...day.fields, todosNote: "Pretend after it went" }, { date: D, seen: day.seen, submittedAt: day.submittedAt });
+    const rec = guardedFetch(fake.fetch, () => ["Pretend after it went"], c.now);
+    await press(fake, c, rec.fetch);
+    await sendToTogether({ fetch: rec.fetch, now: c.now, mode: "hide" });
+    expect(rec.violations).toEqual([]);
+    expect(fake.liveDays(TODOS)[0]!.note).toBe(`No\n${NOTE_T}`);
   });
 });

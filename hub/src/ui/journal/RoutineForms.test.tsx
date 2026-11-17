@@ -82,11 +82,40 @@ describe("the daily log", () => {
     await userEvent.click(screen.getByRole("button", { name: W.remove }));
     await userEvent.click(within(screen.getByRole("group", { name: W.removeAsk })).getByRole("button", { name: W.removeNo }));
     expect((await readDayLog(jk, DAY)).others).toHaveLength(1);
-    // Use it: its answers go into the box, and the day is settled: one version left (review I4).
+    // Use it: its answers go into the box. The answers the box held are never cleared: they stay
+    // listed, read-only, as an earlier version, and the day is settled (fix round 2, R-C1).
     await userEvent.click(screen.getByRole("button", { name: W.useThese }));
     await screen.findByDisplayValue("Pretend Mac words");
-    await waitFor(async () => expect(await readDayLog(jk, DAY)).toMatchObject({ others: [], fields: { schedule: "yes", scheduleNote: "Pretend Mac words" } }));
-    expect(screen.queryByText(W.earlierHere)).toBeNull();
+    await waitFor(async () => {
+      const d = await readDayLog(jk, DAY);
+      expect(d.fields).toMatchObject({ schedule: "yes", scheduleNote: "Pretend Mac words" });
+      expect(d.others.map((o) => [o.fields.scheduleNote, o.settled])).toEqual([["Pretend phone words", true]]);
+    });
+    expect(await screen.findByText(W.earlierVersion)).toBeInTheDocument();
+    expect(screen.getByText("Pretend phone words")).toBeInTheDocument(); // still on screen, read-only
+    expect(screen.queryByRole("button", { name: W.useThese })).toBeNull();
+    expect(screen.queryByRole("button", { name: W.remove })).toBeNull();
+  });
+
+  it("R-C1: words she typed a moment ago are never cleared by \"Use these answers\": they stay listed and in Read back", async () => {
+    const jk = await key();
+    await saveDayLog(jk, PHONE, { ...EMPTY_DAY_LOG, todos: "no", todosNote: "Pretend phone version" }, { date: DAY, seen: [], submittedAt: null });
+    await new Promise((r) => setTimeout(r, 3));
+    await saveDayLog(jk, MAC, { ...EMPTY_DAY_LOG, todos: "yes", todosNote: "Pretend Mac long reflection" }, { date: DAY, seen: [], submittedAt: null });
+    render(<DailyLog jk={jk} date={DAY} deviceId={MAC} />);
+    const box = await screen.findByDisplayValue("Pretend Mac long reflection");
+    await userEvent.type(box, " and Pretend typed just now");
+    await userEvent.click(screen.getByRole("button", { name: W.useThese })); // at once, no pause
+    await screen.findByDisplayValue("Pretend phone version");
+    await waitFor(async () => {
+      const d = await readDayLog(jk, DAY);
+      expect(d.fields.todosNote).toBe("Pretend phone version");
+      expect(d.others.map((o) => o.fields.todosNote)).toEqual(["Pretend Mac long reflection and Pretend typed just now"]);
+      expect(d.others[0]!.settled).toBe(true);
+    });
+    expect(screen.getByText("Pretend Mac long reflection and Pretend typed just now")).toBeInTheDocument();
+    const { listDayLogs } = await import("../../data/repo");
+    expect((await listDayLogs(jk, "2026-12-31"))[0]!.others.map((o) => o.fields.todosNote)).toEqual(["Pretend Mac long reflection and Pretend typed just now"]);
   });
 
   it("Remove, confirmed: that version is gone, the box's answers stay", async () => {
@@ -109,7 +138,8 @@ describe("the daily log", () => {
     render(<DailyLog jk={jk} date={DAY} deviceId={MAC} />);
     await screen.findByText(W.logDone);
     await userEvent.click(screen.getByRole("button", { name: W.useThese }));
-    await waitFor(async () => expect(await readDayLog(jk, DAY)).toMatchObject({ others: [], done: true, fields: { todosNote: "Pretend undone phone words" } }));
+    await waitFor(async () => expect(await readDayLog(jk, DAY)).toMatchObject({ done: true, fields: { todosNote: "Pretend undone phone words" } }));
+    expect((await readDayLog(jk, DAY)).others.map((o) => [o.fields.todos, o.settled])).toEqual([["yes", true]]); // hers kept
   });
 
   it("yesterday's log: folded while empty, then filled and done like today's (it can still be changed today)", async () => {

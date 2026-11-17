@@ -317,7 +317,7 @@ function FormItem<F>({ date, line, day, View }: { date: ISODate; line: string; d
       {!day.done && <p className="journal-muted">{RW.notSubmitted}</p>}
       {day.others.map((o) => (
         <div key={o.id} className="routine-other">
-          <p className="journal-muted">{RW.alsoSaved}</p>
+          <p className="journal-muted">{o.settled ? RW.earlierVersion : RW.alsoSaved}</p>
           <View fields={o.fields} />
         </div>
       ))}

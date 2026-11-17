@@ -183,3 +183,45 @@ describe("shapes", () => {
     expect(isWeekReviewEntry({ ...stamp, ...EMPTY_WEEK_REVIEW, minDays: ["funday"] })).toBe(false);
   });
 });
+
+describe("settled: a version she chose not to use stays listed, and no longer holds the day (fix round 2, R-C1)", () => {
+  it("a new version naming the box's own as settled: both still there, the old one marked settled, nothing replaced", async () => {
+    const jk = await key();
+    const mac = session();
+    mac.version = await saveDayLog(jk, MAC, { ...EMPTY_DAY_LOG, schedule: "yes", scheduleNote: "Pretend Mac words" }, mac);
+    await new Promise((r) => setTimeout(r, 3));
+    await saveDayLog(jk, PHONE, { ...EMPTY_DAY_LOG, schedule: "no", scheduleNote: "Pretend phone words" }, session());
+    const both = await readDayLog(jk, DAY);
+    expect(both.fields.scheduleNote).toBe("Pretend phone words");
+    const macVersion = both.others[0]!;
+    // She uses the Mac's answers: the phone's (shown) is settled, not replaced.
+    await new Promise((r) => setTimeout(r, 3));
+    const use: FormSession = { date: DAY, seen: macVersion.seen, settled: [...both.seen], submittedAt: null };
+    use.version = await saveDayLog(jk, MAC, macVersion.fields, use);
+    let day = await readDayLog(jk, DAY);
+    expect(day.fields.scheduleNote).toBe("Pretend Mac words");
+    expect(day.others.map((o) => [o.fields.scheduleNote, o.settled])).toEqual([["Pretend phone words", true]]);
+    // Later saves of that session keep it settled; a new session from it carries it on.
+    await saveDayLog(jk, MAC, { ...macVersion.fields, todos: "yes" }, use);
+    day = await readDayLog(jk, DAY);
+    expect(day.others.map((o) => o.settled)).toEqual([true]);
+    await new Promise((r) => setTimeout(r, 3));
+    await saveDayLog(jk, MAC, { ...day.fields, todosNote: "Pretend later" }, { date: DAY, seen: day.seen, settled: day.settledTokens, submittedAt: null });
+    expect((await readDayLog(jk, DAY)).others.map((o) => o.settled)).toEqual([true]);
+  });
+
+  it("a later write to a settled version shows it as unsettled again (never hidden by an old choice)", async () => {
+    const jk = await key();
+    const phone = session();
+    phone.version = await saveDayLog(jk, PHONE, { ...EMPTY_DAY_LOG, schedule: "no" }, phone);
+    const shown = await readDayLog(jk, DAY);
+    await new Promise((r) => setTimeout(r, 3));
+    await saveDayLog(jk, MAC, { ...EMPTY_DAY_LOG, schedule: "yes" }, { date: DAY, seen: [], settled: shown.seen, submittedAt: null });
+    expect((await readDayLog(jk, DAY)).others.map((o) => o.settled)).toEqual([true]);
+    await new Promise((r) => setTimeout(r, 3));
+    await saveDayLog(jk, PHONE, { ...EMPTY_DAY_LOG, schedule: "partly" }, phone);
+    const day = await readDayLog(jk, DAY);
+    expect(day.fields.schedule).toBe("partly");
+    expect(day.others.map((o) => [o.fields.schedule, o.settled])).toEqual([["yes", false]]);
+  });
+});

@@ -30,7 +30,7 @@
 
 import { db as appDb, type HubDB } from "../data/db";
 import { listDayLogs, readSharePrivate } from "../data/repo";
-import { SEND_ROUTINE_CHALLENGES, sendRoutineChallenges } from "./routineChallenges";
+import { hideRoutineDays, SEND_ROUTINE_CHALLENGES, sendRoutineChallenges } from "./routineChallenges";
 import { readSyncGate, withSyncLock } from "../data/syncGate";
 import { formerDeviceIds } from "../data/deviceIds";
 import { getDeviceId } from "../sync/engine";
@@ -386,6 +386,8 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       if (snap.journal?.earliest && snap.journal.earliest < sent.since) sent.since = snap.journal.earliest;
       ctx.restoredUnpulled = await restoreHold(db, sent, now());
       await sendDays(ctx, snap.journal);
+      // Daily-log days sent before and now ticked private: hidden (any run, switch on or off).
+      await hideRoutineDays(ctx);
       if (ctx.mode === "send" && (env.routineChallenges ?? SEND_ROUTINE_CHALLENGES.on) && snap.logs) {
         await sendRoutineChallenges(ctx, snap.logs, ANSWERS_DELAY_MS, {
           maxWrites: MAX_WRITES_PER_RUN,
@@ -836,6 +838,7 @@ async function cleanUpHabits(ctx: Ctx, force = false): Promise<number> {
 async function markAllDeleted(ctx: Ctx): Promise<number> {
   const { sent } = ctx;
   let failed = await cleanUpHabits(ctx, true);
+  failed += await hideRoutineDays(ctx, { all: true }); // the daily log's days too
   const challengeId = sent.challenge?.id;
   for (const [date, d] of Object.entries(ctx.days)) {
     if (!d.live || !challengeId) continue;
