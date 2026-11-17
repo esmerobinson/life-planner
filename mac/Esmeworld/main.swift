@@ -8,6 +8,7 @@
 // Native chrome is system default only: standard window, standard menus, no colours.
 
 import AppKit
+import LocalAuthentication
 import UserNotifications
 import WebKit
 
@@ -275,6 +276,57 @@ final class ConsoleBridge: NSObject, WKScriptMessageHandler {
 /// Self-test: the binary shares her bundle id (so her notification settings and her pending
 /// list, 64 at most). It uses its own identifier prefix, and only the harness's probe schedule
 /// (`selfTestProbe: true`) is ever scheduled: the page's own scheduler is answered and ignored.
+// MARK: - Device owner check (pairing codes, 2026-11-17)
+
+/// "Is it really her?" before the Sync page shows a pairing code: one tap there hands over the
+/// journal secret, so the Mac asks for Touch ID, or the Mac login password as the fallback
+/// (LAPolicy.deviceOwnerAuthentication). That is the Mac's own lock, not her Esmeworld
+/// passphrase. The page never chooses the wording, and nothing about the code crosses here.
+///
+/// Messages (window.webkit.messageHandlers.esmeworldDeviceOwner.postMessage → Promise):
+///   { action: "confirm" } → { ok: Bool }   (ok only when macOS says it was her)
+/// Self-test: never prompts; answers { ok: false, selfTest: true }.
+final class DeviceOwnerBridge: NSObject, WKScriptMessageHandlerWithReply {
+    static let name = "esmeworldDeviceOwner"
+    /// Shown by macOS as "Esmeworld is trying to …". Placeholder wording (Esme may reword).
+    static let reason = "show a pairing code for another device"
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping @MainActor (Any?, String?) -> Void)
+    {
+        // Only the app's own page may ask.
+        let origin = message.frameInfo.securityOrigin
+        guard message.frameInfo.isMainFrame, origin.protocol == kScheme, origin.host == kHost,
+              let body = message.body as? [String: Any], let action = body["action"] as? String
+        else {
+            replyHandler(nil, "not allowed")
+            return
+        }
+        guard action == "confirm" else {
+            replyHandler(nil, "unknown action")
+            return
+        }
+        if isSelfTest {
+            replyHandler(["ok": false, "selfTest": true], nil)
+            return
+        }
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            replyHandler(["ok": false], nil) // no way to check: never shown
+            return
+        }
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: Self.reason) { ok, _ in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    _ = context // kept alive until macOS has answered
+                    replyHandler(["ok": ok], nil)
+                }
+            }
+        }
+    }
+}
+
 final class RemindersBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "esmeworldReminders"
     /// Apple keeps at most 64 pending requests per app; the web app sends at most 60, which
@@ -568,6 +620,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     var webView: WKWebView!
     let console = ConsoleBridge()
     let reminders = RemindersBridge()
+    let deviceOwner = DeviceOwnerBridge()
     /// A reminder clicked before the window existed (the click launched the app): opened first.
     private var launchPath: String?
 
@@ -889,6 +942,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
         // Reminders: the web app sends its schedule here (RemindersBridge).
         config.userContentController.addScriptMessageHandler(reminders, contentWorld: .page, name: RemindersBridge.name)
+        // Pairing codes: Touch ID or the Mac password before one is shown (DeviceOwnerBridge).
+        config.userContentController.addScriptMessageHandler(deviceOwner, contentWorld: .page, name: DeviceOwnerBridge.name)
         if isSelfTest || isDebug {
             config.userContentController.add(console, name: ConsoleBridge.name)
             config.userContentController.addUserScript(
@@ -1423,6 +1478,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                 say("reminders.schedule=skipped (notifications not authorised: \(status)) scheduled=\(scheduled) pending=\(pendingReply)")
                 check(scheduled == 0 && pendingReply == 0, "nothing scheduled while not authorised")
             }
+
+            // Pairing codes: the device owner check is there, and the self-test never prompts.
+            let owner = try await js("""
+            const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.esmeworldDeviceOwner;
+            if (!h) return JSON.stringify({ bridge: false });
+            const answer = await h.postMessage({ action: "confirm" });
+            let unknown = "accepted";
+            try { await h.postMessage({ action: "no-such-action" }); } catch (e) { unknown = "rejected"; }
+            return JSON.stringify({ bridge: true, ok: answer && answer.ok === true, selfTest: answer && answer.selfTest === true, unknown });
+            """)
+            say("deviceOwner.bridge=\(owner["bridge"] as? Bool ?? false) ok=\(owner["ok"] ?? "nil") selfTest=\(owner["selfTest"] ?? "nil") unknownAction=\(owner["unknown"] ?? "nil")")
+            check(owner["bridge"] as? Bool == true, "device owner bridge exists")
+            check(owner["ok"] as? Bool == false && owner["selfTest"] as? Bool == true, "the self-test never asks for Touch ID and is never let through")
+            check(owner["unknown"] as? String == "rejected", "device owner bridge rejects unknown actions")
 
             // A reminder's link: opens the page through the app's router.
             try await load(kStartURL)
