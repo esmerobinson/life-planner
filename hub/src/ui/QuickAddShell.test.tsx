@@ -91,15 +91,37 @@ describe("quick add on the phone", () => {
   });
 });
 
-describe("on a computer", () => {
+describe("on a computer (Esme, 2026-11-17: \"do what's best\")", () => {
   beforeEach(() => setPhone(false));
 
-  it("the + still opens the full Add form", async () => {
+  it("the + opens the same quick box, focused at once; Return saves and it stays open", async () => {
+    renderApp("/", TODAY);
+    fireEvent.click(await screen.findByRole("button", { name: "Add" }));
+    expect(document.activeElement).toBe(quickBox());
+    expect(within(sheet()).queryByRole("button", { name: "Add item" })).toBeNull();
+    await userEvent.type(quickBox(), "Pretend desk thing{Enter}");
+    expect(await within(sheet()).findByRole("status")).toHaveTextContent("Added");
+    expect(quickBox()).toHaveFocus();
+    expect((await db.items.toArray())[0]).toMatchObject({ title: "Pretend desk thing", areaId: "inbox" });
+  });
+
+  it("Escape closes it and keeps the draft", async () => {
     renderApp("/", TODAY);
     await userEvent.click(await screen.findByRole("button", { name: "Add" }));
-    expect(screen.getByRole("dialog", { name: "Add" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "What's on your mind?" })).toBeNull();
+    await userEvent.type(quickBox(), "Pretend half on the Mac");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add" })).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(quickBox()).toHaveValue("Pretend half on the Mac");
+  });
+
+  it("More options opens the full form, pre-set as the page says", async () => {
+    renderApp("/area/art", TODAY);
+    await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    await userEvent.click(within(sheet()).getByRole("button", { name: "More options" }));
+    expect(within(sheet()).getByRole("textbox", { name: "Title" })).toHaveFocus();
+    expect(within(sheet()).getByRole("combobox", { name: "Area" })).toHaveValue("art");
   });
 
   it("/add opens the quick box there too", async () => {

@@ -72,11 +72,9 @@ for (const width of [1280, 390]) {
       await add.click();
       const dialog = page.getByRole("dialog", { name: "Add" });
       await expect(dialog).toBeVisible();
-      if (width < 700) {
-        // The phone's + is the one-box quick add (2026-11-17); the full form is More options.
-        await expect(dialog.getByRole("textbox", { name: "What's on your mind?" })).toBeFocused();
-        await dialog.getByRole("button", { name: "More options" }).click();
-      }
+      // The + is the one-box quick add (2026-11-17); the full form is More options.
+      await expect(dialog.getByRole("textbox", { name: "What's on your mind?" })).toBeFocused();
+      await dialog.getByRole("button", { name: "More options" }).click();
       await expect(dialog.getByLabel("Title")).toBeFocused();
       await expect(dialog.getByLabel("Area")).toHaveValue("art");
       if (width < 700) {
@@ -94,7 +92,7 @@ for (const width of [1280, 390]) {
       await expect(add).toBeFocused();
 
       await add.click();
-      if (width < 700) await dialog.getByRole("button", { name: "More options" }).click();
+      await dialog.getByRole("button", { name: "More options" }).click();
       await dialog.getByLabel("Type").selectOption("project");
       await expect(dialog.getByLabel("Sessions")).toHaveValue("4");
       await dialog.getByLabel("Title").fill("Pretend mural project");

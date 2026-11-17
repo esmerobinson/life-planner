@@ -278,6 +278,7 @@ describe("Goals and the shell", () => {
       </MemoryRouter>,
     );
     await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     const quick = within(document.querySelector("form.quick-add") as HTMLElement);
     // On the Goals page Add opens as a goal; a to-do offers the goal picker.
     expect(quick.getByLabelText("Type")).toHaveValue("goal");

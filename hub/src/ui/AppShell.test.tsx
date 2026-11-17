@@ -53,6 +53,7 @@ describe("AppShell", () => {
     renderShell(<TodayRoute />);
     await screen.findByText("Nothing planned for today.");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.type(screen.getByLabelText("Title"), "Pay the gas bill");
     await userEvent.selectOptions(screen.getByLabelText("Area"), "mind");
     await userEvent.type(screen.getByLabelText("Due"), "2026-10-27");
@@ -68,6 +69,7 @@ describe("AppShell", () => {
     await screen.findByText("Nothing planned for today.");
     const addBtn = screen.getByRole("button", { name: "Add" });
     await userEvent.click(addBtn);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.type(screen.getByLabelText("Title"), "Water the ferns");
     await userEvent.selectOptions(screen.getByLabelText("Area"), "mind");
     await userEvent.type(screen.getByLabelText("Due"), "2026-10-27");
@@ -81,6 +83,7 @@ describe("AppShell", () => {
   it("a failed validation keeps the Add form open with what was typed", async () => {
     renderShell(<p>page</p>);
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.selectOptions(screen.getByLabelText("Type"), "goal");
     await userEvent.type(screen.getByLabelText("Title"), "A goal with no deadline");
     await userEvent.click(screen.getByRole("button", { name: "Add item" }));
@@ -137,7 +140,7 @@ describe("AppShell", () => {
 });
 
 describe("the round Add button (1C)", () => {
-  it("is a round '+' named Add, after the page, and opens the form as a pop-up card", async () => {
+  it("is a round '+' named Add, after the page, and opens the quick box as a pop-up card (More options: the form)", async () => {
     renderShell(<p>page</p>);
     const add = screen.getByRole("button", { name: "Add" });
     expect(add).toHaveClass("add-fab");
@@ -150,6 +153,8 @@ describe("the round Add button (1C)", () => {
     const card = screen.getByRole("dialog", { name: "Add" });
     expect(card).toHaveClass("add-pop");
     expect(add).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("textbox", { name: "What's on your mind?" })).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.getByLabelText("Title")).toHaveFocus();
   });
 
@@ -166,6 +171,7 @@ describe("the round Add button (1C)", () => {
     expect(add).toHaveFocus();
 
     await userEvent.click(add);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
     expect(add).toHaveFocus();
@@ -179,20 +185,24 @@ describe("the round Add button (1C)", () => {
     renderShell(<p>page</p>);
     const add = screen.getByRole("button", { name: "Add" });
     await userEvent.click(add);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.type(screen.getByLabelText("Title"), "Pretend half-typed thought");
     await userEvent.selectOptions(screen.getByLabelText("Type"), "project");
     await userEvent.type(screen.getByLabelText("Notes"), "Pretend notes");
     await userEvent.click(screen.getByText("page"));
     expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull();
     await userEvent.click(add);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.getByLabelText("Title")).toHaveValue("Pretend half-typed thought");
     expect(screen.getByLabelText("Type")).toHaveValue("project");
     expect(screen.getByLabelText("Notes")).toHaveValue("Pretend notes");
     await userEvent.keyboard("{Escape}");
     await userEvent.click(add);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.getByLabelText("Title")).toHaveValue("Pretend half-typed thought"); // Escape keeps it too
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await userEvent.click(add);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.getByLabelText("Title")).toHaveValue("");
     expect(screen.getByLabelText("Type")).toHaveValue("task");
 
@@ -200,6 +210,7 @@ describe("the round Add button (1C)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add item" }));
     await vi.waitFor(() => expect(screen.queryByRole("dialog", { name: "Add" })).toBeNull());
     await userEvent.click(add);
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     expect(screen.getByLabelText("Title")).toHaveValue("");
   });
 

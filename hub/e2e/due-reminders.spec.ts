@@ -28,6 +28,7 @@ test("a to-do's time from the Add form shows on its strip", async ({ page }) => 
   await page.goto("/area/admin");
   await page.getByRole("button", { name: "To-dos", exact: true }).click();
   await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "More options" }).click();
   const form = page.locator("form.quick-add");
   await form.getByLabel("Title").fill("Pretend dentist");
   const today = await page.evaluate(() => {

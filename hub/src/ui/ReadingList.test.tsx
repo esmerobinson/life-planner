@@ -152,6 +152,7 @@ describe("Adding a book", () => {
   it("the Add form's Book type shows Author and Status and makes a book under Mind", async () => {
     renderApp("/area/art", TODAY);
     await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     const form = within(screen.getByRole("dialog", { name: "Add" }));
     await userEvent.selectOptions(form.getByLabelText("Type"), "book");
     expect(form.getByLabelText("Area")).toBeDisabled();
@@ -170,6 +171,7 @@ describe("Adding a book", () => {
   it("Type back from Book puts the area back to where it was (not left on Mind)", async () => {
     renderApp("/area/art", TODAY);
     await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     const form = within(screen.getByRole("dialog", { name: "Add" }));
     expect(form.getByLabelText("Area")).toHaveValue("art");
     await userEvent.selectOptions(form.getByLabelText("Type"), "book");
@@ -182,6 +184,7 @@ describe("Adding a book", () => {
     await pretendBooks();
     renderApp("/area/mind", TODAY);
     await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.type(within(screen.getByRole("dialog", { name: "Add" })).getByLabelText("Title"), "Pretend half-typed to-do");
     await userEvent.click(within(await readingList()).getByRole("button", { name: "+ Add a book" }));
     const bookForm = within(screen.getByRole("dialog", { name: "Add" }));
@@ -189,6 +192,7 @@ describe("Adding a book", () => {
     expect(bookForm.getByLabelText("Title")).toHaveValue("");
     await userEvent.keyboard("{Escape}");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     expect(within(screen.getByRole("dialog", { name: "Add" })).getByLabelText("Title")).toHaveValue("Pretend half-typed to-do");
   });
 

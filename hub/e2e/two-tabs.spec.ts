@@ -21,6 +21,7 @@ test("an item added in one tab shows in another tab's Inbox without reload", asy
   await mark(b); // B never navigates or reloads after this point
 
   await a.getByRole("button", { name: "Add", exact: true }).click();
+  await a.getByRole("button", { name: "More options" }).click();
   await a.getByLabel("Title").fill("Cross tab pretend errand");
   await a.getByRole("button", { name: "Add item" }).click();
 
@@ -34,6 +35,7 @@ test("a tick in one tab updates another tab's Home (Today list) without reload",
 
   // Seed one item: add it, then sort it into Art as a To-do (priority 2 makes it a Today pick).
   await a.getByRole("button", { name: "Add", exact: true }).click();
+  await a.getByRole("button", { name: "More options" }).click();
   await a.getByLabel("Title").fill("Cross tab pretend errand");
   await a.getByRole("button", { name: "Add item" }).click();
   await a.getByRole("link", { name: /^Inbox/ }).click();

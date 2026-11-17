@@ -25,6 +25,7 @@ it("an inactive goal is not offered in the Add form's goal picker, nor in a task
   const resting = await createGoal({ title: "Pretend resting", areaId: "art", kind: "practice", active: false }, TODAY);
   renderApp("/area/art", TODAY);
   await userEvent.click(await screen.findByRole("button", { name: "Add" }));
+  await userEvent.click(screen.getByRole("button", { name: "More options" }));
   const quick = within(document.querySelector("form.quick-add") as HTMLElement);
   await userEvent.selectOptions(quick.getByLabelText("Type"), "task");
   expect(await quick.findByRole("option", { name: "Pretend live" })).toBeInTheDocument();
