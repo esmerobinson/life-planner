@@ -90,9 +90,9 @@ describe("pairing text v2 (no passphrase)", () => {
   it("is esmeworld-pair:v2:<token>.<secret>.<address>, base64url, compact", () => {
     expect(PAIRING_V2_PREFIX).toBe("esmeworld-pair:v2:");
     const text = pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: ADDRESS });
-    expect(text).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.https:\/\/sync\.example\.test$/);
+    expect(text).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.https:\/\/sync\.example\.test#$/);
     // The usual address is left out; a code without the journal secret has an empty part.
-    expect(pairingTextV2({ token: TOKEN, secret: null, serverUrl: null })).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.\.$/);
+    expect(pairingTextV2({ token: TOKEN, secret: null, serverUrl: null })).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.\.#$/);
   });
 
   it("parses back to the token, the secret and the address", () => {
@@ -117,15 +117,34 @@ describe("pairing text v2 (no passphrase)", () => {
       "esmeworld-pair:v2:",
       `esmeworld-pair:v2:${tok}`,
       `esmeworld-pair:v2:${tok}.${sec}`, // no address part
-      `esmeworld-pair:v2:${tok!.slice(1)}.${sec}.`, // short token
-      `esmeworld-pair:v2:${tok}.${sec!.slice(2)}.`, // short secret
-      `esmeworld-pair:v2:${tok}.${sec}.${ADDRESS} x`, // a space in the address
-      `esmeworld-pair:v2:${tok}+.${sec}.`,
-      `esmeworld-pair:v2:${tok}.${sec}.${"h".repeat(MAX_PAIRING_ADDRESS + 1)}`,
-      `esmeworld-pair:v3:${tok}.${sec}.`,
+      `esmeworld-pair:v2:${tok}.${sec}.#`.slice(0, -1), // no end marker
+      `esmeworld-pair:v2:${tok!.slice(1)}.${sec}.#`, // short token
+      `esmeworld-pair:v2:${tok}.${sec!.slice(2)}.#`, // short secret
+      `esmeworld-pair:v2:${tok}.${sec}.${ADDRESS} x#`, // a space in the address
+      `esmeworld-pair:v2:${tok}.${sec}.${ADDRESS}#x#`, // a # inside the address
+      `esmeworld-pair:v2:${tok}+.${sec}.#`,
+      `esmeworld-pair:v2:${tok}.${sec}.${"h".repeat(MAX_PAIRING_ADDRESS + 1)}#`,
+      `esmeworld-pair:v3:${tok}.${sec}.#`,
     ]) {
       expect(parsePairing(bad)).toBeNull();
     }
+  });
+
+  it("a paste cut off anywhere is refused (never read as the usual or a shorter address)", () => {
+    const good = pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: ADDRESS });
+    expect(parsePairing(good)).not.toBeNull();
+    for (let n = 0; n < good.length; n++) expect(parsePairing(good.slice(0, n))).toBeNull();
+    const usual = pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: null });
+    for (let n = 0; n < usual.length; n++) expect(parsePairing(usual.slice(0, n))).toBeNull();
+  });
+
+  it("only the one canonical spelling of each value is accepted", () => {
+    const good = pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: null });
+    const [tok, sec] = good.slice(PAIRING_V2_PREFIX.length).split(".");
+    // The last character of 32 bytes in base64 carries 2 spare bits; a non-zero spare bit is another spelling.
+    const alt = (s: string) => s.slice(0, -1) + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"[("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".indexOf(s.at(-1)!) + 1)];
+    expect(parsePairing(`${PAIRING_V2_PREFIX}${alt(tok!)}.${sec}.#`)).toBeNull();
+    expect(parsePairing(`${PAIRING_V2_PREFIX}${tok}.${alt(sec!)}.#`)).toBeNull();
   });
 
   it("fits a small QR code: with the address it is at most version 9 (53 modules + quiet zone)", () => {

@@ -1,7 +1,7 @@
 // "Pair a device by QR code": the text a pairing code carries. Two versions, both read.
 //
 //   v1  esmeworld-pair:v1:<passphrase>
-//   v2  esmeworld-pair:v2:<token>.<secret>.<address>          (2026-11-17, no passphrase)
+//   v2  esmeworld-pair:v2:<token>.<secret>.<address>#         (2026-11-17, no passphrase)
 //
 // v1 carries the passphrase as it is (no trimming, no normalising: the sync token and the
 // journal key normalise it themselves, exactly as when it is typed). A device can only show it
@@ -13,6 +13,9 @@
 // has no copy of it) and the sync ADDRESS (empty for the usual one). Token and secret are
 // base64url (43 characters each), so the whole text stays small enough for a QR code a phone
 // reads off a screen. It never carries the passphrase, and nothing in it can be turned back into it.
+// It ends in "#" (never part of an address here), so a paste cut off anywhere is refused rather
+// than read as the usual address or a shorter one (review M2). Only the one canonical base64url
+// spelling of each value is read (review M6).
 //
 // Either text is a secret: it is never stored, logged or put in a URL; it exists only in
 // memory while the code is shown or just after it is scanned or pasted.
@@ -56,7 +59,8 @@ function fromB64url(text: string, bytes: number): Uint8Array | null {
   try {
     const bin = atob(text.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (text.length % 4)) % 4));
     if (bin.length !== bytes) return null;
-    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    const out = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    return b64url(out) === text ? out : null; // spare bits set: another spelling, refused
   } catch {
     return null;
   }
@@ -72,7 +76,8 @@ const bytesToHex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).p
 export function pairingTextV2(p: { token: string; secret: Uint8Array | null; serverUrl: string | null }): string {
   if (!/^[0-9a-f]{64}$/.test(p.token)) throw new Error("not a sync token");
   if (p.secret && p.secret.length !== SECRET_BYTES) throw new Error("not a journal secret");
-  return `${PAIRING_V2_PREFIX}${b64url(hexToBytes(p.token))}.${p.secret ? b64url(p.secret) : ""}.${p.serverUrl ?? ""}`;
+  if (p.serverUrl && /[\s#]/.test(p.serverUrl)) throw new Error("not a sync address");
+  return `${PAIRING_V2_PREFIX}${b64url(hexToBytes(p.token))}.${p.secret ? b64url(p.secret) : ""}.${p.serverUrl ?? ""}#`;
 }
 
 /** Whitespace before the code and line breaks after it are dropped (a paste often carries them). */
@@ -94,15 +99,15 @@ export function parsePairingText(text: string): string | null {
 export function parsePairing(text: string): PairingPayload | null {
   const passphrase = parsePairingText(text);
   if (passphrase !== null) return { v: 1, passphrase };
-  const t = tidy(text);
-  if (!t.startsWith(PAIRING_V2_PREFIX)) return null;
-  const parts = t.slice(PAIRING_V2_PREFIX.length).split(".");
+  const t = tidy(text).replace(/\s+$/, "");
+  if (!t.startsWith(PAIRING_V2_PREFIX) || !t.endsWith("#")) return null;
+  const parts = t.slice(PAIRING_V2_PREFIX.length, -1).split(".");
   if (parts.length < 3) return null;
   const [tok, sec] = parts as [string, string];
   const address = parts.slice(2).join("."); // an address has dots of its own
   const token = fromB64url(tok, TOKEN_BYTES);
   const secret = sec === "" ? null : fromB64url(sec, SECRET_BYTES);
   if (!token || (sec !== "" && !secret)) return null;
-  if (address.length > MAX_PAIRING_ADDRESS || /\s/.test(address)) return null;
+  if (address.length > MAX_PAIRING_ADDRESS || /[\s#]/.test(address)) return null;
   return { v: 2, token: bytesToHex(token), secret, serverUrl: address === "" ? null : address };
 }
