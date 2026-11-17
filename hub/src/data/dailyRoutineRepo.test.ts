@@ -17,7 +17,7 @@ const habit = (id: string, title: string, extra: Partial<Item> = {}): Item => ({
 });
 
 beforeEach(async () => {
-  await Promise.all([db.prefs.clear(), db.items.clear(), db.pending.clear()]);
+  await Promise.all([db.prefs.clear(), db.items.clear(), db.pending.clear(), db.syncMeta.clear()]);
 });
 
 async function view(today = TODAY) {
@@ -72,6 +72,15 @@ describe("habit links", () => {
     // A default step's row holds only the link (its words still follow the defaults).
     expect(await db.prefs.get(stepRowId("d4"))).toEqual({ id: stepRowId("d4"), habitId: "h-vit", updatedAt: expect.any(Number) });
     expect(await applySuggestedLinks()).toBe(0);
+  });
+
+  it("waits for a newly synced device's first full pull (her other device's routine may be on its way)", async () => {
+    await db.items.put(habit("h-vit", "Vitamins"));
+    await db.syncMeta.put({ key: "token", value: "f0f0".padEnd(64, "0") });
+    expect(await applySuggestedLinks()).toBe(0);
+    expect(await db.prefs.count()).toBe(0);
+    await db.syncMeta.put({ key: "firstPullDone", value: true });
+    expect(await applySuggestedLinks()).toBe(1);
   });
 
   it("an unlinked step is never suggested again", async () => {

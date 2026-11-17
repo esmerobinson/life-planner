@@ -44,6 +44,22 @@ async function open(page: Page, width: number, time = `${DAY}T10:00:00`) {
   await expect(page.getByText("0 of 10 today")).toBeVisible();
 }
 
+/** The routine's own ticks stored on this device (the count on screen shows a tap at once). */
+const storedTicks = (page: Page) =>
+  page.evaluate(async () => {
+    const db: IDBDatabase = await new Promise((res, rej) => {
+      const r = indexedDB.open("life-hub");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const rows: { id: string; done: boolean }[] = await new Promise((res) => {
+      const g = db.transaction("prefs").objectStore("prefs").getAll();
+      g.onsuccess = () => res(g.result);
+    });
+    db.close();
+    return rows.filter((r) => r.id.startsWith("routine-tick:") && r.done).length;
+  });
+
 const routine = (page: Page) => page.getByRole("region", { name: "Today's routine" });
 const next = (page: Page) => routine(page).locator('[aria-current="step"]');
 
@@ -71,7 +87,7 @@ for (const width of [1280, 390]) {
       await expect(page.locator('[data-testid="tick-sparkle"]')).toHaveCount(1);
       await expect(routine(page).getByText("1 of 10 today")).toBeVisible();
       await expect(next(page)).toContainText("5-minute meditation");
-      await expect(routine(page).getByText("Done today (1)")).toBeVisible();
+      await expect(routine(page).getByText("Done (1)")).toBeVisible();
     });
 
     test("a linked step and its habit tick each other (one tick, same history)", async ({ page }) => {
@@ -89,7 +105,7 @@ for (const width of [1280, 390]) {
       // Ticking the habit on Today ticks the step.
       await page.getByRole("checkbox", { name: "Mark done: Vitamins (pretend)" }).click();
       await expect(routine(page).getByText("1 of 10 today")).toBeVisible();
-      await routine(page).getByText("Done today (1)").click();
+      await routine(page).getByText("Done (1)").click();
       await expect(routine(page).getByRole("checkbox", { name: "Done: Vitamins with morning tea" })).toBeChecked();
     });
 
@@ -97,6 +113,7 @@ for (const width of [1280, 390]) {
       await open(page, width, `${DAY}T23:30:00`);
       await routine(page).getByRole("checkbox", { name: "Mark done: Up between 8 and 9am" }).click();
       await expect(routine(page).getByText("1 of 10 today")).toBeVisible();
+      await expect.poll(() => storedTicks(page)).toBe(1); // saved before the reload
       await page.clock.setFixedTime(new Date(`${NEXT}T02:30:00`));
       await page.reload();
       await expect(routine(page).getByText("1 of 10 today")).toBeVisible();

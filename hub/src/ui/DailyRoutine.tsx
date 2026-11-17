@@ -27,7 +27,8 @@ export const ROUTINE_HOME_WORDS = {
   minimum: (min: string) => `Minimum: ${min}`,
   linked: (habit: string) => `Linked to: ${habit}`,
   more: (n: number) => `More steps (${n})`,
-  doneFold: (n: number) => `Done today (${n})`,
+  /** Not "Done today": Today's list above has a fold of that name. "Done (N)" is the area pages' wording. */
+  doneFold: (n: number) => `Done (${n})`,
   empty: "No steps yet.",
   edit: "Edit routine",
   editHeading: "Edit routine",
@@ -79,7 +80,7 @@ function useRoutineRows(today: ISODate) {
  * "Today's routine" (Esme approved, 17 Nov 2026), on Home directly under the goals: her daily
  * steps, each with its minimum (which counts fully). A step can be linked to a habit: ticking
  * the step ticks the habit for today, and the other way round. The next step is highlighted;
- * finished steps fold into "Done today" and later ones into "More steps", so it stays compact.
+ * finished steps fold into "Done" and later ones into "More steps", so it stays compact.
  * Nothing turns red and nothing says missed.
  */
 export function DailyRoutine({ today, headingLevel = 3 }: { today: ISODate; headingLevel?: 2 | 3 }) {
@@ -97,10 +98,12 @@ export function DailyRoutine({ today, headingLevel = 3 }: { today: ISODate; head
   const day = useMemo(() => routineDay(steps, items, rows?.ticks ?? [], today), [steps, items, rows, today]);
 
   // First view (and whenever a matching habit turns up): link the obvious steps to her habits.
+  // Tried again on every change while one is waiting (a new device stores none until its first
+  // full sync); re-read only when one was stored, so this never loops.
   const suggest = loaded && rows !== null && suggestLinks(steps, items).length > 0;
   useEffect(() => {
-    if (suggest) void applySuggestedLinks().then(refresh, () => undefined);
-  }, [suggest, refresh]);
+    if (suggest) void applySuggestedLinks().then((n) => (n > 0 ? refresh() : undefined), () => undefined);
+  }, [suggest, refresh, rows, items]);
 
   async function changed() {
     await Promise.all([refresh(), refreshItems()]);

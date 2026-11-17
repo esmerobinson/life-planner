@@ -244,7 +244,7 @@ test("Today's routine: a step ticked on one device shows ticked on the other, th
   await b.goto("/");
   const routineB = b.getByRole("region", { name: "Today's routine" });
   await expect(routineB.getByText("1 of 10 today")).toBeVisible();
-  await routineB.getByText("Done today (1)").click();
+  await routineB.getByText("Done (1)").click();
   await expect(routineB.getByRole("checkbox", { name: "Done: Up between 8 and 9am" })).toBeChecked();
   await expect(routineB.locator('[aria-current="step"]')).toContainText("5-minute meditation");
 

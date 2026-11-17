@@ -128,10 +128,14 @@ export async function moveRoutineStep(stepId: string, dir: -1 | 1): Promise<void
 
 /**
  * Stores the suggested habit links (domain/dailyRoutine.ts suggestLinks) for steps never linked
- * or unlinked. Returns how many it stored. Never creates a habit.
+ * or unlinked. Returns how many it stored. Never creates a habit. Waits while sync is set up here
+ * but hasn't pulled everything once: her habits can arrive a page before her routine, and a link
+ * written then would win over that step's row from her other device (a rename, an unlink).
  */
 export async function applySuggestedLinks(): Promise<number> {
-  return db.transaction("rw", db.prefs, db.items, async () => {
+  return db.transaction("rw", db.prefs, db.items, db.syncMeta, async () => {
+    const [token, firstPull] = await Promise.all([db.syncMeta.get("token"), db.syncMeta.get("firstPullDone")]);
+    if (token?.value && firstPull?.value !== true) return 0;
     const found = suggestLinks(routineSteps(await stepRows()), await db.items.toArray());
     for (const { stepId, habitId } of found) await patchStep(stepId, { habitId });
     return found.length;

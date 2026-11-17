@@ -5,7 +5,7 @@
    Composition calls made by the builder, for the Design session (Esme may veto):
    - the heading and the "6 of 10 today" count on one line, the count in the strips' small line;
    - the next step and the two after it show; the other open steps fold into "More steps (N)";
-     finished steps fold into "Done today (N)" (the Done fold-out's look, ticked and struck);
+     finished steps fold into "Done (N)" (the Done fold-out's look, ticked and struck);
    - a section gap (--gap-section) above it, after the goals;
    - Edit routine is the Choose goals sheet: each step a --row box with its fields in two
      columns (one on the phone). */

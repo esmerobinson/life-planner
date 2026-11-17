@@ -203,7 +203,7 @@ test.describe("phone layout at 390px", () => {
     const tile = await apps.first().locator(".phone-app-tile").boundingBox();
     expect(tile?.width).toBe(62);
     expect(tile?.height).toBe(62);
-    await expect(page.getByRole("heading", { level: 2, name: "Today" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Today", exact: true })).toBeVisible();
     await expect(page.getByText("Sort the imaginary paint drawer", { exact: false })).toBeVisible();
     const more = page.getByRole("navigation", { name: "More" });
     await expect(more.getByRole("link", { name: "Backup" })).toBeVisible();
