@@ -57,6 +57,26 @@ describe("the map", () => {
   });
 });
 
+describe("places she can visit show it (Esme, 2026-11-17: \"some sign you can go there … a little label subtle underneath\")", () => {
+  it("each open place with room below has a small label under it; places under cloud have none", () => {
+    const st = areaStatuses(200, new Set(["lagoa-house"]));
+    render(<RioMap statuses={st} look="day" onOpen={() => undefined} />);
+    const labels = [...document.querySelectorAll(".rio-place-label")].map((l) => l.textContent);
+    expect(labels).toEqual(expect.arrayContaining(["Barraca", "Zona Sul", "Fazenda", "Ipanema beach"]));
+    // No room under it on the map (label_room 0: another place right below): the hover tooltip names it.
+    expect(labels).not.toContain("Lagoa house");
+    expect(labels).not.toContain("Christ the Redeemer"); // still under cloud
+  });
+
+  it("pressing a place she can't visit yet names it and says when it opens, in the kit's tooltip", async () => {
+    render(<RioMap statuses={day1} look="day" onOpen={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "Barraca" }));
+    const tip = screen.getByRole("tooltip");
+    expect(tip).toHaveTextContent("Barraca");
+    expect(tip).toHaveTextContent("Opens on day 3");
+  });
+});
+
 describe("the map in the rain", () => {
   it("the falling rain plays in the rain, not on a dry day, and never with reduced motion", () => {
     const a = render(<RioMap statuses={day1} look="rain" onOpen={() => undefined} />);

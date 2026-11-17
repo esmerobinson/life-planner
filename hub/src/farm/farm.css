@@ -130,15 +130,4 @@
 .rio-area-layer {
   position: relative;
 }
-.rio-tooltip {
-  position: absolute;
-  z-index: 5;
-  margin: 0;
-  transform: translate(-50%, -100%);
-  white-space: nowrap;
-  pointer-events: none;
-  background: var(--panel);
-  outline: 2px solid var(--placeholder);
-  font-family: system-ui, sans-serif;
-  padding: var(--space-1) var(--space-2);
-}
+/* The map's tooltip is the kit's now (rio/ui/Tip.tsx). */

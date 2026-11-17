@@ -16,7 +16,7 @@ const centreOf = (key: string): [number, number] => {
 
 /** A point on the map canvas, from map pixels to the page. */
 async function onMap(page: Page, key: string): Promise<{ x: number; y: number }> {
-  const box = (await page.locator(".rio-map canvas").boundingBox())!;
+  const box = (await page.locator(".rio-map-layer > canvas").boundingBox())!;
   const s = box.width / MAP.canvas[0];
   const [mx, my] = centreOf(key);
   return { x: mx * s, y: my * s };
@@ -86,7 +86,7 @@ async function expectFullWindowGame(page: Page) {
   const border = [v.x, v.y, vp.width - v.x - v.width, vp.height - v.y - v.height];
   for (const b of border) expect(Math.abs(b - border[0]!)).toBeLessThanOrEqual(1);
   expect(border[0]).toBeGreaterThan(0);
-  const box = (await page.locator(".rio-map canvas").boundingBox())!;
+  const box = (await page.locator(".rio-map-layer > canvas").boundingBox())!;
   for (const p of MAP.places) {
     const at = await onMap(page, p.key);
     expect(box.x + at.x, p.key).toBeGreaterThanOrEqual(v.x - 0.5);
@@ -138,7 +138,7 @@ for (const width of [1280, 390]) {
         expect(p.rendering).toBe("pixelated");
         if (phone || sel === ".farm-nook canvas") expect(Number.isInteger(p.scale)).toBe(true);
       }
-      const m = await pixelated(page, ".rio-map canvas");
+      const m = await pixelated(page, ".rio-map-layer > canvas");
       const dpr = await page.evaluate(() => window.devicePixelRatio);
       expect(m.rendering).toBe("pixelated");
       if (phone) {
@@ -206,7 +206,7 @@ for (const width of [1280, 390]) {
       await page.getByRole("button", { name: "Orchid house doors" }).click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "jardim-botanico/inside");
       // The scene is drawn (not blank) and nothing scrolls.
-      await expect.poll(() => page.locator(".rio-area-layer canvas").evaluate((c) => {
+      await expect.poll(() => page.locator(".rio-area-layer > canvas").evaluate((c) => {
         const x = (c as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, (c as HTMLCanvasElement).width, (c as HTMLCanvasElement).height).data;
         let n = 0;
         for (let i = 3; i < x.length; i += 4) if (x[i]! > 0) n++;
@@ -270,7 +270,7 @@ for (const width of [1280, 390]) {
     test("the map: whole on screen; a tap opens the Lagoa house (the visit is noted); Barraca says when it opens", async ({ page }) => {
       test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await page.goto("/farm");
-      const canvas = page.locator(".rio-map canvas");
+      const canvas = page.locator(".rio-map-layer > canvas");
       await expect(canvas).toBeVisible();
       // The game takes the whole window (Esme, 2026-11-17), every place on screen, nothing scrolls.
       const vp = page.viewportSize()!;
@@ -279,13 +279,20 @@ for (const width of [1280, 390]) {
       // Day one: Barraca is next, with its tooltip on hover.
       await canvas.scrollIntoViewIfNeeded();
       await canvas.hover({ position: await onMap(page, "barraca") });
-      await expect(page.locator(".rio-tooltip")).toHaveText("Opens on day 3");
-      await expect(page.locator(".rio-tooltip")).toBeVisible();
+      await expect(page.getByRole("tooltip")).toContainText("Barraca");
+      await expect(page.getByRole("tooltip")).toContainText("Opens on day 3");
+      await expect(page.getByRole("tooltip")).toBeVisible();
+      // A place she can visit wears its label and lifts when she points at it (Esme, 2026-11-17).
+      await expect(page.locator(".rio-place-label")).toHaveCount(0); // day 1: the Lagoa house only, named on hover (no room under it)
+      await canvas.hover({ position: await onMap(page, "lagoa-house") });
+      await expect(page.locator(".rio-map")).toHaveAttribute("data-hover", "lagoa-house");
+      await expect(page.getByRole("tooltip")).toContainText("Visit");
+      expect(await canvas.evaluate((el) => getComputedStyle(el).cursor)).toBe("pointer");
       // A tap on the Lagoa house opens it.
       await canvas.click({ position: await onMap(page, "lagoa-house") });
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/outside");
       await expect.poll(() => farmRow(page, "visited:lagoa-house")).toMatchObject({ kind: "visited", area: "lagoa-house" });
-      const sbox = (await page.locator(".rio-area-layer canvas").boundingBox())!;
+      const sbox = (await page.locator(".rio-area-layer > canvas").boundingBox())!;
       expect(sbox.x + sbox.width).toBeGreaterThan(0);
       expect(sbox.y).toBeLessThan(vp.height);
       // Doors, not buttons (Esme, 2026-11-17): the kitchen's door, named on hover, goes in.
@@ -375,7 +382,7 @@ for (const [w, h] of [[2560, 1080]] as const) {
   test(`a very wide window (${w}x${h}): the full-window game keeps every place on screen with an even border`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/farm");
-    await expect(page.locator(".rio-map canvas")).toBeVisible();
+    await expect(page.locator(".rio-map-layer > canvas")).toBeVisible();
     await expectFullWindowGame(page);
   });
 }
@@ -387,7 +394,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [2560, 1080]] as const) {
   test(`${w}x${h}: the map fills the view one way, every place on screen, taps still land`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/farm");
-    const canvas = page.locator(".rio-map canvas");
+    const canvas = page.locator(".rio-map-layer > canvas");
     await expect(canvas).toBeVisible();
     await expectFullWindowGame(page);
     const v = (await page.locator(".game-view").boundingBox())!;
@@ -397,7 +404,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [2560, 1080]] as const) {
     // The plank border is small: 4 UI px at 3x.
     expect(v.x).toBeLessThanOrEqual(13);
     await canvas.hover({ position: await onMap(page, "barraca") });
-    await expect(page.locator(".rio-tooltip")).toHaveText("Opens on day 3");
+    await expect(page.getByRole("tooltip")).toContainText("Opens on day 3");
     await canvas.click({ position: await onMap(page, "lagoa-house") });
     await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/outside");
   });
