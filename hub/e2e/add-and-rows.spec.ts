@@ -114,6 +114,8 @@ for (const width of [1280, 390]) {
       await page.goto("/area/content");
       await page.getByRole("button", { name: "To-dos", exact: true }).click();
       await page.getByRole("button", { name: "Add", exact: true }).click();
+      // On the phone the + opens the one-box quick add (2026-11-17); the full form is More options.
+      if (width < 700) await page.getByRole("button", { name: "More options" }).click();
       const form = page.locator("form.quick-add");
       await expect(form.getByLabel("Type")).toHaveValue("task");
       await expect(form.getByLabel("Area")).toHaveValue("content");
