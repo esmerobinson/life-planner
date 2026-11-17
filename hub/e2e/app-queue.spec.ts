@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { FAKE_CARD_TEXT_V2 } from "../src/test/exerciseCards";
 import { pageDate } from "./helpers";
 
 /* Esme's app design queue picks (all A, 2026-11-17), in a real browser at computer and phone
@@ -48,6 +49,56 @@ async function seedRepeats(page: Page) {
      await repo.createItem({ ...t, title: "Water the pretend plants", areaId: "admin", recur: ["sat"] }, args.made);
      await repo.tickItem(walk.id, args.today);`,
   );
+}
+
+const PASS = "fake-app-queue-passphrase";
+const HL_WORDS = "clouds over a made-up hill";
+const HL_NOTE = "Pretend note: remember this on a grey pretend day.";
+const exerciseTab = (page: Page) => page.getByRole("region", { name: "Mental health exercise" });
+
+/** The journal unlocked (set up on another pretend device; the sync address never answers), then `path`. */
+async function unlocked(page: Page, path: string) {
+  await home(page);
+  await page.evaluate(async (pass) => {
+    const at = (p: string): Promise<any> => import(/* @vite-ignore */ p); // the app's own module (dev server)
+    const engine = await at("/src/sync/engine.ts");
+    const token = await at("/src/sync/token.ts");
+    const keys = await at("/src/journal/keyStore.ts");
+    const { db } = await at("/src/data/db.ts");
+    await engine.saveSyncSettings(db, { serverUrl: "https://sync.example.test", token: await token.deriveToken(pass) });
+    const jkey = await at("/src/test/journalKey.ts");
+    await db.journal.put(await jkey.verifierRow(await jkey.keyFor(pass)));
+    await keys.unlockJournal(db, pass);
+  }, PASS);
+  await page.goto(path);
+}
+
+/** Selects words the way a person does: press, drag across them, let go. */
+async function dragSelect(page: Page, within: Locator, words: string) {
+  await within.scrollIntoViewIfNeeded();
+  const box = await within.evaluate((el, w) => {
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      const i = (n as Text).data.indexOf(w);
+      if (i < 0) continue;
+      const at = (k: number) => {
+        const r = document.createRange();
+        r.setStart(n!, k);
+        r.setEnd(n!, k + 1);
+        return r.getBoundingClientRect();
+      };
+      const a = at(i);
+      const b = at(i + w.length - 1);
+      return { x1: a.left + 1, y1: a.top + a.height / 2, x2: b.right - 1, y2: b.top + b.height / 2, bottom: b.bottom };
+    }
+    return null;
+  }, words);
+  if (!box) throw new Error(`"${words}" isn't on the page`);
+  await page.mouse.move(box.x1, box.y1);
+  await page.mouse.down();
+  await page.mouse.move(box.x2, box.y2, { steps: 12 });
+  await page.mouse.up();
+  return box;
 }
 
 for (const width of [1280, 390]) {
@@ -178,6 +229,99 @@ for (const width of [1280, 390]) {
       await page.getByRole("button", { name: "Undo" }).click();
       await page.goto("/goals");
       await expect(page.getByRole("link", { name: "Learn a pretend song" })).toBeVisible();
+    });
+
+    test("Highlights: yellow, the pill just under the words, a note mark after noted words, and the fifth Read back tile", async ({ page }) => {
+      test.setTimeout(150_000);
+      await unlocked(page, "/journal/exercise");
+      await exerciseTab(page).getByLabel("Exercise card file").setInputFiles({
+        name: "pretend-cards.json", mimeType: "application/json", buffer: Buffer.from(FAKE_CARD_TEXT_V2),
+      });
+      const card = exerciseTab(page).getByRole("article", { name: "Today's card" });
+      await expect(card.getByText("Pretend weather")).toBeVisible();
+      const learn = card.locator('[data-hl-field="learn"]');
+
+      // The pill pops up just under the selected words, in the app's green.
+      const words = await dragSelect(page, learn, HL_WORDS);
+      const pill = page.getByRole("button", { name: "Highlight", exact: true });
+      await expect(pill).toBeVisible();
+      await expect(pill).toHaveCSS("background-color", "rgb(152, 194, 147)");
+      const pb = (await pill.boundingBox())!;
+      expect(pb.y).toBeGreaterThanOrEqual(words.bottom);
+      expect(pb.y).toBeLessThan(words.bottom + 12);
+      await shoot(page, `5-highlight-pill-${width}`);
+      await pill.click();
+
+      // Nook Shopping yellow; no note yet, so no note mark.
+      const mark = learn.locator("mark.hl-mark");
+      await expect(mark).toHaveText(HL_WORDS);
+      await expect(mark).toHaveCSS("background-color", "rgb(232, 221, 110)");
+      await expect(learn.locator(".hl-notemark")).toHaveCount(0);
+
+      // Add a note: the note mark shows after the words; tapping it reads the note.
+      await mark.click();
+      const sheet = page.getByRole("dialog", { name: "Highlight" });
+      await sheet.getByLabel("Note (optional)").fill(HL_NOTE);
+      await sheet.locator(".choose-top").getByRole("button", { name: "Done" }).click();
+      await expect(sheet).toHaveCount(0);
+      const note = learn.getByRole("button", { name: `Read the note on: ${HL_WORDS}` });
+      await expect(note).toBeVisible();
+      await expect(note).toHaveCSS("width", "20px");
+      await expect(note).toHaveCSS("background-color", "rgb(228, 207, 164)");
+      const mb = (await mark.boundingBox())!;
+      const nb = (await note.boundingBox())!;
+      expect(nb.x).toBeGreaterThanOrEqual(mb.x + mb.width - 1); // after the words
+      await expect(learn).toHaveText("A made-up note: feelings drift past like pretend clouds over a made-up hill.");
+      await shoot(page, `5-highlight-note-mark-${width}`);
+      await page.reload();
+      const again = exerciseTab(page).getByRole("article", { name: "Today's card" }).getByRole("button", { name: `Read the note on: ${HL_WORDS}` });
+      await again.click();
+      await expect(page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note (optional)")).toHaveValue(HL_NOTE);
+      await shoot(page, `5-highlight-note-open-${width}`);
+      await page.getByRole("dialog", { name: "Highlight" }).locator(".choose-top").getByRole("button", { name: "Done" }).click();
+
+      // Read back: five tiles; one row on the Mac; Highlights full width at the bottom on the phone.
+      await page.goto("/journal/read-back");
+      const tiles = page.locator("button.journal-readback-tile");
+      await expect(tiles).toHaveCount(5);
+      const hl = tiles.nth(4);
+      await expect(hl).toHaveText(/^Highlights1Last: /);
+      await expect(hl).toHaveCSS("background-color", await tiles.nth(0).evaluate((e) => getComputedStyle(e).backgroundColor));
+      await expect(hl).toHaveCSS("outline-style", "none");
+      const boxes = await tiles.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()));
+      const grid = (await page.locator(".journal-readback-tiles").boundingBox())!;
+      if (phone) {
+        expect(boxes[4].top).toBeGreaterThan(boxes[3].bottom - 1);
+        expect(Math.abs(boxes[4].width - grid.width)).toBeLessThan(1);
+      } else {
+        for (const b of boxes) expect(Math.abs(b.top - boxes[0].top)).toBeLessThan(1);
+      }
+      await shoot(page, `5-readback-tiles-${width}`);
+      await noSideways(page);
+    });
+
+    test("Home: the second fold-out reads Coming up (N)", async ({ page }) => {
+      await home(page);
+      const soon = await pageDate(page, 1);
+      const later = await pageDate(page, 2);
+      await withRepo(
+        page,
+        { soon, later, today: await pageDate(page, 0) },
+        `const t = { kind: "task", priority: 2, areaId: "admin" };
+         for (const [i, title] of ["Post the pretend parcel", "Book a made-up haircut", "Return the pretend library book", "Water the made-up ferns"].entries())
+           await repo.createItem({ ...t, title, due: args.soon }, args.today);
+         for (const title of ["Phone the pretend dentist", "Pay the made-up bill", "Send the pretend card"])
+           await repo.createItem({ ...t, title, due: args.later }, args.today);`,
+      );
+      await page.reload();
+      const summary = page.locator("summary", { hasText: /^Coming up/ });
+      await expect(summary).toHaveText("Coming up (3)");
+      await expect(page.getByText("Also due")).toHaveCount(0);
+      await expect(page.getByText("Due in the next few days")).toHaveCount(0);
+      await summary.click();
+      await expect(page.getByRole("list", { name: "Coming up" }).getByRole("listitem")).toHaveCount(3);
+      await page.getByRole("list", { name: "Coming up" }).scrollIntoViewIfNeeded();
+      await shoot(page, `6-coming-up-${width}`);
     });
   });
 }

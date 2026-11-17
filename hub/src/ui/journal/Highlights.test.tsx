@@ -179,7 +179,54 @@ it("Remove asks first; Keep it keeps it; Remove takes the mark away (its rows st
   expect(await db.journal.where("kind").equals("highlight").count()).toBe(2);
 });
 
+describe("the note mark (Esme's pick 3·3 A, 2026-11-17)", () => {
+  it("a highlight with a note shows a small note mark right after its words; tapping it opens the note; none without a note", async () => {
+    const dev = await getDeviceId(db);
+    await createHighlight(jk, TODAY, dev, highlightCard(WEATHER, ""), anchor("learn", "clouds over a made-up hill"), "Pretend note to myself");
+    await createHighlight(jk, TODAY, dev, highlightCard(WEATHER, ""), anchor("learn", "feelings drift"));
+    renderApp("/journal/exercise", TODAY);
+    const card = await todayCard();
+    await waitFor(() => expect(marks(card)).toHaveLength(2));
+    const notemarks = [...learnOf(card).querySelectorAll(".hl-notemark")];
+    expect(notemarks).toHaveLength(1);
+    // Right after the noted words' mark; the card's words read exactly as before (no text added).
+    expect(notemarks[0]!.previousElementSibling).toHaveTextContent("clouds over a made-up hill");
+    expect(learnOf(card).textContent).toBe("A made-up note: feelings drift past like pretend clouds over a made-up hill.");
+    expect(notemarks[0]).toHaveAttribute("aria-label", "Read the note on: clouds over a made-up hill");
+    expect(notemarks[0]!.querySelector("svg")).not.toBeNull();
+    await userEvent.click(notemarks[0]!);
+    const sheet = await screen.findByRole("dialog", { name: "Highlight" });
+    expect(within(sheet).getByLabelText(NOTE_LABEL)).toHaveValue("Pretend note to myself");
+  });
+
+  it("a note added in the sheet brings the mark; selecting next to it still highlights the right words", async () => {
+    renderApp("/journal/exercise", TODAY);
+    await highlightLearn("clouds over a made-up hill");
+    const card = await todayCard();
+    expect(card.querySelector(".hl-notemark")).toBeNull();
+    await userEvent.click(marks(card)[0]!);
+    const sheet = await screen.findByRole("dialog", { name: "Highlight" });
+    await userEvent.type(within(sheet).getByLabelText(NOTE_LABEL), "Pretend note");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect((card.querySelector(".hl-notemark"))).not.toBeNull());
+    select(learnOf(card), "feelings drift");
+    await userEvent.click(await screen.findByRole("button", { name: HIGHLIGHT_ACTION }));
+    await waitFor(async () =>
+      expect((await listHighlights(jk)).highlights.map((h) => h.anchor.exact).sort()).toEqual(["clouds over a made-up hill", "feelings drift"]),
+    );
+  });
+});
+
 describe("Read back's Highlights part", () => {
+  it("its tile is a tile like the others (no placeholder outline), marked to run full width on the phone", async () => {
+    await createHighlight(jk, TODAY, await getDeviceId(db), highlightCard(WEATHER, ""), anchor("learn", "made-up hill"));
+    renderApp("/journal/read-back", TODAY);
+    const tile = await findReadBackTile("Highlights");
+    expect(tile).toHaveClass("journal-readback-tile", "is-highlights");
+    expect(tile).not.toHaveClass("hl-provisional");
+    expect(document.querySelectorAll(".journal-readback-tile.is-highlights")).toHaveLength(1);
+  });
+
   it("a fifth tile after the four, with its count and last day", async () => {
     await createHighlight(jk, TODAY, await getDeviceId(db), highlightCard(WEATHER, ""), anchor("learn", "made-up hill"));
     renderApp("/journal/read-back", TODAY);

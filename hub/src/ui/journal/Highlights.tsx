@@ -3,10 +3,11 @@
 // words then stay marked wherever that card shows. Tapping a mark opens its note (optional,
 // saved as she types) and Remove (which asks first). Read back lists them (HighlightsReadBack).
 //
-// LOOK: every visual here is a PLACEHOLDER (highlights.css): the magenta mark, the magenta
-// button and where it sits, the note pop-up's insides. Not in VISUAL-LANGUAGE.md; Esme to choose.
+// LOOK (highlights.css; Esme's picks A, app design queue 2026-11-17): the yellow mark, the green
+// "Highlight" pill just under the words, a small note mark after a highlight with a note (tap to
+// read). The note pop-up's insides are still placeholders.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   createHighlight, listHighlights, openNoteSession, removeHighlight, saveHighlightNote, type Highlight, type HighlightCard, type NoteSession,
@@ -22,7 +23,7 @@ import { JournalSheet } from "./JournalSheet";
 import { useDbChanges } from "./useJournalKey";
 import "./highlights.css";
 
-/** The button over selected words (placeholder wording). */
+/** The pill under selected words (Esme's pick 3·2 A, 2026-11-17). */
 export const HIGHLIGHT_ACTION = "Highlight";
 /** The same button when the words are already inside a highlight: it opens that one (placeholder wording). */
 export const OPEN_HIGHLIGHT = "Open highlight";
@@ -39,6 +40,15 @@ export const REMOVE_NO = "Keep it";
 export const OTHER_NOTE = "Also noted";
 /** A mark's name for a screen reader (placeholder wording). */
 export const markLabel = (words: string) => `Highlighted: ${words}. Open its note`;
+/** The note mark's name for a screen reader. */
+export const noteMarkLabel = (words: string) => `Read the note on: ${words}`;
+
+/* The note mark's glyph (Esme's pick 3·3 A, 2026-11-17): a new line drawing in the app's 16px,
+   1.6-stroke glyph style (the mockup's note bubble); hers to confirm. No text inside: the
+   highlight code reads a card's words from its text nodes. */
+const NOTE_GLYPH = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 3.5h11v7.5H7l-3 2.5V11H2.5z" /><path d="M5 6h6M5 8.5h4" /></svg>
+);
 const SAVE_PROBLEM = "That didn't save. Try again.";
 
 /** The card a highlight keeps (so it reads back even after the card set changes). */
@@ -46,8 +56,10 @@ export const highlightCard = (c: ExerciseCard, book: string): HighlightCard => (
   id: c.id, track: c.track, book, day: c.day, chapter: c.chapter, chapterTitle: c.chapterTitle, theme: c.theme,
 });
 
-/** One highlight where it is on its card now. */
-type Placed = Located & { key: string; exact: string };
+/** One highlight where it is on its card now; `noted`: it has a note (its own, or another device's). */
+type Placed = Located & { key: string; exact: string; noted: boolean };
+
+const hasNote = (h: Highlight) => [h.note, ...h.others].some((n) => n.trim() !== "");
 
 interface Ctx {
   /** The located marks on one card's field (newest highlight first). */
@@ -102,7 +114,7 @@ export function HighlightsProvider({
     for (const h of list ?? []) {
       const { card, at } = resolveCard(h.card, h.anchor, cards);
       if (!card || !at) continue;
-      out.set(card.id, [...(out.get(card.id) ?? []), { ...at, key: h.key, exact: h.anchor.exact }]);
+      out.set(card.id, [...(out.get(card.id) ?? []), { ...at, key: h.key, exact: h.anchor.exact, noted: hasNote(h) }]);
     }
     return out;
   }, [list, cards]);
@@ -217,27 +229,52 @@ export function HlText({
         const first = !tabbed.has(top.key);
         tabbed.add(top.key);
         const open = () => ctx.open(keys);
+        // A highlight with a note that ends here gets the note mark right after its words (3·3 A).
+        const notes = marks.filter((m) => m.noted && m.end > m.start && m.end === r.at + r.text.length && keys.includes(m.key));
         return (
-          <mark
-            key={r.at}
-            className={keys.length > 1 ? "hl-mark hl-mark-overlap" : "hl-mark"}
-            data-hl-key={top.key}
-            data-hl-keys={keys.join(" ")}
-            {...(first ? { role: "button", tabIndex: 0, "aria-label": markLabel(top.exact) } : {})}
-            onClick={() => {
-              // Selecting words inside a mark isn't a tap on it.
-              if (!(document.getSelection()?.isCollapsed ?? true)) return;
-              open();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
+          <Fragment key={r.at}>
+            <mark
+              className={keys.length > 1 ? "hl-mark hl-mark-overlap" : "hl-mark"}
+              data-hl-key={top.key}
+              data-hl-keys={keys.join(" ")}
+              {...(first ? { role: "button", tabIndex: 0, "aria-label": markLabel(top.exact) } : {})}
+              onClick={() => {
+                // Selecting words inside a mark isn't a tap on it.
+                if (!(document.getSelection()?.isCollapsed ?? true)) return;
                 open();
-              }
-            }}
-          >
-            {node}
-          </mark>
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  open();
+                }
+              }}
+            >
+              {node}
+            </mark>
+            {notes.map((m) => (
+              <span
+                key={m.key}
+                className="hl-notemark"
+                role="button"
+                tabIndex={0}
+                aria-label={noteMarkLabel(m.exact)}
+                title="Note"
+                onClick={() => {
+                  if (!(document.getSelection()?.isCollapsed ?? true)) return;
+                  ctx.open([m.key]);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    ctx.open([m.key]);
+                  }
+                }}
+              >
+                {NOTE_GLYPH}
+              </span>
+            ))}
+          </Fragment>
         );
       })}
     </>
@@ -348,8 +385,8 @@ function SelectionAction({
       // (A test browser without layout has no boxes: the button still shows.)
       const rects = typeof range.getClientRects === "function" ? range.getClientRects() : [];
       const box = rects.length ? rects[rects.length - 1]! : typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : { bottom: 0, left: 0 };
-      // PLACEHOLDER placement: just under the end of the selection (a phone's own menu sits above it).
-      setState({ pick, within: insideRef.current(pick), top: box.bottom + 8, left: Math.max(8, Math.min(box.left, window.innerWidth - 140)) });
+      // Just under the selected words (Esme's pick 3·2 A: the mockup's 6px; a phone's own menu sits above them).
+      setState({ pick, within: insideRef.current(pick), top: box.bottom + 6, left: Math.max(8, Math.min(box.left, window.innerWidth - 140)) });
     };
     document.addEventListener("selectionchange", read);
     window.addEventListener("scroll", read, true);

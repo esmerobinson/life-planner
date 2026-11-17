@@ -402,10 +402,20 @@ a.journal-tab.is-selected {
   gap: var(--gap-rows);
 }
 
-/* 664px = four 160px tiles and three 8px gaps. */
+/* Highlights, the fifth tile (Esme's pick 3·4 A, 2026-11-17): one row of five on the Mac; on
+   the phone (two across) it runs the full width at the bottom, so there's no gap. The switch
+   stays where four across began (664px = four 160px tiles and three 8px gaps). */
+.journal-readback-tile.is-highlights {
+  grid-column: 1 / -1;
+}
+
 @container readback (min-width: 664px) {
   .journal-readback-tiles {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .journal-readback-tile.is-highlights {
+    grid-column: auto;
   }
 }
 

@@ -1,29 +1,58 @@
-/* Highlights (2026-11-06). EVERY rule here is a PLACEHOLDER, obviously wrong on purpose (CLAUDE.md
-   art direction): nothing about how a highlight looks is in VISUAL-LANGUAGE.md yet. Magenta
-   (--placeholder), the system font, no motion. Esme chooses: the mark's colour and shape, the
-   Highlight button (look and where it sits), the note pop-up's insides, the Read back entries and
-   the fifth tile's place. */
+/* Highlights (2026-11-06). Chosen by Esme (app design queue, 2026-11-17, all A; VISUAL-LANGUAGE.md
+   "Highlights"): the colour, Nook Shopping yellow #e8dd6e (a new job for a palette colour, her
+   pick); the "Highlight" pill just under the selected words (the app's green button, small: 6px
+   14px, 14px text, the menus' shadow); a small note mark after a highlight that has a note
+   (20px --track square, 6px radius, a 13px line glyph); Highlights as Read back's fifth tile.
+   Builder's call, not yet seen by her: the quote bars beside highlighted words (sheet, Read back)
+   take the highlight colour. Everything still magenta (--placeholder) is NOT chosen yet: the note
+   pop-up's insides, the Read back entries' boxes, the overlap outline. System font, no motion. */
+:root {
+  --highlight: #e8dd6e; /* Nook Shopping yellow, Esme's pick 3·1 A (2026-11-17) */
+}
 
 mark.hl-mark {
-  background: var(--placeholder);
+  background: var(--highlight);
   color: inherit;
   cursor: pointer;
 }
 
+/* The pill (3·2 A): copied from the mockup's ".pill.sm.popbtn". */
 button.hl-action {
   position: fixed;
   z-index: 1000;
-  background: var(--placeholder);
-  color: #fff;
-  font-family: system-ui, sans-serif;
+  background: var(--bar-fill);
+  color: var(--text);
   border: 0;
-  padding: 6px 12px;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 14px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(45, 63, 131, 0.25);
+}
+
+/* The note mark (3·3 A): copied from the mockup's ".notemark". */
+.hl-notemark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--track);
+  color: var(--text);
+  vertical-align: -4px;
+  margin-left: 3px;
+  cursor: pointer;
+}
+
+.hl-notemark svg {
+  width: 13px;
+  height: 13px;
 }
 
 .hl-sheet .hl-quote {
   margin: 0;
   padding-left: 8px;
-  border-left: 4px solid var(--placeholder);
+  border-left: 4px solid var(--highlight);
   font-family: system-ui, sans-serif;
   white-space: pre-wrap;
 }
@@ -47,11 +76,7 @@ textarea.hl-note-box {
   font-family: system-ui, sans-serif;
 }
 
-/* Read back's Highlights part. */
-button.journal-readback-tile.hl-provisional {
-  outline: 2px dashed var(--placeholder);
-}
-
+/* Read back's Highlights part (the entries' boxes are still placeholders). */
 button.hl-entry {
   display: flex;
   flex-direction: column;
@@ -68,7 +93,7 @@ button.hl-entry {
 
 .hl-entry .hl-quote,
 .hl-lost .hl-quote {
-  border-left: 4px solid var(--placeholder);
+  border-left: 4px solid var(--highlight);
   padding-left: 8px;
   white-space: pre-wrap;
 }

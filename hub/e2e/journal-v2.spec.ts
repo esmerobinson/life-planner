@@ -131,8 +131,8 @@ async function walk(page: Page, w: number) {
   await shot("check-in");
 
   // Read back (2026-11-05, option B): four tiles filling the tab's width, 4 across on a wide
-  // window and 2 across on the phone; each opens its part. Highlights (2026-11-06) is a fifth
-  // tile after them (provisional placement), on the next row.
+  // window and 2 across on the phone; each opens its part. Highlights is a fifth tile after them:
+  // in the same row on a wide window, full width under them on the phone (Esme's pick 3·4 A, 2026-11-17).
   await page.getByRole("link", { name: "Read back", exact: true }).click();
   const tiles = page.locator("button.journal-readback-tile");
   await expect(tiles).toHaveCount(5);

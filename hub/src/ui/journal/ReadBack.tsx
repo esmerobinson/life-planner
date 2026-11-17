@@ -122,7 +122,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
           <Tile
             key={p.id}
             {...(p.id === "highlights" ? { count: highlights.count, line: highlights.line } : tileOf(p.id, data, today))}
-            provisional={p.id === "highlights"}
+            highlights={p.id === "highlights"}
             title={p.title}
             refocus={opened.current === p.id}
             onOpen={() => {
@@ -163,14 +163,15 @@ function tileOf(part: ReadBackPart, data: Loaded, today: ISODate): { count: numb
 }
 
 function Tile({
-  title, count, line, refocus, onOpen, provisional = false,
-}: { title: string; count: number; line: string; refocus: boolean; onOpen: () => void; provisional?: boolean }) {
+  title, count, line, refocus, onOpen, highlights = false,
+}: { title: string; count: number; line: string; refocus: boolean; onOpen: () => void; highlights?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (refocus) ref.current?.focus();
   }, [refocus]);
   return (
-    <button ref={ref} type="button" className={provisional ? "journal-readback-tile hl-provisional" : "journal-readback-tile"} onClick={onOpen}>
+    // Highlights is a tile like the others (Esme's pick 3·4 A, 2026-11-17); it only places differently on the phone.
+    <button ref={ref} type="button" className={highlights ? "journal-readback-tile is-highlights" : "journal-readback-tile"} onClick={onOpen}>
       <span className="journal-readback-tile-name">{title}</span>
       <span className="journal-readback-tile-count">{count}</span>
       <span className="journal-readback-tile-line">{line}</span>
