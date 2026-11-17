@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appDay, instantOf, isoInZone, isTimeZone, parseDueAt, settingsInstant, wallClock, weekdayOf } from "../../../src/due/time";
+import { appDay, instantOf, isoInZone, isTimeZone, offsetMinutes, parseDueAt, settingsInstant, wallClock, weekdayOf } from "../../../src/due/time";
 
 const NY = "America/New_York";
 
@@ -51,5 +51,44 @@ describe("Due reminders: her time zone", () => {
   it("weekdays", () => {
     expect(weekdayOf("2026-11-16")).toBe("mon");
     expect(weekdayOf("2026-11-22")).toBe("sun");
+  });
+});
+
+describe("the zones worked out without Intl (re-review R-I1) agree with Intl", () => {
+  const ZONES = [
+    "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Sao_Paulo",
+    "Europe/London", "Europe/Lisbon", "Europe/Paris", "Europe/Berlin", "Asia/Tokyo", "Australia/Sydney", "UTC",
+  ];
+  const intl = (tz: string) =>
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const read = (f: Intl.DateTimeFormat, ms: number) => {
+    const p: Record<string, string> = {};
+    for (const x of f.formatToParts(new Date(ms))) p[x.type] = x.value;
+    return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+  };
+
+  for (const tz of ZONES) {
+    it(`${tz}: every 5 hours from 2026 to 2031, and every minute around each clock change`, () => {
+      const f = intl(tz);
+      const start = Date.UTC(2026, 0, 1);
+      const end = Date.UTC(2032, 0, 1);
+      let prev = offsetMinutes(start, tz);
+      for (let ms = start; ms < end; ms += 5 * 3_600_000) {
+        expect(wallClock(ms, tz), `${tz} ${new Date(ms).toISOString()}`).toEqual(read(f, ms));
+        const off = offsetMinutes(ms, tz);
+        if (off !== prev) {
+          // A change happened in the last 5 hours: check each minute of them.
+          for (let m = ms - 5 * 3_600_000; m <= ms; m += 60_000) {
+            expect(wallClock(m, tz), `${tz} ${new Date(m).toISOString()}`).toEqual(read(f, m));
+          }
+        }
+        prev = off;
+      }
+    });
+  }
+
+  it("a zone without a rule here still works (through Intl)", () => {
+    expect(wallClock(Date.parse("2026-11-16T20:00:00Z"), "Asia/Kolkata")).toEqual({ date: "2026-11-17", time: "01:30" });
+    expect(isTimeZone("Asia/Kolkata")).toBe(true);
   });
 });

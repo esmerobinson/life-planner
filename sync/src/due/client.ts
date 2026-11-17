@@ -191,11 +191,21 @@ function parseWhole(text: string, days: readonly string[]): DueRemote[] {
   return list.filter((r): r is DueRemote => isOurs(r) && forDays(r, days));
 }
 
-/** The end (index after the closing brace) of the JSON object starting at `start`, or -1. */
+/** Our reminder objects are small (under 1 KB); a candidate longer than this isn't one of ours. */
+const MAX_OBJECT_CHARS = 4 * 1024;
+/** How many `{` before an id are tried as the start of its reminder object. */
+const MAX_CANDIDATES = 64;
+const REMINDERS_ARRAY = /"reminders"\s*:\s*\[/;
+
+/**
+ * The end (index after the closing brace) of the JSON object starting at `start`, or -1 if it
+ * doesn't close within MAX_OBJECT_CHARS.
+ */
 function objectEnd(text: string, start: number): number {
   let depth = 0;
   let inString = false;
-  for (let i = start; i < text.length; i++) {
+  const stop = Math.min(text.length, start + MAX_OBJECT_CHARS);
+  for (let i = start; i < stop; i++) {
     const c = text.charCodeAt(i);
     if (inString) {
       if (c === 92) i++; // backslash: skip the escaped character
@@ -208,39 +218,81 @@ function objectEnd(text: string, start: number): number {
 }
 
 /**
- * Due's state, reduced to our reminders for `days`. Small: parsed whole. Large: each of our ids
- * of those days is found by text search and only its own object is parsed; if any can't be
- * read that way, the whole state is parsed after all (correct, just slower).
+ * The reminder object whose own "id" is the one at `pos`: the nearest `{` before it that opens
+ * an object containing `pos` whose top-level id is that id. A nested object before "id", or a
+ * `{` inside a string, is stepped over (its object ends before `pos`, or doesn't parse).
+ */
+/** A `{` that can open a JSON object: next comes a key (`"`), `}` or whitespace, never other text. */
+function opensObject(text: string, at: number): boolean {
+  const c = text.charCodeAt(at + 1);
+  return c === 34 || c === 125 || c === 32 || c === 10 || c === 13 || c === 9;
+}
+
+function objectAround(text: string, pos: number, id: string, floor: number): DueRemote | null {
+  let start = text.lastIndexOf("{", pos);
+  while (start > floor && !opensObject(text, start)) start = text.lastIndexOf("{", start - 1);
+  // Fast path: a flat object (no other brace in it), as Due's reminders are expected to be.
+  const close = text.indexOf("}", pos);
+  const inner = text.indexOf("{", start + 1);
+  if (start > floor && close > pos && (inner < 0 || inner > close) && close - start < MAX_OBJECT_CHARS) {
+    try {
+      const r = JSON.parse(text.slice(start, close + 1)) as DueRemote;
+      if (r && typeof r === "object" && r.id === id) return r;
+    } catch {
+      // not flat: the careful way below
+    }
+  }
+  for (let tries = 0; start > floor && tries < MAX_CANDIDATES; tries++) {
+    const end = objectEnd(text, start);
+    if (end > pos) {
+      try {
+        const r = JSON.parse(text.slice(start, end)) as DueRemote;
+        if (r && typeof r === "object" && r.id === id) return r;
+      } catch {
+        // not an object start after all (a brace inside a string): try the one before
+      }
+    }
+    start = text.lastIndexOf("{", start - 1);
+    while (start > floor && !opensObject(text, start)) start = text.lastIndexOf("{", start - 1);
+  }
+  return null;
+}
+
+/**
+ * Due's state, reduced to our reminders for `days`. Small: parsed whole. Large: within the
+ * `reminders` array only, each of our ids of those days is found by text search (one pass for
+ * all the days) and only its own object is parsed (re-review R-I1). If the state's shape isn't
+ * the expected one, or an id's object can't be found, the whole state is parsed after all
+ * (correct, slower) and that is logged once, as a fixed code.
  */
 export function parseDueState(text: string, days: readonly string[]): DueRemote[] {
   if (text.length <= FULL_PARSE_BYTES) return parseWhole(text, days);
+  const array = REMINDERS_ARRAY.exec(text);
+  if (!array) return fallback(text, days);
+  const floor = array.index + array[0].length - 1;
   const found = new Map<string, DueRemote>();
-  // One pass over the text for all the days: their common start, then each id's own day.
-  let common = days[0] ?? "";
-  for (const d of days) while (!d.startsWith(common)) common = common.slice(0, -1);
-  const needle = `"esmeworld-${common}`;
-  const wanted = days.map((d) => `"esmeworld-${d}-`);
-  {
-    for (let pos = text.indexOf(needle); pos >= 0; pos = text.indexOf(needle, pos + needle.length)) {
-      if (!wanted.some((wd) => text.startsWith(wd, pos))) continue;
+  // One pass for all the days.
+  const needle = new RegExp(`"esmeworld-(?:${days.map((d) => d.replace(/\D/g, "")).join("|")})-`, "g");
+  needle.lastIndex = floor;
+  for (let m = needle.exec(text); m; m = needle.exec(text)) {
+    const pos = m.index;
+    {
       const idEnd = text.indexOf('"', pos + 1);
       const id = text.slice(pos + 1, idEnd);
       if (found.has(id)) continue;
       // Only where it is an "id" value (a title can't hold one of our ids by chance, but check).
       if (!/"id"\s*:\s*$/.test(text.slice(Math.max(0, pos - 16), pos))) continue;
-      const start = text.lastIndexOf("{", pos);
-      const end = start < 0 ? -1 : objectEnd(text, start);
-      let r: unknown;
-      try {
-        r = end < 0 ? null : JSON.parse(text.slice(start, end));
-      } catch {
-        r = null;
-      }
-      if (!r || (r as DueRemote).id !== id) return parseWhole(text, days);
+      const r = objectAround(text, pos, id, floor);
+      if (!r) return fallback(text, days);
       if (isOurs(r)) found.set(id, r);
     }
   }
   return [...found.values()];
+}
+
+function fallback(text: string, days: readonly string[]): DueRemote[] {
+  console.error("due_reminders_state_fallback");
+  return parseWhole(text, days);
 }
 
 async function drain(res: Response, result: CallResult): Promise<CallResult> {

@@ -156,17 +156,20 @@ export function wantedReminders({ items, prefs, now, tickedToday: ticked }: Rule
   });
   const first = (it: DueItem) => (it.priority === 1 || isHabit(it) ? 0 : 1);
   const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
-  dueToday.sort(
-    (a, b) =>
-      first(a) - first(b) ||
-      a.priority - b.priority ||
-      cmp(a.due ?? "~", b.due ?? "~") ||
-      cmp(a.title, b.title) ||
-      cmp(a.id, b.id),
-  );
+  const order = (a: DueItem, b: DueItem) =>
+    first(a) - first(b) || a.priority - b.priority || cmp(a.due ?? "~", b.due ?? "~") || cmp(a.title, b.title) || cmp(a.id, b.id);
+  // Only the first MAX_DUE_TODAY are needed: kept in order as the list goes by (no full sort).
+  const top: DueItem[] = [];
+  for (const it of dueToday) {
+    if (top.length === MAX_DUE_TODAY && order(it, top[MAX_DUE_TODAY - 1]!) >= 0) continue;
+    let i = top.length;
+    while (i > 0 && order(it, top[i - 1]!) < 0) i--;
+    top.splice(i, 0, it);
+    if (top.length > MAX_DUE_TODAY) top.pop();
+  }
   for (const [kind, slot, time] of [["due1", "d1", prefs.dueFirst], ["due2", "d2", prefs.dueSecond]] as const) {
     const when = settingsInstant(day, time, tz);
-    for (const it of dueToday.slice(0, MAX_DUE_TODAY)) {
+    for (const it of top) {
       out.push({ key: `${prefix}-${slot}-${safeId(it.id)}`, kind, title: shortTitle(it.title), at: when });
     }
   }

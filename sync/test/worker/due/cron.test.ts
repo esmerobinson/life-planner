@@ -27,7 +27,7 @@ const prefsRow = (p: Record<string, unknown> = {}) => ({ id: "due", on: true, ti
 
 /** Puts rows on the server the way the app does (a sync), stamped `stamp`. */
 async function put(rows: { table: string; data: Record<string, unknown> }[], stamp = MORNING - 1000) {
-  await syncOk(DEVICE_A, 0, rows.map((r) => change(String(r.data.id), stamp, { ...r.data, updatedAt: stamp }, r.table)), { now: MORNING });
+  await syncOk(DEVICE_A, 0, rows.map((r) => change(String(r.data.id), stamp, { ...r.data, updatedAt: stamp }, r.table)), { now: Math.max(MORNING, stamp + 1000) });
 }
 
 const runAt = (now: number, e = dueEnv()) => scheduled(e, { now: () => now, dueFetch: due.fetch });
@@ -227,6 +227,54 @@ describe("Due reminders: fix round 1", () => {
     ]);
     await runAt(MORNING);
     expect(activeKeys().filter((k) => k.includes("-d1-"))).toEqual(["esmeworld-20261116-d1-near"]);
+  });
+
+  it("with hundreds of overdue to-dos, the SQL's cut still keeps the timed one, priority 1 and today's habit (re-review R-I1)", async () => {
+    await put([
+      { table: "prefs", data: prefsRow() },
+      ...Array.from({ length: 400 }, (_, i) => ({ table: "items", data: todo(`old${String(i).padStart(3, "0")}`, { due: "2026-11-01", priority: 3 }) })),
+      { table: "items", data: todo("urgent", { due: "2026-11-15", priority: 1 }) },
+      { table: "items", data: todo("habit", { recur: ["mon"], priority: 3 }) },
+      { table: "items", data: todo("notToday", { recur: ["tue"], priority: 1 }) },
+      { table: "items", data: todo("meeting", { due: "2026-11-16", time: "16:00", priority: 3 }) },
+    ]);
+    await runAt(MORNING);
+    const keys = activeKeys();
+    expect(keys).toContain("esmeworld-20261116-d1-urgent");
+    expect(keys).toContain("esmeworld-20261116-d1-habit");
+    expect(keys).toContain("esmeworld-20261116-t-meeting");
+    expect(keys.some((k) => k.endsWith("-notToday"))).toBe(false);
+    expect(keys.filter((k) => k.includes("-d1-"))).toHaveLength(8);
+  });
+
+  it("the log of our own cancellations is pruned after 3 days and stays small (re-review R-M3)", async () => {
+    const count = async () => (await env.DB.prepare("SELECT count(*) AS n FROM meta WHERE key LIKE 'due_x:%'").first<{ n: number }>())!.n;
+    // An old entry (4 days) and a recent one (1 day).
+    await env.DB.prepare("INSERT INTO meta (key, value) VALUES ('due_x:esmeworld-20261112-plan-v00000000', ?1), ('due_x:esmeworld-20261115-plan-v00000000', ?2)")
+      .bind(MORNING - 4 * 86_400_000, MORNING - 86_400_000).run();
+    await put([{ table: "prefs", data: prefsRow() }, { table: "items", data: todo("a", { due: "2026-11-16" }) }]);
+    await runAt(MORNING);
+    const left = await env.DB.prepare("SELECT key FROM meta WHERE key LIKE 'due_x:%' ORDER BY key").all<{ key: string }>();
+    expect(left.results.map((r) => r.key)).toEqual(["due_x:esmeworld-20261115-plan-v00000000"]);
+
+    // Ten days of runs, each with Due turned off and on again and a to-do ticked and unticked:
+    // the log only ever holds about three days of cancellations.
+    let most = 0;
+    for (let d = 0; d < 10; d++) {
+      const day = `2026-11-${String(16 + d).padStart(2, "0")}`;
+      const base = Date.parse(`${day}T08:00:00-05:00`);
+      const stamp = base - 1000 + d; // later each day
+      await put([{ table: "prefs", data: prefsRow({ on: true }) }, { table: "items", data: todo("a", { due: day }) }], stamp);
+      await runAt(base);
+      await put([{ table: "items", data: todo("a", { due: day, status: "done", completedAt: day }) }], stamp + 100);
+      await runAt(base + 60_000);
+      await put([{ table: "prefs", data: prefsRow({ on: false }) }], stamp + 200);
+      await runAt(base + 120_000);
+      most = Math.max(most, await count());
+    }
+    expect(most).toBeLessThanOrEqual(4 * 4);
+    const oldest = await env.DB.prepare("SELECT min(value) AS v FROM meta WHERE key LIKE 'due_x:%'").first<{ v: number }>();
+    expect(oldest!.v).toBeGreaterThanOrEqual(Date.parse("2026-11-25T08:00:00-05:00") - 3 * 86_400_000);
   });
 
   it("a run after a sync that finds another run busy doesn't use up the minute (review M2)", async () => {

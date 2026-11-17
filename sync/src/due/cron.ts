@@ -22,7 +22,7 @@ import { DueClient } from "./client";
 import { DUE_PREFS_ID, PREFS_TABLE, readDuePrefs } from "./prefs";
 import { reconcile, type CancelLog, type RunReport } from "./reconcile";
 import { dayToken, wantedReminders, type DueItem } from "./rules";
-import { addDays, appDay } from "./time";
+import { addDays, appDay, weekdayOf } from "./time";
 
 /** Workers allow 50 subrequests per invocation; this leaves room. */
 export const MAX_CALLS_PER_RUN = 40;
@@ -34,8 +34,12 @@ export const LEASE_MS = 60_000;
 export const SYNC_RUN_GAP_MS = 60_000;
 /** After Due refused several calls in a run: leave it alone this long. */
 export const BACKOFF_MS = 60 * 60_000;
-/** The most candidate to-dos one run reads. */
-export const MAX_ITEM_ROWS = 1_500;
+/**
+ * The most candidate to-dos one run reads (CPU, re-review R-I1). They come in the rules' own
+ * order (timed first, then priority 1 and habits, priority, due date), and the rules need at
+ * most MAX_TIMED + MAX_DUE_TODAY of them, so the cut never drops one that would be reminded.
+ */
+export const MAX_ITEM_ROWS = 300;
 /** How long the log of our own cancellations is kept. */
 const CANCEL_LOG_MS = 3 * 86_400_000;
 
@@ -70,8 +74,10 @@ const FORGET_CANCELS_SQL = "DELETE FROM meta WHERE key >= 'due_x:' AND key < 'du
 
 const PREFS_SQL = "SELECT data FROM rows WHERE tbl = ?1 AND id = ?2";
 
-// Only open to-dos that can matter today (review I3): habits, anything pinned for today or
-// tomorrow, and anything due by tomorrow; only the fields the rules need.
+// Only open to-dos that can matter today (review I3): habits planned for today and not done,
+// anything pinned for today or tomorrow, and anything due by tomorrow; only the fields the
+// rules need; in the rules' order (see MAX_ITEM_ROWS). ?1 today, ?2 tomorrow, ?3 the limit,
+// ?4 today's weekday ("mon").
 const ITEMS_SQL = `
 SELECT id,
   json_extract(data, '$.title') AS title,
@@ -89,10 +95,17 @@ FROM rows
 WHERE tbl = 'items' AND json_valid(data)
   AND json_extract(data, '$.kind') = 'task'
   AND json_extract(data, '$.status') = 'open'
-  AND (json_array_length(data, '$.recur') > 0
-       OR json_extract(data, '$.pinnedDate') IN (?1, ?2)
-       OR json_extract(data, '$.due') <= ?2)
-ORDER BY json_extract(data, '$.priority'), json_extract(data, '$.due'), id
+  AND ((json_array_length(data, '$.recur') > 0
+        AND EXISTS (SELECT 1 FROM json_each(rows.data, '$.recur') WHERE value = ?4)
+        AND NOT EXISTS (SELECT 1 FROM json_each(rows.data, '$.doneDates') WHERE value = ?1))
+       OR (COALESCE(json_array_length(data, '$.recur'), 0) = 0
+           AND (json_extract(data, '$.pinnedDate') IN (?1, ?2) OR json_extract(data, '$.due') <= ?2)))
+ORDER BY
+  (json_extract(data, '$.time') IS NOT NULL) DESC,
+  (json_extract(data, '$.priority') = 1 OR COALESCE(json_array_length(data, '$.recur'), 0) > 0) DESC,
+  json_extract(data, '$.priority'),
+  COALESCE(json_extract(data, '$.due'), '~'),
+  id
 LIMIT ?3`;
 
 // Something ticked off today: a to-do done, a habit's day, a project session.
@@ -162,7 +175,7 @@ async function readPrefs(db: D1Database): Promise<unknown> {
 
 async function readItems(db: D1Database, day: string): Promise<{ items: DueItem[]; ticked: boolean }> {
   const [items, ticked] = await db.batch([
-    db.prepare(ITEMS_SQL).bind(day, addDays(day, 1), MAX_ITEM_ROWS),
+    db.prepare(ITEMS_SQL).bind(day, addDays(day, 1), MAX_ITEM_ROWS, weekdayOf(day)),
     db.prepare(TICKED_SQL).bind(day),
   ]);
   return {

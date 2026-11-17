@@ -16,6 +16,72 @@ const DAY_CHANGE = `${String(DAY_ENDS_AT_HOUR).padStart(2, "0")}:00`;
 export const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
+// CPU (re-review R-I1): the first Intl.DateTimeFormat with a time zone costs about 15 ms in a
+// fresh isolate (ICU's zone data), more than a whole run may use. So:
+// - the zones the app offers (hub DueSection ZONES) are worked out by arithmetic from their
+//   rules, with no Intl at all (checked against Intl in time.test.ts, 2026-2031);
+// - any other zone uses one cached Intl formatter per zone, and Intl is warmed up once at
+//   module scope (isolate start-up, not a run's own time).
+// If a country changes its clock rules, ZONE_RULES needs updating; the test against Intl then
+// fails on a runtime with the new data.
+
+type DstRule = "us" | "eu" | "au";
+/** Standard offset (minutes east of UTC) and daylight-saving rule (+60 minutes while on). */
+const ZONE_RULES: Record<string, { std: number; dst?: DstRule }> = {
+  "America/New_York": { std: -300, dst: "us" },
+  "America/Chicago": { std: -360, dst: "us" },
+  "America/Denver": { std: -420, dst: "us" },
+  "America/Los_Angeles": { std: -480, dst: "us" },
+  "America/Sao_Paulo": { std: -180 },
+  "Europe/London": { std: 0, dst: "eu" },
+  "Europe/Lisbon": { std: 0, dst: "eu" },
+  "Europe/Paris": { std: 60, dst: "eu" },
+  "Europe/Berlin": { std: 60, dst: "eu" },
+  "Asia/Tokyo": { std: 540 },
+  "Australia/Sydney": { std: 600, dst: "au" },
+  UTC: { std: 0 },
+};
+
+/** The UTC day (ms) of the n-th (1-based; -1 = last) Sunday of a month (0-based). */
+function sunday(year: number, month: number, n: number): number {
+  if (n > 0) {
+    const first = Date.UTC(year, month, 1);
+    const dow = new Date(first).getUTCDay();
+    return first + (((7 - dow) % 7) + (n - 1) * 7) * DAY_MS;
+  }
+  const last = Date.UTC(year, month + 1, 0);
+  return last - new Date(last).getUTCDay() * DAY_MS;
+}
+
+const HOUR_MS = 3_600_000;
+
+/** Daylight saving is on at this instant, by the zone's rule. */
+function dstOn(rule: DstRule, std: number, ms: number): boolean {
+  const year = new Date(ms + std * MINUTE_MS).getUTCFullYear();
+  if (rule === "us") {
+    // 2nd Sunday of March, 02:00 standard time, to 1st Sunday of November, 02:00 daylight time.
+    const start = sunday(year, 2, 2) + 2 * HOUR_MS - std * MINUTE_MS;
+    const end = sunday(year, 10, 1) + 2 * HOUR_MS - (std + 60) * MINUTE_MS;
+    return ms >= start && ms < end;
+  }
+  if (rule === "eu") {
+    // Last Sunday of March to last Sunday of October, 01:00 UTC.
+    return ms >= sunday(year, 2, -1) + HOUR_MS && ms < sunday(year, 9, -1) + HOUR_MS;
+  }
+  // Sydney: off from the 1st Sunday of April, 03:00 daylight time, until the 1st Sunday of
+  // October, 02:00 standard time.
+  const end = sunday(year, 3, 1) + 3 * HOUR_MS - (std + 60) * MINUTE_MS;
+  const start = sunday(year, 9, 1) + 2 * HOUR_MS - std * MINUTE_MS;
+  return ms < end || ms >= start;
+}
+
+/** Minutes east of UTC by the zone's rule, or null for a zone without one here. */
+function ruleOffset(ms: number, tz: string): number | null {
+  const z = ZONE_RULES[tz];
+  if (!z) return null;
+  return z.std + (z.dst && dstOn(z.dst, z.std, ms) ? 60 : 0);
+}
+
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatter(timeZone: string): Intl.DateTimeFormat {
@@ -35,9 +101,17 @@ function formatter(timeZone: string): Intl.DateTimeFormat {
   return f;
 }
 
+// Warm Intl up at module scope (isolate start-up), for zones without a rule here.
+try {
+  formatter(DEFAULT_TIME_ZONE).formatToParts(new Date(0));
+} catch {
+  // never fatal
+}
+
 /** True when the runtime knows this IANA time zone. */
 export function isTimeZone(tz: unknown): tz is string {
   if (typeof tz !== "string" || tz.length === 0 || tz.length > 64) return false;
+  if (tz in ZONE_RULES) return true;
   try {
     formatter(tz);
     return true;
@@ -53,6 +127,11 @@ export interface WallClock {
 
 /** The wall-clock date and time of an instant in `tz`. */
 export function wallClock(ms: number, tz: string): WallClock {
+  const off = ruleOffset(ms, tz);
+  if (off !== null) {
+    const iso = new Date(Math.floor(ms / MINUTE_MS) * MINUTE_MS + off * MINUTE_MS).toISOString();
+    return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
+  }
   const parts: Record<string, string> = {};
   for (const p of formatter(tz).formatToParts(new Date(ms))) parts[p.type] = p.value;
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
@@ -63,6 +142,8 @@ const utcOf = (date: string, time: string) =>
 
 /** Minutes `tz` is ahead of UTC at an instant (New York in winter: -300). */
 export function offsetMinutes(ms: number, tz: string): number {
+  const off = ruleOffset(ms, tz);
+  if (off !== null) return off;
   const w = wallClock(ms, tz);
   return Math.round((utcOf(w.date, w.time) - Math.floor(ms / MINUTE_MS) * MINUTE_MS) / MINUTE_MS);
 }
