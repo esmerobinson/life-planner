@@ -13,8 +13,9 @@
 | 3 | `2026-11-17-rio-2b3-zona-sul.md` | Zona Sul: shelves stocked by errands, coins, selling (drop boxes and the COMPRAMOS counter), buying. | 1, 2 | M (6 tasks) |
 | 4 | `2026-11-17-rio-2b4-cooking.md` | Recipes ("inspired at"), kitchen tools, techniques, the recipe book tab, the cooking screen (experimenting, variations, gororoba), the pinned dish line on Today. | 1, 2, 3 | XL (10 tasks) |
 | 5 | `2026-11-17-rio-2b5-wardrobe.md` | The clothing store: a piece per 6 things, rails, try-on, keep, wear, friends' hats, buying ahead, the Wardrobe tab. | 1, 2 (3 for buying ahead) | M (7 tasks) |
+| 6 | `2026-11-17-rio-2b6-noticeboard.md` | The Noticeboard's bundles; the stuck task holding the next opening; boteco themed nights with their posters and one Brazilian record each; holiday sets for doing anything real that week. (Added by the Game Design session, 2026-11-17.) | 1, 2 | L (6 tasks) |
 
-Plans 3 and 5 can be built at the same time once 2 is in; 4 waits for 3 (the pinned dish's "buy it at Zona Sul" path and the shared coin balance). Each plan works in its own worktree on a branch off the previous plan's branch (`rio-2b1` off `rio-menu` with `rio-areas` merged, `rio-2b2` off `rio-2b1`, ...), pushes, and never merges or deploys (Core does).
+Plans 3, 5 and 6 can be built at the same time once 2 is in; 4 waits for 3 (the pinned dish's "buy it at Zona Sul" path and the shared coin balance). Each plan works in its own worktree on a branch off the previous plan's branch (`rio-2b1` off `rio-menu` with `rio-areas` merged, `rio-2b2` off `rio-2b1`, ...), pushes, and never merges or deploys (Core does).
 
 The brief suggested putting the v3 families and the tick card first. The ledger goes first instead, because the tick card, the summary, Zona Sul, cooking and the wardrobe all read it. Building it alone, with no screens, keeps the review focused on the one thing that can lose answers: stored state.
 
@@ -81,6 +82,17 @@ Steady day (5 to-dos, 3 habits, a check-in, an exercise, morning pages, a finish
 - **Self-tests every plan adds** (Esme's top rule): a two-device sync test of its rows (`hub/src/sync/` fake server); a backup round trip of its rows; a "balances never negative" property test; the farm, pwa, phone and sync e2e specs before pushing.
 
 ## Decisions for Esme (each with the default the plans build)
+
+**Answered 2026-11-17** (Game Design session, page `esmeworld-notes/mockups/rio-phase2-rules.html`; logged in `decisions-record.md`):
+- **Every default below is approved as written** ("Yes to all").
+- The tuning numbers start as planned and are tuned after a couple of weeks of real use, so the `// DEFAULT: Esme to confirm` marks stay on the tuning lines.
+- Also ruled the same day:
+  - **Animals droop after 3 quiet days** and perk up with one habit; they never die or leave. Added as plan 1, Task 7b.
+  - **Just coins, no sparkles.** No plan builds a second currency (this replaces the farm-era two-currency rule).
+  - **Seasons: weather and holidays only.** No sticker waits for a season.
+  - **Holiday stickers:** anything real during the holiday's week earns the set; a missed one comes back next year (plan 6).
+  - **Duvet is retired.** There are five friends: Mr Cat, Caetano, Pupup, Bebe, Cereal.
+
 1. **Untick on the same day takes the reward back**, until 3am banks the day. After that it's hers for good. *Default: yes.*
 2. **What's an errand?** *Default: any Admin to-do, or any to-do tagged "errand".*
 3. **What's a big to-do?** *Default: priority 1.*
@@ -113,4 +125,4 @@ Already delivered and used by the plans: `cooking/` (six technique animations: f
 - Until art lands, placeholders follow the repo rule: magenta, system font, linear easing.
 
 ## Not in 2b
-The whole-goal feast, goal-step house decor, weekly/monthly review rewards (the drinks ingredients, the match, the boteco), holiday takeovers (2a's events), vinyl records, the penthouse and other space purchases, craftables.
+The whole-goal feast, goal-step house decor, weekly/monthly review rewards (the drinks ingredients, the match), holiday map takeovers (2a's events), the penthouse and other space purchases, craftables. (Vinyl records, themed nights, bundles, the stuck task and holiday sticker sets are now plan 6.)

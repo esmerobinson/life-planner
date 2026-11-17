@@ -198,7 +198,7 @@
   - Choosing a dress writes `wear:esme` with no top.
   - A friend not yet arrived isn't listed.
   - A friend is offered only pieces that are kept and have its art.
-  - `duvet` never appears.
+  - `duvet` never appears (Duvet is retired, Esme 2026-11-17; five friends: Mr Cat, Caetano, Pupup, Bebe, Cereal).
 - [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS, plus `npx vitest run src/rio/menu src/farm`.
 - [ ] **Step 5: Commit** "Rio wardrobe: the Wardrobe tab, and friends wearing what they have art for".
 
