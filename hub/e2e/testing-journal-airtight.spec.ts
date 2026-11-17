@@ -1057,3 +1057,149 @@ test.describe("Highlights by touch at 390px", () => {
     await expect(exerciseTab(page).getByRole("article", { name: "Today's card" }).locator("mark.hl-mark")).toHaveText(HL_WORDS);
   });
 });
+
+// ================================================================ Daily log (routine plan, 16 Nov 2026)
+
+const LOG = {
+  schedule: "Pretend Thimbleroot schedule note: the made-up lunch ran long",
+  todos: "Pretend Thimbleroot to-do note: two pretend letters left",
+};
+
+const logBox = (page: Page) => page.getByRole("region", { name: "Daily log" });
+
+/** The day's log filled in like a person: a tap, a note, a tap, a note, then a click away. */
+async function fillLog(page: Page) {
+  const s = logBox(page);
+  await s.getByRole("group", { name: "Stuck to my daily schedule?" }).getByRole("button", { name: "Partly" }).click();
+  await typeLikeAPerson(page, s.getByLabel("A short note about your schedule (optional)"), LOG.schedule, s.getByRole("heading", { name: "Daily log" }));
+  await s.getByRole("group", { name: "Finished today's to-dos?" }).getByRole("button", { name: "No" }).click();
+  await typeLikeAPerson(page, s.getByLabel("A short note about your to-dos (optional)"), LOG.todos, s.getByRole("heading", { name: "Daily log" }));
+}
+
+/** A daily log shown read-only (the tab's done box, or Read back's entry): each answer word for word. */
+async function logShown(where: Locator) {
+  const items = where.locator("ol.routine-answers > li");
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0).locator(".journal-q")).toHaveText("Stuck to my daily schedule?");
+  await expect(items.nth(0).locator(".journal-past-answer")).toHaveText(["Partly", LOG.schedule]);
+  await expect(items.nth(1).locator(".journal-q")).toHaveText("Finished today's to-dos?");
+  await expect(items.nth(1).locator(".journal-past-answer")).toHaveText(["No", LOG.todos]);
+}
+
+for (const width of [1280, 390]) {
+  test.describe(`Daily log at ${width}px`, () => {
+    test.use({ viewport: { width, height: width === 390 ? 844 : 900 } });
+
+    test(`${ENGINE}: typed and paused, it survives a reload before Done; Done shows it logged, after a reload and in Read back`, async ({ page }) => {
+      test.setTimeout(150_000);
+      await unlocked(page, "/journal/check-in");
+      const { long } = await appDay(page);
+      await fillLog(page);
+
+      // Not done yet, but nothing lost: a reload brings every answer back into the boxes.
+      await page.reload();
+      const s = logBox(page);
+      await expect(s.getByLabel("A short note about your schedule (optional)")).toHaveValue(LOG.schedule);
+      await expect(s.getByLabel("A short note about your to-dos (optional)")).toHaveValue(LOG.todos);
+      await expect(s.getByRole("group", { name: "Stuck to my daily schedule?" }).getByRole("button", { name: "Partly" })).toHaveAttribute("aria-pressed", "true");
+      await expect(s.getByRole("group", { name: "Finished today's to-dos?" }).getByRole("button", { name: "No" })).toHaveAttribute("aria-pressed", "true");
+
+      await s.getByRole("button", { name: "Done" }).click();
+      await expect(s.getByText("Logged for today")).toBeVisible();
+      await logShown(s);
+      await expect(s.getByRole("button", { name: "Edit" })).toBeVisible();
+
+      await page.reload();
+      await expect(logBox(page).getByText("Logged for today")).toBeVisible();
+      await logShown(logBox(page));
+
+      await logShown(await readBackItem(page, "Daily check-in", `${long} · Daily log`));
+      await noWordsInClear(page, [LOG.schedule, LOG.todos, "Thimbleroot"]);
+    });
+  });
+}
+
+test.describe("Daily log across 3am at 1280px", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test(`${ENGINE}: logged at 01:30 (still that day); past 03:00 a new day's log starts, and that day's is in Read back`, async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.clock.install({ time: localAt(1, 1, 30) });
+    await unlocked(page, "/journal/check-in");
+    const day = await appDay(page);
+    expect(day.iso).toBe(localAt(0, 12).toLocaleDateString("en-CA")); // the evening's own day
+    await fillLog(page);
+    await logBox(page).getByRole("button", { name: "Done" }).click();
+    await expect(logBox(page).getByText("Logged for today")).toBeVisible();
+
+    await page.clock.setSystemTime(localAt(1, 3, 5));
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(logBox(page).getByText("Logged for today")).toHaveCount(0); // a new day's log
+    await expect(logBox(page).getByLabel("A short note about your schedule (optional)")).toHaveValue("");
+    await page.reload();
+    await logShown(await readBackItem(page, "Daily check-in", `${day.long} · Daily log`));
+    await noWordsInClear(page, [LOG.schedule, LOG.todos, "Thimbleroot"]);
+  });
+});
+
+// ================================================================ Weekly review (Sundays)
+
+const REVIEW = {
+  well: "Pretend Mossgrove went well: the made-up garden got watered",
+  inWay: "Pretend Mossgrove got in the way: a pretend storm",
+  ifThen: "If pretend Mossgrove rain, then a made-up indoor stretch",
+};
+
+const reviewBox = (page: Page) => page.getByRole("region", { name: "Weekly review" });
+
+/** The next Sunday at noon (today, if today is Sunday). */
+function nextSundayNoon(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  d.setHours(12, 0, 0, 0);
+  return d;
+}
+
+async function reviewShown(where: Locator) {
+  const items = where.locator("ol.routine-answers > li");
+  await expect(items).toHaveCount(5);
+  await expect(items.locator(".journal-past-answer")).toHaveText([REVIEW.well, REVIEW.inWay, "7 out of 10", REVIEW.ifThen, "Monday, Thursday"]);
+}
+
+test.describe("Weekly review at 1280px", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test(`${ENGINE}: on Sunday, typed and paused, it survives a reload; Done counts as Mental health work and is in Read back`, async ({ page }) => {
+    test.setTimeout(150_000);
+    await page.clock.install({ time: nextSundayNoon() });
+    await unlocked(page, "/journal/exercise");
+    const { long } = await appDay(page);
+    const s = reviewBox(page);
+    await expect(s.getByRole("heading", { name: "It's Sunday: your weekly review" })).toBeVisible();
+    const away = s.getByRole("heading", { name: "It's Sunday: your weekly review" });
+    await typeLikeAPerson(page, s.getByLabel("What went well?"), REVIEW.well, away);
+    await typeLikeAPerson(page, s.getByLabel("What got in the way?"), REVIEW.inWay, away);
+    await s.getByRole("group", { name: "Am I living my values? (1–10)" }).getByRole("button", { name: "7", exact: true }).click();
+    await typeLikeAPerson(page, s.getByLabel("One if-then plan for next week"), REVIEW.ifThen);
+    await s.getByLabel("Thursday").check();
+    await s.getByLabel("Monday").check();
+    await page.waitForTimeout(THINK_MS);
+
+    await page.reload();
+    await expect(reviewBox(page).getByLabel("What went well?")).toHaveValue(REVIEW.well);
+    await expect(reviewBox(page).getByLabel("One if-then plan for next week")).toHaveValue(REVIEW.ifThen);
+    await expect(reviewBox(page).getByLabel("Monday")).toBeChecked();
+    await expect(reviewBox(page).getByLabel("Thursday")).toBeChecked();
+
+    await reviewBox(page).getByRole("button", { name: "Done" }).click();
+    await expect(reviewBox(page).getByText("Weekly review done for this week")).toBeVisible();
+    await reviewShown(reviewBox(page));
+    await tabDone(page, "Mental health exercise"); // Mental health work: the green row ticks
+
+    await page.reload();
+    await reviewShown(reviewBox(page));
+    await tabDone(page, "Mental health exercise");
+    await reviewShown(await readBackItem(page, "Mental health exercise", `${long} · Weekly review`));
+    await noWordsInClear(page, [REVIEW.well, REVIEW.inWay, REVIEW.ifThen, "Mossgrove"]);
+  });
+});
