@@ -217,3 +217,15 @@ it("Wardrobe and Recipes open later", async () => {
   expect(screen.getByRole("tabpanel")).toHaveTextContent("Recipes");
   expect(screen.getByRole("tabpanel")).toHaveTextContent("Opens later");
 });
+
+it("a click outside the panel closes it (the dim, or the stage's empty corners); a click on the panel doesn't", async () => {
+  const onClose = vi.fn();
+  const user = userEvent.setup();
+  render(<Menu view={fakeView()} onClose={onClose} />);
+  await user.click(document.querySelector(".pnl")!);
+  expect(onClose).not.toHaveBeenCalled();
+  await user.click(document.querySelector(".rio-menu")!);
+  expect(onClose).toHaveBeenCalledTimes(1);
+  await user.click(document.querySelector(".rio-menu-dim")!);
+  expect(onClose).toHaveBeenCalledTimes(2);
+});

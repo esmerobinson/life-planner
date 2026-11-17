@@ -23,20 +23,27 @@ export const MENU_STAGE: Record<MenuLayout | "narrowShort", Stage> = {
 
 /**
  * `u`: the whole-number scale of the things over the game (Back, the hotbar, an area's buttons).
- * `menuU`: the menu's scale. On the desktop it grows to the largest that fits the window, fractions
- * allowed (Esme, 2026-11-17: "a bit bigger"); on the phone it is `u`.
+ * `menuU`: the menu's scale. On the desktop a panel over the game (Esme, 2026-11-17: "Text on menu
+ * UI and menu ui in general is way too big shouldnt open full screen"): at most MENU_MAX_H of the
+ * screen's height (and 90% of its width), never above the kit's 3x, fractions allowed below it;
+ * on the phone it is `u`.
  */
 export interface Fit { layout: MenuLayout; u: number; short: boolean; menuU: number }
 
 export const stageOf = (f: Pick<Fit, "layout" | "short">): Stage =>
   f.layout === "wide" ? MENU_STAGE.wide : f.short ? MENU_STAGE.narrowShort : MENU_STAGE.narrow;
 
+/** The kit's desktop scale (kit.json "3x desktop"): the menu never draws bigger. */
+const KIT_DESKTOP_U = 3;
+/** The most of the screen's height the desktop menu takes. */
+export const MENU_MAX_H = 0.7;
+
 const fits = (st: Stage, u: number, vw: number, vh: number) => st.w * u <= vw && st.h * u <= vh;
 
 /** The layout and whole-number scale at which the menu fits a `vw` x `vh` CSS px box. */
 export function menuFit(vw: number, vh: number): Fit {
   const wide = MENU_STAGE.wide;
-  for (const u of [3, 2]) if (fits(wide, u, vw, vh)) return { layout: "wide", u, short: false, menuU: Math.min(vw / wide.w, vh / wide.h) };
+  for (const u of [3, 2]) if (fits(wide, u, vw, vh)) return { layout: "wide", u, short: false, menuU: Math.min(KIT_DESKTOP_U, (MENU_MAX_H * vh) / wide.h, (0.9 * vw) / wide.w) };
   for (const u of [3, 2]) if (fits(MENU_STAGE.narrow, u, vw, vh)) return { layout: "narrow", u, short: false, menuU: u };
   for (const u of [3, 2]) if (fits(MENU_STAGE.narrowShort, u, vw, vh)) return { layout: "narrow", u, short: true, menuU: u };
   return { layout: "narrow", u: 1, short: true, menuU: 1 };

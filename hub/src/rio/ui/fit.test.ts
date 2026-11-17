@@ -46,13 +46,18 @@ it("body text is two thirds of the UI scale on the desktop (2 at 3x), the UI sca
   expect(headPx(3)).toBe(3);
 });
 
-it("the desktop menu grows to the largest size that fits the window, fractions allowed; the phone's stays whole", () => {
-  for (const [w, h] of [[1440, 900], [1280, 800], [2560, 1080]] as const) {
+// Esme, 2026-11-17: "Text on menu UI and menu ui in general is way too big shouldnt open full
+// screen". The desktop menu opens as a panel at most 70% of the screen's height, never above the
+// kit's own 3x (its mockups' proportions: body text at 2 px a font pixel).
+it("the desktop menu is a panel over the game: at most 70% of the screen's height, never above the kit's 3x", () => {
+  expect(menuFit(1440, 900).menuU).toBe(3);
+  for (const [w, h] of [[1440, 900], [1280, 800], [2560, 1440], [1280, 600], [1024, 700]] as const) {
     const f = menuFit(w, h);
-    expect(f.menuU).toBeGreaterThan(f.u);
-    expect(MENU_STAGE.wide.w * f.menuU).toBeLessThanOrEqual(w + 1e-6);
-    expect(MENU_STAGE.wide.h * f.menuU).toBeLessThanOrEqual(h + 1e-6);
-    expect(Math.max(MENU_STAGE.wide.w * f.menuU - w, MENU_STAGE.wide.h * f.menuU - h)).toBeCloseTo(0, 6);
+    expect(f.menuU).toBeLessThanOrEqual(3);
+    expect(MENU_STAGE.wide.h * f.menuU).toBeLessThanOrEqual(0.7 * h + 1e-6);
+    expect(MENU_STAGE.wide.w * f.menuU).toBeLessThanOrEqual(0.9 * w + 1e-6);
   }
+  expect(menuFit(2560, 1440).menuU).toBe(3);
+  expect(menuFit(1280, 800).menuU).toBeCloseTo((0.7 * 800) / MENU_STAGE.wide.h, 9);
   expect(menuFit(390, 760).menuU).toBe(2);
 });
