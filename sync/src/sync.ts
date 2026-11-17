@@ -49,18 +49,22 @@ export interface SyncRequest {
   cursor: number;
   changes: ValidChange[];
   /**
-   * The request ticks something off (a done to-do, a habit's done day, a session) or changes
-   * the Due settings: Due reminders are brought up to date soon after (due/cron.ts).
+   * The request may change today's reminders: something ticked off, binned or archived, a
+   * to-do with a time, a day or a deadline, or the Due settings. Due reminders are brought up
+   * to date soon after (due/cron.ts), instead of at the next quarter hour (review M2).
    */
   touchesDue: boolean;
 }
 
-/** An item that may have been ticked off, or the Due settings row. */
+/** An item that may change today's reminders, or the Due settings row. */
 function touchesDue(table: string, id: string, data: Record<string, unknown>): boolean {
   if (table === PREFS_TABLE) return id === DUE_PREFS_ID;
   if (table !== "items") return false;
   return (
-    data.status === "done" ||
+    (typeof data.status === "string" && data.status !== "open") ||
+    data.time !== undefined ||
+    data.pinnedDate !== undefined ||
+    data.due !== undefined ||
     (Array.isArray(data.doneDates) && data.doneDates.length > 0) ||
     (Array.isArray(data.sessions) && data.sessions.some((s) => isPlainObject(s) && s.doneOn !== undefined))
   );

@@ -30,9 +30,8 @@
   ],
   // Due reminders (src/due/cron.ts). EXACTLY ONE cron trigger: the free plan allows 5 per
   // account and the legacy worker (repo-root wrangler.jsonc) uses 4.
-  "triggers": { "crons": ["*/15 * * * *"] },
-  // Due's public address (a Tailscale Funnel; not a secret). The token is a secret: DUE_TOKEN.
-  "vars": { "DUE_BASE_URL": "https://wsl-esme-1.tailc6cd5d.ts.net" }
+  "triggers": { "crons": ["*/15 * * * *"] }
   // Secrets (never committed): SYNC_TOKEN_HASH (set with tools/set-passphrase.mjs);
-  // DUE_TOKEN (wrangler secret put DUE_TOKEN; without it no reminder is ever sent).
+  // DUE_TOKEN and DUE_BASE_URL (wrangler secret put …; without both no reminder is ever sent).
+  // Due's address is a secret too, so a local `wrangler dev` never reaches the real Due.
 }

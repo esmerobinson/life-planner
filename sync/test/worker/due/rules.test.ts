@@ -9,7 +9,7 @@ const prefs = (p: Partial<DuePrefs> = {}): DuePrefs => ({ ...DEFAULT_DUE_PREFS, 
 const todo = (id: string, p: Partial<DueItem> = {}): DueItem => ({
   id, title: `Pretend ${id}`, kind: "task", status: "open", areaId: "admin", priority: 2, ...p,
 });
-const ids = (list: { id: string }[]) => list.map((r) => r.id);
+const keys = (list: { key: string }[]) => list.map((r) => r.key);
 const run = (items: DueItem[], now = MORNING, p: Partial<DuePrefs> = {}) => wantedReminders({ items, prefs: prefs(p), now });
 
 describe("Due reminder rules", () => {
@@ -19,21 +19,21 @@ describe("Due reminder rules", () => {
 
   it("Plan your day and Review your day at her times", () => {
     const list = run([], MORNING, { plan: "08:30", review: "22:15" });
-    expect(list.find((r) => r.id === "esmeworld-2026-11-16-plan")).toMatchObject({ title: "Plan your day", at: at("2026-11-16T08:30:00") });
-    expect(list.find((r) => r.id === "esmeworld-2026-11-16-review")).toMatchObject({ title: "Review your day", at: at("2026-11-16T22:15:00") });
+    expect(list.find((r) => r.key === "esmeworld-20261116-plan")).toMatchObject({ title: "Plan your day", at: at("2026-11-16T08:30:00") });
+    expect(list.find((r) => r.key === "esmeworld-20261116-review")).toMatchObject({ title: "Review your day", at: at("2026-11-16T22:15:00") });
   });
 
   it("before 3am it is still yesterday's reminders (the 3am rule)", () => {
     const list = run([], at("2026-11-17T02:30:00"));
-    expect(ids(list)).toContain("esmeworld-2026-11-16-review");
-    expect(ids(list).every((id) => id.startsWith("esmeworld-2026-11-16-"))).toBe(true);
-    expect(ids(run([], at("2026-11-17T03:00:00")))).toContain("esmeworld-2026-11-17-plan");
+    expect(keys(list)).toContain("esmeworld-20261116-review");
+    expect(keys(list).every((k) => k.startsWith("esmeworld-20261116-"))).toBe(true);
+    expect(keys(run([], at("2026-11-17T03:00:00")))).toContain("esmeworld-20261117-plan");
   });
 
   it("follows her time zone setting", () => {
     // 08:00 New York is 10:00 in São Paulo: the plan time is 09:00 there.
     const list = run([], MORNING, { timeZone: "America/Sao_Paulo" });
-    expect(list.find((r) => r.id.endsWith("-plan"))!.at).toBe(Date.parse("2026-11-16T09:00:00-03:00"));
+    expect(list.find((r) => r.key.endsWith("-plan"))!.at).toBe(Date.parse("2026-11-16T09:00:00-03:00"));
   });
 
   it("due today, overdue and pinned today, each at the first and second pass", () => {
@@ -48,12 +48,12 @@ describe("Due reminder rules", () => {
       todo("idea", { due: "2026-11-16", kind: "idea" }),
     ]);
     const first = list.filter((r) => r.kind === "due1");
-    expect(ids(first).sort()).toEqual(["esmeworld-2026-11-16-due1-late", "esmeworld-2026-11-16-due1-pinned", "esmeworld-2026-11-16-due1-today"]);
+    expect(keys(first).sort()).toEqual(["esmeworld-20261116-d1-late", "esmeworld-20261116-d1-pinned", "esmeworld-20261116-d1-today"]);
     expect(first[0]!.at).toBe(at("2026-11-16T11:00:00"));
     const second = list.filter((r) => r.kind === "due2");
     expect(second).toHaveLength(3);
     expect(second[0]!.at).toBe(at("2026-11-16T17:00:00"));
-    expect(list.find((r) => r.id.endsWith("due1-today"))!.title).toBe("Pretend today");
+    expect(list.find((r) => r.key.endsWith("d1-today"))!.title).toBe("Pretend today");
   });
 
   it("habits planned for today and not yet done today", () => {
@@ -63,7 +63,7 @@ describe("Due reminder rules", () => {
       todo("doneToday", { recur: ["mon"], doneToday: true }),
       todo("inboxHabit", { recur: ["mon"], areaId: "inbox" }),
     ]);
-    expect(ids(list.filter((r) => r.kind === "due1"))).toEqual(["esmeworld-2026-11-16-due1-mon"]);
+    expect(keys(list.filter((r) => r.kind === "due1"))).toEqual(["esmeworld-20261116-d1-mon"]);
   });
 
   it("priority 1 and habits first, and never more than the cap", () => {
@@ -71,16 +71,16 @@ describe("Due reminder rules", () => {
     const list = run([...many, todo("habit", { recur: ["mon"], priority: 3 }), todo("urgent", { priority: 1, due: "2026-11-16" })]);
     const first = list.filter((r) => r.kind === "due1");
     expect(first).toHaveLength(MAX_DUE_TODAY);
-    expect(ids(first).slice(0, 2).sort()).toEqual(["esmeworld-2026-11-16-due1-habit", "esmeworld-2026-11-16-due1-urgent"]);
+    expect(keys(first).slice(0, 2).sort()).toEqual(["esmeworld-20261116-d1-habit", "esmeworld-20261116-d1-urgent"]);
     expect(list.filter((r) => r.kind === "due2")).toHaveLength(MAX_DUE_TODAY);
   });
 
   it("a timed to-do: an alert its lead before, and not in the due-today passes", () => {
     const list = run([todo("dentist", { pinnedDate: "2026-11-16", time: "15:00" }), todo("call", { due: "2026-11-16", time: "09:30" })], MORNING, { leadMinutes: 20 });
     const timed = list.filter((r) => r.kind === "timed");
-    expect(timed.map((r) => [r.id, r.at])).toEqual([
-      ["esmeworld-2026-11-16-at-call-0930", at("2026-11-16T09:10:00")],
-      ["esmeworld-2026-11-16-at-dentist-1500", at("2026-11-16T14:40:00")],
+    expect(timed.map((r) => [r.key, r.at])).toEqual([
+      ["esmeworld-20261116-t-call", at("2026-11-16T09:10:00")],
+      ["esmeworld-20261116-t-dentist", at("2026-11-16T14:40:00")],
     ]);
     expect(timed[1]!.title).toBe("Pretend dentist");
     expect(list.filter((r) => r.kind === "due1")).toEqual([]);
@@ -95,12 +95,12 @@ describe("Due reminder rules", () => {
     ]);
     expect(list.filter((r) => r.kind === "timed")).toEqual([]);
     // A broken time is just a to-do due today.
-    expect(ids(list.filter((r) => r.kind === "due1"))).toEqual(["esmeworld-2026-11-16-due1-bad"]);
+    expect(keys(list.filter((r) => r.kind === "due1"))).toEqual(["esmeworld-20261116-d1-bad"]);
   });
 
   it("a 1am meeting tomorrow (calendar) belongs to tonight", () => {
     const list = run([todo("late", { due: "2026-11-17", time: "01:00" })]);
-    expect(list.filter((r) => r.kind === "timed").map((r) => r.at)).toEqual([at("2026-11-17T00:45:00")]);
+    expect(list.filter((r) => r.kind === "timed").map((r) => [r.key, r.at])).toEqual([["esmeworld-20261117-t-late", at("2026-11-17T00:45:00")]]);
   });
 
   it("timed alerts are capped too", () => {
@@ -108,11 +108,35 @@ describe("Due reminder rules", () => {
     expect(run(many).filter((r) => r.kind === "timed")).toHaveLength(MAX_TIMED);
   });
 
+  it("a 03:05 meeting's 02:50 alert is wanted before 3am, under the meeting's own day (review M3)", () => {
+    const item = todo("early", { due: "2026-11-17", time: "03:05" });
+    const before = run([item], at("2026-11-17T02:30:00"));
+    const after = run([item], at("2026-11-17T03:00:00"));
+    const pick = (l: ReturnType<typeof run>) => l.filter((r) => r.kind === "timed").map((r) => [r.key, r.at]);
+    expect(pick(before)).toEqual([["esmeworld-20261117-t-early", at("2026-11-17T02:50:00")]]);
+    // After 3am the same key (so the same reminder, never a second one).
+    expect(pick(after)).toEqual(pick(before));
+  });
+
+  it("a timed to-do added after its lead but before the meeting: sent a minute from now (review M3)", () => {
+    const list = run([todo("soon", { due: "2026-11-16", time: "08:10" })], MORNING);
+    const t = list.find((r) => r.kind === "timed")!;
+    expect(t.at).toBe(at("2026-11-16T07:55:00"));
+    expect(t.sendAt).toBe(MORNING + 60_000);
+    // Once the meeting itself is within the minute, nothing.
+    expect(run([todo("now", { due: "2026-11-16", time: "08:00" })], MORNING).some((r) => r.kind === "timed")).toBe(false);
+  });
+
+  it("an old pin is ignored for the time's day, as Today ignores it (review M4)", () => {
+    const list = run([todo("oldpin", { pinnedDate: "2026-11-10", due: "2026-11-16", time: "15:00" })]);
+    expect(keys(list.filter((r) => r.kind === "timed"))).toEqual(["esmeworld-20261116-t-oldpin"]);
+  });
+
   describe("the 1pm motivation nudge", () => {
     const NOON = at("2026-11-16T12:40:00");
     it("is not wanted until half an hour before", () => {
       expect(run([], at("2026-11-16T12:20:00")).some((r) => r.kind === "nudge")).toBe(false);
-      expect(run([], NOON).find((r) => r.kind === "nudge")).toMatchObject({ id: "esmeworld-2026-11-16-nudge", at: at("2026-11-16T13:00:00") });
+      expect(run([], NOON).find((r) => r.kind === "nudge")).toMatchObject({ key: "esmeworld-20261116-nudge", at: at("2026-11-16T13:00:00") });
     });
 
     it("uses her own lines in turn, one a day, and a gentle line when she has none", () => {
@@ -136,7 +160,7 @@ describe("Due reminder rules", () => {
   it("titles are short and plain; odd ids are made safe", () => {
     const list = run([todo("weird id/with spaces", { due: "2026-11-16", title: `  ${"Long ".repeat(40)}\nline ` })]);
     const r = list.find((x) => x.kind === "due1")!;
-    expect(r.id).toMatch(/^esmeworld-2026-11-16-due1-h[0-9a-f]{8}$/);
+    expect(r.key).toMatch(/^esmeworld-20261116-d1-h[0-9a-f]{8}$/);
     expect(r.title.length).toBeLessThanOrEqual(100);
     expect(r.title).not.toMatch(/\n|^\s/);
   });

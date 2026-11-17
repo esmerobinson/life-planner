@@ -28,6 +28,14 @@ export class FakeDue {
   failWith: number | "down" | null = null;
   /** Fail only these methods. */
   failOnly: string[] | null = null;
+  /** Refuse (400) a POST this says no to, e.g. a dueAt with an offset. */
+  refuse: ((body: Record<string, unknown>) => boolean) | null = null;
+  /** How Due stores what it was sent (an echo in another format). */
+  echo: ((r: FakeReminder) => FakeReminder) | null = null;
+  /** Other reminders in the state (other apps, other days), sent as they are. */
+  filler: unknown[] = [];
+  /** Runs before every call (tests move a clock with it). */
+  onCall: (() => void) | null = null;
 
   /** Puts a reminder in Due as if it were already there. */
   seed(r: Partial<FakeReminder> & { id: string }): void {
@@ -51,6 +59,7 @@ export class FakeDue {
     const url = new URL(request.url);
     const body = request.method === "POST" ? ((await request.json()) as Record<string, unknown>) : undefined;
     this.calls.push({ method: request.method, path: url.pathname, auth: request.headers.get("Authorization"), body });
+    this.onCall?.();
     if (this.failWith !== null && (this.failOnly === null || this.failOnly.includes(request.method))) {
       if (this.failWith === "down") throw new TypeError("network down");
       return Response.json({ error: "pretend failure" }, { status: this.failWith });
@@ -59,18 +68,22 @@ export class FakeDue {
     if (request.headers.get("Authorization") !== `Bearer ${FAKE_DUE_TOKEN}`) return Response.json({ error: "unauthorized" }, { status: 401 });
 
     if (request.method === "GET" && url.pathname === "/due/api/state") {
-      return Response.json({ state: { reminders: [...this.reminders.values(), { id: "oliver-1", title: "Not ours", type: "manual", completedAt: null, deletedAt: null }] } });
+      return Response.json({
+        state: { reminders: [...this.filler, ...this.reminders.values(), { id: "oliver-1", title: "Not ours", type: "manual", completedAt: null, deletedAt: null }] },
+      });
     }
     if (request.method === "POST" && url.pathname === "/due/api/reminders") {
       const b = body!;
       if (typeof b.id !== "string" || typeof b.title !== "string" || typeof b.dueAt !== "string") {
         return Response.json({ error: "bad reminder" }, { status: 400 });
       }
+      if (this.refuse?.(b)) return Response.json({ error: "bad dueAt" }, { status: 400 });
       const had = this.reminders.get(b.id);
       if (had && had.deletedAt === null) return Response.json({ error: "reminder already exists" }, { status: 400 });
-      this.reminders.set(b.id, {
+      const stored: FakeReminder = {
         id: b.id, title: b.title, dueAt: b.dueAt, notes: b.notes as string, type: String(b.type), completedAt: null, deletedAt: null,
-      });
+      };
+      this.reminders.set(b.id, this.echo ? this.echo(stored) : stored);
       return Response.json({ ok: true, id: b.id });
     }
     const del = /^\/due\/reminder\/(.+)$/.exec(url.pathname);

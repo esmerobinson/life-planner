@@ -6,6 +6,6 @@ export interface Env {
    * `wrangler secret put DUE_TOKEN`. Never in the repo, a log or a response. Unset: no reminders.
    */
   DUE_TOKEN?: string;
-  /** Due's public address (a plain var in wrangler.jsonc), e.g. "https://host.example". */
+  /** Due's address, e.g. "https://host.example" (a secret, so local dev never reaches the real Due). */
   DUE_BASE_URL?: string;
 }

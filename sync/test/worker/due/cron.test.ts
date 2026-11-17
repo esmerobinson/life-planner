@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_CALLS_PER_RUN, runDueReminders, SYNC_RUN_GAP_MS } from "../../../src/due/cron";
+import { BACKOFF_MS, MAX_CALLS_PER_RUN, RUN_DEADLINE_MS, runDueReminders, SYNC_RUN_GAP_MS } from "../../../src/due/cron";
+import { keyOf } from "../../../src/due/reconcile";
 import type { Env } from "../../../src/env";
 import { scheduled } from "../../../src/index";
 import { call, change, DEVICE_A, errorOf, sync, syncOk } from "../helpers";
@@ -15,6 +16,8 @@ let due: FakeDue;
 beforeEach(() => {
   due = new FakeDue();
 });
+/** What's active in Due, by key (what and which day; the version left off). */
+const activeKeys = () => due.activeIds().map(keyOf).sort();
 
 const todo = (id: string, p: Record<string, unknown> = {}) => ({
   id, kind: "task", title: `Pretend ${id}`, links: [], areaId: "admin", priority: 2, status: "open",
@@ -61,16 +64,17 @@ describe("Due reminders: the cron run", () => {
       { table: "items", data: todo("gone", { status: "deleted", due: "2026-11-16" }) },
     ]);
     await runAt(MORNING);
-    expect(due.activeIds()).toEqual([
-      "esmeworld-2026-11-16-at-meeting-1500",
-      "esmeworld-2026-11-16-due1-habit",
-      "esmeworld-2026-11-16-due1-late",
-      "esmeworld-2026-11-16-due2-habit",
-      "esmeworld-2026-11-16-due2-late",
-      "esmeworld-2026-11-16-plan",
-      "esmeworld-2026-11-16-review",
+    expect(activeKeys()).toEqual([
+      "esmeworld-20261116-d1-habit",
+      "esmeworld-20261116-d1-late",
+      "esmeworld-20261116-d2-habit",
+      "esmeworld-20261116-d2-late",
+      "esmeworld-20261116-plan",
+      "esmeworld-20261116-review",
+      "esmeworld-20261116-t-meeting",
     ]);
-    expect(due.reminders.get("esmeworld-2026-11-16-at-meeting-1500")).toMatchObject({ title: "Pretend meeting", dueAt: "2026-11-16T14:45:00-05:00" });
+    const meeting = [...due.reminders.values()].find((r) => keyOf(r.id) === "esmeworld-20261116-t-meeting");
+    expect(meeting).toMatchObject({ title: "Pretend meeting", dueAt: "2026-11-16T14:45:00" });
     // Nothing from a page or notes ever goes to Due.
     expect(JSON.stringify(due.calls)).not.toContain("secret page words");
   });
@@ -86,35 +90,35 @@ describe("Due reminders: the cron run", () => {
   it("done means cancelled: the next run cancels its reminders", async () => {
     await put([{ table: "prefs", data: prefsRow() }, { table: "items", data: todo("a", { due: "2026-11-16" }) }]);
     await runAt(MORNING);
-    expect(due.activeIds()).toContain("esmeworld-2026-11-16-due1-a");
+    expect(activeKeys()).toContain("esmeworld-20261116-d1-a");
     await put([{ table: "items", data: todo("a", { due: "2026-11-16", status: "done", completedAt: "2026-11-16" }) }], MORNING);
     await runAt(MORNING + 15 * 60_000);
-    expect(due.activeIds()).toEqual(["esmeworld-2026-11-16-plan", "esmeworld-2026-11-16-review"]);
+    expect(activeKeys()).toEqual(["esmeworld-20261116-plan", "esmeworld-20261116-review"]);
   });
 
   it("a habit ticked today stops its reminders and the nudge", async () => {
     await put([{ table: "prefs", data: prefsRow() }, { table: "items", data: todo("h", { recur: ["mon"] }) }]);
     await runAt(at("2026-11-16T12:45:00"));
-    expect(due.activeIds()).toContain("esmeworld-2026-11-16-nudge");
-    expect(due.activeIds()).toContain("esmeworld-2026-11-16-due2-h");
+    expect(activeKeys()).toContain("esmeworld-20261116-nudge");
+    expect(activeKeys()).toContain("esmeworld-20261116-d2-h");
     await put([{ table: "items", data: todo("h", { recur: ["mon"], doneDates: ["2026-11-16"] }) }], MORNING);
     await runAt(at("2026-11-16T12:50:00"));
-    expect(due.activeIds()).toEqual(["esmeworld-2026-11-16-review"]);
+    expect(activeKeys()).toEqual(["esmeworld-20261116-review"]);
   });
 
   it("the nudge uses her own lines", async () => {
     await put([{ table: "prefs", data: prefsRow({ lines: ["You've got this, pretend"] }) }]);
     await runAt(at("2026-11-16T12:45:00"));
-    expect(due.reminders.get("esmeworld-2026-11-16-nudge")!.title).toBe("You've got this, pretend");
+    expect(due.active().find((r) => keyOf(r.id) === "esmeworld-20261116-nudge")!.title).toBe("You've got this, pretend");
   });
 
   it("turning Due off cancels what's there", async () => {
     await put([{ table: "prefs", data: prefsRow() }]);
     await runAt(MORNING);
-    expect(due.activeIds()).toHaveLength(2);
+    expect(activeKeys()).toHaveLength(2);
     await put([{ table: "prefs", data: prefsRow({ on: false }) }], MORNING);
     await runAt(MORNING + 60_000);
-    expect(due.activeIds()).toEqual([]);
+    expect(activeKeys()).toEqual([]);
   });
 
   it("only one run at a time (the lease), and the lease is given back", async () => {
@@ -146,19 +150,91 @@ describe("Due reminders: the cron run", () => {
     expect(JSON.stringify(logged)).not.toContain(FAKE_DUE_TOKEN);
     due.failWith = null;
     await runAt(MORNING + 15 * 60_000);
-    expect(due.activeIds()).toHaveLength(2);
+    expect(activeKeys()).toHaveLength(2);
   });
 
   it("never more than the call budget in one run", async () => {
     expect(MAX_CALLS_PER_RUN).toBeLessThan(50);
     // 40 stale reminders to cancel and a full day to create.
-    for (let i = 0; i < 45; i++) due.seed({ id: `esmeworld-2026-11-15-due1-x${i}` });
+    for (let i = 0; i < 45; i++) due.seed({ id: `esmeworld-20261115-d1-x${i}-v0000abcd` });
     await put([
       { table: "prefs", data: prefsRow() },
       ...Array.from({ length: 12 }, (_, i) => ({ table: "items", data: todo(`t${i}`, { due: "2026-11-16" }) })),
     ]);
     await runAt(MORNING);
     expect(due.calls.length).toBeLessThanOrEqual(MAX_CALLS_PER_RUN);
+  });
+});
+
+describe("Due reminders: fix round 1", () => {
+  it("Off then On the same day brings today's reminders back (our cancellations are logged in D1, review I1)", async () => {
+    await put([{ table: "prefs", data: prefsRow() }, { table: "items", data: todo("a", { due: "2026-11-16" }) }]);
+    await runAt(MORNING);
+    const before = activeKeys();
+    await put([{ table: "prefs", data: prefsRow({ on: false }) }], MORNING);
+    await runAt(MORNING + 60_000);
+    expect(activeKeys()).toEqual([]);
+    const logged = await env.DB.prepare("SELECT count(*) AS n FROM meta WHERE key LIKE 'due_x:%'").first<{ n: number }>();
+    expect(logged!.n).toBe(before.length);
+    await put([{ table: "prefs", data: prefsRow({ on: true }) }], MORNING + 120_000);
+    await runAt(MORNING + 180_000);
+    expect(activeKeys()).toEqual(before);
+  });
+
+  it("Off and nothing left in Due: later runs don't even ask Due (review M7)", async () => {
+    await put([{ table: "prefs", data: prefsRow({ on: false }) }]);
+    await runAt(MORNING);
+    expect(due.calls.map((c) => c.method)).toEqual(["GET"]);
+    due.calls = [];
+    await runAt(MORNING + 15 * 60_000);
+    expect(due.calls).toEqual([]);
+    await put([{ table: "prefs", data: prefsRow({ on: true }) }], MORNING);
+    await runAt(MORNING + 30 * 60_000);
+    expect(activeKeys()).toHaveLength(2);
+  });
+
+  it("Due refusing every reminder: the run stops after 3 and Due is left alone for an hour (review I4)", async () => {
+    await put([{ table: "prefs", data: prefsRow() }, ...Array.from({ length: 6 }, (_, i) => ({ table: "items", data: todo(`r${i}`, { due: "2026-11-16" }) }))]);
+    due.refuse = () => true;
+    await runAt(MORNING);
+    expect(due.mutations()).toHaveLength(3);
+    due.calls = [];
+    await runAt(MORNING + 15 * 60_000);
+    expect(due.calls).toEqual([]);
+    due.refuse = null;
+    await runAt(MORNING + BACKOFF_MS + 1);
+    expect(activeKeys().length).toBeGreaterThan(0);
+  });
+
+  it("a slow Due: the run stops at its deadline, long before the lease ends (review I2)", async () => {
+    await put([{ table: "prefs", data: prefsRow() }, ...Array.from({ length: 8 }, (_, i) => ({ table: "items", data: todo(`s${i}`, { due: "2026-11-16" }) }))]);
+    let clock = 1_000_000;
+    due.onCall = () => (clock += 3_000);
+    const result = await runDueReminders(dueEnv(), { now: () => MORNING, dueFetch: due.fetch, clock: () => clock });
+    expect(result).toMatchObject({ kind: "ran", report: { stopped: "deadline" } });
+    expect(clock - 1_000_000).toBeLessThanOrEqual(RUN_DEADLINE_MS);
+    // The lease was given back: the next run goes.
+    due.onCall = null;
+    expect((await runDueReminders(dueEnv(), { now: () => MORNING, dueFetch: due.fetch, clock: () => clock })).kind).toBe("ran");
+  });
+
+  it("reads only open to-dos that can matter today, never ideas or books (review I3)", async () => {
+    await put([
+      { table: "prefs", data: prefsRow() },
+      { table: "items", data: todo("idea", { kind: "idea", due: "2026-11-16" }) },
+      { table: "items", data: todo("far", { due: "2026-12-25" }) },
+      { table: "items", data: todo("near", { due: "2026-11-16" }) },
+    ]);
+    await runAt(MORNING);
+    expect(activeKeys().filter((k) => k.includes("-d1-"))).toEqual(["esmeworld-20261116-d1-near"]);
+  });
+
+  it("a run after a sync that finds another run busy doesn't use up the minute (review M2)", async () => {
+    await put([{ table: "prefs", data: prefsRow() }]);
+    await env.DB.prepare("INSERT INTO meta (key, value) VALUES ('due_lease', ?1)").bind(Date.now() + 60_000).run();
+    expect((await runDueReminders(dueEnv(), { now: () => MORNING, dueFetch: due.fetch }, true)).kind).toBe("busy");
+    await env.DB.prepare("UPDATE meta SET value = 0 WHERE key = 'due_lease'").run();
+    expect((await runDueReminders(dueEnv(), { now: () => MORNING + 1000, dueFetch: due.fetch }, true)).kind).toBe("ran");
   });
 });
 
@@ -177,7 +253,7 @@ describe("Due reminders: sync", () => {
   it("a sync that ticks something off cancels its reminder soon after, without waiting for Due", async () => {
     await put([{ table: "prefs", data: prefsRow() }, { table: "items", data: todo("a", { due: "2026-11-16" }) }]);
     await runAt(MORNING);
-    expect(due.activeIds()).toContain("esmeworld-2026-11-16-due1-a");
+    expect(activeKeys()).toContain("esmeworld-20261116-d1-a");
 
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
@@ -193,10 +269,10 @@ describe("Due reminders: sync", () => {
     // The sync answered while Due hadn't been reached yet.
     expect(res.status).toBe(200);
     expect(later).toHaveLength(1);
-    expect(due.activeIds()).toContain("esmeworld-2026-11-16-due1-a");
+    expect(activeKeys()).toContain("esmeworld-20261116-d1-a");
     release();
     await Promise.all(later);
-    expect(due.activeIds()).not.toContain("esmeworld-2026-11-16-due1-a");
+    expect(activeKeys()).not.toContain("esmeworld-20261116-d1-a");
   });
 
   it("sync-started runs are at most one a minute, and never without a token", async () => {
@@ -209,11 +285,19 @@ describe("Due reminders: sync", () => {
     const withToken = { DUE_TOKEN: FAKE_DUE_TOKEN, DUE_BASE_URL: FAKE_DUE_URL };
     await tick(0, MORNING, {});
     expect(later).toHaveLength(0); // no token: nothing scheduled
-    await tick(1, MORNING, withToken);
-    await tick(2, MORNING + 1000, withToken);
-    await tick(3, MORNING + SYNC_RUN_GAP_MS + 1, withToken);
-    await Promise.all(later);
+    for (const [n, when] of [[1, MORNING], [2, MORNING + 1000], [3, MORNING + SYNC_RUN_GAP_MS + 1]] as const) {
+      await tick(n, when, withToken);
+      await Promise.all(later);
+    }
     expect(due.calls.filter((c) => c.method === "GET")).toHaveLength(2);
+  });
+
+  it("adding a to-do with a time starts a run (its alert may be within 15 minutes)", async () => {
+    const later: Promise<unknown>[] = [];
+    await sync(DEVICE_A, 0, [change("t", MORNING, todo("t", { due: "2026-11-16", time: "08:20", updatedAt: MORNING }))], {
+      now: MORNING, envOverride: { DUE_TOKEN: FAKE_DUE_TOKEN, DUE_BASE_URL: FAKE_DUE_URL }, deps: { dueFetch: due.fetch, waitUntil: (p) => void later.push(p) },
+    });
+    expect(later).toHaveLength(1);
   });
 
   it("an ordinary edit (nothing ticked) doesn't start a run", async () => {

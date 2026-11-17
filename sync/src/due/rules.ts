@@ -1,15 +1,16 @@
 // Which Due reminders Esme wants right now: one pure function of her open to-dos and habits,
 // her settings and the time. The cron (due/cron.ts) diffs this against what Due holds.
 //
-// Every reminder belongs to one of her days (3am to 3am, in her time zone) and its id carries
-// that day, so tomorrow's are new reminders and yesterday's are no longer wanted:
-//   esmeworld-<day>-plan             "Plan your day" at her morning time
-//   esmeworld-<day>-review           "Review your day" at her evening time
-//   esmeworld-<day>-due1-<item>      due today / overdue / pinned today / a habit planned today,
-//   esmeworld-<day>-due2-<item>      at the first and the second pass (at most MAX_DUE_TODAY each)
-//   esmeworld-<day>-at-<item>-<HHMM> a timed to-do, its lead before (the time is in the id, so
-//                                    a changed time is a new reminder)
-//   esmeworld-<day>-nudge            the motivation nudge, if nothing was ticked off today
+// Every reminder has a KEY: what it is, for which day (yyyymmdd; her day runs 3am to 3am in
+// her time zone). reconcile.ts adds a version (a hash of its title and time) to make the id sent
+// to Due, so tomorrow's are new reminders and yesterday's are no longer wanted:
+//   esmeworld-<day>-plan          "Plan your day" at her morning time
+//   esmeworld-<day>-review        "Review your day" at her evening time
+//   esmeworld-<day>-d1-<item>     due today / overdue / pinned today / a habit planned today,
+//   esmeworld-<day>-d2-<item>     at the first and the second pass (at most MAX_DUE_TODAY each)
+//   esmeworld-<date>-t-<item>     a timed to-do, its lead before; <date> is the meeting's own date,
+//                                 so the alert keeps one key across the 3am change
+//   esmeworld-<day>-nudge         the motivation nudge, if nothing was ticked off today
 //
 // Titles are the to-do's or habit's title, the two fixed words, or one of her motivation
 // lines: never notes, pages or anything from the journal (the Worker can't read the journal).
@@ -53,18 +54,29 @@ export interface DueItem {
 export type WantedKind = "plan" | "review" | "due1" | "due2" | "timed" | "nudge";
 
 export interface Wanted {
-  id: string;
+  /** What it is and for which day (reconcile.ts adds the version). */
+  key: string;
   kind: WantedKind;
   title: string;
-  /** When it goes off (epoch ms). */
+  /** When it is meant to go off (epoch ms). Part of its version. */
   at: number;
+  /**
+   * A timed to-do whose lead has passed but whose meeting hasn't (added late): send it to go off
+   * at this moment instead (a minute from now). Not part of its version, so it is sent once.
+   */
+  sendAt?: number;
 }
 
 export interface RulesInput {
   items: readonly DueItem[];
   prefs: DuePrefs;
   now: number;
+  /** Something was ticked off today (worked out in SQL by the cron); else from `items`. */
+  tickedToday?: boolean;
 }
+
+/** "2026-11-16" -> "20261116". */
+export const dayToken = (day: string) => day.replaceAll("-", "");
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -86,10 +98,14 @@ function shortTitle(t: string): string {
 }
 
 const isHabit = (it: DueItem) => (it.recur?.length ?? 0) > 0;
-const isOpenTodo = (it: DueItem) => it.kind === "task" && it.status === "open" && shortTitle(it.title) !== "";
+const isOpenTodo = (it: DueItem) => it.kind === "task" && it.status === "open" && it.title.trim() !== "";
 
-/** The day a timed to-do's time is on: its "Do it on" day, else its due date. */
-const timedDay = (it: DueItem) => it.pinnedDate ?? it.due;
+/**
+ * The day a timed to-do's time is on: its "Do it on" day, else its due date. A pin before `day`
+ * is ignored, as Today ignores it.
+ */
+const timedDay = (it: DueItem, day: string) =>
+  it.pinnedDate !== undefined && (it.pinnedDate >= day || it.due === undefined) ? it.pinnedDate : it.due;
 
 function tickedToday(items: readonly DueItem[], day: string): boolean {
   return items.some(
@@ -97,34 +113,37 @@ function tickedToday(items: readonly DueItem[], day: string): boolean {
   );
 }
 
-export function wantedReminders({ items, prefs, now }: RulesInput): Wanted[] {
+export function wantedReminders({ items, prefs, now, tickedToday: ticked }: RulesInput): Wanted[] {
   if (!prefs.on) return [];
   const tz = prefs.timeZone;
   const day = appDay(now, tz);
-  const prefix = `esmeworld-${day}`;
+  const prefix = `esmeworld-${dayToken(day)}`;
   const out: Wanted[] = [
-    { id: `${prefix}-plan`, kind: "plan", title: PLAN_TITLE, at: settingsInstant(day, prefs.plan, tz) },
-    { id: `${prefix}-review`, kind: "review", title: REVIEW_TITLE, at: settingsInstant(day, prefs.review, tz) },
+    { key: `${prefix}-plan`, kind: "plan", title: PLAN_TITLE, at: settingsInstant(day, prefs.plan, tz) },
+    { key: `${prefix}-review`, kind: "review", title: REVIEW_TITLE, at: settingsInstant(day, prefs.review, tz) },
   ];
 
-  // Timed to-dos whose moment falls in today (a 1am meeting on tomorrow's date is tonight's).
+  // Timed to-dos whose meeting or alert falls in today (a 1am meeting on tomorrow's date is
+  // tonight's; a 03:05 meeting's 02:50 alert is wanted before 3am, under the meeting's date).
   const timed: Wanted[] = [];
   const timedIds = new Set<string>();
   for (const it of items) {
-    const on = timedDay(it);
+    const on = timedDay(it, day);
     if (!isOpenTodo(it) || isHabit(it) || !it.time || !HHMM.test(it.time) || !on) continue;
     if (on !== day && on !== addDays(day, 1)) continue;
     const moment = instantOf(on, it.time, tz);
-    if (appDay(moment, tz) !== day) continue;
+    const alert = moment - prefs.leadMinutes * 60_000;
+    if (appDay(moment, tz) !== day && appDay(alert, tz) !== day) continue;
     timedIds.add(it.id);
-    timed.push({
-      id: `${prefix}-at-${safeId(it.id)}-${it.time.replace(":", "")}`,
-      kind: "timed",
-      title: shortTitle(it.title),
-      at: moment - prefs.leadMinutes * 60_000,
-    });
+    const w: Wanted = { key: `esmeworld-${dayToken(on)}-t-${safeId(it.id)}`, kind: "timed", title: shortTitle(it.title), at: alert };
+    // Added late (the lead has passed, the meeting hasn't): a minute from now.
+    if (alert <= now) {
+      if (moment <= now + 60_000) continue;
+      w.sendAt = now + 60_000;
+    }
+    timed.push(w);
   }
-  timed.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  timed.sort((a, b) => a.at - b.at || (a.key < b.key ? -1 : 1));
   out.push(...timed.slice(0, MAX_TIMED));
 
   // Due today and not done: priority 1 and habits first.
@@ -136,28 +155,29 @@ export function wantedReminders({ items, prefs, now }: RulesInput): Wanted[] {
     return it.due !== undefined && it.due <= day && !(it.pinnedDate !== undefined && it.pinnedDate > day);
   });
   const first = (it: DueItem) => (it.priority === 1 || isHabit(it) ? 0 : 1);
+  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
   dueToday.sort(
     (a, b) =>
       first(a) - first(b) ||
       a.priority - b.priority ||
-      (a.due ?? "~").localeCompare(b.due ?? "~") ||
-      a.title.localeCompare(b.title) ||
-      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      cmp(a.due ?? "~", b.due ?? "~") ||
+      cmp(a.title, b.title) ||
+      cmp(a.id, b.id),
   );
-  for (const [kind, time] of [["due1", prefs.dueFirst], ["due2", prefs.dueSecond]] as const) {
+  for (const [kind, slot, time] of [["due1", "d1", prefs.dueFirst], ["due2", "d2", prefs.dueSecond]] as const) {
     const when = settingsInstant(day, time, tz);
     for (const it of dueToday.slice(0, MAX_DUE_TODAY)) {
-      out.push({ id: `${prefix}-${kind}-${safeId(it.id)}`, kind, title: shortTitle(it.title), at: when });
+      out.push({ key: `${prefix}-${slot}-${safeId(it.id)}`, kind, title: shortTitle(it.title), at: when });
     }
   }
 
   // The motivation nudge: only near its time, and only if nothing was ticked off today.
   const nudgeAt = settingsInstant(day, prefs.nudge, tz);
-  if (now >= nudgeAt - NUDGE_AHEAD_MS && !tickedToday(items, day)) {
+  if (now >= nudgeAt - NUDGE_AHEAD_MS && !(ticked ?? tickedToday(items, day))) {
     const lines = prefs.lines;
     const dayIndex = Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
     const title = lines.length ? shortTitle(lines[dayIndex % lines.length]!) : GENERIC_LINE;
-    out.push({ id: `${prefix}-nudge`, kind: "nudge", title, at: nudgeAt });
+    out.push({ key: `${prefix}-nudge`, kind: "nudge", title, at: nudgeAt });
   }
   return out;
 }
