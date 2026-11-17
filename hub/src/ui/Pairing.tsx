@@ -20,8 +20,11 @@ export const SYNC_ONLY_NOTE =
 /** How often a camera frame is read while scanning, in ms (a technical rate, not an animation). */
 const SCAN_EVERY_MS = 150;
 
-/** The shown code hides itself after this long (coordinator's rule, concern 1). */
-export const PAIRING_SHOW_MS = 60_000;
+/**
+ * The shown code hides itself after this long (coordinator's rule, concern 1; 2 minutes since
+ * 2026-11-17, review I2: one tap now shows it, so it never stays up for long).
+ */
+export const PAIRING_SHOW_MS = 120_000;
 
 /** "Hides in 0:45". */
 export function hidesIn(seconds: number): string {
@@ -33,7 +36,7 @@ export function hidesIn(seconds: number): string {
  * The pairing code for `text` (a pairing text, v1 or v2) as a black-on-white QR code (SVG), the
  * warning, an optional note, a countdown and Hide. The text is only in the drawn modules: never
  * in an attribute, label or text.
- * It hides itself after 60 seconds, and at once when the page or app goes to the background
+ * It hides itself after 2 minutes, and at once when the page or app goes to the background
  * (visibilitychange to hidden, pagehide, or the window losing focus, as the Mac app does).
  * Showing it again needs another tap.
  */
@@ -297,7 +300,16 @@ export function ScanPairingCode({ onCode, busy = false }: { onCode: (code: Pairi
       <form onSubmit={submitPasted}>
         <label className="form-field">
           <span className="form-label">Paste pairing code</span>
-          <input type="password" autoComplete="off" value={pasted} onChange={(e) => setPasted(e.target.value)} />
+          {/* A plain field (review M5): a password field lets the browser offer to save the code. */}
+          <input
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+          />
         </label>
         <div className="form-actions">
           <button type="submit" className="btn-secondary" disabled={busy || !pasted}>

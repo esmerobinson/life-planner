@@ -1,11 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { vi } from "vitest";
 import { db } from "../data/db";
 import { FakeSyncServer } from "../sync/fakeServer";
 import { SyncController } from "../sync/controller";
-import { getMeta, saveSyncSettings } from "../sync/engine";
+import { DEFAULT_SYNC_URL, getMeta, saveSyncSettings } from "../sync/engine";
 import { deriveToken } from "../sync/token";
 import { deriveJournalSecret } from "../journal/crypto";
 import { journalSecretForPairing, saveJournalKeyFromSync, unlockJournal, loadJournalKey } from "../journal/keyStore";
@@ -16,7 +16,8 @@ import { renderApp } from "../test/renderApp";
 import {
   CAMERA_DENIED, CODE_FAILED, NOT_PAIRING, PAIRING_WARNING, PairingCode, SCANNER_FAILED, SYNC_ONLY_NOTE, ScanPairingCode, TOO_LONG, hidesIn,
 } from "./Pairing";
-import { SyncPage } from "./SyncPage";
+import { SyncPage, CONFIRM_ADDRESS_BUTTON, JOURNAL_MAY_ASK_NOTE, OTHER_JOURNAL, OWNER_REFUSED, OWNER_UNAVAILABLE, otherAddressLine } from "./SyncPage";
+import { CODE_REFUSED_LINE } from "./journal/JournalPage";
 
 // Pair a device by QR code. Fictional passphrases only; the camera and the frame decoder are
 // mocked (jsdom has neither).
@@ -141,19 +142,20 @@ describe("the shown code hides itself", () => {
   });
 
   it("formats the countdown", () => {
+    expect(hidesIn(120)).toBe("Hides in 2:00");
     expect(hidesIn(60)).toBe("Hides in 1:00");
     expect(hidesIn(45)).toBe("Hides in 0:45");
     expect(hidesIn(5)).toBe("Hides in 0:05");
     expect(hidesIn(-1)).toBe("Hides in 0:00");
   });
 
-  it("counts down under the warning and hides at 60 seconds; showing again starts a new minute", () => {
+  it("counts down under the warning and hides at 2 minutes; showing again starts afresh", () => {
     vi.useFakeTimers();
     render(<Harness />);
-    const line = screen.getByText("Hides in 1:00");
+    const line = screen.getByText("Hides in 2:00");
     expect(line).toHaveClass("journal-muted");
     expect(screen.getByText(PAIRING_WARNING).nextElementSibling).toBe(line);
-    act(() => vi.advanceTimersByTime(15_000));
+    act(() => vi.advanceTimersByTime(75_000));
     expect(screen.getByText("Hides in 0:45")).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(44_000));
     expect(screen.getByText("Hides in 0:01")).toBeInTheDocument();
@@ -164,7 +166,7 @@ describe("the shown code hides itself", () => {
     act(() => vi.advanceTimersByTime(120_000));
     expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show" }));
-    expect(screen.getByText("Hides in 1:00")).toBeInTheDocument();
+    expect(screen.getByText("Hides in 2:00")).toBeInTheDocument();
   });
 
   it("hides at once when the page goes to the background (visibilitychange), not when it comes back", () => {
@@ -187,12 +189,12 @@ describe("the shown code hides itself", () => {
     expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
   });
 
-  it("hides at 60 seconds even when the countdown's ticks never run (a timeout for the exact time)", () => {
+  it("hides at 2 minutes even when the countdown's ticks never run (a timeout for the exact time)", () => {
     vi.useFakeTimers();
     const realSetInterval = window.setInterval;
     vi.spyOn(window, "setInterval").mockImplementation((() => 0) as unknown as typeof realSetInterval);
     render(<Harness />);
-    act(() => vi.advanceTimersByTime(59_999));
+    act(() => vi.advanceTimersByTime(119_999));
     expect(screen.getByRole("img", { name: "Pairing code" })).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(1));
     expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
@@ -220,7 +222,8 @@ describe("the shown code hides itself", () => {
     expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Pair another device" }));
     expect(await screen.findByRole("img", { name: "Pairing code" })).toBeInTheDocument();
-    expect(screen.getByText("Hides in 1:00")).toBeInTheDocument();    // Let this Save's journal step finish before the next test clears the database.
+    expect(screen.getByText("Hides in 2:00")).toBeInTheDocument();
+    // Let this Save's journal step finish before the next test clears the database.
     await waitFor(async () => expect(await journalSecretForPairing(db)).toBeTruthy(), { timeout: 5000 });
   });
 });
@@ -334,6 +337,18 @@ describe("show a pairing code (Sync page)", () => {
     expect(await everythingStored()).not.toContain(PASSPHRASE);
   });
 
+  it("a code from a passphrase that doesn't open this journal says the journal may ask (review M4)", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    await confirmedDevice(db, await keyFor("fake-first-passphrase-of-this-journal")); // no wrap for PASSPHRASE here
+    setup();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Passphrase for the pairing code"), PASSPHRASE);
+    await user.click(screen.getByRole("button", { name: "Show pairing code" }));
+    const qr = await screen.findByRole("img", { name: "Pairing code" });
+    expect(qr.querySelector("path")!.getAttribute("d")).toBe(qrPath(qrModules(pairingText(PASSPHRASE))));
+    expect(screen.getByText(JOURNAL_MAY_ASK_NOTE)).toBeInTheDocument();
+  });
+
   it("'Show pairing code' refuses a passphrase over 1024 characters", async () => {
     await saveSyncSettings(db, { serverUrl: ADDRESS, token });
     setup();
@@ -420,7 +435,11 @@ describe("scan a pairing code (Sync page)", () => {
     setup();
     const user = await setAddress();
     const field = screen.getByLabelText("Paste pairing code");
-    expect(field).toHaveAttribute("type", "password");
+    // A plain field: a password field would let the browser offer to save the code (review M5).
+    expect(field).toHaveAttribute("type", "text");
+    expect(field).toHaveAttribute("autocomplete", "off");
+    expect(field).toHaveAttribute("spellcheck", "false");
+    expect(field).toHaveAttribute("autocapitalize", "off");
     await user.type(field, PASSPHRASE);
     await user.click(screen.getByRole("button", { name: "Use pairing code" }));
     expect(await screen.findByText(NOT_PAIRING)).toBeInTheDocument();
@@ -457,8 +476,13 @@ describe("scan or paste a v2 code (no passphrase)", () => {
     vi.mocked(readFrame).mockResolvedValue(text);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Scan pairing code" }));
-    await waitFor(async () => expect(await getMeta(db, "token")).toBe(token), { timeout: 5000 });
+    // A new device and an address other than the usual one: she is asked first, in plain words.
+    const ask = await screen.findByRole("group", { name: "Sync address in the code" });
+    expect(ask).toHaveTextContent(ADDRESS);
     expect(stop).toHaveBeenCalled();
+    expect(await getMeta(db, "token")).toBeUndefined();
+    await user.click(screen.getByRole("button", { name: CONFIRM_ADDRESS_BUTTON }));
+    await waitFor(async () => expect(await getMeta(db, "token")).toBe(token), { timeout: 5000 });
     expect(await getMeta(db, "serverUrl")).toBe(ADDRESS);
     expect(screen.getByLabelText("Sync address")).toHaveValue(ADDRESS);
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
@@ -489,6 +513,7 @@ describe("scan or paste a v2 code (no passphrase)", () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Paste pairing code"), text);
     await user.click(screen.getByRole("button", { name: "Use pairing code" }));
+    await user.click(await screen.findByRole("button", { name: CONFIRM_ADDRESS_BUTTON }));
     await waitFor(async () => expect(await getMeta(db, "token")).toBe(token), { timeout: 5000 });
     await waitFor(() => expect(server.syncRequests.length).toBeGreaterThan(0));
     expect(await loadJournalKey(db)).toBeUndefined();
@@ -501,6 +526,108 @@ describe("scan or paste a v2 code (no passphrase)", () => {
     await user.click(screen.getByRole("button", { name: "Use pairing code" }));
     expect(await screen.findByText("That pairing code's sync address can't be used here.")).toBeInTheDocument();
     expect(await getMeta(db, "token")).toBeUndefined();
+  });
+
+  it("a new device: Cancel on the address question saves nothing", async () => {
+    const { server } = setup();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Paste pairing code"), await macCode(server));
+    await user.click(screen.getByRole("button", { name: "Use pairing code" }));
+    const ask = await screen.findByRole("group", { name: "Sync address in the code" });
+    await user.click(within(ask).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("group", { name: "Sync address in the code" })).toBeNull();
+    expect(await getMeta(db, "token")).toBeUndefined();
+    expect(await getMeta(db, "serverUrl")).toBeUndefined();
+    expect(server.syncRequests).toHaveLength(0);
+  });
+});
+
+describe("a device that already syncs only takes a code that matches it (review C1)", () => {
+  /** This device syncs with ADDRESS and has its journal key (confirmed by a real first sync). */
+  async function syncing() {
+    const { server, controller } = setup();
+    const user = await setAddress();
+    await saveTyped(user);
+    await waitFor(async () => expect(await journalSecretForPairing(db)).toBeTruthy(), { timeout: 5000 });
+    return { server, controller, user };
+  }
+  const snapshot = async () => JSON.stringify({
+    token: await getMeta(db, "token"), url: await getMeta(db, "serverUrl"), key: (await db.syncMeta.get("journalKey"))?.value && (await loadJournalKey(db))?.fp,
+    candidate: !!(await db.syncMeta.get("journalCandidate")), journal: (await db.journal.toArray()).map((r) => [r.id, r.fp]),
+  });
+
+  it("another address: refused in plain words, nothing changed, nothing sent there", async () => {
+    const { user } = await syncing();
+    const before = await snapshot();
+    const evil = pairingTextV2({ token, secret: await deriveJournalSecret("fake-other-journal"), serverUrl: "https://elsewhere.example.test" });
+    await user.type(screen.getByLabelText("Paste pairing code"), evil);
+    await user.click(screen.getByRole("button", { name: "Use pairing code" }));
+    expect(await screen.findByText(otherAddressLine("https://elsewhere.example.test"))).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Sync address in the code" })).toBeNull();
+    expect(await snapshot()).toBe(before);
+  });
+
+  it("its own address but another journal's secret: refused, nothing changed", async () => {
+    const { user } = await syncing();
+    const before = await snapshot();
+    await user.type(screen.getByLabelText("Paste pairing code"), pairingTextV2({ token, secret: await deriveJournalSecret("fake-other-journal"), serverUrl: ADDRESS }));
+    await user.click(screen.getByRole("button", { name: "Use pairing code" }));
+    expect(await screen.findByText(OTHER_JOURNAL)).toBeInTheDocument();
+    expect(await snapshot()).toBe(before);
+  });
+
+  it("its own address and journal: accepted with no question; the journal key is left exactly as it was", async () => {
+    const { user, server } = await syncing();
+    const keyBefore = (await db.syncMeta.get("journalKey"))!.value;
+    const sent = server.syncRequests.length;
+    await user.type(screen.getByLabelText("Paste pairing code"), pairingTextV2({ token, secret: await deriveJournalSecret(PASSPHRASE), serverUrl: ADDRESS }));
+    await user.click(screen.getByRole("button", { name: "Use pairing code" }));
+    await waitFor(() => expect(server.syncRequests.length).toBeGreaterThan(sent));
+    expect(screen.queryByRole("group", { name: "Sync address in the code" })).toBeNull();
+    expect((await db.syncMeta.get("journalKey"))!.value).toEqual(keyBefore);
+    expect(await db.syncMeta.get("journalCandidate")).toBeUndefined();
+  });
+});
+
+describe("showing a code in the Mac app needs Touch ID or the Mac password (review I2)", () => {
+  type W = { webkit?: { messageHandlers?: Record<string, unknown> } };
+  afterEach(() => Reflect.deleteProperty(window as W, "webkit"));
+  function macApp(reply?: unknown) {
+    const postMessage = vi.fn(async () => reply);
+    (window as W).webkit = { messageHandlers: { esmeworldReminders: { postMessage: vi.fn(async () => ({ status: "denied" })) }, ...(reply === undefined ? {} : { esmeworldDeviceOwner: { postMessage } }) } };
+    return postMessage;
+  }
+
+  it("refused: no code; allowed: the code; the passphrase field needs no check", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    const ask = macApp({ ok: false });
+    setup();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Pair another device" }));
+    expect(await screen.findByText(OWNER_REFUSED)).toBeInTheDocument();
+    expect(ask).toHaveBeenCalledWith({ action: "confirm" });
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+
+    ask.mockResolvedValue({ ok: true });
+    await user.click(screen.getByRole("button", { name: "Pair another device" }));
+    expect(await screen.findByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Hide" }));
+
+    ask.mockClear();
+    await user.type(screen.getByLabelText("Passphrase for the pairing code"), PASSPHRASE);
+    await user.click(screen.getByRole("button", { name: "Show pairing code" }));
+    expect(await screen.findByRole("img", { name: "Pairing code" })).toBeInTheDocument();
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("a Mac app without the check never shows a one-tap code", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    macApp();
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Pair another device" }));
+    expect(await screen.findByText(OWNER_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
   });
 });
 
@@ -599,19 +726,28 @@ describe("scan a pairing code (Journal, Unlock journal)", () => {
   it("a v2 code opens it the same way (its journal secret must open the verifier); a sync-only code says so", async () => {
     const jk = await keyFor(PASSPHRASE);
     await db.journal.put(await verifierRow(jk));
+    await saveSyncSettings(db, { serverUrl: DEFAULT_SYNC_URL, token });
+    vi.spyOn(globalThis, "fetch").mockImplementation(new FakeSyncServer(token).fetch); // the app's own syncs
     renderApp("/journal/morning", "2026-10-28");
     const field = await screen.findByLabelText("Paste pairing code");
+    // A code for another sync address: refused, nothing changed.
+    await userEvent.type(field, pairingTextV2({ token, secret: await deriveJournalSecret(PASSPHRASE), serverUrl: "https://elsewhere.example.test" }));
+    await userEvent.click(screen.getByRole("button", { name: "Use pairing code" }));
+    expect(await screen.findByText(CODE_REFUSED_LINE)).toBeInTheDocument();
+    expect(await loadJournalKey(db)).toBeUndefined();
     await userEvent.type(field, pairingTextV2({ token, secret: null, serverUrl: null }));
     await userEvent.click(screen.getByRole("button", { name: "Use pairing code" }));
     expect(await screen.findByText("That pairing code doesn't include your journal. Type your passphrase instead.")).toBeInTheDocument();
     await userEvent.type(field, pairingTextV2({ token, secret: await deriveJournalSecret("fake-other-journal"), serverUrl: null }));
     await userEvent.click(screen.getByRole("button", { name: "Use pairing code" }));
-    expect(await screen.findByText(/doesn't open your journal/, {}, { timeout: 5000 })).toBeInTheDocument();
+    // Another journal's secret: refused too (it doesn't open the verifier here).
+    await waitFor(() => expect(screen.getAllByText(CODE_REFUSED_LINE)).toHaveLength(1));
     expect(await loadJournalKey(db)).toBeUndefined();
+    expect(await db.syncMeta.get("journalCandidate")).toBeUndefined();
     await userEvent.type(field, pairingTextV2({ token, secret: await deriveJournalSecret(PASSPHRASE), serverUrl: null }));
     await userEvent.click(screen.getByRole("button", { name: "Use pairing code" }));
     expect(await screen.findByLabelText("Today's morning page", {}, { timeout: 5000 })).toBeInTheDocument();
     expect((await loadJournalKey(db))!.fp).toBe(jk.fp);
     expect(unlockJournal).not.toHaveBeenCalled();
-  });
+  }, 20_000);
 });

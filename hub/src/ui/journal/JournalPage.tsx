@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { db } from "../../data/db";
 import { isKeychainError, unlockJournal, unlockJournalWithSecret, type UnlockResult } from "../../journal/keyStore";
+import { checkPairingCode } from "../../pairing/acceptCode";
 import type { PairingPayload } from "../../pairing/pairingText";
 import type { RowStatus } from "../../journal/rows";
 import type { ISODate } from "../../domain/types";
@@ -276,6 +277,18 @@ function UnlockJournal({ again = false }: { again?: boolean }) {
       }
       setBusy(true);
       try {
+        // A code must be for this device's own sync address and journal (review C1).
+        if (typeof secret !== "string") {
+          const v = await checkPairingCode(db, secret);
+          if (!v.ok) {
+            setProblem("code-refused");
+            return;
+          }
+          if (!v.configured) {
+            setProblem("no-sync");
+            return;
+          }
+        }
         const result = typeof secret === "string" ? await unlockJournal(db, secret) : await unlockJournalWithSecret(db, s!, secret.token);
         if (result !== "ok" && result !== "checking") setProblem(result);
       } catch (e) {
