@@ -283,7 +283,7 @@ for (const width of [1280, 390]) {
       await expect(page.getByRole("tooltip")).toContainText("Opens on day 3");
       await expect(page.getByRole("tooltip")).toBeVisible();
       // A place she can visit wears its label and lifts when she points at it (Esme, 2026-11-17).
-      await expect(page.locator(".rio-place-label")).toHaveCount(0); // day 1: the Lagoa house only, named on hover (no room under it)
+      expect(await page.locator(".rio-place-label").count()).toBeLessThanOrEqual(1); // day 1: the Lagoa house only (labelled where it fits)
       await canvas.hover({ position: await onMap(page, "lagoa-house") });
       await expect(page.locator(".rio-map")).toHaveAttribute("data-hover", "lagoa-house");
       await expect(page.getByRole("tooltip")).toContainText("Visit");

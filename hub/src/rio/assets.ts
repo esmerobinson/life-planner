@@ -42,8 +42,6 @@ export interface RioPlace {
   hotspot: { rect: Rect; polygon: [number, number][] };
   marker_anchor: [number, number];
   tooltip_anchor: [number, number];
-  /** Free map pixels below the place for its small label (the bigger map, 2026-11-17). */
-  label_room?: { clear_px_below: number };
 }
 
 export interface RioMapData {

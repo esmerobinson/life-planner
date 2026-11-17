@@ -144,10 +144,9 @@ html:has(.app-shell.is-game) body {
   outline-offset: 0;
   box-shadow: inset 0 0 0 var(--art-px, 3px) #fff3d6;
 }
-/* The small label under a place she can visit on the map (RioMap.tsx), centred under it. */
+/* The small label under a place she can visit on the map (RioMap.tsx; placed by mapMath.ts placeLabels). */
 .rio-ui .rio-place-label {
   position: absolute;
-  transform: translateX(-50%);
   pointer-events: none;
 }
 

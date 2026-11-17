@@ -164,3 +164,30 @@ export function coverFit(box: { w: number; h: number }, canvas: [number, number]
     mode: "fit",
   };
 }
+
+const hits = (a: Rect, b: Rect) => a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+
+/**
+ * Where each open place's small label stands (its top-left, map pixels; Esme, 2026-11-17: "a little
+ * label subtle underneath"): centred under the place, or over its own foot when another place sits
+ * right under it, and only where it clears every other place and every label already placed, inside
+ * the map. A place left out is named by the hover tooltip. Worked out from the bboxes alone, so a
+ * redrawn map's labels follow it.
+ */
+export function placeLabels(open: readonly { key: string; name: string; bbox: Rect }[], all: readonly { key: string; bbox: Rect }[],
+  size: (name: string) => [number, number], canvas: [number, number]): Map<string, [number, number]> {
+  const out = new Map<string, [number, number]>();
+  const taken: Rect[] = [];
+  for (const p of open) {
+    const [w, h] = size(p.name);
+    const [bx, by, bw, bh] = p.bbox;
+    const x = Math.round(bx + bw / 2 - w / 2);
+    const clear = (r: Rect) => r[0] >= 0 && r[1] >= 0 && r[0] + r[2] <= canvas[0] && r[1] + r[3] <= canvas[1] &&
+      !all.some((q) => q.key !== p.key && hits(r, q.bbox)) && !taken.some((t) => hits(r, t));
+    const spot = ([[x, by + bh + 1, w, h], [x, by + bh - h, w, h]] as Rect[]).find(clear);
+    if (!spot) continue;
+    taken.push(spot);
+    out.set(p.key, [spot[0], spot[1]]);
+  }
+  return out;
+}

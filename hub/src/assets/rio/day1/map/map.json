@@ -103,83 +103,83 @@
    "positions": {
     "christ-the-redeemer": [
      469,
-     194
+     219
     ],
     "parque-lage": [
-     460,
-     314
+     469,
+     316
     ],
     "jardim-botanico": [
-     359,
-     290
+     360,
+     297
     ],
     "dois-irmaos": [
      266,
      354
     ],
     "rocinha": [
-     190,
-     409
+     196,
+     412
     ],
     "tijuca-park": [
-     93,
-     253
+     98,
+     270
     ],
     "os-esquilos": [
-     39,
-     323
+     40,
+     319
     ],
     "flamengo-match": [
-     334,
-     30
+     333,
+     38
     ],
     "santa-teresa": [
      618,
-     145
+     146
     ],
     "museum": [
-     748,
-     96
+     746,
+     97
     ],
     "lagoa-house": [
-     543,
-     291
+     542,
+     306
     ],
     "clothing-store": [
-     497,
-     374
+     495,
+     381
     ],
     "sult": [
-     674,
-     281
+     675,
+     295
     ],
     "copacabana-palace": [
      715,
-     333
+     334
     ],
     "ipanema-beach": [
      560,
      470
     ],
     "barraca": [
-     494,
-     464
+     498,
+     466
     ],
     "zona-sul": [
      375,
-     407
+     413
     ],
     "boteco": [
-     491,
-     421
+     489,
+     428
     ],
     "quilo": [
-     568,
-     426
+     563,
+     437
     ],
     "ipanema-penthouse": [
-     530,
-     410
+     531,
+     414
     ],
     "fazenda": [
      802,
@@ -191,25 +191,25 @@
  "hit_test_order": [
   "barraca",
   "quilo",
+  "zona-sul",
   "ipanema-penthouse",
   "sult",
   "clothing-store",
-  "zona-sul",
   "boteco",
-  "parque-lage",
   "museum",
-  "jardim-botanico",
+  "parque-lage",
   "copacabana-palace",
+  "jardim-botanico",
   "santa-teresa",
   "os-esquilos",
   "tijuca-park",
-  "ipanema-beach",
-  "lagoa-house",
-  "rocinha",
   "flamengo-match",
+  "lagoa-house",
+  "ipanema-beach",
+  "rocinha",
   "christ-the-redeemer",
-  "fazenda",
-  "dois-irmaos"
+  "dois-irmaos",
+  "fazenda"
  ],
  "hit_test_note": "test hotspots smallest first (the places near Ipanema overlap their neighbours' rectangles)",
  "opening_order_note": "opens_day follows the opening-order table in rio-design.md (a suggestion until Esme rules). christ-the-redeemer has no day: it opens last, after every other place. The sea off Arpoador opens on day 30 inside ipanema-beach; it is not a separate layer.",
@@ -236,65 +236,71 @@
    },
    "bbox": [
     425,
-    182,
+    191,
     125,
-    127
+    118
    ],
    "bbox_night": [
     416,
-    182,
+    191,
     141,
-    131
+    122
    ],
    "hotspot": {
     "rect": [
      423,
-     180,
+     189,
      129,
-     131
+     122
     ],
     "polygon": [
      [
-      448,
-      180
+      447,
+      189
      ],
      [
-      527,
-      180
-     ],
-     [
-      552,
-      205
+      528,
+      189
      ],
      [
       552,
-      286
+      213
      ],
      [
-      527,
+      552,
+      287
+     ],
+     [
+      528,
       311
      ],
      [
-      448,
+      447,
       311
      ],
      [
       423,
-      286
+      287
      ],
      [
       423,
-      205
+      213
      ]
     ]
    },
    "marker_anchor": [
     469,
-    180
+    189
    ],
    "tooltip_anchor": [
     469,
-    180
+    189
+   ],
+   "bbox_rain": [
+    425,
+    191,
+    125,
+    118
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -327,26 +333,7 @@
      469,
      205
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "scale": [
-     1.0,
-     1.0
-    ],
-    "held": "Corcovado is protected geography; the statue and its viewing terrace grew again instead (landmarks.py SC_CHRIST 1.25 -> 1.45)"
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies parque-lage, lagoa-house; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
-   "bbox_rain": [
-    425,
-    182,
-    125,
-    127
-   ]
+   }
   },
   {
    "key": "parque-lage",
@@ -367,100 +354,72 @@
     }
    },
    "bbox": [
-    424,
-    295,
-    82,
-    41
+    439,
+    298,
+    66,
+    36
    ],
    "bbox_night": [
-    424,
-    295,
-    89,
-    42
+    439,
+    298,
+    74,
+    39
    ],
    "hotspot": {
     "rect": [
-     422,
-     293,
-     86,
-     45
+     437,
+     296,
+     70,
+     40
     ],
     "polygon": [
      [
-      431,
-      293
+      445,
+      296
      ],
      [
       499,
-      293
+      296
      ],
      [
-      508,
-      302
+      507,
+      304
      ],
      [
-      508,
-      329
+      507,
+      328
      ],
      [
       499,
-      338
+      336
      ],
      [
-      431,
-      338
+      445,
+      336
      ],
      [
-      422,
-      329
+      437,
+      328
      ],
      [
-      422,
-      302
+      437,
+      304
      ]
     ]
    },
    "marker_anchor": [
-    460,
-    300
+    469,
+    302
    ],
    "tooltip_anchor": [
-    460,
-    300
+    469,
+    302
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.25,
-     1.15
-    ],
-    "bbox_before": [
-     439,
-     298,
-     66,
-     36
-    ],
-    "bbox_night_before": [
-     439,
-     298,
-     74,
-     39
-    ],
-    "marker_anchor_before": [
-     469,
-     302
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
    "bbox_rain": [
-    424,
-    295,
-    82,
-    41
+    439,
+    298,
+    66,
+    36
    ]
   },
   {
@@ -482,100 +441,72 @@
     }
    },
    "bbox": [
-    341,
-    277,
-    65,
-    72
+    348,
+    284,
+    52,
+    58
    ],
    "bbox_night": [
     333,
     268,
     78,
-    81
+    79
    ],
    "hotspot": {
     "rect": [
-     339,
-     275,
-     69,
-     76
+     346,
+     282,
+     56,
+     62
     ],
     "polygon": [
      [
-      352,
-      275
+      357,
+      282
      ],
      [
-      395,
-      275
+      391,
+      282
      ],
      [
-      408,
-      288
+      402,
+      293
      ],
      [
-      408,
-      338
+      402,
+      333
      ],
      [
-      395,
-      351
+      391,
+      344
      ],
      [
-      352,
-      351
+      357,
+      344
      ],
      [
-      339,
-      338
+      346,
+      333
      ],
      [
-      339,
-      288
+      346,
+      293
      ]
     ]
    },
    "marker_anchor": [
-    359,
-    276
+    360,
+    283
    ],
    "tooltip_anchor": [
-    359,
-    276
+    360,
+    283
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.25,
-     1.25
-    ],
-    "bbox_before": [
-     348,
-     284,
-     52,
-     58
-    ],
-    "bbox_night_before": [
-     333,
-     268,
-     78,
-     79
-    ],
-    "marker_anchor_before": [
-     360,
-     283
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
    "bbox_rain": [
-    341,
-    277,
-    65,
-    72
+    348,
+    284,
+    52,
+    58
    ]
   },
   {
@@ -598,35 +529,35 @@
    },
    "bbox": [
     208,
-    292,
+    302,
     129,
-    189
+    179
    ],
    "bbox_night": [
     208,
-    292,
+    302,
     129,
-    203
+    193
    ],
    "hotspot": {
     "rect": [
      206,
-     290,
+     300,
      133,
-     193
+     183
     ],
     "polygon": [
      [
       232,
-      290
+      300
      ],
      [
       313,
-      290
+      300
      ],
      [
       339,
-      316
+      326
      ],
      [
       339,
@@ -646,7 +577,7 @@
      ],
      [
       206,
-      316
+      326
      ]
     ]
    },
@@ -657,6 +588,12 @@
    "tooltip_anchor": [
     266,
     340
+   ],
+   "bbox_rain": [
+    208,
+    302,
+    129,
+    179
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -673,25 +610,7 @@
      110,
      169
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "scale": [
-     1.0,
-     1.0
-    ],
-    "held": "the twin peaks are protected geography and already the biggest landmark; its summit viewpoint deck, flag and hikers grew instead (landmarks.py)"
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
-   "bbox_rain": [
-    208,
-    292,
-    129,
-    189
-   ]
+   }
   },
   {
    "key": "rocinha",
@@ -712,100 +631,72 @@
     }
    },
    "bbox": [
-    117,
-    377,
-    132,
-    106
+    136,
+    384,
+    115,
+    92
    ],
    "bbox_night": [
-    117,
+    121,
     376,
-    132,
+    130,
     109
    ],
    "hotspot": {
     "rect": [
-     115,
-     375,
-     136,
-     110
+     134,
+     382,
+     119,
+     96
     ],
     "polygon": [
      [
-      137,
-      375
+      153,
+      382
      ],
      [
-      229,
-      375
+      234,
+      382
      ],
      [
-      251,
-      397
+      253,
+      401
      ],
      [
-      251,
-      463
+      253,
+      459
      ],
      [
-      229,
-      485
+      234,
+      478
      ],
      [
-      137,
-      485
+      153,
+      478
      ],
      [
-      115,
-      463
+      134,
+      459
      ],
      [
-      115,
-      397
+      134,
+      401
      ]
     ]
    },
    "marker_anchor": [
-    190,
-    395
+    196,
+    398
    ],
    "tooltip_anchor": [
-    190,
-    395
+    196,
+    398
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.15,
-     1.15
-    ],
-    "bbox_before": [
-     136,
-     384,
-     115,
-     92
-    ],
-    "bbox_night_before": [
-     121,
-     376,
-     130,
-     109
-    ],
-    "marker_anchor_before": [
-     196,
-     398
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
    "bbox_rain": [
-    117,
-    377,
-    132,
-    106
+    136,
+    384,
+    115,
+    92
    ]
   },
   {
@@ -827,101 +718,72 @@
     }
    },
    "bbox": [
-    71,
-    240,
-    79,
-    92
+    80,
+    257,
+    61,
+    71
    ],
    "bbox_night": [
     68,
-    240,
-    82,
-    95
+    257,
+    73,
+    78
    ],
    "hotspot": {
     "rect": [
-     69,
-     238,
-     83,
-     96
+     78,
+     255,
+     65,
+     75
     ],
     "polygon": [
      [
-      85,
-      238
+      91,
+      255
      ],
      [
-      136,
-      238
+      130,
+      255
      ],
      [
-      152,
-      254
+      143,
+      268
      ],
      [
-      152,
-      318
+      143,
+      317
      ],
      [
-      136,
-      334
+      130,
+      330
      ],
      [
-      85,
-      334
+      91,
+      330
      ],
      [
-      69,
-      318
+      78,
+      317
      ],
      [
-      69,
-      254
+      78,
+      268
      ]
     ]
    },
    "marker_anchor": [
-    93,
-    239
+    98,
+    256
    ],
    "tooltip_anchor": [
-    93,
-    239
+    98,
+    256
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.3,
-     1.3
-    ],
-    "bbox_before": [
-     80,
-     257,
-     61,
-     71
-    ],
-    "bbox_night_before": [
-     68,
-     257,
-     73,
-     78
-    ],
-    "marker_anchor_before": [
-     98,
-     256
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies os-esquilos; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
    "bbox_rain": [
-    71,
-    240,
-    79,
-    92
+    80,
+    257,
+    61,
+    71
    ]
   },
   {
@@ -943,66 +805,72 @@
     }
    },
    "bbox": [
-    6,
-    275,
-    78,
-    90
+    15,
+    286,
+    60,
+    69
    ],
    "bbox_night": [
-    6,
-    275,
-    78,
-    94
+    11,
+    278,
+    70,
+    91
    ],
    "hotspot": {
     "rect": [
-     4,
-     273,
-     82,
-     94
+     13,
+     284,
+     64,
+     73
     ],
     "polygon": [
      [
-      20,
-      273
+      25,
+      284
      ],
      [
-      70,
-      273
+      65,
+      284
      ],
      [
-      86,
-      289
+      77,
+      296
      ],
      [
-      86,
-      351
+      77,
+      345
      ],
      [
-      70,
-      367
+      65,
+      357
      ],
      [
-      20,
-      367
+      25,
+      357
      ],
      [
-      4,
-      351
+      13,
+      345
      ],
      [
-      4,
-      289
+      13,
+      296
      ]
     ]
    },
    "marker_anchor": [
-    39,
-    309
+    40,
+    305
    ],
    "tooltip_anchor": [
-    39,
-    309
+    40,
+    305
+   ],
+   "bbox_rain": [
+    15,
+    286,
+    60,
+    69
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -1019,41 +887,7 @@
      70,
      91
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.3,
-     1.3
-    ],
-    "bbox_before": [
-     15,
-     286,
-     60,
-     69
-    ],
-    "bbox_night_before": [
-     11,
-     278,
-     70,
-     91
-    ],
-    "marker_anchor_before": [
-     40,
-     305
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
-   "bbox_rain": [
-    6,
-    275,
-    78,
-    90
-   ]
+   }
   },
   {
    "key": "flamengo-match",
@@ -1074,66 +908,72 @@
     }
    },
    "bbox": [
-    261,
-    0,
-    144,
-    102
+    273,
+    4,
+    120,
+    85
    ],
    "bbox_night": [
-    261,
-    0,
-    144,
-    102
+    273,
+    4,
+    120,
+    85
    ],
    "hotspot": {
     "rect": [
-     259,
-     0,
-     148,
-     104
+     271,
+     2,
+     124,
+     89
     ],
     "polygon": [
      [
-      279,
-      0
+      288,
+      2
      ],
      [
-      387,
-      0
+      378,
+      2
      ],
      [
-      407,
-      20
+      395,
+      19
      ],
      [
-      407,
-      84
+      395,
+      74
      ],
      [
-      387,
-      104
+      378,
+      91
      ],
      [
-      279,
-      104
+      288,
+      91
      ],
      [
-      259,
-      84
+      271,
+      74
      ],
      [
-      259,
-      20
+      271,
+      19
      ]
     ]
    },
    "marker_anchor": [
-    334,
-    16
+    333,
+    15
    ],
    "tooltip_anchor": [
-    334,
-    16
+    333,
+    15
+   ],
+   "bbox_rain": [
+    273,
+    4,
+    120,
+    85
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -1166,41 +1006,7 @@
      333,
      24
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.2,
-     1.2
-    ],
-    "bbox_before": [
-     273,
-     4,
-     120,
-     85
-    ],
-    "bbox_night_before": [
-     273,
-     4,
-     120,
-     85
-    ],
-    "marker_anchor_before": [
-     333,
-     15
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
-   "bbox_rain": [
-    261,
-    0,
-    144,
-    102
-   ]
+   }
   },
   {
    "key": "santa-teresa",
@@ -1221,100 +1027,72 @@
     }
    },
    "bbox": [
-    564,
-    130,
-    104,
-    66
+    578,
+    131,
+    80,
+    51
    ],
    "bbox_night": [
-    564,
+    568,
     122,
-    110,
-    74
+    106,
+    73
    ],
    "hotspot": {
     "rect": [
-     562,
-     128,
-     108,
-     70
+     576,
+     129,
+     84,
+     55
     ],
     "polygon": [
      [
-      576,
-      128
+      587,
+      129
      ],
      [
-      656,
-      128
+      649,
+      129
      ],
      [
-      670,
-      142
+      660,
+      140
      ],
      [
-      670,
+      660,
+      173
+     ],
+     [
+      649,
       184
      ],
      [
-      656,
-      198
-     ],
-     [
-      576,
-      198
-     ],
-     [
-      562,
+      587,
       184
      ],
      [
-      562,
-      142
+      576,
+      173
+     ],
+     [
+      576,
+      140
      ]
     ]
    },
    "marker_anchor": [
     618,
-    131
+    132
    ],
    "tooltip_anchor": [
     618,
-    131
+    132
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.3,
-     1.3
-    ],
-    "bbox_before": [
-     578,
-     131,
-     80,
-     51
-    ],
-    "bbox_night_before": [
-     568,
-     122,
-     106,
-     73
-    ],
-    "marker_anchor_before": [
-     618,
-     132
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
    "bbox_rain": [
-    564,
-    130,
-    104,
-    66
+    578,
+    131,
+    80,
+    51
    ]
   },
   {
@@ -1336,10 +1114,10 @@
     }
    },
    "bbox": [
-    717,
-    79,
-    66,
-    53
+    720,
+    80,
+    51,
+    44
    ],
    "bbox_night": [
     705,
@@ -1349,53 +1127,59 @@
    ],
    "hotspot": {
     "rect": [
-     715,
-     77,
-     70,
-     57
+     718,
+     78,
+     55,
+     48
     ],
     "polygon": [
      [
-      726,
-      77
+      727,
+      78
      ],
      [
-      774,
-      77
+      764,
+      78
      ],
      [
-      785,
-      88
+      773,
+      87
      ],
      [
-      785,
-      123
+      773,
+      117
      ],
      [
-      774,
-      134
+      764,
+      126
      ],
      [
-      726,
-      134
+      727,
+      126
      ],
      [
-      715,
-      123
+      718,
+      117
      ],
      [
-      715,
-      88
+      718,
+      87
      ]
     ]
    },
    "marker_anchor": [
-    748,
-    82
+    746,
+    83
    ],
    "tooltip_anchor": [
-    748,
-    82
+    746,
+    83
+   ],
+   "bbox_rain": [
+    720,
+    80,
+    51,
+    44
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -1412,41 +1196,7 @@
      80,
      71
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.3,
-     1.2
-    ],
-    "bbox_before": [
-     720,
-     80,
-     51,
-     44
-    ],
-    "bbox_night_before": [
-     705,
-     68,
-     80,
-     71
-    ],
-    "marker_anchor_before": [
-     746,
-     83
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
-   "bbox_rain": [
-    717,
-    79,
-    66,
-    53
-   ]
+   }
   },
   {
    "key": "lagoa-house",
@@ -1467,101 +1217,72 @@
     }
    },
    "bbox": [
-    494,
-    274,
-    94,
-    128
+    502,
+    290,
+    78,
+    107
    ],
    "bbox_night": [
-    494,
-    274,
-    99,
-    128
+    502,
+    290,
+    91,
+    109
    ],
    "hotspot": {
     "rect": [
-     492,
-     272,
-     98,
-     132
+     500,
+     288,
+     82,
+     111
     ],
     "polygon": [
      [
-      511,
-      272
+      516,
+      288
      ],
      [
-      571,
-      272
+      566,
+      288
      ],
      [
-      590,
-      291
+      582,
+      304
      ],
      [
-      590,
-      385
+      582,
+      383
      ],
      [
-      571,
-      404
+      566,
+      399
      ],
      [
-      511,
-      404
+      516,
+      399
      ],
      [
-      492,
-      385
+      500,
+      383
      ],
      [
-      492,
-      291
+      500,
+      304
      ]
     ]
    },
    "marker_anchor": [
-    543,
-    277
+    542,
+    292
    ],
    "tooltip_anchor": [
-    543,
-    277
+    542,
+    292
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.2,
-     1.2
-    ],
-    "bbox_before": [
-     502,
-     290,
-     78,
-     107
-    ],
-    "bbox_night_before": [
-     502,
-     290,
-     91,
-     109
-    ],
-    "marker_anchor_before": [
-     542,
-     292
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies boteco, ipanema-penthouse; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
    "bbox_rain": [
-    494,
-    274,
-    94,
-    128
+    502,
+    290,
+    78,
+    107
    ]
   },
   {
@@ -1583,101 +1304,72 @@
     }
    },
    "bbox": [
-    469,
-    361,
-    66,
-    38
+    473,
+    368,
+    51,
+    32
    ],
    "bbox_night": [
-    469,
-    361,
-    66,
-    40
+    473,
+    368,
+    51,
+    33
    ],
    "hotspot": {
     "rect": [
-     467,
-     359,
-     70,
-     42
+     471,
+     366,
+     55,
+     36
     ],
     "polygon": [
      [
-      475,
-      359
+      478,
+      366
      ],
      [
-      529,
-      359
+      519,
+      366
      ],
      [
-      537,
-      367
+      526,
+      373
      ],
      [
-      537,
-      393
+      526,
+      395
      ],
      [
-      529,
-      401
+      519,
+      402
      ],
      [
-      475,
-      401
+      478,
+      402
      ],
      [
-      467,
-      393
+      471,
+      395
      ],
      [
-      467,
-      367
+      471,
+      373
      ]
     ]
    },
    "marker_anchor": [
-    497,
-    360
+    495,
+    367
    ],
    "tooltip_anchor": [
-    497,
-    360
+    495,
+    367
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.3,
-     1.2
-    ],
-    "bbox_before": [
-     473,
-     368,
-     51,
-     32
-    ],
-    "bbox_night_before": [
-     473,
-     368,
-     51,
-     33
-    ],
-    "marker_anchor_before": [
-     495,
-     367
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies boteco, ipanema-penthouse; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
    "bbox_rain": [
-    469,
-    361,
-    66,
-    38
+    473,
+    368,
+    51,
+    32
    ]
   },
   {
@@ -1699,66 +1391,72 @@
     }
    },
    "bbox": [
-    653,
-    270,
-    46,
-    52
+    660,
+    284,
+    33,
+    37
    ],
    "bbox_night": [
-    653,
-    270,
-    46,
-    52
+    660,
+    284,
+    33,
+    37
    ],
    "hotspot": {
     "rect": [
-     651,
-     268,
-     50,
-     56
+     658,
+     282,
+     37,
+     41
     ],
     "polygon": [
      [
-      661,
-      268
+      665,
+      282
      ],
      [
-      691,
-      268
+      688,
+      282
      ],
      [
-      701,
-      278
+      695,
+      289
      ],
      [
-      701,
-      314
+      695,
+      316
      ],
      [
-      691,
-      324
+      688,
+      323
      ],
      [
-      661,
-      324
+      665,
+      323
      ],
      [
-      651,
-      314
+      658,
+      316
      ],
      [
-      651,
-      278
+      658,
+      289
      ]
     ]
    },
    "marker_anchor": [
-    674,
-    267
+    675,
+    281
    ],
    "tooltip_anchor": [
-    674,
-    267
+    675,
+    281
+   ],
+   "bbox_rain": [
+    660,
+    284,
+    33,
+    37
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -1775,42 +1473,7 @@
      37,
      50
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.4,
-     1.4
-    ],
-    "bbox_before": [
-     660,
-     284,
-     33,
-     37
-    ],
-    "bbox_night_before": [
-     660,
-     284,
-     33,
-     37
-    ],
-    "marker_anchor_before": [
-     675,
-     281
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies copacabana-palace; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
-   "bbox_rain": [
-    653,
-    270,
-    46,
-    52
-   ]
+   }
   },
   {
    "key": "copacabana-palace",
@@ -1831,66 +1494,72 @@
     }
    },
    "bbox": [
-    668,
-    319,
-    101,
-    64
+    678,
+    320,
+    81,
+    56
    ],
    "bbox_night": [
-    668,
-    319,
-    101,
-    64
+    678,
+    320,
+    81,
+    56
    ],
    "hotspot": {
     "rect": [
-     666,
-     317,
-     105,
-     68
+     676,
+     318,
+     85,
+     60
     ],
     "polygon": [
      [
-      679,
-      317
+      688,
+      318
      ],
      [
-      758,
-      317
+      749,
+      318
      ],
      [
-      771,
+      761,
       330
      ],
      [
-      771,
-      372
+      761,
+      366
      ],
      [
-      758,
-      385
+      749,
+      378
      ],
      [
-      679,
-      385
+      688,
+      378
      ],
      [
-      666,
-      372
+      676,
+      366
      ],
      [
-      666,
+      676,
       330
      ]
     ]
    },
    "marker_anchor": [
     715,
-    319
+    320
    ],
    "tooltip_anchor": [
     715,
-    319
+    320
+   ],
+   "bbox_rain": [
+    678,
+    320,
+    81,
+    56
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -1907,41 +1576,7 @@
      64,
      47
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.25,
-     1.15
-    ],
-    "bbox_before": [
-     678,
-     320,
-     81,
-     56
-    ],
-    "bbox_night_before": [
-     678,
-     320,
-     81,
-     56
-    ],
-    "marker_anchor_before": [
-     715,
-     320
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
-   "bbox_rain": [
-    668,
-    319,
-    101,
-    64
-   ]
+   }
   },
   {
    "key": "ipanema-beach",
@@ -2023,19 +1658,6 @@
     560,
     456
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "scale": [
-     1.0,
-     1.0
-    ],
-    "held": "the beach is the coastline itself (protected geography); its sand, kiosks and parasols stay where the shore is"
-   },
-   "label_room": {
-    "clear_px_below": 7,
-    "wanted_px": 10,
-    "note": "the canvas ends; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
    "bbox_rain": [
     447,
     441,
@@ -2062,100 +1684,72 @@
     }
    },
    "bbox": [
-    478,
-    444,
-    52,
-    33
+    486,
+    453,
+    36,
+    23
    ],
    "bbox_night": [
-    478,
-    444,
-    52,
-    33
+    486,
+    453,
+    36,
+    23
    ],
    "hotspot": {
     "rect": [
-     476,
-     442,
-     56,
-     37
+     484,
+     451,
+     40,
+     27
     ],
     "polygon": [
      [
-      483,
-      442
+      489,
+      451
      ],
      [
-      525,
-      442
+      519,
+      451
      ],
      [
-      532,
-      449
+      524,
+      456
      ],
      [
-      532,
-      472
+      524,
+      473
      ],
      [
-      525,
-      479
+      519,
+      478
      ],
      [
-      483,
-      479
+      489,
+      478
      ],
      [
-      476,
-      472
+      484,
+      473
      ],
      [
-      476,
-      449
+      484,
+      456
      ]
     ]
    },
    "marker_anchor": [
-    494,
-    450
+    498,
+    452
    ],
    "tooltip_anchor": [
-    494,
-    450
+    498,
+    452
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.45,
-     1.45
-    ],
-    "bbox_before": [
-     486,
-     453,
-     36,
-     23
-    ],
-    "bbox_night_before": [
-     486,
-     453,
-     36,
-     23
-    ],
-    "marker_anchor_before": [
-     498,
-     452
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
    "bbox_rain": [
-    478,
-    444,
-    52,
-    33
+    486,
+    453,
+    36,
+    23
    ]
   },
   {
@@ -2177,100 +1771,72 @@
     }
    },
    "bbox": [
-    344,
-    394,
-    62,
-    45
+    352,
+    400,
+    46,
+    33
    ],
    "bbox_night": [
-    344,
+    345,
     388,
-    62,
+    60,
     53
    ],
    "hotspot": {
     "rect": [
-     342,
-     392,
-     66,
-     49
+     350,
+     398,
+     50,
+     37
     ],
     "polygon": [
      [
-      351,
-      392
+      357,
+      398
      ],
      [
-      399,
-      392
+      393,
+      398
      ],
      [
-      408,
-      401
+      400,
+      405
      ],
      [
-      408,
-      432
+      400,
+      428
      ],
      [
-      399,
-      441
+      393,
+      435
      ],
      [
-      351,
-      441
+      357,
+      435
      ],
      [
-      342,
-      432
+      350,
+      428
      ],
      [
-      342,
-      401
+      350,
+      405
      ]
     ]
    },
    "marker_anchor": [
     375,
-    393
+    399
    ],
    "tooltip_anchor": [
     375,
-    393
+    399
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.35,
-     1.35
-    ],
-    "bbox_before": [
-     352,
-     400,
-     46,
-     33
-    ],
-    "bbox_night_before": [
-     345,
-     388,
-     60,
-     53
-    ],
-    "marker_anchor_before": [
-     375,
-     399
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 10,
-    "wanted_px": 10
-   },
    "bbox_rain": [
-    344,
-    394,
-    62,
-    45
+    352,
+    400,
+    46,
+    33
    ]
   },
   {
@@ -2292,101 +1858,72 @@
     }
    },
    "bbox": [
-    451,
-    396,
-    55,
-    55
+    458,
+    405,
+    42,
+    46
    ],
    "bbox_night": [
-    451,
-    396,
-    55,
-    55
+    456,
+    404,
+    44,
+    47
    ],
    "hotspot": {
     "rect": [
-     449,
-     394,
-     59,
-     59
+     456,
+     403,
+     46,
+     50
     ],
     "polygon": [
      [
-      460,
-      394
+      465,
+      403
      ],
      [
-      497,
-      394
+      493,
+      403
      ],
      [
-      508,
-      405
+      502,
+      412
      ],
      [
-      508,
-      442
+      502,
+      444
      ],
      [
-      497,
+      493,
       453
      ],
      [
-      460,
+      465,
       453
      ],
      [
-      449,
-      442
+      456,
+      444
      ],
      [
-      449,
-      405
+      456,
+      412
      ]
     ]
    },
    "marker_anchor": [
-    491,
-    407
+    489,
+    414
    ],
    "tooltip_anchor": [
-    491,
-    407
+    489,
+    414
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.3,
-     1.2
-    ],
-    "bbox_before": [
-     458,
-     405,
-     42,
-     46
-    ],
-    "bbox_night_before": [
-     456,
-     404,
-     44,
-     47
-    ],
-    "marker_anchor_before": [
-     489,
-     414
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies ipanema-beach, barraca; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
    "bbox_rain": [
-    451,
-    396,
-    55,
-    55
+    458,
+    405,
+    42,
+    46
    ]
   },
   {
@@ -2409,65 +1946,71 @@
    },
    "bbox": [
     546,
-    413,
-    51,
-    39
+    424,
+    38,
+    29
    ],
    "bbox_night": [
     546,
-    413,
-    51,
-    39
+    424,
+    38,
+    29
    ],
    "hotspot": {
     "rect": [
      544,
-     411,
-     55,
-     43
+     422,
+     42,
+     33
     ],
     "polygon": [
      [
-      552,
-      411
+      550,
+      422
      ],
      [
-      591,
-      411
+      580,
+      422
      ],
      [
-      599,
-      419
+      586,
+      428
      ],
      [
-      599,
-      446
+      586,
+      449
      ],
      [
-      591,
-      454
+      580,
+      455
      ],
      [
-      552,
-      454
-     ],
-     [
-      544,
-      446
+      550,
+      455
      ],
      [
       544,
-      419
+      449
+     ],
+     [
+      544,
+      428
      ]
     ]
    },
    "marker_anchor": [
-    568,
-    412
+    563,
+    423
    ],
    "tooltip_anchor": [
-    568,
-    412
+    563,
+    423
+   ],
+   "bbox_rain": [
+    546,
+    424,
+    38,
+    29
    ],
    "redrawn": {
     "date": "2026-11-16",
@@ -2484,42 +2027,7 @@
      41,
      32
     ]
-   },
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.35,
-     1.35
-    ],
-    "bbox_before": [
-     546,
-     424,
-     38,
-     29
-    ],
-    "bbox_night_before": [
-     546,
-     424,
-     38,
-     29
-    ],
-    "marker_anchor_before": [
-     563,
-     423
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies ipanema-beach, ipanema-penthouse; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
-   "bbox_rain": [
-    546,
-    413,
-    51,
-    39
-   ]
+   }
   },
   {
    "key": "ipanema-penthouse",
@@ -2540,101 +2048,72 @@
     }
    },
    "bbox": [
-    512,
-    397,
-    34,
-    59
+    516,
+    401,
+    30,
+    51
    ],
    "bbox_night": [
     512,
     396,
     38,
-    60
+    58
    ],
    "hotspot": {
     "rect": [
-     510,
-     395,
-     38,
-     63
+     514,
+     399,
+     34,
+     55
     ],
     "polygon": [
      [
-      517,
-      395
+      520,
+      399
      ],
      [
-      541,
-      395
-     ],
-     [
-      548,
-      402
+      542,
+      399
      ],
      [
       548,
-      451
+      405
      ],
      [
-      541,
-      458
+      548,
+      448
      ],
      [
-      517,
-      458
+      542,
+      454
      ],
      [
-      510,
-      451
+      520,
+      454
      ],
      [
-      510,
-      402
+      514,
+      448
+     ],
+     [
+      514,
+      405
      ]
     ]
    },
    "marker_anchor": [
-    530,
-    396
+    531,
+    400
    ],
    "tooltip_anchor": [
-    530,
-    396
+    531,
+    400
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "why": "Esme's play-test: the visitable places can be pushed even bigger",
-    "scale": [
-     1.15,
-     1.15
-    ],
-    "bbox_before": [
-     516,
-     401,
-     30,
-     51
-    ],
-    "bbox_night_before": [
-     512,
-     396,
-     38,
-     58
-    ],
-    "marker_anchor_before": [
-     531,
-     400
-    ]
-   },
-   "label_room": {
-    "clear_px_below": 0,
-    "wanted_px": 10,
-    "note": "under it lies ipanema-beach, barraca; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
    "bbox_rain": [
-    512,
-    397,
-    34,
-    59
+    516,
+    401,
+    30,
+    51
    ]
   },
   {
@@ -2717,19 +2196,6 @@
     802,
     398
    ],
-   "enlarged": {
-    "date": "2026-11-17",
-    "scale": [
-     1.0,
-     1.0
-    ],
-    "held": "the fazenda is the framed Ilha Grande inset, already the biggest place; its frame is part of the base and the bay around it is protected"
-   },
-   "label_room": {
-    "clear_px_below": 4,
-    "wanted_px": 10,
-    "note": "the canvas ends; draw the label over the map there, or inside the hotspot's bottom edge"
-   },
    "bbox_rain": [
     716,
     402,
@@ -2837,53 +2303,6 @@
    33
   ]
  },
- "landmarks_redrawn": {
-  "date": "2026-11-16",
-  "note": "scenery landmarks in the base drawn bigger than life; rect = every base pixel that changed for them (day or night)",
-  "scenery": [
-   {
-    "key": "sugarloaf",
-    "name": "Sugarloaf, Morro da Urca and the cable car",
-    "rect": [
-     780,
-     123,
-     115,
-     207
-    ]
-   },
-   {
-    "key": "arcos",
-    "name": "Arcos da Lapa and the bonde",
-    "rect": [
-     602,
-     82,
-     124,
-     61
-    ]
-   },
-   {
-    "key": "theatro",
-    "name": "Theatro Municipal",
-    "rect": [
-     710,
-     42,
-     52,
-     41
-    ]
-   }
-  ]
- },
- "label_room_note": "The app draws a small label under each place. label_room.clear_px_below is how many rows under the hotspot rect are free of every other place (wanted: 10). Short: christ-the-redeemer, tijuca-park, lagoa-house, clothing-store, sult, ipanema-beach, boteco, quilo, ipanema-penthouse, fazenda.",
- "places_enlarged": {
-  "date": "2026-11-17",
-  "why": "Esme's play-test: the visitable places on the map can be pushed even bigger",
-  "note": "each grown place repeats whole columns and rows of its own art (no pixel scaling, no new colours); keys and file names unchanged. Per place: `enlarged` (scale, old boxes and anchor, or why it was held) and `label_room`. The holiday overlays keep clear of the hero landmarks and redrawn shopfronts where they now stand."
- },
- "night_dedithered": {
-  "date": "2026-11-16",
-  "why": "Esme: \"I don't like the hazy clouds\"",
-  "note": "the night's dotted/checker glows and fades are now clean solid light (dedither.py); the night differs from the approved concept only at those pixels (check.py verifies it)"
- },
  "weather": {
   "rain": {
    "look": "rain",
@@ -2952,5 +2371,46 @@
    "contents": "day: Copacabana, Ipanema and Leblon sand filling up with people in white, white flowers at the waterline, Iemanja's offering boat, boats gathering in the bay. Night: the sand packed in white, candles and flowers along the waterline, the offering boat, boats with lights and their reflections, and fireworks over the Copacabana bay (4 frames)."
   }
  ],
- "events_note": "Holiday overlays: transparent, full canvas (896x504), hard alpha. Draw the active event's layer for the current look after the last place layer and before the markers (and before the rain overlay when it rains). They sit over open and locked places alike: on a takeover the whole city celebrates. draw_order is unchanged."
+ "events_note": "Holiday overlays: transparent, full canvas (896x504), hard alpha. Draw the active event's layer for the current look after the last place layer and before the markers (and before the rain overlay when it rains). They sit over open and locked places alike: on a takeover the whole city celebrates. draw_order is unchanged.",
+ "landmarks_redrawn": {
+  "date": "2026-11-16",
+  "note": "scenery landmarks in the base drawn bigger than life; rect = every base pixel that changed for them (day or night)",
+  "scenery": [
+   {
+    "key": "sugarloaf",
+    "name": "Sugarloaf, Morro da Urca and the cable car",
+    "rect": [
+     780,
+     123,
+     115,
+     207
+    ]
+   },
+   {
+    "key": "arcos",
+    "name": "Arcos da Lapa and the bonde",
+    "rect": [
+     602,
+     82,
+     124,
+     61
+    ]
+   },
+   {
+    "key": "theatro",
+    "name": "Theatro Municipal",
+    "rect": [
+     710,
+     42,
+     52,
+     41
+    ]
+   }
+  ]
+ },
+ "night_dedithered": {
+  "date": "2026-11-16",
+  "why": "Esme: \"I don't like the hazy clouds\"",
+  "note": "the night's dotted/checker glows and fades are now clean solid light (dedither.py); the night differs from the approved concept only at those pixels (check.py verifies it)"
+ }
 }

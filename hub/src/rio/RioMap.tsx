@@ -15,11 +15,11 @@ import { opensOn, type AreaStatus } from "./areas";
 import { MAP_DIR, RIO_MAP, mapBase, mapLayer, mapLook, type Look, type RioEvent } from "./assets";
 import { activeEvent, eventLook, useNow } from "./events";
 import { useCover, useRioImages, type RioImages } from "./canvas";
-import { MAP_KEEP, hitPlace } from "./mapMath";
+import { MAP_KEEP, hitPlace, placeLabels } from "./mapMath";
 import { outlineRings, type Rings } from "./outline";
 import { BitmapText } from "./ui/BitmapText";
 import { bodyPx, useUi } from "./ui/fit";
-import { FONT } from "./ui/font";
+import { FONT, measure } from "./ui/font";
 import { INK } from "./ui/kit";
 import { Tip } from "./ui/Tip";
 
@@ -38,10 +38,6 @@ function tipFor(key: string, status: AreaStatus | undefined): string {
   if (status === "next") return `Opens on day ${opensOn(key)}`;
   return "Coming soon";
 }
-
-/** Free map pixels below a place for its label (map.json label_room; the old map had none: room enough). */
-const LABEL_MIN_ROOM = 4;
-const labelled = (p: { label_room?: { clear_px_below: number } }) => (p.label_room?.clear_px_below ?? LABEL_MIN_ROOM) >= LABEL_MIN_ROOM;
 
 /** The kit's ink and cream (the line round an open place: cream on the art, ink round that). */
 const LINE = { inner: "#fff3d6", outer: "#56160c" };
@@ -178,6 +174,11 @@ export function RioMap({ statuses, look, now: fixedNow, onOpen }: {
   const tipAt = tipPlace?.tooltip_anchor;
   const { u, layout } = useUi();
   const fz = bodyPx(u, layout);
+  // Label sizes in map pixels at this scale (the small font, plus its one-pixel shadow).
+  const labels = useMemo(() => placeLabels(
+    RIO_MAP.places.filter((p) => isOpen(statuses.get(p.key))), RIO_MAP.places,
+    (name) => [((measure(name) + 1) * fz) / scale, ((FONT.lineHeight + 1) * fz) / scale], RIO_MAP.canvas,
+  ), [statuses, fz, scale]);
 
   return (
     <div className="rio-map" ref={wrap} data-look={look} data-fit={fit.mode} data-event={event?.key} data-hover={hover ?? undefined}>
@@ -197,17 +198,12 @@ export function RioMap({ statuses, look, now: fixedNow, onOpen }: {
             else setPicked(null);
           }}
         />
-        {/* A small label under each place she can visit, over its foot where the map has a little room
-            below; where it has none (another place right under it), the hover tooltip names it. PLACEHOLDER WORDING */}
-        {RIO_MAP.places.filter((p) => isOpen(statuses.get(p.key)) && labelled(p)).map((p) => {
-          const [bx, by, bw, bh] = p.bbox;
-          const labelH = (FONT.lineHeight + 1) * fz;
-          const room = (p.label_room?.clear_px_below ?? 10) * scale;
-          return (
-            <BitmapText key={p.key} text={p.name} colour={INK.cream} shadow={INK.ink} className="rio-place-label"
-              style={{ left: (bx + bw / 2) * scale, top: (by + bh) * scale + Math.min(0, room - labelH) + 1 }} />
-          );
-        })}
+        {/* A small label under each place she can visit, where it clears every other place and label
+            (mapMath.ts placeLabels); a place left out is named by the hover tooltip. PLACEHOLDER WORDING */}
+        {[...labels].map(([key, [lx, ly]]) => (
+          <BitmapText key={key} text={PLACE.get(key)!.name} colour={INK.cream} shadow={INK.ink} className="rio-place-label"
+            style={{ left: lx * scale, top: ly * scale }} />
+        ))}
         {tipPlace && tipAt && tip && (
           <Tip className="rio-tooltip" lines={[tipPlace.name, tip]} side="above" at={{ x: tipAt[0] * scale, y: tipAt[1] * scale - 2 * u }} />
         )}

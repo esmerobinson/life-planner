@@ -1,5 +1,5 @@
 import { RIO_MAP } from "./assets";
-import { MAP_KEEP, coverFit, fitScale, hitPlace, doorKeep, sceneKeep, stickerBox } from "./mapMath";
+import { MAP_KEEP, coverFit, fitScale, hitPlace, doorKeep, placeLabels, sceneKeep, stickerBox } from "./mapMath";
 
 const CANVAS: [number, number] = [896, 504];
 
@@ -209,3 +209,42 @@ describe("coverFit, fractional (desktop; Esme 2026-11-17: \"a bit bigger and bor
     expect(Number.isFinite(coverFit({ w: 800, h: 600 }, CANVAS, [10, 10, 0, 0], 2, true).x)).toBe(true);
   });
 });
+
+describe("placeLabels: a small label under each open place, only where it clears every other place and label", () => {
+  const size = (name: string): [number, number] => [name.length * 4, 8];
+  const box = (key: string, bbox: [number, number, number, number]) => ({ key, name: key, bbox });
+
+  it("under its place, centred, one pixel down", () => {
+    const at = placeLabels([box("aa", [10, 10, 20, 20])], [box("aa", [10, 10, 20, 20])], size, [200, 200]);
+    expect(at.get("aa")).toEqual([16, 31]);
+  });
+
+  it("over its own foot when another place sits right under it; left out when even that collides", () => {
+    const a = box("aa", [10, 10, 20, 20]);
+    const below = box("bb", [0, 31, 60, 30]);
+    expect(placeLabels([a], [a, below], size, [200, 200]).get("aa")).toEqual([16, 22]);
+    const tight = box("cc", [0, 20, 60, 30]);
+    expect(placeLabels([a], [a, tight], size, [200, 200]).has("aa")).toBe(false);
+  });
+
+  it("two labels never overlap, and never leave the map", () => {
+    const a = box("aaaa", [10, 10, 10, 10]);
+    const b = box("bbbb", [14, 2, 10, 10]);
+    const at = placeLabels([a, b], [a, b], size, [200, 200]);
+    expect(at.size).toBe(1);
+    expect(placeLabels([box("zzzzzzzz", [190, 190, 10, 10])], [box("zzzzzzzz", [190, 190, 10, 10])], size, [200, 200]).size).toBe(0);
+  });
+
+  it("the real map: no label overlaps another place or label", () => {
+    const places = RIO_MAP.places.map((p) => ({ key: p.key, name: p.name, bbox: p.bbox }));
+    const at = placeLabels(places, places, (n) => [n.length * 5, 8], RIO_MAP.canvas);
+    expect(at.size).toBeGreaterThan(5);
+    const rects = [...at].map(([k, [x, y]]) => ({ k, r: [x, y, places.find((p) => p.key === k)!.name.length * 5, 8] }));
+    for (const { k, r } of rects) {
+      for (const p of places) if (p.key !== k) expect(overlaps(r, p.bbox), `${k} on ${p.key}`).toBe(false);
+      for (const o of rects) if (o.k !== k) expect(overlaps(r, o.r), `${k} on ${o.k}`).toBe(false);
+    }
+  });
+});
+
+const overlaps = (a: readonly number[], b: readonly number[]) => a[0]! < b[0]! + b[2]! && b[0]! < a[0]! + a[2]! && a[1]! < b[1]! + b[3]! && b[1]! < a[1]! + a[3]!;
