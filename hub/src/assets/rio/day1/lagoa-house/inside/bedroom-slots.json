@@ -75,8 +75,95 @@
    "h": 58,
    "goes": "outside",
    "note": "the open terrace door (the steps lead down to the garden)"
+  },
+  {
+   "id": "door_out",
+   "rect": [
+    16,
+    66,
+    70,
+    14
+   ],
+   "to": "outside",
+   "to_key": "lagoa-house-garden",
+   "label": "Garden",
+   "kind": "door",
+   "walk_to": [
+    50,
+    88
+   ],
+   "pair": "outside.stairs_up",
+   "note": "the open terrace door; the outside steps lead down to the garden",
+   "x": 16,
+   "y": 66,
+   "w": 70,
+   "h": 14,
+   "goes": "outside"
+  },
+  {
+   "id": "stairs_down",
+   "rect": [
+    0,
+    132,
+    16,
+    28
+   ],
+   "to": "living",
+   "to_key": "lagoa-living",
+   "label": "Living room",
+   "kind": "stairs",
+   "walk_to": [
+    24,
+    146
+   ],
+   "pair": "living.stairs_up",
+   "note": "the stairs going down through the left wall, to the living room",
+   "x": 0,
+   "y": 132,
+   "w": 16,
+   "h": 28,
+   "goes": "inside/living"
   }
  ],
+ "doors": {
+  "door_out": {
+   "rect": [
+    16,
+    66,
+    70,
+    14
+   ],
+   "to": "outside",
+   "to_key": "lagoa-house-garden",
+   "label": "Garden",
+   "kind": "door",
+   "walk_to": [
+    50,
+    88
+   ],
+   "pair": "outside.stairs_up",
+   "note": "the open terrace door; the outside steps lead down to the garden"
+  },
+  "stairs_down": {
+   "rect": [
+    0,
+    132,
+    16,
+    28
+   ],
+   "to": "living",
+   "to_key": "lagoa-living",
+   "label": "Living room",
+   "kind": "stairs",
+   "walk_to": [
+    24,
+    146
+   ],
+   "pair": "living.stairs_up",
+   "note": "the stairs going down through the left wall, to the living room"
+  }
+ },
+ "doors_note": "Doors pass 2026-11-17: every way between scenes, keyed by id. rect = [x, y, w, h] in scene pixels, on the real door or stair opening and reaching down to floor level; to = the scene id (outside, living, bedroom, kitchen, map; the same names as the files), to_key = its manifest key; walk_to = the foot point on the floor in front of it, where a walking character stands to go through; pair = the matching door in the target scene (where she arrives).",
  "rain_overlay": {
   "file": "inside/bedroom-rain-overlay.png",
   "json": "inside/bedroom-rain-overlay.json"

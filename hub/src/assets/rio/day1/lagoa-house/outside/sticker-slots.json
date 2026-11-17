@@ -45,21 +45,21 @@
  "hotspots": [
   {
    "id": "door-living",
-   "x": 174,
-   "y": 90,
-   "w": 54,
-   "h": 41,
+   "x": 104,
+   "y": 91,
+   "w": 76,
+   "h": 40,
    "goes": "inside/living",
-   "note": "the open living room on the ground floor"
+   "note": "the living room's verdigris sliders, one panel slid open (moved 2026-11-17; same as doors.terrace_doors)"
   },
   {
    "id": "door-kitchen",
-   "x": 104,
-   "y": 91,
-   "w": 65,
-   "h": 40,
+   "x": 234,
+   "y": 95,
+   "w": 16,
+   "h": 36,
    "goes": "inside/kitchen",
-   "note": "the verdigris sliding doors are the kitchen's open wall"
+   "note": "the kitchen's stable door (moved 2026-11-17; same as doors.kitchen_door)"
   },
   {
    "id": "stairs-bedroom",
@@ -85,7 +85,9 @@
    "y": 210,
    "w": 34,
    "h": 22,
-   "goes": "ui:noticeboard"
+   "goes": "ui:noticeboard",
+   "retired": true,
+   "note": "retired 2026-11-17: the Noticeboard is no longer drawn in the garden (Esme: it makes no sense at the house; it moves to the beach street). Drop this hotspot."
   },
   {
    "id": "letterbox",
@@ -97,15 +99,228 @@
   },
   {
    "id": "lagoa-deck",
-   "x": 36,
-   "y": 226,
-   "w": 34,
-   "h": 24,
+   "x": 42,
+   "y": 224,
+   "w": 24,
+   "h": 32,
    "goes": "none",
-   "note": "the deck at the Lagoa's edge (a place to stand)"
+   "note": "the little jetty out over the Lagoa, a rowing boat tied alongside (a place to stand)"
+  },
+  {
+   "id": "front_door",
+   "rect": [
+    187,
+    95,
+    16,
+    36
+   ],
+   "to": "living",
+   "to_key": "lagoa-living",
+   "label": "Living room",
+   "kind": "door",
+   "walk_to": [
+    195,
+    140
+   ],
+   "pair": "living.door_out",
+   "note": "the front door (warm wood slats, brass bar, doormat, a fern either side)",
+   "x": 187,
+   "y": 95,
+   "w": 16,
+   "h": 36,
+   "goes": "inside/living"
+  },
+  {
+   "id": "terrace_doors",
+   "rect": [
+    104,
+    91,
+    76,
+    40
+   ],
+   "to": "living",
+   "to_key": "lagoa-living",
+   "label": "Living room",
+   "kind": "door",
+   "walk_to": [
+    160,
+    140
+   ],
+   "pair": "living.terrace_doors",
+   "note": "the green verdigris sliders, one panel slid open onto the lit living room",
+   "x": 104,
+   "y": 91,
+   "w": 76,
+   "h": 40,
+   "goes": "inside/living"
+  },
+  {
+   "id": "kitchen_door",
+   "rect": [
+    234,
+    95,
+    16,
+    36
+   ],
+   "to": "kitchen",
+   "to_key": "lagoa-kitchen",
+   "label": "Kitchen",
+   "kind": "door",
+   "walk_to": [
+    242,
+    140
+   ],
+   "pair": "kitchen.door_out",
+   "note": "the kitchen's stable door (top half open), beside the kitchen window",
+   "x": 234,
+   "y": 95,
+   "w": 16,
+   "h": 36,
+   "goes": "inside/kitchen"
+  },
+  {
+   "id": "stairs_up",
+   "rect": [
+    252,
+    111,
+    50,
+    24
+   ],
+   "to": "bedroom",
+   "to_key": "lagoa-bedroom",
+   "label": "Bedroom",
+   "kind": "stairs",
+   "walk_to": [
+    276,
+    139
+   ],
+   "pair": "bedroom.door_out",
+   "note": "the foot of the broad concrete steps up the right side; they lead to the bedroom's terrace door",
+   "x": 252,
+   "y": 111,
+   "w": 50,
+   "h": 24,
+   "goes": "inside/bedroom"
+  },
+  {
+   "id": "exit",
+   "rect": [
+    300,
+    232,
+    32,
+    24
+   ],
+   "to": "map",
+   "to_key": "map",
+   "label": "Back to the map",
+   "kind": "exit",
+   "walk_to": [
+    316,
+    246
+   ],
+   "pair": null,
+   "note": "the garden gate: the way back to the Rio map",
+   "x": 300,
+   "y": 232,
+   "w": 32,
+   "h": 24,
+   "goes": "map"
   }
  ],
- "baked": "house, steps, tall wall, pool, terraces, paths, beds, mango tree with the toucan, bananas, the noticeboard, the letterbox, the cobogo front wall and gate, the deck and the Lagoa",
+ "doors": {
+  "front_door": {
+   "rect": [
+    187,
+    95,
+    16,
+    36
+   ],
+   "to": "living",
+   "to_key": "lagoa-living",
+   "label": "Living room",
+   "kind": "door",
+   "walk_to": [
+    195,
+    140
+   ],
+   "pair": "living.door_out",
+   "note": "the front door (warm wood slats, brass bar, doormat, a fern either side)"
+  },
+  "terrace_doors": {
+   "rect": [
+    104,
+    91,
+    76,
+    40
+   ],
+   "to": "living",
+   "to_key": "lagoa-living",
+   "label": "Living room",
+   "kind": "door",
+   "walk_to": [
+    160,
+    140
+   ],
+   "pair": "living.terrace_doors",
+   "note": "the green verdigris sliders, one panel slid open onto the lit living room"
+  },
+  "kitchen_door": {
+   "rect": [
+    234,
+    95,
+    16,
+    36
+   ],
+   "to": "kitchen",
+   "to_key": "lagoa-kitchen",
+   "label": "Kitchen",
+   "kind": "door",
+   "walk_to": [
+    242,
+    140
+   ],
+   "pair": "kitchen.door_out",
+   "note": "the kitchen's stable door (top half open), beside the kitchen window"
+  },
+  "stairs_up": {
+   "rect": [
+    252,
+    111,
+    50,
+    24
+   ],
+   "to": "bedroom",
+   "to_key": "lagoa-bedroom",
+   "label": "Bedroom",
+   "kind": "stairs",
+   "walk_to": [
+    276,
+    139
+   ],
+   "pair": "bedroom.door_out",
+   "note": "the foot of the broad concrete steps up the right side; they lead to the bedroom's terrace door"
+  },
+  "exit": {
+   "rect": [
+    300,
+    232,
+    32,
+    24
+   ],
+   "to": "map",
+   "to_key": "map",
+   "label": "Back to the map",
+   "kind": "exit",
+   "walk_to": [
+    316,
+    246
+   ],
+   "pair": null,
+   "note": "the garden gate: the way back to the Rio map"
+  }
+ },
+ "doors_note": "Doors pass 2026-11-17: every way between scenes, keyed by id. rect = [x, y, w, h] in scene pixels, on the real door or stair opening and reaching down to floor level; to = the scene id (outside, living, bedroom, kitchen, map; the same names as the files), to_key = its manifest key; walk_to = the foot point on the floor in front of it, where a walking character stands to go through; pair = the matching door in the target scene (where she arrives).",
+ "baked": "house (living-room sliders, front door, kitchen window and stable door), steps, tall wall, pool, terraces, loungers, paths, beds, mango tree with the toucan, bananas, the letterbox, the cobogo front wall and gate, the jetty with its boat and the Lagoa",
  "slots": [
   {
    "id": "bed-left-1",
