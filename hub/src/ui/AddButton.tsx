@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { usePanel } from "./panelContext";
 
 /**
@@ -8,7 +9,8 @@ import { usePanel } from "./panelContext";
  * appears. Escape, a click outside, the button again (or Close / Cancel) closes it, and
  * focus goes back to the button.
  *
- * `children(close)` is the form; call `close()` when it is done with.
+ * `children(close)` is the form; call `close()` when it is done with. A field marked
+ * `data-focus-first` is focused within the tap that opens it (the phone's quick add).
  */
 export function AddButton({
   open,
@@ -95,7 +97,13 @@ export function AddButton({
         className="add-fab"
         aria-label="Add"
         aria-expanded={open}
-        onClick={() => onToggle(!open)}
+        onClick={() => {
+          if (open) return onToggle(false);
+          // Drawn now, inside the tap, and its first field focused here too: iOS only brings the
+          // keyboard up for a focus made within the tap itself, not in a later effect.
+          flushSync(() => onToggle(true));
+          card.current?.querySelector<HTMLElement>("[data-focus-first]")?.focus();
+        }}
       >
         {/* Drawn, not a font glyph: a "+" or "×" character sits off-centre in most fonts. */}
         <svg className="add-fab-icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">

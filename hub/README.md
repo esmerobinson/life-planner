@@ -24,6 +24,25 @@ copy on the sync server and on your other devices. Automatic backup and
 encryption are later plans. Clearing site data for the app deletes this
 device's copy.
 
+## Quick add on your iPhone home screen
+
+On the phone, the round **+** opens one box, "What's on your mind?", with the
+keyboard up. Type, press Return: it goes into the Inbox and the box is ready
+for the next one. Today, Tomorrow and Time are optional; **More options** opens
+the full Add form. Anything half-typed is kept on the phone until you add it.
+
+To get an **Add** icon that opens straight into that box:
+
+1. In Safari on the iPhone, open the app's address followed by `/add`
+   (for example `https://<your Esmeworld address>/add`).
+2. Tap the Share button, then **Add to Home Screen**, then **Add**.
+
+The keyboard comes up once you tap the box (iPhones don't raise it by
+themselves when an app opens). An iPhone may keep a home-screen icon's data
+separately from the main Esmeworld icon: if things added from the Add icon
+don't show up in Esmeworld, pair the Add icon on the Sync page too, and sync
+carries them across.
+
 ## Importing your backlog
 
 Open **Backup** (next to Inbox), then the **Import from a file** section at the

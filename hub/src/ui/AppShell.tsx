@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { flushSync } from "react-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PhoneTopBar, phoneTitle } from "./PhoneTopBar";
 import { usePhone } from "./usePhone";
 import { requestPersistence, type PersistenceStatus } from "../data/storage";
@@ -10,6 +11,8 @@ import { AddButton } from "./AddButton";
 import { UndoLine } from "./DeleteButton";
 import { ShellUndoContext, type UndoNote } from "./undoContext";
 import { draftHasContent, QuickAdd, type AddDraft } from "./QuickAdd";
+import { clearQuickDraft, QuickCapture, setQuickDraftText, type QuickDraft } from "./QuickCapture";
+import { DEFAULT_SESSIONS } from "../domain/projects";
 import { CHECK_DATE_EVENT, ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
@@ -51,6 +54,9 @@ export function AppShell() {
   const inboxLabel = inboxCount > 0 ? `Inbox (${inboxCount})` : "Inbox";
   const phone = usePhone();
   const location = useLocation();
+  const navigate = useNavigate();
+  // Home with the quick add open (her home-screen "Add" bookmark, /add).
+  const atAdd = location.pathname === "/add";
   // Esme's Rio is a full-window game (Esme, 2026-11-17): none of the app's own chrome round it.
   const game = location.pathname === "/farm" || location.pathname === "/farm/";
   // The Mac app's reminders follow every change (does nothing elsewhere).
@@ -120,16 +126,70 @@ export function AppShell() {
 
   // "+ Add a book" (and the like): Add opens pre-set as asked, not as the page says.
   const [addOverride, setAddOverride] = useState<AddDefaults | null>(null);
-  const toggleAdd = useCallback((open: boolean) => {
-    if (open) setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
-    setAddOverride(null);
-    setAdding(open);
-  }, []);
+  // The phone's + opens the one-box quick add (Esme, 2026-11-17); "More options" (and "+ Add a
+  // book" and the like, and the + on a computer) the full form.
+  const [addMode, setAddMode] = useState<"quick" | "full">("full");
+  // The full form opened by More options: it starts from the quick box's text, and keeps the
+  // quick draft in step until it adds or is cancelled.
+  const [handover, setHandover] = useState<AddDraft | null>(null);
+  const fromQuick = useRef(false);
+  const toggleAdd = useCallback(
+    (open: boolean) => {
+      if (open) {
+        setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
+        setAddMode(phone ? "quick" : "full");
+        setHandover(null);
+        fromQuick.current = false;
+      }
+      setAddOverride(null);
+      setAdding(open);
+      // Closed on /add: Home is what was under it.
+      if (!open && atAdd) navigate("/", { replace: true });
+    },
+    [phone, atAdd, navigate],
+  );
   const openAddWith = useCallback((d: AddDefaults) => {
     setAddOpened((n) => n + 1);
+    setAddMode("full");
+    setHandover(null);
+    fromQuick.current = false;
     setAddOverride(d);
     setAdding(true);
   }, []);
+  // /add: the quick add opens by itself (no tap: on an iPhone the keyboard then waits for a tap on the box).
+  useEffect(() => {
+    if (!atAdd) return;
+    setAddOpened((n) => n + 1);
+    setAddMode("quick");
+    setHandover(null);
+    fromQuick.current = false;
+    setAddOverride(null);
+    setAdding(true);
+  }, [atAdd]);
+  // On /add, "Add to Home Screen" saves an icon that opens /add (its own manifest and name).
+  useEffect(() => {
+    if (!atAdd) return;
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    const title = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+    const was = { href: link?.getAttribute("href"), title: title?.getAttribute("content") };
+    link?.setAttribute("href", "/manifest-add.webmanifest");
+    title?.setAttribute("content", ADD_BOOKMARK_NAME);
+    return () => {
+      if (link && was.href) link.setAttribute("href", was.href);
+      if (title && was.title) title.setAttribute("content", was.title);
+    };
+  }, [atAdd]);
+  /** More options: the full form, starting from what was typed, its title focused in the same tap. */
+  const moreOptions = useCallback((d: QuickDraft) => {
+    const base = addDefaults ?? BASE_ADD_DEFAULTS;
+    flushSync(() => {
+      fromQuick.current = true;
+      setHandover(d.text.trim() ? { ...blankDraft(base), title: d.text } : null);
+      setAddOpened((n) => n + 1);
+      setAddMode("full");
+    });
+    document.querySelector<HTMLElement>(".add-sheet [data-focus-first], .add-pop [data-focus-first]")?.focus();
+  }, [addDefaults]);
 
   // ⌘K search (3A): ⌘K on a Mac, Ctrl+K elsewhere, from any page; the phone's 🔍 too.
   const [searching, setSearching] = useState(false);
@@ -186,7 +246,10 @@ export function AppShell() {
             </div>
           )}
           {!game && <AddButton open={adding} onToggle={toggleAdd} phone={phone} buttonRef={addButton}>
-            {(close) => (
+            {(close) =>
+              addMode === "quick" ? (
+                <QuickCapture key={addOpened} today={today} autoFocus onAdded={() => void changed()} onMore={moreOptions} />
+              ) : (
               <QuickAdd
                 key={addOpened}
                 today={today}
@@ -194,8 +257,11 @@ export function AppShell() {
                 defaults={addOverride ?? addDefaults ?? BASE_ADD_DEFAULTS}
                 // A click outside, Escape or the button keep what was typed for the next open (I-5);
                 // Cancel and a successful add start afresh. Opened as asked ("+ Add a book"): fresh.
-                initial={!addOverride && addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined}
+                // Opened by More options: what the quick box had.
+                initial={handover ?? (!addOverride && addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : undefined)}
                 onDraft={(d) => {
+                  // The quick box's text follows the title, so closing and reopening loses nothing.
+                  if (fromQuick.current) setQuickDraftText(d.title);
                   // A fresh form opened as asked ("+ Add a book") must not wipe a draft kept from
                   // before until something is typed in it (review M-12).
                   if (addOverride && !draftHasContent(d)) return;
@@ -203,15 +269,18 @@ export function AppShell() {
                 }}
                 onCancel={() => {
                   addDraft.current = null;
+                  if (fromQuick.current) clearQuickDraft();
                   close();
                 }}
                 onAdded={() => {
                   addDraft.current = null;
+                  if (fromQuick.current) clearQuickDraft();
                   close(); // saved: the form goes away and focus goes back to "+" (a failed save never reaches here)
                   void changed();
                 }}
               />
-            )}
+              )
+            }
           </AddButton>}
           {/* The nook belongs to the game too: in the full-window game it stands bottom left, as on the phone. */}
           {(phone || game) && <ErrorGuard name="nook"><Nook phone /></ErrorGuard>}
@@ -224,6 +293,17 @@ export function AppShell() {
       </AddDefaultsContext.Provider>
     </ShellContext.Provider>
   );
+}
+
+/** The home-screen bookmark's name (WORDING PROVISIONAL, for Esme / Design). */
+const ADD_BOOKMARK_NAME = "Add";
+
+/** An empty full-form draft, pre-set as the page says (More options fills in the title). */
+function blankDraft(d: AddDefaults): AddDraft {
+  return {
+    title: "", type: d.type, areaId: d.areaId, goalId: "", priority: 2, due: "", recur: [], notes: "",
+    goalKind: "finite", deadline: "", target: "", sessionCount: String(DEFAULT_SESSIONS), time: "",
+  };
 }
 
 /** Wording provisional (for Esme / Design). */

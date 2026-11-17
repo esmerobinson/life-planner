@@ -93,6 +93,8 @@ export function AppRoutes() {
             ),
           )}
           <Route path="/today" element={<TodayRedirect />} />
+          {/* Home with the quick add open: the address of her home-screen "Add" bookmark (AppShell opens it). */}
+          <Route path="/add" element={<HomeRoute />} />
           <Route path="/journal/:tab" element={<JournalRoute />} />
           <Route path="/goals" element={<GoalsRoute />} />
           <Route path="/goals/:id" element={<GoalDetailRoute />} />

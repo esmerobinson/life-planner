@@ -266,7 +266,7 @@ export function QuickAdd({
     <form className="quick-add form-grid" noValidate onSubmit={(e) => void submit(e)}>
       <label className="form-field form-full">
         <span className="form-label">Title</span>
-        <input type="text" value={title} autoFocus={autoFocus} onChange={(e) => setTitle(e.target.value)} />
+        <input type="text" data-focus-first="" value={title} autoFocus={autoFocus} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <label className="form-field">
         <span className="form-label">Type</span>

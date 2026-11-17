@@ -128,3 +128,32 @@ button.add-fab {
   overscroll-behavior: contain;
   box-shadow: 0 10px 40px rgba(58, 65, 47, 0.3);
 }
+
+/* The phone's quick add (Esme, 2026-11-17; QuickCapture.tsx). Built from what exists: the
+   form label and soft field, the soft pills (button[aria-pressed]) as the chips, the quiet
+   link for More options. Layout gaps reuse the spacing tokens. NEW and undecided, so a
+   placeholder: the "Added" line (magenta outline, system font). */
+.quick-capture {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.quick-capture-field input {
+  width: 100%;
+}
+.quick-capture-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.quick-capture-added {
+  margin: 0;
+  align-self: flex-start;
+  font-family: system-ui, sans-serif;
+  outline: 2px solid var(--placeholder);
+  outline-offset: 2px;
+}
+.quick-capture-more {
+  margin: 0;
+}

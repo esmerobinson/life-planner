@@ -31,7 +31,8 @@ export function phoneTitle(pathname: string): string | null {
 export function PhoneTopBar({ inboxLabel, onSearch }: { inboxLabel: string; onSearch?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const home = location.pathname === "/";
+  // /add is Home with the quick add open (her home-screen "Add" bookmark).
+  const home = location.pathname === "/" || location.pathname === "/add";
   const title = phoneTitle(location.pathname);
 
   return (
