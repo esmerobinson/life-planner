@@ -4,6 +4,7 @@ import { db } from "../../data/db";
 import { isKeychainError, unlockJournal, type UnlockResult } from "../../journal/keyStore";
 import type { RowStatus } from "../../journal/rows";
 import type { ISODate } from "../../domain/types";
+import { addDays } from "../../domain/dates";
 import { syncController } from "../../sync";
 import type { SyncController } from "../../sync/controller";
 import { getDeviceId } from "../../sync/engine";
@@ -170,6 +171,7 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyLog jk={open.jk} date={today} deviceId={open.deviceId} />}
+          {tab === "check-in" && <DailyLog jk={open.jk} date={addDays(today, -1)} deviceId={open.deviceId} yesterday />}
           {tab === "check-in" && <PrivateDayTick jk={open.jk} date={today} part="checkin" />}
           {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
           {tab === "notes" && <NotesToMyself jk={open.jk} today={today} deviceId={open.deviceId} />}

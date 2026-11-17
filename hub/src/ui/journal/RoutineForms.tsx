@@ -45,6 +45,8 @@ const DAY_LOG_SPEC: FormSpec<DayLogFields> = {
   doneTitle: W.logDone,
 };
 
+const DAY_LOG_YESTERDAY: FormSpec<DayLogFields> = { ...DAY_LOG_SPEC, doneTitle: W.logDoneYesterday };
+
 const WEEK_REVIEW_SPEC: FormSpec<WeekReviewFields> = {
   rules: WEEK_REVIEW_RULES,
   normalise: weekReviewFields,
@@ -67,14 +69,24 @@ function useForm<F>(read: () => Promise<FormDay<F>>, deps: unknown[]): FormDay<F
   return day;
 }
 
-/** The daily log for `date` (today in the app: its day runs to 3am). */
-export function DailyLog({ jk, date, deviceId }: { jk: JournalKey; date: ISODate; deviceId: string }) {
+/**
+ * The daily log for `date`: today's (the app's day runs to 3am), or yesterday's (`yesterday`),
+ * which she can still change until it is final (review I4). Yesterday's is folded until opened or
+ * until something is in it.
+ */
+export function DailyLog({ jk, date, deviceId, yesterday = false, extra }: { jk: JournalKey; date: ISODate; deviceId: string; yesterday?: boolean; extra?: (day: FormDay<DayLogFields>) => ReactNode }) {
   const day = useForm(() => readDayLog(jk, date), [jk, date]);
+  const started = !!day && (day.id !== "" || day.others.length > 0);
   return (
-    <section className="routine-placeholder" aria-label={W.logSection}>
-      <h3>{W.logHeading}</h3>
-      {day && <FormBox key={date} jk={jk} deviceId={deviceId} day={day} newDate={date} spec={DAY_LOG_SPEC} />}
-    </section>
+    <Folded
+      label={yesterday ? W.logSectionYesterday : W.logSection}
+      heading={yesterday ? W.logHeadingYesterday : W.logHeading}
+      fold={yesterday && !started}
+      line={yesterday ? W.logYesterdayLine : undefined}
+    >
+      {day && <FormBox key={date} jk={jk} deviceId={deviceId} day={day} newDate={date} spec={yesterday ? DAY_LOG_YESTERDAY : DAY_LOG_SPEC} />}
+      {day && extra?.(day)}
+    </Folded>
   );
 }
 
@@ -86,22 +98,35 @@ export function WeeklyReview({ jk, today, deviceId }: { jk: JournalKey; today: I
   const week = weekOf(today);
   const day = useForm(() => readWeekReview(jk, today), [jk, week]);
   const sunday = isReviewDay(today);
-  const [open, setOpen] = useState(false);
   const started = !!day && (day.id !== "" || day.others.length > 0);
-  const box = day && <FormBox key={week} jk={jk} deviceId={deviceId} day={day} newDate={today} spec={WEEK_REVIEW_SPEC} />;
   return (
-    <section className="routine-placeholder" aria-label={W.reviewSection}>
-      {sunday || started ? (
-        <>
-          <h3>{sunday ? W.reviewHeadingSunday : W.reviewHeadingWeek}</h3>
-          {box}
-        </>
+    <Folded label={W.reviewSection} heading={sunday ? W.reviewHeadingSunday : W.reviewHeadingWeek} fold={!sunday && !started}>
+      {day && <FormBox key={week} jk={jk} deviceId={deviceId} day={day} newDate={today} spec={WEEK_REVIEW_SPEC} />}
+    </Folded>
+  );
+}
+
+/**
+ * A section whose box is always in the same place in the tree (review I3: folding or unfolding,
+ * or something being saved, never rebuilds the box, so focus and every key typed are kept). While
+ * `fold`, its heading is a button that shows or hides the box.
+ */
+function Folded({ label, heading, fold, line, children }: { label: string; heading: string; fold: boolean; line?: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const shown = !fold || open;
+  return (
+    <section className="routine-placeholder" aria-label={label}>
+      {fold ? (
+        <button type="button" className="routine-fold" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {heading}
+        </button>
       ) : (
-        <details open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
-          <summary>{W.reviewHeadingWeek}</summary>
-          {open && box}
-        </details>
+        <h3>{heading}</h3>
       )}
+      <div hidden={!shown}>
+        {line && <p className="journal-muted">{line}</p>}
+        {children}
+      </div>
     </section>
   );
 }
@@ -133,7 +158,9 @@ function FormBox<F extends object>({
   const cur = session.current;
   const own = !!queued.current && queued.current.session === cur && (cur.version === undefined || day.id === cur.version);
   const stored = own ? queued.current!.text : JSON.stringify(spec.normalise(day.fields));
-  const fresh = (): FormSession => ({ date: day.id ? day.date : newDate, seen: [...day.seen], submittedAt: day.submittedAt });
+  // Every new session is filed under the box's day (today for the review): a review belongs to the
+  // day she pressed Done, or while not done the day she last edited it (review C1).
+  const fresh = (): FormSession => ({ date: newDate, seen: [...day.seen], submittedAt: day.submittedAt, doneOn: day.doneOn });
 
   const enqueue = (fields: F) => {
     const s = session.current ?? (session.current = fresh());
@@ -176,12 +203,23 @@ function FormBox<F extends object>({
       /* the problem line says so; the answers stay in the box */
     }
   }
-  /** Another version's answers into the box: it is replaced; the box's own version stays (listed). */
-  function use(v: FormVersion<F>) {
+  /**
+   * "Use these answers": they go into the box as a new version that replaces both that version and
+   * the one the box held, so one version is left and the day is settled (review I4). She chose it;
+   * Done stays if either was done (review M6).
+   */
+  async function use(v: FormVersion<F>) {
+    const prev = session.current;
     draft.flush();
-    session.current = { date: v.date, seen: [...v.seen], submittedAt: v.submittedAt };
-    draft.set(JSON.stringify(spec.normalise(v.fields)));
+    await queue.current; // anything typed is saved first
+    // The box's own session row by its bare id (only this device ever writes it, and never again).
+    const seen = [...new Set([...v.seen, ...day.seen, ...(prev?.version ? [prev.version] : [])])];
+    session.current = { date: newDate, seen, submittedAt: v.submittedAt ?? day.submittedAt, doneOn: v.doneOn ?? day.doneOn };
+    const before = draft.value;
+    const text = JSON.stringify(spec.normalise(v.fields));
+    draft.set(text);
     draft.flush();
+    if (text === before) await enqueue(v.fields); // the same answers: still one version written
   }
   async function remove(v: FormVersion<F>) {
     try {
@@ -213,7 +251,7 @@ function FormBox<F extends object>({
         </div>
       )}
       {problem && <p role="alert">{problem}</p>}
-      <OtherVersions versions={day.others} mine={(d) => ids.includes(d)} View={View} onUse={use} onRemove={remove} />
+      <OtherVersions versions={day.others} mine={(d) => ids.includes(d)} View={View} onUse={(v) => void use(v)} onRemove={remove} />
     </>
   );
 }

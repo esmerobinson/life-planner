@@ -4,7 +4,7 @@ import { db } from "../../data/db";
 import { readDayLog, readWeekReview, reviewDoneDays, saveDayLog } from "../../data/repo";
 import { EMPTY_DAY_LOG } from "../../journal/routine";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
-import { emptyDb } from "../../together/testKit";
+import { clock, emptyDb } from "../../together/testKit";
 import { DailyLog, WeeklyReview } from "./RoutineForms";
 import { ROUTINE_WORDS as W } from "./routineWording";
 
@@ -78,26 +78,71 @@ describe("the daily log", () => {
     await screen.findByDisplayValue("Pretend phone words");
     expect(screen.getByText(W.earlierHere)).toBeInTheDocument();
     expect(screen.getByText("Pretend Mac words")).toBeInTheDocument();
-    // Use it: its answers go into the box; the phone's version stays listed (nothing lost).
-    await userEvent.click(screen.getByRole("button", { name: W.useThese }));
-    await screen.findByDisplayValue("Pretend Mac words");
-    await waitFor(async () => {
-      const d = await readDayLog(jk, DAY);
-      expect(d.fields.scheduleNote).toBe("Pretend Mac words");
-      expect(d.others.map((o) => o.fields.scheduleNote)).toEqual(["Pretend phone words"]);
-    });
-    // Remove asks first.
-    await userEvent.click(await screen.findByRole("button", { name: W.remove }));
+    // Remove asks first; "Keep them" changes nothing.
+    await userEvent.click(screen.getByRole("button", { name: W.remove }));
     await userEvent.click(within(screen.getByRole("group", { name: W.removeAsk })).getByRole("button", { name: W.removeNo }));
     expect((await readDayLog(jk, DAY)).others).toHaveLength(1);
+    // Use it: its answers go into the box, and the day is settled: one version left (review I4).
+    await userEvent.click(screen.getByRole("button", { name: W.useThese }));
+    await screen.findByDisplayValue("Pretend Mac words");
+    await waitFor(async () => expect(await readDayLog(jk, DAY)).toMatchObject({ others: [], fields: { schedule: "yes", scheduleNote: "Pretend Mac words" } }));
+    expect(screen.queryByText(W.earlierHere)).toBeNull();
+  });
+
+  it("Remove, confirmed: that version is gone, the box's answers stay", async () => {
+    const jk = await key();
+    await saveDayLog(jk, MAC, { ...EMPTY_DAY_LOG, schedule: "yes", scheduleNote: "Pretend Mac words" }, { date: DAY, seen: [], submittedAt: null });
+    await new Promise((r) => setTimeout(r, 3));
+    await saveDayLog(jk, PHONE, { ...EMPTY_DAY_LOG, schedule: "no", scheduleNote: "Pretend phone words" }, { date: DAY, seen: [], submittedAt: null });
+    render(<DailyLog jk={jk} date={DAY} deviceId={MAC} />);
+    await screen.findByDisplayValue("Pretend phone words");
     await userEvent.click(screen.getByRole("button", { name: W.remove }));
     await userEvent.click(within(screen.getByRole("group", { name: W.removeAsk })).getByRole("button", { name: W.removeYes }));
-    await waitFor(async () => expect(await readDayLog(jk, DAY)).toMatchObject({ others: [], fields: { scheduleNote: "Pretend Mac words" } }));
+    await waitFor(async () => expect(await readDayLog(jk, DAY)).toMatchObject({ others: [], fields: { scheduleNote: "Pretend phone words" } }));
+  });
+
+  it("\"Use these answers\" over a done box keeps it done (review M6)", async () => {
+    const jk = await key();
+    await saveDayLog(jk, PHONE, { ...EMPTY_DAY_LOG, todos: "no", todosNote: "Pretend undone phone words" }, { date: DAY, seen: [], submittedAt: null });
+    await new Promise((r) => setTimeout(r, 3));
+    await saveDayLog(jk, MAC, { ...EMPTY_DAY_LOG, todos: "yes" }, { date: DAY, seen: [], submittedAt: null }, true);
+    render(<DailyLog jk={jk} date={DAY} deviceId={MAC} />);
+    await screen.findByText(W.logDone);
+    await userEvent.click(screen.getByRole("button", { name: W.useThese }));
+    await waitFor(async () => expect(await readDayLog(jk, DAY)).toMatchObject({ others: [], done: true, fields: { todosNote: "Pretend undone phone words" } }));
+  });
+
+  it("yesterday's log: folded while empty, then filled and done like today's (it can still be changed today)", async () => {
+    const jk = await key();
+    render(<DailyLog jk={jk} date="2026-11-11" deviceId={MAC} yesterday />);
+    const fold = await screen.findByRole("button", { name: W.logHeadingYesterday });
+    expect(screen.getByLabelText(W.todosNote)).not.toBeVisible();
+    await userEvent.click(fold);
+    await userEvent.click(within(group(W.todos)).getByRole("button", { name: "Partly" }));
+    await userEvent.click(screen.getByRole("button", { name: W.done }));
+    await screen.findByText(W.logDoneYesterday);
+    expect(await readDayLog(jk, "2026-11-11")).toMatchObject({ done: true, fields: { todos: "partly" } });
   });
 });
 
 describe("the weekly review", () => {
+  it("I3: on a Thursday, typing on across an autosave keeps focus and every key (the box is never rebuilt)", async () => {
+    const jk = await key();
+    render(<WeeklyReview jk={jk} today={DAY} deviceId={MAC} />);
+    await userEvent.click(await screen.findByRole("button", { name: W.reviewHeadingWeek }));
+    const box = screen.getByLabelText(W.well);
+    await userEvent.type(box, "Pretend first");
+    await waitFor(async () => expect((await readWeekReview(jk, DAY)).fields.well).toBe("Pretend first"), { timeout: 3000 });
+    await new Promise((r) => setTimeout(r, 100)); // the re-read after the save lands
+    expect(document.activeElement).toBe(screen.getByLabelText(W.well));
+    expect(screen.getByLabelText(W.well)).toBe(box); // the same box
+    await userEvent.keyboard(" more words"); // no click: she just keeps typing
+    expect(screen.getByLabelText(W.well)).toHaveValue("Pretend first more words");
+    await waitFor(async () => expect((await readWeekReview(jk, DAY)).fields.well).toBe("Pretend first more words"), { timeout: 3000 });
+  });
+
   it("is open on Sunday: every box saved, Done shows it done for the week and counts as a Mental health day", async () => {
+    clock(`${SUNDAY}T18:00:00`); // she presses Done on Sunday
     const jk = await key();
     render(<WeeklyReview jk={jk} today={SUNDAY} deviceId={MAC} />);
     await screen.findByText(W.reviewHeadingSunday);
@@ -123,8 +168,8 @@ describe("the weekly review", () => {
   it("any other day of the week it is folded until opened, then works the same; once started it stays open", async () => {
     const jk = await key();
     const { unmount } = render(<WeeklyReview jk={jk} today={DAY} deviceId={MAC} />);
-    const fold = await screen.findByText(W.reviewHeadingWeek);
-    expect(screen.queryByLabelText(W.well)).toBeNull();
+    const fold = await screen.findByRole("button", { name: W.reviewHeadingWeek });
+    expect(screen.getByLabelText(W.well)).not.toBeVisible();
     await userEvent.click(fold);
     await userEvent.type(await screen.findByLabelText(W.well), "Pretend Thursday words");
     unmount();

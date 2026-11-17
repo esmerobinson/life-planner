@@ -8,6 +8,7 @@ import { confirmedDevice, keyFor } from "../../test/journalKey";
 import { openReadBackPart } from "../../test/readBack";
 import { renderApp } from "../../test/renderApp";
 import { ROUTINE_WORDS as W } from "./routineWording";
+import { clock } from "../../together/testKit";
 
 // The daily log and the weekly review in Read back (PLACEHOLDER placement): every day's log in
 // the Daily check-in part, every week's review in the Mental health exercise part, word for word,
@@ -24,6 +25,7 @@ afterEach(cleanup);
 vi.setConfig({ testTimeout: 30_000 });
 
 it("daily logs are in the Daily check-in part and weekly reviews in the Mental health exercise part, word for word", async () => {
+  clock("2026-11-15T18:00:00"); // the review's Done is pressed on Sunday
   const jk = await keyFor("fake-journal-routine-readback");
   const me = await getDeviceId(db);
   await saveDayLog(jk, me, { ...EMPTY_DAY_LOG, schedule: "partly", scheduleNote: "Pretend Gallowmere note", todos: "yes" }, { date: "2026-11-15", seen: [], submittedAt: null }, true);
@@ -43,7 +45,7 @@ it("daily logs are in the Daily check-in part and weekly reviews in the Mental h
   await userEvent.click(within(saturday).getByText(`Saturday 14 November · ${W.readBackLog}`));
   expect(within(saturday).getByText(W.notSubmitted)).toBeVisible();
   expect(within(saturday).getByText("Pretend phone version")).toBeVisible(); // both versions, nothing hidden
-  expect(within(saturday).getByText(W.otherDevice)).toBeVisible();
+  expect(within(saturday).getByText(W.alsoSaved)).toBeVisible();
 
   await userEvent.click(screen.getByRole("link", { name: "← Read back" }));
   const exercise = await openReadBackPart("Mental health exercise");

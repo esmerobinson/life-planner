@@ -14,6 +14,7 @@
 // ever cleared silently. A box session rewrites only its own row while she types.
 
 import { isObj, isStr } from "../data/validate";
+import { isValidISODate, todayISO } from "../domain/dates";
 import { WEEKDAYS, type ISODate, type Weekday } from "../domain/types";
 
 export type Choice = "yes" | "partly" | "no";
@@ -46,6 +47,11 @@ interface VersionStamp {
   v: 1;
   /** When she pressed Done (null: not yet). An edit after Done keeps it. */
   submittedAt: number | null;
+  /**
+   * The app day (3am rule) she pressed Done: the day it belongs to (review C1: never the day it
+   * was first touched). Kept by every later edit. Earlier rows: the app day of `submittedAt`.
+   */
+  doneOn?: ISODate;
   /** This write (strictly newer than the row's previous write). */
   at: number;
   /** The versions this one replaces (`<row id>@<at>`). */
@@ -64,7 +70,8 @@ const text = (max: number) => (v: unknown) => isStr(v) && v.length <= max;
 const seenOk = (v: unknown) =>
   v === undefined || (Array.isArray(v) && v.length <= 64 && v.every((x) => isStr(x) && x.length <= 256));
 const stampOk = (v: Record<string, unknown>) =>
-  v.v === 1 && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) && seenOk(v.seen);
+  v.v === 1 && (v.submittedAt === null || num(v.submittedAt)) && num(v.at) && seenOk(v.seen) &&
+  (v.doneOn === undefined || (isStr(v.doneOn) && isValidISODate(v.doneOn)));
 
 export function isDayLogEntry(v: unknown): v is DayLogEntry {
   return (
@@ -115,6 +122,8 @@ export interface FormVersion<F> {
   device: string;
   fields: F;
   submittedAt: number | null;
+  /** The app day she pressed Done (null: not done). */
+  doneOn: ISODate | null;
   at: number;
   /**
    * What to put in `seen` to replace this version as she sees it: `<id>@<at>` for it and every
@@ -126,6 +135,11 @@ export interface FormVersion<F> {
 export interface FormDay<F> extends FormVersion<F> {
   /** Done (she pressed Done on it, or on a version with the same answers) and something answered. */
   done: boolean;
+  /**
+   * The day it belongs to (Together's note and private tick, the green row, the farm): the day she
+   * pressed Done; while not done, the day of its newest version (the day she last edited it).
+   */
+  day: ISODate;
   /** Every other version not replaced, with something in it, newest first. */
   others: FormVersion<F>[];
   /** Rows this device can't open. */
@@ -139,6 +153,8 @@ export interface RawVersion<F> {
   device: string;
   fields: F;
   submittedAt: number | null;
+  /** As stored (absent on earlier rows). */
+  doneOn?: ISODate;
   at: number;
   seen: string[];
 }
@@ -151,6 +167,10 @@ export interface FormRules<F> {
 
 export const DAY_LOG_RULES: FormRules<DayLogFields> = { key: dayLogKey, filled: dayLogFilled, empty: EMPTY_DAY_LOG };
 export const WEEK_REVIEW_RULES: FormRules<WeekReviewFields> = { key: weekReviewKey, filled: weekReviewFilled, empty: EMPTY_WEEK_REVIEW };
+
+/** The app day a version was done: as stored, else the app day (3am rule) of its Done. */
+const doneDay = (v: { submittedAt: number | null; doneOn?: ISODate }): ISODate | null =>
+  v.doneOn ?? (v.submittedAt === null ? null : todayISO(new Date(v.submittedAt)));
 
 /** A `seen` entry: the row id and the stamp she saw. */
 export const seenToken = (v: { id: string; at: number }): string => `${v.id}@${v.at}`;
@@ -172,21 +192,26 @@ export function mergeVersions<F>(versions: RawVersion<F>[], unreadable: number, 
   const replaced = (v: RawVersion<F>) => bare.has(v.id) || (sawAt.get(v.id) ?? -Infinity) >= v.at;
   const live = versions.filter((v) => !replaced(v)).sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
   const same = (f: F) => live.filter((v) => rules.key(v.fields) === rules.key(f));
+  const view = (v: RawVersion<F>, done: RawVersion<F> | undefined): FormVersion<F> => ({
+    id: v.id, date: v.date, device: v.device, fields: v.fields, at: v.at, seen: same(v.fields).map(seenToken),
+    submittedAt: done?.submittedAt ?? null, doneOn: done ? doneDay(done) : null,
+  });
+  // Done on any version with the same answers counts (two devices, the same answers).
+  const doneOf = (v: RawVersion<F>) => same(v.fields).find((x) => x.submittedAt !== null);
   const top = live[0];
   const shown: FormVersion<F> = top
-    ? { id: top.id, date: top.date, device: top.device, fields: top.fields, submittedAt: top.submittedAt, at: top.at, seen: same(top.fields).map(seenToken) }
-    : { id: "", date: "", device: "", fields: rules.empty, submittedAt: null, at: 0, seen: [] };
-  // Done on any version with the same answers counts (two devices, the same answers).
-  const submittedAt = top ? (same(top.fields).find((v) => v.submittedAt !== null)?.submittedAt ?? null) : null;
+    ? view(top, doneOf(top))
+    : { id: "", date: "", device: "", fields: rules.empty, submittedAt: null, doneOn: null, at: 0, seen: [] };
   const keys = new Set([rules.key(shown.fields)]);
   const others: FormVersion<F>[] = [];
   for (const v of live.slice(1)) {
     const k = rules.key(v.fields);
     if (!rules.filled(v.fields) || keys.has(k)) continue;
     keys.add(k);
-    others.push({ id: v.id, date: v.date, device: v.device, fields: v.fields, submittedAt: v.submittedAt, at: v.at, seen: same(v.fields).map(seenToken) });
+    others.push(view(v, v.submittedAt !== null ? v : undefined));
   }
-  return { ...shown, submittedAt, done: submittedAt !== null && rules.filled(shown.fields), others, unreadable };
+  const done = shown.submittedAt !== null && rules.filled(shown.fields);
+  return { ...shown, done, day: done && shown.doneOn ? shown.doneOn : shown.date, others, unreadable };
 }
 
 // ---- the week ------------------------------------------------------------------------------------

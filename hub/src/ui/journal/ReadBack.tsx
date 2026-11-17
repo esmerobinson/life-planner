@@ -93,8 +93,8 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
       setData({
         exercises: [
           ...exerciseItems(exercises.entries, learned, title),
-          // Each week's review (Mental health work), on the day it was written.
-          ...reviews.map((r): ExerciseItem => ({ date: r.date || r.week, entry: null, title: "", learned: null, review: r })),
+          // Each week's review (Mental health work), on the day she pressed Done (review C1).
+          ...reviews.map((r): ExerciseItem => ({ date: r.day || r.week, entry: null, title: "", learned: null, review: r })),
         ].sort((a, b) => b.date.localeCompare(a.date)),
         // Every day she checked in, even if its words were lost; only a day of skips isn't listed
         // (Esme, 2026-11-04 and 2026-11-06). Each day's daily log after that day's check-in.
@@ -317,7 +317,7 @@ function FormItem<F>({ date, line, day, View }: { date: ISODate; line: string; d
       {!day.done && <p className="journal-muted">{RW.notSubmitted}</p>}
       {day.others.map((o) => (
         <div key={o.id} className="routine-other">
-          <p className="journal-muted">{RW.otherDevice}</p>
+          <p className="journal-muted">{RW.alsoSaved}</p>
           <View fields={o.fields} />
         </div>
       ))}

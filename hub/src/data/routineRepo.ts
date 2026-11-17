@@ -18,7 +18,7 @@ import { db } from "./db";
 import { CANT_OPEN, formRows, type FormKind } from "./journalRepo";
 import { journalId } from "./validate";
 import { ownDevices } from "./deviceIds";
-import { addDays, mondayOf } from "../domain/dates";
+import { addDays, mondayOf, todayISO } from "../domain/dates";
 import type { ISODate, JournalRow } from "../domain/types";
 import type { JournalKey } from "../journal/crypto";
 import {
@@ -37,6 +37,8 @@ export interface FormSession {
   version?: string;
   seen: string[];
   submittedAt: number | null;
+  /** The app day she pressed Done (kept from the version she edits). */
+  doneOn?: ISODate | null;
 }
 
 type Spec<F> = { kind: FormKind; rules: FormRules<F>; fields: (e: never) => F; tooLong: (f: F) => boolean };
@@ -73,7 +75,7 @@ async function merged<F>(jk: JournalKey, spec: Spec<F>, rows: JournalRow[]): Pro
     const e = o.entry;
     versions.push({
       id: row.id, date: row.date, device: deviceOf(row), fields: spec.fields(e as never),
-      submittedAt: e.submittedAt, at: e.at, seen: e.seen ?? [],
+      submittedAt: e.submittedAt, ...(e.doneOn ? { doneOn: e.doneOn } : {}), at: e.at, seen: e.seen ?? [],
     });
   }
   return mergeVersions(versions, unreadable, spec.rules);
@@ -119,12 +121,17 @@ async function saveForm<F extends object>(
   // A session row under a former id is replaced only as it is here now (bug #60).
   const carriedAt = carry ? await atOf(jk, kind, v!) : null;
   const carried = carriedAt === null ? [] : [seenToken({ id: v!, at: carriedAt })];
+  // Kept in the session: every later save of the new row still replaces the old one (review M1).
+  for (const t of carried) if (!session.seen.includes(t)) session.seen.push(t);
   const seen = [...session.seen, ...carried].filter((x) => x !== id && !x.startsWith(`${id}@`));
   // Strictly newer than this row's previous write, so a version hidden as <id>@<at> shows again once written to.
   const prevAt = (await atOf(jk, kind, id)) ?? 0;
   const at = Math.max(Date.now(), prevAt + 1);
   const submittedAt = submit ? (session.submittedAt ?? at) : session.submittedAt;
-  const entry = { v: 1, ...spec.fields(fields as never), submittedAt, at, ...(seen.length ? { seen } : {}) };
+  // The day she pressed Done: kept from the version she edits, else today in the app (3am rule).
+  const doneOn = submittedAt === null ? null : (session.doneOn ?? (session.submittedAt === null ? todayISO(new Date(at)) : todayISO(new Date(session.submittedAt))));
+  if (submittedAt !== null) session.doneOn = doneOn;
+  const entry = { v: 1, ...spec.fields(fields as never), submittedAt, ...(doneOn ? { doneOn } : {}), at, ...(seen.length ? { seen } : {}) };
   await formRows.write(jk, kind, [await formRows.seal(jk, kind, date, id.slice(`${kind}:${date}:`.length), entry)]);
   return id;
 }
@@ -192,11 +199,11 @@ export async function listWeekReviews(jk: JournalKey, before: ISODate): Promise<
 
 /**
  * The days a weekly review was done (Done pressed, something answered): Mental health work, like a
- * card done (the Journal's green row, its week bars, the farm). One per week: the shown version's day.
+ * card done (the Journal's green row, its week bars, the farm). One per week: the day she pressed Done.
  */
 export async function reviewDoneDays(jk: JournalKey): Promise<Set<ISODate>> {
   const out = new Set<ISODate>();
-  for (const w of await listWeekReviews(jk, "9999-12-31")) if (w.done && w.date) out.add(w.date);
+  for (const w of await listWeekReviews(jk, "9999-12-31")) if (w.done && w.day) out.add(w.day);
   return out;
 }
 

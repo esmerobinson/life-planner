@@ -14,6 +14,10 @@ export const ROUTINE_WORDS = {
   todosNote: "A short note about your to-dos (optional)",
   choice: { yes: "Yes", partly: "Partly", no: "No" } satisfies Record<Choice, string>,
   logDone: "Logged for today",
+  logDoneYesterday: "Logged for yesterday",
+  logSectionYesterday: "Yesterday's daily log",
+  logHeadingYesterday: "Yesterday's daily log",
+  logYesterdayLine: "You can still change yesterday's log today.",
   // ---- the weekly review (Mental health exercise tab, under "what I learned") ----
   reviewSection: "Weekly review",
   reviewHeadingSunday: "It's Sunday: your weekly review",
@@ -33,6 +37,8 @@ export const ROUTINE_WORDS = {
   notSubmitted: "Not done yet",
   otherDevice: "Also saved, from another device:",
   earlierHere: "Also saved, earlier on this device:",
+  /** Read back (it doesn't say which device). */
+  alsoSaved: "Also saved, another version:",
   useThese: "Use these answers",
   remove: "Remove",
   removeAsk: "Remove these answers? They'll be gone from every device.",

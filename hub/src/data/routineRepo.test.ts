@@ -7,7 +7,7 @@ import { validJournal } from "./validate";
 import { journalAad, sealJson } from "../journal/crypto";
 import { EMPTY_DAY_LOG, EMPTY_WEEK_REVIEW, isDayLogEntry, isWeekReviewEntry } from "../journal/routine";
 import { confirmedDevice, keyFor } from "../test/journalKey";
-import { emptyDb } from "../together/testKit";
+import { clock, emptyDb } from "../together/testKit";
 
 // The daily log and the weekly review, sealed and versioned like the learned words. Made-up words.
 
@@ -99,22 +99,68 @@ describe("the daily log", () => {
   });
 });
 
+describe("after a Replace (a new device id)", () => {
+  it("a box open across the Replace: its answers move to a new version under the new id, which keeps replacing the old one on every save", async () => {
+    const jk = await key();
+    const OLD = "device-pretend-old-0001";
+    const NEW = "device-pretend-new-0002";
+    const s = session();
+    s.version = await saveDayLog(jk, OLD, { ...EMPTY_DAY_LOG, schedule: "yes" }, s);
+    const { DEVICE_ID_META, FORMER_DEVICE_IDS_META } = await import("./deviceIds");
+    await db.syncMeta.bulkPut([{ key: DEVICE_ID_META, value: NEW }, { key: FORMER_DEVICE_IDS_META, value: [OLD] }]);
+    s.version = await saveDayLog(jk, OLD, { ...EMPTY_DAY_LOG, schedule: "yes", scheduleNote: "Pretend after" }, s);
+    expect(s.version).toMatch(new RegExp(`^day-log:${DAY}:${NEW}_`));
+    await saveDayLog(jk, OLD, { ...EMPTY_DAY_LOG, schedule: "yes", scheduleNote: "Pretend after, more" }, s);
+    expect(await readDayLog(jk, DAY)).toMatchObject({ fields: { scheduleNote: "Pretend after, more" }, others: [] });
+  });
+});
+
 describe("the weekly review", () => {
   const REVIEW = { well: "Pretend Thistlewick went well", inWay: "Pretend fog", values: 7, ifThen: "If pretend rain, then indoor walk", minDays: ["wed" as const, "mon" as const] };
 
-  it("one per week (Monday to Sunday): an edit later in the week stays on its day; done days count", async () => {
+  it("one per week (Monday to Sunday); it belongs to the day she pressed Done, even edited later in the week", async () => {
+    const c = clock("2026-11-13T20:00:00"); // Friday
     const jk = await key();
-    const s = session("2026-11-13"); // Friday
+    const s = session("2026-11-13");
     s.version = await saveWeekReview(jk, MAC, REVIEW, s, true);
-    // Sunday, the same week: the same review.
-    const week = await readWeekReview(jk, DAY);
-    expect(week).toMatchObject({ date: "2026-11-13", done: true, fields: { ...REVIEW, minDays: ["mon", "wed"] } });
-    await saveWeekReview(jk, MAC, { ...week.fields, values: 8 }, { date: week.date, seen: week.seen, submittedAt: week.submittedAt });
-    expect(await readWeekReview(jk, DAY)).toMatchObject({ date: "2026-11-13", fields: { values: 8 }, others: [] });
+    let week = await readWeekReview(jk, DAY);
+    expect(week).toMatchObject({ day: "2026-11-13", done: true, fields: { ...REVIEW, minDays: ["mon", "wed"] } });
+    // Sunday: an edit (filed under Sunday, its own session) keeps Done and the day it was done.
+    c.set(`${DAY}T10:00:00`);
+    await saveWeekReview(jk, MAC, { ...week.fields, values: 8 }, { date: DAY, seen: week.seen, submittedAt: week.submittedAt, doneOn: week.doneOn });
+    week = await readWeekReview(jk, DAY);
+    expect(week).toMatchObject({ day: "2026-11-13", fields: { values: 8 }, others: [], done: true });
     // The next week starts empty.
     expect(await readWeekReview(jk, "2026-11-16")).toMatchObject({ id: "", done: false, fields: EMPTY_WEEK_REVIEW });
     expect([...(await reviewDoneDays(jk))]).toEqual(["2026-11-13"]);
     expect((await listWeekReviews(jk, "2026-11-30")).map((w) => w.week)).toEqual(["2026-11-09"]);
+  });
+
+  it("C1: touched on Monday, done on Sunday: it belongs to Sunday (never the Monday it was first touched)", async () => {
+    const c = clock("2026-11-09T09:00:00"); // Monday
+    const jk = await key();
+    const mon = session("2026-11-09");
+    mon.version = await saveWeekReview(jk, MAC, { ...EMPTY_WEEK_REVIEW, values: 4 }, mon);
+    expect(await readWeekReview(jk, DAY)).toMatchObject({ day: "2026-11-09", done: false });
+    c.set(`${DAY}T19:00:00`); // Sunday: a new session, filed under Sunday, replacing Monday's version
+    const shown = await readWeekReview(jk, DAY);
+    await saveWeekReview(jk, MAC, { ...shown.fields, well: "Pretend Sunday words" }, { date: DAY, seen: shown.seen, submittedAt: null }, true);
+    expect(await readWeekReview(jk, DAY)).toMatchObject({ day: DAY, done: true, others: [] });
+    expect([...(await reviewDoneDays(jk))]).toEqual([DAY]);
+  });
+
+  it("an older entry without doneOn belongs to the app day of its Done (3am rule)", async () => {
+    clock("2026-11-16T01:30:00"); // Monday 01:30: still Sunday in the app
+    const jk = await key();
+    await saveWeekReview(jk, MAC, REVIEW, session("2026-11-14"), true);
+    // Written by an earlier build: no doneOn.
+    const row = (await db.journal.where("kind").equals("week-review").toArray())[0]!;
+    const { formRows } = await import("./journalRepo");
+    const o = await formRows.open(jk, row, "week-review");
+    if (o.state !== "ok") throw new Error("pretend row should open");
+    const { doneOn: _d, ...older } = o.entry;
+    await db.journal.put(await formRows.seal(jk, "week-review", row.date, row.id.slice(`week-review:${row.date}:`.length), older));
+    expect((await readWeekReview(jk, DAY)).day).toBe(DAY);
   });
 
   it("a draft review (no Done) is kept and listed but doesn't count", async () => {

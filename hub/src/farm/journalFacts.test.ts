@@ -63,6 +63,8 @@ it("a check-in with a question not yet moved past isn't a check-in day", async (
 });
 
 it("a weekly review done is a Mental health day; a draft one isn't (only the day, never its words)", async () => {
+  const { clock } = await import("../together/testKit");
+  clock("2026-11-08T18:00:00"); // Done pressed on that Sunday
   const jk = await world();
   await saveWeekReview(jk, ME, { ...EMPTY_WEEK_REVIEW, well: "Pretend review words" }, { date: "2026-11-08", seen: [], submittedAt: null }, true);
   await saveWeekReview(jk, ME, { ...EMPTY_WEEK_REVIEW, well: "Pretend draft" }, { date: "2026-11-10", seen: [], submittedAt: null });

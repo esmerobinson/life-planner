@@ -95,7 +95,8 @@ it("there is no Done checkbox or button: Submit is the only way to finish a card
   const today = await within(s).findByRole("article", { name: "Today's card" });
   expect(within(s).queryByRole("checkbox", { name: "Done" })).toBeNull();
   expect(within(s).queryByRole("button", { name: "Done" })).toBeNull();
-  expect(within(s).queryByText("Done", { exact: true })).toBeNull();
+  // (The weekly review under the cards, its own section, has a Done of its own.)
+  expect(within(s).queryAllByText("Done", { exact: true }).filter((e) => !e.closest(".routine-placeholder"))).toEqual([]);
   expect(await within(today).findByRole("button", { name: "Submit" })).toBeDisabled();
 });
 
