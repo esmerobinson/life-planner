@@ -39,8 +39,8 @@
 
 import { db } from "../data/db";
 import {
-  answeredPrompts, highlightRows, listExerciseEntries, readCheckinDay, readExerciseCards, readExerciseProgress, readLearned,
-  unreadableExerciseDates,
+  answeredPrompts, highlightRows, listExerciseEntries, listWeekReviews, readCheckinDay, readExerciseCards, readExerciseProgress, readLearned,
+  unreadableExerciseDates, type WeekReviewFields,
   type ExerciseResponse, type PartAnswer,
 } from "../data/repo";
 import type { ISODate } from "../domain/types";
@@ -50,6 +50,8 @@ import type { HighlightEntry } from "../journal/highlights";
 import { PROMPTS } from "../journal/prompts";
 import { checkedIn } from "../journal/rows";
 import { cardTitle } from "../ui/journal/ResponseView";
+import { ROUTINE_WORDS, WEEKDAY_NAMES } from "../ui/journal/routineWording";
+import { weekReviewFields } from "../journal/routine";
 
 /** The two parts of a day's note (named like the private ticks). */
 export type Part = "exercise" | "checkin";
@@ -129,9 +131,29 @@ export function researchBullets(learned: string, highlights: { words: string; no
   return [...own, ...hl];
 }
 
-/** The exercise part's summary: the titles of the cards she did, joined with " · ". */
-/** The exercise part's words in the summary line: how many cards she did ("1 exercise", "6 exercises"). */
-export const exerciseSummary = (cards: number): string => (cards <= 0 ? "" : cards === 1 ? "1 exercise" : `${cards} exercises`);
+/**
+ * The exercise part's words in the summary line: how many cards she did ("1 exercise", "6
+ * exercises"), and "Weekly review" on a day with one (PROVISIONAL wording).
+ */
+export const exerciseSummary = (cards: number, review = false): string =>
+  [cards <= 0 ? "" : cards === 1 ? "1 exercise" : `${cards} exercises`, review ? REVIEW_SUMMARY : ""].filter((x) => x !== "").join(SEP);
+
+/** The weekly review's heading in the note and its words in the summary line (PROVISIONAL, Esme 16 Nov 2026). */
+export const REVIEW_HEADING = "### Weekly review";
+export const REVIEW_SUMMARY = "Weekly review";
+
+/** A weekly review's questions and her answers, as the note writes them. */
+export function reviewQAs(f: WeekReviewFields): QA[] {
+  const w = ROUTINE_WORDS;
+  const n = weekReviewFields(f);
+  return [
+    { q: w.well, a: n.well },
+    { q: w.inWay, a: n.inWay },
+    { q: w.values, a: n.values === null ? "" : `${n.values} out of 10` },
+    { q: w.ifThen, a: n.ifThen },
+    { q: w.minDays, a: n.minDays.map((d) => WEEKDAY_NAMES[d]).join(", ") },
+  ];
+}
 
 /** A card's own heading in the note. */
 export const CARD_HEADING = "### ";
@@ -142,13 +164,18 @@ export const CARD_HEADING = "### ";
  * them, and between cards). A card with nothing kept (all n/a), or on a titles-only or private
  * day, still shows its title (and, titles-only, its questions).
  */
-export function exerciseSection(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean): string {
-  if (cards.length === 0) return "";
+export function exerciseSection(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean, review?: QA[] | null): string {
+  if (cards.length === 0 && !review) return "";
   const blocks = [PART_HEADINGS.exercise];
-  if (answers && research.length > 0) blocks.push([RESEARCH_HEADING, ...research.map((b) => `${BULLET}${b}`)].join("\n"));
+  if (answers && research.length > 0 && cards.length > 0) blocks.push([RESEARCH_HEADING, ...research.map((b) => `${BULLET}${b}`)].join("\n"));
   for (const c of cards) {
     const qa = qaBlock(kept(c.qas), answers);
     blocks.push(qa ? `${CARD_HEADING}${oneLine(c.title)}\n${qa}` : `${CARD_HEADING}${oneLine(c.title)}`);
+  }
+  // The weekly review (Mental health work), after the cards: like a card, its heading always.
+  if (review) {
+    const qa = qaBlock(kept(review), answers);
+    blocks.push(qa ? `${REVIEW_HEADING}\n${qa}` : REVIEW_HEADING);
   }
   return blocks.join("\n\n");
 }
@@ -348,10 +375,21 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
   const { entries, unreadable } = await listExerciseEntries(jk, today);
   if (unreadable > 0) for (const d of await unreadableExerciseDates(jk)) bad.add(d);
   for (const d of bad) if (d < today) unknown.add(d);
-  if (ids.size === 0) return { notes, unknown, partial };
+  // Each week's review she pressed Done on, on its day (a draft never goes). A week with a review
+  // row that won't open here goes titles-only on that day.
+  const reviews = new Map<ISODate, { qas: QA[]; partial: boolean }>();
+  for (const r of await listWeekReviews(jk, today)) {
+    if (!r.done || !r.date || !(r.date < today)) continue;
+    reviews.set(r.date, { qas: reviewQAs(r.fields), partial: r.unreadable > 0 });
+  }
+  if (ids.size === 0 && reviews.size === 0) return { notes, unknown, partial };
   const twins = await noteTwins(jk);
-  for (const [date, cardIds] of ids) {
+  const dates = new Set<ISODate>([...ids.keys(), ...reviews.keys()]);
+  for (const date of [...dates].sort()) {
+    const cardIds = ids.get(date) ?? [];
     if (bad.has(date)) continue;
+    const review = reviews.get(date) ?? null;
+    if (review?.partial) partial.add(date);
     const learned = await readLearned(jk, date);
     const hl = await dayHighlights(jk, date, twins);
     if (learned.unreadable > 0 || hl.partial) partial.add(date);
@@ -375,9 +413,9 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
     }
     const research = researchBullets(learned.text, hl.list);
     notes.set(date, {
-      titles: exerciseSection(done, [], false),
-      full: exerciseSection(done, research, true),
-      summary: exerciseSummary(done.length),
+      titles: exerciseSection(done, [], false, review?.qas),
+      full: exerciseSection(done, research, true, review?.qas),
+      summary: exerciseSummary(done.length, !!review),
     });
   }
   return { notes, unknown, partial };
