@@ -45,7 +45,7 @@ test("an existing v1 database upgrades with every row kept, stamped and pending"
         };
       }),
   );
-  expect(stored.version).toBe(60); // Dexie version 6 (Esme's Farm: farm)
+  expect(stored.version).toBe(70); // Dexie version 7 (prefs: Due reminder settings)
   expect(stored.items).toHaveLength(1);
   expect(typeof stored.items[0]!.updatedAt).toBe("number");
   expect(stored.pending).toHaveLength(2);
