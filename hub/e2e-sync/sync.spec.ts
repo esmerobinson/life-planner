@@ -56,10 +56,10 @@ const summary = async (page: Page) =>
 async function setUpSync(page: Page) {
   await page.goto("/sync");
   await page.getByLabel("Sync address").fill(SYNC_URL);
-  await page.getByLabel("Passphrase").fill(E2E_PASSPHRASE);
+  await page.getByLabel("Passphrase", { exact: true }).fill(E2E_PASSPHRASE);
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByLabel("Passphrase")).toHaveValue("");
+  await expect(page.getByLabel("Passphrase", { exact: true })).toHaveValue("");
 }
 
 /** Presses Sync now and waits until this device has nothing left to send. */
