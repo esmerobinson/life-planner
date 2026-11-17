@@ -16,6 +16,7 @@ import Dexie from "dexie";
 import type { DBCore, DBCoreMutateRequest, DBCoreMutateResponse, DBCoreTable, DBCoreTransaction, Transaction } from "dexie";
 import { validFile, validGoal, validItem, validJournal } from "./validate";
 import { validFarm } from "../farm/state";
+import { validPrefs } from "../reminders/duePrefs";
 
 /** The synced tables, each with the row check other devices apply and its name in messages. */
 const TRACKED_TABLES: Record<string, { valid: (r: unknown) => boolean; noun: string }> = {
@@ -24,6 +25,7 @@ const TRACKED_TABLES: Record<string, { valid: (r: unknown) => boolean; noun: str
   files: { valid: validFile, noun: "picture" },
   journal: { valid: validJournal, noun: "journal entry" },
   farm: { valid: validFarm, noun: "farm change" },
+  prefs: { valid: validPrefs, noun: "setting" },
 };
 const TRACKED = new Set(Object.keys(TRACKED_TABLES));
 const PENDING = "pending";

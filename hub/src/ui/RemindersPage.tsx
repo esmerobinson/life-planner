@@ -8,6 +8,7 @@ import { loadReminderSettings, saveReminderSettings } from "../reminders/setting
 import { todayISO } from "../domain/dates";
 import { dayLabel } from "../domain/display";
 import { usePhone } from "./usePhone";
+import { DueSection } from "./DueSection";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -212,6 +213,7 @@ export function RemindersPage() {
           Reminders are planned up to {dayLabel(until, todayISO())}, and refresh whenever Esmeworld opens.
         </p>
       )}
+      <DueSection />
     </section>
   );
 }

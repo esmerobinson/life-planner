@@ -47,7 +47,8 @@ describe("Reminders page (4A, a simple list)", () => {
   it("lists the six reminders with their words, times and On / Off, as in the mockup", async () => {
     renderPage();
     expect(screen.getByRole("heading", { name: "Reminders" })).toBeInTheDocument();
-    const rows = within(await screen.findByRole("list")).getAllByRole("listitem");
+    // The first list is this device's reminders (the Due section below has its own).
+    const rows = within((await screen.findAllByRole("list"))[0]!).getAllByRole("listitem");
     expect(rows.map((r) => r.querySelector(".rem-name")!.textContent)).toEqual([
       "Morning pages", "Daily check-in", "To-dos and deadlines", "Project session today", "Weekly review", "Monthly review",
     ]);

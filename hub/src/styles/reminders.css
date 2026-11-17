@@ -99,3 +99,18 @@
 .is-phone .rem-when select {
   font-size: max(16px, 1em);
 }
+
+/* Reminders in Due (2026-11-16): PLACEHOLDER LOOK, deliberately wrong until Esme picks one
+   (CLAUDE.md: placeholders are magenta and the system font). */
+.due-section {
+  margin-top: var(--space-4);
+  padding: 12px;
+  outline: 3px dashed magenta;
+  font-family: system-ui, sans-serif;
+}
+
+.due-fields {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}

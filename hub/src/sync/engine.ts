@@ -23,6 +23,7 @@ import type { FileRow, Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
 import { validFarm } from "../farm/state";
+import { validPrefs } from "../reminders/duePrefs";
 import { retireCandidateForToken, writeAcceptedKeyWrap } from "../journal/keyStore";
 import { SYNC_TABLES, type HubDB, type SyncTable } from "../data/db";
 
@@ -105,7 +106,7 @@ export type MetaKey =
  * other table syncs as usual. Without this, each refused row would be split out one by one
  * (farm review I1: 120 rows hit the round cap and stopped other rows syncing).
  */
-export const NEWER_TABLES: readonly SyncTable[] = ["farm"];
+export const NEWER_TABLES: readonly SyncTable[] = ["farm", "prefs"];
 
 export async function getMeta<T = unknown>(db: HubDB, key: MetaKey): Promise<T | undefined> {
   return (await db.syncMeta.get(key))?.value as T | undefined;
@@ -199,7 +200,7 @@ export async function stopSyncing(db: HubDB): Promise<void> {
 
 /** The row check for each synced table (the same one every local write passes). */
 const VALID_ROW: Record<SyncTable, (r: unknown) => boolean> = {
-  items: validItem, goals: validGoal, files: validFile, journal: validJournal, farm: validFarm,
+  items: validItem, goals: validGoal, files: validFile, journal: validJournal, farm: validFarm, prefs: validPrefs,
 };
 /** A table this build syncs (a later build may add more; their rows are skipped here). */
 const isSyncTable = (t: unknown): t is SyncTable => (SYNC_TABLES as readonly unknown[]).includes(t);
