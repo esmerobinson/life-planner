@@ -288,13 +288,19 @@ test("pairing with no passphrase: a code from a fresh Sync page sets up another 
   await a.getByRole("button", { name: "Pair another device" }).click();
   await expect(a.getByRole("img", { name: "Pairing code" })).toBeVisible();
   const code = await shownCode(a);
-  expect(code).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.http:\/\/127\.0\.0\.1:\d+$/);
+  expect(code).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.http:\/\/127\.0\.0\.1:\d+#$/);
   expect(code).not.toContain(E2E_PASSPHRASE);
   await a.getByRole("button", { name: "Hide" }).click();
 
   await b.goto("/sync");
+  // A production build takes a plain-http address from a code only when she typed it herself
+  // (review M3), and a new device asks before using an address other than the usual one (C1).
+  await b.getByLabel("Sync address").fill(SYNC_URL);
   await b.getByLabel("Paste pairing code").fill(code);
   await b.getByRole("button", { name: "Use pairing code" }).click();
+  const ask = b.getByRole("group", { name: "Sync address in the code" });
+  await expect(ask).toContainText(SYNC_URL);
+  await ask.getByRole("button", { name: "Use this address" }).click();
   await expect(b.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
   await expect(b.getByLabel("Sync address")).toHaveValue(SYNC_URL);
   const notesB = b.getByRole("region", { name: "Notes to myself" });

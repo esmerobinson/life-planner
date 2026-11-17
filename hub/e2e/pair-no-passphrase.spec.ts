@@ -147,6 +147,13 @@ async function showCodeWithoutTyping(page: Page): Promise<string> {
   return decodeShownCode(page);
 }
 
+/** A new device: the code's address isn't the usual one, so she is asked, in plain words (review C1). */
+async function useAddress(page: Page) {
+  const ask = page.getByRole("group", { name: "Sync address in the code" });
+  await expect(ask).toContainText(ADDRESS);
+  await ask.getByRole("button", { name: "Use this address" }).click();
+}
+
 /** A pretend rear camera filming `text` as a QR code (installed before the page loads). */
 async function cameraFilming(page: Page, text: string) {
   const modules = encodeQR(text, "raw", { ecc: "medium", border: 4 });
@@ -203,7 +210,7 @@ test("a fresh Sync page visit shows a code with no passphrase; the phone scans i
   expect(text.startsWith("esmeworld-pair:v2:")).toBe(true);
   expect(text).not.toContain(PASS);
   await expect(a.page.getByText("This code sets up sync only.", { exact: false })).toHaveCount(0);
-  await expect(a.page.getByText(/^Hides in [01]:\d\d$/)).toBeVisible();
+  await expect(a.page.getByText(/^Hides in [012]:\d\d$/)).toBeVisible();
   expect(await a.page.content()).not.toContain(text.slice(18, 60));
   expect(await everythingKept(a.page)).not.toContain(text.slice(18));
   await shoot(a.page, "pair-v2-mac-code");
@@ -215,6 +222,7 @@ test("a fresh Sync page visit shows a code with no passphrase; the phone scans i
   await cameraFilming(b.page, text);
   await b.page.goto("/sync");
   await b.page.getByRole("button", { name: "Scan pairing code" }).click();
+  await useAddress(b.page);
   await expect(b.page.getByText("Saved.")).toBeVisible({ timeout: 20_000 });
   await expect(b.page.getByLabel("Sync address")).toHaveValue(ADDRESS);
   await expect(b.page.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
@@ -319,6 +327,7 @@ test("a journal set up before the re-key update: the code sets up sync only and 
   await b.page.goto("/sync");
   await b.page.getByLabel("Paste pairing code").fill(syncOnly);
   await b.page.getByRole("button", { name: "Use pairing code" }).click();
+  await useAddress(b.page);
   await expect(b.page.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
   await b.page.goto("/journal/notes");
   await expect(b.page.getByRole("heading", { name: "Unlock journal" })).toBeVisible({ timeout: 30_000 });
@@ -370,6 +379,7 @@ test("after a passphrase change, the Mac's code carries the new one; the paired 
   await b.page.goto("/sync");
   await b.page.getByLabel("Paste pairing code").fill(text);
   await b.page.getByRole("button", { name: "Use pairing code" }).click();
+  await useAddress(b.page);
   await expect(b.page.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
   await seesNote(b.page, STEADY_A);
 
@@ -385,4 +395,73 @@ test("after a passphrase change, the Mac's code carries the new one; the paired 
   await setUpByTyping(c.page, NEWER);
   await seesNote(c.page, STEADY_A);
   for (const d of [a, b, c]) await d.context.close();
+});
+
+test("a device that already syncs refuses a code for another address or another journal, and changes nothing (review C1)", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const server = new FakeSyncServer(await deriveToken(PASS));
+  const a = await device(browser, server);
+  await setUpByTyping(a.page);
+  await writeNote(a.page, WORRY_A, STEADY_A);
+  await syncNow(a.page);
+  const mine = await showCodeWithoutTyping(a.page);
+  await a.page.getByRole("button", { name: "Hide" }).click();
+
+  // Another device of hers that already syncs with a different journal and address: a stranger's code.
+  const strangerServer = new FakeSyncServer(await deriveToken("fake-stranger-e2e-passphrase"));
+  const s = await device(browser, strangerServer);
+  await s.context.route("https://elsewhere.example.test/**", async (route) => {
+    const req = route.request();
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS });
+    const res = await strangerServer.fetch(req.url().replace("https://elsewhere.example.test", ADDRESS), { method: req.method(), headers: req.headers(), body: req.postData() ?? undefined });
+    return route.fulfill({ status: res.status, headers: { ...CORS, "content-type": "application/json" }, body: await res.text() });
+  });
+  await s.page.goto("/sync");
+  await s.page.getByLabel("Sync address").fill("https://elsewhere.example.test");
+  await s.page.getByLabel("Passphrase", { exact: true }).fill("fake-stranger-e2e-passphrase");
+  await s.page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(s.page.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(() => s.page.evaluate(async () => {
+      const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+      const { db } = await at("/src/data/db.ts");
+      return (await at("/src/journal/keyStore.ts")).confirmJournalKey(db);
+    }), { timeout: 30_000 })
+    .toBe("confirmed");
+  const strangerCode = await showCodeWithoutTyping(s.page);
+  await s.page.getByRole("button", { name: "Hide" }).click();
+
+  const state = (page: Page) => page.evaluate(async () => {
+    const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+    const { db } = await at("/src/data/db.ts");
+    const k = await db.syncMeta.get("journalKey");
+    return JSON.stringify({ token: (await db.syncMeta.get("token"))?.value, url: (await db.syncMeta.get("serverUrl"))?.value, fp: k?.value?.fp, cand: !!(await db.syncMeta.get("journalCandidate")) });
+  });
+
+  // Her Mac, given the stranger's code: refused in plain words; nothing changed, nothing sent there.
+  const before = await state(a.page);
+  const strangerAsked = strangerServer.syncRequests.length;
+  await a.page.getByLabel("Paste pairing code").fill(strangerCode);
+  await a.page.getByRole("button", { name: "Use pairing code" }).click();
+  await expect(a.page.getByText("That pairing code is for another sync address (https://elsewhere.example.test), so nothing was changed.")).toBeVisible();
+  await expect(a.page.getByRole("group", { name: "Sync address in the code" })).toHaveCount(0);
+  expect(await state(a.page)).toBe(before);
+  expect(strangerServer.syncRequests.length).toBe(strangerAsked);
+  await shoot(a.page, "pair-v2-refused-address");
+
+  // The stranger's device, given her code (her address, her journal): refused as well.
+  const sBefore = await state(s.page);
+  await s.page.getByLabel("Paste pairing code").fill(mine);
+  await s.page.getByRole("button", { name: "Use pairing code" }).click();
+  await expect(s.page.getByText("That pairing code is for another sync address (https://sync.example.test), so nothing was changed.")).toBeVisible();
+  expect(await state(s.page)).toBe(sBefore);
+
+  // Her own code on her own Mac: accepted, nothing new; her journal is still open and readable.
+  await a.page.getByLabel("Paste pairing code").fill(mine);
+  await a.page.getByRole("button", { name: "Use pairing code" }).click();
+  await expect(a.page.getByText("Saved.")).toBeVisible({ timeout: 20_000 });
+  expect(JSON.parse(await state(a.page)).fp).toBe(JSON.parse(before).fp);
+  await seesNote(a.page, STEADY_A);
+  await a.context.close();
+  await s.context.close();
 });

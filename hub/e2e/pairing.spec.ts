@@ -102,14 +102,14 @@ test("Sync page: after Save, Pair another device shows the pairing code; Hide an
   expect(box?.height).toBe(240);
   await expect(page.getByText("Anyone who scans this can open your Esmeworld. Only show it to your own devices.")).toBeVisible();
   const text = await decodeShownCode(page);
-  expect(text).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.https:\/\/sync\.example\.test$/);
+  expect(text).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.https:\/\/sync\.example\.test#$/);
   expect(text).not.toContain(PASS);
   expect(await page.content()).not.toContain(PASS);
   expect(await everythingKept(page)).not.toContain(PASS);
   expect(await everythingKept(page)).not.toContain(text.slice(18));
   await shoot(page, "pairing-desktop-code");
 
-  await expect(page.getByText(/^Hides in [01]:\d\d$/)).toBeVisible();
+  await expect(page.getByText(/^Hides in [012]:\d\d$/)).toBeVisible();
 
   // Hidden means gone from the screen; showing it again is another deliberate tap.
   const showAgain = async () => {
