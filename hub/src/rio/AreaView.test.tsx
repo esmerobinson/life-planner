@@ -89,6 +89,24 @@ describe("an area, outside and inside", () => {
     expect(onBack).toHaveBeenCalled();
   });
 
+  it("hovering a placed sticker names it and says what it's for, beside it (never over it)", async () => {
+    render(<AreaView area="fazenda" look="day" day={1} placed={["seeds-mind"]} onBack={() => undefined} />);
+    const sticker = document.querySelector<HTMLElement>('.rio-sticker[data-sticker="seeds-mind"]')!;
+    expect(sticker).not.toBeNull();
+    await userEvent.hover(sticker);
+    const tip = screen.getByRole("tooltip");
+    expect(tip).toHaveTextContent("Mind: seeds");
+    expect(tip).toHaveTextContent("1 to-do ticked off in Mind");
+    const side = tip.getAttribute("data-side");
+    expect(["right", "left"]).toContain(side);
+    const s = { left: parseFloat(sticker.style.left), width: parseFloat(sticker.style.width) };
+    const t = parseFloat(tip.style.left);
+    if (side === "right") expect(t).toBeGreaterThan(s.left + s.width);
+    else expect(t).toBeLessThan(s.left);
+    await userEvent.unhover(sticker);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
   it("names every sticker drawn, and says how many more wait in the book", () => {
     const beds = COLLECTION.filter((s) => s.group === "beds");
     render(<AreaView area="fazenda" look="day" day={1} placed={beds.map((s) => s.key)} onBack={() => undefined} />);

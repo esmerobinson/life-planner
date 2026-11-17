@@ -144,6 +144,10 @@ html:has(.app-shell.is-game) body {
   outline-offset: 0;
   box-shadow: inset 0 0 0 var(--art-px, 3px) #fff3d6;
 }
+/* A placed sticker's hover area (its 16x16 box): the tooltip names it. */
+.rio-ui .rio-sticker {
+  position: absolute;
+}
 .rio-ui .rio-tip {
   white-space: nowrap;
   pointer-events: none;

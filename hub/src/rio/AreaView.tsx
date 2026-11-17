@@ -5,7 +5,7 @@
 // foot y; in the rain the pack's falling rain plays over everything (not with reduced motion).
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { STICKER_BY_KEY } from "../farm/catalogue";
+import { STICKER_BY_KEY, hintFor } from "../farm/catalogue";
 import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d, drawFrame, drawSticker, useSheets } from "../farm/sprites";
 import { AREA_SCENES, sceneOpen } from "./areas";
@@ -87,6 +87,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   const enter = canEnter ?? ((s: SceneId) => sceneOpen(s, day));
   const doors = doorsFor(scene).filter((d) => d.to === null || d.to === "map" || enter(d.to));
   const [hoverDoor, setHoverDoor] = useState<string | null>(null);
+  const [hoverSticker, setHoverSticker] = useState<string | null>(null);
   const data = SCENES[scene];
   const reduced = useReducedMotion();
 
@@ -261,6 +262,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
     return { door: d, x: r.x - fit.x, y: r.y - fit.y, w: r.w, h: r.h };
   });
   const tipDoor = doorBoxes.find((b) => b.door.id === hoverDoor);
+  const tipSticker = drawn.find((d) => d.key === hoverSticker);
   const room = fit.y + (tipDoor?.y ?? 0) > 30 * u; // room above the door for its label
 
   return (
@@ -281,6 +283,23 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
               onFocus={() => setHoverDoor(d.id)} onBlur={() => setHoverDoor((h) => (h === d.id ? null : h))} />
           ))}
         </nav>
+        {/* Each placed sticker: hovering names it and says what it's for, beside it (Esme, 2026-11-17). */}
+        {drawn.map(({ slot, key }) => {
+          const [bx, by] = stickerBox(slot);
+          return (
+            <span key={key} className="rio-sticker" data-sticker={key} aria-hidden="true"
+              style={{ left: bx * scale, top: by * scale, width: STICKER * scale, height: STICKER * scale }}
+              onMouseEnter={() => setHoverSticker(key)} onMouseLeave={() => setHoverSticker((h) => (h === key ? null : h))} />
+          );
+        })}
+        {tipSticker && (() => {
+          const [bx, by] = stickerBox(tipSticker.slot);
+          const st = STICKER_BY_KEY.get(tipSticker.key)!;
+          // Right of the sticker, or left of it near the view's right edge.
+          const right = fit.x + (bx + STICKER) * scale + 140 * u < fit.view.w;
+          const at = { x: right ? (bx + STICKER) * scale + 2 * u : bx * scale - 2 * u, y: (by + STICKER / 2) * scale };
+          return <Tip lines={[st.name, hintFor(st)]} side={right ? "right" : "left"} at={at} />;
+        })()}
         {tipDoor && (
           <Tip lines={[tipDoor.door.label]} side={room ? "above" : "below"}
             at={{ x: tipDoor.x + tipDoor.w / 2, y: room ? tipDoor.y - 2 * u : tipDoor.y + tipDoor.h + 2 * u }} />
