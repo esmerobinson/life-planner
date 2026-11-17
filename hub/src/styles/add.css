@@ -157,3 +157,18 @@ button.add-fab {
 .quick-capture-more {
   margin: 0;
 }
+/* The quick box's Add button (Esme, 2026-11-17): the full form's own button (the plain primary
+   pill), just after the box on its row, lined up with the box. Placement provisional for Design. */
+.quick-capture-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.quick-capture-row > .quick-capture-field {
+  flex: 1;
+  min-width: 0;
+  margin: 0; /* as in a .form-row: the row lines the button up with the box itself */
+}
+.quick-capture-add {
+  flex: none;
+}
