@@ -12,13 +12,17 @@
 //   today:<date>         Today's list was seen finished that day (not derivable afterwards:
 //                        what was on a past day's list isn't kept)
 //   visited:<area>       she has opened that area of Esme's Rio (the map's NEW badge goes)
+//   hidden:<sticker>     she hid that placed sticker from its Rio scene (hidden: true), or showed it
+//                        again (false). Never deleted: it stays earned, placed and in the Collection
+//   spot:<sticker>       she moved that placed sticker to this slot of its scene (Esme, 2026-11-17:
+//                        "Items should be movable or deletable from scenes (hide) somehow")
 //
 // No database import here, so the change tracker and validators can use it without a cycle.
 
 import { isValidISODate } from "../domain/dates";
 import type { ISODate } from "../domain/types";
 
-export const FARM_KINDS = ["start", "seen", "placed", "arrived", "outfit", "today", "visited"] as const;
+export const FARM_KINDS = ["start", "seen", "placed", "arrived", "outfit", "today", "visited", "hidden", "spot"] as const;
 export type FarmKind = (typeof FARM_KINDS)[number];
 
 /** The six characters, in arrival order. */
@@ -37,10 +41,14 @@ export interface ArrivedRow extends Base { kind: "arrived"; character: Character
 export interface OutfitRow extends Base { kind: "outfit"; character: CharacterId; item: string | null }
 export interface TodayRow extends Base { kind: "today"; date: ISODate }
 export interface VisitedRow extends Base { kind: "visited"; area: string; date: ISODate }
-export type FarmRow = StartRow | SeenRow | PlacedRow | ArrivedRow | OutfitRow | TodayRow | VisitedRow;
+export interface HiddenRow extends Base { kind: "hidden"; sticker: string; hidden: boolean; date: ISODate }
+export interface SpotRow extends Base { kind: "spot"; sticker: string; slot: string; date: ISODate }
+export type FarmRow = StartRow | SeenRow | PlacedRow | ArrivedRow | OutfitRow | TodayRow | VisitedRow | HiddenRow | SpotRow;
 
 /** Sticker keys, spot ids and Rio area keys: lower-case words and dashes (a later pack may add more). */
 const KEY = /^[a-z0-9][a-z0-9-]{0,47}$/;
+/** A Rio scene's slot id, as the pack writes them (lower-case words, dashes or underscores). */
+const SLOT = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 /** Device ids, as the sync engine makes them. */
 const DEVICE = /^[A-Za-z0-9_-]{1,64}$/;
 /** Accessory codes in the art pack (A1–A11, H1–H7; a later pack may add more). */
@@ -81,6 +89,12 @@ export function validFarm(r: unknown): r is FarmRow {
     case "visited":
       return isStr(r.area) && KEY.test(r.area) && suffix === r.area && isDate(r.date) &&
         only(r, ["id", "kind", "area", "date", "updatedAt"]);
+    case "hidden":
+      return isStr(r.sticker) && KEY.test(r.sticker) && suffix === r.sticker && typeof r.hidden === "boolean" && isDate(r.date) &&
+        only(r, ["id", "kind", "sticker", "hidden", "date", "updatedAt"]);
+    case "spot":
+      return isStr(r.sticker) && KEY.test(r.sticker) && suffix === r.sticker && isStr(r.slot) && SLOT.test(r.slot) && isDate(r.date) &&
+        only(r, ["id", "kind", "sticker", "slot", "date", "updatedAt"]);
     default:
       return false;
   }
@@ -98,6 +112,8 @@ export const outfitRow = (character: CharacterId, item: string | null): OutfitRo
   ({ id: `outfit:${character}`, kind: "outfit", character, item });
 export const todayRow = (date: ISODate): TodayRow => ({ id: `today:${date}`, kind: "today", date });
 export const visitedRow = (area: string, date: ISODate): VisitedRow => ({ id: `visited:${area}`, kind: "visited", area, date });
+export const hiddenRow = (sticker: string, hidden: boolean, date: ISODate): HiddenRow => ({ id: `hidden:${sticker}`, kind: "hidden", sticker, hidden, date });
+export const spotRow = (sticker: string, slot: string, date: ISODate): SpotRow => ({ id: `spot:${sticker}`, kind: "spot", sticker, slot, date });
 
 // ---- the state, read from the rows ---------------------------------------------------------
 
@@ -115,10 +131,15 @@ export interface FarmState {
   todayDone: readonly ISODate[];
   /** Rio areas she has opened. */
   visited: ReadonlySet<string>;
+  /** Placed stickers she hid from their scene (still earned, placed and in the Collection). */
+  hidden: ReadonlySet<string>;
+  /** Placed sticker -> the slot she moved it to in its scene. */
+  spots: ReadonlyMap<string, string>;
 }
 
 export const EMPTY_FARM: FarmState = {
   start: null, seen: new Set(), seenOn: new Map(), placed: new Map(), arrived: new Set(), outfits: new Map(), todayDone: [], visited: new Set(),
+  hidden: new Set(), spots: new Map(),
 };
 
 /** The farm state from its rows (rows that aren't valid are ignored). */
@@ -131,6 +152,8 @@ export function farmState(rows: readonly unknown[]): FarmState {
   const outfits = new Map<CharacterId, string | null>();
   const todayDone: ISODate[] = [];
   const visited = new Set<string>();
+  const hidden = new Set<string>();
+  const spots = new Map<string, string>();
   for (const r of rows) {
     if (!validFarm(r)) continue;
     if (r.kind === "start") starts.push(r.date);
@@ -142,9 +165,11 @@ export function farmState(rows: readonly unknown[]): FarmState {
     else if (r.kind === "arrived") arrived.add(r.character);
     else if (r.kind === "outfit") outfits.set(r.character, r.item);
     else if (r.kind === "visited") visited.add(r.area);
+    else if (r.kind === "hidden") { if (r.hidden) hidden.add(r.sticker); }
+    else if (r.kind === "spot") spots.set(r.sticker, r.slot);
     else todayDone.push(r.date);
   }
   todayDone.sort();
   const start = starts.length ? starts.sort()[0]! : null;
-  return { start, seen, seenOn, placed, arrived, outfits, todayDone, visited };
+  return { start, seen, seenOn, placed, arrived, outfits, todayDone, visited, hidden, spots };
 }

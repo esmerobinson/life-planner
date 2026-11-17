@@ -14,10 +14,11 @@ import { AREA_HOTBAR_SLOTS, hotbarBox } from "./Hotbar";
 import { BOTECO_NIGHTS, SCENES, sceneBase, type BotecoNight, type Look, type SceneId } from "./assets";
 import { useCover, useRioImages } from "./canvas";
 import { doorKeep, sceneKeep, stickerBox } from "./mapMath";
-import { layout } from "./placement";
+import { freeSlotsFor, layout } from "./placement";
 import { NO_COUNTS, scenePlan, type RioCounts } from "./progress";
 import { drawTinted, tintFor } from "./tint";
 import { BitmapText } from "./ui/BitmapText";
+import { TextButton } from "./menu/pieces";
 import { useUi } from "./ui/fit";
 import { Tip } from "./ui/Tip";
 
@@ -61,7 +62,8 @@ const STICKER_SHEETS = ["stickers"];
 /** A tick for the themed nights' strips (each strip keeps its own speed from the elapsed time). */
 const NIGHT_TICK_MS = 40;
 
-export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, goal = false, onBack, canEnter, onOpenMenu, onVisit }: {
+export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, goal = false, onBack, canEnter, onOpenMenu, onVisit,
+  spots, editing = false, onHide, onMove, onEditDone }: {
   area: string;
   look: Look;
   /** The farm day: a scene that opens later (the sea, day 30) has no door before then. */
@@ -72,6 +74,14 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   onOpenMenu?: (tab: DoorMenu) => void;
   /** She stepped into another area's scene (the barraca from the beach): it counts as a visit. */
   onVisit?: (area: string) => void;
+  /** Stickers she moved: their slots (farm `spot` rows). */
+  spots?: ReadonlyMap<string, string>;
+  /** Edit mode (the hotbar's Arrange): pick a placed sticker, then a free slot for it, or Hide. */
+  editing?: boolean;
+  onHide?: (sticker: string) => void;
+  onMove?: (sticker: string, slot: string) => void;
+  /** Esc with nothing picked leaves edit mode. */
+  onEditDone?: () => void;
   /** Every placed sticker (book order); the scene picks its own. */
   placed: readonly string[];
   /** Her counters the new areas grow from (progress.ts). */
@@ -88,12 +98,36 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   const doors = doorsFor(scene).filter((d) => d.to === null || d.to === "map" || enter(d.to));
   const [hoverDoor, setHoverDoor] = useState<string | null>(null);
   const [hoverSticker, setHoverSticker] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   const data = SCENES[scene];
   const reduced = useReducedMotion();
 
   const plan = useMemo(() => scenePlan(scene, placed, counts), [scene, placed, counts]);
   const state = plan.state;
-  const { bySlot, overflow } = useMemo(() => layout(scene, placed, plan.milestones), [scene, placed, plan.milestones]);
+  const { bySlot, overflow } = useMemo(() => layout(scene, placed, plan.milestones, spots), [scene, placed, plan.milestones, spots]);
+  // Edit mode: where the picked sticker can go (the kit's place targets), and Esc to step back out.
+  const pick = editing && picked && [...bySlot.values()].includes(picked) ? picked : null;
+  const targets = useMemo(() => (pick ? freeSlotsFor(scene, pick, placed, plan.milestones, spots) : []), [pick, scene, placed, plan.milestones, spots]);
+  useEffect(() => {
+    if (!editing) {
+      setPicked(null);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      if (pick) setPicked(null);
+      else onEditDone?.();
+    };
+    // Capture: before the game's own Esc (which opens the menu).
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [editing, pick, onEditDone]);
+  const moveHere = (slot: string) => {
+    if (!pick) return;
+    onMove?.(pick, slot);
+    setPicked(null);
+  };
   const base = sceneBase(scene, state, look);
   const shownLook: Look = base === data.base[state]?.[look] ? look : "day";
   const inLook = (files: Partial<Record<Look, string>>) => files[shownLook] ?? files.day ?? "";
@@ -286,13 +320,37 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
         {/* Each placed sticker: hovering names it and says what it's for, beside it (Esme, 2026-11-17). */}
         {drawn.map(({ slot, key }) => {
           const [bx, by] = stickerBox(slot);
+          const box = { left: bx * scale, top: by * scale, width: STICKER * scale, height: STICKER * scale };
+          const hover = { onMouseEnter: () => setHoverSticker(key), onMouseLeave: () => setHoverSticker((h) => (h === key ? null : h)) };
+          if (!editing) return <span key={key} className="rio-sticker" data-sticker={key} aria-hidden="true" style={box} {...hover} />;
+          // PLACEHOLDER WORDING
           return (
-            <span key={key} className="rio-sticker" data-sticker={key} aria-hidden="true"
-              style={{ left: bx * scale, top: by * scale, width: STICKER * scale, height: STICKER * scale }}
-              onMouseEnter={() => setHoverSticker(key)} onMouseLeave={() => setHoverSticker((h) => (h === key ? null : h))} />
+            <button key={key} type="button" className={pick === key ? "rio-sticker on" : "rio-sticker"} data-sticker={key}
+              aria-label={`${STICKER_BY_KEY.get(key)?.name ?? key}: move or hide`} aria-pressed={pick === key} style={box} {...hover}
+              onPointerDown={() => setPicked(key)} onClick={() => setPicked(key)} />
           );
         })}
-        {tipSticker && (() => {
+        {/* The free slots it can go to: the kit's place target (its own pulse; still with reduced motion). */}
+        {targets.map((t) => {
+          const [bx, by] = stickerBox(t);
+          return (
+            // PLACEHOLDER WORDING
+            <button key={t.id} type="button" className="rio-target pulse" data-slot={t.id} aria-label={`Move ${STICKER_BY_KEY.get(pick!)?.name ?? pick} here`}
+              style={{ left: (bx - 1) * scale, top: (by - 1) * scale, width: 18 * scale, height: 18 * scale }}
+              onPointerUp={() => moveHere(t.id)} onClick={() => moveHere(t.id)} />
+          );
+        })}
+        {pick && (() => {
+          const d = drawn.find((x) => x.key === pick)!;
+          const [bx, by] = stickerBox(d.slot);
+          return (
+            <div className="rio-edit-actions" style={{ left: (bx + STICKER) * scale + 2 * u, top: by * scale, fontSize: `${u}px` }}>
+              {/* PLACEHOLDER WORDING */}
+              <TextButton label="Hide" onClick={() => { onHide?.(pick); setPicked(null); }} />
+            </div>
+          );
+        })()}
+        {tipSticker && tipSticker.key !== pick && (() => {
           const [bx, by] = stickerBox(tipSticker.slot);
           const st = STICKER_BY_KEY.get(tipSticker.key)!;
           // Right of the sticker, or left of it near the view's right edge.
@@ -305,6 +363,12 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
             at={{ x: tipDoor.x + tipDoor.w / 2, y: room ? tipDoor.y - 2 * u : tipDoor.y + tipDoor.h + 2 * u }} />
         )}
       </div>
+      {editing && (
+        <div className="rio-edit-note" style={{ fontSize: `${u}px` }}>
+          {/* PLACEHOLDER WORDING */}
+          <div className="thin flow" role="status"><BitmapText text={pick ? "Pick where it goes, or Hide it" : "Arranging: pick a sticker to move or hide"} /></div>
+        </div>
+      )}
       {/* PLACEHOLDER WORDING */}
       {overflow > 0 && (
         <div className="rio-area-note" style={{ fontSize: `${u}px` }}>

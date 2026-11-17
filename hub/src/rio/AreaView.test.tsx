@@ -2,6 +2,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { COLLECTION } from "../farm/catalogue";
 import * as hooks from "../farm/hooks";
+import { SCENES } from "./assets";
 import { layout } from "./placement";
 import { AreaView } from "./AreaView";
 
@@ -218,3 +219,61 @@ it("the goal moment plays in the stands at a full match only when asked (dev pre
   await userEvent.click(screen.getByRole("button", { name: "Stadium gates" }));
   expect(document.querySelector(".rio-area")).not.toHaveAttribute("data-goal"); // start: the goal is drawn for the full stands
 });
+
+describe("edit mode: move or hide a placed sticker (Esme, 2026-11-17)", () => {
+  const sticker = (k: string) => document.querySelector<HTMLElement>(`.rio-sticker[data-sticker="${k}"]`)!;
+
+  it("pick a sticker, then one of the free slots that takes it: it moves there", async () => {
+    const onMove = vi.fn();
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen", "cow"]} editing onMove={onMove} onBack={() => undefined} />);
+    expect(screen.queryByRole("button", { name: /Move Hen here/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Hen: move or hide" }));
+    const targets = screen.getAllByRole("button", { name: "Move Hen here" });
+    expect(targets.map((t) => t.getAttribute("data-slot"))).toEqual(["hen-2", "hen-3", "hen-4"]);
+    await userEvent.click(targets[1]!);
+    expect(onMove).toHaveBeenCalledWith("hen", "hen-3");
+    expect(screen.queryByRole("button", { name: "Move Hen here" })).toBeNull();
+  });
+
+  it("Hide hides the picked sticker (never deletes it)", async () => {
+    const onHide = vi.fn();
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} editing onHide={onHide} onBack={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "Hen: move or hide" }));
+    await userEvent.click(screen.getByRole("button", { name: "Hide" }));
+    expect(onHide).toHaveBeenCalledWith("hen");
+  });
+
+  it("a moved sticker stands on its chosen slot", () => {
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} spots={new Map([["hen", "hen-4"]])} onBack={() => undefined} />);
+    const four = layoutSlotX("hen-4");
+    expect(parseFloat(sticker("hen").style.left)).toBeCloseTo(four, 6);
+  });
+
+  it("Esc steps back: first the pick, then edit mode itself (before the game's own Esc opens the menu)", async () => {
+    const onEditDone = vi.fn();
+    const outer = vi.fn();
+    document.addEventListener("keydown", outer);
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} editing onEditDone={onEditDone} onBack={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "Hen: move or hide" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: "Move Hen here" })).toBeNull();
+    expect(onEditDone).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Escape}");
+    expect(onEditDone).toHaveBeenCalled();
+    expect(outer.mock.calls.every(([e]) => (e as KeyboardEvent).defaultPrevented)).toBe(true);
+    document.removeEventListener("keydown", outer);
+  });
+
+  it("out of edit mode, stickers aren't buttons", () => {
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} onBack={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "Hen: move or hide" })).toBeNull();
+  });
+});
+
+/** A fazenda slot's sticker box left edge, in the test DOM's scale (the scene's own pixels: scale 1). */
+function layoutSlotX(id: string): number {
+  const el = document.querySelector<HTMLElement>(".rio-area-layer")!;
+  const scale = parseFloat(el.style.width) / 512;
+  const slot = SCENES["fazenda/outside"].slots.find((s) => s.id === id)!;
+  return (slot.x - 8) * scale;
+}

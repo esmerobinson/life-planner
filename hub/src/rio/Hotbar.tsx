@@ -19,13 +19,20 @@ const SLOTS: { tab: MenuTab; icon: string; label: string }[] = [
 
 /** The hotbar's size in UI px (slots across, the thin frame, 2 above the game's bottom edge). */
 export const hotbarBox = (slots: number) => ({ w: slots * 16 + 6, h: 22, below: 2 });
-/** Slots in an area (the same as on the map). */
-export const AREA_HOTBAR_SLOTS = SLOTS.length;
+/** Slots in an area: the menu's, and Arrange. */
+export const AREA_HOTBAR_SLOTS = SLOTS.length + 1;
 
-export function Hotbar({ current, onPick }: { current: MenuTab | null; onPick: (t: MenuTab) => void }) {
+/**
+ * `arrange` (in an area): one more slot, the kit's hammer, that turns edit mode on and off for the
+ * scene (Esme, 2026-11-17: "Items should be movable or deletable from scenes (hide) somehow").
+ */
+export function Hotbar({ current, onPick, arrange }: {
+  current: MenuTab | null; onPick: (t: MenuTab) => void; arrange?: { on: boolean; toggle: () => void };
+}) {
   const { u } = useUi();
-  const w = SLOTS.length * 16 + 6;
-  const sel = SLOTS.findIndex((s) => s.tab === current);
+  const n = SLOTS.length + (arrange ? 1 : 0);
+  const w = n * 16 + 6;
+  const sel = arrange?.on ? SLOTS.length : SLOTS.findIndex((s) => s.tab === current);
   return (
     <div className="rio-hud-bottom">
       <nav className="rio-hotbar" aria-label="Game menu" style={{ fontSize: `${u}px`, width: em(w), height: em(22) }}>
@@ -36,6 +43,13 @@ export function Hotbar({ current, onPick }: { current: MenuTab | null; onPick: (
             <KitIcon name={s.icon} x={2} y={2} />
           </button>
         ))}
+        {arrange && (
+          // PLACEHOLDER WORDING
+          <button type="button" className="slot hb" aria-label="Arrange" title="Arrange: move or hide what's here" aria-pressed={arrange.on}
+            style={pos(3 + SLOTS.length * 16, 3)} onClick={arrange.toggle}>
+            <KitIcon name="extra-s-hammer" x={2} y={2} />
+          </button>
+        )}
         {sel >= 0 && <div className="selq" aria-hidden="true" style={pos(3 + sel * 16, 3)} />}
       </nav>
     </div>

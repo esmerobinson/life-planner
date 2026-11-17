@@ -1,8 +1,8 @@
 // Esme's Rio: where each earned sticker sits. A phase-1 sticker's zone maps to the area that took
 // it over (rio-design.md, "Nothing is lost"); inside its scene, placed stickers take, in book
-// order, the first free slot whose `accepts` (the pack's tags) takes them, one per slot. Nothing
-// about a slot is stored: the old phase-1 spot id is never read, so the move needs no migration
-// and nothing can be lost by it.
+// order, the first free slot whose `accepts` (the pack's tags) takes them, one per slot. The old
+// phase-1 spot id is never read, so the move needs no migration and nothing can be lost by it;
+// the one slot ever stored is where she moved a sticker herself (a farm `spot` row, edit mode).
 
 import { STICKER_BY_KEY } from "../farm/catalogue";
 import { SCENES, type SceneId, type Slot } from "./assets";
@@ -118,15 +118,29 @@ export const slotsIn = (scene: SceneId, state: string, milestones: readonly stri
 /**
  * The scene's own placed stickers (of `placed`, any order) in book order, each in the first free
  * slot (slot order) that takes it; `overflow` is how many found no slot (they stay in the book).
+ * `spots` (a sticker she moved: its slot) come first, where that slot is free in this state and
+ * takes the sticker; a spot that isn't (a slot gone, taken, or the wrong kind) is ignored and the
+ * sticker takes its usual place, so a move can never lose one.
  */
-export function layout(scene: SceneId, placed: readonly string[], milestones: readonly string[] = []): { bySlot: Map<string, string>; overflow: number } {
+export function layout(scene: SceneId, placed: readonly string[], milestones: readonly string[] = [],
+  spots: ReadonlyMap<string, string> = NO_SPOTS): { bySlot: Map<string, string>; overflow: number } {
   const mine = placed
     .filter((k) => homeOf(k)?.scene === scene)
     .sort((a, b) => STICKER_BY_KEY.get(a)!.index - STICKER_BY_KEY.get(b)!.index);
   const free = slotsIn(scene, sceneState(scene, mine.length), milestones);
   const bySlot = new Map<string, string>();
+  const laid = new Set<string>();
+  for (const k of mine) {
+    const want = spots.get(k);
+    const slot = want ? free.find((s) => s.id === want) : undefined;
+    if (slot && !bySlot.has(slot.id) && accepts(slot, stickerTags(k))) {
+      bySlot.set(slot.id, k);
+      laid.add(k);
+    }
+  }
   let overflow = 0;
   for (const k of mine) {
+    if (laid.has(k)) continue;
     const tags = stickerTags(k);
     const open = (s: Slot) => !bySlot.has(s.id) && accepts(s, tags);
     const slot = (KIND_FIRST.has(scene) ? free.find((s) => open(s) && tags.includes(s.accepts[0]!)) : undefined) ?? free.find(open);
@@ -134,4 +148,15 @@ export function layout(scene: SceneId, placed: readonly string[], milestones: re
     else overflow++;
   }
   return { bySlot, overflow };
+}
+
+const NO_SPOTS: ReadonlyMap<string, string> = new Map();
+
+/** Where a placed sticker can move in its scene: the free slots there that take it (its own and taken ones left out). */
+export function freeSlotsFor(scene: SceneId, sticker: string, placed: readonly string[], milestones: readonly string[] = [],
+  spots: ReadonlyMap<string, string> = NO_SPOTS): Slot[] {
+  const { bySlot } = layout(scene, placed, milestones, spots);
+  const mine = placed.filter((k) => homeOf(k)?.scene === scene).length;
+  const tags = stickerTags(sticker);
+  return slotsIn(scene, sceneState(scene, mine), milestones).filter((s) => !bySlot.has(s.id) && accepts(s, tags));
 }

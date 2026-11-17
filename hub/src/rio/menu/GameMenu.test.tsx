@@ -25,7 +25,7 @@ function fakeView(o: { earned?: string[]; placed?: string[]; seenOn?: [string, s
     arrived: new Set(["domino"]), awake: new Set(), unlocked: [], queue: [], journalOpen: false, farmZones: [], setFarmZones: () => undefined,
     glint: false, clearGlint: () => undefined, ensureStart: async () => undefined, markSeen: async () => undefined,
     place: o.place ?? vi.fn(async () => undefined), markArrived: async () => undefined, setOutfit: async () => undefined,
-    markVisited: async () => undefined,
+    markVisited: async () => undefined, setHidden: vi.fn(async () => undefined), moveTo: async () => undefined,
   };
 }
 
@@ -228,4 +228,18 @@ it("a click outside the panel closes it (the dim, or the stage's empty corners);
   expect(onClose).toHaveBeenCalledTimes(1);
   await user.click(document.querySelector(".rio-menu-dim")!);
   expect(onClose).toHaveBeenCalledTimes(2);
+});
+
+it("a sticker hidden from its scene says so in the Collection and can be shown again from there (never lost)", async () => {
+  const user = userEvent.setup();
+  const view = fakeView({ earned: ["hen"], placed: ["hen"] });
+  const v = { ...view, state: { ...view.state, hidden: new Set(["hen"]) } };
+  render(<Menu view={v} />);
+  await user.click(screen.getByRole("tab", { name: "Fazenda" }));
+  await user.click(screen.getByRole("button", { name: "Next page" }));
+  await user.click(screen.getByRole("button", { name: "Hen: placed in Rio" }));
+  const card = screen.getByRole("dialog", { name: "Hen" });
+  expect(card).toHaveTextContent("Hidden");
+  await user.click(within(card).getByRole("button", { name: "Show in Rio" }));
+  expect(v.setHidden).toHaveBeenCalledWith("hen", false);
 });

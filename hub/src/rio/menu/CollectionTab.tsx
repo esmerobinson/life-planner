@@ -195,7 +195,14 @@ function Card({ view, stickerKey, state, times, placeable, narrow, cell, inner, 
       <i className="tipdiv" aria-hidden="true" />
       <BitmapText text={hintFor(st)} w={textW} />
       {/* PLACEHOLDER WORDING (the card's status lines) */}
-      {state === "placed" && <BitmapText text="Placed in Rio" colour={INK.green} w={textW} />}
+      {state === "placed" && !view.state.hidden.has(stickerKey) && <BitmapText text="Placed in Rio" colour={INK.green} w={textW} />}
+      {/* Hidden from its scene (edit mode), never lost: shown again from here. */}
+      {state === "placed" && view.state.hidden.has(stickerKey) && (
+        <div className="tip-row">
+          <TextButton label="Show in Rio" onClick={() => void view.setHidden(stickerKey, false).catch(() => undefined)} />
+          <BitmapText text="Hidden" colour={INK.brown} />
+        </div>
+      )}
       {times >= 2 && <BitmapText text={`Earned ×${times}`} colour={INK.green} w={textW} />}
       {state === "ghost" && <BitmapText text="Not yet" colour={INK.brown} w={textW} />}
       {state === "ready" && placeable && (

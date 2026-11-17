@@ -59,7 +59,11 @@ export function FarmPage() {
   const visited = view?.state.visited;
   const statuses = useMemo(() => areaStatuses(day, visited ?? new Set()), [day, visited]);
   const placed = view?.state.placed;
-  const placedKeys = useMemo(() => STICKERS.filter((s) => placed?.has(s.key)).map((s) => s.key), [placed]);
+  const hidden = view?.state.hidden;
+  // A sticker she hid stays placed and in the Collection; the scene leaves it out.
+  const placedKeys = useMemo(() => STICKERS.filter((s) => placed?.has(s.key) && !hidden?.has(s.key)).map((s) => s.key), [placed, hidden]);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [area]);
   const canPlace = useCallback((key: string) => {
     const home = homeOf(key);
     const s = home ? statuses.get(home.area) : undefined;
@@ -175,7 +179,9 @@ export function FarmPage() {
       <div className="rio-wrap">
         {area
           ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} counts={counts} night={night} goal={goal} onBack={() => setArea(null)}
-            canEnter={canEnter} onOpenMenu={openMenu} onVisit={visit} />
+            canEnter={canEnter} onOpenMenu={openMenu} onVisit={visit} spots={view.state.spots} editing={editing && !menu}
+            onHide={(k) => void view.setHidden(k, true).catch(() => undefined)} onMove={(k, slot) => void view.moveTo(k, slot).catch(() => undefined)}
+            onEditDone={() => setEditing(false)} />
           : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
       </div>
       {/* Top centre: arrivals and earned stickers (the nook box is not on the game screen; Esme, 2026-11-17). */}
@@ -183,7 +189,7 @@ export function FarmPage() {
         {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}
         {view.loaded && view.state.start && <GameMoments queue={view.queue} markSeen={view.markSeen} />}
       </TopPopups>
-      <Hotbar current={menu ?? (area ? null : "map")} onPick={openMenu} />
+      <Hotbar current={menu ?? (area ? null : "map")} onPick={openMenu} arrange={area ? { on: editing, toggle: () => setEditing((e) => !e) } : undefined} />
       {/* Only once the game has started and its rows are read: the notes and counts are then true. */}
       {menu && view.loaded && view.state.start && (
         <GameMenu view={view} tab={menu} onTab={openMenu} onClose={closeMenu} canPlace={canPlace} day={day} statuses={statuses}

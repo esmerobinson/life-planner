@@ -21,9 +21,9 @@ it("every kit piece the menu uses is bundled, with its size", () => {
   expect(KIT.panel!.slice).toEqual([6, 7, 6, 6]);
 });
 
-it("only the kit's own pieces were copied (no screen-specific extras, no review files)", () => {
+it("only the kit's own pieces were copied (no screen-specific extras but the ones the game uses, no review files)", () => {
   const files = readdirSync("src/assets/rio-ui/kit");
-  expect(files.some((f) => f.startsWith("extra-"))).toBe(false);
+  expect(files.filter((f) => f.startsWith("extra-"))).toEqual(["extra-s-hammer.png"]);
   expect(files.some((f) => /review|preview|sample/i.test(f))).toBe(false);
 });
 
@@ -54,4 +54,8 @@ it("the menu's gear and recipe-book tab icons are bundled (rio-pack tab-icons), 
   }
   expect(MENU_TABS.every((t) => t.icon && KIT[t.icon])).toBe(true);
   expect(readdirSync("src/assets/rio-ui/tab-icons").sort()).toEqual(["ic-tab-recipes.png", "ic-tab-settings.png"]);
+});
+
+it("the hotbar's Arrange hammer is bundled (one of the kit's extra pieces the game uses)", () => {
+  expect(kitUrl("extra-s-hammer")).not.toBe("");
 });

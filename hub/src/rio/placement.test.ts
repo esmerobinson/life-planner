@@ -1,7 +1,7 @@
 import { COLLECTION, STICKERS } from "../farm/catalogue";
 import { farmState, placedRow } from "../farm/state";
 import { SCENES } from "./assets";
-import { HOME, accepts, homeOf, layout, sceneState, slotsIn, stickerTags } from "./placement";
+import { HOME, accepts, freeSlotsFor, homeOf, layout, sceneState, slotsIn, stickerTags } from "./placement";
 
 const keysIn = (group: string) => COLLECTION.filter((s) => s.group === group).map((s) => s.key);
 
@@ -182,5 +182,35 @@ describe("where earned stickers sit", () => {
     expect(sceneState("ipanema-beach/outside", Math.ceil(m / 3))).toBe("stage2");
     expect(sceneState("ipanema-beach/outside", m)).toBe("stage3");
     expect(sceneState("ipanema-beach/outside", m + 5)).toBe("stage3");
+  });
+});
+
+describe("moving a placed sticker (Esme, 2026-11-17: \"Items should be movable\")", () => {
+  it("a sticker's chosen slot comes first; the rest fill the free slots in book order", () => {
+    const plain = layout("fazenda/outside", ["hen", "cow"]);
+    expect(plain.bySlot.get("hen-1")).toBe("hen");
+    expect(plain.bySlot.get("cow-1")).toBe("cow");
+    const moved = layout("fazenda/outside", ["hen", "cow"], [], new Map([["hen", "hen-3"], ["cow", "cow-2"]]));
+    expect(moved.bySlot.get("hen-3")).toBe("hen");
+    expect(moved.bySlot.get("cow-2")).toBe("cow");
+    expect(moved.bySlot.has("hen-1")).toBe(false);
+  });
+
+  it("a chosen slot that's gone, taken, or doesn't take the sticker is ignored: it falls back to book order, never vanishes", () => {
+    for (const slot of ["no-such-slot", "cow-1"]) {
+      const l = layout("fazenda/outside", ["hen"], [], new Map([["hen", slot]]));
+      expect([...l.bySlot.values()], slot).toEqual(["hen"]);
+      expect(l.bySlot.get("hen-1")).toBe("hen");
+    }
+    // Two stickers chose the same slot: the first in book order keeps it, the other goes to the next free one.
+    const both = layout("fazenda/outside", ["hen", "chick"].filter((k) => k === "hen"), [], new Map([["hen", "hen-2"]]));
+    expect(both.bySlot.get("hen-2")).toBe("hen");
+  });
+
+  it("where a placed sticker can move: the free slots of its scene that take it (not its own, not taken)", () => {
+    const placed = ["hen", "cow"];
+    expect(freeSlotsFor("fazenda/outside", "hen", placed).map((s) => s.id)).toEqual(["hen-2", "hen-3", "hen-4"]);
+    expect(freeSlotsFor("fazenda/outside", "cow", placed).map((s) => s.id)).toEqual(["cow-2"]);
+    expect(freeSlotsFor("fazenda/outside", "cow", placed, [], new Map([["cow", "cow-2"]])).map((s) => s.id)).toEqual(["cow-1"]);
   });
 });

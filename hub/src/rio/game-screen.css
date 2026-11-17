@@ -155,6 +155,59 @@ html:has(.app-shell.is-game) body {
 .rio-ui .rio-sticker {
   position: absolute;
 }
+/* Edit mode (the hotbar's Arrange): each placed sticker is a button; the picked one wears the
+   doors' two-tone line; the free slots it can go to wear the kit's place target, pulsing as the
+   kit's own .pulse (none with reduced motion). */
+.rio-ui button.rio-sticker {
+  box-sizing: border-box;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: grab;
+}
+.rio-ui button.rio-sticker:hover,
+.rio-ui button.rio-sticker:focus-visible,
+.rio-ui button.rio-sticker.on {
+  outline: var(--art-px, 3px) solid #56160c;
+  box-shadow: inset 0 0 0 var(--art-px, 3px) #fff3d6;
+}
+.rio-ui .rio-target {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: var(--k-place-target) 0 0 / 100% 100% no-repeat;
+  cursor: pointer;
+}
+.rio-ui .rio-target:focus-visible {
+  outline: var(--art-px, 3px) solid #fff3d6;
+}
+.rio-ui .pulse {
+  animation: rio-pulse 1s ease-in-out infinite;
+}
+@keyframes rio-pulse {
+  50% {
+    transform: scale(1.12);
+    opacity: 0.7;
+  }
+}
+.rio-ui.is-still .pulse {
+  animation: none;
+}
+.rio-ui .rio-edit-actions {
+  position: absolute;
+  z-index: 3;
+}
+.rio-edit-note {
+  position: absolute;
+  top: 22em;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 19;
+}
+
 .rio-ui .rio-tip {
   white-space: nowrap;
   pointer-events: none;
