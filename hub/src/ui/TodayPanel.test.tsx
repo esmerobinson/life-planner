@@ -44,8 +44,8 @@ function watchUnhandled() {
   return { seen, stop: () => proc.off("unhandledRejection", seen) };
 }
 
-/** Provisional wording (was "Also due"), for Esme / Design. */
-const DROPDOWN = "Due in the next few days";
+/** The fold-out's list name; its summary reads "Coming up (N)" (Esme's pick A, 2026-11-17). */
+const DROPDOWN = "Coming up";
 
 describe("TodayPanel", () => {
   it("overdue and due-today things are all on the list, never hidden in the dropdown (Esme, 2026-11-06)", async () => {
@@ -55,7 +55,7 @@ describe("TodayPanel", () => {
     const main = await screen.findByRole("list", { name: "Today" });
     expect(within(main).getAllByRole("listitem")).toHaveLength(7);
     expect(within(main).getByText("Added for today")).toBeInTheDocument();
-    expect(screen.queryByText(DROPDOWN)).toBeNull();
+    expect(screen.queryByText(/^Coming up/)).toBeNull();
   });
 
   it("shows up to 4 and keeps things due in the next few days in a closed dropdown", async () => {
@@ -63,7 +63,7 @@ describe("TodayPanel", () => {
     render(<TodayPanel today={TODAY} />);
     const main = await screen.findByRole("list", { name: "Today" });
     expect(within(main).getAllByRole("listitem")).toHaveLength(4);
-    const also = screen.getByText(DROPDOWN).closest("details")!;
+    const also = screen.getByText("Coming up (3)").closest("details")!;
     expect(also).not.toHaveAttribute("open");
     expect(within(also).getAllByRole("listitem")).toHaveLength(3);
     for (let i = 1; i <= 7; i++) {
