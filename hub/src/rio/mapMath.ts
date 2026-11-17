@@ -79,10 +79,24 @@ export const MAP_KEEP: Rect = within(
   RIO_MAP.canvas,
 );
 
-/** What an area scene may never trim: its sticker slots, a 16x16 sticker on each (the whole scene if none). */
-export function sceneKeep(slots: readonly { x: number; y: number; anchor?: string }[], scene: [number, number]): Rect {
-  if (slots.length === 0) return [0, 0, scene[0], scene[1]];
-  return within(union(slots.map((s): Rect => [s.x - 8, s.anchor === "top" ? s.y : s.y - 16, 16, 16])), scene);
+/** The 16x16 box of a sticker standing on a slot (foot point bottom-centre, or top-centre). */
+export const stickerBox = (s: { x: number; y: number; anchor?: string }): Rect => [s.x - 8, s.anchor === "top" ? s.y : s.y - 16, 16, 16];
+
+/** The part of a door that must stay on screen: its middle, at most 24x24 (a strip-wide exit can't stop a scene covering the view). */
+export function doorKeep([x, y, w, h]: Rect): Rect {
+  const kw = Math.min(w, 24);
+  const kh = Math.min(h, 24);
+  return [x + Math.floor((w - kw) / 2), y + Math.floor((h - kh) / 2), kw, kh];
+}
+
+/**
+ * What an area scene may never trim (Esme, 2026-11-17: every scene fills the game screen, nothing
+ * that matters cut): what is drawn there, its placed stickers' boxes and its doors' middles (free
+ * slots hold nothing). Nothing at all: the scene's middle, so it simply covers the view centred.
+ */
+export function sceneKeep(boxes: readonly Rect[], scene: [number, number]): Rect {
+  if (boxes.length === 0) return [scene[0] / 2, scene[1] / 2, 0, 0];
+  return within(union(boxes), scene);
 }
 
 export interface Cover { scale: number; x: number; y: number; mode: "cover" | "fit" }
@@ -103,8 +117,10 @@ function fractionalFit(box: { w: number; h: number }, canvas: [number, number], 
   const ah = canvas[1] * s;
   const place = (view: number, art: number, k0: number, k1: number): number => {
     if (art < view) return Math.round(((view - art) / 2) * d) / d; // the whole art, centred
-    const lo = Math.max(view - art, view - k1 * s);
-    const hi = Math.min(0, -k0 * s);
+    // Covering the view (offset <= 0, offset + art >= view) with `keep` inside it
+    // (offset + k0 s >= 0, offset + k1 s <= view).
+    const lo = Math.max(view - art, -k0 * s);
+    const hi = Math.min(0, view - k1 * s);
     const centred = Math.round((view / 2 - ((k0 + k1) / 2) * s) * d) / d;
     return Math.min(hi, Math.max(lo, centred));
   };
@@ -130,8 +146,8 @@ export function coverFit(box: { w: number; h: number }, canvas: [number, number]
   if (box.w > 0 && box.h > 0 && aw >= box.w - EPS && ah >= box.h - EPS) {
     // The offsets that keep the art covering the view and `keep` inside it, on the device grid.
     const place = (view: number, art: number, k0: number, k1: number): number | null => {
-      const lo = Math.ceil(Math.max(view - art, view - k1 * s) * d - EPS) / d;
-      const hi = Math.floor(Math.min(0, -k0 * s) * d + EPS) / d;
+      const lo = Math.ceil(Math.max(view - art, -k0 * s) * d - EPS) / d;
+      const hi = Math.floor(Math.min(0, view - k1 * s) * d + EPS) / d;
       if (lo > hi) return null;
       const centred = Math.round((view / 2 - ((k0 + k1) / 2) * s) * d) / d;
       return Math.min(hi, Math.max(lo, centred));

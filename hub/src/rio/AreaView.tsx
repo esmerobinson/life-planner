@@ -10,7 +10,7 @@ import { ctx2d, drawFrame, drawSticker, useSheets } from "../farm/sprites";
 import { AREA_SCENES, sceneOpen } from "./areas";
 import { BOTECO_NIGHTS, SCENES, sceneBase, type BotecoNight, type Look, type SceneId } from "./assets";
 import { useCover, useRioImages } from "./canvas";
-import { sceneKeep } from "./mapMath";
+import { sceneKeep, stickerBox } from "./mapMath";
 import { TextButton } from "./menu/pieces";
 import { layout } from "./placement";
 import { NO_COUNTS, scenePlan, type RioCounts } from "./progress";
@@ -127,10 +127,6 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
 
   const wrap = useRef<HTMLDivElement>(null);
   const { u, layout: uiLayout } = useUi();
-  // The buttons sit on top of the game; the scene covers the view, never trimming a sticker slot.
-  const keep = useMemo(() => sceneKeep(data.slots, data.scene), [data]);
-  const fit = useCover(wrap, data.scene, keep, uiLayout === "wide");
-  const scale = fit.scale;
   const canvas = useRef<HTMLCanvasElement>(null);
 
   const drawn = useMemo(() => {
@@ -139,6 +135,12 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
       .map(([slot, key]) => ({ slot: at.get(slot)!, key }))
       .sort((a, b) => a.slot.y - b.slot.y || a.slot.x - b.slot.x);
   }, [bySlot, data]);
+
+  // The scene covers the view (an even plank border), never trimming what's drawn there.
+  const [kx, ky, kw, kh] = sceneKeep(drawn.map((d) => stickerBox(d.slot)), data.scene);
+  const keep = useMemo((): [number, number, number, number] => [kx, ky, kw, kh], [kx, ky, kw, kh]);
+  const fit = useCover(wrap, data.scene, keep, uiLayout === "wide");
+  const scale = fit.scale;
 
   useEffect(() => {
     const ctx = ctx2d(canvas.current);

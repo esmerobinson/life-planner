@@ -1,5 +1,5 @@
 import { RIO_MAP } from "./assets";
-import { MAP_KEEP, coverFit, fitScale, hitPlace, sceneKeep } from "./mapMath";
+import { MAP_KEEP, coverFit, fitScale, hitPlace, doorKeep, sceneKeep, stickerBox } from "./mapMath";
 
 const CANVAS: [number, number] = [896, 504];
 
@@ -133,10 +133,16 @@ describe("coverFit: an even border, never trimming what matters (Esme, 2026-11-1
     }
   });
 
-  it("a scene's keep region is its sticker slots", () => {
-    const k = sceneKeep([{ x: 40, y: 60 }, { x: 100, y: 30 }], [320, 180]);
+  it("a scene's keep region is what's drawn there: its stickers and the middle of each door", () => {
+    const k = sceneKeep([stickerBox({ x: 40, y: 60 }), stickerBox({ x: 100, y: 30 })], [320, 180]);
     expect(k).toEqual([32, 14, 76, 46]);
-    expect(sceneKeep([], [320, 180])).toEqual([0, 0, 320, 180]);
+    // A strip-wide exit only keeps its middle (it can't stop the scene covering the view).
+    expect(doorKeep([0, 200, 384, 40])).toEqual([180, 208, 24, 24]);
+    expect(doorKeep([196, 96, 10, 54])).toEqual([196, 111, 10, 24]);
+    // Nothing drawn: the middle of the scene.
+    expect(sceneKeep([], [320, 180])).toEqual([160, 90, 0, 0]);
+    // Kept to the art.
+    expect(sceneKeep([stickerBox({ x: 2, y: 4 })], [320, 180])).toEqual([0, 0, 10, 4]);
   });
 });
 
@@ -169,6 +175,33 @@ describe("coverFit, fractional (desktop; Esme 2026-11-17: \"a bit bigger and bor
     const f = coverFit({ w: 1000, h: 600 }, [320, 180], [150, 80, 16, 16], 2, true);
     expect(f.scale).toBeCloseTo(Math.max(1000 / 320, 600 / 180), 9);
     expect(f.mode).toBe("cover");
+  });
+
+  // Esme, 2026-11-17 ("store appearing like this, same with zona sul not full screen"): a protected
+  // area smaller than the view left planks below and to the right (its bounds were swapped).
+  it.each([[[150, 110, 60, 40]], [[10, 10, 30, 30]], [[300, 190, 60, 40]]] as const)(
+    "a scene covers the view whole, its protected area %j inside", (keep) => {
+      const box = { w: 1416, h: 876 };
+      const f = coverFit(box, [384, 240], [...keep], 1, true);
+      expect(f.mode).toBe("cover");
+      expect(f.x).toBeLessThanOrEqual(1e-6);
+      expect(f.y).toBeLessThanOrEqual(1e-6);
+      expect(f.x + 384 * f.scale).toBeGreaterThanOrEqual(box.w - 1e-6);
+      expect(f.y + 240 * f.scale).toBeGreaterThanOrEqual(box.h - 1e-6);
+      const [kx, ky, kw, kh] = keep;
+      expect(f.x + kx * f.scale).toBeGreaterThanOrEqual(-1e-6);
+      expect(f.y + ky * f.scale).toBeGreaterThanOrEqual(-1e-6);
+      expect(f.x + (kx + kw) * f.scale).toBeLessThanOrEqual(box.w + 1e-6);
+      expect(f.y + (ky + kh) * f.scale).toBeLessThanOrEqual(box.h + 1e-6);
+    });
+
+  it("the phone's crisp cover keeps a small protected area inside too", () => {
+    const f = coverFit({ w: 375, h: 600 }, [384, 240], [300, 190, 40, 40], 2);
+    const [kx, ky, kw, kh] = [300, 190, 40, 40];
+    expect(f.x + kx * f.scale).toBeGreaterThanOrEqual(-1e-6);
+    expect(f.x + (kx + kw) * f.scale).toBeLessThanOrEqual(375 + 1e-6);
+    expect(f.y + ky * f.scale).toBeGreaterThanOrEqual(-1e-6);
+    expect(f.y + (ky + kh) * f.scale).toBeLessThanOrEqual(600 + 1e-6);
   });
 
   it("an empty box or protected area doesn't break it", () => {
