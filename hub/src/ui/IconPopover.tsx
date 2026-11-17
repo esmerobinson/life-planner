@@ -22,6 +22,24 @@ export const REPEAT_GLYPH = (
   </svg>
 );
 
+/* "More" dots (app design queue, 2026-11-17, Esme's pick A for Repeating rows): copied from
+   that mockup's {{DOTS}} glyph, three 0.9 dots on the 16px box, currentColor. */
+export const DOTS_GLYPH = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true" focusable="false">
+    <circle cx="3.5" cy="8" r=".9" fill="currentColor" />
+    <circle cx="8" cy="8" r=".9" fill="currentColor" />
+    <circle cx="12.5" cy="8" r=".9" fill="currentColor" />
+  </svg>
+);
+
+/* Bin (app design queue, 2026-11-17, Esme's pick A for the goal panel's Delete pill): copied
+   from that mockup's {{BIN}} glyph, 16px box, 1.6 stroke, currentColor. */
+export const BIN_GLYPH = (
+  <svg className="pill-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M2 4h12M6 4V2h4v2M3.5 4l.8 10h7.4l.8-10M6.5 7v4.5M9.5 7v4.5" />
+  </svg>
+);
+
 /* Milestone flag (round 3): drawn by the implementer in the calendar/arrow style (16px
    box, 1.6 stroke, currentColor); the drawing is unreviewed. */
 export const FLAG_GLYPH = (

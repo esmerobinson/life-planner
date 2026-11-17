@@ -132,6 +132,9 @@ describe("the Repeating page", () => {
     ]);
     const stretch = screen.getByText("Pretend stretch").closest("li")!;
     expect(within(stretch).getByText("Mondays, Wednesdays and Fridays")).toBeInTheDocument();
+    // Stop repeating and Delete wait in the row's "…" menu (Esme's pick 1·2 A, 2026-11-17).
+    expect(within(stretch).queryByRole("button", { name: "Stop repeating: Pretend stretch" })).toBeNull();
+    await userEvent.click(within(stretch).getByRole("button", { name: "More: Pretend stretch" }));
     expect(within(stretch).getByRole("button", { name: "Stop repeating: Pretend stretch" })).toBeInTheDocument();
     expect(within(stretch).getByRole("button", { name: "Delete: Pretend stretch" })).toBeInTheDocument();
     expect(screen.queryByText("Pretend one-off")).toBeNull();
@@ -147,16 +150,18 @@ describe("the Repeating page", () => {
   it("Stop repeating takes the row off the list and keeps the item; Undo brings the row back", async () => {
     const h = await mk("Pretend stretch", "body", ["mon"], { doneDates: ["2026-11-03"] });
     renderApp("/repeating", TODAY);
+    await openMenu("Pretend stretch");
     await userEvent.click(await screen.findByRole("button", { name: "Stop repeating: Pretend stretch" }));
-    await vi.waitFor(() => expect(screen.queryByRole("button", { name: "Stop repeating: Pretend stretch" })).toBeNull());
+    await vi.waitFor(() => expect(screen.queryByRole("button", { name: "More: Pretend stretch" })).toBeNull());
     expect(await db.items.get(h.id)).toMatchObject({ areaId: "body", status: "open", doneDates: ["2026-11-03"] });
     await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
-    expect(await screen.findByRole("button", { name: "Stop repeating: Pretend stretch" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "More: Pretend stretch" })).toBeInTheDocument();
   });
 
   it("Delete moves it to the Bin with Undo", async () => {
     const h = await mk("Pretend stretch", "body", ["mon"]);
     renderApp("/repeating", TODAY);
+    await openMenu("Pretend stretch");
     await userEvent.click(await screen.findByRole("button", { name: "Delete: Pretend stretch" }));
     await vi.waitFor(async () => expect((await db.items.get(h.id))!.status).toBe("deleted"));
     await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
@@ -176,9 +181,103 @@ describe("the Repeating page", () => {
     const h = await mk("Pretend stretch", "body", ["mon", "wed"]);
     await tickItem(h.id, TODAY);
     renderApp("/repeating", TODAY);
+    await openMenu("Pretend stretch");
     await userEvent.click(await screen.findByRole("button", { name: "Stop repeating: Pretend stretch" }));
     await vi.waitFor(async () => expect((await db.items.get(h.id))!.recur).toBeUndefined());
     expect((await db.items.get(h.id))!.doneDates).toEqual([TODAY]);
+  });
+});
+
+/** Opens a row's "…" menu (Stop repeating, Delete). */
+async function openMenu(title: string) {
+  await userEvent.click(await screen.findByRole("button", { name: `More: ${title}` }));
+}
+
+/** A row's seven day buttons, Monday first. */
+async function dayButtons(title: string) {
+  const group = await screen.findByRole("group", { name: `Repeats on: ${title}` });
+  return within(group).getAllByRole("button");
+}
+
+describe("changing the days on the Repeating page (Esme's pick 1·2 A, 2026-11-17)", () => {
+  it("every row shows M T W T F S S, the repeat's days pressed", async () => {
+    await mk("Pretend stretch", "body", ["mon", "wed", "fri"]);
+    renderApp("/repeating", TODAY);
+    const days = await dayButtons("Pretend stretch");
+    expect(days.map((d) => d.textContent)).toEqual(["M", "T", "W", "T", "F", "S", "S"]);
+    expect(days.map((d) => d.getAttribute("aria-label"))).toEqual([
+      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+    ]);
+    expect(days.map((d) => d.getAttribute("aria-pressed"))).toEqual(["true", "false", "true", "false", "true", "false", "false"]);
+  });
+
+  it("a tap switches a day on or off and saves at once, in Monday-first order; the rest of the item is untouched", async () => {
+    const h = await mk("Pretend stretch", "body", ["wed"], { doneDates: ["2026-11-03"], notes: "Pretend note" });
+    renderApp("/repeating", TODAY);
+    const days = await dayButtons("Pretend stretch");
+    await userEvent.click(days[6]); // Sunday on
+    await userEvent.click(days[0]); // Monday on
+    await vi.waitFor(async () => expect((await db.items.get(h.id))!.recur).toEqual(["mon", "wed", "sun"]));
+    await userEvent.click(days[2]); // Wednesday off
+    await vi.waitFor(async () => expect((await db.items.get(h.id))!.recur).toEqual(["mon", "sun"]));
+    expect(await db.items.get(h.id)).toMatchObject({ status: "open", doneDates: ["2026-11-03"], notes: "Pretend note", areaId: "body" });
+    expect((await dayButtons("Pretend stretch")).map((d) => d.getAttribute("aria-pressed"))).toEqual([
+      "true", "false", "false", "false", "false", "false", "true",
+    ]);
+  });
+
+  it("the last day on can't be switched off: it stays, and the row says why", async () => {
+    const h = await mk("Pretend stretch", "body", ["sat"]);
+    renderApp("/repeating", TODAY);
+    await userEvent.click((await dayButtons("Pretend stretch"))[5]);
+    expect(await screen.findByText(/It has to repeat on at least one day/)).toBeInTheDocument();
+    expect((await dayButtons("Pretend stretch"))[5]).toHaveAttribute("aria-pressed", "true");
+    expect((await db.items.get(h.id))!.recur).toEqual(["sat"]);
+    // Switching another day on clears the message.
+    await userEvent.click((await dayButtons("Pretend stretch"))[0]);
+    await vi.waitFor(() => expect(screen.queryByText(/It has to repeat on at least one day/)).toBeNull());
+    await vi.waitFor(async () => expect((await db.items.get(h.id))!.recur).toEqual(["mon", "sat"]));
+  });
+});
+
+describe("the Repeating page's week (Esme's pick 1·3 A, 2026-11-17)", () => {
+  it("This week shows Monday to Sunday, each repeat on its days with its area tile, today outlined and ticked ones crossed out", async () => {
+    const walk = await mk("Pretend walk", "body", ["mon", "wed", "fri"]);
+    await mk("Pretend sketch", "art", ["tue", "thu"]);
+    await mk("Water the pretend herbs", "inbox", ["sat"]);
+    await tickItem(walk.id, TODAY);
+    renderApp("/repeating", TODAY);
+    const byArea = await screen.findByRole("button", { name: "By area" });
+    expect(byArea).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "This week" }));
+    expect(screen.getByRole("button", { name: "This week" })).toHaveAttribute("aria-pressed", "true");
+    const cols = document.querySelectorAll(".week-day");
+    expect([...cols].map((c) => c.querySelector("h2")!.textContent)).toEqual([
+      "Mon 2", "Tue 3", "Wed 4 · today", "Thu 5", "Fri 6", "Sat 7", "Sun 8",
+    ]);
+    expect([...cols].map((c) => c.classList.contains("is-today"))).toEqual([false, false, true, false, false, false, false]);
+    const titles = (i: number) => [...cols[i].querySelectorAll(".week-title")].map((t) => t.textContent);
+    expect(titles(0)).toEqual(["Pretend walk"]);
+    expect(titles(1)).toEqual(["Pretend sketch"]);
+    expect(titles(5)).toEqual(["Water the pretend herbs"]);
+    expect(titles(6)).toEqual([]);
+    // Ticked today: crossed out in today's column only.
+    expect(cols[2].querySelector(".week-mini")).toHaveClass("crossed");
+    expect(cols[0].querySelector(".week-mini")).not.toHaveClass("crossed");
+    // The area tile: Body's colour; the Inbox's own tile for the older import.
+    expect((cols[0].querySelector(".week-tile") as HTMLElement).style.background).toBe("rgb(227, 152, 118)");
+    expect((cols[5].querySelector(".week-tile") as HTMLElement).style.background).toBe("rgb(212, 209, 195)");
+    // A strip opens the item in the side panel.
+    await userEvent.click(within(cols[1] as HTMLElement).getByRole("button", { name: "Pretend sketch" }));
+    expect(await screen.findByRole("complementary", { name: "Pretend sketch" })).toBeInTheDocument();
+  });
+
+  it("a day changed in By area shows in This week", async () => {
+    await mk("Pretend walk", "body", ["mon"]);
+    renderApp("/repeating", TODAY);
+    await userEvent.click((await dayButtons("Pretend walk"))[6]);
+    await userEvent.click(screen.getByRole("button", { name: "This week" }));
+    await vi.waitFor(() => expect(document.querySelectorAll(".week-day")[6].textContent).toContain("Pretend walk"));
   });
 });
 

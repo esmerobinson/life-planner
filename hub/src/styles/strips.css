@@ -458,3 +458,141 @@ h2.journal-row-heading {
   height: 100%;
   background: var(--bar-fill);
 }
+
+/* ---- The Repeating page (app design queue, 2026-11-17; Esme: "A is best option here").
+   Values copied from that mockup (app-queue.html):
+   1·2 A: seven day buttons always on each row, 28px circles, 12px 600 letters, --track when off
+   and the app's green (--bar-fill #98c293) when on, 4px apart, 6px under the title; Stop repeating
+   and Delete in a "…" menu (the Move-to menu's look, .pop-menu above).
+   1·3 A: "By area" / "This week" pressed pills (6px apart, 14px text); seven day columns 8px apart
+   (--panel, 14px radius, 10px padding, 6px gap, today outlined 2px --text inside its edge), each
+   repeat a small strip (--row, 8px radius, 7px 8px padding, 13px text, 18px area tile with a 13px
+   icon); today's ticked ones crossed out as on Home. On the phone the days stack. ---- */
+.day-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.day-buttons button.day-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--track);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex: none;
+}
+
+.day-buttons button.day-button[aria-pressed="true"] {
+  background: var(--bar-fill);
+}
+
+.repeat-views {
+  gap: 6px;
+}
+
+.repeat-views button {
+  font-size: 14px;
+}
+
+.week-cols {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.is-phone .week-cols {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.week-day {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.week-day.is-today {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+
+.week-day h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+
+.week-day h2 small {
+  font-weight: 400;
+  color: var(--sage);
+}
+
+.week-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.week-mini {
+  background: var(--row);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 13px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.week-tile {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.week-tile img {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.week-mini.crossed .week-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+button.week-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  line-height: inherit;
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+button.week-open:hover .week-title,
+button.week-open:focus-visible .week-title {
+  text-decoration: underline;
+}

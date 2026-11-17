@@ -99,21 +99,23 @@ for (const width of [1280, 390]) {
 
     test("the Repeating page lists everything by area, Mind first; stop one, delete one", async ({ page }) => {
       await seed(page);
-      // The way there: the footer links (the sidebar's, or the bottom of the phone's Home).
+      // The way there: its own sidebar row, or its app on the phone's Home (Esme's pick A, 2026-11-17).
       await page.goto("/");
-      await page.getByRole("link", { name: "Repeating" }).click();
+      await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Repeating" }).click();
       await expect(page).toHaveURL(/\/repeating$/);
       await expect(page.getByRole("heading", { level: 1, name: "Repeating" })).toBeVisible();
       await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Mind", "Art", "Body", "Inbox"]);
       await expect(page.getByText("Pretend one-off")).toHaveCount(0);
       const stretch = page.getByRole("listitem").filter({ hasText: "Pretend stretch" });
-      await expect(stretch).toContainText("Mondays, Wednesdays and Fridays");
+      await expect(stretch.getByRole("group", { name: "Repeats on: Pretend stretch" }).getByRole("button", { pressed: true })).toHaveCount(3);
       await shoot(page, `repeating-${width}`, true);
       await noSideways(page);
 
+      await page.getByRole("button", { name: "More: Pretend stretch" }).click();
       await page.getByRole("button", { name: "Stop repeating: Pretend stretch" }).click();
       await expect(page.locator(".strip-title", { hasText: "Pretend stretch" })).toHaveCount(0);
       await expect(page.getByText("Stopped repeating: Pretend stretch")).toBeVisible();
+      await page.getByRole("button", { name: "More: Water the pretend herbs" }).click();
       await page.getByRole("button", { name: "Delete: Water the pretend herbs" }).click();
       await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Mind", "Art"]);
       await shoot(page, `repeating-after-${width}`, true);
