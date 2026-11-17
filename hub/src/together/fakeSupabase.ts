@@ -19,6 +19,11 @@
 //   deleted ("an undone event stays undone", P0001).
 // - Stricter than needed, to catch client bugs: the client never sends `created_at`,
 //   `updated_at` or `by` (the server sets them), and any column the link doesn't use is refused.
+// - challenges may be inserted by her (the daily log's challenges, Oliver's answer 2026-11-16):
+//   in her couple, with an id, a non-blank name and a start, and never already accepted
+//   (`accepted_at` absent or null); an id taken in her couple is a conflict (409, 23505).
+// - The daily log's challenges (`insertOnly`) take challenge_days by INSERT only: no update grant
+//   and no deleted_at there (Oliver's answer), so any PATCH of one of their days is refused (42501).
 //
 // Tests can queue forced responses with `inject` and read every request from `requests`.
 
@@ -45,6 +50,8 @@ const DAY_INSERT = ["id", "couple_id", "challenge_id", "day", "note"];
 const DAY_UPDATE = ["note", "deleted_at"];
 const CHALLENGE_UPDATE = ["name"];
 const CHALLENGE_FIXED = ["id", "start", "couple_id"];
+/** The only columns the link sends when it makes a challenge. */
+const CHALLENGE_INSERT = ["id", "couple_id", "name", "start"];
 const STAMPS = ["created_at", "updated_at", "by"];
 
 class Refusal extends Error {
@@ -64,6 +71,8 @@ export class FakeSupabase {
   /** Only what an earlier build made (seeded by tests with `seedLegacy`). */
   readonly todos = new Map<string, Row>();
   readonly events = new Map<string, Row>();
+  /** Challenges whose days are insert-only (the daily log's, as Together has them). */
+  readonly insertOnly = new Set<string>(["esme-daily-schedule", "esme-daily-todos"]);
   accessLifetimeMs = 3_600_000;
   now: () => number = () => Date.now();
 
@@ -177,6 +186,7 @@ export class FakeSupabase {
       return json(200, rows.map((c) => pick(c, u)));
     }
     if (table === "challenges" && r.method === "PATCH") return this.patchChallenge(u, parse(r.body), couple, rep);
+    if (table === "challenges" && r.method === "POST") return this.insertChallenge(parse(r.body), couple, rep);
     if (table === "challenge_days" && r.method === "POST") return this.insertDay(parse(r.body), me, couple, rep);
     if (table === "challenge_days" && r.method === "PATCH") return this.patchDay(u, parse(r.body), couple, rep);
     if ((table === "todos" || table === "todo_events") && r.method === "POST") throw new Refusal(403, "42501", "fake: the link never makes to-dos");
@@ -240,11 +250,29 @@ export class FakeSupabase {
     return rep ? json(201, [row]) : new Response(null, { status: 201 });
   }
 
+  private insertChallenge(body: Row, couple: string | null, rep: boolean): Response {
+    if ("accepted_at" in body && body.accepted_at !== null) throw new Refusal(403, "42501", "fake: a new challenge is never already accepted");
+    columns(body, CHALLENGE_INSERT);
+    for (const k of CHALLENGE_INSERT) if (body[k] === undefined || body[k] === null) throw new Refusal(400, "23502", `fake: ${k} is required`);
+    if (body.couple_id !== couple) throw new Refusal(403, "42501", "fake: not her couple");
+    if (typeof body.name !== "string" || body.name.trim() === "") throw new Refusal(400, "23514", "fake: a challenge needs a name");
+    if (typeof body.start !== "string" || !DATE.test(body.start)) throw new Refusal(400, "22007", "fake: start isn't a date");
+    const id = String(body.id);
+    const had = this.challenges.get(id);
+    if (had && had.couple_id === couple) throw new Refusal(409, "23505", "fake: that challenge id is taken");
+    const stamp = new Date(this.now()).toISOString();
+    const row: Row = { for_user: null, accepted_at: null, deleted_at: null, ...body, created_at: stamp, updated_at: stamp };
+    this.challenges.set(id, row);
+    return rep ? json(201, [row]) : new Response(null, { status: 201 });
+  }
+
   private patchDay(u: URL, body: Row, couple: string | null, rep: boolean): Response {
     for (const k of Object.keys(body)) {
       if (!DAY_UPDATE.includes(k)) throw new Refusal(403, "42501", `fake: only note and deleted_at change (not ${k})`);
     }
     if (eq(u, "id") === null) throw new Refusal(400, "FAKE_FILTER", "fake: the link only ever changes one row, by id");
+    const target = this.days.get(eq(u, "id")!);
+    if (target && this.insertOnly.has(String(target.challenge_id))) throw new Refusal(403, "42501", "fake: these challenge days are insert-only");
     if ("note" in body && (typeof body.note !== "string" || body.note.trim() === "")) throw new Refusal(400, "23514", "fake: a note can't be blank");
     const rows = [...this.days.values()].filter((d) => d.couple_id === couple && matches(d, u, ["couple_id", "id"]));
     const out = rows.map((d) => {

@@ -104,3 +104,29 @@ it("refresh tokens work once", async () => {
   expect((await ask()).status).toBe(200);
   expect((await ask()).status).toBe(400);
 });
+
+describe("the daily log's challenges (Oliver's answer, 2026-11-16)", () => {
+  const ch = (extra: Record<string, unknown> = {}) => ({ id: "esme-daily-schedule", couple_id: COUPLE, name: "Pretend schedule", start: "2026-11-10", ...extra });
+
+  it("she may make one in her couple, never already accepted, never another couple's, never twice", async () => {
+    const { rest, me } = await setup();
+    expect((await rest(me.access_token, "POST", "challenges", ch({ accepted_at: "2026-11-10T00:00:00Z" }))).status).toBe(403);
+    expect((await rest(me.access_token, "POST", "challenges", ch({ couple_id: OTHER_COUPLE }))).status).toBe(403);
+    expect((await rest(me.access_token, "POST", "challenges", ch({ name: " " }))).status).toBe(400);
+    expect((await rest(me.access_token, "POST", "challenges", ch({ start: undefined }))).status).toBe(400);
+    expect((await rest(me.access_token, "POST", "challenges", ch())).status).toBe(201);
+    expect((await rest(me.access_token, "POST", "challenges", ch())).status).toBe(409);
+  });
+
+  it("their days are insert only: no change and no delete, by anyone", async () => {
+    const { rest, me, partner } = await setup();
+    await rest(me.access_token, "POST", "challenges", ch());
+    const d = { id: "esme-schedule-2026-11-10", couple_id: COUPLE, challenge_id: "esme-daily-schedule", day: "2026-11-10", note: "Yes" };
+    expect((await rest(me.access_token, "POST", "challenge_days", d)).status).toBe(201);
+    for (const t of [me, partner]) {
+      expect((await rest(t.access_token, "PATCH", `challenge_days?id=eq.${d.id}`, { note: "No" })).status).toBe(403);
+      expect((await rest(t.access_token, "PATCH", `challenge_days?id=eq.${d.id}`, { deleted_at: "2026-11-12T00:00:00Z" })).status).toBe(403);
+    }
+    expect((await rest(me.access_token, "POST", "challenge_days", d)).status).toBe(409);
+  });
+});

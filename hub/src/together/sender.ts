@@ -29,7 +29,8 @@
 //   forgotten. To-dos are never written otherwise.
 
 import { db as appDb, type HubDB } from "../data/db";
-import { readSharePrivate } from "../data/repo";
+import { listDayLogs, readSharePrivate } from "../data/repo";
+import { SEND_ROUTINE_CHALLENGES, sendRoutineChallenges } from "./routineChallenges";
 import { readSyncGate, withSyncLock } from "../data/syncGate";
 import { formerDeviceIds } from "../data/deviceIds";
 import { getDeviceId } from "../sync/engine";
@@ -85,6 +86,8 @@ export interface SendEnv {
   mode?: "send" | "hide";
   /** The pause between batches of a big press (tests: 0). */
   batchPauseMs?: number;
+  /** The daily log's two challenges (routineChallenges.ts); default SEND_ROUTINE_CHALLENGES. */
+  routineChallenges?: boolean;
 }
 
 class Stop extends Error {
@@ -369,7 +372,9 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       const jk = await loadJournalKey(db).catch(() => undefined);
       // Today too: a press sends it like any other day.
       const journal = jk ? await readJournalDays(jk, addDays(today, 1)).catch(() => null) : null;
-      return { jk, journal };
+      // The daily logs (only days before today can be final; null: couldn't be read, nothing goes).
+      const logs = jk && ctx.mode === "send" ? await listDayLogs(jk, today).catch(() => null) : null;
+      return { jk, journal, logs };
     });
     ctx.challengeId = challengeId;
     if (!snap.jk) {
@@ -381,6 +386,12 @@ async function run(db: HubDB, env: SendEnv): Promise<SendOutcome> {
       if (snap.journal?.earliest && snap.journal.earliest < sent.since) sent.since = snap.journal.earliest;
       ctx.restoredUnpulled = await restoreHold(db, sent, now());
       await sendDays(ctx, snap.journal);
+      if (ctx.mode === "send" && (env.routineChallenges ?? SEND_ROUTINE_CHALLENGES) && snap.logs) {
+        await sendRoutineChallenges(ctx, snap.logs, ANSWERS_DELAY_MS, {
+          maxWrites: MAX_WRITES_PER_RUN,
+          between: () => pause(env.batchPauseMs ?? BATCH_PAUSE_MS),
+        });
+      }
     }
     return done(true);
   } catch (e) {
