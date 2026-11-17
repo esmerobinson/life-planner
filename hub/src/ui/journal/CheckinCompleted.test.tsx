@@ -56,7 +56,8 @@ it("finished: 'Checked in for today', each question with her answer exactly as t
   expect(await within(s).findByText("Checked in for today")).toBeInTheDocument();
   const answers = s.querySelector<HTMLElement>(".journal-answers")!;
   await waitFor(() => expect(within(answers).getAllByLabelText("Your answer").map((a) => a.textContent)).toEqual(WORDS));
-  expect(within(s).queryByRole("textbox")).toBeNull();
+  // The check-in's own boxes (the daily log under it, its own section, has boxes of its own).
+  expect(within(s).queryAllByRole("textbox").filter((b) => !b.closest('[aria-label="Daily log"]'))).toEqual([]);
   for (const id of ["M1", "D3", "K2"]) expect(within(answers).getByText(text(id))).toBeInTheDocument();
   expect(within(s).getByRole("button", { name: "Edit" })).toBeInTheDocument();
 });

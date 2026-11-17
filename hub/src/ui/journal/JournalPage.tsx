@@ -25,6 +25,7 @@ import { useTabsStacked } from "./useTabsFit";
 import { usePhone } from "../usePhone";
 import { LearnedToday } from "../together/LearnedToday";
 import { PrivateDayTick } from "../together/PrivateDayTick";
+import { DailyLog, WeeklyReview } from "./RoutineForms";
 
 /** While a typed passphrase waits for sync to accept it (review C1's suggested words). */
 export const CHECKING_LINE = "Checking your passphrase with sync…";
@@ -164,9 +165,11 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           </h2>
           {tab === "exercise" && <MentalHealthExercise jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "exercise" && <LearnedToday jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "exercise" && <WeeklyReview jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "exercise" && <PrivateDayTick jk={open.jk} date={today} part="exercise" />}
           {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
+          {tab === "check-in" && <DailyLog jk={open.jk} date={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <PrivateDayTick jk={open.jk} date={today} part="checkin" />}
           {tab === "read-back" && <ReadBack jk={open.jk} today={today} />}
           {tab === "notes" && <NotesToMyself jk={open.jk} today={today} deviceId={open.deviceId} />}

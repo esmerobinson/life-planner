@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  answeredPrompts, CANT_OPEN, shownPrompts, listCheckinDays, listExerciseEntries, listLearned, listNotes, listReadBack, morningOpensOn,
-  readExerciseCards, readMorningPage, type CheckinDay, type ExerciseResponse, type Learned, type MorningText, type Note,
+  answeredPrompts, CANT_OPEN, shownPrompts, listCheckinDays, listDayLogs, listExerciseEntries, listLearned, listNotes, listReadBack,
+  listWeekReviews, morningOpensOn, readExerciseCards, readMorningPage, type CheckinDay, type DayLogFields, type ExerciseResponse,
+  type FormDay, type Learned, type MorningText, type Note, type WeekReviewFields,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
 import type { ISODate } from "../../domain/types";
@@ -15,6 +16,8 @@ import { READ_BACK_PARTS, tabPath, type ReadBackPart } from "./tabs";
 import { useDbChanges } from "./useJournalKey";
 import { HighlightsPart, useHighlightsTile } from "./HighlightsReadBack";
 import { LearnedInReadBack } from "../together/LearnedInReadBack";
+import { DayLogView, WeekReviewView } from "./RoutineForms";
+import { ROUTINE_WORDS as RW } from "./routineWording";
 
 /** The line at the top of Read back (the approved mockup, 2026-11-05 option B). */
 export const READ_BACK_LINE = "Everything you've done in the Journal, saved.";
@@ -33,10 +36,12 @@ type Page = { id: string; date: ISODate; n: number };
  * One item in the Mental health exercise list: a card's response (with that day's "what I
  * learned" words on the day's first card), or a day with learned words and no card (bug #45).
  */
-type ExerciseItem = { date: ISODate; entry: ExerciseResponse | null; title: string; learned: Learned | null };
+type ExerciseItem = { date: ISODate; entry: ExerciseResponse | null; title: string; learned: Learned | null; review?: FormDay<WeekReviewFields> };
+/** One item in the Daily check-in list: a day's check-in, or a day's daily log (PLACEHOLDER placement). */
+type CheckinItem = { date: ISODate; checkin: CheckinDay } | { date: ISODate; log: FormDay<DayLogFields> };
 type Loaded = {
   exercises: ExerciseItem[];
-  checkins: CheckinDay[];
+  checkins: CheckinItem[];
   pages: Page[];
   notes: Note[];
   unreadable: Record<"exercise" | "check-in" | "notes", number>;
@@ -66,13 +71,15 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const [exercises, checkins, pages, cards, notes, learned] = await Promise.all([
+      const [exercises, checkins, pages, cards, notes, learned, logs, reviews] = await Promise.all([
         listExerciseEntries(jk, addDays(today, 1)),
         listCheckinDays(jk),
         listReadBack(),
         readExerciseCards(jk),
         listNotes(jk),
         listLearned(jk, addDays(today, 1)),
+        listDayLogs(jk, addDays(today, 1)),
+        listWeekReviews(jk, addDays(today, 1)),
       ]);
       // Each response's title: its own card (by its full id), with that card's book.
       const set = cards.state === "ok" ? cards.set : null;
@@ -84,10 +91,17 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
       if (id !== latest.current) return;
       const pageCount = new Map<ISODate, number>();
       setData({
-        exercises: exerciseItems(exercises.entries, learned, title),
+        exercises: [
+          ...exerciseItems(exercises.entries, learned, title),
+          // Each week's review (Mental health work), on the day it was written.
+          ...reviews.map((r): ExerciseItem => ({ date: r.date || r.week, entry: null, title: "", learned: null, review: r })),
+        ].sort((a, b) => b.date.localeCompare(a.date)),
         // Every day she checked in, even if its words were lost; only a day of skips isn't listed
-        // (Esme, 2026-11-04 and 2026-11-06).
-        checkins: checkins.filter((d) => shownPrompts(d).length > 0).sort((a, b) => b.date.localeCompare(a.date)),
+        // (Esme, 2026-11-04 and 2026-11-06). Each day's daily log after that day's check-in.
+        checkins: [
+          ...checkins.filter((d) => shownPrompts(d).length > 0).map((d): CheckinItem => ({ date: d.date, checkin: d })),
+          ...logs.map((l): CheckinItem => ({ date: l.date, log: l })),
+        ].sort((a, b) => b.date.localeCompare(a.date) || Number("log" in a) - Number("log" in b)),
         pages: pages.map((p) => {
           const n = (pageCount.get(p.date) ?? 0) + 1;
           pageCount.set(p.date, n);
@@ -95,8 +109,8 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         }),
         notes: [...notes.notes].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt),
         unreadable: {
-          exercise: exercises.unreadable + learned.reduce((n, d) => n + d.unreadable, 0),
-          "check-in": checkins.reduce((n, d) => n + d.unreadable, 0),
+          exercise: exercises.unreadable + learned.reduce((n, d) => n + d.unreadable, 0) + reviews.reduce((n, d) => n + d.unreadable, 0),
+          "check-in": checkins.reduce((n, d) => n + d.unreadable, 0) + logs.reduce((n, d) => n + d.unreadable, 0),
           notes: notes.unreadable,
         },
       });
@@ -203,7 +217,10 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
   const months = (() => {
     if (part === "exercise") {
       return byMonth(data.exercises, (x) => x.date).map(([m, xs]) => [m, xs.map((x) => (
-        <li key={x.entry ? `${x.entry.date}|${x.entry.id}|${x.entry.theme}` : `${x.date}|learned`}>
+        <li key={x.entry ? `${x.entry.date}|${x.entry.id}|${x.entry.theme}` : x.review ? `${x.date}|review` : `${x.date}|learned`}>
+          {x.review ? (
+            <FormItem date={x.date} line={RW.readBackReview} day={x.review} View={WeekReviewView} />
+          ) : (
           <details>
             <summary>{x.entry ? `${longDate(x.entry.date)} · ${x.title}` : `${longDate(x.date)} · ${LEARNED_ONLY}`}</summary>
             {x.entry && <ResponseView text={x.entry.text} parts={x.entry.parts} />}
@@ -211,11 +228,20 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
             {x.entry && <OtherVersions others={x.entry.others} />}
             {x.learned && <LearnedInReadBack day={x.learned} />}
           </details>
+          )}
         </li>
       ))] as const);
     }
     if (part === "check-in") {
-      return byMonth(data.checkins, (d) => d.date).map(([m, ds]) => [m, ds.map((d) => {
+      return byMonth(data.checkins, (d) => d.date).map(([m, ds]) => [m, ds.map((item) => {
+        if ("log" in item) {
+          return (
+            <li key={`${item.date}|log`}>
+              <FormItem date={item.date} line={RW.readBackLog} day={item.log} View={DayLogView} />
+            </li>
+          );
+        }
+        const d = item.checkin;
         const ids = shownPrompts(d);
         const n = answeredPrompts(d).length;
         return (
@@ -276,6 +302,26 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
         );
       })}
     </section>
+  );
+}
+
+/**
+ * A daily log or weekly review in Read back (PLACEHOLDER placement): its answers, "Not done yet"
+ * when Done wasn't pressed, and every other version not replaced (nothing hidden).
+ */
+function FormItem<F>({ date, line, day, View }: { date: ISODate; line: string; day: FormDay<F>; View: (p: { fields: F }) => React.ReactNode }) {
+  return (
+    <details className="routine-placeholder routine-readback">
+      <summary>{`${longDate(date)} · ${line}`}</summary>
+      <View fields={day.fields} />
+      {!day.done && <p className="journal-muted">{RW.notSubmitted}</p>}
+      {day.others.map((o) => (
+        <div key={o.id} className="routine-other">
+          <p className="journal-muted">{RW.otherDevice}</p>
+          <View fields={o.fields} />
+        </div>
+      ))}
+    </details>
   );
 }
 

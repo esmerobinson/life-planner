@@ -1,0 +1,26 @@
+/* PLACEHOLDER look for the daily log and the weekly review (nothing here is designed): magenta,
+   the system font, no easing. The Design session decides the real look and placement; nothing
+   here may be taken as a choice. */
+.routine-placeholder,
+.routine-placeholder * {
+  font-family: system-ui, sans-serif;
+  transition: none !important;
+  animation: none !important;
+}
+.routine-placeholder {
+  border: 2px dashed magenta;
+  padding: 8px;
+  margin: 16px 0;
+}
+.routine-placeholder h3,
+.routine-placeholder summary {
+  color: magenta;
+}
+.routine-placeholder button[aria-pressed="true"] {
+  outline: 3px solid magenta;
+}
+.routine-placeholder .routine-other {
+  border-top: 1px dashed magenta;
+  margin-top: 8px;
+  padding-top: 8px;
+}
