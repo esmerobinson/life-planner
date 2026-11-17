@@ -2407,5 +2407,10 @@
     ]
    }
   ]
+ },
+ "night_dedithered": {
+  "date": "2026-11-16",
+  "why": "Esme: \"I don't like the hazy clouds\"",
+  "note": "the night's dotted/checker glows and fades are now clean solid light (dedither.py); the night differs from the approved concept only at those pixels (check.py verifies it)"
  }
 }

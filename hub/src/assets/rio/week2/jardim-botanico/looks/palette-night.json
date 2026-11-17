@@ -1,6 +1,6 @@
 {
  "name": "Jardim Botanico: night look",
- "notes": "Every day colour name used here -> its night colour from the Rio map's night palette v2; names the map never used get v2's twin formula snapped to a v2 colour ('derived'). Light pools use v2's glow twins (name+gold/cyan/lime/moon, levels 1-2), dithered: the lamp posts and lanterns, the glasshouse's warm glass, the fountain and pool lit cyan, the floodlit Christ.",
+ "notes": "Every day colour name used here -> its night colour from the Rio map's night palette v2; names the map never used get v2's twin formula snapped to a v2 colour ('derived'). Light uses v2's glow twins (name+gold/cyan/moon, levels 1-2) as SOLID tight halos, no dither (Esme 2026-11-16): the lamp posts and lanterns, the glasshouse's warm glass, the fountain and pool lit cyan, the floodlit Christ.",
  "night": {
   "ch_berry0": "#8f598a",
   "ch_berry1": "#871a70",

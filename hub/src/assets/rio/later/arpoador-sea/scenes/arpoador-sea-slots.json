@@ -25,7 +25,7 @@
  },
  "states": {
   "start": "quiet: Arpoador's granite face with barnacles, mussels and two anemones, the coral reef, two sargassum plants, the granite arch, the paddleboard at the surface, a little group of sardines and three reef fish; the octopus's eyes in its crevice",
-  "full": "busy: a big sardine shoal, two green turtles, a spotted eagle ray and a stingray in the sand, the octopus out on the crevice lip, more kelp and seagrass, more corals, sponges, sea fans, anemones, starfish, urchins, a crab, nine reef fish, bubbles, and a snorkeller's legs and fins at the surface"
+  "full": "busy: a big sardine shoal, two green turtles, a spotted eagle ray and a stingray in the sand, the octopus out on the crevice lip, more kelp and seagrass, more corals, sponges, sea fans, anemones, starfish, urchins, a crab, nine reef fish and bubbles"
  },
  "foot": "x, y = bottom-centre pixel of the sticker frame (16x16); draw at left = x - 8, top = y - 15",
  "draw_order": "sort stickers by foot y (then x), back to front, over the base and the caustics overlay",
@@ -79,8 +79,8 @@
   },
   "json": "player/esme-snorkel.json",
   "anchor": {
-   "x": 172,
-   "y": 37
+   "x": 160,
+   "y": 38
   },
   "draw": "left = x - 26, top = y - 18; above stickers; 4 frames at 180 ms",
   "note": "just under the surface by the paddleboard's nose, face down, snorkel up through the surface. Her dive torch is lit at night: the warm pool round it is baked into the night bases"
@@ -91,17 +91,17 @@
   "row": "sit_left",
   "frames": 4,
   "foot": {
-   "x": 198,
+   "x": 202,
    "y": {
     "start": {
-     "day": 19,
-     "rain": 19,
-     "night": 19
+     "day": 17,
+     "rain": 17,
+     "night": 17
     },
     "full": {
-     "day": 19,
-     "rain": 19,
-     "night": 19
+     "day": 17,
+     "rain": 17,
+     "night": 17
     }
    }
   },
