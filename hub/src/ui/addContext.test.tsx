@@ -17,6 +17,8 @@ afterEach(() => vi.useRealTimers());
 
 async function openAdd() {
   await userEvent.click(await screen.findByRole("button", { name: /^Add$/ }));
+  // The + opens the quick box (2026-11-17); the full form is More options.
+  await userEvent.click(screen.getByRole("button", { name: "More options" }));
   const form = document.querySelector("form.quick-add") as HTMLElement;
   return within(form);
 }

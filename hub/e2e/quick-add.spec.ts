@@ -143,11 +143,39 @@ test("the quick sheet fits: no sideways scroll, fields 16px or more (no iOS zoom
   for (const s of sizes) expect(s).toBeGreaterThanOrEqual(16);
 });
 
-test.describe("on a computer", () => {
+test.describe("on a computer (Esme: \"do what's best\", 2026-11-17)", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
-  test("the + still opens the full Add form", async ({ page }) => {
+  test("the + opens the same quick box, focused at once; Return saves; Escape closes and keeps the draft", async ({ page }) => {
     await home(page);
+    const add = page.getByRole("button", { name: "Add", exact: true });
+    await add.click();
+    await expect(box(page)).toBeFocused();
+    await expect(sheet(page)).toHaveClass(/add-pop/);
+    await page.keyboard.type("Pretend desk errand");
+    await page.keyboard.press("Enter");
+    await expect(sheet(page).getByRole("status")).toHaveText("Added");
+    await expect(box(page)).toBeFocused();
+    await page.keyboard.type("Pretend half typed on the Mac");
+    await page.keyboard.press("Escape");
+    await expect(sheet(page)).toHaveCount(0);
+    await expect(add).toBeFocused();
+    await page.reload();
     await page.getByRole("button", { name: "Add", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Add" }).getByRole("button", { name: "Add item" })).toBeVisible();
+    await expect(box(page)).toHaveValue("Pretend half typed on the Mac");
+    await page.goto("/inbox");
+    await expect(page.getByText("Pretend desk errand")).toBeVisible();
+  });
+
+  test("More options opens the full form; + Add a book still opens the full form, pre-set", async ({ page }) => {
+    await page.goto("/area/art");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await sheet(page).getByRole("button", { name: "More options" }).click();
+    await expect(sheet(page).getByLabel("Title")).toBeFocused();
+    await expect(sheet(page).getByLabel("Area")).toHaveValue("art");
+    await page.keyboard.press("Escape");
+    await page.goto("/area/mind");
+    await page.getByRole("button", { name: "+ Add a book" }).click();
+    await expect(sheet(page).getByLabel("Type")).toHaveValue("book");
+    await expect(sheet(page).getByRole("textbox", { name: "What's on your mind?" })).toHaveCount(0);
   });
 });

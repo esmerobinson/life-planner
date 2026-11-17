@@ -19,6 +19,7 @@ test("installable: manifest, service worker, works offline, data survives", asyn
 
   // Add a to-do while online.
   await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "More options" }).click();
   await page.getByLabel("Title").fill("Offline survivor task");
   await page.getByRole("button", { name: "Add item" }).click();
   await page.getByRole("link", { name: /^Inbox/ }).click();

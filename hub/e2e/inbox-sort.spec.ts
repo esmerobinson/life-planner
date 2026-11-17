@@ -145,6 +145,7 @@ test("delete from an area strip and delete a goal: both in the Bin, both restora
   await expect(page.getByText("Nothing planned for today.").first()).toBeVisible();
   // Make a task and a goal through the app itself.
   await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "More options" }).click();
   await page.getByLabel("Title").fill("Pretend chore to delete");
   await page.getByRole("combobox", { name: "Area", exact: true }).selectOption({ label: "Art" });
   await page.getByRole("button", { name: "Add item" }).click();

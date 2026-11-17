@@ -126,8 +126,9 @@ export function AppShell() {
 
   // "+ Add a book" (and the like): Add opens pre-set as asked, not as the page says.
   const [addOverride, setAddOverride] = useState<AddDefaults | null>(null);
-  // The phone's + opens the one-box quick add (Esme, 2026-11-17); "More options" (and "+ Add a
-  // book" and the like, and the + on a computer) the full form.
+  // The round + opens the one-box quick add, on the phone (Esme, 2026-11-17) and on a computer
+  // (her "do what's best", 2026-11-17); "More options" and "+ Add a book" and the like open the
+  // full form.
   const [addMode, setAddMode] = useState<"quick" | "full">("full");
   // The full form opened by More options: it starts from the quick box's text, and keeps the
   // quick draft in step until it adds or is cancelled.
@@ -137,7 +138,7 @@ export function AppShell() {
     (open: boolean) => {
       if (open) {
         setAddOpened((n) => n + 1); // a fresh form, pre-set from this page
-        setAddMode(phone ? "quick" : "full");
+        setAddMode("quick");
         setHandover(null);
         fromQuick.current = false;
       }
@@ -146,7 +147,7 @@ export function AppShell() {
       // Closed on /add: Home is what was under it.
       if (!open && atAdd) navigate("/", { replace: true });
     },
-    [phone, atAdd, navigate],
+    [atAdd, navigate],
   );
   const openAddWith = useCallback((d: AddDefaults) => {
     setAddOpened((n) => n + 1);
@@ -184,7 +185,11 @@ export function AppShell() {
     const base = addDefaults ?? BASE_ADD_DEFAULTS;
     flushSync(() => {
       fromQuick.current = true;
-      setHandover(d.text.trim() ? { ...blankDraft(base), title: d.text } : null);
+      // The full form's own kept draft carries on when the box holds its title (or nothing);
+      // new text in the box starts a fresh form with it.
+      const kept = addDraft.current && draftHasContent(addDraft.current) ? addDraft.current : null;
+      const same = kept && (!d.text.trim() || d.text === kept.title);
+      setHandover(same ? null : d.text.trim() ? { ...blankDraft(base), title: d.text } : null);
       setAddOpened((n) => n + 1);
       setAddMode("full");
     });

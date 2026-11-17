@@ -14,6 +14,7 @@ test("approved soft-pill control styles in real Chrome", async ({ page }) => {
   expect(await inbox.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(212, 209, 195)");
 
   await add.click();
+  await page.getByRole("button", { name: "More options" }).click();
   const input = page.getByLabel("Title");
   const i = await input.evaluate((el) => {
     const s = getComputedStyle(el);

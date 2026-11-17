@@ -210,6 +210,7 @@ describe("double actions and refresh", () => {
     await userEvent.click(await screen.findByRole("link", { name: "Inbox (1)" }));
     await screen.findByText("Seed", { selector: ".strip-title" });
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.type(screen.getByLabelText("Title"), "Fresh arrival");
     await userEvent.click(screen.getByRole("button", { name: "Add item" }));
     const list = await screen.findByRole("list", { name: "Inbox items" });
@@ -239,6 +240,7 @@ describe("AppShell additions", () => {
     expect(screen.queryByLabelText("Title")).toBeNull();
     expect(screen.getByRole("link", { name: "Inbox" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "More options" }));
     await userEvent.type(screen.getByLabelText("Title"), "Fresh");
     await userEvent.click(screen.getByRole("button", { name: "Add item" }));
     expect(await screen.findByRole("link", { name: "Inbox (1)" })).toBeInTheDocument();
