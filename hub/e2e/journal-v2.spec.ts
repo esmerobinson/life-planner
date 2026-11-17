@@ -142,7 +142,11 @@ async function walk(page: Page, w: number) {
   const grid = (await page.locator(".journal-readback-tiles").boundingBox())!;
   const inner = (await page.locator(".journal-panel").boundingBox())!;
   expect(grid.width).toBeGreaterThanOrEqual(inner.width - 2 * 16 - 1); // the panel's whole width, inside its padding
-  expect(Math.abs(Math.max(...boxes.map((b) => b.x + b.width)) - (grid.x + grid.width))).toBeLessThan(1);
+  const all = (await Promise.all([0, 1, 2, 3, 4].map((i) => tiles.nth(i).boundingBox()))).map((b) => b!);
+  expect(Math.abs(Math.max(...all.map((b) => b.x + b.width)) - (grid.x + grid.width))).toBeLessThan(1);
+  // Highlights: in the four's row on a wide window; full width under them on the phone.
+  if (w >= 1000) expect(Math.round(all[4]!.y)).toBe(Math.round(all[0]!.y));
+  else expect(Math.abs(all[4]!.width - grid.width)).toBeLessThan(1);
   await noSidewaysScroll(page);
   await shot("read-back");
   const ex2 = await openReadBackPart(page, "Mental health exercise");

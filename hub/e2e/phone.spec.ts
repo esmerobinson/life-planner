@@ -198,7 +198,8 @@ test.describe("phone layout at 390px", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Esmeworld" })).toBeVisible();
     await expect(page.locator(".phone-top").getByRole("link", { name: /^Inbox \(\d+\)$/ })).toBeVisible();
     const apps = page.getByRole("navigation", { name: "Main" }).getByRole("link");
-    await expect(apps).toHaveCount(12); // no Today: Home is the Today page (2026-11-04); with Esme's Farm
+    // No Today: Home is the Today page (2026-11-04); with Esme's Rio, and Repeating's own app (2026-11-17).
+    await expect(apps).toHaveCount(13);
     const tile = await apps.first().locator(".phone-app-tile").boundingBox();
     expect(tile?.width).toBe(62);
     expect(tile?.height).toBe(62);

@@ -170,7 +170,9 @@ test("delete from an area strip and delete a goal: both in the Bin, both restora
   await page.getByRole("button", { name: "Delete goal" }).click();
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Goals" })).toBeVisible();
-  await expect(page.getByText("Pretend goal to delete")).toHaveCount(0);
+  // Gone from the Goals page; only the Undo line names it now (Esme's pick A, 2026-11-17).
+  await expect(page.getByRole("link", { name: "Pretend goal to delete" })).toHaveCount(0);
+  await expect(page.getByText("Moved to the Bin: Pretend goal to delete")).toBeVisible();
 
   await page.goto("/bin");
   const bin = page.getByRole("list", { name: "In the bin" });
