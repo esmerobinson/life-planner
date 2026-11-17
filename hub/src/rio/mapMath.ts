@@ -140,7 +140,10 @@ export function coverFit(box: { w: number; h: number }, canvas: [number, number]
   const d = dpr > 0 ? dpr : 1;
   if (fractional) return fractionalFit(box, canvas, keep, d);
   const [kx, ky, kw, kh] = keep;
-  const s = fitScale(box, [kw, kh], d);
+  // Never zoomed past the smallest crisp scale that covers the view (a scene's keep can be tiny,
+  // or empty: review M3).
+  const covers = Math.ceil(Math.max(box.w / canvas[0], box.h / canvas[1]) * d - EPS) / d;
+  const s = Math.min(fitScale(box, [kw, kh], d), covers > 0 ? covers : Infinity);
   const aw = canvas[0] * s;
   const ah = canvas[1] * s;
   if (box.w > 0 && box.h > 0 && aw >= box.w - EPS && ah >= box.h - EPS) {

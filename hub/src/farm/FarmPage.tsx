@@ -59,9 +59,8 @@ export function FarmPage() {
   const visited = view?.state.visited;
   const statuses = useMemo(() => areaStatuses(day, visited ?? new Set()), [day, visited]);
   const placed = view?.state.placed;
-  const hidden = view?.state.hidden;
-  // A sticker she hid stays placed and in the Collection; the scene leaves it out.
-  const placedKeys = useMemo(() => STICKERS.filter((s) => placed?.has(s.key) && !hidden?.has(s.key)).map((s) => s.key), [placed, hidden]);
+  // A sticker she hid stays placed and in the Collection; the scene counts it but doesn't draw it (AreaView `hidden`).
+  const placedKeys = useMemo(() => STICKERS.filter((s) => placed?.has(s.key)).map((s) => s.key), [placed]);
   const [editing, setEditing] = useState(false);
   useEffect(() => setEditing(false), [area]);
   const canPlace = useCallback((key: string) => {
@@ -179,7 +178,7 @@ export function FarmPage() {
       <div className="rio-wrap">
         {area
           ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} counts={counts} night={night} goal={goal} onBack={() => setArea(null)}
-            canEnter={canEnter} onOpenMenu={openMenu} onVisit={visit} spots={view.state.spots} editing={editing && !menu}
+            canEnter={canEnter} onOpenMenu={openMenu} onVisit={visit} spots={view.state.spots} hidden={view.state.hidden} editing={editing && !menu}
             onHide={(k) => void view.setHidden(k, true).catch(() => undefined)} onMove={(k, slot) => void view.moveTo(k, slot).catch(() => undefined)}
             onEditDone={() => setEditing(false)} />
           : <RioMap statuses={statuses} look={look} onOpen={openArea} />}

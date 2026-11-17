@@ -134,9 +134,12 @@ export const slotsIn = (scene: SceneId, state: string, milestones: readonly stri
 /**
  * The scene's own placed stickers (of `placed`, any order) in book order, each in the first free
  * slot (slot order) that takes it; `overflow` is how many found no slot (they stay in the book).
- * `spots` (a sticker she moved: its slot) come first, where that slot is free in this state and
- * takes the sticker; a spot that isn't (a slot gone, taken, or the wrong kind) is ignored and the
- * sticker takes its usual place, so a move can never lose one.
+ * A sticker she moved (`spots`) stands on its slot when that slot is free in this state and takes
+ * it; every other sticker keeps the slot book order gives it, so moving one never shifts the rest
+ * (review I2). Only a sticker whose slot a moved one took falls to the next free slot. A spot that
+ * can't be used (a slot gone, taken, or the wrong kind) is ignored: a move can never lose one.
+ * Hidden stickers are laid out like any other (the caller leaves them undrawn), so hiding one never
+ * shrinks the scene or moves the others (review I3).
  */
 export function layout(scene: SceneId, placed: readonly string[], milestones: readonly string[] = [],
   spots: ReadonlyMap<string, string> = NO_SPOTS): { bySlot: Map<string, string>; overflow: number } {
@@ -144,35 +147,49 @@ export function layout(scene: SceneId, placed: readonly string[], milestones: re
     .filter((k) => homeOf(k)?.scene === scene)
     .sort((a, b) => STICKER_BY_KEY.get(a)!.index - STICKER_BY_KEY.get(b)!.index);
   const free = slotsIn(scene, sceneState(scene, mine.length), milestones);
-  const bySlot = new Map<string, string>();
-  const laid = new Set<string>();
-  for (const k of mine) {
-    const want = spots.get(k);
-    const slot = want ? free.find((s) => s.id === want) : undefined;
-    if (slot && !bySlot.has(slot.id) && accepts(slot, stickerTags(k))) {
-      bySlot.set(slot.id, k);
-      laid.add(k);
-    }
-  }
-  let overflow = 0;
-  for (const k of mine) {
-    if (laid.has(k)) continue;
+  const fill = (bySlot: Map<string, string>, k: string): boolean => {
     const tags = stickerTags(k);
     const open = (s: Slot) => !bySlot.has(s.id) && accepts(s, tags);
     const slot = (KIND_FIRST.has(scene) ? free.find((s) => open(s) && tags.includes(s.accepts[0]!)) : undefined) ?? free.find(open);
     if (slot) bySlot.set(slot.id, k);
-    else overflow++;
+    return !!slot;
+  };
+  // Book order alone: where each sticker stands if nothing was moved.
+  const book = new Map<string, string>();
+  for (const k of mine) fill(book, k);
+  const bookSlot = new Map([...book].map(([slot, k]) => [k, slot]));
+  // Moved stickers first, then everyone else on their book-order slot, then whoever was displaced.
+  const bySlot = new Map<string, string>();
+  const rest: string[] = [];
+  for (const k of mine) {
+    const want = spots.get(k);
+    const slot = want ? free.find((s) => s.id === want) : undefined;
+    if (slot && !bySlot.has(slot.id) && accepts(slot, stickerTags(k))) bySlot.set(slot.id, k);
+    else rest.push(k);
   }
+  const displaced: string[] = [];
+  for (const k of rest) {
+    const slot = bookSlot.get(k);
+    if (slot && !bySlot.has(slot)) bySlot.set(slot, k);
+    else displaced.push(k);
+  }
+  let overflow = 0;
+  for (const k of displaced) if (!fill(bySlot, k)) overflow++;
   return { bySlot, overflow };
 }
 
 const NO_SPOTS: ReadonlyMap<string, string> = new Map();
+const NONE: ReadonlySet<string> = new Set();
 
-/** Where a placed sticker can move in its scene: the free slots there that take it (its own and taken ones left out). */
+/**
+ * Where a placed sticker can move in its scene: the free slots there that take it (its own and
+ * taken ones left out; a hidden sticker's slot counts as free).
+ */
 export function freeSlotsFor(scene: SceneId, sticker: string, placed: readonly string[], milestones: readonly string[] = [],
-  spots: ReadonlyMap<string, string> = NO_SPOTS): Slot[] {
+  spots: ReadonlyMap<string, string> = NO_SPOTS, hidden: ReadonlySet<string> = NONE): Slot[] {
   const { bySlot } = layout(scene, placed, milestones, spots);
   const mine = placed.filter((k) => homeOf(k)?.scene === scene).length;
   const tags = stickerTags(sticker);
-  return slotsIn(scene, sceneState(scene, mine), milestones).filter((s) => !bySlot.has(s.id) && accepts(s, tags));
+  const taken = (id: string) => bySlot.has(id) && !hidden.has(bySlot.get(id)!);
+  return slotsIn(scene, sceneState(scene, mine), milestones).filter((s) => !taken(s.id) && accepts(s, tags));
 }

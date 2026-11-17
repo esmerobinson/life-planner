@@ -277,3 +277,17 @@ function layoutSlotX(id: string): number {
   const slot = SCENES["fazenda/outside"].slots.find((s) => s.id === id)!;
   return (slot.x - 8) * scale;
 }
+
+it("I3: a hidden sticker isn't drawn, but the scene keeps its stage and every other sticker keeps its place", () => {
+  const placed = ["lilypad", "pebble", "cattail", "frogspawn", "snail", "dragonfly"];
+  const { unmount } = render(<AreaView area="ipanema-beach" look="day" day={3} placed={placed} onBack={() => undefined} />);
+  const state = document.querySelector(".rio-area")!.getAttribute("data-state");
+  const left = (k: string) => document.querySelector<HTMLElement>(`.rio-sticker[data-sticker="${k}"]`)?.style.left;
+  const before = Object.fromEntries(placed.map((k) => [k, left(k)]));
+  unmount();
+  render(<AreaView area="ipanema-beach" look="day" day={3} placed={placed} hidden={new Set(["lilypad"])} onBack={() => undefined} />);
+  expect(document.querySelector(".rio-area")).toHaveAttribute("data-state", state!);
+  expect(document.querySelector('.rio-sticker[data-sticker="lilypad"]')).toBeNull();
+  for (const k of placed.slice(1)) expect(left(k), k).toBe(before[k]);
+  expect(within(screen.getByRole("list", { name: "Stickers here" })).queryByText("Lily pad")).toBeNull();
+});

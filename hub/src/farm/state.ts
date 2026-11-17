@@ -47,8 +47,8 @@ export type FarmRow = StartRow | SeenRow | PlacedRow | ArrivedRow | OutfitRow | 
 
 /** Sticker keys, spot ids and Rio area keys: lower-case words and dashes (a later pack may add more). */
 const KEY = /^[a-z0-9][a-z0-9-]{0,47}$/;
-/** A Rio scene's slot id, as the pack writes them (lower-case words, dashes or underscores). */
-const SLOT = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+/** A Rio scene's slot id, as the pack writes them (letters of either case, digits, dashes, underscores: "gondola-A-top-1"). */
+const SLOT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 /** Device ids, as the sync engine makes them. */
 const DEVICE = /^[A-Za-z0-9_-]{1,64}$/;
 /** Accessory codes in the art pack (A1–A11, H1–H7; a later pack may add more). */

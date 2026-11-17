@@ -1,5 +1,5 @@
 import { COLLECTION, STICKERS } from "../farm/catalogue";
-import { farmState, placedRow } from "../farm/state";
+import { farmState, placedRow, spotRow, validFarm } from "../farm/state";
 import { SCENES } from "./assets";
 import { HOME, accepts, freeSlotsFor, homeOf, inScenes, layout, sceneState, slotsIn, stickerTags } from "./placement";
 
@@ -232,4 +232,32 @@ describe("only Rio art in Rio scenes (Esme, 2026-11-17: the old \"HI!\" and \"OK
       expect(homeOf(s.key), s.key).not.toBeNull();
     }
   });
+});
+
+describe("review fixes: a move or a hide touches only that sticker", () => {
+  const beach = ["lilypad", "pebble", "cattail", "frogspawn"];
+
+  it("I2: moving one sticker leaves every other one where it was", () => {
+    const before = layout("ipanema-beach/outside", beach);
+    const slotOf = (m: Map<string, string>, k: string) => [...m].find(([, v]) => v === k)?.[0];
+    const to = freeSlotsFor("ipanema-beach/outside", "lilypad", beach)[0]!.id;
+    const after = layout("ipanema-beach/outside", beach, [], new Map([["lilypad", to]]));
+    expect(slotOf(after.bySlot, "lilypad")).toBe(to);
+    for (const k of beach.slice(1)) expect(slotOf(after.bySlot, k), k).toBe(slotOf(before.bySlot, k));
+  });
+
+  it("I3: a hidden sticker still counts and keeps its slot (the scene doesn't shrink, the others don't shift); its slot is free to move into", () => {
+    const placed = ["hen", "chick", "cow"];
+    const all = layout("fazenda/outside", placed);
+    const hidden = new Set(["hen"]);
+    const withHidden = layout("fazenda/outside", placed, [], undefined);
+    expect([...withHidden.bySlot]).toEqual([...all.bySlot]);
+    expect(freeSlotsFor("fazenda/outside", "hen", placed, [], undefined, hidden).map((s) => s.id)).toContain("hen-1");
+  });
+});
+
+it("I1: every slot id in the pack can be stored as a spot (Zona Sul's gondola-A-top-1, for one)", () => {
+  for (const [scene, data] of Object.entries(SCENES)) {
+    for (const s of data.slots) expect(validFarm(spotRow("hen", s.id, "2026-11-17")), `${scene} ${s.id}`).toBe(true);
+  }
 });

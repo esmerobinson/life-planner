@@ -248,3 +248,9 @@ describe("placeLabels: a small label under each open place, only where it clears
 });
 
 const overlaps = (a: readonly number[], b: readonly number[]) => a[0]! < b[0]! + b[2]! && b[0]! < a[0]! + a[2]! && a[1]! < b[1]! + b[3]! && b[1]! < a[1]! + a[3]!;
+
+it("M3: a small desktop window (crisp, not fractional) with nothing drawn still gets a finite scene scale", () => {
+  const f = coverFit({ w: 500, h: 380 }, [384, 240], sceneKeep([], [384, 240]), 2);
+  expect(Number.isFinite(f.scale)).toBe(true);
+  expect(f.scale).toBeLessThanOrEqual(2);
+});

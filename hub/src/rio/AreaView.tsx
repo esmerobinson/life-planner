@@ -63,7 +63,7 @@ const STICKER_SHEETS = ["stickers"];
 const NIGHT_TICK_MS = 40;
 
 export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = null, goal = false, onBack, canEnter, onOpenMenu, onVisit,
-  spots, editing = false, onHide, onMove, onEditDone }: {
+  spots, hidden, editing = false, onHide, onMove, onEditDone }: {
   area: string;
   look: Look;
   /** The farm day: a scene that opens later (the sea, day 30) has no door before then. */
@@ -74,6 +74,8 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   onOpenMenu?: (tab: DoorMenu) => void;
   /** She stepped into another area's scene (the barraca from the beach): it counts as a visit. */
   onVisit?: (area: string) => void;
+  /** Placed stickers she hid: laid out and counted like the rest (the scene keeps its stage), not drawn. */
+  hidden?: ReadonlySet<string>;
   /** Stickers she moved: their slots (farm `spot` rows). */
   spots?: ReadonlyMap<string, string>;
   /** Edit mode (the hotbar's Arrange): pick a placed sticker, then a free slot for it, or Hide. */
@@ -106,8 +108,8 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   const state = plan.state;
   const { bySlot, overflow } = useMemo(() => layout(scene, placed, plan.milestones, spots), [scene, placed, plan.milestones, spots]);
   // Edit mode: where the picked sticker can go (the kit's place targets), and Esc to step back out.
-  const pick = editing && picked && [...bySlot.values()].includes(picked) ? picked : null;
-  const targets = useMemo(() => (pick ? freeSlotsFor(scene, pick, placed, plan.milestones, spots) : []), [pick, scene, placed, plan.milestones, spots]);
+  const pick = editing && picked && [...bySlot.values()].includes(picked) && !hidden?.has(picked) ? picked : null;
+  const targets = useMemo(() => (pick ? freeSlotsFor(scene, pick, placed, plan.milestones, spots, hidden) : []), [pick, scene, placed, plan.milestones, spots, hidden]);
   useEffect(() => {
     if (!editing) {
       setPicked(null);
@@ -178,9 +180,10 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
   const drawn = useMemo(() => {
     const at = new Map(data.slots.map((s) => [s.id, s]));
     return [...bySlot]
+      .filter(([, key]) => !hidden?.has(key))
       .map(([slot, key]) => ({ slot: at.get(slot)!, key }))
       .sort((a, b) => a.slot.y - b.slot.y || a.slot.x - b.slot.x);
-  }, [bySlot, data]);
+  }, [bySlot, data, hidden]);
 
   // The scene covers the view (an even plank border), never trimming what's drawn there.
   const [kx, ky, kw, kh] = sceneKeep([...drawn.map((d) => stickerBox(d.slot)), ...doors.map((d) => doorKeep(d.rect))], data.scene);
@@ -377,7 +380,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
       )}
       {/* PLACEHOLDER WORDING (book order) */}
       <ul className="visually-hidden" aria-label="Stickers here">
-        {[...bySlot.values()].map((key) => <li key={key}>{STICKER_BY_KEY.get(key)?.name ?? key}</li>)}
+        {[...bySlot.values()].filter((key) => !hidden?.has(key)).map((key) => <li key={key}>{STICKER_BY_KEY.get(key)?.name ?? key}</li>)}
       </ul>
     </div>
   );
