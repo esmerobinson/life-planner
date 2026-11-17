@@ -7,7 +7,7 @@
 // never re-opens the journal; only a new or changed row is opened.
 
 import { db } from "../data/db";
-import { readExerciseCards } from "../data/repo";
+import { readExerciseCards, reviewDoneDays } from "../data/repo";
 import type { ISODate, JournalRow } from "../domain/types";
 import { journalAad, openJson, type JournalKey } from "../journal/crypto";
 import { countWords, ENTRY_CHECK, MORNING_WORDS } from "../journal/entries";
@@ -123,6 +123,8 @@ export async function readJournalFacts(jk: JournalKey): Promise<JournalFacts> {
     shortPages,
     checkins,
     exercise: marks.filter((m) => m.done || m.logged).map((m) => ({ date: m.date, card: m.id })),
+    // Only the days (a review row that won't open here is simply not counted).
+    reviews: await reviewDoneDays(jk).catch(() => new Set<ISODate>()),
     chapters: books?.chapters ?? [],
     workbooks: books?.workbooks ?? { dbt: null, bpd: null },
   };

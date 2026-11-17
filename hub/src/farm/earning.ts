@@ -26,6 +26,8 @@ export interface JournalFacts {
   checkins: ReadonlySet<ISODate>;
   /** Exercise cards done (or tracker days logged): one per card per day. */
   exercise: readonly { date: ISODate; card: string }[];
+  /** Days with a weekly review done: Mental health work, counted as exercise days (Esme, 16 Nov 2026). */
+  reviews?: ReadonlySet<ISODate>;
   /** Workbook chapters finished, with the day the last card of each was first done. */
   chapters: readonly { track: string; chapter: number; doneOn: ISODate }[];
   /** The day each whole workbook was finished (null: not yet). */
@@ -268,7 +270,7 @@ export function counters(input: EarningInput): Counters {
     const checkins = days([...journal.checkins].filter(after));
     set("checkins", checkins.length);
     set("checkin-after-gap", gaps(checkins, 3) > 0 ? 1 : 0);
-    set("exercise-days", new Set(journal.exercise.map((e) => e.date).filter(after)).size);
+    set("exercise-days", new Set([...journal.exercise.map((e) => e.date), ...(journal.reviews ?? [])].filter(after)).size);
     set("chapters", journal.chapters.filter((ch) => after(ch.doneOn)).length);
     set("workbook:dbt", after(journal.workbooks.dbt ?? undefined) ? 1 : 0);
     set("workbook:bpd", after(journal.workbooks.bpd ?? undefined) ? 1 : 0);
@@ -280,7 +282,7 @@ export function counters(input: EarningInput): Counters {
     ...sessions,
     ...items.filter(kept).flatMap((it) => (it.sessions ?? []).map((s) => s.doneOn)),
     ...input.todayDone.filter(after),
-    ...(journal ? [...journal.morning, ...journal.checkins, ...journal.exercise.map((e) => e.date)].filter(after) : []),
+    ...(journal ? [...journal.morning, ...journal.checkins, ...journal.exercise.map((e) => e.date), ...(journal.reviews ?? [])].filter(after) : []),
   ].filter((d): d is ISODate => after(d) && d <= today));
   set("returns", gaps(days([start, ...active]), 3));
   for (const month of new Set(active.map((d) => MONTHS[Number(d.slice(5, 7)) - 1]!))) set(`month:${month}`, 1);

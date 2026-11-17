@@ -67,3 +67,11 @@ export function journalRowDays(morning: ReadonlySet<ISODate>, checkins: readonly
 export function exerciseDoneDays(marks: readonly ExerciseMark[]): Set<ISODate> {
   return new Set(marks.filter((m) => m.done || m.logged).map((m) => m.date));
 }
+
+/**
+ * The Mental health exercise row's days: a card done (or a tracker day logged), or a weekly review
+ * done (Esme, 16 Nov 2026: the Sunday review counts as Mental health work).
+ */
+export function mentalHealthDays(marks: readonly ExerciseMark[], reviewDays: ReadonlySet<ISODate>): Set<ISODate> {
+  return new Set([...exerciseDoneDays(marks), ...reviewDays]);
+}

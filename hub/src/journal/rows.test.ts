@@ -98,3 +98,13 @@ describe("journalRowDays (goals: Journal daily, fix round 1)", () => {
     expect(days).toEqual(set("2026-11-01", "2026-10-31"));
   });
 });
+
+describe("the weekly review counts as Mental health work", () => {
+  it("a day with a done weekly review is an exercise day, like a card done", async () => {
+    const { mentalHealthDays } = await import("./rows");
+    const marks = [{ date: "2026-11-12", id: "b-001", done: true }] as unknown as Parameters<typeof mentalHealthDays>[0];
+    const days = mentalHealthDays(marks, new Set(["2026-11-15"]));
+    expect([...days].sort()).toEqual(["2026-11-12", "2026-11-15"]);
+    expect(mentalHealthDays(marks, new Set()).has("2026-11-15")).toBe(false);
+  });
+});

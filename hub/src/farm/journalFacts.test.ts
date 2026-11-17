@@ -1,5 +1,6 @@
 import { db } from "../data/db";
-import { ensureCheckinSet, finishMorningPage, saveAnswer, saveExerciseMark, saveMorningDraft } from "../data/repo";
+import { ensureCheckinSet, finishMorningPage, saveAnswer, saveExerciseMark, saveMorningDraft, saveWeekReview } from "../data/repo";
+import { EMPTY_WEEK_REVIEW } from "../journal/routine";
 import { confirmedDevice, keyFor } from "../test/journalKey";
 import { forgetJournalFacts, journalOpenCount, readJournalFacts } from "./journalFacts";
 
@@ -59,4 +60,13 @@ it("a check-in with a question not yet moved past isn't a check-in day", async (
   await ensureCheckinSet(jk, D1, ["q1", "q2"]);
   await saveAnswer(jk, D1, "q1", ME, "Pretend", true);
   expect([...(await readJournalFacts(jk)).checkins]).toEqual([]);
+});
+
+it("a weekly review done is a Mental health day; a draft one isn't (only the day, never its words)", async () => {
+  const jk = await world();
+  await saveWeekReview(jk, ME, { ...EMPTY_WEEK_REVIEW, well: "Pretend review words" }, { date: "2026-11-08", seen: [], submittedAt: null }, true);
+  await saveWeekReview(jk, ME, { ...EMPTY_WEEK_REVIEW, well: "Pretend draft" }, { date: "2026-11-10", seen: [], submittedAt: null });
+  const f = await readJournalFacts(jk);
+  expect([...(f.reviews ?? [])]).toEqual(["2026-11-08"]);
+  expect(JSON.stringify([...(f.reviews ?? [])])).not.toContain("Pretend");
 });

@@ -229,6 +229,15 @@ describe("counters", () => {
     expect(c.get("exercise-days")).toBe(2);
   });
 
+  it("a day with a weekly review done is an exercise day (Mental health work), counted once with cards that day", () => {
+    const journal: JournalFacts = {
+      ...NO_JOURNAL,
+      exercise: [{ date: "2026-11-02", card: "a" }],
+      reviews: new Set(["2026-11-02", "2026-11-08"]),
+    };
+    expect(counters(input({ journal })).get("exercise-days")).toBe(2);
+  });
+
   it("the parts not built yet are never earned", () => {
     const c = new Map([["weekly-reviews", 99], ["started", 1]]) as never;
     expect(derivedEarned(c)).toEqual(["hi"]);

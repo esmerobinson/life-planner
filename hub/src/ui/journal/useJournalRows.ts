@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { db } from "../../data/db";
-import { listCheckinDays, listMorningDone, readExerciseCards, readExerciseProgress } from "../../data/repo";
+import { listCheckinDays, listMorningDone, readExerciseCards, readExerciseProgress, reviewDoneDays } from "../../data/repo";
 import type { ISODate } from "../../domain/types";
 import { planExercise } from "../../journal/exercise";
 import { loadJournalKey } from "../../journal/keyStore";
-import { checkinDoneDays, exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows";
+import { checkinDoneDays, mentalHealthDays, rowStatus, type RowStatus } from "../../journal/rows";
 import { loadTimeout } from "./loadTimeout";
 import { useDbChanges } from "./useJournalKey";
 
@@ -39,12 +39,13 @@ export function useJournalRows(today: ISODate): JournalRowsView {
       if (!jk) {
         next = { state: "locked" };
       } else {
-        const [morning, checkins, progress, cards, device] = await Promise.all([
+        const [morning, checkins, progress, cards, device, reviews] = await Promise.all([
           listMorningDone(jk),
           listCheckinDays(jk),
           readExerciseProgress(jk),
           readExerciseCards(jk),
           db.syncMeta.get("deviceId"),
+          reviewDoneDays(jk),
         ]);
         const deviceId = typeof device?.value === "string" ? device.value : "";
         const card =
@@ -53,7 +54,7 @@ export function useJournalRows(today: ISODate): JournalRowsView {
           state: "ok",
           morning: rowStatus(morning, today),
           checkin: rowStatus(checkinDoneDays(checkins), today),
-          exercise: { ...rowStatus(exerciseDoneDays(progress.marks), today), card: card && { day: card.day, theme: card.theme } },
+          exercise: { ...rowStatus(mentalHealthDays(progress.marks, reviews), today), card: card && { day: card.day, theme: card.theme } },
         };
       }
     } catch {

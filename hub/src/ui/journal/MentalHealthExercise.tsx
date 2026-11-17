@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { readBackPath } from "./tabs";
 import {
-  CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseProgress,
+  CANT_OPEN, CARDS_TOO_BIG, importExerciseCards, listExerciseEntries, readExerciseCards, readExerciseProgress, reviewDoneDays,
   recordExerciseShown, setExerciseStar, type CardsState, type ExerciseProgress, type ExerciseResponse,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
@@ -12,7 +12,7 @@ import {
   type CardSet, type ExerciseCard,
 } from "../../journal/exercise";
 import type { ISODate } from "../../domain/types";
-import { exerciseDoneDays, rowStatus, type RowStatus } from "../../journal/rows";
+import { mentalHealthDays, rowStatus, type RowStatus } from "../../journal/rows";
 import { Streak } from "../Streak";
 import { LoadLine, longDate, useLoadGuard } from "./bits";
 import { CardExample, ExerciseResponseBox, fillsCard } from "./ExerciseResponseBox";
@@ -67,6 +67,8 @@ const MAX_FILE_BYTES = 16 * 1024 * 1024;
 export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; today: ISODate; deviceId: string }) {
   const [cards, setCards] = useState<CardsState | null>(null);
   const [progress, setProgress] = useState<ExerciseProgress | null>(null);
+  // Days with a weekly review done: they count for the row too (Mental health work).
+  const [reviews, setReviews] = useState<ReadonlySet<ISODate>>(new Set());
   // Every response (today's too), newest first: Past exercises and each card in the chapter map.
   const [responses, setResponses] = useState<ExerciseResponse[]>([]);
   const [problem, setProblem] = useState("");
@@ -98,11 +100,14 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const [c, p, all] = await Promise.all([readExerciseCards(jk), readExerciseProgress(jk), listExerciseEntries(jk, addDays(today, 1))]);
+      const [c, p, all, r] = await Promise.all([
+        readExerciseCards(jk), readExerciseProgress(jk), listExerciseEntries(jk, addDays(today, 1)), reviewDoneDays(jk).catch(() => new Set<ISODate>()),
+      ]);
       if (id !== latest.current) return;
       loaded.current = true;
       setCards(c);
       setProgress(p);
+      setReviews(r);
       setResponses(all.entries);
     } catch {
       if (id !== latest.current) return;
@@ -168,7 +173,7 @@ export function MentalHealthExercise({ jk, today, deviceId }: { jk: JournalKey; 
 
   const star = (id: string, on: boolean) => void attempt(() => setExerciseStar(jk, today, deviceId, id, on));
   const starred = progress?.starred ?? new Set<string>();
-  const row = useMemo(() => rowStatus(exerciseDoneDays(progress?.marks ?? []), today), [progress, today]);
+  const row = useMemo(() => rowStatus(mentalHealthDays(progress?.marks ?? [], reviews), today), [progress, reviews, today]);
   const byId = new Map((set?.cards ?? []).map((c) => [c.id, c]));
   // Finished today: done, and what she submitted still fills the card as it is now (a re-imported
   // card with a new part to answer shows again, her earlier answer on it).
