@@ -1,4 +1,4 @@
-import { buildTint, recolour } from "./tint";
+import { buildTint, cachedTint, recolour } from "./tint";
 
 // Placed stickers take the look's colours (museum README: "Finds placed by the game as stickers
 // are in day colours. They should be tinted with the same night/rain twin"). The twin of each day
@@ -35,4 +35,14 @@ describe("tinting placed stickers to the look", () => {
     recolour(img, new Map());
     expect([...img]).toEqual([110, 90, 100, 255]);
   });
+});
+
+it("review I1: a tinted sticker is built once per look and reused on every frame", () => {
+  const build = vi.fn(() => ({}) as HTMLCanvasElement);
+  const a = cachedTint("hall-day|hall-rain|ammonite", build);
+  const b = cachedTint("hall-day|hall-rain|ammonite", build);
+  expect(a).toBe(b);
+  expect(build).toHaveBeenCalledTimes(1);
+  cachedTint("hall-day|hall-night|ammonite", build);
+  expect(build).toHaveBeenCalledTimes(2);
 });

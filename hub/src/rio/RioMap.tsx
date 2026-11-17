@@ -9,7 +9,7 @@ import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d } from "../farm/sprites";
 import { opensOn, type AreaStatus } from "./areas";
 import { MAP_DIR, RIO_MAP, mapBase, mapLayer, mapLook, type Look, type RioEvent } from "./assets";
-import { activeEvent, useNow } from "./events";
+import { activeEvent, eventLook, useNow } from "./events";
 import { useCover, useRioImages, type RioImages } from "./canvas";
 import { MAP_KEEP, hitPlace } from "./mapMath";
 import { useUi } from "./ui/fit";
@@ -32,22 +32,22 @@ function tipFor(key: string, status: AreaStatus | undefined): string | null {
   return "Coming soon";
 }
 
-/** A takeover's layer for the look (on a rainy day, the day layer over the rain look). */
-const eventLayer = (e: RioEvent, look: Look) => (look === "night" ? e.layers.night : e.layers.day);
-const fireworksFor = (e: RioEvent | null, look: Look) => (e && look === "night" ? e.animation?.night : undefined);
+/** A takeover's layer (events.ts eventLook: on a rainy day the day layer; Réveillon's night till 06:00). */
+const eventLayer = (e: RioEvent, layer: "day" | "night") => e.layers[layer];
+const fireworksFor = (e: RioEvent | null, layer: "day" | "night") => (e && layer === "night" ? e.animation?.night : undefined);
 
-function filesFor(look: Look, event: RioEvent | null): string[] {
+function filesFor(look: Look, event: RioEvent | null, layer: "day" | "night"): string[] {
   const out = [at(mapBase(look)), at(RIO_MAP.markers.locked.file), at(RIO_MAP.markers.new.file)];
   for (const p of [...RIO_MAP.places, RIO_MAP.boat_route]) {
     out.push(at(mapLayer(p, look, "open")), at(mapLayer(p, look, "locked")));
   }
   if (rainsOn(look)) out.push(...RAIN!.frames.map(at));
-  if (event) out.push(at(eventLayer(event, look)), ...(fireworksFor(event, look)?.frames ?? []).map(at));
+  if (event) out.push(at(eventLayer(event, layer)), ...(fireworksFor(event, layer)?.frames ?? []).map(at));
   return out;
 }
 
 function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, statuses: ReadonlyMap<string, AreaStatus>, rainFrame: number | null,
-  event: RioEvent | null, fireworksFrame: number | null) {
+  event: RioEvent | null, layer: "day" | "night", fireworksFrame: number | null) {
   ctx.clearRect(0, 0, W, H);
   const put = (path: string, x = 0, y = 0) => {
     const i = img[at(path)];
@@ -69,8 +69,8 @@ function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, stat
   }
   // A holiday takeover: after the last place, over open and locked alike, before the rain and markers.
   if (event) {
-    put(eventLayer(event, look));
-    const fw = fireworksFor(event, look);
+    put(eventLayer(event, layer));
+    const fw = fireworksFor(event, layer);
     if (fw && fireworksFrame !== null) put(fw.frames[fireworksFrame % fw.frames.length]!);
   }
   // The falling rain: after the places, before the markers (map.json weather.rain).
@@ -96,21 +96,22 @@ export function RioMap({ statuses, look, now: fixedNow, onOpen }: {
   const scale = fit.scale;
   const now = useNow(fixedNow);
   const event = activeEvent(now);
-  const files = useMemo(() => filesFor(look, event), [look, event]);
+  const layer = event ? eventLook(event, now, look) : "day";
+  const files = useMemo(() => filesFor(look, event, layer), [look, event, layer]);
   const images = useRioImages(files);
   const [hover, setHover] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const reduced = useReducedMotion();
   const raining = rainsOn(look) && !reduced;
   const rainTick = useTicker(RAIN?.frame_ms ?? 1000, raining);
-  const fireworks = fireworksFor(event, look);
+  const fireworks = fireworksFor(event, layer);
   const fireworksTick = useTicker(fireworks?.frame_ms ?? 1000, !!fireworks && !reduced);
 
   useEffect(() => {
     const ctx = ctx2d(canvas.current);
     if (!ctx || !images) return;
-    drawMap(ctx, images, look, statuses, raining ? rainTick : null, event, fireworks && !reduced ? fireworksTick : null);
-  }, [images, look, statuses, raining, rainTick, event, fireworks, reduced, fireworksTick]);
+    drawMap(ctx, images, look, statuses, raining ? rainTick : null, event, layer, fireworks && !reduced ? fireworksTick : null);
+  }, [images, look, statuses, raining, rainTick, event, layer, fireworks, reduced, fireworksTick]);
 
   const pick = (key: string) => {
     if (isOpen(statuses.get(key))) {

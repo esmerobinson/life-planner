@@ -33,6 +33,17 @@ export function activeEvent(now: Date, events: readonly RioEvent[] = RIO_MAP.eve
   return null;
 }
 
+/**
+ * Which of a takeover's layers to draw: the map's look (rain shows the day layer); while a
+ * takeover's night runs past midnight (Réveillon, until 06:00 on 1 January) always the night one.
+ */
+export function eventLook(e: RioEvent, now: Date, look: "day" | "rain" | "night"): "day" | "night" {
+  const until = runsUntil(e);
+  const { md, hour } = rioDate(now);
+  if (until && md === until.md && hour < until.hour) return "night";
+  return look === "night" ? "night" : "day";
+}
+
 /** The time, re-read every minute (or the fixed one given, for tests and previews). */
 export function useNow(fixed?: Date): Date {
   const [now, setNow] = useState(() => new Date());

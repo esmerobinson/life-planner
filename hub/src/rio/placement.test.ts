@@ -70,6 +70,16 @@ describe("where earned stickers sit", () => {
     expect(overflow).toBe(2);
   });
 
+  it("review I2: the orchid house puts each glasshouse sticker where the pack meant it (bench, floor tubs), never in the pools", () => {
+    const { bySlot } = layout("jardim-botanico/inside", keysIn("glasshouse"));
+    expect(bySlot.get("potting-bench")).toBe("seedtray");
+    expect(["floor-left", "floor-right"].map((s) => bySlot.get(s)).sort()).toEqual(["fig-tree", "lemontree"]);
+    expect(bySlot.has("pool-1")).toBe(false);
+    expect(bySlot.has("pool-2")).toBe(false);
+    // Phase-1 scenes keep their layout: the preference is the Jardim's alone.
+    expect(layout("fazenda/outside", ["haybale", "seeds-art", "seeds-mind"]).bySlot.get("decor-veranda-1")).toBe("seeds-mind");
+  });
+
   it("the glasshouse fills the orchid house, each on a slot that takes its kind", () => {
     const glass = keysIn("glasshouse");
     const { bySlot, overflow } = layout("jardim-botanico/inside", glass);

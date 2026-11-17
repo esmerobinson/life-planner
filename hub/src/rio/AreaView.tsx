@@ -154,7 +154,8 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
     for (const st of stampList) put(st.file, st.at[0], st.at[1]);
     const dayImg = tintPair ? images[tintPair.day] : undefined;
     const lookImg = tintPair ? images[tintPair.look] : undefined;
-    const tint = tintPair && dayImg && lookImg ? tintFor(`${tintPair.day}|${tintPair.look}`, dayImg, lookImg) : null;
+    const tintKey = tintPair ? `${tintPair.day}|${tintPair.look}` : "";
+    const tint = tintPair && dayImg && lookImg ? tintFor(tintKey, dayImg, lookImg) : null;
     if (underlay && underlayStrip) {
       const img = images[underlayStrip];
       if (img) drawFrame(ctx, img, underlay.size[0], underlay.size[1], reduced ? 0 : underlayTick % underlay.count, 0, 0);
@@ -180,7 +181,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
         if (!st) continue;
         const left = slot.x - STICKER / 2;
         const top = slot.anchor === "top" ? slot.y : slot.y - STICKER + 1;
-        if (tint) drawTinted(ctx, tint, { x: left, y: top, w: STICKER, h: STICKER }, (c, x, y) => drawSticker(c, sheets, st, "sticker", x, y));
+        if (tint) drawTinted(ctx, `${tintKey}|${key}`, tint, { x: left, y: top, w: STICKER, h: STICKER }, (c, x, y) => drawSticker(c, sheets, st, "sticker", x, y));
         else drawSticker(ctx, sheets, st, "sticker", left, top);
       }
     }
@@ -188,7 +189,7 @@ export function AreaView({ area, look, day, placed, counts = NO_COUNTS, night = 
     const glass = data.glass ? images[data.glass.file] : undefined;
     if (data.glass && glass) {
       for (const [gx, gy] of data.glass.at) {
-        if (tint) drawTinted(ctx, tint, { x: gx, y: gy, w: glass.width, h: glass.height }, (c, x, y) => c.drawImage(glass, x, y));
+        if (tint) drawTinted(ctx, `${tintKey}|glass`, tint, { x: gx, y: gy, w: glass.width, h: glass.height }, (c, x, y) => c.drawImage(glass, x, y));
         else ctx.drawImage(glass, gx, gy);
       }
     }

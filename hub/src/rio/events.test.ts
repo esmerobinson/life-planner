@@ -1,4 +1,4 @@
-import { activeEvent, rioDate } from "./events";
+import { activeEvent, eventLook, rioDate } from "./events";
 
 // Holiday takeovers on the map (map.json events), in Rio time (UTC-3, no daylight saving),
 // read the same on a device in any time zone.
@@ -28,5 +28,20 @@ describe("the map's holiday takeovers", () => {
     expect(at("2027-01-01T08:59:00Z")).toBe("reveillon"); // 05:59 on 1 Jan
     expect(at("2027-01-01T09:00:00Z")).toBeNull(); // 06:00
     expect(at("2027-01-01T15:00:00Z")).toBeNull();
+  });
+});
+
+describe("which takeover layer shows", () => {
+  const reveillon = activeEvent(new Date("2026-12-31T21:00:00Z"))!;
+  const carnaval = activeEvent(new Date("2027-02-10T15:00:00Z"))!;
+  it("follows the map's look, the day layer in the rain", () => {
+    expect(eventLook(carnaval, new Date("2027-02-10T15:00:00Z"), "day")).toBe("day");
+    expect(eventLook(carnaval, new Date("2027-02-10T15:00:00Z"), "rain")).toBe("day");
+    expect(eventLook(carnaval, new Date("2027-02-10T23:00:00Z"), "night")).toBe("night");
+    expect(eventLook(reveillon, new Date("2026-12-31T15:00:00Z"), "day")).toBe("day");
+  });
+  it("Réveillon's night runs until 06:00 on 1 January even once the weather says day (map.json)", () => {
+    expect(eventLook(reveillon, new Date("2027-01-01T08:30:00Z"), "day")).toBe("night"); // 05:30 in Rio
+    expect(eventLook(reveillon, new Date("2027-01-01T08:30:00Z"), "rain")).toBe("night");
   });
 });

@@ -81,18 +81,35 @@ export function tintFor(key: string, day: HTMLImageElement, look: HTMLImageEleme
   return t;
 }
 
-/** Draws `draw` (at the given box) into an offscreen canvas, recolours it, and puts it on ctx. */
-export function drawTinted(ctx: CanvasRenderingContext2D, tint: ReadonlyMap<number, number>, box: { x: number; y: number; w: number; h: number },
+const tinted = new Map<string, HTMLCanvasElement | null>();
+
+/**
+ * A tinted picture, built once per key (scene look + sticker) and reused on every frame after:
+ * the rain redraws the scene about 9 times a second (review I1).
+ */
+export function cachedTint(key: string, build: () => HTMLCanvasElement | null): HTMLCanvasElement | null {
+  if (!tinted.has(key)) tinted.set(key, build());
+  return tinted.get(key)!;
+}
+
+/**
+ * Draws `draw` into an offscreen canvas of the box's size, recoloured to the look, and puts it on
+ * ctx at the box. `key` names what is drawn in this look (built once, then reused).
+ */
+export function drawTinted(ctx: CanvasRenderingContext2D, key: string, tint: ReadonlyMap<number, number>, box: { x: number; y: number; w: number; h: number },
   draw: (c: CanvasRenderingContext2D, x: number, y: number) => void): void {
-  const off = document.createElement("canvas");
-  off.width = box.w;
-  off.height = box.h;
-  const o = off.getContext("2d");
-  if (!o) return;
-  o.imageSmoothingEnabled = false;
-  draw(o, 0, 0);
-  const data = o.getImageData(0, 0, box.w, box.h);
-  recolour(data.data, tint);
-  o.putImageData(data, 0, 0);
-  ctx.drawImage(off, Math.round(box.x), Math.round(box.y));
+  const off = cachedTint(key, () => {
+    const c = document.createElement("canvas");
+    c.width = box.w;
+    c.height = box.h;
+    const o = c.getContext("2d");
+    if (!o) return null;
+    o.imageSmoothingEnabled = false;
+    draw(o, 0, 0);
+    const data = o.getImageData(0, 0, box.w, box.h);
+    recolour(data.data, tint);
+    o.putImageData(data, 0, 0);
+    return c;
+  });
+  if (off) ctx.drawImage(off, Math.round(box.x), Math.round(box.y));
 }

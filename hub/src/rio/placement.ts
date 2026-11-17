@@ -56,6 +56,9 @@ const TAGS_BY_KEY: Record<string, string[]> = {
   "golden-carp": ["fish:rare"],
   // The glasshouse's potting things go where the seed packet goes.
   seedtray: ["greenhouse:seeds"],
+  // The potted trees stand in the orchid house's floor tubs (the pack's "trees:tree" spots).
+  lemontree: ["trees:tree"],
+  "fig-tree": ["trees:tree"],
   seedling: ["greenhouse:seeds"],
   wateringcan: ["greenhouse:seeds"],
 };
@@ -101,6 +104,13 @@ export function sceneState(scene: SceneId, placedHere: number): string {
   return placedHere * 2 >= n ? "full" : "start";
 }
 
+/**
+ * Scenes whose slots list a main kind first (accepts[0]) and fall back to others: a sticker takes a
+ * free slot made for its own kind before a fallback one, so plants don't fill the pools while the
+ * bench stands empty (review I2). Only these scenes: phase-1 layouts stay exactly as they were.
+ */
+const KIND_FIRST: ReadonlySet<SceneId> = new Set<SceneId>(["jardim-botanico/outside", "jardim-botanico/inside"]);
+
 /** The slots free in a state (a slot that needs a milestone, only once it is earned). */
 export const slotsIn = (scene: SceneId, state: string, milestones: readonly string[] = []): Slot[] =>
   SCENES[scene].slots.filter((s) => (!s.state || s.state === state) && (!s.requires || milestones.includes(s.requires)));
@@ -118,7 +128,8 @@ export function layout(scene: SceneId, placed: readonly string[], milestones: re
   let overflow = 0;
   for (const k of mine) {
     const tags = stickerTags(k);
-    const slot = free.find((s) => !bySlot.has(s.id) && accepts(s, tags));
+    const open = (s: Slot) => !bySlot.has(s.id) && accepts(s, tags);
+    const slot = (KIND_FIRST.has(scene) ? free.find((s) => open(s) && tags.includes(s.accepts[0]!)) : undefined) ?? free.find(open);
     if (slot) bySlot.set(slot.id, k);
     else overflow++;
   }
