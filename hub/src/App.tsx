@@ -88,7 +88,7 @@ export function AppRoutes() {
               <Route key={n.id} path={n.path} element={<VisionPage />} />
             ) : n.id === "journal" ? (
               <Route key={n.id} path={n.path} element={<JournalRoute />} />
-            ) : n.id === "goals" || n.id === "farm" || n.path.startsWith("/area/") ? null : (
+            ) : n.id === "goals" || n.id === "farm" || n.id === "repeating" || n.path.startsWith("/area/") ? null : (
               <Route key={n.id} path={n.path} element={<h1>{n.label}</h1>} />
             ),
           )}

@@ -14,6 +14,7 @@ import production from "../assets/icons/production.svg";
 import admin from "../assets/icons/admin.svg";
 import farmIcon from "../assets/farm/esmes-farm-icon-pixel.png";
 import inbox from "../assets/icons/inbox.svg";
+import repeating from "../assets/icons/repeating.svg";
 
 export type NavEntry = {
   id: string;
@@ -27,6 +28,9 @@ export type NavEntry = {
 export const NAV: NavEntry[] = [
   { id: "home", label: "Home", path: "/", icon: home, tile: "#9eb4e6", group: 1 },
   { id: "goals", label: "Goals", path: "/goals", icon: goals, tile: "#98c293", group: 1 },
+  // Repeating (Esme's pick A, app design queue 2026-11-17): its own row under Goals and an app
+  // on the phone grid. Rescue coral #df7e6f is her pick; the repeat-arrows icon is new.
+  { id: "repeating", label: "Repeating", path: "/repeating", icon: repeating, tile: "#df7e6f", group: 1 },
   { id: "admin", label: "Admin", path: "/area/admin", icon: admin, tile: "#90825b", group: 1 },
   { id: "mind", label: "Mind", path: "/area/mind", icon: mind, tile: "#a3d5c2", group: 2 },
   { id: "writing", label: "Writing", path: "/area/writing", icon: writing, tile: "#e6aeaf", group: 2 },

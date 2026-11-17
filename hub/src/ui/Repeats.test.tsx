@@ -183,10 +183,14 @@ describe("the Repeating page", () => {
 });
 
 describe("how to get there", () => {
-  it("the footer links include Repeating", async () => {
+  it("Repeating has its own sidebar row under Goals, and is no longer a footer link (Esme's pick A, 2026-11-17)", async () => {
     renderApp("/", TODAY);
-    const link = await screen.findByRole("link", { name: "Repeating" });
-    expect(link).toHaveAttribute("href", "/repeating");
+    const main = await screen.findByRole("navigation", { name: "Main" });
+    const links = within(main).getAllByRole("link");
+    const at = links.findIndex((l) => l.textContent === "Repeating");
+    expect(links[at]).toHaveAttribute("href", "/repeating");
+    expect(links[at - 1]).toHaveTextContent("Goals");
+    expect(screen.getAllByRole("link", { name: "Repeating" })).toHaveLength(1);
   });
 
   it("each area's Habits box ends with a Manage repeats link", async () => {

@@ -158,7 +158,7 @@ describe("Reminders link", () => {
     expect(link).toHaveAttribute("href", "/reminders");
     expect(link.closest(".sidebar-footer")).not.toBeNull();
     expect([...link.closest(".sidebar-footer")!.querySelectorAll("a")].map((a) => a.textContent)).toEqual([
-      "Repeating", "Reminders", "Backup", "Sync", "Bin",
+      "Reminders", "Backup", "Sync", "Bin",
     ]);
   });
 });

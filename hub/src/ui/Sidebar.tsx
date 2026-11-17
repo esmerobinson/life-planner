@@ -14,13 +14,12 @@ const GROUPS: { group: 1 | 2 | 3; name: string }[] = [
 /**
  * The quiet links under the main nav (Backup, Sync, ...). One list for both layouts: the
  * sidebar footer on desktop and the bottom of the phone Home, so a link added here shows
- * in both.
+ * in both. Repeating left this list for its own row in NAV (Esme's pick A, 2026-11-17).
  */
 export function FooterLinks() {
   const sync = useSyncState();
   return (
     <>
-      <NavLink to="/repeating">Repeating</NavLink>{" "}
       <NavLink to="/reminders">Reminders</NavLink>{" "}
       <NavLink to="/backup">Backup</NavLink>{" "}
       <NavLink to="/sync">{sync.status === "needs-passphrase" ? "Sync (needs passphrase)" : "Sync"}</NavLink>{" "}

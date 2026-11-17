@@ -8,9 +8,9 @@ describe("areas", () => {
     ]);
   });
 
-  it("NAV has thirteen entries in order with exact labels and paths", () => {
+  it("NAV has fourteen entries in order with exact labels and paths", () => {
     expect(NAV.map((n) => [n.label, n.path])).toEqual([
-      ["Home", "/"], ["Goals", "/goals"], ["Admin", "/area/admin"],
+      ["Home", "/"], ["Goals", "/goals"], ["Repeating", "/repeating"], ["Admin", "/area/admin"],
       ["Mind", "/area/mind"], ["Writing", "/area/writing"], ["Art", "/area/art"],
       ["Content", "/area/content"], ["Body", "/area/body"],
       ["Tech projects", "/area/tech"], ["Production", "/area/production"],
@@ -40,6 +40,19 @@ describe("areas", () => {
     expect(tile("tech")).toBe("#cedb6e");
     expect(tile("production")).toBe("#d59770");
     expect(tile("admin")).toBe("#90825b");
+  });
+
+  it("Repeating sits right under Goals on Rescue coral with its own repeat-arrows icon (Esme's pick A, 2026-11-17)", () => {
+    const ids = NAV.map((n) => n.id);
+    expect(ids.indexOf("repeating")).toBe(ids.indexOf("goals") + 1);
+    const r = NAV.find((n) => n.id === "repeating")!;
+    expect(r).toMatchObject({ label: "Repeating", path: "/repeating", tile: "#df7e6f", group: 1 });
+    // Drawn in the area icons' style: 32 viewBox, #3a412f 2.4 stroke, cream fill.
+    const svg = decodeURIComponent(r.icon);
+    expect(svg).toContain("viewBox='0 0 32 32'");
+    expect(svg).toContain("stroke='#3a412f' stroke-width='2.4'");
+    expect(svg).toContain("fill='#e9e3d6'");
+    expect(NAV.filter((n) => n.icon === r.icon)).toHaveLength(1);
   });
 
   it("Esme's Rio (was Esme's Farm, renamed 2026-11-16) is the pixel barn on the Room Sketch yellow tile (Esme, 2026-11-04)", () => {

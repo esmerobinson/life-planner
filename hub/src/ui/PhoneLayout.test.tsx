@@ -61,7 +61,7 @@ afterEach(() => {
 describe("phone layout (below 700px)", () => {
   beforeEach(() => setPhone(true));
 
-  it("Home: Esmeworld title, Inbox pill, the 12 apps in sidebar order (no Today: Home is the Today page), Today, then the footer links; no sidebar", async () => {
+  it("Home: Esmeworld title, Inbox pill, the 13 apps in sidebar order (no Today: Home is the Today page), Today, then the footer links; no sidebar", async () => {
     await createItem({ kind: "task", title: "Phone pick", areaId: "body", priority: 3, due: todayISO() }, todayISO());
     renderAt(["/"]);
     expect(await screen.findByText("Phone pick")).toBeInTheDocument();
@@ -70,14 +70,15 @@ describe("phone layout (below 700px)", () => {
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
     const apps = within(screen.getByRole("navigation", { name: "Main" })).getAllByRole("link");
     expect(apps.map((a) => a.textContent)).toEqual([
-      "Goals", "Admin", "Mind", "Writing", "Art", "Content", "Body",
+      "Goals", "Repeating", "Admin", "Mind", "Writing", "Art", "Content", "Body",
       "Tech projects", "Production", "Journal", "Vision board", "Esme's Rio",
     ]);
-    expect(apps[4]).toHaveAttribute("href", "/area/art");
+    expect(apps[5]).toHaveAttribute("href", "/area/art");
+    expect(apps[1]).toHaveAttribute("href", "/repeating");
     expect(screen.getByRole("heading", { level: 2, name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inbox (1)" })).toHaveAttribute("href", "/inbox");
     const footer = screen.getByRole("navigation", { name: "More" });
-    expect(within(footer).getAllByRole("link").map((a) => a.textContent)).toEqual(["Repeating", "Reminders", "Backup", "Sync", "Bin"]);
+    expect(within(footer).getAllByRole("link").map((a) => a.textContent)).toEqual(["Reminders", "Backup", "Sync", "Bin"]);
     // Desktop-only parts of Home stay off the phone Home.
     expect(screen.queryByText("Goals this month")).toBeNull();
   });
