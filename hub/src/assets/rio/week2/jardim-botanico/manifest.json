@@ -1,0 +1,100 @@
+{
+ "pack": "rio-pack",
+ "batch": "week2",
+ "location": "jardim-botanico",
+ "opensDay": 14,
+ "notes": "The Jardim Botanico: the palm avenue and fountain outside and the orchid house inside, each in two states (start, full) and three looks (day, rain, night). Bases ship without stickers, Esme or Bebe.",
+ "role": "mornings with morning pages fill it with orchids and potted plants (the 'greenhouse' family, 'Orchid house'); weeks with a habit ticked add trees (the 'trees' family). Nothing is ever removed.",
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "lookPalettes": {
+  "rain": "looks/palette-rain.json",
+  "night": "looks/palette-night.json"
+ },
+ "locations": [
+  {
+   "key": "jardim-botanico-avenue",
+   "name": "Jardim Botanico: the palm avenue and fountain",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "opensDay": 14,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "outside/jardim-outside-start-day.png",
+     "rain": "outside/jardim-outside-start-rain.png",
+     "night": "outside/jardim-outside-start-night.png"
+    },
+    "full": {
+     "day": "outside/jardim-outside-full-day.png",
+     "rain": "outside/jardim-outside-full-rain.png",
+     "night": "outside/jardim-outside-full-night.png"
+    }
+   },
+   "slots": "outside/jardim-outside-slots.json",
+   "slotCount": 23,
+   "rainOverlay": "outside/jardim-outside-rain-overlay.png"
+  },
+  {
+   "key": "jardim-botanico-orchid-house",
+   "name": "Jardim Botanico: the orchid house",
+   "kind": "interior",
+   "size": [
+    320,
+    192
+   ],
+   "tile": 16,
+   "opensDay": 14,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "inside/jardim-inside-start-day.png",
+     "rain": "inside/jardim-inside-start-rain.png",
+     "night": "inside/jardim-inside-start-night.png"
+    },
+    "full": {
+     "day": "inside/jardim-inside-full-day.png",
+     "rain": "inside/jardim-inside-full-rain.png",
+     "night": "inside/jardim-inside-full-night.png"
+    }
+   },
+   "slots": "inside/jardim-inside-slots.json",
+   "slotCount": 17,
+   "rainOverlay": "inside/jardim-inside-rain-overlay.png"
+  }
+ ],
+ "stickerAccepts": {
+  "trees:tree": "a Trees tree (imperial palm, yellow ipe, jabuticaba, pau-brasil sapling, bamboo clump)",
+  "trees:animal": "a Trees animal (capybara)",
+  "trees:bird": "a Trees bird (collared aracari)",
+  "greenhouse:plant": "an Orchid house plant (orchid, bromeliad, moth orchid, cattleya, anthurium, bird-of-paradise, fern basket)",
+  "greenhouse:water": "an Orchid house water plant (Victoria water lily)",
+  "greenhouse:seeds": "the seed packet",
+  "greenhouse:*": "any Orchid house sticker"
+ },
+ "stickerNote": "kind comes from the sticker manifest's 'kind'; the existing family stickers live in art/final/rio-pack/day1/stickers/, the new ones in stickers/ here",
+ "stickers": "stickers/manifest.json"
+}

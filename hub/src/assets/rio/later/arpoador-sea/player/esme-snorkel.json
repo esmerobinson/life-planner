@@ -1,0 +1,60 @@
+{
+ "frames": 4,
+ "layout": "frames side by side, left to right",
+ "ms": 180,
+ "loop": true,
+ "frame_size": [
+  48,
+  32
+ ],
+ "anchor": [
+  26,
+  18
+ ],
+ "snorkel_tip": [
+  35,
+  1
+ ],
+ "torch_lens": [
+  47,
+  23
+ ],
+ "files": {
+  "day": "player/esme-snorkel-day.png",
+  "rain": "player/esme-snorkel-rain.png",
+  "night": "player/esme-snorkel-night.png"
+ },
+ "outfit_layer": "player/esme-snorkel-outfit-day.png",
+ "outfit_colours": [
+  "ch_cloth_red_1",
+  "ch_cloth_red_2",
+  "ch_cloth_red_3",
+  "yel1",
+  "ink_maroon"
+ ],
+ "outfit_note": "the swimwear is drawn in the lenco bikini set's named colours (rio-pack/wardrobe-batch2/swim-bikini-lenco-set). To dress her in another swimsuit, recolour these names in the strip, or clear the outfit layer's pixels and draw new ones in the same places (the outfit layer shows exactly which pixels are swimwear)",
+ "colours": {
+  "skin": [
+   "ch_skin2_0",
+   "ch_skin2_1",
+   "ch_skin2_2",
+   "ch_skin2_3",
+   "ch_skin2_ink"
+  ],
+  "hair": [
+   "ch_hair3_0",
+   "ch_hair3_1",
+   "ch_hair3_2",
+   "ch_hair3_3",
+   "ch_hair3_ink"
+  ],
+  "gear": [
+   "ch_teal0",
+   "ch_teal1",
+   "ch_teal2",
+   "ch_teal3",
+   "ch_teal_ink"
+  ]
+ },
+ "note": "Esme snorkelling, facing right, face down; a gentle flutter kick, floating hair and bubbles from the mouthpiece. Night strip: night twins with the torch lens lit"
+}

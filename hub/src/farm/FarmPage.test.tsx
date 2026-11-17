@@ -269,6 +269,21 @@ describe("Esme's Rio on the farm page", () => {
     expect(within(card).queryByRole("button", { name: "Place in Rio" })).toBeNull();
   });
 
+  it("from day 14 an orchard sticker is placed at the Jardim Botanico (phase 2a); it was never lost", async () => {
+    // Fictional: the farm started on 22 October 2026, so 4 November is day 14.
+    await db.farm.bulkPut([startRow("dev-a", "2026-10-22"), seenRow("hi", "2026-10-22"), seenRow("sapling", "2026-10-23")]);
+    renderApp("/farm", "2026-11-04");
+    const user = userEvent.setup();
+    await waitFor(async () => expect(within(await places()).getByRole("button", { name: "Jardim Botânico" })).toHaveAttribute("data-status", "new"));
+    await collectionAt(user, "Jardim Botânico");
+    await user.click(await screen.findByRole("button", { name: "Sapling: ready to place" }));
+    await user.click(within(screen.getByRole("dialog", { name: "Sapling" })).getByRole("button", { name: "Place in Rio" }));
+    await waitFor(async () => expect(await db.farm.get("placed:sapling")).toMatchObject({ spot: "rio" }));
+    await user.keyboard("{Escape}{Escape}");
+    await user.click(within(await places()).getByRole("button", { name: "Jardim Botânico" }));
+    expect(within(await screen.findByRole("list", { name: "Stickers here" })).getByText("Sapling")).toBeInTheDocument();
+   }, 15000);
+
   it("an aquarium sticker waits until the sea off Arpoador opens on day 30 (Esme, 2026-11-16)", async () => {
     const fish = COLLECTION.find((s) => s.group === "aquarium")!;
     // Fictional: the farm started on 6 October 2026; 3 November is day 29, 4 November day 30.
@@ -349,15 +364,31 @@ it("outfits: she picks, any time; a new unlock is offered, never put on for her 
   expect(await db.farm.get("outfit:domino")).toBeUndefined();
 });
 
-it("friends arrive by day too: with no stickers but Welcome, Duvet is there on day 120 (Esme, 2026-11-04)", async () => {
+it("friends arrive by day too: with no stickers but Welcome, all five are there on day 120; Duvet is retired and never comes (Esme, 2026-11-17)", async () => {
   // Fictional: the farm started on 7 July 2026; 3 November is day 120.
   await db.farm.put(startRow("dev-a", "2026-07-07"));
   renderApp("/farm", "2026-11-03");
-  await waitFor(async () => expect(await db.farm.get("arrived:duvet")).toBeTruthy());
+  await waitFor(async () => expect(await db.farm.get("arrived:crumpet")).toBeTruthy());
   await openMenu(userEvent.setup(), "Friends");
   expect(within(screen.getByLabelText("Who lives here")).getAllByRole("button").map((b) => b.textContent)).toEqual(
-    ["Mr Cat", "Caetano", "Pupup", "Bebe", "Cereal", "Duvet"],
+    ["Mr Cat", "Caetano", "Pupup", "Bebe", "Cereal"],
   );
+  expect(await db.farm.get("arrived:duvet")).toBeUndefined();
+  expect(screen.queryByText("Duvet has moved in!")).toBeNull();
+});
+
+it("Duvet already moved in on this device before it was retired: the row is kept, but Duvet is shown nowhere", async () => {
+  await db.farm.bulkPut([startRow("dev-a", "2026-07-07"), { id: "arrived:duvet", kind: "arrived", character: "duvet", date: "2026-11-01" } as never]);
+  renderApp("/farm", "2026-11-03");
+  const user = userEvent.setup();
+  await openMenu(user, "Friends");
+  const here = within(screen.getByLabelText("Who lives here")).getAllByRole("button").map((b) => b.textContent);
+  expect(here).not.toContain("Duvet");
+  expect(here).toContain("Cereal");
+  await user.click(screen.getByRole("tab", { name: "Noticeboard" }));
+  expect(screen.getByRole("tabpanel")).not.toHaveTextContent("Duvet");
+  expect(screen.queryByText("Duvet has moved in!")).toBeNull();
+  expect(await db.farm.get("arrived:duvet")).toMatchObject({ character: "duvet" }); // nothing taken away
 });
 
 it("on the Journal, Bap (once arrived) takes the nook", async () => {

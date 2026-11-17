@@ -53,5 +53,7 @@ describe("the next friend", () => {
 
   it("everyone has moved in: no one to announce", () => {
     expect(nextFriend(200, 200, new Set(["domino", "bap", "puddle", "clover", "crumpet", "duvet"]))).toBeNull();
+    // Duvet is retired (Esme, 2026-11-17): once Cereal is here nobody else is coming.
+    expect(nextFriend(90, 90, new Set(["domino", "bap", "puddle", "clover", "crumpet"]))).toBeNull();
   });
 });

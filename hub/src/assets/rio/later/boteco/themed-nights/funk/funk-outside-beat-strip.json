@@ -4,12 +4,12 @@
  "scene": "outside",
  "look": "night",
  "at": [
-  31,
-  118
+  30,
+  117
  ],
  "frame_size": [
-  344,
-  121
+  345,
+  123
  ],
  "frames": 4,
  "frame_ms": 150,

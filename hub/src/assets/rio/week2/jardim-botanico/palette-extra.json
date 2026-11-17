@@ -1,0 +1,7 @@
+{
+ "name": "Jardim Botanico extras (Rio pack, week 2)",
+ "notes": "No new colours. Day uses the summer palette and the existing extra ramps: stone (palm trunks, the fountain, the glasshouse's white iron, the pond rim), cream (the gate pillars), cot_honey + cream0 + dirt0 (the sand avenue, the map's yel0/dirt0), mead_stone (the plaza paving, gravel), fam_aqua + map_fog (glass), mus_teal/mus_jade (the doors, the garden seen through glass), water + pnd_deep (the pond), fam_leaf/vg_leaf/grass/fam_pine (palms and forest), mead_pink + pink + hol_br_mag (the pink ipe), mus_garnet (Victoria pads' red rims), vg_terra (bed edging, pots, tiles), ch_sky + map_grey + w24_sage + mus_teal (the sky, the Corcovado and the ridges). Rain uses its own twins (looks/palette-rain.json). Night uses only palette-night-v2.json colours. The stickers use only the launch stickers' palette.",
+ "ramps": [],
+ "newColoursFound": 0,
+ "ownColoursUsed": []
+}

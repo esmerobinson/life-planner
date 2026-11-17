@@ -1,0 +1,5 @@
+{
+ "name": "Rio pack, Quilo: new colours (need Esme's OK)",
+ "notes": "None. Everything uses the pack palette and the existing extra ramps, read-only. Quilo blue is fam_blue0-3 with vg_snow0 white (the harlequin tiles, the sign, the awning); concrete is stone/mead_stone; the black tables ch_charcoal/ch_coal; the stair railing tom/red.",
+ "ramps": []
+}

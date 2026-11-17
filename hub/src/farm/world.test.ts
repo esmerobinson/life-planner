@@ -2,7 +2,7 @@ import type { Item } from "../domain/types";
 import { todayList } from "../domain/triage";
 import { COLLECTION, STICKERS, STICKER_BY_KEY, hintFor, stickersIn } from "./catalogue";
 import {
-  ACCESSORIES, ARRIVES_AT, BED_STAGE_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, farmDay, momentQueue, nookHost,
+  ACCESSORIES, ARRIVES_AT, KEEPER, RETIRED, BED_STAGE_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, farmDay, momentQueue, nookHost,
   sleeping, spreadOf, spreadOfSticker, stickerTotals, todayListFinished, unlockedAccessories, wakeAt,
 } from "./world";
 import type { CharacterId } from "./state";
@@ -13,7 +13,15 @@ describe("arrivals", () => {
     expect(arrivedAt(0, 1)).toEqual(["domino"]);
     expect(arrivedAt(4, 1)).toEqual(["domino"]);
     expect(arrivedAt(5, 1)).toEqual(["domino", "bap"]);
-    expect(arrivedAt(170, 1)).toHaveLength(6);
+    expect(arrivedAt(170, 1)).toHaveLength(5);
+  });
+
+  it("Duvet is retired (Esme, 2026-11-17): no Rio friend, so it never moves in, by stickers or by day", () => {
+    expect(RETIRED.has("duvet")).toBe(true);
+    expect(arrivedAt(500, 500)).not.toContain("duvet");
+    expect(arrivedAt(500, 500)).toEqual(["domino", "bap", "puddle", "clover", "crumpet"]);
+    // Caetano took over the museum and reading list (Game Design, 2026-11-15).
+    expect(KEEPER.museum).toBe("bap");
   });
 
   it("or on day N of the farm, whichever comes first (Esme, 2026-11-04): calendar days, the start is day 1", () => {
@@ -23,7 +31,7 @@ describe("arrivals", () => {
     expect(arrivedAt(0, 4)).toEqual(["domino"]);
     expect(arrivedAt(0, 5)).toEqual(["domino", "bap"]);
     expect(arrivedAt(0, 119)).not.toContain("duvet");
-    expect(arrivedAt(0, 120)).toEqual(["domino", "bap", "puddle", "clover", "crumpet", "duvet"]); // zero stickers, day 120
+    expect(arrivedAt(0, 120)).toEqual(["domino", "bap", "puddle", "clover", "crumpet"]); // zero stickers, day 120 (Duvet retired)
     expect(arrivedAt(45, 21)).toEqual(["domino", "bap", "puddle", "clover"]); // stickers first
     expect(arrivedAt(3, 45)).toEqual(["domino", "bap", "puddle", "clover"]); // days first
   });

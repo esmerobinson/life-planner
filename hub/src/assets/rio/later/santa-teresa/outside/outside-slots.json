@@ -1,0 +1,128 @@
+{
+ "location": "santa-teresa-outside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "outside/outside-start-day.png",
+  "start-night": "outside/outside-start-night.png",
+  "start-rain": "outside/outside-start-rain.png",
+  "full-day": "outside/outside-full-day.png",
+  "full-night": "outside/outside-full-night.png",
+  "full-rain": "outside/outside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "outside/outside-rain-streaks-0.png",
+    "outside/outside-rain-streaks-1.png",
+    "outside/outside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "draw on top of everything (stickers too) while it rains; the bookshop's awning band stays dry"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker cell; draw at left = x - 8, top = y - 15",
+ "fill_rule": "The newest reading-nook stickers fill the ordered slots, newest in order 1. Draw after the base, sorted by y; while it rains draw the streak overlay on top of everything.",
+ "sticker_slots": [
+  {
+   "id": "book-cart",
+   "x": 126,
+   "y": 106,
+   "area": "on the bookshop's book cart",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 1
+  },
+  {
+   "id": "cafe-table",
+   "x": 186,
+   "y": 104,
+   "area": "on the bistro table outside the bookshop",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 2
+  },
+  {
+   "id": "balcony",
+   "x": 40,
+   "y": 39,
+   "area": "on the pink casarao's balcony, among the pots",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 3
+  },
+  {
+   "id": "lookout-wall",
+   "x": 304,
+   "y": 80,
+   "area": "on the lookout's low wall, against the view",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 4
+  },
+  {
+   "id": "steps-top",
+   "x": 116,
+   "y": 206,
+   "area": "on the mosaic wall at the top of the tiled steps",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 5
+  }
+ ],
+ "hotspots": {
+  "door": {
+   "x": 8,
+   "y": 52,
+   "w": 28,
+   "h": 40,
+   "note": "the pink casarao's arched door: up to the studio"
+  },
+  "bookshop": {
+   "x": 150,
+   "y": 52,
+   "w": 20,
+   "h": 40,
+   "note": "the bookshop-cafe (decor; could open the reading list)"
+  },
+  "bonde": {
+   "x": 116,
+   "y": 120,
+   "w": 156,
+   "h": 78,
+   "note": "the bonde: ride it (back to the map)"
+  },
+  "exit": {
+   "x": 22,
+   "y": 207,
+   "w": 86,
+   "h": 33,
+   "note": "down the tiled steps to Lapa (map exit)"
+  },
+  "esme_spot": {
+   "x": 196,
+   "y": 226
+  }
+ },
+ "baked": {
+  "start": "a quiet afternoon: the bonde at the stop with its motorman and two riders, one reader at a bistro table, the bookseller (Bia) at the door, Rosa waiting at the stop",
+  "full": "a busy evening: the bonde packed (eight on the benches, four hanging off the running board), both bistro tables full and a third at the lookout, Duda and Lucas browsing the book cart, a painter (Marcos) at an easel at the lookout, three waiting at the stop, a string of bulbs from the bookshop to the lookout, Esme and Mr Cat. Rain: the lookout table and the painter go in, umbrellas come out"
+ }
+}

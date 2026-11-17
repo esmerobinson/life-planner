@@ -30,15 +30,25 @@ export const ARRIVES_AT: Record<CharacterId, number> = Object.fromEntries(
   CHARACTERS.map((c) => [c, MANIFEST.arrivals.find((a) => a.character.toLowerCase() === c)!.at_stickers]),
 ) as Record<CharacterId, number>;
 
+/**
+ * Friends retired from the game (Esme, 2026-11-17, "retired"): Duvet has no Rio friend. They never
+ * move in and are shown nowhere; an `arrived:` row a device already has is kept (nothing is taken
+ * away), just not shown. Hats and accessories count stickers, not friends, so they don't change.
+ */
+export const RETIRED: ReadonlySet<CharacterId> = new Set<CharacterId>(["duvet"]);
+
+/** The friends still in the game, in arrival order. */
+export const LIVING: readonly CharacterId[] = CHARACTERS.filter((c) => !RETIRED.has(c));
+
 /** The farm's day: its start is day 1, then calendar days (not days active). */
 export const farmDay = (start: ISODate, today: ISODate): number => daysBetween(start, today) + 1;
 
 /**
  * Who lives here, in arrival order (Domino from day one): each friend arrives at N stickers or on
- * day N of the farm, whichever comes first, so Duvet is always there by day 120.
+ * day N of the farm, whichever comes first, so Cereal is always there by day 80. Retired friends never.
  */
 export const arrivedAt = (stickers: number, day: number): CharacterId[] =>
-  CHARACTERS.filter((c) => stickers >= ARRIVES_AT[c] || day >= ARRIVES_AT[c]);
+  LIVING.filter((c) => stickers >= ARRIVES_AT[c] || day >= ARRIVES_AT[c]);
 
 /**
  * The sticker totals (Esme, 2026-11-04). `collected`: of the 175 (the book's "N OF 175" and the
@@ -53,7 +63,8 @@ export function stickerTotals(earned: ReadonlySet<string>): { collected: number;
 /** Each zone's keeper (game design v2, section 1 and 6). */
 export const KEEPER: Record<string, CharacterId> = {
   beds: "domino", orchard: "domino", meadow: "puddle", lane: "puddle", barnyard: "crumpet", farmhouse: "crumpet",
-  glasshouse: "clover", pond: "bap", aquarium: "bap", museum: "duvet",
+  // The museum was Duvet's; Caetano took it over with the reading list (Game Design, 2026-11-15).
+  glasshouse: "clover", pond: "bap", aquarium: "bap", museum: "bap",
 };
 
 /** Where a host could appear: the page being shown. */

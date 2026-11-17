@@ -1,0 +1,134 @@
+{
+ "pack": "rio-pack week2",
+ "area": "zona-sul",
+ "name": "Zona Sul, the neighbourhood supermarket",
+ "opens_day": 10,
+ "notes": "Outside and inside 384x240 (24x15 tiles), 16 px tiles, 3/4 top-down, light from the top-left. Hard alpha; day images use palette colours only (no new colours).",
+ "locations": [
+  {
+   "key": "zona-sul-outside",
+   "name": "The supermarket front on the Ipanema grid",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "outside/outside-start-day.png",
+    "start-night": "outside/outside-start-night.png",
+    "start-rain": "outside/outside-start-rain.png",
+    "full-day": "outside/outside-full-day.png",
+    "full-night": "outside/outside-full-night.png",
+    "full-rain": "outside/outside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "outside/outside-rain-streaks-0.png",
+      "outside/outside-rain-streaks-1.png",
+      "outside/outside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "outside/outside-slots.json"
+  },
+  {
+   "key": "zona-sul-inside",
+   "name": "The aisles",
+   "kind": "interior",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "mid",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "inside/inside-start-day.png",
+    "start-night": "inside/inside-start-night.png",
+    "start-rain": "inside/inside-start-rain.png",
+    "mid-day": "inside/inside-mid-day.png",
+    "mid-night": "inside/inside-mid-night.png",
+    "mid-rain": "inside/inside-mid-rain.png",
+    "full-day": "inside/inside-full-day.png",
+    "full-night": "inside/inside-full-night.png",
+    "full-rain": "inside/inside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "inside/inside-rain-streaks-0.png",
+      "inside/inside-rain-streaks-1.png",
+      "inside/inside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "inside/inside-slots.json"
+  }
+ ],
+ "stages": {
+  "rule": "The base stage follows real Admin to-dos ticked (start on opening day, mid, full). Ingredients come separately, from errands (see the slots' fill_rule).",
+  "start": "opening day",
+  "mid": "inside only: halfway",
+  "full": "bustling"
+ },
+ "ingredients": {
+  "new": [
+   "ingredients/farinha.png",
+   "ingredients/polvilho.png",
+   "ingredients/acucar.png",
+   "ingredients/leite-condensado.png",
+   "ingredients/requeijao.png",
+   "ingredients/queijo-minas.png",
+   "ingredients/linguica.png",
+   "ingredients/carne-seca.png",
+   "ingredients/dende.png",
+   "ingredients/leite-de-coco.png",
+   "ingredients/cachaca.png",
+   "ingredients/mamao.png",
+   "ingredients/maracuja.png",
+   "ingredients/mandioca.png",
+   "ingredients/abacaxi.png",
+   "ingredients/banana.png",
+   "ingredients/acai.png",
+   "ingredients/caju.png",
+   "ingredients/quiabo.png",
+   "ingredients/goiabada.png",
+   "ingredients/palmito.png"
+  ],
+  "sheet": "ingredients/ingredients-sheet.png",
+  "catalogue": "ingredients/ingredients.json"
+ },
+ "looks": {
+  "day": "default",
+  "night": "after dark (Rio local time)",
+  "rain": "when Rio is rainy; add the streak overlay"
+ },
+ "characters": "Esme and Mr Cat are the shipped sprites, baked into the full scenes. Everyone else is one of the ten Rio townsfolk (art/sources/rio-pack/townsfolk/folk.py), staff in forest-green tops.",
+ "palettes": {
+  "extra": "palette-extra.json",
+  "night": "palette-night.json",
+  "rain": "palette-rain.json"
+ },
+ "sources": "art/sources/rio-pack/zona-sul/ (python3 -I -B deliver.py)"
+}

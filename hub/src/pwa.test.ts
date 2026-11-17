@@ -14,7 +14,9 @@ const dist = resolve(root, "dist-test");
 const read = (f: string) => readFileSync(resolve(dist, f), "utf8");
 
 beforeAll(() => {
-  execSync("npx vite build --outDir dist-test --emptyOutDir", { cwd: root, stdio: "pipe" });
+  // As `npm run build` builds it: vitest sets NODE_ENV=test, which would bundle React's
+  // development build and check a bigger app than the one that ships.
+  execSync("npx vite build --outDir dist-test --emptyOutDir", { cwd: root, stdio: "pipe", env: { ...process.env, NODE_ENV: "production" } });
 }, 180_000);
 
 describe("built manifest", () => {

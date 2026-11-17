@@ -4,7 +4,7 @@
 // she is offline, the look comes from Rio's clock (night after dark, never rain).
 
 import { useEffect, useState } from "react";
-import type { Look } from "./assets";
+import { BOTECO_NIGHT_KEYS, type BotecoNight, type Look } from "./assets";
 
 export const RIO = { latitude: -22.98, longitude: -43.2, timeZone: "America/Sao_Paulo" } as const;
 
@@ -131,4 +131,25 @@ export function useRioLook(): Look {
   }, []);
 
   return lookFrom(weather, now);
+}
+
+/** Development builds only: `?day=N` jumps the farm day (to look at areas before they open). */
+export function devDay(search: string, dev: boolean = import.meta.env.DEV): number | null {
+  if (!dev) return null;
+  const v = new URLSearchParams(search).get("day");
+  if (!v || !/^\d+$/.test(v)) return null;
+  const n = Number(v);
+  return n >= 1 ? n : null;
+}
+
+/** Development builds only: `?night=<theme>` previews a boteco themed night (nothing triggers them until bundles, phase 2b). */
+export function devNight(search: string, dev: boolean = import.meta.env.DEV): BotecoNight | null {
+  if (!dev) return null;
+  const v = new URLSearchParams(search).get("night");
+  return (BOTECO_NIGHT_KEYS as readonly string[]).includes(v ?? "") ? (v as BotecoNight) : null;
+}
+
+/** Development builds only: `?goal=1` plays the match's goal moment (weekly reviews will, once built). */
+export function devGoal(search: string, dev: boolean = import.meta.env.DEV): boolean {
+  return dev && new URLSearchParams(search).get("goal") === "1";
 }

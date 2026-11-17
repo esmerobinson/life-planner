@@ -1,0 +1,1054 @@
+{
+ "location": "zona-sul-inside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "mid",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "inside/inside-start-day.png",
+  "start-night": "inside/inside-start-night.png",
+  "start-rain": "inside/inside-start-rain.png",
+  "mid-day": "inside/inside-mid-day.png",
+  "mid-night": "inside/inside-mid-night.png",
+  "mid-rain": "inside/inside-mid-rain.png",
+  "full-day": "inside/inside-full-day.png",
+  "full-night": "inside/inside-full-night.png",
+  "full-rain": "inside/inside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "inside/inside-rain-streaks-0.png",
+    "inside/inside-rain-streaks-1.png",
+    "inside/inside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "rain seen through the glass front and the open doors only"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 cell; draw at left = x - 8, top = y - 15",
+ "fill_rule": "Ingredient slots fill as real errands are ticked, one ingredient per errand, and never empty again. Put a new ingredient in the free slot with the lowest 'order' whose 'accepts' includes its category; if none is free, the lowest free slot accepting 'any'. Draw after the base, sorted by y then x. Empty slots show a waiting price tag (baked).",
+ "categories": [
+  "fruit",
+  "veg",
+  "pantry",
+  "cold",
+  "bakery",
+  "drink"
+ ],
+ "ingredient_slots": [
+  {
+   "id": "wall-1-7",
+   "x": 250,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 1
+  },
+  {
+   "id": "fridge-2-1-2",
+   "x": 327,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 2
+  },
+  {
+   "id": "deli-2",
+   "x": 48,
+   "y": 85,
+   "w": 16,
+   "h": 16,
+   "group": "deli",
+   "accepts": [
+    "bakery",
+    "cold"
+   ],
+   "order": 3
+  },
+  {
+   "id": "island-back-4",
+   "x": 101,
+   "y": 121,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 4
+  },
+  {
+   "id": "gondola-A-1-7",
+   "x": 250,
+   "y": 113,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 5
+  },
+  {
+   "id": "gondola-B-1-7",
+   "x": 250,
+   "y": 169,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "drink",
+    "pantry"
+   ],
+   "order": 6
+  },
+  {
+   "id": "wall-2-1",
+   "x": 142,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 7
+  },
+  {
+   "id": "fridge-2-2-1",
+   "x": 311,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 8
+  },
+  {
+   "id": "deli-3",
+   "x": 72,
+   "y": 85,
+   "w": 16,
+   "h": 16,
+   "group": "deli",
+   "accepts": [
+    "bakery",
+    "cold"
+   ],
+   "order": 9
+  },
+  {
+   "id": "island-front-1",
+   "x": 29,
+   "y": 133,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 10
+  },
+  {
+   "id": "gondola-A-2-1",
+   "x": 142,
+   "y": 131,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 11
+  },
+  {
+   "id": "gondola-B-2-1",
+   "x": 142,
+   "y": 187,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "pantry",
+    "any"
+   ],
+   "order": 12
+  },
+  {
+   "id": "wall-1-6",
+   "x": 232,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 13
+  },
+  {
+   "id": "fridge-2-1-1",
+   "x": 311,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 14
+  },
+  {
+   "id": "deli-1",
+   "x": 24,
+   "y": 85,
+   "w": 16,
+   "h": 16,
+   "group": "deli",
+   "accepts": [
+    "bakery",
+    "cold"
+   ],
+   "order": 15
+  },
+  {
+   "id": "island-back-3",
+   "x": 77,
+   "y": 121,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 16
+  },
+  {
+   "id": "gondola-A-1-6",
+   "x": 232,
+   "y": 113,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 17
+  },
+  {
+   "id": "gondola-B-1-6",
+   "x": 232,
+   "y": 169,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "drink",
+    "pantry"
+   ],
+   "order": 18
+  },
+  {
+   "id": "wall-2-2",
+   "x": 160,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 19
+  },
+  {
+   "id": "fridge-2-2-2",
+   "x": 327,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 20
+  },
+  {
+   "id": "deli-4",
+   "x": 96,
+   "y": 85,
+   "w": 16,
+   "h": 16,
+   "group": "deli",
+   "accepts": [
+    "bakery",
+    "cold"
+   ],
+   "order": 21
+  },
+  {
+   "id": "island-front-2",
+   "x": 53,
+   "y": 133,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 22
+  },
+  {
+   "id": "gondola-A-2-2",
+   "x": 160,
+   "y": 131,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 23
+  },
+  {
+   "id": "gondola-B-2-2",
+   "x": 160,
+   "y": 187,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "pantry",
+    "any"
+   ],
+   "order": 24
+  },
+  {
+   "id": "wall-1-5",
+   "x": 214,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 25
+  },
+  {
+   "id": "fridge-1-2-2",
+   "x": 291,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 26
+  },
+  {
+   "id": "island-back-2",
+   "x": 53,
+   "y": 121,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 27
+  },
+  {
+   "id": "gondola-A-1-5",
+   "x": 214,
+   "y": 113,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 28
+  },
+  {
+   "id": "gondola-B-1-5",
+   "x": 214,
+   "y": 169,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "drink",
+    "pantry"
+   ],
+   "order": 29
+  },
+  {
+   "id": "wall-2-3",
+   "x": 178,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 30
+  },
+  {
+   "id": "fridge-3-1-1",
+   "x": 347,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 31
+  },
+  {
+   "id": "island-front-3",
+   "x": 77,
+   "y": 133,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 32
+  },
+  {
+   "id": "gondola-A-2-3",
+   "x": 178,
+   "y": 131,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 33
+  },
+  {
+   "id": "gondola-B-2-3",
+   "x": 178,
+   "y": 187,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "pantry",
+    "any"
+   ],
+   "order": 34
+  },
+  {
+   "id": "wall-1-4",
+   "x": 196,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 35
+  },
+  {
+   "id": "fridge-1-2-1",
+   "x": 275,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 36
+  },
+  {
+   "id": "island-back-1",
+   "x": 29,
+   "y": 121,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 37
+  },
+  {
+   "id": "gondola-A-1-4",
+   "x": 196,
+   "y": 113,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 38
+  },
+  {
+   "id": "gondola-B-1-4",
+   "x": 196,
+   "y": 169,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "drink",
+    "pantry"
+   ],
+   "order": 39
+  },
+  {
+   "id": "wall-2-4",
+   "x": 196,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 40
+  },
+  {
+   "id": "fridge-3-1-2",
+   "x": 363,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 41
+  },
+  {
+   "id": "island-front-4",
+   "x": 101,
+   "y": 133,
+   "w": 16,
+   "h": 16,
+   "group": "island",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 42
+  },
+  {
+   "id": "gondola-A-2-4",
+   "x": 196,
+   "y": 131,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 43
+  },
+  {
+   "id": "gondola-B-2-4",
+   "x": 196,
+   "y": 187,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "pantry",
+    "any"
+   ],
+   "order": 44
+  },
+  {
+   "id": "wall-1-3",
+   "x": 178,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 45
+  },
+  {
+   "id": "fridge-1-1-2",
+   "x": 291,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 46
+  },
+  {
+   "id": "gondola-A-1-3",
+   "x": 178,
+   "y": 113,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 47
+  },
+  {
+   "id": "gondola-B-1-3",
+   "x": 178,
+   "y": 169,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "drink",
+    "pantry"
+   ],
+   "order": 48
+  },
+  {
+   "id": "wall-2-5",
+   "x": 214,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 49
+  },
+  {
+   "id": "fridge-3-2-1",
+   "x": 347,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 50
+  },
+  {
+   "id": "gondola-A-2-5",
+   "x": 214,
+   "y": 131,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 51
+  },
+  {
+   "id": "gondola-B-2-5",
+   "x": 214,
+   "y": 187,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "pantry",
+    "any"
+   ],
+   "order": 52
+  },
+  {
+   "id": "wall-1-2",
+   "x": 160,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 53
+  },
+  {
+   "id": "fridge-1-1-1",
+   "x": 275,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 54
+  },
+  {
+   "id": "gondola-A-1-2",
+   "x": 160,
+   "y": 113,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 55
+  },
+  {
+   "id": "gondola-B-1-2",
+   "x": 160,
+   "y": 169,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "drink",
+    "pantry"
+   ],
+   "order": 56
+  },
+  {
+   "id": "wall-2-6",
+   "x": 232,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 57
+  },
+  {
+   "id": "fridge-3-2-2",
+   "x": 363,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "fridge",
+   "accepts": [
+    "cold",
+    "drink"
+   ],
+   "order": 58
+  },
+  {
+   "id": "gondola-A-2-6",
+   "x": 232,
+   "y": 131,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 59
+  },
+  {
+   "id": "gondola-B-2-6",
+   "x": 232,
+   "y": 187,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "pantry",
+    "any"
+   ],
+   "order": 60
+  },
+  {
+   "id": "wall-1-1",
+   "x": 142,
+   "y": 42,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 61
+  },
+  {
+   "id": "gondola-A-1-1",
+   "x": 142,
+   "y": 113,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 62
+  },
+  {
+   "id": "gondola-B-1-1",
+   "x": 142,
+   "y": 169,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "drink",
+    "pantry"
+   ],
+   "order": 63
+  },
+  {
+   "id": "wall-2-7",
+   "x": 250,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "wall",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 64
+  },
+  {
+   "id": "gondola-A-2-7",
+   "x": 250,
+   "y": 131,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-A",
+   "accepts": [
+    "pantry"
+   ],
+   "order": 65
+  },
+  {
+   "id": "gondola-B-2-7",
+   "x": 250,
+   "y": 187,
+   "w": 16,
+   "h": 16,
+   "group": "gondola-B",
+   "accepts": [
+    "pantry",
+    "any"
+   ],
+   "order": 66
+  }
+ ],
+ "sticker_slots": [
+  {
+   "id": "gondola-A-top-1",
+   "x": 218,
+   "y": 94,
+   "area": "gondola top",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "gondola-A-top-2",
+   "x": 242,
+   "y": 94,
+   "area": "gondola top",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "gondola-B-top-1",
+   "x": 218,
+   "y": 150,
+   "area": "gondola top",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "gondola-B-top-2",
+   "x": 242,
+   "y": 150,
+   "area": "gondola top",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "deli-top",
+   "x": 70,
+   "y": 65,
+   "area": "on the deli case",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "till-1-belt",
+   "x": 296,
+   "y": 113,
+   "area": "on the conveyor belt",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "till-2-belt",
+   "x": 300,
+   "y": 167,
+   "area": "on the conveyor belt",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "sell-counter",
+   "x": 68,
+   "y": 171,
+   "area": "on the selling counter",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "floor-aisle",
+   "x": 126,
+   "y": 168,
+   "area": "floor",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "floor-tills",
+   "x": 290,
+   "y": 146,
+   "area": "floor",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "floor-corner",
+   "x": 362,
+   "y": 216,
+   "area": "floor",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "floor-door",
+   "x": 248,
+   "y": 196,
+   "area": "floor",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  }
+ ],
+ "hotspots": {
+  "door": {
+   "x": 170,
+   "y": 216,
+   "w": 44,
+   "h": 24,
+   "note": "back out to the street"
+  },
+  "sell_counter": {
+   "x": 16,
+   "y": 162,
+   "w": 88,
+   "h": 30,
+   "note": "sell the harvest here (COMPRAMOS = we buy); coins arrive overnight"
+  },
+  "drop_box": {
+   "x": 78,
+   "y": 163,
+   "w": 20,
+   "h": 9
+  },
+  "tills": [
+   {
+    "n": 1,
+    "x": 286,
+    "y": 112,
+    "w": 80,
+    "h": 16,
+    "note": "pay for ingredients with coins (till 2 is closed at start)"
+   },
+   {
+    "n": 2,
+    "x": 286,
+    "y": 166,
+    "w": 80,
+    "h": 16,
+    "note": "pay for ingredients with coins (till 2 is closed at start)"
+   }
+  ],
+  "esme_spot": {
+   "x": 86,
+   "y": 212,
+   "note": "where Esme stands in the full scenes (at the selling counter)"
+  }
+ },
+ "baked": {
+  "start": "opening day: a BEM-VINDOS banner on the bare top shelf, balloons at the door, a pallet of boxes and Lucas unpacking, a few loaves, two crates of produce, till 1 open (Marcos), the baker (Thiago), Bia at the selling counter, Dona Celia shopping",
+  "mid": "start - banner - one box + more bread, more top-shelf stock, fridge tops, deli trays, three crates, both tills open (Ana on 2), Rosa at the deli, Duda, Vovo Ze and Seu Jorge shopping",
+  "full": "every shelf top and fridge top full, all bread, four crates, end-cap pyramids, overstock on the gondolas, Lucas at the fridges, Esme at the selling counter with a crate of tomatoes, Mr Cat"
+ }
+}

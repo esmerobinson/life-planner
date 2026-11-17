@@ -74,3 +74,25 @@ describe("the map in the rain", () => {
     expect(useTicker.mock.calls.every(([, on]) => on === false)).toBe(true);
   });
 });
+
+describe("holiday takeovers on the map", () => {
+  it("Carnaval dresses the whole city, locked places too; none in March", () => {
+    const { unmount } = render(<RioMap statuses={day1} look="day" now={new Date("2027-02-10T15:00:00Z")} onOpen={() => undefined} />);
+    expect(document.querySelector(".rio-map")).toHaveAttribute("data-event", "carnaval");
+    unmount();
+    render(<RioMap statuses={day1} look="day" now={new Date("2027-03-10T15:00:00Z")} onOpen={() => undefined} />);
+    expect(document.querySelector(".rio-map")).not.toHaveAttribute("data-event");
+  });
+
+  it("Réveillon's fireworks play at night, and not with reduced motion", () => {
+    const nye = new Date("2027-01-01T01:00:00Z"); // 22:00 on 31 Dec in Rio
+    const { unmount } = render(<RioMap statuses={day1} look="night" now={nye} onOpen={() => undefined} />);
+    expect(document.querySelector(".rio-map")).toHaveAttribute("data-event", "reveillon");
+    expect(useTicker.mock.calls.some(([, on]) => on === true)).toBe(true);
+    unmount();
+    useTicker.mockClear();
+    useReducedMotion.mockReturnValue(true);
+    render(<RioMap statuses={day1} look="night" now={nye} onOpen={() => undefined} />);
+    expect(useTicker.mock.calls.every(([, on]) => on === false)).toBe(true);
+  });
+});

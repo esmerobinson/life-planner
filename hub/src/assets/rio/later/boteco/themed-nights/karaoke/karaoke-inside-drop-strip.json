@@ -5,11 +5,11 @@
  "look": "night",
  "at": [
   99,
-  19
+  18
  ],
  "frame_size": [
   124,
-  71
+  58
  ],
  "frames": 5,
  "frame_ms": 160,

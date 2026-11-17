@@ -8,7 +8,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion, useTicker } from "../farm/hooks";
 import { ctx2d } from "../farm/sprites";
 import { opensOn, type AreaStatus } from "./areas";
-import { MAP_DIR, RIO_MAP, mapBase, mapLayer, mapLook, type Look } from "./assets";
+import { MAP_DIR, RIO_MAP, mapBase, mapLayer, mapLook, type Look, type RioEvent } from "./assets";
+import { activeEvent, eventLook, useNow } from "./events";
 import { useCover, useRioImages, type RioImages } from "./canvas";
 import { MAP_KEEP, hitPlace } from "./mapMath";
 import { useUi } from "./ui/fit";
@@ -31,16 +32,22 @@ function tipFor(key: string, status: AreaStatus | undefined): string | null {
   return "Coming soon";
 }
 
-function filesFor(look: Look): string[] {
+/** A takeover's layer (events.ts eventLook: on a rainy day the day layer; Réveillon's night till 06:00). */
+const eventLayer = (e: RioEvent, layer: "day" | "night") => e.layers[layer];
+const fireworksFor = (e: RioEvent | null, layer: "day" | "night") => (e && layer === "night" ? e.animation?.night : undefined);
+
+function filesFor(look: Look, event: RioEvent | null, layer: "day" | "night"): string[] {
   const out = [at(mapBase(look)), at(RIO_MAP.markers.locked.file), at(RIO_MAP.markers.new.file)];
   for (const p of [...RIO_MAP.places, RIO_MAP.boat_route]) {
     out.push(at(mapLayer(p, look, "open")), at(mapLayer(p, look, "locked")));
   }
   if (rainsOn(look)) out.push(...RAIN!.frames.map(at));
+  if (event) out.push(at(eventLayer(event, layer)), ...(fireworksFor(event, layer)?.frames ?? []).map(at));
   return out;
 }
 
-function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, statuses: ReadonlyMap<string, AreaStatus>, rainFrame: number | null) {
+function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, statuses: ReadonlyMap<string, AreaStatus>, rainFrame: number | null,
+  event: RioEvent | null, layer: "day" | "night", fireworksFrame: number | null) {
   ctx.clearRect(0, 0, W, H);
   const put = (path: string, x = 0, y = 0) => {
     const i = img[at(path)];
@@ -60,6 +67,12 @@ function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, stat
       if (s === "new") markers.push({ file: RIO_MAP.markers.new.file, at: p.marker_anchor });
     }
   }
+  // A holiday takeover: after the last place, over open and locked alike, before the rain and markers.
+  if (event) {
+    put(eventLayer(event, layer));
+    const fw = fireworksFor(event, layer);
+    if (fw && fireworksFrame !== null) put(fw.frames[fireworksFrame % fw.frames.length]!);
+  }
   // The falling rain: after the places, before the markers (map.json weather.rain).
   if (rainFrame !== null && RAIN) put(RAIN.frames[rainFrame % RAIN.frames.length]!);
   // Markers last, anchored at their bottom-centre.
@@ -69,9 +82,11 @@ function drawMap(ctx: CanvasRenderingContext2D, img: RioImages, look: Look, stat
   }
 }
 
-export function RioMap({ statuses, look, onOpen }: {
+export function RioMap({ statuses, look, now: fixedNow, onOpen }: {
   statuses: ReadonlyMap<string, AreaStatus>;
   look: Look;
+  /** The moment the map shows (default: now, re-read each minute): it picks the holiday takeover. */
+  now?: Date;
   onOpen: (area: string) => void;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
@@ -79,19 +94,24 @@ export function RioMap({ statuses, look, onOpen }: {
   // The desktop scales by fractions to fill the view (Esme, 2026-11-17); the phone stays crisp.
   const fit = useCover(wrap, RIO_MAP.canvas, MAP_KEEP, useUi().layout === "wide");
   const scale = fit.scale;
-  const files = useMemo(() => filesFor(look), [look]);
+  const now = useNow(fixedNow);
+  const event = activeEvent(now);
+  const layer = event ? eventLook(event, now, look) : "day";
+  const files = useMemo(() => filesFor(look, event, layer), [look, event, layer]);
   const images = useRioImages(files);
   const [hover, setHover] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const reduced = useReducedMotion();
   const raining = rainsOn(look) && !reduced;
   const rainTick = useTicker(RAIN?.frame_ms ?? 1000, raining);
+  const fireworks = fireworksFor(event, layer);
+  const fireworksTick = useTicker(fireworks?.frame_ms ?? 1000, !!fireworks && !reduced);
 
   useEffect(() => {
     const ctx = ctx2d(canvas.current);
     if (!ctx || !images) return;
-    drawMap(ctx, images, look, statuses, raining ? rainTick : null);
-  }, [images, look, statuses, raining, rainTick]);
+    drawMap(ctx, images, look, statuses, raining ? rainTick : null, event, layer, fireworks && !reduced ? fireworksTick : null);
+  }, [images, look, statuses, raining, rainTick, event, layer, fireworks, reduced, fireworksTick]);
 
   const pick = (key: string) => {
     if (isOpen(statuses.get(key))) {
@@ -109,7 +129,7 @@ export function RioMap({ statuses, look, onOpen }: {
   const tipAt = tipKey ? PLACE.get(tipKey)?.tooltip_anchor : undefined;
 
   return (
-    <div className="rio-map" ref={wrap} data-look={look} data-fit={fit.mode}>
+    <div className="rio-map" ref={wrap} data-look={look} data-fit={fit.mode} data-event={event?.key}>
       <div className="rio-map-layer" style={{ left: fit.x, top: fit.y, width: W * scale, height: H * scale }}>
         <canvas
           ref={canvas}

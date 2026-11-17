@@ -1,0 +1,574 @@
+{
+ "location": "os-esquilos-farmhouse",
+ "name": "Os Esquilos: the forest farmhouse",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "opensDay": 165,
+ "base": {
+  "start": {
+   "day": "outside/os-esquilos-outside-start-day.png",
+   "rain": "outside/os-esquilos-outside-start-rain.png",
+   "night": "outside/os-esquilos-outside-start-night.png"
+  },
+  "full": {
+   "day": "outside/os-esquilos-outside-full-day.png",
+   "rain": "outside/os-esquilos-outside-full-rain.png",
+   "night": "outside/os-esquilos-outside-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "states": {
+  "start": "a quiet weekday: the colonial house and its veranda with one family at a dark wooden table, the east table empty, the little white table by the door, the ornate parasol over an empty table in the stone courtyard, smoke from the wood stove, one squirrel",
+  "full": "the Sunday feast: the veranda crowded, every parasol table taken, the feast table under its parasol and the lanterns with the five friends at it, the roast and the cake, garlands, the band (viola, accordion, pandeiro), squirrels and birds"
+ },
+ "state_note": "both states share every fixed thing (house, veranda, courtyard, the ornate parasol, trees), so the swap never moves a slot. Suggested switch to 'full': on a Sunday after the fifth whole goal, or for the day of any whole goal (the feast).",
+ "celebrations": [
+  {
+   "step": 1,
+   "id": "feast-table",
+   "what": "the long feast table in the courtyard under a big cream parasol, laid with a white lace cloth, plates and cups for the friends, and Esme's chair at its head",
+   "layers": {
+    "day": "outside/os-esquilos-outside-celebration-1-feast-table-day.png",
+    "rain": "outside/os-esquilos-outside-celebration-1-feast-table-rain.png",
+    "night": "outside/os-esquilos-outside-celebration-1-feast-table-night.png"
+   }
+  },
+  {
+   "step": 2,
+   "id": "lanterns",
+   "what": "strings of little paper lanterns across the courtyard, from the columns to the poles and the trees",
+   "layers": {
+    "day": "outside/os-esquilos-outside-celebration-2-lanterns-day.png",
+    "rain": "outside/os-esquilos-outside-celebration-2-lanterns-rain.png",
+    "night": "outside/os-esquilos-outside-celebration-2-lanterns-night.png"
+   }
+  },
+  {
+   "step": 3,
+   "id": "flowers",
+   "what": "flower garlands along the veranda eave and posies and hydrangea vases on the feast table",
+   "layers": {
+    "day": "outside/os-esquilos-outside-celebration-3-flowers-day.png",
+    "rain": "outside/os-esquilos-outside-celebration-3-flowers-rain.png",
+    "night": "outside/os-esquilos-outside-celebration-3-flowers-night.png"
+   }
+  },
+  {
+   "step": 4,
+   "id": "roast",
+   "what": "the Sunday roast (a golden leitão) and clay pots of food on the feast table",
+   "layers": {
+    "day": "outside/os-esquilos-outside-celebration-4-roast-day.png",
+    "rain": "outside/os-esquilos-outside-celebration-4-roast-rain.png",
+    "night": "outside/os-esquilos-outside-celebration-4-roast-night.png"
+   }
+  },
+  {
+   "step": 5,
+   "id": "cake",
+   "what": "a big white cake with candles at the head of the table, by Esme's chair",
+   "layers": {
+    "day": "outside/os-esquilos-outside-celebration-5-cake-day.png",
+    "rain": "outside/os-esquilos-outside-celebration-5-cake-rain.png",
+    "night": "outside/os-esquilos-outside-celebration-5-cake-night.png"
+   }
+  }
+ ],
+ "celebration_rule": "Each WHOLE goal finished lays the next celebration piece, in order (1 feast table, 2 lanterns, 3 flowers and mementos, 4 the roast, 5 the cake), in BOTH scenes, and puts its goal sticker in the next free goal slot (lowest 'order'). Draw the start base, then celebration layers 1..n for the current look (each layer holds only the pixels it changes). After the fifth goal the feast is fully laid; goals 6+ only add stickers. 'full' (the Sunday feast) already contains all five pieces plus the crowd, the friends at the feast table and the band.",
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker; draw at left = x - 8, top = y - 15",
+ "draw_order": "base, celebration layers in order, then stickers sorted by foot y (then x), then the rain overlay",
+ "sticker_looks": "recolour placed stickers by colour name with palette-rain.json ('rain') or palette-night.json ('night') so they match the base",
+ "overlays": {
+  "rain": {
+   "file": "outside/os-esquilos-outside-rain-overlay.png",
+   "json": "outside/os-esquilos-outside-rain-overlay.json"
+  }
+ },
+ "hotspots": [
+  {
+   "id": "door",
+   "x": 172,
+   "y": 92,
+   "w": 26,
+   "h": 62,
+   "goes": "inside",
+   "note": "the open blue doors: the dining room"
+  },
+  {
+   "id": "path-south",
+   "x": 168,
+   "y": 222,
+   "w": 40,
+   "h": 18,
+   "goes": "map",
+   "note": "the path down through the forest: back to the Rio map"
+  },
+  {
+   "id": "trail-east",
+   "x": 360,
+   "y": 160,
+   "w": 24,
+   "h": 30,
+   "goes": "map",
+   "note": "the cobbled trail east over the footbridge, towards the Cascatinha (Tijuca park): back to the map"
+  },
+  {
+   "id": "feast-table",
+   "x": 42,
+   "y": 184,
+   "w": 118,
+   "h": 40,
+   "goes": "ui:celebrations",
+   "state": "celebration 1+",
+   "note": "the feast table: the whole goals celebrated here"
+  },
+  {
+   "id": "buffet",
+   "x": 194,
+   "y": 114,
+   "w": 26,
+   "h": 24,
+   "goes": "ui:recipe-book",
+   "note": "the little white table by the main door: the dish just learned (Inspired at Os Esquilos)"
+  },
+  {
+   "id": "veranda-west",
+   "x": 58,
+   "y": 120,
+   "w": 78,
+   "h": 30,
+   "goes": "sit"
+  },
+  {
+   "id": "veranda-east",
+   "x": 228,
+   "y": 120,
+   "w": 94,
+   "h": 30,
+   "goes": "sit"
+  },
+  {
+   "id": "ornate-parasol",
+   "x": 236,
+   "y": 160,
+   "w": 54,
+   "h": 64,
+   "goes": "sit",
+   "note": "the table under the ornate tasselled parasol"
+  }
+ ],
+ "walkable": [
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "011000000000000000000110",
+  "011000000000000000000110",
+  "011100000111110000001110",
+  "011000000111110000000110",
+  "011111111111111111111110",
+  "011111111111111111111110",
+  "011000000011111101111110",
+  "011000000011111001110010",
+  "011111111111111111110010"
+ ],
+ "walkable_note": "suggested, one string per tile row (1 = the courtyard, the veranda floor, the trail east; 0 = the house wall, the forest, tables)",
+ "lamps": [
+  {
+   "kind": "wall",
+   "x": 39,
+   "y": 118
+  },
+  {
+   "kind": "wall",
+   "x": 170,
+   "y": 105
+  },
+  {
+   "kind": "wall",
+   "x": 198,
+   "y": 105
+  },
+  {
+   "kind": "wall",
+   "x": 130,
+   "y": 105
+  },
+  {
+   "kind": "wall",
+   "x": 288,
+   "y": 105
+  },
+  {
+   "kind": "parasol",
+   "x": 262,
+   "y": 188
+  },
+  {
+   "kind": "paper",
+   "x": 36,
+   "y": 158
+  },
+  {
+   "kind": "paper",
+   "x": 47,
+   "y": 161
+  },
+  {
+   "kind": "paper",
+   "x": 58,
+   "y": 163
+  },
+  {
+   "kind": "paper",
+   "x": 69,
+   "y": 165
+  },
+  {
+   "kind": "paper",
+   "x": 80,
+   "y": 167
+  },
+  {
+   "kind": "paper",
+   "x": 91,
+   "y": 167
+  },
+  {
+   "kind": "paper",
+   "x": 102,
+   "y": 167
+  },
+  {
+   "kind": "paper",
+   "x": 113,
+   "y": 167
+  },
+  {
+   "kind": "paper",
+   "x": 124,
+   "y": 166
+  },
+  {
+   "kind": "paper",
+   "x": 135,
+   "y": 164
+  },
+  {
+   "kind": "paper",
+   "x": 146,
+   "y": 162
+  },
+  {
+   "kind": "paper",
+   "x": 157,
+   "y": 159
+  },
+  {
+   "kind": "paper",
+   "x": 168,
+   "y": 155
+  },
+  {
+   "kind": "paper",
+   "x": 179,
+   "y": 151
+  },
+  {
+   "kind": "paper",
+   "x": 190,
+   "y": 146
+  },
+  {
+   "kind": "paper",
+   "x": 96,
+   "y": 119
+  },
+  {
+   "kind": "paper",
+   "x": 85,
+   "y": 129
+  },
+  {
+   "kind": "paper",
+   "x": 74,
+   "y": 138
+  },
+  {
+   "kind": "paper",
+   "x": 63,
+   "y": 145
+  },
+  {
+   "kind": "paper",
+   "x": 52,
+   "y": 150
+  },
+  {
+   "kind": "paper",
+   "x": 41,
+   "y": 154
+  },
+  {
+   "kind": "paper",
+   "x": 150,
+   "y": 121
+  },
+  {
+   "kind": "paper",
+   "x": 161,
+   "y": 132
+  },
+  {
+   "kind": "paper",
+   "x": 172,
+   "y": 141
+  },
+  {
+   "kind": "paper",
+   "x": 183,
+   "y": 145
+  },
+  {
+   "kind": "paper",
+   "x": 224,
+   "y": 121
+  },
+  {
+   "kind": "paper",
+   "x": 213,
+   "y": 133
+  },
+  {
+   "kind": "paper",
+   "x": 202,
+   "y": 142
+  },
+  {
+   "kind": "paper",
+   "x": 278,
+   "y": 119
+  },
+  {
+   "kind": "paper",
+   "x": 289,
+   "y": 129
+  },
+  {
+   "kind": "paper",
+   "x": 300,
+   "y": 137
+  },
+  {
+   "kind": "paper",
+   "x": 311,
+   "y": 143
+  },
+  {
+   "kind": "paper",
+   "x": 322,
+   "y": 148
+  },
+  {
+   "kind": "paper",
+   "x": 333,
+   "y": 151
+  },
+  {
+   "kind": "paper",
+   "x": 344,
+   "y": 153
+  },
+  {
+   "kind": "paper",
+   "x": 355,
+   "y": 153
+  }
+ ],
+ "baked": "the colonial house (mossy terracotta Roman-tile roof, chimney and smoke, cream plaster, whitewashed rafter ends, white round columns, a terracotta tile veranda floor, the blue-and-white azulejo dado, gallery walls of little framed pictures, wall lanterns, a round plate, open doors), bougainvillea, the coral-red side wing with hanging plants, dark tables with Windsor chairs and a bistro table on the veranda, the stone-flagged courtyard with the ornate tasselled parasol and its table, terracotta pots, the forest (the buttress-rooted giant, a juçara palm, tree ferns, heliconias), a squirrel and a tanager",
+ "slots": [
+  {
+   "id": "feast-goal-1",
+   "x": 60,
+   "y": 206,
+   "area": "feast",
+   "order": 1,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table: a whole goal finished (the head of the table first)"
+  },
+  {
+   "id": "feast-goal-2",
+   "x": 78,
+   "y": 206,
+   "area": "feast",
+   "order": 2,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table: a whole goal finished (the head of the table first)"
+  },
+  {
+   "id": "feast-goal-3",
+   "x": 96,
+   "y": 206,
+   "area": "feast",
+   "order": 3,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table: a whole goal finished (the head of the table first)"
+  },
+  {
+   "id": "feast-goal-4",
+   "x": 114,
+   "y": 206,
+   "area": "feast",
+   "order": 4,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table: a whole goal finished (the head of the table first)"
+  },
+  {
+   "id": "feast-goal-5",
+   "x": 132,
+   "y": 206,
+   "area": "feast",
+   "order": 5,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table: a whole goal finished (the head of the table first)"
+  },
+  {
+   "id": "feast-goal-6",
+   "x": 150,
+   "y": 206,
+   "area": "feast",
+   "order": 6,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table: a whole goal finished (the head of the table first)"
+  },
+  {
+   "id": "veranda-goal-1",
+   "x": 94,
+   "y": 136,
+   "area": "feast",
+   "order": 7,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the veranda floor by a column, once the feast table is full"
+  },
+  {
+   "id": "veranda-goal-2",
+   "x": 138,
+   "y": 136,
+   "area": "feast",
+   "order": 8,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the veranda floor by a column, once the feast table is full"
+  },
+  {
+   "id": "veranda-goal-3",
+   "x": 238,
+   "y": 136,
+   "area": "feast",
+   "order": 9,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the veranda floor by a column, once the feast table is full"
+  },
+  {
+   "id": "veranda-goal-4",
+   "x": 282,
+   "y": 136,
+   "area": "feast",
+   "order": 10,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the veranda floor by a column, once the feast table is full"
+  },
+  {
+   "id": "dish-buffet",
+   "x": 207,
+   "y": 131,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside"
+   ],
+   "inspired": true,
+   "note": "on the little white table by the main door: the dish just learned ('Inspired at Os Esquilos')"
+  },
+  {
+   "id": "dish-family-table",
+   "x": 118,
+   "y": 138,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside",
+    "dishes:*"
+   ],
+   "note": "on the family table on the veranda"
+  },
+  {
+   "id": "dish-east-table",
+   "x": 300,
+   "y": 138,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside",
+    "dishes:*"
+   ]
+  },
+  {
+   "id": "ornate-table",
+   "x": 268,
+   "y": 209,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside",
+    "goals:*"
+   ],
+   "note": "on the table under the ornate parasol"
+  },
+  {
+   "id": "courtyard-flags",
+   "x": 176,
+   "y": 214,
+   "area": "path",
+   "accepts": [
+    "goals:*",
+    "dishes:countryside"
+   ]
+  },
+  {
+   "id": "coral-step",
+   "x": 24,
+   "y": 170,
+   "area": "rail",
+   "accepts": [
+    "goals:*",
+    "dishes:countryside"
+   ],
+   "note": "at the foot of the coral wall"
+  }
+ ]
+}

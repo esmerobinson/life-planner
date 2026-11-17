@@ -1,0 +1,12 @@
+{
+ "file": "rain/hall-rain-streaks.png",
+ "frame": [
+  352,
+  224
+ ],
+ "frames": 4,
+ "frame_ms": 110,
+ "loop": true,
+ "blend": "normal, over the whole scene (plaza) / over the hall (only windows and the skylight pool have rain)",
+ "notes": "hard alpha; stamp at 0,0 over the rain base; frame n = x offset n*width in the strip"
+}

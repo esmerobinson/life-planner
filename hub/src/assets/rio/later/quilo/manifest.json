@@ -1,0 +1,146 @@
+{
+ "pack": "rio-pack later",
+ "area": "quilo",
+ "name": "Quilo, the pay-by-weight lunch canteen",
+ "opens_day": 30,
+ "notes": "Outside and inside 384x240 (24x15 tiles), 16 px tiles, 3/4 top-down, light from the top-left. Hard alpha; day images use palette colours only (no new colours).",
+ "map": {
+  "place_key": "quilo",
+  "map": "art/final/rio-pack/day1/map/map.json",
+  "layers": {
+   "day": "art/final/rio-pack/day1/map/layers/quilo-open-day.png",
+   "night": "art/final/rio-pack/day1/map/layers/quilo-open-night.png",
+   "rain": "art/final/rio-pack/day1/map/layers/quilo-open-rain.png"
+  },
+  "matches": "the grey parapet, the wide window of buffet trays, the blue door, the scale by the door. CHANGED 2026-11-16 (Esme): the board is now white with a blue harlequin border and blue lettering, the awning blue-and-white, the plinth harlequin; the map sprite's red board and awning need recolouring to match"
+ },
+ "locations": [
+  {
+   "key": "quilo-outside",
+   "name": "The canteen front on the Ipanema grid",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "outside/outside-start-day.png",
+    "start-night": "outside/outside-start-night.png",
+    "start-rain": "outside/outside-start-rain.png",
+    "full-day": "outside/outside-full-day.png",
+    "full-night": "outside/outside-full-night.png",
+    "full-rain": "outside/outside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "outside/outside-rain-streaks-0.png",
+      "outside/outside-rain-streaks-1.png",
+      "outside/outside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "outside/outside-slots.json"
+  },
+  {
+   "key": "quilo-inside",
+   "name": "The buffet and the scale",
+   "kind": "interior",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "inside/inside-start-day.png",
+    "start-night": "inside/inside-start-night.png",
+    "start-rain": "inside/inside-start-rain.png",
+    "full-day": "inside/inside-full-day.png",
+    "full-night": "inside/inside-full-night.png",
+    "full-rain": "inside/inside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "inside/inside-rain-streaks-0.png",
+      "inside/inside-rain-streaks-1.png",
+      "inside/inside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "inside/inside-slots.json"
+  }
+ ],
+ "stages": {
+  "rule": "The base stage follows the Quilo stickers earned (everyday dishes; days she did anything). Suggested: start from opening (day 30), full from half the Quilo's ~60 dishes. Dishes appear in the slots as they are earned (see fill_rule).",
+  "start": "quiet: a few trays filled, one or two diners",
+  "full": "every tray full, lunchtime rush, a queue at the scale"
+ },
+ "looks": {
+  "day": "lunchtime (default)",
+  "night": "after dark: closing time (chairs up, trays covered, one cleaner, warm light)",
+  "rain": "when Rio is rainy; add the streak overlay"
+ },
+ "inspired": {
+  "dish_of_the_day": "inside-slots.json special_slots 'dish-of-the-day' (the gold tray) shows the newest dish; the chalkboard and the outside menu board show the latest three / two",
+  "card": "art/final/rio-pack/day1/ui/inspired-card-template.png (the existing 'Inspired at <restaurant>' card; not redrawn)"
+ },
+ "dishes": {
+  "new": [
+   "dishes/dishes-strogonoff.png",
+   "dishes/dishes-bife-acebolado.png",
+   "dishes/dishes-frango-grelhado.png",
+   "dishes/dishes-peixe-frito.png",
+   "dishes/dishes-escondidinho.png",
+   "dishes/dishes-pure-de-batata.png",
+   "dishes/dishes-mandioca-frita.png",
+   "dishes/dishes-salpicao.png",
+   "dishes/dishes-feijao-tropeiro.png",
+   "dishes/dishes-beterraba-ralada.png",
+   "dishes/dishes-caldo-verde.png",
+   "dishes/dishes-mousse-de-maracuja.png"
+  ],
+  "catalogue": "dishes/dishes.json",
+  "sheet": "dishes/dishes-sheet.png",
+  "reused": [
+   "final/rio-pack/day1/stickers/dishes/dishes-arroz-e-feijao.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-farofa.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-couve-refogada.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-ovo-frito.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-banana-frita.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-salada-de-manga.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-feijoada.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-moqueca.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-pudim.png",
+   "final/rio-pack/day1/stickers/dishes/dishes-suco-de-laranja.png"
+  ]
+ },
+ "characters": "Esme and Mr Cat are the shipped sprites, baked into the full day and rain scenes. Staff and customers are the ten Rio townsfolk plus twelve Quilo regulars drawn with folk.py's own spec format (qin.REG), each with their own face. Staff wear Quilo-red tees; the cooks wear white with caps.",
+ "palettes": {
+  "extra": "palette-extra.json",
+  "night": "palette-night.json",
+  "rain": "palette-rain.json"
+ },
+ "sources": "art/sources/rio-pack/quilo/ (python3 -I -B deliver.py)"
+}

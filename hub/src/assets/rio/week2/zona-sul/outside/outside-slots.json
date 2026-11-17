@@ -1,0 +1,287 @@
+{
+ "location": "zona-sul-outside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "outside/outside-start-day.png",
+  "start-night": "outside/outside-start-night.png",
+  "start-rain": "outside/outside-start-rain.png",
+  "full-day": "outside/outside-full-day.png",
+  "full-night": "outside/outside-full-night.png",
+  "full-rain": "outside/outside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "outside/outside-rain-streaks-0.png",
+    "outside/outside-rain-streaks-1.png",
+    "outside/outside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "draw on top of everything (stickers too) while it rains; the band under the awning stays dry"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 cell; draw at left = x - 8, top = y - 15",
+ "fill_rule": "The fruit stand's front crates take fruit and veg in 'order'; the NOVO table shows the newest ingredient.",
+ "ingredient_slots": [
+  {
+   "id": "novo",
+   "x": 236,
+   "y": 117,
+   "w": 16,
+   "h": 16,
+   "group": "novo-table",
+   "accepts": [
+    "newest"
+   ],
+   "order": 0,
+   "note": "shows the most recently unlocked ingredient (the errand just ticked)"
+  },
+  {
+   "id": "stand-5",
+   "x": 123,
+   "y": 129,
+   "w": 16,
+   "h": 16,
+   "group": "fruit-stand",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 1
+  },
+  {
+   "id": "stand-3",
+   "x": 81,
+   "y": 129,
+   "w": 16,
+   "h": 16,
+   "group": "fruit-stand",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 2
+  },
+  {
+   "id": "stand-1",
+   "x": 39,
+   "y": 129,
+   "w": 16,
+   "h": 16,
+   "group": "fruit-stand",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 3
+  },
+  {
+   "id": "stand-2",
+   "x": 60,
+   "y": 129,
+   "w": 16,
+   "h": 16,
+   "group": "fruit-stand",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 4
+  },
+  {
+   "id": "stand-4",
+   "x": 102,
+   "y": 129,
+   "w": 16,
+   "h": 16,
+   "group": "fruit-stand",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 5
+  },
+  {
+   "id": "stand-6",
+   "x": 144,
+   "y": 129,
+   "w": 16,
+   "h": 16,
+   "group": "fruit-stand",
+   "accepts": [
+    "fruit",
+    "veg"
+   ],
+   "order": 6
+  }
+ ],
+ "sticker_slots": [
+  {
+   "id": "balcony-1",
+   "x": 100,
+   "y": 36,
+   "area": "on a balcony upstairs",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "balcony-2",
+   "x": 228,
+   "y": 36,
+   "area": "on a balcony upstairs",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "balcony-3",
+   "x": 356,
+   "y": 36,
+   "area": "on a balcony upstairs",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "window-right-1",
+   "x": 300,
+   "y": 116,
+   "area": "in the right window",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "window-right-2",
+   "x": 340,
+   "y": 116,
+   "area": "in the right window",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "novo-table-side",
+   "x": 252,
+   "y": 117,
+   "area": "on the NOVO table",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "pavement-1",
+   "x": 160,
+   "y": 178,
+   "area": "pavement",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "pavement-2",
+   "x": 268,
+   "y": 192,
+   "area": "pavement",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "pavement-3",
+   "x": 330,
+   "y": 186,
+   "area": "pavement",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "pavement-4",
+   "x": 96,
+   "y": 176,
+   "area": "pavement",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "kerb-1",
+   "x": 160,
+   "y": 199,
+   "area": "on the kerb",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "street-1",
+   "x": 60,
+   "y": 226,
+   "area": "street",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "street-2",
+   "x": 220,
+   "y": 236,
+   "area": "street",
+   "accepts": [
+    "sticker:zonasul",
+    "sticker:any"
+   ]
+  }
+ ],
+ "hotspots": {
+  "door": {
+   "x": 170,
+   "y": 80,
+   "w": 44,
+   "h": 50,
+   "note": "the sliding doors: go inside"
+  },
+  "exit": {
+   "x": 0,
+   "y": 200,
+   "w": 384,
+   "h": 40,
+   "note": "the street (map exit)"
+  },
+  "esme_spot": {
+   "x": 200,
+   "y": 176
+  }
+ },
+ "baked": {
+  "start": "opening day: balloons at the doors, a HOJE chalkboard, half the stand stocked, three trolleys, empty crates stacked, Marcos and Bia (staff), Dona Celia with the first trolley, one bike",
+  "full": "start - balloons - crates + a full stand, flower buckets, OFERTAS chalkboard, six trolleys, two bikes, the delivery tricycle with Thiago, shoppers (Vovo Ze, Duda, Seu Jorge, Ana, Lucas), Marcos by the lobby, Esme and Mr Cat"
+ }
+}

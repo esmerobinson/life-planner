@@ -1,0 +1,201 @@
+{
+ "pack": "rio-pack",
+ "batch": "later",
+ "location": "os-esquilos",
+ "mapKey": "os-esquilos",
+ "opensDay": 165,
+ "notes": "Os Esquilos: the old farmhouse restaurant deep in the Tijuca forest, famous for long Sunday lunches. Restyled 2026-11-17 from Esme's photos. Outside: the low colonial house (mossy terracotta roof, cream plaster, white columns, an azulejo veranda with a gallery wall) and its stone-flagged courtyard of parasol tables. Inside: the dining room (cream walls, rust-red sash windows, a dark central post, red-cushioned booths, carved chairs, copper pans, a kitchen hatch with a little wood stove). Two states (start, full) x three looks (day, rain, night), plus five celebration layers per look. No lettering or logo: the name is the map tooltip. Bases ship without stickers or Esme.",
+ "role": "goal celebrations (part): each WHOLE goal finished lays the next piece of the feast and adds a goal sticker; the restaurant teaches slow countryside cooking (dishes, set 'countryside'), arriving 'Inspired at Os Esquilos' with the existing day1/ui inspired card",
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "lookPalettes": {
+  "rain": "palette-rain.json",
+  "night": "palette-night.json"
+ },
+ "celebrationSteps": [
+  {
+   "step": 1,
+   "id": "feast-table",
+   "outside": "the long feast table in the courtyard under a big cream parasol, laid with a white lace cloth, plates and cups for the friends, and Esme's chair at its head",
+   "inside": "the long table laid as the feast table: a white lace cloth, plates and cups for the friends, Esme's chair at its head"
+  },
+  {
+   "step": 2,
+   "id": "lanterns",
+   "outside": "strings of little paper lanterns across the courtyard, from the columns to the poles and the trees",
+   "inside": "strings of paper lanterns along the ceiling beam, and candles on the feast table"
+  },
+  {
+   "step": 3,
+   "id": "flowers",
+   "outside": "flower garlands along the veranda eave and posies and hydrangea vases on the feast table",
+   "inside": "a flower garland along the beam, hydrangea vases on the table, and framed mementos above the goals shelf"
+  },
+  {
+   "step": 4,
+   "id": "roast",
+   "outside": "the Sunday roast (a golden leitão) and clay pots of food on the feast table",
+   "inside": "the Sunday roast (a golden leitão) and a clay pot of stew on the feast table"
+  },
+  {
+   "step": 5,
+   "id": "cake",
+   "outside": "a big white cake with candles at the head of the table, by Esme's chair",
+   "inside": "a big white cake with candles at the head of the table, by Esme's chair"
+  }
+ ],
+ "celebrationRule": "Each WHOLE goal finished lays the next celebration piece, in order (1 feast table, 2 lanterns, 3 flowers and mementos, 4 the roast, 5 the cake), in BOTH scenes, and puts its goal sticker in the next free goal slot (lowest 'order'). Draw the start base, then celebration layers 1..n for the current look (each layer holds only the pixels it changes). After the fifth goal the feast is fully laid; goals 6+ only add stickers. 'full' (the Sunday feast) already contains all five pieces plus the crowd, the friends at the feast table and the band.",
+ "locations": [
+  {
+   "key": "os-esquilos-farmhouse",
+   "name": "Os Esquilos: the forest farmhouse",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "opensDay": 165,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "outside/os-esquilos-outside-start-day.png",
+     "rain": "outside/os-esquilos-outside-start-rain.png",
+     "night": "outside/os-esquilos-outside-start-night.png"
+    },
+    "full": {
+     "day": "outside/os-esquilos-outside-full-day.png",
+     "rain": "outside/os-esquilos-outside-full-rain.png",
+     "night": "outside/os-esquilos-outside-full-night.png"
+    }
+   },
+   "celebrations": {
+    "feast-table": {
+     "day": "outside/os-esquilos-outside-celebration-1-feast-table-day.png",
+     "rain": "outside/os-esquilos-outside-celebration-1-feast-table-rain.png",
+     "night": "outside/os-esquilos-outside-celebration-1-feast-table-night.png"
+    },
+    "lanterns": {
+     "day": "outside/os-esquilos-outside-celebration-2-lanterns-day.png",
+     "rain": "outside/os-esquilos-outside-celebration-2-lanterns-rain.png",
+     "night": "outside/os-esquilos-outside-celebration-2-lanterns-night.png"
+    },
+    "flowers": {
+     "day": "outside/os-esquilos-outside-celebration-3-flowers-day.png",
+     "rain": "outside/os-esquilos-outside-celebration-3-flowers-rain.png",
+     "night": "outside/os-esquilos-outside-celebration-3-flowers-night.png"
+    },
+    "roast": {
+     "day": "outside/os-esquilos-outside-celebration-4-roast-day.png",
+     "rain": "outside/os-esquilos-outside-celebration-4-roast-rain.png",
+     "night": "outside/os-esquilos-outside-celebration-4-roast-night.png"
+    },
+    "cake": {
+     "day": "outside/os-esquilos-outside-celebration-5-cake-day.png",
+     "rain": "outside/os-esquilos-outside-celebration-5-cake-rain.png",
+     "night": "outside/os-esquilos-outside-celebration-5-cake-night.png"
+    }
+   },
+   "slots": "outside/os-esquilos-outside-slots.json",
+   "slotCount": 16,
+   "rainOverlay": "outside/os-esquilos-outside-rain-overlay.png"
+  },
+  {
+   "key": "os-esquilos-dining-room",
+   "name": "Os Esquilos: the dining room",
+   "kind": "interior",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "opensDay": 165,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "rain",
+    "night"
+   ],
+   "base": {
+    "start": {
+     "day": "inside/os-esquilos-inside-start-day.png",
+     "rain": "inside/os-esquilos-inside-start-rain.png",
+     "night": "inside/os-esquilos-inside-start-night.png"
+    },
+    "full": {
+     "day": "inside/os-esquilos-inside-full-day.png",
+     "rain": "inside/os-esquilos-inside-full-rain.png",
+     "night": "inside/os-esquilos-inside-full-night.png"
+    }
+   },
+   "celebrations": {
+    "feast-table": {
+     "day": "inside/os-esquilos-inside-celebration-1-feast-table-day.png",
+     "rain": "inside/os-esquilos-inside-celebration-1-feast-table-rain.png",
+     "night": "inside/os-esquilos-inside-celebration-1-feast-table-night.png"
+    },
+    "lanterns": {
+     "day": "inside/os-esquilos-inside-celebration-2-lanterns-day.png",
+     "rain": "inside/os-esquilos-inside-celebration-2-lanterns-rain.png",
+     "night": "inside/os-esquilos-inside-celebration-2-lanterns-night.png"
+    },
+    "flowers": {
+     "day": "inside/os-esquilos-inside-celebration-3-flowers-day.png",
+     "rain": "inside/os-esquilos-inside-celebration-3-flowers-rain.png",
+     "night": "inside/os-esquilos-inside-celebration-3-flowers-night.png"
+    },
+    "roast": {
+     "day": "inside/os-esquilos-inside-celebration-4-roast-day.png",
+     "rain": "inside/os-esquilos-inside-celebration-4-roast-rain.png",
+     "night": "inside/os-esquilos-inside-celebration-4-roast-night.png"
+    },
+    "cake": {
+     "day": "inside/os-esquilos-inside-celebration-5-cake-day.png",
+     "rain": "inside/os-esquilos-inside-celebration-5-cake-rain.png",
+     "night": "inside/os-esquilos-inside-celebration-5-cake-night.png"
+    }
+   },
+   "slots": "inside/os-esquilos-inside-slots.json",
+   "slotCount": 14,
+   "rainOverlay": "inside/os-esquilos-inside-rain-overlay.png"
+  }
+ ],
+ "stickerAccepts": {
+  "goals:*": "a whole goal finished (e.g. goals-esquilos-squirrel)",
+  "dishes:countryside": "a countryside dish learned here (set 'countryside', the 12 in dishes/)",
+  "dishes:*": "any dish (the table slots only)"
+ },
+ "dishes": {
+  "manifest": "dishes/dishes-countryside.json",
+  "count": 12,
+  "keys": [
+   "dishes-frango-com-quiabo",
+   "dishes-tutu-a-mineira",
+   "dishes-torresmo",
+   "dishes-leitao-a-pururuca",
+   "dishes-costelinha-com-canjiquinha",
+   "dishes-vaca-atolada",
+   "dishes-angu",
+   "dishes-queijo-minas-com-goiabada",
+   "dishes-doce-de-abobora",
+   "dishes-doce-de-leite-caseiro",
+   "dishes-ambrosia",
+   "dishes-arroz-doce"
+  ]
+ },
+ "uiReuse": "the 'Inspired at Os Esquilos' card is day1/ui/inspired-card-template.png with the dish's die-cut (not redrawn)"
+}

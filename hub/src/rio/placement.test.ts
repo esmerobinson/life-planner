@@ -1,7 +1,7 @@
 import { COLLECTION, STICKERS } from "../farm/catalogue";
 import { farmState, placedRow } from "../farm/state";
 import { SCENES } from "./assets";
-import { HOME, accepts, homeOf, layout, sceneState, stickerTags } from "./placement";
+import { HOME, accepts, homeOf, layout, sceneState, slotsIn, stickerTags } from "./placement";
 
 const keysIn = (group: string) => COLLECTION.filter((s) => s.group === group).map((s) => s.key);
 
@@ -20,17 +20,92 @@ describe("where earned stickers sit", () => {
     expect(homeOf("lilypad")).toEqual({ area: "ipanema-beach", scene: "ipanema-beach/outside" });
     expect(homeOf(keysIn("aquarium")[0]!)).toEqual({ area: "ipanema-beach", scene: "ipanema-beach/sea" });
     expect(homeOf(keysIn("farmhouse")[0]!)).toEqual({ area: "boteco", scene: "boteco/inside" });
+    // The Flamengo match takes over the theatre family (no phase-1 zone): the farmhouse stays at the boteco.
+    expect(homeOf("lantern")).toEqual({ area: "boteco", scene: "boteco/inside" });
     expect(homeOf("cleared-mind")).toBeNull(); // bonus
     expect(homeOf("no-such-sticker")).toBeNull();
   });
 
-  it("a placed orchard sticker has no home and no slot (it stays in the book)", () => {
-    const orchard = keysIn("orchard")[0]!;
-    expect(homeOf(orchard)).toBeNull();
+  it("museum stickers are displayed in the museum's hall (day 21), every one on a display slot", () => {
+    const museum = keysIn("museum");
+    expect(homeOf("ammonite")).toEqual({ area: "museum", scene: "museum/inside" });
+    expect(homeOf("pressed-daisy")).toEqual({ area: "museum", scene: "museum/inside" });
+    const { bySlot, overflow } = layout("museum/inside", museum);
+    expect(bySlot.size).toBe(museum.length);
+    expect(overflow).toBe(0);
+  });
+
+  it("a bonus sticker has no home and no slot (it stays in the collection)", () => {
     for (const id of Object.keys(SCENES)) {
-      const { bySlot } = layout(id as keyof typeof SCENES, [orchard]);
-      expect([...bySlot.values()]).not.toContain(orchard);
+      const { bySlot } = layout(id as keyof typeof SCENES, ["cleared-mind"]);
+      expect([...bySlot.values()]).not.toContain("cleared-mind");
     }
+  });
+
+  it("the sea off Arpoador: stream fish swim, the two workbook fish take the rare showcase", () => {
+    const fish = keysIn("aquarium");
+    const { bySlot, overflow } = layout("ipanema-beach/sea", fish);
+    expect(overflow).toBe(0);
+    for (const [slot, key] of bySlot) {
+      if (key === "moonfish" || key === "golden-carp") expect(slot, key).toMatch(/^rare-/);
+      else expect(slot, key).toMatch(/^swim-/);
+    }
+    expect(bySlot.size).toBe(fish.length);
+  });
+
+  it("orchard trees stand outside the Jardim Botanico, the glasshouse in its orchid house", () => {
+    expect(homeOf("sapling")).toEqual({ area: "jardim-botanico", scene: "jardim-botanico/outside" });
+    expect(homeOf("tree-swing")).toEqual({ area: "jardim-botanico", scene: "jardim-botanico/outside" });
+    expect(homeOf("orchid")).toEqual({ area: "jardim-botanico", scene: "jardim-botanico/inside" });
+    expect(homeOf("seedtray")).toEqual({ area: "jardim-botanico", scene: "jardim-botanico/inside" });
+  });
+
+  it("every orchard sticker stands on a tree slot only: 7 spots, 2 wait in the collection", () => {
+    const orchard = keysIn("orchard");
+    expect(orchard).toHaveLength(9);
+    const { bySlot, overflow } = layout("jardim-botanico/outside", orchard);
+    const at = new Map(SCENES["jardim-botanico/outside"].slots.map((s) => [s.id, s]));
+    for (const slot of bySlot.keys()) expect(at.get(slot)!.accepts, slot).toEqual(["trees:tree"]);
+    expect(bySlot.size).toBe(7);
+    expect(overflow).toBe(2);
+  });
+
+  it("review I2: the orchid house puts each glasshouse sticker where the pack meant it (bench, floor tubs), never in the pools", () => {
+    const { bySlot } = layout("jardim-botanico/inside", keysIn("glasshouse"));
+    expect(bySlot.get("potting-bench")).toBe("seedtray");
+    expect(["floor-left", "floor-right"].map((s) => bySlot.get(s)).sort()).toEqual(["fig-tree", "lemontree"]);
+    expect(bySlot.has("pool-1")).toBe(false);
+    expect(bySlot.has("pool-2")).toBe(false);
+    // Phase-1 scenes keep their layout: the preference is the Jardim's alone.
+    expect(layout("fazenda/outside", ["haybale", "seeds-art", "seeds-mind"]).bySlot.get("decor-veranda-1")).toBe("seeds-mind");
+  });
+
+  it("the glasshouse fills the orchid house, each on a slot that takes its kind", () => {
+    const glass = keysIn("glasshouse");
+    const { bySlot, overflow } = layout("jardim-botanico/inside", glass);
+    const at = new Map(SCENES["jardim-botanico/inside"].slots.map((s) => [s.id, s]));
+    for (const [slot, key] of bySlot) expect(accepts(at.get(slot)!, stickerTags(key)), `${slot} ${key}`).toBe(true);
+    // The seed tray, seedling and can only where seeds or any orchid-house sticker go (never a hook or the pool).
+    for (const k of ["seedtray", "seedling", "wateringcan"]) {
+      const slot = [...bySlot].find(([, v]) => v === k)![0];
+      expect(at.get(slot)!.accepts.some((a) => a === "greenhouse:seeds" || a === "greenhouse:*"), `${k} on ${slot}`).toBe(true);
+    }
+    expect(bySlot.size).toBe(12);
+    expect(overflow).toBe(0);
+    expect(stickerTags("orchid")).toEqual(["greenhouse:plant"]);
+    expect(stickerTags("wateringcan")).toEqual(["greenhouse:seeds"]);
+  });
+
+  it("an orchard sticker placed back in phase 1 (old spot id) stands at the Jardim Botanico", () => {
+    const old = farmState([placedRow("sapling", "sapling", "2026-11-05")]);
+    expect([...layout("jardim-botanico/outside", [...old.placed.keys()]).bySlot.values()]).toEqual(["sapling"]);
+  });
+
+  it("a slot that needs a milestone is free only once it is earned (Santa Teresa's window seat)", () => {
+    const free = (m: string[]) => slotsIn("santa-teresa/inside", "start", m).map((s) => s.id);
+    expect(free([])).not.toContain("window-seat");
+    expect(free([])).not.toContain("bookcase-2-top");
+    expect(free(["window-seat"])).toContain("window-seat");
   });
 
   it("layout fills the slots that take them, in book order", () => {

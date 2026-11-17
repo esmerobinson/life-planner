@@ -1,0 +1,484 @@
+{
+ "room": "os-esquilos-dining-room",
+ "name": "Os Esquilos: the dining room",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "inside/os-esquilos-inside-start-day.png",
+   "rain": "inside/os-esquilos-inside-start-rain.png",
+   "night": "inside/os-esquilos-inside-start-night.png"
+  },
+  "full": {
+   "day": "inside/os-esquilos-inside-full-day.png",
+   "rain": "inside/os-esquilos-inside-full-rain.png",
+   "night": "inside/os-esquilos-inside-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "states": {
+  "start": "a quiet weekday: cream walls, sash windows, the central post, one family in the red-cushioned booth, the small table laid but empty, the long table bare, the kitchen hatch with its steaming clay pot, the goals shelf empty",
+  "full": "the Sunday feast: every booth full, the five friends at the feast table, the roast and the cake, lanterns, garlands and mementos, a violeiro, a waiter with a tray, a squirrel on the sideboard"
+ },
+ "celebrations": [
+  {
+   "step": 1,
+   "id": "feast-table",
+   "what": "the long table laid as the feast table: a white lace cloth, plates and cups for the friends, Esme's chair at its head",
+   "layers": {
+    "day": "inside/os-esquilos-inside-celebration-1-feast-table-day.png",
+    "rain": "inside/os-esquilos-inside-celebration-1-feast-table-rain.png",
+    "night": "inside/os-esquilos-inside-celebration-1-feast-table-night.png"
+   }
+  },
+  {
+   "step": 2,
+   "id": "lanterns",
+   "what": "strings of paper lanterns along the ceiling beam, and candles on the feast table",
+   "layers": {
+    "day": "inside/os-esquilos-inside-celebration-2-lanterns-day.png",
+    "rain": "inside/os-esquilos-inside-celebration-2-lanterns-rain.png",
+    "night": "inside/os-esquilos-inside-celebration-2-lanterns-night.png"
+   }
+  },
+  {
+   "step": 3,
+   "id": "flowers",
+   "what": "a flower garland along the beam, hydrangea vases on the table, and framed mementos above the goals shelf",
+   "layers": {
+    "day": "inside/os-esquilos-inside-celebration-3-flowers-day.png",
+    "rain": "inside/os-esquilos-inside-celebration-3-flowers-rain.png",
+    "night": "inside/os-esquilos-inside-celebration-3-flowers-night.png"
+   }
+  },
+  {
+   "step": 4,
+   "id": "roast",
+   "what": "the Sunday roast (a golden leitão) and a clay pot of stew on the feast table",
+   "layers": {
+    "day": "inside/os-esquilos-inside-celebration-4-roast-day.png",
+    "rain": "inside/os-esquilos-inside-celebration-4-roast-rain.png",
+    "night": "inside/os-esquilos-inside-celebration-4-roast-night.png"
+   }
+  },
+  {
+   "step": 5,
+   "id": "cake",
+   "what": "a big white cake with candles at the head of the table, by Esme's chair",
+   "layers": {
+    "day": "inside/os-esquilos-inside-celebration-5-cake-day.png",
+    "rain": "inside/os-esquilos-inside-celebration-5-cake-rain.png",
+    "night": "inside/os-esquilos-inside-celebration-5-cake-night.png"
+   }
+  }
+ ],
+ "celebration_rule": "Each WHOLE goal finished lays the next celebration piece, in order (1 feast table, 2 lanterns, 3 flowers and mementos, 4 the roast, 5 the cake), in BOTH scenes, and puts its goal sticker in the next free goal slot (lowest 'order'). Draw the start base, then celebration layers 1..n for the current look (each layer holds only the pixels it changes). After the fifth goal the feast is fully laid; goals 6+ only add stickers. 'full' (the Sunday feast) already contains all five pieces plus the crowd, the friends at the feast table and the band.",
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker; draw at left = x - 8, top = y - 15",
+ "draw_order": "as outside; characters sort with stickers by foot y",
+ "sticker_looks": "as outside",
+ "overlays": {
+  "rain": {
+   "file": "inside/os-esquilos-inside-rain-overlay.png",
+   "json": "inside/os-esquilos-inside-rain-overlay.json"
+  }
+ },
+ "exits": [
+  {
+   "id": "door",
+   "x": 172,
+   "y": 224,
+   "w": 40,
+   "h": 16,
+   "goes": "outside",
+   "note": "the doormat at the bottom: back out to the veranda"
+  }
+ ],
+ "hotspots": [
+  {
+   "id": "stove",
+   "x": 14,
+   "y": 70,
+   "w": 46,
+   "h": 54,
+   "goes": "ui:recipe-book",
+   "note": "the kitchen hatch and its little wood stove: the steaming clay pot is the dish just learned"
+  },
+  {
+   "id": "goals-shelf",
+   "x": 202,
+   "y": 20,
+   "w": 64,
+   "h": 66,
+   "goes": "ui:celebrations",
+   "note": "the goals shelf and the mementos above it"
+  },
+  {
+   "id": "sideboard",
+   "x": 316,
+   "y": 82,
+   "w": 62,
+   "h": 40,
+   "goes": "none",
+   "note": "the doces in jars and the bolo de fubá under its dome"
+  }
+ ],
+ "walkable": [
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "000000000000000000000000",
+  "111111111111111111111111",
+  "100000111111100000011111",
+  "110001111111111111111111",
+  "111111111111111111111111",
+  "111110000000000000011111",
+  "111110000000000000011111",
+  "111111111111111111111111"
+ ],
+ "walkable_note": "suggested (1 = the floor between the tables; 0 = the wall, the hatch, the sideboard, the booths and tables)",
+ "lamps": [
+  {
+   "kind": "oil",
+   "x": 72,
+   "y": 48
+  },
+  {
+   "kind": "oil",
+   "x": 124,
+   "y": 48
+  },
+  {
+   "kind": "oil",
+   "x": 196,
+   "y": 48
+  },
+  {
+   "kind": "oil",
+   "x": 268,
+   "y": 48
+  },
+  {
+   "kind": "oil",
+   "x": 310,
+   "y": 48
+  },
+  {
+   "kind": "paper",
+   "x": 6,
+   "y": 14
+  },
+  {
+   "kind": "paper",
+   "x": 18,
+   "y": 16
+  },
+  {
+   "kind": "paper",
+   "x": 30,
+   "y": 17
+  },
+  {
+   "kind": "paper",
+   "x": 42,
+   "y": 18
+  },
+  {
+   "kind": "paper",
+   "x": 54,
+   "y": 19
+  },
+  {
+   "kind": "paper",
+   "x": 66,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 78,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 90,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 102,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 114,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 126,
+   "y": 19
+  },
+  {
+   "kind": "paper",
+   "x": 138,
+   "y": 18
+  },
+  {
+   "kind": "paper",
+   "x": 150,
+   "y": 17
+  },
+  {
+   "kind": "paper",
+   "x": 162,
+   "y": 16
+  },
+  {
+   "kind": "paper",
+   "x": 174,
+   "y": 14
+  },
+  {
+   "kind": "paper",
+   "x": 202,
+   "y": 14
+  },
+  {
+   "kind": "paper",
+   "x": 214,
+   "y": 15
+  },
+  {
+   "kind": "paper",
+   "x": 226,
+   "y": 17
+  },
+  {
+   "kind": "paper",
+   "x": 238,
+   "y": 18
+  },
+  {
+   "kind": "paper",
+   "x": 250,
+   "y": 19
+  },
+  {
+   "kind": "paper",
+   "x": 262,
+   "y": 19
+  },
+  {
+   "kind": "paper",
+   "x": 274,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 286,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 298,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 310,
+   "y": 20
+  },
+  {
+   "kind": "paper",
+   "x": 322,
+   "y": 19
+  },
+  {
+   "kind": "paper",
+   "x": 334,
+   "y": 18
+  },
+  {
+   "kind": "paper",
+   "x": 346,
+   "y": 18
+  },
+  {
+   "kind": "paper",
+   "x": 358,
+   "y": 16
+  },
+  {
+   "kind": "paper",
+   "x": 370,
+   "y": 15
+  },
+  {
+   "kind": "paper",
+   "x": 382,
+   "y": 13
+  }
+ ],
+ "slots": [
+  {
+   "id": "goals-shelf-1",
+   "x": 218,
+   "y": 59,
+   "area": "goals-shelf",
+   "order": 1,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "the goals shelf: one sticker per whole goal finished"
+  },
+  {
+   "id": "goals-shelf-2",
+   "x": 235,
+   "y": 59,
+   "area": "goals-shelf",
+   "order": 2,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "the goals shelf: one sticker per whole goal finished"
+  },
+  {
+   "id": "goals-shelf-3",
+   "x": 252,
+   "y": 59,
+   "area": "goals-shelf",
+   "order": 3,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "the goals shelf: one sticker per whole goal finished"
+  },
+  {
+   "id": "goals-shelf-4",
+   "x": 218,
+   "y": 85,
+   "area": "goals-shelf",
+   "order": 4,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "the goals shelf: one sticker per whole goal finished"
+  },
+  {
+   "id": "goals-shelf-5",
+   "x": 235,
+   "y": 85,
+   "area": "goals-shelf",
+   "order": 5,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "the goals shelf: one sticker per whole goal finished"
+  },
+  {
+   "id": "goals-shelf-6",
+   "x": 252,
+   "y": 85,
+   "area": "goals-shelf",
+   "order": 6,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "the goals shelf: one sticker per whole goal finished"
+  },
+  {
+   "id": "feast-goal-1",
+   "x": 120,
+   "y": 202,
+   "area": "feast",
+   "order": 7,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table, once the shelf is full"
+  },
+  {
+   "id": "feast-goal-2",
+   "x": 210,
+   "y": 202,
+   "area": "feast",
+   "order": 8,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table, once the shelf is full"
+  },
+  {
+   "id": "feast-goal-3",
+   "x": 286,
+   "y": 202,
+   "area": "feast",
+   "order": 9,
+   "accepts": [
+    "goals:*"
+   ],
+   "note": "on the feast table, once the shelf is full"
+  },
+  {
+   "id": "dish-stove",
+   "x": 37,
+   "y": 80,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside"
+   ],
+   "inspired": true,
+   "note": "on the clay pot steaming on the little wood stove in the kitchen hatch: the dish just learned ('Inspired at Os Esquilos')"
+  },
+  {
+   "id": "dish-sideboard-1",
+   "x": 330,
+   "y": 95,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside"
+   ],
+   "note": "the sideboard: the dishes learned here, most recent first"
+  },
+  {
+   "id": "dish-sideboard-2",
+   "x": 348,
+   "y": 95,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside"
+   ],
+   "note": "the sideboard: the dishes learned here, most recent first"
+  },
+  {
+   "id": "dish-sideboard-3",
+   "x": 366,
+   "y": 95,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside"
+   ],
+   "note": "the sideboard: the dishes learned here, most recent first"
+  },
+  {
+   "id": "dish-family-table",
+   "x": 232,
+   "y": 149,
+   "area": "dish",
+   "accepts": [
+    "dishes:countryside",
+    "dishes:*"
+   ]
+  }
+ ]
+}

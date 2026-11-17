@@ -6,8 +6,8 @@
 import { addDays, daysBetween } from "../domain/dates";
 import type { ISODate } from "../domain/types";
 import { STICKER_BY_KEY } from "../farm/catalogue";
-import { CHARACTERS, type CharacterId } from "../farm/state";
-import { ARRIVES_AT, NAMES } from "../farm/world";
+import type { CharacterId } from "../farm/state";
+import { ARRIVES_AT, LIVING, NAMES } from "../farm/world";
 import { opensOn, type AreaStatus } from "./areas";
 import { RIO_MAP } from "./assets";
 
@@ -38,7 +38,7 @@ export interface NextFriend { id: CharacterId; name: string; at: number; sticker
 
 /** The next friend to move in (`friends`: the sticker count friends go by; `day`: the game's day). */
 export function nextFriend(friends: number, day: number, arrived: ReadonlySet<CharacterId>): NextFriend | null {
-  const c = CHARACTERS.find((ch) => !arrived.has(ch));
+  const c = LIVING.find((ch) => !arrived.has(ch));
   if (!c) return null;
   const at = ARRIVES_AT[c];
   return { id: c, name: NAMES[c], at, stickersToGo: Math.max(0, at - friends), daysToGo: Math.max(0, at - day) };

@@ -1,0 +1,573 @@
+{
+ "location": "quilo-inside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "inside/inside-start-day.png",
+  "start-night": "inside/inside-start-night.png",
+  "start-rain": "inside/inside-start-rain.png",
+  "full-day": "inside/inside-full-day.png",
+  "full-night": "inside/inside-full-night.png",
+  "full-rain": "inside/inside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "inside/inside-rain-streaks-0.png",
+    "inside/inside-rain-streaks-1.png",
+    "inside/inside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "rain through the glass front and the open door only"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 cell; draw the sticker at left = x - 8, top = y - 15",
+ "fill_rule": "Dish slots fill as Quilo stickers (everyday dishes) are earned, one dish per slot, in 'order', and never empty. Only slots whose 'from_stage' is reached are used. When every slot is full, each new dish replaces the oldest one shown, so the room always shows the latest dishes. Slots with hide_at_night are not drawn at night (chairs are up). Draw stickers after the base, sorted by y then x; draw the rain overlay over everything.",
+ "dish_slots": [
+  {
+   "id": "shelf-5",
+   "x": 186,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 1
+  },
+  {
+   "id": "table-3-2",
+   "x": 157,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 2
+  },
+  {
+   "id": "hatch-1",
+   "x": 193,
+   "y": 49,
+   "w": 16,
+   "h": 16,
+   "group": "kitchen-hatch",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "a finished plate on the pass",
+   "order": 3
+  },
+  {
+   "id": "fridge-1",
+   "x": 257,
+   "y": 44,
+   "w": 16,
+   "h": 16,
+   "group": "dessert-fridge",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "desserts first if there are any",
+   "order": 4
+  },
+  {
+   "id": "juice-1",
+   "x": 364,
+   "y": 61,
+   "w": 16,
+   "h": 16,
+   "group": "juice-counter",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "drinks first if there are any",
+   "order": 5
+  },
+  {
+   "id": "shelf-6",
+   "x": 206,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 6
+  },
+  {
+   "id": "table-4-1",
+   "x": 208,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "full",
+   "hide_at_night": true,
+   "order": 7
+  },
+  {
+   "id": "hatch-2",
+   "x": 224,
+   "y": 49,
+   "w": 16,
+   "h": 16,
+   "group": "kitchen-hatch",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "a finished plate on the pass",
+   "order": 8
+  },
+  {
+   "id": "fridge-2",
+   "x": 273,
+   "y": 44,
+   "w": 16,
+   "h": 16,
+   "group": "dessert-fridge",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "desserts first if there are any",
+   "order": 9
+  },
+  {
+   "id": "shelf-4",
+   "x": 166,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 10
+  },
+  {
+   "id": "table-3-1",
+   "x": 144,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 11
+  },
+  {
+   "id": "shelf-7",
+   "x": 226,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 12
+  },
+  {
+   "id": "table-4-2",
+   "x": 221,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "full",
+   "hide_at_night": true,
+   "order": 13
+  },
+  {
+   "id": "shelf-3",
+   "x": 146,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 14
+  },
+  {
+   "id": "table-2-2",
+   "x": 221,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 15
+  },
+  {
+   "id": "shelf-8",
+   "x": 246,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 16
+  },
+  {
+   "id": "table-5-1",
+   "x": 266,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "full",
+   "hide_at_night": true,
+   "order": 17
+  },
+  {
+   "id": "shelf-2",
+   "x": 126,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 18
+  },
+  {
+   "id": "table-2-1",
+   "x": 208,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 19
+  },
+  {
+   "id": "shelf-9",
+   "x": 266,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 20
+  },
+  {
+   "id": "table-5-2",
+   "x": 279,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "full",
+   "hide_at_night": true,
+   "order": 21
+  },
+  {
+   "id": "shelf-1",
+   "x": 106,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 22
+  },
+  {
+   "id": "table-1-2",
+   "x": 157,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 23
+  },
+  {
+   "id": "shelf-10",
+   "x": 286,
+   "y": 81,
+   "w": 16,
+   "h": 16,
+   "group": "buffet-shelf",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "note": "on the glass shelf of the sneeze guard, a dish card under it",
+   "order": 24
+  },
+  {
+   "id": "table-6-1",
+   "x": 56,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 25
+  },
+  {
+   "id": "table-1-1",
+   "x": 144,
+   "y": 158,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 26
+  },
+  {
+   "id": "table-6-2",
+   "x": 69,
+   "y": 200,
+   "w": 16,
+   "h": 16,
+   "group": "table",
+   "accepts": [
+    "sticker:dishes"
+   ],
+   "from_stage": "start",
+   "hide_at_night": true,
+   "order": 27
+  }
+ ],
+ "special_slots": [
+  {
+   "id": "dish-of-the-day",
+   "x": 207,
+   "y": 104,
+   "w": 16,
+   "h": 16,
+   "group": "dish-of-the-day",
+   "accepts": [
+    "newest"
+   ],
+   "note": "the gold-rimmed tray in the buffet: shows the dish she was most recently inspired by (the sparkle above it is baked; the game may twinkle it)"
+  },
+  {
+   "id": "chalkboard-1",
+   "x": 118,
+   "y": 35,
+   "w": 16,
+   "h": 16,
+   "group": "chalkboard",
+   "accepts": [
+    "newest-1"
+   ],
+   "note": "the day's dishes, pictures only: 1 = newest (the chalk star), then the two before it"
+  },
+  {
+   "id": "chalkboard-2",
+   "x": 138,
+   "y": 35,
+   "w": 16,
+   "h": 16,
+   "group": "chalkboard",
+   "accepts": [
+    "newest-2"
+   ],
+   "note": "the day's dishes, pictures only: 1 = newest (the chalk star), then the two before it"
+  },
+  {
+   "id": "chalkboard-3",
+   "x": 158,
+   "y": 35,
+   "w": 16,
+   "h": 16,
+   "group": "chalkboard",
+   "accepts": [
+    "newest-3"
+   ],
+   "note": "the day's dishes, pictures only: 1 = newest (the chalk star), then the two before it"
+  }
+ ],
+ "sticker_slots": [
+  {
+   "id": "floor-door",
+   "x": 296,
+   "y": 226,
+   "area": "floor by the door",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "floor-aisle",
+   "x": 110,
+   "y": 222,
+   "area": "floor by the corner table",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "planter-rim",
+   "x": 22,
+   "y": 128,
+   "area": "on the tree planter's rim",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  },
+  {
+   "id": "fridge-top",
+   "x": 265,
+   "y": 8,
+   "area": "on top of the dessert fridge",
+   "accepts": [
+    "sticker:quilo",
+    "sticker:any"
+   ]
+  }
+ ],
+ "hotspots": {
+  "door": {
+   "x": 236,
+   "y": 216,
+   "w": 46,
+   "h": 24,
+   "note": "back out to the street"
+  },
+  "buffet": {
+   "x": 94,
+   "y": 82,
+   "w": 208,
+   "h": 41
+  },
+  "dish_of_the_day": {
+   "x": 198,
+   "y": 90,
+   "w": 20,
+   "h": 16,
+   "note": "tap: show the 'Inspired at Quilo' card (ui/inspired-card-template.png) for the newest dish"
+  },
+  "scale": {
+   "x": 318,
+   "y": 135,
+   "w": 46,
+   "h": 28
+  },
+  "cashier": {
+   "x": 300,
+   "y": 183,
+   "w": 58,
+   "h": 27
+  },
+  "juice_counter": {
+   "x": 290,
+   "y": 20,
+   "w": 84,
+   "h": 60
+  },
+  "chalkboard": {
+   "x": 92,
+   "y": 10,
+   "w": 78,
+   "h": 30
+  },
+  "tree": {
+   "x": 15,
+   "y": 125,
+   "w": 50,
+   "h": 24,
+   "note": "the tree in its blue-and-white harlequin planter"
+  },
+  "esme_spot": {
+   "x": 208,
+   "y": 137,
+   "note": "where Esme stands in the full day scenes (at the dish of the day)"
+  }
+ },
+ "baked": {
+  "start": "quiet: 6 of 19 trays filled, a few plates and one skewer, staff at the juice counter, grill, scale and cashier, Seu Jorge eating, Camila at the buffet, 4 small black tables (one in the corner with a plant), one string of bulbs along the wall",
+  "full": "every tray full, three skewers, a cook topping up the trays and one in the kitchen hatch, a queue along the buffet, three at the scale, someone paying, 8 diners at 6 tables (a plate left on the corner one), a second string of bulbs over the tables and the corner, Esme at the dish of the day with Mr Cat",
+  "night": "closing time (both stages): trays under lids, chairs folded up on the tables, the grill out, Lucas mopping, Dona Celia counting up at the till; the bulbs glow with tight solid halos (no dither)"
+ }
+}

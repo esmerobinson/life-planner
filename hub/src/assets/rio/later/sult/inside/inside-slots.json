@@ -1,0 +1,169 @@
+{
+ "location": "sult-inside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "inside/inside-start-day.png",
+  "start-night": "inside/inside-start-night.png",
+  "start-rain": "inside/inside-start-rain.png",
+  "full-day": "inside/inside-full-day.png",
+  "full-night": "inside/inside-full-night.png",
+  "full-rain": "inside/inside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "inside/inside-rain-streaks-0.png",
+    "inside/inside-rain-streaks-1.png",
+    "inside/inside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "rain seen through the front windows and the open door only"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker cell; draw at left = x - 8, top = y - 15",
+ "fill_rule": "Sult takes part of the goal celebrations: each real monthly goal hit (about one a month) earns a goals:* sticker. The newest one always goes on 'celebration-table' (the month's celebration, under an extra warm glow at night); the one it replaces moves to the free slot with the lowest 'order' (the ledge spots, then the floor). Italian dishes learned at Sult (dishes:italian, 'Inspired at Sult') show on 'pass' (the chef's special: the dish just learned, under the middle pendant); the previous one moves to 'board'. If every ordered slot is full, the oldest sticker leaves the room (it stays in the book). Draw stickers after the base, sorted by y then x.",
+ "sticker_slots": [
+  {
+   "id": "celebration-table",
+   "x": 306,
+   "y": 183,
+   "area": "on the round celebration table, between the cake and the votive",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 1
+  },
+  {
+   "id": "ledge-1",
+   "x": 40,
+   "y": 60,
+   "area": "on the concrete ledge among the wine bottles (a framed photo or menu)",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 2
+  },
+  {
+   "id": "ledge-2",
+   "x": 106,
+   "y": 60,
+   "area": "on the concrete ledge among the wine bottles",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 3
+  },
+  {
+   "id": "ledge-3",
+   "x": 354,
+   "y": 60,
+   "area": "on the right-hand ledge, under the sea photo",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 4
+  },
+  {
+   "id": "floor-1",
+   "x": 64,
+   "y": 216,
+   "area": "by the front window",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 5
+  },
+  {
+   "id": "floor-2",
+   "x": 112,
+   "y": 216,
+   "area": "by the front window",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 6
+  },
+  {
+   "id": "floor-3",
+   "x": 236,
+   "y": 216,
+   "area": "by the door",
+   "accepts": [
+    "goals:*",
+    "dishes:italian"
+   ],
+   "order": 7
+  },
+  {
+   "id": "pass",
+   "x": 240,
+   "y": 75,
+   "area": "the chef's special: the dish just learned, on the steel pass under the middle cone pendant",
+   "accepts": [
+    "dishes:italian"
+   ],
+   "role": "pass"
+  },
+  {
+   "id": "board",
+   "x": 357,
+   "y": 30,
+   "area": "the wall spot beside the sea photo: the dish learned before that",
+   "accepts": [
+    "dishes:italian"
+   ],
+   "role": "board"
+  }
+ ],
+ "hotspots": {
+  "door": {
+   "x": 172,
+   "y": 214,
+   "w": 40,
+   "h": 26,
+   "note": "back out to the street"
+  },
+  "celebration_table": {
+   "x": 256,
+   "y": 158,
+   "w": 100,
+   "h": 44,
+   "note": "the monthly-goal moment: open the goal celebration here"
+  },
+  "pass": {
+   "x": 148,
+   "y": 20,
+   "w": 184,
+   "h": 70,
+   "note": "the open kitchen in its sage-green frame: the chef's special (the dish just learned) waits on the steel pass under the middle pendant ('Inspired at Sult')"
+  },
+  "esme_spot": {
+   "x": 298,
+   "y": 214,
+   "note": "where Esme stands in the full scenes (at her celebration table)"
+  }
+ },
+ "baked": {
+  "start": "a quiet afternoon: three tables laid, one couple (Rosa and Seu Jorge), four bare tables, two chefs in caps and aprons at the pass (Thiago rolling pasta, Bia plating), the waiter (Marcos), the celebration table laid with a reserved card",
+  "full": "every table taken, a third chef (Lucas) at the pass, Vovo Ze playing the accordion, the waiter with a tray, the celebration table with a cake with candles, prosecco on ice, confetti and friends (Ana, Bia cheering, Duda), Esme and Mr Cat"
+ }
+}

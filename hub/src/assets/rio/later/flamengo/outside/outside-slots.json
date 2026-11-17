@@ -1,0 +1,131 @@
+{
+ "location": "flamengo-outside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "outside/outside-start-day.png",
+  "start-night": "outside/outside-start-night.png",
+  "start-rain": "outside/outside-start-rain.png",
+  "full-day": "outside/outside-full-day.png",
+  "full-night": "outside/outside-full-night.png",
+  "full-rain": "outside/outside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "outside/outside-rain-streaks-0.png",
+    "outside/outside-rain-streaks-1.png",
+    "outside/outside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "draw on top of everything (stickers too) while it rains"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker cell; draw at left = x - 8, top = y - 15",
+ "fill_rule": "'stall' shows the newest match item. The ordered slots show the ones before it, newest in order 1. Draw after the base, sorted by y; while it rains draw the streak overlay on top of everything.",
+ "sticker_slots": [
+  {
+   "id": "stall",
+   "x": 150,
+   "y": 168,
+   "area": "hung on the scarves stall: the newest match item",
+   "accepts": [
+    "theatre:*"
+   ],
+   "role": "newest"
+  },
+  {
+   "id": "canopy",
+   "x": 192,
+   "y": 99,
+   "area": "on the red canopy over the ticket gates",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 1
+  },
+  {
+   "id": "booth-left",
+   "x": 115,
+   "y": 113,
+   "area": "in the left ticket booth's window",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 2
+  },
+  {
+   "id": "booth-right",
+   "x": 269,
+   "y": 113,
+   "area": "in the right ticket booth's window",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 3
+  },
+  {
+   "id": "plinth",
+   "x": 52,
+   "y": 184,
+   "area": "leaning on the statue's plinth",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 4
+  },
+  {
+   "id": "grill",
+   "x": 322,
+   "y": 156,
+   "area": "on the churrasquinho cart",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 5
+  }
+ ],
+ "hotspots": {
+  "gates": {
+   "x": 132,
+   "y": 96,
+   "w": 120,
+   "h": 32,
+   "note": "go in (the stands)"
+  },
+  "vendors": {
+   "x": 300,
+   "y": 140,
+   "w": 56,
+   "h": 32,
+   "note": "the churrasquinho cart"
+  },
+  "exit": {
+   "x": 0,
+   "y": 208,
+   "w": 384,
+   "h": 32,
+   "note": "the street (map exit)"
+  },
+  "esme_spot": {
+   "x": 200,
+   "y": 196
+  }
+ },
+ "baked": {
+  "start": "a quiet midweek evening: four fans drifting to the gates, the churrasquinho man (Seu Jorge) at his grill, Dona Celia at a half-stocked scarves stall",
+  "full": "derby day: fans in red-and-black streaming to the gates, hand flags waving, every vendor busy (Rosa with the beer cooler), a full scarves stall, Esme and Mr Cat arriving. Rain: ponchos and colourful umbrellas, no grill smoke"
+ }
+}

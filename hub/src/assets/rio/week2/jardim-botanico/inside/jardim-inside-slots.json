@@ -1,0 +1,298 @@
+{
+ "room": "jardim-botanico-orchid-house",
+ "name": "Jardim Botanico: the orchid house",
+ "scene": [
+  320,
+  192
+ ],
+ "tile": 16,
+ "base": {
+  "start": {
+   "day": "inside/jardim-inside-start-day.png",
+   "rain": "inside/jardim-inside-start-rain.png",
+   "night": "inside/jardim-inside-start-night.png"
+  },
+  "full": {
+   "day": "inside/jardim-inside-full-day.png",
+   "rain": "inside/jardim-inside-full-rain.png",
+   "night": "inside/jardim-inside-full-night.png"
+  }
+ },
+ "looks": {
+  "day": "sunny daytime",
+  "rain": "Rio's weather says rain (before dark)",
+  "night": "after sunset in Rio until sunrise (rain at night shows night)"
+ },
+ "states": {
+  "start": "the glass, the beam and two lanterns, empty staging with three pots, the epiphyte tree with two bromeliads, the pool, the rockery, the potting bench with seed trays; beds of bare soil with seedlings",
+  "full": "staging packed with orchids, ferns and bromeliads, four hanging baskets, fairy lights on the beam, the tree hung with orchids, lush beds of ferns, caladiums and begonias, anthuriums and a bird-of-paradise in the rockery, a gardener and two visitors, butterflies and a hummingbird"
+ },
+ "foot": "x, y = bottom-centre pixel of the sticker frame (16x16); draw at left = x - 8, top = y - 15",
+ "draw_order": "sort stickers by foot y (then x); characters sort with them",
+ "sticker_looks": "as outside",
+ "overlays": {
+  "rain": {
+   "file": "inside/jardim-inside-rain-overlay.png",
+   "json": "inside/jardim-inside-rain-overlay.json"
+  }
+ },
+ "exits": [
+  {
+   "id": "door",
+   "x": 140,
+   "y": 178,
+   "w": 40,
+   "h": 14,
+   "goes": "outside",
+   "note": "the tiled aisle at the bottom: back out to the avenue (the glasshouse door)"
+  }
+ ],
+ "hotspots": [
+  {
+   "id": "bench",
+   "x": 250,
+   "y": 115,
+   "w": 24,
+   "h": 13,
+   "goes": "sit"
+  },
+  {
+   "id": "potting-bench",
+   "x": 14,
+   "y": 120,
+   "w": 70,
+   "h": 30,
+   "goes": "none"
+  },
+  {
+   "id": "pool",
+   "x": 126,
+   "y": 108,
+   "w": 68,
+   "h": 24,
+   "goes": "none"
+  },
+  {
+   "id": "epiphyte-tree",
+   "x": 120,
+   "y": 14,
+   "w": 80,
+   "h": 84,
+   "goes": "none"
+  }
+ ],
+ "host": {
+  "x": 112,
+  "y": 170,
+  "note": "where Bebe stands later, by the potting bench at the foot of the aisle; nothing is baked here"
+ },
+ "walkable": [
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000000000000000000",
+  "00000001000010011100",
+  "01111100000000000000",
+  "00000100011000000000",
+  "00000000011000000000",
+  "00000000011000000000"
+ ],
+ "walkable_note": "suggested (1 = the tiled aisles and the gravel; 0 = glass walls, staging, beds, the pool, the potting bench)",
+ "lamps": [
+  {
+   "kind": "lantern",
+   "x": 104,
+   "y": 42
+  },
+  {
+   "kind": "lantern",
+   "x": 216,
+   "y": 42
+  }
+ ],
+ "slots": [
+  {
+   "id": "staging-left-top",
+   "x": 40,
+   "y": 50,
+   "area": "staging",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ],
+   "note": "the left staging's top tier"
+  },
+  {
+   "id": "staging-left-mid",
+   "x": 70,
+   "y": 60,
+   "area": "staging",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "staging-left-low",
+   "x": 100,
+   "y": 70,
+   "area": "staging",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "staging-right-top",
+   "x": 280,
+   "y": 50,
+   "area": "staging",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "staging-right-mid",
+   "x": 250,
+   "y": 60,
+   "area": "staging",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "staging-right-low",
+   "x": 220,
+   "y": 70,
+   "area": "staging",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "hook-left",
+   "x": 58,
+   "y": 44,
+   "area": "hanging",
+   "accepts": [
+    "greenhouse:plant"
+   ],
+   "note": "a free hook on the beam (left): a hanging orchid"
+  },
+  {
+   "id": "hook-right",
+   "x": 262,
+   "y": 44,
+   "area": "hanging",
+   "accepts": [
+    "greenhouse:plant"
+   ],
+   "note": "a free hook on the beam (right)"
+  },
+  {
+   "id": "tree-left",
+   "x": 136,
+   "y": 60,
+   "area": "tree",
+   "accepts": [
+    "greenhouse:plant",
+    "trees:animal",
+    "trees:bird"
+   ],
+   "note": "on the epiphyte tree's left limb"
+  },
+  {
+   "id": "tree-right",
+   "x": 186,
+   "y": 50,
+   "area": "tree",
+   "accepts": [
+    "greenhouse:plant",
+    "trees:animal",
+    "trees:bird"
+   ],
+   "note": "on the epiphyte tree's right limb"
+  },
+  {
+   "id": "pool-1",
+   "x": 146,
+   "y": 124,
+   "area": "water",
+   "accepts": [
+    "greenhouse:water",
+    "greenhouse:plant"
+   ]
+  },
+  {
+   "id": "pool-2",
+   "x": 178,
+   "y": 118,
+   "area": "water",
+   "accepts": [
+    "greenhouse:water",
+    "greenhouse:plant"
+   ]
+  },
+  {
+   "id": "potting-bench",
+   "x": 30,
+   "y": 134,
+   "area": "bench",
+   "accepts": [
+    "greenhouse:seeds",
+    "greenhouse:*"
+   ],
+   "note": "on the potting bench, by the seed trays"
+  },
+  {
+   "id": "rockery",
+   "x": 244,
+   "y": 176,
+   "area": "rockery",
+   "accepts": [
+    "greenhouse:plant",
+    "greenhouse:*"
+   ]
+  },
+  {
+   "id": "floor-left",
+   "x": 88,
+   "y": 170,
+   "area": "floor",
+   "accepts": [
+    "trees:tree",
+    "greenhouse:*"
+   ],
+   "note": "a big tub spot on the gravel, left of the aisle"
+  },
+  {
+   "id": "floor-right",
+   "x": 196,
+   "y": 150,
+   "area": "floor",
+   "accepts": [
+    "trees:tree",
+    "greenhouse:*"
+   ],
+   "note": "a big tub spot, right of the aisle"
+  },
+  {
+   "id": "bench",
+   "x": 268,
+   "y": 118,
+   "area": "bench",
+   "accepts": [
+    "greenhouse:*",
+    "trees:animal",
+    "trees:bird"
+   ],
+   "note": "on the iron bench's seat"
+  }
+ ]
+}

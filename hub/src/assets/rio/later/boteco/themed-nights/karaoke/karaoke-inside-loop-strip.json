@@ -4,12 +4,12 @@
  "scene": "inside",
  "look": "night",
  "at": [
-  262,
-  78
+  261,
+  75
  ],
  "frame_size": [
-  91,
-  129
+  94,
+  134
  ],
  "frames": 4,
  "frame_ms": 200,

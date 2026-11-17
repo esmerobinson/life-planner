@@ -11,12 +11,13 @@ import { areaStatuses, sceneOpen } from "../rio/areas";
 import { groupsOf } from "../rio/collection";
 import { GameScreen } from "../rio/GameScreen";
 import { Hotbar } from "../rio/Hotbar";
-import { devLook, useRioLook } from "../rio/look";
+import { devDay, devGoal, devLook, devNight, useRioLook } from "../rio/look";
 import { GameMenu, MENU_TABS, type MenuTab } from "../rio/menu/GameMenu";
 import { PhoneCollection } from "../rio/menu/PhoneCollection";
 import { usePhone } from "../ui/usePhone";
 import { TextButton, em } from "../rio/menu/pieces";
 import { homeOf } from "../rio/placement";
+import { rioCounts } from "../rio/progress";
 import { RioMap } from "../rio/RioMap";
 import { BitmapText } from "../rio/ui/BitmapText";
 import { useUi } from "../rio/ui/fit";
@@ -46,7 +47,12 @@ export function FarmPage() {
   const navigate = useNavigate();
   const look = devLook(location.search) ?? weather;
 
-  const day = view?.state.start ? farmDay(view.state.start, view.today) : 1;
+  // ?day=N (development builds only) jumps the farm day, to look at areas before they open.
+  const day = devDay(location.search) ?? (view?.state.start ? farmDay(view.state.start, view.today) : 1);
+  const night = devNight(location.search);
+  const goal = devGoal(location.search);
+  const viewCounters = view?.counters ?? null;
+  const counts = useMemo(() => rioCounts(viewCounters), [viewCounters]);
   const visited = view?.state.visited;
   const statuses = useMemo(() => areaStatuses(day, visited ?? new Set()), [day, visited]);
   const placed = view?.state.placed;
@@ -157,7 +163,7 @@ export function FarmPage() {
       </p>
       <div className="rio-wrap">
         {area
-          ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} onBack={() => setArea(null)} />
+          ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} counts={counts} night={night} goal={goal} onBack={() => setArea(null)} />
           : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
       </div>
       {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}

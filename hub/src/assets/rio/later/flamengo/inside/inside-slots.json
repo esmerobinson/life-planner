@@ -1,0 +1,190 @@
+{
+ "location": "flamengo-inside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "inside/inside-start-day.png",
+  "start-night": "inside/inside-start-night.png",
+  "start-rain": "inside/inside-start-rain.png",
+  "full-day": "inside/inside-full-day.png",
+  "full-night": "inside/inside-full-night.png",
+  "full-rain": "inside/inside-full-rain.png"
+ },
+ "animations": {
+  "goal": {
+   "frames": {
+    "day": [
+     "inside/goal/inside-goal-day-0.png",
+     "inside/goal/inside-goal-day-1.png",
+     "inside/goal/inside-goal-day-2.png",
+     "inside/goal/inside-goal-day-3.png"
+    ],
+    "night": [
+     "inside/goal/inside-goal-night-0.png",
+     "inside/goal/inside-goal-night-1.png",
+     "inside/goal/inside-goal-night-2.png",
+     "inside/goal/inside-goal-night-3.png"
+    ],
+    "rain": [
+     "inside/goal/inside-goal-rain-0.png",
+     "inside/goal/inside-goal-rain-1.png",
+     "inside/goal/inside-goal-rain-2.png",
+     "inside/goal/inside-goal-rain-3.png"
+    ]
+   },
+   "frame_ms": 140,
+   "loop": true,
+   "state": "full",
+   "note": "the goal moment: the crowd jumps (arms up), the bandeirao ripples, confetti falls, Esme jumps; frame 0 is the full base, so it can loop or play 2-3 times and settle"
+  }
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "inside/inside-rain-streaks-0.png",
+    "inside/inside-rain-streaks-1.png",
+    "inside/inside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "rain over the open bowl; the band under the roof ring stays dry"
+  }
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker cell; draw at left = x - 8, top = y - 15",
+ "fill_rule": "The Flamengo match takes over the movie theatre family: each real WEEKLY REVIEW done earns one match item (family 'theatre': the shirt, flag and football from day one plus the ten new ones). The newest always goes on 'esme-seat' (right in front of Esme); the one it replaces moves to the free slot with the lowest 'order' (the parapet, then the far wall's boards). Snack-kind items (kind 'snack' or 'drink') also show on 'snacks' (the newest one). If every ordered slot is full, the oldest item leaves the stands (it stays in the book). Draw stickers after the base, sorted by y then x. When a weekly review is done, play the goal moment (goal/inside-goal-<look>-0..3.png at 140 ms, 2-3 loops) over the full stage, then settle on the base.",
+ "sticker_slots": [
+  {
+   "id": "esme-seat",
+   "x": 98,
+   "y": 192,
+   "area": "on the front rail right beside Esme's seat: the newest match item",
+   "accepts": [
+    "theatre:*"
+   ],
+   "role": "newest"
+  },
+  {
+   "id": "parapet-1",
+   "x": 40,
+   "y": 192,
+   "area": "on the front rail, front-row left",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 1
+  },
+  {
+   "id": "parapet-2",
+   "x": 196,
+   "y": 192,
+   "area": "on the front rail by the aisle",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 2
+  },
+  {
+   "id": "board-1",
+   "x": 48,
+   "y": 101,
+   "area": "hung on the far wall's colour boards",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 3
+  },
+  {
+   "id": "board-2",
+   "x": 144,
+   "y": 101,
+   "area": "hung on the far wall's colour boards",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 4
+  },
+  {
+   "id": "board-3",
+   "x": 240,
+   "y": 101,
+   "area": "hung on the far wall's colour boards",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 5
+  },
+  {
+   "id": "board-4",
+   "x": 336,
+   "y": 101,
+   "area": "hung on the far wall's colour boards",
+   "accepts": [
+    "theatre:*"
+   ],
+   "order": 6
+  },
+  {
+   "id": "snacks",
+   "x": 300,
+   "y": 185,
+   "area": "on the snacks cooler: the newest snack-kind match item (kind 'snack' or 'drink')",
+   "accepts": [
+    "theatre:snack",
+    "theatre:drink"
+   ],
+   "role": "snacks"
+  }
+ ],
+ "hotspots": {
+  "esme_seat": {
+   "x": 106,
+   "y": 186,
+   "w": 40,
+   "h": 34,
+   "note": "Esme's seat on the front row: open the weekly review here"
+  },
+  "snacks": {
+   "x": 246,
+   "y": 180,
+   "w": 64,
+   "h": 20,
+   "note": "the snacks ledge and cooler on the near stand's front rail (biscuit bag, mate, pipoca)"
+  },
+  "pitch": {
+   "x": 0,
+   "y": 102,
+   "w": 384,
+   "h": 74,
+   "note": "tap the pitch to replay the goal moment"
+  },
+  "scoreboard": {
+   "x": 160,
+   "y": 1,
+   "w": 64,
+   "h": 13,
+   "note": "numbers only; could show this month's weekly reviews done (suggestion)"
+  },
+  "exit": {
+   "x": 226,
+   "y": 224,
+   "w": 16,
+   "h": 16,
+   "note": "down the aisle, back out to the plaza"
+  }
+ },
+ "baked": {
+  "start": "a quiet midweek game: half-empty stands with seated fans and bare blue seats, 0-0 on the scoreboard, one drummer; on the pitch only footballers in open play (Flamengo in red-and-black hoops, white shorts and hooped socks dribbling to the right against the visitors in white with a teal trim, a yellow and a magenta keeper with gloves, a subtle referee in black, the ball at the dribbler's feet); Esme at her seat",
+  "full": "derby day: both stands packed and standing, the bandeirao rolled over the far stand's left half, red-black-white confetti and smoke-coloured streamers, three drummers, a snack seller in the aisle, 2-1; on the pitch the goal celebration: the ball in the right-hand net, the visitors' keeper beaten at full stretch, Flamengo arms up and a knee slide, the visitors standing; Esme at her seat with Mr Cat on the seat beside her"
+ }
+}

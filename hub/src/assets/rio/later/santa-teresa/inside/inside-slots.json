@@ -1,0 +1,3078 @@
+{
+ "location": "santa-teresa-inside",
+ "scene": [
+  384,
+  240
+ ],
+ "tile": 16,
+ "states": [
+  "start",
+  "full"
+ ],
+ "looks": [
+  "day",
+  "night",
+  "rain"
+ ],
+ "base": {
+  "start-day": "inside/inside-start-day.png",
+  "start-night": "inside/inside-start-night.png",
+  "start-rain": "inside/inside-start-rain.png",
+  "full-day": "inside/inside-full-day.png",
+  "full-night": "inside/inside-full-night.png",
+  "full-rain": "inside/inside-full-rain.png"
+ },
+ "overlays": {
+  "rain": {
+   "frames": [
+    "inside/inside-rain-streaks-0.png",
+    "inside/inside-rain-streaks-1.png",
+    "inside/inside-rain-streaks-2.png"
+   ],
+   "frame_ms": 110,
+   "note": "rain seen on the arched window's glass only"
+  }
+ },
+ "fill_rule": "Santa Teresa is filled by reading-list books finished (about 1 to 3 a month). On the START base: book n (1, 2, 3...) draws spine n from books/spines-<look>.png at shelf slot n (shelf_slots, in order: eye-level shelves first; the second bookcase's slots only once that milestone is earned). Every fifth book (5, 10, 15...) also hangs its cover in the next cover slot (cover_slots, from books/covers-<look>.png). Milestones draw their overlay from milestones/ (full-size, transparent; draw in any order after the base, before spines). Reading-nook stickers fill sticker_slots by 'order' (skip any whose 'requires' milestone is not earned). Draw: base, milestone overlays, spines and covers, stickers (sorted by y then x), then the rain overlay. On the FULL base the shelves and covers are baked in: draw stickers only.",
+ "milestones": [
+  {
+   "id": "reading-lamp",
+   "order": 1,
+   "what": "a tall brass reading lamp by the armchair (its small warm pool at night)",
+   "overlay": {
+    "day": "inside/milestones/inside-reading-lamp-day.png",
+    "night": "inside/milestones/inside-reading-lamp-night.png",
+    "rain": "inside/milestones/inside-reading-lamp-rain.png"
+   }
+  },
+  {
+   "id": "second-bookcase",
+   "order": 2,
+   "what": "a second bookcase on the right-hand wall (replaces the big abstract painting; adds its own shelf slots)",
+   "overlay": {
+    "day": "inside/milestones/inside-second-bookcase-day.png",
+    "night": "inside/milestones/inside-second-bookcase-night.png",
+    "rain": "inside/milestones/inside-second-bookcase-rain.png"
+   }
+  },
+  {
+   "id": "rug",
+   "order": 3,
+   "what": "a kilim rug (terracotta, teal and mustard) in the middle of the tiles",
+   "overlay": {
+    "day": "inside/milestones/inside-rug-day.png",
+    "night": "inside/milestones/inside-rug-night.png",
+    "rain": "inside/milestones/inside-rug-rain.png"
+   }
+  },
+  {
+   "id": "cat-bed",
+   "order": 4,
+   "what": "a woven cat bed with a pink lining for Mr Cat, by the desk",
+   "overlay": {
+    "day": "inside/milestones/inside-cat-bed-day.png",
+    "night": "inside/milestones/inside-cat-bed-night.png",
+    "rain": "inside/milestones/inside-cat-bed-rain.png"
+   }
+  },
+  {
+   "id": "window-seat",
+   "order": 5,
+   "what": "a padded window seat with cushions under the arched window (cat-friendly; adds a sticker slot)",
+   "overlay": {
+    "day": "inside/milestones/inside-window-seat-day.png",
+    "night": "inside/milestones/inside-window-seat-night.png",
+    "rain": "inside/milestones/inside-window-seat-rain.png"
+   }
+  }
+ ],
+ "milestone_note": "Overlays are full-size (384x240) and transparent except the pixels that milestone changes on the START base (furniture plus its light at night). They never overlap each other, so any set can be drawn in any order. When to earn each one is the app's call (a suggestion: after 3, 6, 10, 15 and 20 books).",
+ "shelf_slots": {
+  "sheets": {
+   "day": "inside/books/spines-day.png",
+   "night": "inside/books/spines-night.png",
+   "rain": "inside/books/spines-rain.png"
+  },
+  "note": "slot n = book n. Copy sheet rect (sheet.x, 0, w, h) to (x, y). 'requires' = the milestone that must be earned first.",
+  "slots": [
+   {
+    "n": 1,
+    "x": 54,
+    "y": 68,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     0,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 2,
+    "x": 57,
+    "y": 66,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     3,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 3,
+    "x": 62,
+    "y": 64,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     8,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 4,
+    "x": 66,
+    "y": 67,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     12,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 5,
+    "x": 69,
+    "y": 65,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     15,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 6,
+    "x": 74,
+    "y": 68,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     20,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 7,
+    "x": 78,
+    "y": 66,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     24,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 8,
+    "x": 81,
+    "y": 64,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     27,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 9,
+    "x": 86,
+    "y": 67,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     32,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 10,
+    "x": 90,
+    "y": 65,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     36,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 11,
+    "x": 93,
+    "y": 68,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     39,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 12,
+    "x": 98,
+    "y": 66,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     44,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 13,
+    "x": 102,
+    "y": 64,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     48,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 14,
+    "x": 105,
+    "y": 67,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     51,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 15,
+    "x": 110,
+    "y": 65,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     56,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 16,
+    "x": 114,
+    "y": 68,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     60,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 2
+   },
+   {
+    "n": 17,
+    "x": 15,
+    "y": 83,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     63,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 18,
+    "x": 20,
+    "y": 81,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     68,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 19,
+    "x": 24,
+    "y": 84,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     72,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 20,
+    "x": 27,
+    "y": 82,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     75,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 21,
+    "x": 32,
+    "y": 85,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     80,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 22,
+    "x": 36,
+    "y": 83,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     84,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 23,
+    "x": 39,
+    "y": 81,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     87,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 24,
+    "x": 44,
+    "y": 84,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     92,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 25,
+    "x": 48,
+    "y": 82,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     96,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 26,
+    "x": 51,
+    "y": 85,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     99,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 27,
+    "x": 56,
+    "y": 83,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     104,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 28,
+    "x": 60,
+    "y": 81,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     108,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 29,
+    "x": 63,
+    "y": 84,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     111,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 30,
+    "x": 68,
+    "y": 82,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     116,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 31,
+    "x": 72,
+    "y": 85,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     120,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 32,
+    "x": 75,
+    "y": 83,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     123,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 33,
+    "x": 80,
+    "y": 81,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     128,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 34,
+    "x": 84,
+    "y": 84,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     132,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 35,
+    "x": 87,
+    "y": 82,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     135,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 36,
+    "x": 92,
+    "y": 85,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     140,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 37,
+    "x": 96,
+    "y": 83,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     144,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 38,
+    "x": 99,
+    "y": 81,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     147,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 39,
+    "x": 104,
+    "y": 84,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     152,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 40,
+    "x": 108,
+    "y": 82,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     156,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 41,
+    "x": 111,
+    "y": 85,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     159,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 42,
+    "x": 116,
+    "y": 83,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     164,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 3
+   },
+   {
+    "n": 43,
+    "x": 15,
+    "y": 46,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     168,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 44,
+    "x": 18,
+    "y": 49,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     171,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 45,
+    "x": 23,
+    "y": 47,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     176,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 46,
+    "x": 27,
+    "y": 50,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     180,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 47,
+    "x": 30,
+    "y": 48,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     183,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 48,
+    "x": 35,
+    "y": 46,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     188,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 49,
+    "x": 39,
+    "y": 49,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     192,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 50,
+    "x": 42,
+    "y": 47,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     195,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 51,
+    "x": 47,
+    "y": 50,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     200,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 52,
+    "x": 51,
+    "y": 48,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     204,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 53,
+    "x": 54,
+    "y": 46,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     207,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 54,
+    "x": 59,
+    "y": 49,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     212,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 55,
+    "x": 63,
+    "y": 47,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     216,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 56,
+    "x": 66,
+    "y": 50,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     219,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 57,
+    "x": 71,
+    "y": 48,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     224,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 58,
+    "x": 75,
+    "y": 46,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     228,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 59,
+    "x": 78,
+    "y": 49,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     231,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 60,
+    "x": 83,
+    "y": 47,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     236,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 61,
+    "x": 87,
+    "y": 50,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     240,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 62,
+    "x": 90,
+    "y": 48,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     243,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 63,
+    "x": 95,
+    "y": 46,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     248,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 64,
+    "x": 99,
+    "y": 49,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     252,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 1
+   },
+   {
+    "n": 65,
+    "x": 15,
+    "y": 100,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     255,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 66,
+    "x": 20,
+    "y": 103,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     260,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 67,
+    "x": 24,
+    "y": 101,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     264,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 68,
+    "x": 27,
+    "y": 99,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     267,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 69,
+    "x": 32,
+    "y": 102,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     272,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 70,
+    "x": 36,
+    "y": 100,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     276,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 71,
+    "x": 39,
+    "y": 103,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     279,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 72,
+    "x": 44,
+    "y": 101,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     284,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 73,
+    "x": 48,
+    "y": 99,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     288,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 74,
+    "x": 51,
+    "y": 102,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     291,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 75,
+    "x": 56,
+    "y": 100,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     296,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 76,
+    "x": 60,
+    "y": 103,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     300,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 77,
+    "x": 63,
+    "y": 101,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     303,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 78,
+    "x": 68,
+    "y": 99,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     308,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 79,
+    "x": 72,
+    "y": 102,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     312,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 80,
+    "x": 75,
+    "y": 100,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     315,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 81,
+    "x": 80,
+    "y": 103,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     320,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 82,
+    "x": 84,
+    "y": 101,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     324,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 83,
+    "x": 87,
+    "y": 99,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     327,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 84,
+    "x": 92,
+    "y": 102,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     332,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 85,
+    "x": 96,
+    "y": 100,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     336,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 86,
+    "x": 99,
+    "y": 103,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     339,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 87,
+    "x": 104,
+    "y": 101,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     344,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 88,
+    "x": 108,
+    "y": 99,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     348,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 89,
+    "x": 111,
+    "y": 102,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     351,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 90,
+    "x": 116,
+    "y": 100,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     356,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 4
+   },
+   {
+    "n": 91,
+    "x": 15,
+    "y": 32,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     360,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 92,
+    "x": 18,
+    "y": 30,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     363,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 93,
+    "x": 23,
+    "y": 28,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     368,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 94,
+    "x": 27,
+    "y": 31,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     372,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 95,
+    "x": 30,
+    "y": 29,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     375,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 96,
+    "x": 35,
+    "y": 32,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     380,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 97,
+    "x": 39,
+    "y": 30,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     384,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 98,
+    "x": 42,
+    "y": 28,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     387,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 99,
+    "x": 47,
+    "y": 31,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     392,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 100,
+    "x": 51,
+    "y": 29,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     396,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 101,
+    "x": 54,
+    "y": 32,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     399,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 102,
+    "x": 59,
+    "y": 30,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     404,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 103,
+    "x": 63,
+    "y": 28,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     408,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 104,
+    "x": 66,
+    "y": 31,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     411,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 105,
+    "x": 71,
+    "y": 29,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     416,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 106,
+    "x": 75,
+    "y": 32,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     420,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 107,
+    "x": 78,
+    "y": 30,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     423,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 108,
+    "x": 83,
+    "y": 28,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     428,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 109,
+    "x": 87,
+    "y": 31,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     432,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 110,
+    "x": 90,
+    "y": 29,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     435,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 111,
+    "x": 95,
+    "y": 32,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     440,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 112,
+    "x": 99,
+    "y": 30,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     444,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 113,
+    "x": 102,
+    "y": 28,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     447,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 114,
+    "x": 107,
+    "y": 31,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     452,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 115,
+    "x": 111,
+    "y": 29,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     456,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 116,
+    "x": 114,
+    "y": 32,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     459,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 0
+   },
+   {
+    "n": 117,
+    "x": 15,
+    "y": 119,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     464,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 118,
+    "x": 19,
+    "y": 117,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     468,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 119,
+    "x": 22,
+    "y": 120,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     471,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 120,
+    "x": 27,
+    "y": 118,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     476,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 121,
+    "x": 31,
+    "y": 121,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     480,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 122,
+    "x": 34,
+    "y": 119,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     483,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 123,
+    "x": 39,
+    "y": 117,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     488,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 124,
+    "x": 43,
+    "y": 120,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     492,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 125,
+    "x": 46,
+    "y": 118,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     495,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 126,
+    "x": 51,
+    "y": 121,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     500,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 127,
+    "x": 55,
+    "y": 119,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     504,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 128,
+    "x": 58,
+    "y": 117,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     507,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 129,
+    "x": 63,
+    "y": 120,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     512,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 130,
+    "x": 67,
+    "y": 118,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     516,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 131,
+    "x": 70,
+    "y": 121,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     519,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 132,
+    "x": 75,
+    "y": 119,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     524,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 133,
+    "x": 79,
+    "y": 117,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     528,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 134,
+    "x": 82,
+    "y": 120,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     531,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 135,
+    "x": 87,
+    "y": 118,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     536,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 136,
+    "x": 91,
+    "y": 121,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     540,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 137,
+    "x": 94,
+    "y": 119,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     543,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 138,
+    "x": 99,
+    "y": 117,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     548,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 139,
+    "x": 103,
+    "y": 120,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     552,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 140,
+    "x": 106,
+    "y": 118,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     555,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 141,
+    "x": 111,
+    "y": 121,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     560,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 142,
+    "x": 115,
+    "y": 119,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     564,
+     0
+    ],
+    "bookcase": "bc1",
+    "shelf": 5
+   },
+   {
+    "n": 143,
+    "x": 315,
+    "y": 84,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     567,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 144,
+    "x": 319,
+    "y": 82,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     571,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 145,
+    "x": 322,
+    "y": 80,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     574,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 146,
+    "x": 327,
+    "y": 83,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     579,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 147,
+    "x": 331,
+    "y": 81,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     583,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 148,
+    "x": 334,
+    "y": 84,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     586,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 149,
+    "x": 339,
+    "y": 82,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     591,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 150,
+    "x": 343,
+    "y": 80,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     595,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 151,
+    "x": 346,
+    "y": 83,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     598,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 152,
+    "x": 351,
+    "y": 81,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     603,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 153,
+    "x": 355,
+    "y": 84,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     607,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 154,
+    "x": 358,
+    "y": 82,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     610,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 155,
+    "x": 363,
+    "y": 80,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     615,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 2,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 156,
+    "x": 315,
+    "y": 64,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     619,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 157,
+    "x": 318,
+    "y": 62,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     622,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 158,
+    "x": 323,
+    "y": 65,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     627,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 159,
+    "x": 327,
+    "y": 63,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     631,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 160,
+    "x": 330,
+    "y": 61,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     634,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 161,
+    "x": 335,
+    "y": 64,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     639,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 162,
+    "x": 339,
+    "y": 62,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     643,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 163,
+    "x": 342,
+    "y": 65,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     646,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 164,
+    "x": 347,
+    "y": 63,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     651,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 165,
+    "x": 351,
+    "y": 61,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     655,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 166,
+    "x": 354,
+    "y": 64,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     658,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 167,
+    "x": 359,
+    "y": 62,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     663,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 168,
+    "x": 363,
+    "y": 65,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     667,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 1,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 169,
+    "x": 315,
+    "y": 100,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     670,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 170,
+    "x": 320,
+    "y": 98,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     675,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 171,
+    "x": 324,
+    "y": 101,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     679,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 172,
+    "x": 327,
+    "y": 99,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     682,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 173,
+    "x": 332,
+    "y": 102,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     687,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 174,
+    "x": 336,
+    "y": 100,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     691,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 175,
+    "x": 339,
+    "y": 98,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     694,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 176,
+    "x": 344,
+    "y": 101,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     699,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 177,
+    "x": 348,
+    "y": 99,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     703,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 178,
+    "x": 351,
+    "y": 102,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     706,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 179,
+    "x": 356,
+    "y": 100,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     711,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 180,
+    "x": 360,
+    "y": 98,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     715,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 3,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 181,
+    "x": 315,
+    "y": 46,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     718,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 182,
+    "x": 320,
+    "y": 44,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     723,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 183,
+    "x": 324,
+    "y": 47,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     727,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 184,
+    "x": 327,
+    "y": 45,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     730,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 185,
+    "x": 332,
+    "y": 43,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     735,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 186,
+    "x": 336,
+    "y": 46,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     739,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 187,
+    "x": 339,
+    "y": 44,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     742,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 188,
+    "x": 344,
+    "y": 47,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     747,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 189,
+    "x": 348,
+    "y": 45,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     751,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 190,
+    "x": 351,
+    "y": 43,
+    "w": 5,
+    "h": 14,
+    "sheet": [
+     754,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 191,
+    "x": 356,
+    "y": 46,
+    "w": 4,
+    "h": 11,
+    "sheet": [
+     759,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 192,
+    "x": 360,
+    "y": 44,
+    "w": 3,
+    "h": 13,
+    "sheet": [
+     763,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 0,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 193,
+    "x": 315,
+    "y": 121,
+    "w": 5,
+    "h": 10,
+    "sheet": [
+     766,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 194,
+    "x": 320,
+    "y": 119,
+    "w": 4,
+    "h": 12,
+    "sheet": [
+     771,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 195,
+    "x": 324,
+    "y": 117,
+    "w": 3,
+    "h": 14,
+    "sheet": [
+     775,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 196,
+    "x": 327,
+    "y": 120,
+    "w": 5,
+    "h": 11,
+    "sheet": [
+     778,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 197,
+    "x": 332,
+    "y": 118,
+    "w": 4,
+    "h": 13,
+    "sheet": [
+     783,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 198,
+    "x": 336,
+    "y": 121,
+    "w": 3,
+    "h": 10,
+    "sheet": [
+     787,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 199,
+    "x": 339,
+    "y": 119,
+    "w": 5,
+    "h": 12,
+    "sheet": [
+     790,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 200,
+    "x": 344,
+    "y": 117,
+    "w": 4,
+    "h": 14,
+    "sheet": [
+     795,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 201,
+    "x": 348,
+    "y": 120,
+    "w": 3,
+    "h": 11,
+    "sheet": [
+     799,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 202,
+    "x": 351,
+    "y": 118,
+    "w": 5,
+    "h": 13,
+    "sheet": [
+     802,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 203,
+    "x": 356,
+    "y": 121,
+    "w": 4,
+    "h": 10,
+    "sheet": [
+     807,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   },
+   {
+    "n": 204,
+    "x": 360,
+    "y": 119,
+    "w": 3,
+    "h": 12,
+    "sheet": [
+     811,
+     0
+    ],
+    "bookcase": "bc2",
+    "shelf": 4,
+    "requires": "second-bookcase"
+   }
+  ]
+ },
+ "cover_slots": {
+  "sheets": {
+   "day": "inside/books/covers-day.png",
+   "night": "inside/books/covers-night.png",
+   "rain": "inside/books/covers-rain.png"
+  },
+  "note": "small framed covers (abstract cover art, no text) on the picture hooks right of the window; copy sheet rect (sheet.x, 0, 14, 18) to (x, y)",
+  "slots": [
+   {
+    "n": 1,
+    "x": 248,
+    "y": 26,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     0,
+     0
+    ]
+   },
+   {
+    "n": 2,
+    "x": 266,
+    "y": 26,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     14,
+     0
+    ]
+   },
+   {
+    "n": 3,
+    "x": 284,
+    "y": 26,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     28,
+     0
+    ]
+   },
+   {
+    "n": 4,
+    "x": 250,
+    "y": 48,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     42,
+     0
+    ]
+   },
+   {
+    "n": 5,
+    "x": 268,
+    "y": 48,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     56,
+     0
+    ]
+   },
+   {
+    "n": 6,
+    "x": 286,
+    "y": 48,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     70,
+     0
+    ]
+   },
+   {
+    "n": 7,
+    "x": 248,
+    "y": 70,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     84,
+     0
+    ]
+   },
+   {
+    "n": 8,
+    "x": 266,
+    "y": 70,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     98,
+     0
+    ]
+   },
+   {
+    "n": 9,
+    "x": 284,
+    "y": 70,
+    "w": 14,
+    "h": 18,
+    "sheet": [
+     112,
+     0
+    ]
+   }
+  ]
+ },
+ "foot": "x, y = bottom-centre pixel of the 16x16 sticker cell; draw at left = x - 8, top = y - 15",
+ "sticker_slots": [
+  {
+   "id": "bookcase-top",
+   "x": 70,
+   "y": 19,
+   "area": "on top of the tall bookcase, under the fairy lights",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 1
+  },
+  {
+   "id": "window-sill",
+   "x": 176,
+   "y": 121,
+   "area": "on the window sill, against the view of the bay",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 2
+  },
+  {
+   "id": "sideboard",
+   "x": 278,
+   "y": 123,
+   "area": "on the record corner's sideboard, between the record player and the lamp",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 3
+  },
+  {
+   "id": "desk",
+   "x": 328,
+   "y": 179,
+   "area": "on the writer's desk, by the papers",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 4
+  },
+  {
+   "id": "by-armchair",
+   "x": 226,
+   "y": 198,
+   "area": "on the tiles beside the reading armchair",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 5
+  },
+  {
+   "id": "by-easel",
+   "x": 104,
+   "y": 216,
+   "area": "on the tiles by the easel",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 6
+  },
+  {
+   "id": "by-door",
+   "x": 246,
+   "y": 222,
+   "area": "on the tiles near the door",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 7
+  },
+  {
+   "id": "window-seat",
+   "x": 202,
+   "y": 130,
+   "area": "on the window seat's cushion",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 8,
+   "requires": "window-seat"
+  },
+  {
+   "id": "bookcase-2-top",
+   "x": 362,
+   "y": 33,
+   "area": "on top of the second bookcase",
+   "accepts": [
+    "reading:*"
+   ],
+   "order": 9,
+   "requires": "second-bookcase"
+  }
+ ],
+ "hotspots": {
+  "door": {
+   "x": 176,
+   "y": 222,
+   "w": 32,
+   "h": 18,
+   "note": "back out to the street"
+  },
+  "shelves": {
+   "x": 10,
+   "y": 20,
+   "w": 116,
+   "h": 120,
+   "note": "the reading list: books to read and books finished"
+  },
+  "just_finished": {
+   "x": 229,
+   "y": 150,
+   "w": 18,
+   "h": 22,
+   "note": "the brass book stand on the side table: the book just finished (open its card)"
+  },
+  "armchair": {
+   "x": 251,
+   "y": 150,
+   "w": 26,
+   "h": 24,
+   "note": "the reading armchair (an open book left on the seat): open the Journal"
+  },
+  "caetano": {
+   "x": 130,
+   "y": 132,
+   "w": 24,
+   "h": 32,
+   "note": "Caetano reading on his cushion on a crate of atlases: he hosts the Journal, the reading list and the museum"
+  },
+  "covers": {
+   "x": 246,
+   "y": 23,
+   "w": 58,
+   "h": 70,
+   "note": "the wall of framed covers"
+  },
+  "record_player": {
+   "x": 246,
+   "y": 110,
+   "w": 30,
+   "h": 30,
+   "note": "the record corner (shipped vinyl record player and crate)"
+  },
+  "esme_spot": {
+   "x": 206,
+   "y": 204,
+   "note": "where Esme stands in the full scene (on the rug, facing the window)"
+  }
+ },
+ "baked": {
+  "start": "a quiet studio: bookcase nearly empty (seven books and a fallen one on the third shelf, a little stack on the second), the armchair with an open book on the seat, the side table with the brass book stand, one stack of books by Caetano's crate, the easel, the desk with a candle, the record corner, picture hooks waiting for covers, a big abstract painting where the second bookcase will go; Caetano reading on his cushion",
+  "full": "shelves floor to ceiling on both bookcases with books piled on top, all nine framed covers, every milestone (reading lamp, second bookcase, rug, cat bed, window seat), stacks of books on the floor, Rosa up the ladder, Duda browsing the second bookcase, Marcos painting at the easel, Esme on the rug, Mr Cat asleep in his bed, Caetano reading"
+ }
+}

@@ -181,11 +181,11 @@
       "play": "once, first",
       "at": [
        99,
-       19
+       18
       ],
       "frame_size": [
        124,
-       71
+       58
       ],
       "frames": 5,
       "frame_ms": 160
@@ -212,12 +212,12 @@
       "json": "karaoke/karaoke-inside-loop-strip.json",
       "play": "loop",
       "at": [
-       262,
-       78
+       261,
+       75
       ],
       "frame_size": [
-       91,
-       129
+       94,
+       134
       ],
       "frames": 4,
       "frame_ms": 200
@@ -281,12 +281,12 @@
       "json": "karaoke/karaoke-outside-loop-strip.json",
       "play": "loop",
       "at": [
-       43,
-       118
+       35,
+       116
       ],
       "frame_size": [
-       333,
-       119
+       341,
+       121
       ],
       "frames": 4,
       "frame_ms": 200
@@ -348,12 +348,12 @@
       "json": "funk/funk-inside-beat-strip.json",
       "play": "loop",
       "at": [
-       198,
+       195,
        22
       ],
       "frame_size": [
-       160,
-       186
+       163,
+       187
       ],
       "frames": 4,
       "frame_ms": 150
@@ -417,12 +417,12 @@
       "json": "funk/funk-outside-beat-strip.json",
       "play": "loop",
       "at": [
-       31,
-       118
+       30,
+       117
       ],
       "frame_size": [
-       344,
-       121
+       345,
+       123
       ],
       "frames": 4,
       "frame_ms": 150

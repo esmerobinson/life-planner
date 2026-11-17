@@ -1,0 +1,51 @@
+{
+ "name": "The sea off Arpoador: extras (Rio pack, later)",
+ "notes": "No new colours. Day uses the summer palette, the existing extra ramps (fam_aqua, water, pnd_deep, pnd_steel, mead_stone, fam_olive/leaf/pine, fam_blue, fam_violet, ch_rust, ch_sage, ch_navy, ch_teal, mead_heath, ch_hair8) and Ipanema's two sea ramps below (ipa_seabed, ipa_coral; listed in rio-pack/day1/ipanema/palette-extra.json, reused, not new). Night uses the approved night twins and night-only colours (sea_*, nl_*); rain uses Ipanema's rain twins.",
+ "newRamps": [],
+ "reusedRamps": [
+  {
+   "name": "ipa_seabed",
+   "use": "sand seen through clear water (the sea floor off Arpoador); light to dark",
+   "colours": [
+    [
+     "ipa_seabed0",
+     "#e6f0c2"
+    ],
+    [
+     "ipa_seabed1",
+     "#bcd9a8"
+    ],
+    [
+     "ipa_seabed2",
+     "#86b892"
+    ],
+    [
+     "ipa_seabed3",
+     "#56907e"
+    ]
+   ]
+  },
+  {
+   "name": "ipa_coral",
+   "use": "sea fans, coralline crust on the rocks and anemone bases (the sea off Arpoador); light to dark",
+   "colours": [
+    [
+     "ipa_coral0",
+     "#ffc2a8"
+    ],
+    [
+     "ipa_coral1",
+     "#ff7f6e"
+    ],
+    [
+     "ipa_coral2",
+     "#d94c5c"
+    ],
+    [
+     "ipa_coral3",
+     "#9a2e4e"
+    ]
+   ]
+  }
+ ]
+}

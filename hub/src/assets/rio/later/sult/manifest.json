@@ -1,0 +1,126 @@
+{
+ "pack": "rio-pack later",
+ "area": "sult",
+ "name": "Sult, the Italian restaurant in Botafogo",
+ "opens_day": 90,
+ "map": {
+  "key": "sult",
+  "file": "art/final/rio-pack/day1/map/map.json",
+  "note": "REDRAWN from Esme's photos (2026-11-16): the outside no longer matches the current map sprite (charcoal front, dark awning, chimney, olive trees). The map sprite should be updated to: a two-storey coral-red house, white sash windows, a stone corner pilaster, a big white awning over a warm open front, a jade plant in a wooden planter and small white-clothed tables (the map was not edited)."
+ },
+ "notes": "Outside and inside 384x240 (24x15 tiles), 16 px tiles, 3/4 top-down, light from the top-left. Hard alpha; day images use palette colours only (no new colours). Drawn from Esme's photos for accuracy (nothing traced; no real labels, logos or faces). Night is the hero look: the pass lit only by its cone pendants. The name only goes in the tooltip.",
+ "locations": [
+  {
+   "key": "sult-outside",
+   "name": "Sult from Rua Fernandes Guimaraes",
+   "kind": "outdoor",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "outside/outside-start-day.png",
+    "start-night": "outside/outside-start-night.png",
+    "start-rain": "outside/outside-start-rain.png",
+    "full-day": "outside/outside-full-day.png",
+    "full-night": "outside/outside-full-night.png",
+    "full-rain": "outside/outside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "outside/outside-rain-streaks-0.png",
+      "outside/outside-rain-streaks-1.png",
+      "outside/outside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "outside/outside-slots.json"
+  },
+  {
+   "key": "sult-inside",
+   "name": "The room and the open kitchen",
+   "kind": "interior",
+   "size": [
+    384,
+    240
+   ],
+   "tile": 16,
+   "states": [
+    "start",
+    "full"
+   ],
+   "looks": [
+    "day",
+    "night",
+    "rain"
+   ],
+   "base": {
+    "start-day": "inside/inside-start-day.png",
+    "start-night": "inside/inside-start-night.png",
+    "start-rain": "inside/inside-start-rain.png",
+    "full-day": "inside/inside-full-day.png",
+    "full-night": "inside/inside-full-night.png",
+    "full-rain": "inside/inside-full-rain.png"
+   },
+   "overlays": {
+    "rain": {
+     "frames": [
+      "inside/inside-rain-streaks-0.png",
+      "inside/inside-rain-streaks-1.png",
+      "inside/inside-rain-streaks-2.png"
+     ],
+     "frame_ms": 110
+    }
+   },
+   "slots": "inside/inside-slots.json"
+  }
+ ],
+ "stages": {
+  "rule": "Sult takes over part of the goal celebrations: the base stage follows real monthly goals hit (start on opening day, full once the room is busy). Each goal also fills a celebration slot (see inside-slots.json fill_rule).",
+  "start": "a quiet afternoon, a few tables laid",
+  "full": "a buzzing room: every table taken, an accordion player, three chefs at the pass, a celebration table"
+ },
+ "dishes": {
+  "new": [
+   "dishes/dishes-margherita.png",
+   "dishes/dishes-carbonara.png",
+   "dishes/dishes-lasagne.png",
+   "dishes/dishes-risotto-ai-funghi.png",
+   "dishes/dishes-burrata.png",
+   "dishes/dishes-bruschetta.png",
+   "dishes/dishes-gnocchi-al-sugo.png",
+   "dishes/dishes-ravioli.png",
+   "dishes/dishes-tiramisu.png",
+   "dishes/dishes-panna-cotta.png",
+   "dishes/dishes-gelato.png",
+   "dishes/dishes-affogato.png",
+   "dishes/dishes-oysters.png"
+  ],
+  "catalogue": "dishes/dishes.json",
+  "card": "the existing 'Inspired at Sult' card: art/final/rio-pack/day1/ui/inspired-card-template.png"
+ },
+ "looks": {
+  "day": "lunch and afternoon (default)",
+  "night": "after dark (Rio local time): the hero look",
+  "rain": "when Rio is rainy; add the streak overlay"
+ },
+ "characters": "Esme and Mr Cat are the shipped sprites, baked into the full scenes. Everyone else is one of the ten Rio townsfolk (art/sources/rio-pack/townsfolk/folk.py) in their own faces; the waiter (Marcos) in a white shirt, the chefs (Thiago, Bia, Lucas) in caps and aprons.",
+ "palettes": {
+  "extra": "palette-extra.json",
+  "night": "palette-night.json",
+  "rain": "palette-rain.json"
+ },
+ "sources": "art/sources/rio-pack/sult/ (python3 -I -B deliver.py)"
+}
