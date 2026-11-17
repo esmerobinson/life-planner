@@ -287,8 +287,9 @@ export function AppShell() {
               )
             }
           </AddButton>}
-          {/* The nook belongs to the game too: in the full-window game it stands bottom left, as on the phone. */}
-          {(phone || game) && <ErrorGuard name="nook"><Nook phone /></ErrorGuard>}
+          {/* On the phone the nook stands bottom left on every page. Not on the desktop game screen (Esme,
+              2026-11-17: "Bottom left UI box seems to be redundant"): its moments pop up there instead (rio/GameMoments.tsx). */}
+          {phone && <ErrorGuard name="nook"><Nook phone /></ErrorGuard>}
         </main>
       </div>
       </FarmProvider>

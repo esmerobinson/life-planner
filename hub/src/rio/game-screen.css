@@ -108,7 +108,7 @@ html:has(.app-shell.is-game) body {
   pointer-events: none;
   z-index: 20;
 }
-/* Clear of the nook, which stands bottom left in the game (Nook.tsx), on a narrow screen. */
+/* Clear of the nook, which stands bottom left on the phone's game page (Nook.tsx), on a narrow screen. */
 .game-screen[data-layout="narrow"] .rio-hud-bottom {
   bottom: calc(96px + env(safe-area-inset-bottom));
 }
@@ -173,7 +173,9 @@ html:has(.app-shell.is-game) body {
   left: 0;
   right: 0;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 4em;
   z-index: 21;
   pointer-events: none;
 }
