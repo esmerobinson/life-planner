@@ -26,8 +26,42 @@ export const POPIN_FRAME_MS = FRAME_MS;
 /** …and the wait before the next sticker pops in (one frame, as nothing longer is chosen). */
 export const POPIN_STEP_MS = FRAME_MS;
 
-/** prefers-reduced-motion: every animation shows its end frame instead. */
+/**
+ * Reduced motion on this device: "system" follows the device's own setting (the default); "on"
+ * and "off" are her choice in the game menu's Settings, kept for this device only.
+ */
+export type MotionPref = "system" | "on" | "off";
+const PREF_KEY = "rio-reduced-motion";
+/** Fired on window when the choice changes (useReducedMotion follows it). */
+export const MOTION_PREF_EVENT = "rio-motion-pref";
+/** The choice made this session (storage can be blocked: it still holds until the page closes). */
+let chosen: MotionPref | null = null;
+
+export function motionPref(): MotionPref {
+  if (chosen) return chosen;
+  try {
+    const v = localStorage.getItem(PREF_KEY);
+    return v === "on" || v === "off" ? v : "system";
+  } catch {
+    return "system";
+  }
+}
+
+export function setMotionPref(p: MotionPref): void {
+  chosen = p;
+  try {
+    if (p === "system") localStorage.removeItem(PREF_KEY);
+    else localStorage.setItem(PREF_KEY, p);
+  } catch {
+    // Storage blocked (a private window): the choice holds for this session only.
+  }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(MOTION_PREF_EVENT));
+}
+
+/** Reduced motion (her choice, or prefers-reduced-motion): every animation shows its end frame instead. */
 export function reducedMotion(): boolean {
+  const p = motionPref();
+  if (p !== "system") return p === "on";
   return typeof window !== "undefined" && typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }

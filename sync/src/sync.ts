@@ -4,6 +4,7 @@
 // D1 executes as a single transaction: either every write and the pull happen, or
 // nothing does.
 
+import { DUE_PREFS_ID, PREFS_TABLE, validDuePrefsRow } from "./due/prefs";
 import {
   HttpError,
   MAX_CHANGES,
@@ -27,9 +28,11 @@ export const DEFAULT_CHUNK_BYTES = 1_900_000;
  * The synced tables. "files": pictures on pages (base64 JPEG rows, kept under 1 MB by the
  * app). "journal": end-to-end encrypted journal entries (the server only ever sees `id`,
  * `kind`, `date`, `iv` and the ciphertext `ct`; it cannot read them). "farm": Esme's Farm's
- * own state (start day, stickers seen and placed, arrivals, outfits); tiny rows.
+ * own state (start day, stickers seen and placed, arrivals, outfits); tiny rows. "prefs":
+ * small settings rows the Worker itself reads, NOT encrypted; so far only "due" (Due reminder
+ * settings, due/prefs.ts), which is checked here and refused when malformed.
  */
-const TABLES = new Set(["items", "goals", "files", "journal", "farm"]);
+const TABLES = new Set(["items", "goals", "files", "journal", "farm", PREFS_TABLE]);
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 export interface ValidChange {
@@ -45,6 +48,26 @@ export interface SyncRequest {
   deviceId: string;
   cursor: number;
   changes: ValidChange[];
+  /**
+   * The request may change today's reminders: something ticked off, binned or archived, a
+   * to-do with a time, a day or a deadline, or the Due settings. Due reminders are brought up
+   * to date soon after (due/cron.ts), instead of at the next quarter hour (review M2).
+   */
+  touchesDue: boolean;
+}
+
+/** An item that may change today's reminders, or the Due settings row. */
+function touchesDue(table: string, id: string, data: Record<string, unknown>): boolean {
+  if (table === PREFS_TABLE) return id === DUE_PREFS_ID;
+  if (table !== "items") return false;
+  return (
+    (typeof data.status === "string" && data.status !== "open") ||
+    data.time !== undefined ||
+    data.pinnedDate !== undefined ||
+    data.due !== undefined ||
+    (Array.isArray(data.doneDates) && data.doneDates.length > 0) ||
+    (Array.isArray(data.sessions) && data.sessions.some((s) => isPlainObject(s) && s.doneOn !== undefined))
+  );
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -62,6 +85,7 @@ export function validateSyncRequest(body: unknown, now: number): SyncRequest {
 
   const latest = now + MAX_FUTURE_MS;
   const valid: ValidChange[] = [];
+  let due = false;
   for (const raw of changes as unknown[]) {
     if (!isPlainObject(raw)) throw new HttpError(400, "bad_change");
     const { table, id, updatedAt, data } = raw;
@@ -73,12 +97,14 @@ export function validateSyncRequest(body: unknown, now: number): SyncRequest {
       throw new HttpError(400, "bad_change");
     }
     if (!isPlainObject(data)) throw new HttpError(400, "bad_change");
+    if (table === PREFS_TABLE && id === DUE_PREFS_ID && !validDuePrefsRow(data)) throw new HttpError(400, "bad_change");
+    if (!due && touchesDue(table, id, data)) due = true;
     const entry = JSON.stringify({ t: table, i: id, u: updatedAt, d: JSON.stringify(data) });
     const entryBytes = utf8Length(entry);
     if (entryBytes > MAX_ROW_BYTES) throw new HttpError(400, "row_too_large");
     valid.push({ table, id, updatedAt, entry, entryBytes });
   }
-  return { deviceId, cursor, changes: valid };
+  return { deviceId, cursor, changes: valid, touchesDue: due };
 }
 
 /** Groups serialized changes into JSON arrays of at most `maxBytes` (a lone oversize entry gets its own chunk). */

@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { reducedMotion } from "./motion";
+import { MOTION_PREF_EVENT, reducedMotion } from "./motion";
 import { canDraw } from "./sprites";
 
 /** A field she types into (the earned moment never interrupts typing). */
@@ -78,13 +78,17 @@ export function useTicker(ms: number, on = true): number {
 
 const REDUCED = "(prefers-reduced-motion: reduce)";
 function subscribeReduced(onChange: () => void) {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => undefined;
-  const q = window.matchMedia(REDUCED);
-  q.addEventListener("change", onChange);
-  return () => q.removeEventListener("change", onChange);
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(MOTION_PREF_EVENT, onChange);
+  const q = typeof window.matchMedia === "function" ? window.matchMedia(REDUCED) : null;
+  q?.addEventListener("change", onChange);
+  return () => {
+    window.removeEventListener(MOTION_PREF_EVENT, onChange);
+    q?.removeEventListener("change", onChange);
+  };
 }
 
-/** prefers-reduced-motion, following changes made while the app is open. */
+/** Reduced motion (her choice in Settings, or the device's), following changes made while the app is open. */
 export function useReducedMotion(): boolean {
   return useSyncExternalStore(subscribeReduced, reducedMotion, () => false);
 }

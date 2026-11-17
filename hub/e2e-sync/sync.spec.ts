@@ -26,10 +26,10 @@ const BACKUP = {
   goals: [{ id: "e2e-goal-1", title: "Paint a pretend mural", areaId: AREA, kind: "practice", milestones: [], createdAt: "2026-09-01" }],
 };
 
-type Row = { id: string; title: string; status: string; updatedAt?: number };
+type Row = { id: string; title: string; status: string; updatedAt?: number; [field: string]: unknown };
 
 /** Reads one object store of this device's database directly. */
-function readStore(page: Page, store: "items" | "goals" | "pending"): Promise<Row[]> {
+function readStore(page: Page, store: "items" | "goals" | "pending" | "prefs"): Promise<Row[]> {
   return page.evaluate(
     (name) =>
       new Promise<Row[]>((resolve, reject) => {
@@ -181,4 +181,45 @@ test("two devices converge through the real server: import, own items, edits, a 
   await ctxA.close();
   await ctxB.close();
   await ctxC.close();
+});
+
+/* Due reminders (2026-11-16), after the test above (they share one server): the Due settings row
+   and a to-do's time reach the server and another device, and the cron handler runs without a
+   token and reaches nothing. */
+test("Due settings and a to-do's time sync through the real server; the cron runs without a token and does nothing", async ({ browser, request }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+
+  await setUpSync(a);
+  await a.goto("/reminders");
+  const due = a.getByRole("region", { name: "Reminders in Due" });
+  await due.getByRole("button", { name: "Reminders in Due: Off" }).click();
+  await due.getByLabel("New motivation line").fill("A pretend line for the nudge");
+  await due.getByRole("button", { name: "Add line" }).click();
+  await expect.poll(async () => (await readStore(a, "prefs"))[0]?.lines).toEqual(["A pretend line for the nudge"]);
+
+  await a.goto("/area/admin");
+  await a.getByRole("button", { name: "To-dos", exact: true }).click();
+  await a.getByRole("button", { name: "Add", exact: true }).click();
+  const form = a.locator("form.quick-add");
+  await form.getByLabel("Title").fill("Pretend appointment");
+  await form.getByLabel("Due").fill("2026-12-01");
+  await form.getByLabel("Time").fill("09:30");
+  await form.getByRole("button", { name: "Add item" }).click();
+  await expect(a.getByText("9:30am")).toBeVisible();
+  await syncNow(a);
+
+  await setUpSync(b);
+  await syncNow(b);
+  expect((await readStore(b, "prefs"))[0]).toMatchObject({ id: "due", on: true, lines: ["A pretend line for the nudge"] });
+  expect((await readStore(b, "items")).find((i) => i.title === "Pretend appointment")).toMatchObject({ due: "2026-12-01", time: "09:30" });
+
+  // The cron handler: no DUE_TOKEN here, so it runs and does nothing (no crash, nothing reached).
+  const cron = await request.get(`${SYNC_URL}/__scheduled?cron=*/15+*+*+*+*`);
+  expect(cron.status()).toBe(200);
+
+  await ctxA.close();
+  await ctxB.close();
 });

@@ -60,7 +60,7 @@ test.describe("Reminders", () => {
   test("the footer link opens the list; changes stay on this device; a browser tab says the Mac app shows them", async ({ page }) => {
     await page.goto("/");
     await page.locator(".sidebar-footer").getByRole("link", { name: "Reminders" }).click();
-    await expect(page.getByRole("heading", { name: "Reminders" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Reminders", exact: true })).toBeVisible();
     await expect(page.locator(".rem-row")).toHaveCount(6);
     await expect(page.getByText(/pop up from the Esmeworld Mac app/)).toBeVisible();
 

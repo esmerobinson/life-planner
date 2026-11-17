@@ -24,6 +24,8 @@ export const MAX_NOTES_TEXT = 20_000;
 export const MAX_GOAL_NOTES = 4000;
 
 const AREAS: readonly string[] = AREA_IDS;
+/** A to-do's time: "HH:MM", 24-hour. */
+export const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ITEM_KINDS = ["task", "idea"];
 const STATUSES = ["open", "done", "archived", "deleted", "purged"];
 const GOAL_KINDS = ["finite", "practice"];
@@ -52,6 +54,7 @@ export function validItem(r: unknown): r is Item {
     optDate(r.due) &&
     (r.recur === undefined || (Array.isArray(r.recur) && r.recur.every((d) => WEEKDAY_LIST.includes(d as string)))) &&
     optDate(r.pinnedDate) &&
+    (r.time === undefined || (isStr(r.time) && TIME_OF_DAY.test(r.time))) &&
     optDate(r.weekOf) &&
     optDate(r.hiddenOn) &&
     optDate(r.completedAt) &&

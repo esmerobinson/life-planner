@@ -236,72 +236,104 @@
    },
    "bbox": [
     425,
-    207,
+    191,
     125,
-    102
+    118
    ],
    "bbox_night": [
     416,
-    192,
+    191,
     141,
-    121
+    122
    ],
    "hotspot": {
     "rect": [
      423,
-     205,
+     189,
      129,
-     106
+     122
     ],
     "polygon": [
      [
-      444,
-      205
+      447,
+      189
      ],
      [
-      531,
-      205
-     ],
-     [
-      552,
-      226
+      528,
+      189
      ],
      [
       552,
-      290
+      213
      ],
      [
-      531,
+      552,
+      287
+     ],
+     [
+      528,
       311
      ],
      [
-      444,
+      447,
       311
      ],
      [
       423,
-      290
+      287
      ],
      [
       423,
-      226
+      213
      ]
     ]
    },
    "marker_anchor": [
     469,
-    205
+    189
    ],
    "tooltip_anchor": [
     469,
-    205
+    189
    ],
    "bbox_rain": [
     425,
-    207,
+    191,
     125,
-    102
-   ]
+    118
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "hero landmark drawn about 1.3-1.7x bigger than life (Esme's design choice)",
+    "bbox_before": [
+     425,
+     207,
+     125,
+     102
+    ],
+    "bbox_night_before": [
+     416,
+     192,
+     141,
+     121
+    ],
+    "bbox_round1": [
+     425,
+     200,
+     125,
+     109
+    ],
+    "bbox_night_round1": [
+     416,
+     192,
+     141,
+     121
+    ],
+    "marker_anchor_before": [
+     469,
+     205
+    ]
+   }
   },
   {
    "key": "parque-lage",
@@ -496,56 +528,56 @@
     }
    },
    "bbox": [
-    219,
-    341,
-    110,
-    138
+    208,
+    302,
+    129,
+    179
    ],
    "bbox_night": [
-    219,
-    326,
-    110,
-    169
+    208,
+    302,
+    129,
+    193
    ],
    "hotspot": {
     "rect": [
-     217,
-     339,
-     114,
-     142
+     206,
+     300,
+     133,
+     183
     ],
     "polygon": [
      [
-      239,
-      339
+      232,
+      300
      ],
      [
-      309,
-      339
+      313,
+      300
      ],
      [
-      331,
-      361
+      339,
+      326
      ],
      [
-      331,
-      459
+      339,
+      457
      ],
      [
-      309,
-      481
+      313,
+      483
      ],
      [
-      239,
-      481
+      232,
+      483
      ],
      [
-      217,
-      459
+      206,
+      457
      ],
      [
-      217,
-      361
+      206,
+      326
      ]
     ]
    },
@@ -558,11 +590,27 @@
     340
    ],
    "bbox_rain": [
-    219,
-    341,
-    110,
-    138
-   ]
+    208,
+    302,
+    129,
+    179
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "hero landmark drawn about 1.3-1.7x bigger than life (Esme's design choice)",
+    "bbox_before": [
+     219,
+     341,
+     110,
+     138
+    ],
+    "bbox_night_before": [
+     219,
+     326,
+     110,
+     169
+    ]
+   }
   },
   {
    "key": "rocinha",
@@ -823,7 +871,23 @@
     286,
     60,
     69
-   ]
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "matches the newly drawn area (art/final/rio-pack/later/os-esquilos/); drawn over the old layer inside the old bbox, so bbox and hotspot are unchanged",
+    "bbox_before": [
+     15,
+     286,
+     60,
+     69
+    ],
+    "bbox_night_before": [
+     11,
+     278,
+     70,
+     91
+    ]
+   }
   },
   {
    "key": "flamengo-match",
@@ -844,73 +908,105 @@
     }
    },
    "bbox": [
-    292,
-    24,
-    81,
-    57
+    273,
+    4,
+    120,
+    85
    ],
    "bbox_night": [
-    276,
-    12,
-    113,
-    77
+    273,
+    4,
+    120,
+    85
    ],
    "hotspot": {
     "rect": [
-     290,
-     22,
-     85,
-     61
+     271,
+     2,
+     124,
+     89
     ],
     "polygon": [
      [
-      302,
-      22
+      288,
+      2
      ],
      [
-      363,
-      22
+      378,
+      2
      ],
      [
-      375,
-      34
+      395,
+      19
      ],
      [
-      375,
-      71
+      395,
+      74
      ],
      [
-      363,
-      83
+      378,
+      91
      ],
      [
-      302,
-      83
+      288,
+      91
      ],
      [
-      290,
-      71
+      271,
+      74
      ],
      [
-      290,
-      34
+      271,
+      19
      ]
     ]
    },
    "marker_anchor": [
     333,
-    24
+    15
    ],
    "tooltip_anchor": [
     333,
-    24
+    15
    ],
    "bbox_rain": [
-    292,
-    24,
-    81,
-    57
-   ]
+    273,
+    4,
+    120,
+    85
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "hero landmark drawn about 1.3-1.7x bigger than life (Esme's design choice)",
+    "bbox_before": [
+     292,
+     24,
+     81,
+     57
+    ],
+    "bbox_night_before": [
+     276,
+     12,
+     113,
+     77
+    ],
+    "bbox_round1": [
+     278,
+     16,
+     110,
+     73
+    ],
+    "bbox_night_round1": [
+     276,
+     12,
+     113,
+     77
+    ],
+    "marker_anchor_before": [
+     333,
+     24
+    ]
+   }
   },
   {
    "key": "santa-teresa",
@@ -1019,9 +1115,9 @@
    },
    "bbox": [
     720,
-    84,
+    80,
     51,
-    40
+    44
    ],
    "bbox_night": [
     705,
@@ -1032,42 +1128,42 @@
    "hotspot": {
     "rect": [
      718,
-     82,
+     78,
      55,
-     44
+     48
     ],
     "polygon": [
      [
-      726,
-      82
+      727,
+      78
      ],
      [
-      765,
-      82
-     ],
-     [
-      773,
-      90
+      764,
+      78
      ],
      [
       773,
-      118
+      87
      ],
      [
-      765,
+      773,
+      117
+     ],
+     [
+      764,
       126
      ],
      [
-      726,
+      727,
       126
      ],
      [
       718,
-      118
+      117
      ],
      [
       718,
-      90
+      87
      ]
     ]
    },
@@ -1081,10 +1177,26 @@
    ],
    "bbox_rain": [
     720,
-    84,
+    80,
     51,
-    40
-   ]
+    44
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "hero landmark drawn about 1.3-1.7x bigger than life (Esme's design choice)",
+    "bbox_before": [
+     720,
+     84,
+     51,
+     40
+    ],
+    "bbox_night_before": [
+     705,
+     68,
+     80,
+     71
+    ]
+   }
   },
   {
    "key": "lagoa-house",
@@ -1280,42 +1392,42 @@
    },
    "bbox": [
     660,
-    271,
-    32,
-    50
+    284,
+    33,
+    37
    ],
    "bbox_night": [
     660,
-    271,
-    37,
-    50
+    284,
+    33,
+    37
    ],
    "hotspot": {
     "rect": [
      658,
-     269,
-     36,
-     54
+     282,
+     37,
+     41
     ],
     "polygon": [
      [
       665,
-      269
+      282
      ],
      [
-      687,
-      269
+      688,
+      282
      ],
      [
-      694,
-      276
+      695,
+      289
      ],
      [
-      694,
+      695,
       316
      ],
      [
-      687,
+      688,
       323
      ],
      [
@@ -1328,7 +1440,7 @@
      ],
      [
       658,
-      276
+      289
      ]
     ]
    },
@@ -1342,10 +1454,26 @@
    ],
    "bbox_rain": [
     660,
-    271,
-    32,
-    50
-   ]
+    284,
+    33,
+    37
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "matches the newly drawn area (art/final/rio-pack/later/sult/)",
+    "bbox_before": [
+     660,
+     271,
+     32,
+     50
+    ],
+    "bbox_night_before": [
+     660,
+     271,
+     37,
+     50
+    ]
+   }
   },
   {
    "key": "copacabana-palace",
@@ -1366,56 +1494,56 @@
     }
    },
    "bbox": [
-    684,
-    321,
-    64,
-    44
+    678,
+    320,
+    81,
+    56
    ],
    "bbox_night": [
-    684,
+    678,
     320,
-    64,
-    47
+    81,
+    56
    ],
    "hotspot": {
     "rect": [
-     682,
-     319,
-     68,
-     48
+     676,
+     318,
+     85,
+     60
     ],
     "polygon": [
      [
-      691,
-      319
+      688,
+      318
      ],
      [
-      741,
-      319
+      749,
+      318
      ],
      [
-      750,
-      328
+      761,
+      330
      ],
      [
-      750,
-      358
+      761,
+      366
      ],
      [
-      741,
-      367
+      749,
+      378
      ],
      [
-      691,
-      367
+      688,
+      378
      ],
      [
-      682,
-      358
+      676,
+      366
      ],
      [
-      682,
-      328
+      676,
+      330
      ]
     ]
    },
@@ -1428,11 +1556,27 @@
     320
    ],
    "bbox_rain": [
-    684,
-    321,
-    64,
-    44
-   ]
+    678,
+    320,
+    81,
+    56
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "hero landmark drawn about 1.3-1.7x bigger than life (Esme's design choice)",
+    "bbox_before": [
+     684,
+     321,
+     64,
+     44
+    ],
+    "bbox_night_before": [
+     684,
+     320,
+     64,
+     47
+    ]
+   }
   },
   {
    "key": "ipanema-beach",
@@ -1808,9 +1952,9 @@
    ],
    "bbox_night": [
     546,
-    422,
-    41,
-    32
+    424,
+    38,
+    29
    ],
    "hotspot": {
     "rect": [
@@ -1867,7 +2011,23 @@
     424,
     38,
     29
-   ]
+   ],
+   "redrawn": {
+    "date": "2026-11-16",
+    "why": "matches the newly drawn area (art/final/rio-pack/later/quilo/)",
+    "bbox_before": [
+     546,
+     424,
+     38,
+     29
+    ],
+    "bbox_night_before": [
+     546,
+     422,
+     41,
+     32
+    ]
+   }
   },
   {
    "key": "ipanema-penthouse",
@@ -2178,7 +2338,7 @@
     "night": "events/carnaval-night.png"
    },
    "rain": "on a rainy day draw the day overlay over the rain look",
-   "contents": "bloco crowds with standards in Ipanema, Leblon, Copacabana, Lapa, Santa Teresa, Botafogo and Centro; confetti and serpentinas over the city; green-and-yellow and multicolour bunting along the main streets; a samba-school float and its alas on the Sambodromo avenue near Centro; a trio electrico on Copacabana's beachfront. At night the bunting carries gold bulbs and the costumes, float, trio and confetti glow in the night palette's lights."
+   "contents": "the louder takeover: bloco crowds filling the streets and beachfronts of Ipanema, Leblon, Copacabana, Lapa, Santa Teresa, Botafogo and Centro, with big standards; giant puppets (bonecos) and frevo umbrellas in the crowds; confetti over the city and drifts of it on the squares; green, yellow, pink, cyan and orange bunting with paper lanterns across the streets; two samba-school floats and long alas on the Sambodromo; a big trio electrico on Copacabana's beachfront with its bloco trailing. At night the bunting carries gold bulbs and the costumes, float, trio and confetti glow in the night palette's lights."
   },
   {
    "key": "reveillon",
@@ -2211,5 +2371,41 @@
    "contents": "day: Copacabana, Ipanema and Leblon sand filling up with people in white, white flowers at the waterline, Iemanja's offering boat, boats gathering in the bay. Night: the sand packed in white, candles and flowers along the waterline, the offering boat, boats with lights and their reflections, and fireworks over the Copacabana bay (4 frames)."
   }
  ],
- "events_note": "Holiday overlays: transparent, full canvas (896x504), hard alpha. Draw the active event's layer for the current look after the last place layer and before the markers (and before the rain overlay when it rains). They sit over open and locked places alike: on a takeover the whole city celebrates. draw_order is unchanged."
+ "events_note": "Holiday overlays: transparent, full canvas (896x504), hard alpha. Draw the active event's layer for the current look after the last place layer and before the markers (and before the rain overlay when it rains). They sit over open and locked places alike: on a takeover the whole city celebrates. draw_order is unchanged.",
+ "landmarks_redrawn": {
+  "date": "2026-11-16",
+  "note": "scenery landmarks in the base drawn bigger than life; rect = every base pixel that changed for them (day or night)",
+  "scenery": [
+   {
+    "key": "sugarloaf",
+    "name": "Sugarloaf, Morro da Urca and the cable car",
+    "rect": [
+     780,
+     123,
+     115,
+     207
+    ]
+   },
+   {
+    "key": "arcos",
+    "name": "Arcos da Lapa and the bonde",
+    "rect": [
+     602,
+     82,
+     124,
+     61
+    ]
+   },
+   {
+    "key": "theatro",
+    "name": "Theatro Municipal",
+    "rect": [
+     710,
+     42,
+     52,
+     41
+    ]
+   }
+  ]
+ }
 }

@@ -44,6 +44,16 @@ export default defineConfig({
           include: ["test/node/**/*.test.ts"],
         },
       },
+      {
+        // CPU measurements of the Worker's own code (Node: workerd's clock stands still during CPU
+        // work). Run after the other projects, alone, so neither disturbs the other's timings.
+        test: {
+          name: "cpu",
+          environment: "node",
+          include: ["test/cpu/**/*.test.ts"],
+          sequence: { groupOrder: 1 },
+        },
+      },
     ],
   },
 });

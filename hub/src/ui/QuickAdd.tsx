@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { isActive } from "../domain/goalCounts";
 import { createBook, createGoal, createItem, listGoals } from "../data/repo";
 import { BOOK_AREA, BOOK_LIMITS, BOOK_STATUSES, BOOK_STATUS_LABEL, type BookStatus } from "../domain/books";
-import { MAX_GOAL_NOTES, MAX_NOTES_TEXT } from "../data/validate";
+import { MAX_GOAL_NOTES, MAX_NOTES_TEXT, TIME_OF_DAY } from "../data/validate";
 import { DEFAULT_SESSIONS, MAX_SESSIONS, MIN_SESSIONS, newSessions } from "../domain/projects";
 import type { AreaId, Goal, ISODate, Priority, Weekday } from "../domain/types";
 import { BASE_ADD_DEFAULTS, type AddDefaults, type AddType } from "./addContext";
@@ -36,11 +36,13 @@ export interface AddDraft {
   /** A book's author and status (Type "Book"). Optional so a draft kept by an older build still reads. */
   author?: string;
   bookStatus?: BookStatus;
+  /** A to-do's time on its due day ("HH:MM"). Optional so a draft kept by an older build still reads. */
+  time?: string;
 }
 
 /** Something was typed (a draft worth keeping); only choosing type or area is not. */
 export function draftHasContent(d: AddDraft): boolean {
-  return Boolean(d.title.trim() || d.notes.trim() || d.due || d.deadline || d.target.trim() || d.recur.length || d.author?.trim());
+  return Boolean(d.title.trim() || d.notes.trim() || d.due || d.deadline || d.target.trim() || d.recur.length || d.author?.trim() || d.time);
 }
 
 /**
@@ -77,6 +79,7 @@ export function QuickAdd({
   const [goalId, setGoalId] = useState(initial?.goalId ?? "");
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? 2);
   const [due, setDue] = useState(initial?.due ?? "");
+  const [time, setTime] = useState(initial?.time ?? "");
   const [recur, setRecur] = useState<Weekday[]>(initial?.recur ?? []);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [goalKind, setGoalKind] = useState<Goal["kind"]>(initial?.goalKind ?? "finite");
@@ -91,9 +94,9 @@ export function QuickAdd({
   draftRef.current = onDraft;
   useEffect(() => {
     draftRef.current?.({
-      title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount, author, bookStatus,
+      title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount, author, bookStatus, time,
     });
-  }, [title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount, author, bookStatus]);
+  }, [title, type, areaId, goalId, priority, due, recur, notes, goalKind, deadline, target, sessionCount, author, bookStatus, time]);
   const [message, setMessage] = useState("");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [saving, setSaving] = useState(false);
@@ -171,6 +174,7 @@ export function QuickAdd({
       }
       if (!deadline) return setMessage("A project needs a deadline.");
     }
+    if (type === "task" && time && recur.length === 0 && !due) return setMessage("A time needs a due day.");
     if (isBookType && author.trim().length > BOOK_LIMITS.author) {
       return setMessage(`An author is at most ${BOOK_LIMITS.author} characters.`);
     }
@@ -232,6 +236,7 @@ export function QuickAdd({
           ...page,
           ...(goalId ? { goalId } : {}),
           ...(type === "task" && due ? { due } : {}),
+          ...(type === "task" && due && recur.length === 0 && TIME_OF_DAY.test(time.slice(0, 5)) ? { time: time.slice(0, 5) } : {}),
           ...(type === "task" && recur.length ? { recur: WEEKDAYS.filter((d) => recur.includes(d)) } : {}),
         },
         today,
@@ -244,6 +249,7 @@ export function QuickAdd({
     setGoalId("");
     setPriority(2);
     setDue("");
+    setTime("");
     setRecur([]);
     setNotes("");
     setGoalKind("finite");
@@ -375,6 +381,14 @@ export function QuickAdd({
             <span className="form-label">Due</span>
             <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
           </label>
+          {/* PROVISIONAL label and placement (Due reminders): a meeting's or appointment's time.
+              Not for a repeating to-do (a habit has no day for it). */}
+          {recur.length === 0 && (
+            <label className="form-field">
+              <span className="form-label">Time</span>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </label>
+          )}
           <fieldset className="form-full">
             <legend>Repeats on</legend>
             <div className="form-checks">

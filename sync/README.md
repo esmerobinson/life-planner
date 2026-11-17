@@ -58,6 +58,47 @@ Client limits:
 
 `wrangler tail` still works for live debugging. Treat its output as sensitive.
 
+## Due reminders (cron)
+
+Esmeworld puts Esme's reminders into **Due** (her partner's reminders app) from this Worker. One cron
+trigger (`*/15 * * * *` in `wrangler.jsonc`; the free plan allows 5 per account and the legacy worker
+uses 4) runs `src/due/cron.ts`:
+
+1. Nothing happens unless the **`DUE_TOKEN`** and **`DUE_BASE_URL`** (https) secrets are both set.
+2. Reads her settings: the synced `prefs` table, row `due` (plain JSON, not encrypted; the app writes it
+   from its Reminders page). Off unless `on` is `true`. Fields: `on`, `timeZone`, `plan`, `review`,
+   `dueFirst`, `dueSecond`, `nudge` ("HH:MM"), `leadMinutes` (0-240), `lines` (up to 50, 1-120 chars).
+   `POST /v1/sync` refuses a malformed `due` row (`400 bad_change`); unknown fields are allowed.
+3. Reads her open items (only the fields the rules need, via `json_extract`) and works out today's
+   reminders (`src/due/rules.ts`; her day runs 3am to 3am in her zone): "Plan your day", "Review your
+   day", due today / overdue / pinned today / habits planned today (priority 1 and habits first, at most 8
+   per pass, two passes), timed to-dos (`time` minus her lead, at most 10), and the motivation nudge
+   (only if nothing was ticked off today; one of her lines a day, in turn). Titles only: never notes,
+   pages or the journal.
+4. Diffs against Due (`GET /due/api/state`, ours = `type:"esmeworld"`) and makes the fewest calls
+   (`src/due/reconcile.ts`). Ids are never reused: `esmeworld-<yyyymmdd>-<what>-v<hash of title and
+   time>` (`g2`, `g3` when made again). A change is a new version, created before the old one is
+   cancelled. Every id the Worker cancels is logged in `meta` (`due_x:<id>`, 3 days) before the DELETE,
+   so only a reminder SHE completed or deleted in Due counts as dismissed for the day. At most 3 of
+   our own cancellations per reminder per day (no flapping). A reminder whose time has passed is never
+   sent (Due drops them). "Already exists" means that version is there. Compared by id, never by
+   Due's echo, so a different format there causes no churn. dueAt is plain local time in Due's own
+   zone (US Eastern), with the offset elsewhere.
+
+Safety: a run has a 20 s deadline and 5 s per call (a call starts only if it can end in time), well
+inside the 60 s lease (`due_lease`), so runs never overlap; at most 40 calls; Due unreachable, 5xx,
+401/403 or 429 stops the run (a fixed code is logged) and the next run retries; 3 refusals stop the run
+and Due is left alone for an hour (`due_backoff`); Off with nothing left in Due skips Due entirely
+(`due_off_clean`). Due's state is read up to 8 MB; above 256 KB only our ids of yesterday, today and
+tomorrow are found by text search (inside the `reminders` array, one pass) and only their objects
+parsed; a full parse is only a logged fallback (`due_reminders_state_fallback`). The zones the app
+offers are worked out by arithmetic (no Intl in a run). `test/cpu` (Node, M-series Mac; a year of Due,
+10k reminders): warm under 2 ms, a cold fresh process about 3 ms (5 ms with nested objects). The items
+query hands the rules at most 300 real candidates, in their own order. A sync that
+ticks something off, bins it, or carries a time, day or deadline (or the `due` row) starts a run
+**after** its answer is sent (`ctx.waitUntil`), at most one a minute (`meta.due_sync_run`, taken
+only once the lease is). The token is only ever in the Authorization header to Due.
+
 ## Layout
 
 ```
@@ -69,6 +110,8 @@ src/http.ts       limits, JSON/error helpers, capped body reading
 src/sync.ts       validation, last-write-wins upserts, the paginated pull, returned winners
 src/export.ts     streamed export
 src/pinterest.ts  public Pinterest board feed -> pins (fetch, edge cache)
+src/due/          Due reminders: cron.ts (the run), rules.ts (what she wants), reconcile.ts (the diff),
+                  client.ts (Due's API), prefs.ts (her settings row), time.ts (her zone, the 3am day)
 shared/token.ts   passphrase -> token -> hash (NFC, WebCrypto only; reusable by the client)
 shared/pinterestFeed.ts  RSS -> pins parser and URL filter, linear time on any input (indexOf, bounded slices)
 tools/set-passphrase.mjs   sets the SYNC_TOKEN_HASH secret (hidden input)

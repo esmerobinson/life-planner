@@ -878,6 +878,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         let config = WKWebViewConfiguration()
         config.websiteDataStore = dataStore
         config.setURLSchemeHandler(WebAppSchemeHandler(root: webRoot), forURLScheme: kScheme)
+        // No back/forward cache. WebKit keeps a page loaded away from (a reminder's link, a link
+        // opened here, the self-test's pages) in that cache with any IndexedDB write it had going
+        // suspended, still holding its lock: every later save to that table then waits for ever,
+        // and so does the save before a new version's reload ("saving" for ever). There is no Back
+        // in this window, so the cache never helps. WebKit SPI `_usesPageCache`, set the same way
+        // as developerExtrasEnabled below; the self-test's "left page" check fails without it.
+        if config.preferences.responds(to: Selector(("_setUsesPageCache:"))) {
+            config.preferences.setValue(false, forKey: "usesPageCache")
+        }
         // Reminders: the web app sends its schedule here (RemindersBridge).
         config.userContentController.addScriptMessageHandler(reminders, contentWorld: .page, name: RemindersBridge.name)
         if isSelfTest || isDebug {
@@ -1450,6 +1459,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         return obj
     }
 
+    /// A page the app navigates away from (a load of another page, not the router) in the middle
+    /// of a write must not keep that write's lock: if it did, every later save to that table would
+    /// wait for ever, and so would the save-before-reload check (prepareForReload: "saving").
+    /// WebKit's back/forward cache does exactly that (it keeps the page, its write suspended), so
+    /// the app turns that cache off. Uses its own database, never her data.
+    @MainActor
+    private func runLeftPageSelfTest(_ check: (Bool, String) -> Void) async {
+        let openDB = """
+        const db = await new Promise((res, rej) => {
+          const r = indexedDB.open("esmeworld-selftest-leftpage", 1);
+          r.onupgradeneeded = () => r.result.createObjectStore("kv");
+          r.onsuccess = () => res(r.result);
+          r.onerror = () => rej(r.error);
+        });
+        """
+        do {
+            try await load(URL(string: "esmeworld://app/area/writing")!)
+            // A write that is still going when the page is left (requests chained for 3 s).
+            _ = try await js("""
+            \(openDB)
+            try { sessionStorage.removeItem("esmeworld.selftest.leftPersisted"); } catch {}
+            addEventListener("pagehide", (e) => {
+              try { sessionStorage.setItem("esmeworld.selftest.leftPersisted", String(e.persisted)); } catch {}
+            });
+            const st = db.transaction("kv", "readwrite").objectStore("kv");
+            const until = Date.now() + 3000;
+            const step = () => { st.put(Date.now(), "left").onsuccess = () => { if (Date.now() < until) step(); }; };
+            step();
+            return JSON.stringify({});
+            """)
+            try await load(URL(string: "esmeworld://app/inbox")!)
+            let next = try await js("""
+            \(openDB)
+            const t0 = Date.now();
+            let why = "";
+            const saved = await Promise.race([
+              new Promise((res) => {
+                const tx = db.transaction("kv", "readwrite");
+                tx.objectStore("kv").put(1, "next");
+                tx.oncomplete = () => res(true);
+                tx.onerror = () => { why = "error " + (tx.error && tx.error.name) + " " + (tx.error && tx.error.message); res(false); };
+                tx.onabort = () => { why = why || "abort " + (tx.error && tx.error.name) + " " + (tx.error && tx.error.message); res(false); };
+              }),
+              new Promise((res) => setTimeout(() => { why = "no answer in 10 s"; res(false); }, 10000)),
+            ]);
+            const ms = Date.now() - t0;
+            db.close();
+            let persisted = null;
+            try { persisted = sessionStorage.getItem("esmeworld.selftest.leftPersisted"); } catch {}
+            if (saved) await new Promise((r) => { const d = indexedDB.deleteDatabase("esmeworld-selftest-leftpage"); d.onsuccess = d.onerror = d.onblocked = r; });
+            return JSON.stringify({ saved, ms, persisted, why });
+            """)
+            say("leftPage saved=\(next["saved"] as? Bool ?? false) ms=\(next["ms"] ?? "nil") leftPageCached=\(next["persisted"] ?? "nil")\((next["why"] as? String).map { $0.isEmpty ? "" : " why=\($0)" } ?? "")")
+            check(next["saved"] as? Bool == true, "a page left mid-write never blocks the next page's saves")
+            check(next["persisted"] as? String == "false", "a page left is never kept in the back/forward cache")
+        } catch {
+            check(false, "left page: \(error.localizedDescription)")
+        }
+    }
+
     /// Never touches the bundle: the app is pointed at a copy of its Info.plist, which the test
     /// changes as an install would. Never relaunches (only that decision is checked).
     @MainActor
@@ -1812,6 +1881,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             await runReminderSelfTest(check)
             // (g) A new version installed under the running app (bug #39).
             await runVersionSelfTest(check)
+            // (h) A page left in the middle of a write never keeps that write's lock.
+            await runLeftPageSelfTest(check)
         } catch {
             check(false, "error \(error.localizedDescription)")
         }

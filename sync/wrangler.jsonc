@@ -27,6 +27,11 @@
       "database_id": "4c51585e-306e-4454-a450-a3a290f100aa",
       "migrations_dir": "migrations"
     }
-  ]
-  // Secret (set with tools/set-passphrase.mjs, never committed): SYNC_TOKEN_HASH
+  ],
+  // Due reminders (src/due/cron.ts). EXACTLY ONE cron trigger: the free plan allows 5 per
+  // account and the legacy worker (repo-root wrangler.jsonc) uses 4.
+  "triggers": { "crons": ["*/15 * * * *"] }
+  // Secrets (never committed): SYNC_TOKEN_HASH (set with tools/set-passphrase.mjs);
+  // DUE_TOKEN and DUE_BASE_URL (wrangler secret put …; without both no reminder is ever sent).
+  // Due's address is a secret too, so a local `wrangler dev` never reaches the real Due.
 }

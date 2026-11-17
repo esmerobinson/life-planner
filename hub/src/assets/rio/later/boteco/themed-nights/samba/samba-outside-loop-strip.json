@@ -1,0 +1,18 @@
+{
+ "file": "samba-outside-loop-strip.png",
+ "night": "samba",
+ "scene": "outside",
+ "look": "night",
+ "at": [
+  51,
+  149
+ ],
+ "frame_size": [
+  324,
+  91
+ ],
+ "frames": 4,
+ "frame_ms": 180,
+ "play": "loop",
+ "note": "frames run left to right; draw frame k at 'at' over the night's overlay. Transparent pixels show what is under; opaque ones replace it. Frame 0 matches the overlay."
+}

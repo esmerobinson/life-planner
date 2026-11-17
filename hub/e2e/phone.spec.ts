@@ -149,7 +149,8 @@ for (const width of [360, 390, 430]) {
         await seedPretendWorld(page);
         await page.goto(path);
         await page.waitForLoadState("networkidle");
-        await expect(page.locator(".phone-top")).toBeVisible();
+        // Esme's Rio is a full-window game with no phone header (Esme, 2026-11-17).
+        await expect(page.locator(name === "farm" ? ".game-screen" : ".phone-top")).toBeVisible();
         await page.waitForLoadState("networkidle");
         const m = await sideways(page);
         expect(m.scrollWidth).toBeLessThanOrEqual(m.innerWidth);

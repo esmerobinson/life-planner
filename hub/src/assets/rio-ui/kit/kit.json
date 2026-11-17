@@ -1,0 +1,960 @@
+{
+ "name": "Esme World UI kit",
+ "scale": "Draw at 1x. Show at whole-number scales only: 3x desktop, 2x phone. CSS: image-rendering: pixelated.",
+ "nine_slice": "slice = [top, right, bottom, left] in 1x pixels (CSS border-image-slice order). border-width = slice * scale.",
+ "ui_ramp_proposed": {
+  "ui_ink": "#5b2b2a",
+  "ui_or0": "#ffb94a",
+  "ui_or1": "#f99305",
+  "ui_or2": "#dc7b05",
+  "ui_or3": "#b14e05",
+  "ui_or4": "#853605",
+  "ui_sh": "#c47a48",
+  "ui_sh2": "#d48f54",
+  "parch0": "#fff3d6",
+  "parch1": "#ffe0a6",
+  "parch2": "#ffcb7b",
+  "parch3": "#f5b66e",
+  "parch4": "#e9a665",
+  "parch5": "#d9975a",
+  "sil": "#d1a062",
+  "text": "#56160c",
+  "textsh": "#dd9b5c",
+  "sel": "#e3302a",
+  "sel2": "#ff7a4a",
+  "nail": "#3f8f9a",
+  "nail2": "#9fe0de",
+  "sky0": "#bfe9ff",
+  "sky1": "#7cc4f4",
+  "sky2": "#4a8ed8",
+  "sky3": "#2b5aa8",
+  "night0": "#6a5fb0",
+  "night1": "#3d3478",
+  "ok0": "#9bd84a",
+  "ok1": "#4c9c2c",
+  "ok2": "#2c6a24",
+  "x0": "#ff9a6a",
+  "x1": "#e3402a",
+  "x2": "#a82424"
+ },
+ "note": "The ui/parchment ramp is a proposed palette addition (sampled to match the Stardew menu look). Everything else uses the Esme World pack palette by name.",
+ "pieces": {
+  "panel": {
+   "slice": [
+    6,
+    7,
+    6,
+    6
+   ],
+   "use": "Big menu panel. border-image slice 6 7 6 6 (top right bottom left), stretch; fill with the parchment gradient parch2->parch4 top to bottom.",
+   "file": "panel.png",
+   "w": 24,
+   "h": 24
+  },
+  "inset": {
+   "slice": [
+    4,
+    3,
+    3,
+    4
+   ],
+   "use": "Sunken box inside a panel (groups, list rows).",
+   "file": "inset.png",
+   "w": 12,
+   "h": 12
+  },
+  "row": {
+   "slice": [
+    4,
+    4,
+    4,
+    4
+   ],
+   "use": "Clickable list row (store items, journal goals). Hover: row-hover.",
+   "file": "row.png",
+   "w": 16,
+   "h": 16
+  },
+  "row-hover": {
+   "slice": [
+    4,
+    4,
+    4,
+    4
+   ],
+   "file": "row-hover.png",
+   "w": 16,
+   "h": 16
+  },
+  "divider": {
+   "use": "Horizontal band that splits a panel in two (inventory/equipment). Stretch horizontally.",
+   "file": "divider.png",
+   "w": 16,
+   "h": 5
+  },
+  "tab": {
+   "use": "Top tab, 18x18, icon 12x12 centred at (3,3). Bottom edge hides under the panel's top border (overlap 4px).",
+   "file": "tab.png",
+   "w": 18,
+   "h": 18
+  },
+  "tab-active": {
+   "use": "Selected tab: lighter face, drawn 3px lower so it bites into the panel.",
+   "file": "tab-active.png",
+   "w": 18,
+   "h": 18
+  },
+  "tab-side": {
+   "use": "Side tab (open edge faces right, toward the panel). Icon at (3,2).",
+   "file": "tab-side.png",
+   "w": 18,
+   "h": 18
+  },
+  "tab-side-active": {
+   "file": "tab-side-active.png",
+   "w": 18,
+   "h": 18
+  },
+  "slot": {
+   "use": "Inventory / hotbar slot 16x16; item 16x16 drawn on top. Slots tile with no gap.",
+   "file": "slot.png",
+   "w": 16,
+   "h": 16
+  },
+  "slot-hover": {
+   "file": "slot-hover.png",
+   "w": 16,
+   "h": 16
+  },
+  "slot-lg": {
+   "use": "20x20 sticker-book slot: a 16x16 sticker sits dead centre with 2px all round.",
+   "file": "slot-lg.png",
+   "w": 20,
+   "h": 20
+  },
+  "slot-lg-hover": {
+   "file": "slot-lg-hover.png",
+   "w": 20,
+   "h": 20
+  },
+  "slot-selected": {
+   "use": "Red selection square drawn over a slot at offset (-1,-1).",
+   "file": "slot-selected.png",
+   "w": 18,
+   "h": 18
+  },
+  "tooltip": {
+   "slice": [
+    3,
+    4,
+    4,
+    3
+   ],
+   "use": "Hover/tap card. Fill parch2. Add a 3px hard drop shadow (rgba(0,0,0,.35)) down-right.",
+   "file": "tooltip.png",
+   "w": 12,
+   "h": 12
+  },
+  "tooltip-divider": {
+   "use": "Band between tooltip title block and body. Stretch horizontally, spans inner width.",
+   "file": "tooltip-divider.png",
+   "w": 8,
+   "h": 4
+  },
+  "dialogue-box": {
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "use": "Dialogue text box: wooden poles with nailed corners, parchment fill. Text inset 10px. Also wraps the portrait panel.",
+   "file": "dialogue-box.png",
+   "w": 32,
+   "h": 32
+  },
+  "wood-planks": {
+   "use": "Tileable plank fill (background-repeat) behind the portrait.",
+   "file": "wood-planks.png",
+   "w": 32,
+   "h": 32
+  },
+  "portrait-frame": {
+   "portrait_offset": [
+    5,
+    5
+   ],
+   "use": "Portrait 64x64 sits at (5,5).",
+   "file": "portrait-frame.png",
+   "w": 74,
+   "h": 74
+  },
+  "name-scroll": {
+   "slice": [
+    0,
+    7,
+    0,
+    7
+   ],
+   "use": "Name label under the portrait and title tabs (e.g. 'Sticker Book'). 3-slice: 7px caps, middle repeats.",
+   "file": "name-scroll.png",
+   "w": 32,
+   "h": 18
+  },
+  "btn-close": {
+   "use": "Close (X) button, top-right outside the panel corner.",
+   "file": "btn-close.png",
+   "w": 12,
+   "h": 12
+  },
+  "btn-close-hover": {
+   "file": "btn-close-hover.png",
+   "w": 12,
+   "h": 12
+  },
+  "btn-ok": {
+   "use": "OK / confirm button.",
+   "file": "btn-ok.png",
+   "w": 18,
+   "h": 18
+  },
+  "btn-ok-hover": {
+   "file": "btn-ok-hover.png",
+   "w": 18,
+   "h": 18
+  },
+  "btn-arrow-right": {
+   "use": "Cycle arrow (wardrobe, pages). Hover: brighten (filter: brightness(1.12)) and nudge 1px.",
+   "file": "btn-arrow-right.png",
+   "w": 11,
+   "h": 11
+  },
+  "btn-arrow-left": {
+   "file": "btn-arrow-left.png",
+   "w": 11,
+   "h": 11
+  },
+  "btn-arrow-up": {
+   "file": "btn-arrow-up.png",
+   "w": 11,
+   "h": 11
+  },
+  "btn-arrow-down": {
+   "file": "btn-arrow-down.png",
+   "w": 11,
+   "h": 11
+  },
+  "btn-plus": {
+   "file": "btn-plus.png",
+   "w": 10,
+   "h": 10
+  },
+  "btn-minus": {
+   "file": "btn-minus.png",
+   "w": 10,
+   "h": 10
+  },
+  "btn-text": {
+   "slice": [
+    3,
+    3,
+    3,
+    3
+   ],
+   "use": "Orange word button (Place, Wear, Buy). Text in parch0 with ui_or4 shadow.",
+   "file": "btn-text.png",
+   "w": 16,
+   "h": 14
+  },
+  "btn-text-hover": {
+   "file": "btn-text-hover.png",
+   "w": 16,
+   "h": 14
+  },
+  "scroll-track": {
+   "slice": [
+    2,
+    0,
+    2,
+    0
+   ],
+   "use": "Scroll runner, repeat vertically.",
+   "file": "scroll-track.png",
+   "w": 6,
+   "h": 12
+  },
+  "scroll-thumb": {
+   "file": "scroll-thumb.png",
+   "w": 8,
+   "h": 12
+  },
+  "frame-thin": {
+   "slice": [
+    3,
+    3,
+    3,
+    3
+   ],
+   "use": "Thin frame: hotbar, pickup toast, small boxes.",
+   "file": "frame-thin.png",
+   "w": 10,
+   "h": 10
+  },
+  "hud-box": {
+   "slice": [
+    2,
+    2,
+    2,
+    2
+   ],
+   "use": "Sunken text box inside HUD panels.",
+   "file": "hud-box.png",
+   "w": 8,
+   "h": 10
+  },
+  "letter-paper": {
+   "slice": [
+    8,
+    8,
+    8,
+    8
+   ],
+   "use": "Letter / kind note paper. Fill parch0; text in the dialogue font, colour text.",
+   "file": "letter-paper.png",
+   "w": 40,
+   "h": 40
+  },
+  "board": {
+   "slice": [
+    10,
+    10,
+    10,
+    10
+   ],
+   "use": "Wooden board behind the calendar and the noticeboard. Plank fill repeats.",
+   "file": "board.png",
+   "w": 32,
+   "h": 32
+  },
+  "pin": {
+   "file": "pin.png",
+   "w": 7,
+   "h": 7
+  },
+  "festival-flag": {
+   "use": "Holiday marker on calendar days.",
+   "file": "festival-flag.png",
+   "w": 10,
+   "h": 12
+  },
+  "badge-new": {
+   "use": "'NEW' tag on journal goals and freshly earned stickers.",
+   "file": "badge-new.png",
+   "w": 18,
+   "h": 9
+  },
+  "badge-done": {
+   "file": "badge-done.png",
+   "w": 20,
+   "h": 9
+  },
+  "emote-bang": {
+   "use": "'!' bubble over something new on the farm or a sticker waiting to be placed. Bob 1px.",
+   "file": "emote-bang.png",
+   "w": 12,
+   "h": 14
+  },
+  "emote-heart": {
+   "file": "emote-heart.png",
+   "w": 12,
+   "h": 12
+  },
+  "fx-sparkle": {
+   "frames": 4,
+   "frame_w": 7,
+   "frame_ms": 90,
+   "use": "Sparkle, 4 frames.",
+   "file": "fx-sparkle.png",
+   "w": 28,
+   "h": 7
+  },
+  "cursor": {
+   "hotspot": [
+    0,
+    0
+   ],
+   "use": "Pointer (CSS cursor at 2x/3x, or drawn).",
+   "file": "cursor.png",
+   "w": 11,
+   "h": 14
+  },
+  "place-target": {
+   "use": "Tile brackets around a sticker's home spot while placing. Pulse opacity / 1px in-out.",
+   "file": "place-target.png",
+   "w": 18,
+   "h": 18
+  },
+  "dialogue-next": {
+   "use": "Bobbing 'more' marker at the dialogue box's bottom-right.",
+   "file": "dialogue-next.png",
+   "w": 7,
+   "h": 5
+  },
+  "icon-barnyard": {
+   "use": "12x12 icon",
+   "file": "icon-barnyard.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-veggarden": {
+   "use": "12x12 icon",
+   "file": "icon-veggarden.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-meadow": {
+   "use": "12x12 icon",
+   "file": "icon-meadow.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-pond": {
+   "use": "12x12 icon",
+   "file": "icon-pond.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-aquarium": {
+   "use": "12x12 icon",
+   "file": "icon-aquarium.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-orchard": {
+   "use": "12x12 icon",
+   "file": "icon-orchard.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-cottage": {
+   "use": "12x12 icon",
+   "file": "icon-cottage.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-museum": {
+   "use": "12x12 icon",
+   "file": "icon-museum.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-theatre": {
+   "use": "12x12 icon",
+   "file": "icon-theatre.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-saloon": {
+   "use": "12x12 icon",
+   "file": "icon-saloon.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-book": {
+   "use": "12x12 icon",
+   "file": "icon-book.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-wardrobe": {
+   "use": "12x12 icon",
+   "file": "icon-wardrobe.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-map": {
+   "use": "12x12 icon",
+   "file": "icon-map.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-calendar": {
+   "use": "12x12 icon",
+   "file": "icon-calendar.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-journal": {
+   "use": "12x12 icon",
+   "file": "icon-journal.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-letter": {
+   "use": "12x12 icon",
+   "file": "icon-letter.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-friends": {
+   "use": "12x12 icon",
+   "file": "icon-friends.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-star": {
+   "use": "12x12 icon",
+   "file": "icon-star.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-sticker7": {
+   "use": "7x7 icon",
+   "file": "icon-sticker7.png",
+   "w": 7,
+   "h": 7
+  },
+  "icon-heart-full": {
+   "use": "7x7 icon",
+   "file": "icon-heart-full.png",
+   "w": 7,
+   "h": 7
+  },
+  "icon-heart-empty": {
+   "use": "7x7 icon",
+   "file": "icon-heart-empty.png",
+   "w": 7,
+   "h": 7
+  },
+  "hud-clock": {
+   "regions": {
+    "date": [
+     29,
+     3,
+     46,
+     12
+    ],
+    "weather": [
+     29,
+     16,
+     14,
+     9
+    ],
+    "season": [
+     45,
+     16,
+     14,
+     9
+    ],
+    "event": [
+     61,
+     16,
+     14,
+     9
+    ],
+    "time": [
+     29,
+     26,
+     46,
+     12
+    ],
+    "bar": [
+     19,
+     46,
+     56,
+     9
+    ],
+    "dial_hub": [
+     25,
+     20
+    ]
+   },
+   "use": "Top-right HUD. Text drawn in the small font into the regions; icons 12x7 into the three icon boxes.",
+   "file": "hud-clock.png",
+   "w": 80,
+   "h": 62
+  },
+  "hud-weather-sun": {
+   "file": "hud-weather-sun.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-weather-rain": {
+   "file": "hud-weather-rain.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-season-spring": {
+   "file": "hud-season-spring.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-season-summer": {
+   "file": "hud-season-summer.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-season-fall": {
+   "file": "hud-season-fall.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-season-winter": {
+   "file": "hud-season-winter.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-event-none": {
+   "file": "hud-event-none.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-event-festival": {
+   "file": "hud-event-festival.png",
+   "w": 12,
+   "h": 7
+  },
+  "hud-journal": {
+   "use": "Hangs under the HUD bar when a new goal arrives.",
+   "file": "hud-journal.png",
+   "w": 8,
+   "h": 11
+  },
+  "icon-frame": {
+   "use": "Framed picture square (milestone card corners, skill-style icons). 16x16 art fits at (2,2).",
+   "file": "icon-frame.png",
+   "w": 20,
+   "h": 20
+  },
+  "btn-help": {
+   "use": "'?' help button, top-right of every screen (left of the X). Opens the host friend's guide.",
+   "file": "btn-help.png",
+   "w": 12,
+   "h": 12
+  },
+  "icon-coin": {
+   "use": "Coins (selling harvest and crafts).",
+   "file": "icon-coin.png",
+   "w": 7,
+   "h": 7
+  },
+  "icon-sparkle": {
+   "use": "Sparkles (from doing anything).",
+   "file": "icon-sparkle.png",
+   "w": 7,
+   "h": 7
+  },
+  "badge-dot": {
+   "use": "Count dot on hotbar buttons.",
+   "file": "badge-dot.png",
+   "w": 7,
+   "h": 7
+  },
+  "icon-noticeboard": {
+   "use": "Noticeboard (farm notes: bundles, the stuck task, requests, tips).",
+   "file": "icon-noticeboard.png",
+   "w": 12,
+   "h": 12
+  },
+  "ribbon-bow": {
+   "use": "Tied ribbon on a door or gate that's waiting (the stuck task).",
+   "file": "ribbon-bow.png",
+   "w": 15,
+   "h": 9
+  },
+  "sign-post": {
+   "use": "Little sign beside a waiting door: 'See the noticeboard'.",
+   "file": "sign-post.png",
+   "w": 16,
+   "h": 13
+  },
+  "bunting": {
+   "use": "Holiday bunting strip (tile horizontally) for festival decorations.",
+   "file": "bunting.png",
+   "w": 48,
+   "h": 8
+  },
+  "icon-streak": {
+   "use": "Streak counter flame (days in a row). Never shown red or 'broken'.",
+   "file": "icon-streak.png",
+   "w": 7,
+   "h": 9
+  },
+  "icon-tick": {
+   "use": "Ticked-off task in the day's tally.",
+   "file": "icon-tick.png",
+   "w": 7,
+   "h": 7
+  },
+  "extra-m-heart-big": {
+   "file": "extra-m-heart-big.png",
+   "w": 9,
+   "h": 8,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-m-moon": {
+   "file": "extra-m-moon.png",
+   "w": 6,
+   "h": 7,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-m-saloon-front": {
+   "file": "extra-m-saloon-front.png",
+   "w": 56,
+   "h": 56,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-chair": {
+   "file": "extra-s-chair.png",
+   "w": 14,
+   "h": 17,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-emote-droop": {
+   "file": "extra-s-emote-droop.png",
+   "w": 12,
+   "h": 14,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-hammer": {
+   "file": "extra-s-hammer.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-head-unknown": {
+   "file": "extra-s-head-unknown.png",
+   "w": 16,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-ic-chair": {
+   "file": "extra-s-ic-chair.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-ic-lamp": {
+   "file": "extra-s-ic-lamp.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-ic-plant": {
+   "file": "extra-s-ic-plant.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-ic-rug": {
+   "file": "extra-s-ic-rug.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-ic-table": {
+   "file": "extra-s-ic-table.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-lamp": {
+   "file": "extra-s-lamp.png",
+   "w": 14,
+   "h": 20,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pip-off": {
+   "file": "extra-s-pip-off.png",
+   "w": 6,
+   "h": 9,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pip-on": {
+   "file": "extra-s-pip-on.png",
+   "w": 6,
+   "h": 9,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pipbig-off": {
+   "file": "extra-s-pipbig-off.png",
+   "w": 12,
+   "h": 9,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pipbig-on": {
+   "file": "extra-s-pipbig-on.png",
+   "w": 12,
+   "h": 9,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-plant": {
+   "file": "extra-s-plant.png",
+   "w": 15,
+   "h": 15,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pouch-blue": {
+   "file": "extra-s-pouch-blue.png",
+   "w": 16,
+   "h": 15,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pouch-gold": {
+   "file": "extra-s-pouch-gold.png",
+   "w": 16,
+   "h": 15,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pouch-green": {
+   "file": "extra-s-pouch-green.png",
+   "w": 16,
+   "h": 15,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pouch-pink": {
+   "file": "extra-s-pouch-pink.png",
+   "w": 16,
+   "h": 15,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pouch-red": {
+   "file": "extra-s-pouch-red.png",
+   "w": 16,
+   "h": 15,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-pouch-violet": {
+   "file": "extra-s-pouch-violet.png",
+   "w": 16,
+   "h": 15,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-preview-bg-wide": {
+   "file": "extra-s-preview-bg-wide.png",
+   "w": 52,
+   "h": 50,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-preview-bg": {
+   "file": "extra-s-preview-bg.png",
+   "w": 46,
+   "h": 58,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-room": {
+   "file": "extra-s-room.png",
+   "w": 320,
+   "h": 192,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-sil-acc-neckerchief": {
+   "file": "extra-s-sil-acc-neckerchief.png",
+   "w": 16,
+   "h": 16,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-sil-acc-satchel": {
+   "file": "extra-s-sil-acc-satchel.png",
+   "w": 16,
+   "h": 16,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-sil-hat-bobble": {
+   "file": "extra-s-sil-hat-bobble.png",
+   "w": 16,
+   "h": 16,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-sil-hat-flowercrown": {
+   "file": "extra-s-sil-hat-flowercrown.png",
+   "w": 16,
+   "h": 16,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-sil-shirt-jumper": {
+   "file": "extra-s-sil-shirt-jumper.png",
+   "w": 16,
+   "h": 16,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-sil-shirt-raincoat": {
+   "file": "extra-s-sil-shirt-raincoat.png",
+   "w": 16,
+   "h": 16,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-sil-shoes-wellies": {
+   "file": "extra-s-sil-shoes-wellies.png",
+   "w": 16,
+   "h": 16,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-s-table": {
+   "file": "extra-s-table.png",
+   "w": 32,
+   "h": 17,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-bridge-1": {
+   "file": "extra-st-bridge-1.png",
+   "w": 112,
+   "h": 72,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-bridge-2": {
+   "file": "extra-st-bridge-2.png",
+   "w": 112,
+   "h": 72,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-bridge-3": {
+   "file": "extra-st-bridge-3.png",
+   "w": 112,
+   "h": 72,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-ic-bait": {
+   "file": "extra-st-ic-bait.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-ic-gifts": {
+   "file": "extra-st-ic-gifts.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-ic-helpers": {
+   "file": "extra-st-ic-helpers.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-ic-projects": {
+   "file": "extra-st-ic-projects.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-ic-sprinkler": {
+   "file": "extra-st-ic-sprinkler.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-ic-styling": {
+   "file": "extra-st-ic-styling.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  },
+  "extra-st-ic-treat": {
+   "file": "extra-st-ic-treat.png",
+   "w": 12,
+   "h": 12,
+   "use": "Drawn for a specific screen or moment (see extra_screens.py / extra_moments.py)."
+  }
+ }
+}

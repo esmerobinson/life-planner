@@ -1,21 +1,7 @@
-import { totalPlate } from "./StickerBook";
 import { drawBadge, textWidth, type Sheets } from "./sprites";
-import { COLLECTION } from "./catalogue";
 
-// The book's counts (fix round 1): the contents page's total plate reads "N OF 175" (the whole
-// collection, never the bonus page), and a repeatable sticker carries the pack's ×N badge from ×2.
-
-describe("the total plate", () => {
-  it("reads N OF 175, centred on the plate and inside its ornaments", () => {
-    expect(COLLECTION).toHaveLength(175);
-    expect(totalPlate(0).text).toBe("0 OF 175");
-    expect(totalPlate(37).text).toBe("37 OF 175");
-    const all = totalPlate(175);
-    expect(all.text).toBe("175 OF 175");
-    expect(textWidth(all.text)).toBeLessThanOrEqual(41); // the manifest's max_text_width
-    expect(all.x + Math.floor(textWidth(all.text) / 2)).toBe(116 + 56); // centred on text_centre_x, right page
-  });
-});
+// A repeatable sticker carries the pack's ×N badge from ×2 (fix round 1). The book itself is gone
+// (Esme, 2026-11-17); its total lives on in the game menu's Collection (rio/menu).
 
 describe("the ×N badge", () => {
   const ctx = () => {

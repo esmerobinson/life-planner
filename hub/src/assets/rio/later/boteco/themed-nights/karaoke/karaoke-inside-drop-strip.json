@@ -1,0 +1,18 @@
+{
+ "file": "karaoke-inside-drop-strip.png",
+ "night": "karaoke",
+ "scene": "inside",
+ "look": "night",
+ "at": [
+  99,
+  19
+ ],
+ "frame_size": [
+  124,
+  71
+ ],
+ "frames": 5,
+ "frame_ms": 160,
+ "play": "once, first",
+ "note": "play once when the scene opens, BEFORE the loops start; its last frame is the overlay's own state, so afterwards just drop it"
+}

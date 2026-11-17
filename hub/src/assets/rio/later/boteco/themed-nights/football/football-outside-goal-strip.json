@@ -1,0 +1,18 @@
+{
+ "file": "football-outside-goal-strip.png",
+ "night": "football",
+ "scene": "outside",
+ "look": "night",
+ "at": [
+  31,
+  85
+ ],
+ "frame_size": [
+  350,
+  153
+ ],
+ "frames": 6,
+ "frame_ms": 240,
+ "play": "loop",
+ "note": "frames run left to right; draw frame k at 'at' over the night's overlay. Transparent pixels show what is under; opaque ones replace it. Frame 0 matches the overlay."
+}
