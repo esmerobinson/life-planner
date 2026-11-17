@@ -25,7 +25,7 @@ export async function readDueSettingsView(): Promise<DueSettingsView> {
     db.syncMeta.get("token"),
     db.syncMeta.get("firstPullDone"),
   ]);
-  return { row, waitingForSync: row === undefined && Boolean(token?.value) && firstPull?.value !== true };
+  return { row: row as DuePrefsRow | undefined, waitingForSync: row === undefined && Boolean(token?.value) && firstPull?.value !== true };
 }
 
 /** Applies `change` (worked out from the newest settings) and saves the result. */
