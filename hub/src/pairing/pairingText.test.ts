@@ -1,5 +1,8 @@
 import { decodeQR } from "qr/decode.js";
-import { MAX_PAIRING_PASSPHRASE, PAIRING_PREFIX, pairingText, parsePairingText } from "./pairingText";
+import {
+  MAX_PAIRING_ADDRESS, MAX_PAIRING_PASSPHRASE, PAIRING_PREFIX, PAIRING_V2_PREFIX, pairingText, pairingTextV2, parsePairing,
+  parsePairingText,
+} from "./pairingText";
 import { qrModules, qrPath } from "./qr";
 
 // Fictional passphrases only.
@@ -74,5 +77,62 @@ describe("pairing QR code", () => {
     expect(m[4]![4]).toBe(true); // the top-left finder starts right inside it
     const dark = m.flat().filter(Boolean).length;
     expect(qrPath(m).match(/M/g)).toHaveLength(dark);
+  });
+});
+
+// ---- v2: no passphrase (2026-11-17) ------------------------------------------------------
+
+const TOKEN = "0123456789abcdef".repeat(4); // 64 hex: a fictional sync token
+const SECRET = new Uint8Array(32).map((_, i) => (i * 7 + 3) & 0xff); // fictional journal secret
+const ADDRESS = "https://sync.example.test";
+
+describe("pairing text v2 (no passphrase)", () => {
+  it("is esmeworld-pair:v2:<token>.<secret>.<address>, base64url, compact", () => {
+    expect(PAIRING_V2_PREFIX).toBe("esmeworld-pair:v2:");
+    const text = pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: ADDRESS });
+    expect(text).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}\.https:\/\/sync\.example\.test$/);
+    // The usual address is left out; a code without the journal secret has an empty part.
+    expect(pairingTextV2({ token: TOKEN, secret: null, serverUrl: null })).toMatch(/^esmeworld-pair:v2:[A-Za-z0-9_-]{43}\.\.$/);
+  });
+
+  it("parses back to the token, the secret and the address", () => {
+    const p = parsePairing(pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: ADDRESS }));
+    expect(p).toEqual({ v: 2, token: TOKEN, secret: SECRET, serverUrl: ADDRESS });
+    expect(parsePairing(pairingTextV2({ token: TOKEN, secret: null, serverUrl: null }))).toEqual({
+      v: 2, token: TOKEN, secret: null, serverUrl: null,
+    });
+    // A paste with whitespace around it.
+    expect(parsePairing(`  ${pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: null })}\r\n`)).toMatchObject({ v: 2, token: TOKEN });
+  });
+
+  it("parsePairing still reads v1 codes, and parsePairingText still reads only v1", () => {
+    expect(parsePairing(pairingText(PASS))).toEqual({ v: 1, passphrase: PASS });
+    expect(parsePairingText(pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: null }))).toBeNull();
+  });
+
+  it("refuses a damaged or foreign v2 code", () => {
+    const good = pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: ADDRESS });
+    const [tok, sec] = good.slice(PAIRING_V2_PREFIX.length).split(".");
+    for (const bad of [
+      "esmeworld-pair:v2:",
+      `esmeworld-pair:v2:${tok}`,
+      `esmeworld-pair:v2:${tok}.${sec}`, // no address part
+      `esmeworld-pair:v2:${tok!.slice(1)}.${sec}.`, // short token
+      `esmeworld-pair:v2:${tok}.${sec!.slice(2)}.`, // short secret
+      `esmeworld-pair:v2:${tok}.${sec}.${ADDRESS} x`, // a space in the address
+      `esmeworld-pair:v2:${tok}+.${sec}.`,
+      `esmeworld-pair:v2:${tok}.${sec}.${"h".repeat(MAX_PAIRING_ADDRESS + 1)}`,
+      `esmeworld-pair:v3:${tok}.${sec}.`,
+    ]) {
+      expect(parsePairing(bad)).toBeNull();
+    }
+  });
+
+  it("fits a small QR code: with the address it is at most version 9 (53 modules + quiet zone)", () => {
+    const text = pairingTextV2({ token: TOKEN, secret: SECRET, serverUrl: "https://esmeworld-sync.esme-brain.workers.dev" });
+    expect(text.length).toBeLessThanOrEqual(152);
+    const m = qrModules(text);
+    expect(m.length).toBeLessThanOrEqual(53 + 8);
+    expect(decodeQR(pixels(m))).toBe(text);
   });
 });
