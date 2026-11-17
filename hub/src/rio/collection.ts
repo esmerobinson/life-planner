@@ -6,6 +6,7 @@
 import { STICKERS } from "../farm/catalogue";
 import type { FarmView } from "../farm/FarmContext";
 import { RIO_MAP } from "./assets";
+import { inScenes } from "./placement";
 
 export interface CollectionPage { title: string; stickers: string[] }
 export interface CollectionArea { key: string; name: string; icon: string; pages: CollectionPage[] }
@@ -41,10 +42,14 @@ export const areaOfSticker = (key: string): string => AREA_OF.get(key) ?? "bonus
 export const groupsOf = (area: string): string[] =>
   [...new Set((COLLECTION_AREAS.find((a) => a.key === area)?.pages ?? []).flatMap((p) => p.stickers.map((k) => STICKERS.find((s) => s.key === k)!.group)))];
 
-export type CellState = "placed" | "ready" | "ghost";
+export type CellState = "placed" | "ready" | "kept" | "ghost";
 
-/** Placed in Rio, earned and ready to place, or not yet earned (shown as its silhouette). */
+/**
+ * Placed in Rio, earned and ready to place, earned and kept in the Collection only (no place in a
+ * scene: placement.ts inScenes), or not yet earned (shown as its silhouette).
+ */
 export function cellState(key: string, view: { earnedSet: ReadonlySet<string>; state: { placed: ReadonlyMap<string, string> } } | Pick<FarmView, "earnedSet" | "state">): CellState {
+  if (!inScenes(key) && (view.state.placed.has(key) || view.earnedSet.has(key))) return "kept";
   if (view.state.placed.has(key)) return "placed";
   return view.earnedSet.has(key) ? "ready" : "ghost";
 }

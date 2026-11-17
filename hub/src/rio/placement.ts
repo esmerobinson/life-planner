@@ -25,9 +25,25 @@ export const HOME: Record<string, Home> = {
   bonus: null,
 };
 
+/**
+ * Only Rio art in Rio scenes (Esme, 2026-11-17: the old farm-style "HI!" and "OK" notes and the
+ * "]" door note looked random in the Lagoa garden). A phase-1 sticker is drawn in a scene only if
+ * the Rio family that took its set over lives in that scene (the rio pack's sticker manifest,
+ * `place`). The Kind notes' family (`notes`) lives at the Lagoa house letterbox, a hotspot that
+ * opens a UI, not a scene: they stay earned and in the Collection only. Every other set's family
+ * lives where it is laid out.
+ */
+export const COLLECTION_ONLY_SETS: ReadonlySet<string> = new Set(["lane/Kind notes"]);
+
+/** The sticker can be drawn in a Rio scene (false: kept in the Collection only). */
+export function inScenes(stickerKey: string): boolean {
+  const s = STICKER_BY_KEY.get(stickerKey);
+  return !!s && !COLLECTION_ONLY_SETS.has(`${s.group}/${s.set}`);
+}
+
 /** Sets that go somewhere other than their group. */
 export const HOME_BY_SET: Record<string, Home> = {
-  "lane/Kind notes": { area: "lagoa-house", scene: "lagoa-house/outside" },
+  "lane/Kind notes": null, // kept in the Collection (COLLECTION_ONLY_SETS); placed rows from before stay, unread
   "lane/Hedgerow": { area: "tijuca-park", scene: "tijuca-park/inside" },
 };
 

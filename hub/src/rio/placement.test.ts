@@ -1,7 +1,7 @@
 import { COLLECTION, STICKERS } from "../farm/catalogue";
 import { farmState, placedRow } from "../farm/state";
 import { SCENES } from "./assets";
-import { HOME, accepts, freeSlotsFor, homeOf, layout, sceneState, slotsIn, stickerTags } from "./placement";
+import { HOME, accepts, freeSlotsFor, homeOf, inScenes, layout, sceneState, slotsIn, stickerTags } from "./placement";
 
 const keysIn = (group: string) => COLLECTION.filter((s) => s.group === group).map((s) => s.key);
 
@@ -14,7 +14,7 @@ describe("where earned stickers sit", () => {
     expect(homeOf("seeds-mind")).toEqual({ area: "fazenda", scene: "fazenda/outside" });
     expect(homeOf("hen")).toEqual({ area: "fazenda", scene: "fazenda/outside" });
     expect(homeOf("daisy")).toEqual({ area: "tijuca-park", scene: "tijuca-park/outside" });
-    expect(homeOf("hi")).toEqual({ area: "lagoa-house", scene: "lagoa-house/outside" }); // Kind notes
+    expect(homeOf("hi")).toBeNull(); // Kind notes: kept in the Collection (their Rio family lives at the letterbox, not in a scene)
     const hedgerow = COLLECTION.find((s) => s.group === "lane" && s.set === "Hedgerow")!.key;
     expect(homeOf(hedgerow)).toEqual({ area: "tijuca-park", scene: "tijuca-park/inside" });
     expect(homeOf("lilypad")).toEqual({ area: "ipanema-beach", scene: "ipanema-beach/outside" });
@@ -212,5 +212,24 @@ describe("moving a placed sticker (Esme, 2026-11-17: \"Items should be movable\"
     expect(freeSlotsFor("fazenda/outside", "hen", placed).map((s) => s.id)).toEqual(["hen-2", "hen-3", "hen-4"]);
     expect(freeSlotsFor("fazenda/outside", "cow", placed).map((s) => s.id)).toEqual(["cow-2"]);
     expect(freeSlotsFor("fazenda/outside", "cow", placed, [], new Map([["cow", "cow-2"]])).map((s) => s.id)).toEqual(["cow-1"]);
+  });
+});
+
+describe("only Rio art in Rio scenes (Esme, 2026-11-17: the old \"HI!\" and \"OK\" notes and the \"]\" sign looked random in the garden)", () => {
+  const KIND_NOTES = ["hi", "door", "steps", "always-welcome", "ok", "feather", "candle", "back-to-it"];
+
+  it("the eight Kind notes stay in the Collection only: never laid out in a scene, never placed", () => {
+    expect(COLLECTION.filter((s) => !inScenes(s.key)).map((s) => s.key)).toEqual(KIND_NOTES);
+    for (const k of KIND_NOTES) expect(homeOf(k), k).toBeNull();
+    const l = layout("lagoa-house/outside", KIND_NOTES);
+    expect(l.bySlot.size).toBe(0);
+    expect(l.overflow).toBe(0);
+  });
+
+  it("every other sticker with a home still has its scene (nothing else changes)", () => {
+    for (const s of COLLECTION) {
+      if (KIND_NOTES.includes(s.key) || s.group === "bonus") continue;
+      expect(homeOf(s.key), s.key).not.toBeNull();
+    }
   });
 });
