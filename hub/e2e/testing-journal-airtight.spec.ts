@@ -420,7 +420,8 @@ async function checkedIn(page: Page, questions: string[], answers: string[]) {
     await expect(items.nth(i).locator(".journal-q")).toHaveText(questions[i]!);
     await expect(items.nth(i).getByLabel("Your answer")).toHaveText(answers[i]!);
   }
-  await expect(s.getByRole("textbox")).toHaveCount(0);
+  // The check-in's own boxes (the daily log under it, its own section, has boxes of its own).
+  await expect(s.locator('textarea:not(section[aria-label="Daily log"] textarea), input[type="text"]:not(section[aria-label="Daily log"] input)')).toHaveCount(0);
   await expect(s.getByRole("button", { name: "Edit" })).toBeVisible();
 }
 
