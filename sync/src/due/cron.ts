@@ -17,7 +17,9 @@
 //   stops, the HTTP status and, for an answer it couldn't read, that answer's top-level shape
 //   (key names and types only: client.ts describeShape).
 // - D1 keeps, in `meta`, the ids this Worker cancelled (`due_x:<id>`, kept 3 days), so a
-//   reminder Esmeworld cancelled is never mistaken for one she dismissed (reconcile.ts).
+//   reminder Esmeworld cancelled is never mistaken for one she dismissed, and the ids it sent
+//   (`due_s:<id>`, the value is when it goes off; kept 3 days after), so one she dismissed is
+//   known even if Due's list leaves it out (reconcile.ts).
 // - Due's list is asked from the start of yesterday in her zone (Oliver's filtered endpoint):
 //   every reminder of the three days looked at that can still go off is due after that.
 
@@ -72,9 +74,11 @@ ON CONFLICT (key) DO UPDATE SET value = excluded.value WHERE meta.value <= ?2
 RETURNING value`;
 const META_GET_SQL = "SELECT value FROM meta WHERE key = ?1";
 const META_SET_SQL = "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value";
-const CANCELLED_SQL = "SELECT substr(key, 7) AS id FROM meta WHERE key >= 'due_x:' AND key < 'due_x;'";
+// Both logs: `due_s:` (sent) and `due_x:` (cancelled) sort next to each other.
+const LOGS_SQL = "SELECT substr(key, 5, 1) AS log, substr(key, 7) AS id, value FROM meta WHERE (key >= 'due_s:' AND key < 'due_s;') OR (key >= 'due_x:' AND key < 'due_x;')";
 const RECORD_CANCEL_SQL = "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO NOTHING";
-const FORGET_CANCELS_SQL = "DELETE FROM meta WHERE key >= 'due_x:' AND key < 'due_x;' AND value < ?1";
+const RECORD_SENT_SQL = "INSERT INTO meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = excluded.value";
+const FORGET_LOGS_SQL = "DELETE FROM meta WHERE ((key >= 'due_s:' AND key < 'due_s;') OR (key >= 'due_x:' AND key < 'due_x;')) AND value < ?1";
 
 const PREFS_SQL = "SELECT data FROM rows WHERE tbl = ?1 AND id = ?2";
 
@@ -194,16 +198,26 @@ async function metaGet(db: D1Database, key: string): Promise<number> {
 
 const metaSet = (db: D1Database, key: string, value: number) => db.prepare(META_SET_SQL).bind(key, value).run();
 
-/** The log of ids this Worker cancelled, kept in `meta`. */
+/** The logs of ids this Worker cancelled and sent, kept in `meta`. */
 async function cancelLog(db: D1Database, now: number): Promise<CancelLog> {
-  await db.prepare(FORGET_CANCELS_SQL).bind(now - CANCEL_LOG_MS).run();
-  const { results } = await db.prepare(CANCELLED_SQL).all<{ id: string }>();
-  const cancelled = new Set(results.map((r) => r.id));
+  await db.prepare(FORGET_LOGS_SQL).bind(now - CANCEL_LOG_MS).run();
+  const { results } = await db.prepare(LOGS_SQL).all<{ log: string; id: string; value: number }>();
+  const cancelled = new Set<string>();
+  const sent = new Map<string, number>();
+  for (const r of results) {
+    if (r.log === "x") cancelled.add(r.id);
+    else sent.set(r.id, r.value);
+  }
   return {
     cancelled,
+    sent,
     record: async (ids) => {
       await db.batch(ids.map((id) => db.prepare(RECORD_CANCEL_SQL).bind(`due_x:${id}`, now)));
       for (const id of ids) cancelled.add(id);
+    },
+    recordSent: async (list) => {
+      await db.batch(list.map((s) => db.prepare(RECORD_SENT_SQL).bind(`due_s:${s.id}`, s.at)));
+      for (const s of list) sent.set(s.id, s.at);
     },
   };
 }

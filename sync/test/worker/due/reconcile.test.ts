@@ -12,18 +12,24 @@ const DAYS = ["20261115", "20261116", "20261117"];
 const FROM = "2026-11-15T00:00:00-05:00";
 const w = (slot: string, local: string, title = `T ${slot}`): Wanted => ({ key: `esmeworld-20261116-${slot}`, kind: "plan", title, at: at(local) });
 
-/** The cron's log of the ids it cancelled, in memory, with the order of events. */
+/** The cron's log of the ids it cancelled and sent, in memory, with the order of events. */
 function memoryLog() {
   const cancelled = new Set<string>();
+  const sent = new Map<string, number>();
   const events: string[] = [];
   const log: CancelLog = {
     cancelled,
+    sent,
     record: async (ids) => {
       for (const id of ids) cancelled.add(id);
       events.push(`record ${ids.join(",")}`);
     },
+    recordSent: async (list) => {
+      for (const s of list) sent.set(s.id, s.at);
+      events.push(`sent ${list.map((s) => s.id).join(",")}`);
+    },
   };
-  return { log, cancelled, events };
+  return { log, cancelled, sent, events };
 }
 
 let due: FakeDue;
@@ -398,5 +404,65 @@ describe("Oliver's filtered endpoint (18 Nov)", () => {
     expect(describeShape("nope", "text/html; charset=utf-8")).toBe("not_json(text/html)");
     expect(describeShape("nope", "weird type with spaces")).toBe("not_json");
     expect(describeShape(JSON.stringify(Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`k${i}`, i]))), null)).toMatch(/,\+4}$/);
+  });
+
+  describe("if the endpoint leaves out completed and deleted reminders", () => {
+    beforeEach(() => {
+      due.omitDismissed = true;
+    });
+
+    it("one she completed is not brought back (we know we sent it)", async () => {
+      const plan = w("plan", "2026-11-16T09:00:00");
+      await go([plan]);
+      due.reminders.get(versionId(plan))!.completedAt = "2026-11-16T14:00:00Z";
+      due.calls = [];
+      await go([plan]);
+      await go([w("plan", "2026-11-16T09:30:00", "Changed")]);
+      expect(due.mutations()).toEqual([]);
+    });
+
+    it("one she deleted is not brought back", async () => {
+      const plan = w("plan", "2026-11-16T09:00:00");
+      await go([plan]);
+      due.reminders.get(versionId(plan))!.deletedAt = "2026-11-16T14:00:00Z";
+      due.calls = [];
+      await go([plan]);
+      expect(due.mutations()).toEqual([]);
+      expect(due.activeIds()).toEqual([]);
+    });
+
+    it("Off then On: ours come back under a new id (never re-sent under the cancelled one)", async () => {
+      const wanted = [w("plan", "2026-11-16T09:00:00"), w("review", "2026-11-16T21:00:00")];
+      await go(wanted);
+      await go([]);
+      await go(wanted);
+      expect(due.activeIds()).toEqual(wanted.map((x) => `${versionId(x)}g2`).sort());
+    });
+
+    it(`still stops flapping after ${MAX_CANCELS_PER_KEY} of our own cancellations`, async () => {
+      const a = w("d1-a", "2026-11-16T11:00:00");
+      for (let i = 0; i < 6; i++) {
+        await go([a]);
+        await go([]);
+      }
+      expect(due.mutations().filter((c) => c.method === "POST")).toHaveLength(MAX_CANCELS_PER_KEY);
+    });
+
+    it("a sent one that has already gone off and isn't listed doesn't block a new time later that day", async () => {
+      const early = w("t-x", "2026-11-16T09:00:00");
+      await go([early], { now: at("2026-11-16T08:00:00") });
+      due.reminders.delete(versionId(early)); // went off; not listed any more
+      const later = w("t-x", "2026-11-16T15:00:00");
+      await go([later], { now: at("2026-11-16T10:00:00") });
+      expect(due.activeIds()).toEqual([versionId(later)]);
+    });
+  });
+
+  it("logs what it sent with when it goes off, after the POSTs (only those Due took)", async () => {
+    due.refuse = (b) => String(b.id).includes("-bad-");
+    const good = w("good", "2026-11-16T09:00:00");
+    const report = await go([good, w("bad", "2026-11-16T10:00:00")]);
+    expect(report.done).toMatchObject({ created: 1, rejected: 1 });
+    expect([...mem.sent]).toEqual([[versionId(good), good.at]]);
   });
 });

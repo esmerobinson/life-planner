@@ -402,4 +402,19 @@ describe("Due reminders: the filtered endpoint (18 Nov)", () => {
     spy.mockRestore();
     expect(logged).toEqual([["due_reminders_stopped", "due_bad_state", "status=404"]]);
   });
+
+  it("keeps a log in D1 of what it sent (with when it goes off), so a dismissal is known even if Due stops listing it", async () => {
+    await put([{ table: "prefs", data: prefsRow({ plan: "09:00" }) }]);
+    await runAt(MORNING);
+    const rows = await env.DB.prepare("SELECT substr(key, 7) AS id, value FROM meta WHERE key LIKE 'due_s:%' ORDER BY key").all<{ id: string; value: number }>();
+    expect(rows.results.map((r) => keyOf(r.id))).toEqual(["esmeworld-20261116-plan", "esmeworld-20261116-review"]);
+    expect(rows.results.find((r) => r.id.includes("-plan-"))!.value).toBe(at("2026-11-16T09:00:00"));
+    // She deletes the plan reminder in Due, and Due's list leaves deleted ones out: not brought back.
+    due.omitDismissed = true;
+    const plan = rows.results.find((r) => r.id.includes("-plan-"))!.id;
+    due.reminders.get(plan)!.deletedAt = "2026-11-16T13:30:00Z";
+    due.calls = [];
+    await runAt(MORNING + 15 * 60_000);
+    expect(due.mutations()).toEqual([]);
+  });
 });

@@ -10,6 +10,11 @@
 // - Wanted but gone: made again under the next `g` id, if Esmeworld itself cancelled it (the
 //   cron keeps a log of every id it cancels, written BEFORE the DELETE). If SHE completed or
 //   deleted any version of it in Due, it is left alone for that day: she dismissed it.
+// - Due's list might leave out completed and deleted reminders (its filtered endpoint, 18 Nov:
+//   not confirmed either way). So the cron also logs every id it sent and when it goes off
+//   (written AFTER the POST). A version we sent whose time hasn't come, that Due no longer
+//   lists and that we didn't cancel, was dismissed by her: left alone too. And the next `g` id
+//   skips every id we ever sent or cancelled, listed or not, so an id is never sent twice.
 // - Active in Due but no longer wanted (done, moved, yesterday's, Due turned off): cancelled.
 // - Never sent if its time has passed (Due drops those): an active older version is kept.
 // - At most MAX_CANCELS_PER_KEY of our own cancellations per reminder per day; after that it is
@@ -28,11 +33,17 @@ export const MAX_CANCELS_PER_KEY = 3;
 export const MAX_REJECTIONS = 3;
 const VERSION = /-v[0-9a-f]{8}(?:g\d+)?$/;
 
-/** The ids Esmeworld itself cancelled (so "deleted" in Due doesn't mean she dismissed it). */
+/**
+ * The ids Esmeworld itself cancelled (so "deleted" in Due doesn't mean she dismissed it), and
+ * the ids it sent, with when each goes off (so one Due stops listing is known to be dismissed).
+ */
 export interface CancelLog {
   cancelled: ReadonlySet<string>;
+  sent: ReadonlyMap<string, number>;
   /** Called BEFORE the DELETEs are sent, so a run cut short still knows they were ours. */
   record(ids: readonly string[]): Promise<void>;
+  /** Called AFTER the POSTs, with only those Due took (or already had). */
+  recordSent(sent: readonly { id: string; at: number }[]): Promise<void>;
 }
 
 export interface Create {
@@ -81,16 +92,26 @@ function fnv(s: string): string {
 export const versionId = (w: Wanted) => `${w.key}-v${fnv(`${w.title}\u0000${w.at}`)}`;
 const generation = (base: string, g: number) => (g === 1 ? base : `${base}g${g}`);
 
+function push<T>(m: Map<string, T[]>, k: string, v: T): void {
+  const list = m.get(k);
+  if (list) list.push(v);
+  else m.set(k, [v]);
+}
+
 /** The calls needed, worked out without making any. Pure. */
-export function planCalls(wanted: readonly Wanted[], remote: readonly DueRemote[], cancelledByUs: ReadonlySet<string>, now: number): Plan {
+export function planCalls(
+  wanted: readonly Wanted[],
+  remote: readonly DueRemote[],
+  cancelledByUs: ReadonlySet<string>,
+  now: number,
+  sentByUs: ReadonlyMap<string, number> = new Map(),
+): Plan {
   const byKey = new Map<string, DueRemote[]>();
-  for (const r of remote) {
-    if (!isOurs(r)) continue;
-    const k = keyOf(r.id);
-    const list = byKey.get(k);
-    if (list) list.push(r);
-    else byKey.set(k, [r]);
-  }
+  for (const r of remote) if (isOurs(r)) push(byKey, keyOf(r.id), r);
+  // Every id our logs know, by key: listed by Due or not.
+  const logged = new Map<string, string[]>();
+  for (const id of cancelledByUs) push(logged, keyOf(id), id);
+  for (const id of sentByUs.keys()) if (!cancelledByUs.has(id)) push(logged, keyOf(id), id);
   const wantedKeys = new Set(wanted.map((w) => w.key));
   const cancel: string[] = [];
   for (const [k, recs] of byKey) if (!wantedKeys.has(k)) for (const r of recs) if (isActive(r)) cancel.push(r.id);
@@ -103,8 +124,12 @@ export function planCalls(wanted: readonly Wanted[], remote: readonly DueRemote[
     const active = recs.filter(isActive);
     // She completed or deleted a version in Due: dismissed for the day.
     if (recs.some((r) => !isActive(r) && (!isNullish(r.completedAt) || !cancelledByUs.has(r.id)))) continue;
+    const listed = new Set(recs.map((r) => r.id));
+    const mine = logged.get(w.key) ?? [];
+    // One we sent, not yet gone off, that Due no longer lists and we didn't cancel: she dismissed it.
+    if (mine.some((id) => !listed.has(id) && !cancelledByUs.has(id) && (sentByUs.get(id) ?? 0) > now)) continue;
     const base = versionId(w);
-    const here = new Set(recs.map((r) => r.id));
+    const here = new Set([...listed, ...mine]);
     const current = active.find((r) => r.id === base || (r.id.startsWith(`${base}g`) && keyOf(r.id) === w.key));
     if (current) {
       // This version is in; any other active version of it goes.
@@ -113,7 +138,7 @@ export function planCalls(wanted: readonly Wanted[], remote: readonly DueRemote[
     }
     const at = w.sendAt ?? w.at;
     if (at <= now) continue; // gone off already: Due would drop it; an older version stays
-    if (recs.filter((r) => cancelledByUs.has(r.id)).length >= MAX_CANCELS_PER_KEY) continue;
+    if (mine.filter((id) => cancelledByUs.has(id)).length >= MAX_CANCELS_PER_KEY) continue;
     let g = 1;
     while (here.has(generation(base, g))) g++;
     create.push({ id: generation(base, g), key: w.key, title: w.title, at, replaces: active.map((r) => r.id) });
@@ -163,17 +188,24 @@ export async function reconcile(client: DueClient, wanted: readonly Wanted[], op
     }
   };
   try {
-    plan = planCalls(wanted, await client.reminders(opts.days, opts.from), opts.log.cancelled, opts.now);
+    plan = planCalls(wanted, await client.reminders(opts.days, opts.from), opts.log.cancelled, opts.now, opts.log.sent);
     // What she ticked off goes first ("done means cancelled").
     await cancelAll(plan.cancel);
     const older = [...plan.replaced];
-    for (const c of plan.create) {
-      const result = await client.create(body(c, opts.timeZone));
-      if (result === "rejected") rejected();
-      else {
-        done.created++; // "exists": that very version is there already
-        older.push(...c.replaces);
+    const sent: { id: string; at: number }[] = [];
+    try {
+      for (const c of plan.create) {
+        const result = await client.create(body(c, opts.timeZone));
+        if (result === "rejected") rejected();
+        else {
+          done.created++; // "exists": that very version is there already
+          sent.push({ id: c.id, at: c.at });
+          older.push(...c.replaces);
+        }
       }
+    } finally {
+      // Even when the run stops part-way: what Due took is logged.
+      if (sent.length) await opts.log.recordSent(sent);
     }
     // Older versions go only once their replacements are in.
     await cancelAll(older);
