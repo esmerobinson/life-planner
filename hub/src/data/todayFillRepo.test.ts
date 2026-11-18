@@ -1,6 +1,6 @@
 import { db } from "./db";
 import {
-  OWN_FILL_META, daySeenAt, forgetDaysSeen, markTodayTouched, pruneTodayFill, recordTodayFill, shouldRecord, syncGateOpen,
+  OWN_FILL_META, daySeenAt, forgetDaysSeen, markTodayTouched, pruneTodayFill, recordTodayFill, shouldRecord, syncGate,
 } from "./todayFillRepo";
 import { firstWinsStamp, todayFillRow, todayFillRowId } from "../domain/todayFill";
 import { keepOwnStamps } from "./changeTracking";
@@ -120,11 +120,63 @@ describe("I2: the sync gate", () => {
     expect(daySeenAt(WED, AT_10)).toBe(AT_10);
   });
 
-  it("sync off or offline: open at once; sync on: only after a full sync that finished once the day began here", () => {
-    expect(syncGateOpen({ token: false, firstPull: false, lastSyncedAt: undefined, online: true, daySeen: AT_8 })).toBe(true);
-    expect(syncGateOpen({ token: true, firstPull: true, lastSyncedAt: AT_8 - 1, online: false, daySeen: AT_8 })).toBe(true);
-    expect(syncGateOpen({ token: true, firstPull: true, lastSyncedAt: AT_8 - 1, online: true, daySeen: AT_8 })).toBe(false);
-    expect(syncGateOpen({ token: true, firstPull: false, lastSyncedAt: AT_10, online: true, daySeen: AT_8 })).toBe(false);
-    expect(syncGateOpen({ token: true, firstPull: true, lastSyncedAt: AT_10, online: true, daySeen: AT_8 })).toBe(true);
+  it("sync off: publish at once; offline before the day's full sync: keep locally only (R-I1); else wait", () => {
+    const base = { token: true, firstPull: true, lastFullSyncAt: AT_8 - 1, online: true, daySeen: AT_8 };
+    expect(syncGate({ ...base, token: false, firstPull: false, lastFullSyncAt: undefined })).toBe("publish");
+    expect(syncGate({ ...base, online: false })).toBe("local");
+    expect(syncGate(base)).toBe("wait");
+    expect(syncGate({ ...base, firstPull: false, lastFullSyncAt: AT_10 })).toBe("wait");
+    expect(syncGate({ ...base, lastFullSyncAt: AT_10 })).toBe("publish");
+    // Once the day's full sync is in, offline later in the day still publishes (it goes out next sync).
+    expect(syncGate({ ...base, lastFullSyncAt: AT_10, online: false })).toBe("publish");
+  });
+});
+
+describe("R-I1: picks made offline stay on this device until the day's full sync", () => {
+  const AT_7 = AT_8 - 3600_000;
+  const AT_9 = AT_8 + 3600_000;
+
+  it("offline: kept as this device's own copy only, no shared row", async () => {
+    await recordTodayFill(TUE, { ids: ["stale"], room: 1 }, AT_7, db, "local");
+    expect(await db.prefs.get(ID)).toBeUndefined();
+    expect(await own()).toEqual({ date: TUE, ids: ["stale"], room: 1, touched: false, unpublished: true });
+    // Never past its places, locally too.
+    await recordTodayFill(TUE, { ids: ["stale", "x"], room: 1 }, AT_7, db, "local");
+    expect(await own()).toMatchObject({ ids: ["stale"] });
+  });
+
+  it("she uses Today while offline: still to publish", async () => {
+    await recordTodayFill(TUE, { ids: ["a"], room: 4 }, AT_7, db, "local");
+    await markTodayTouched(TUE, { ids: ["a"], room: 4 });
+    expect(await own()).toEqual({ date: TUE, ids: ["a"], room: 4, touched: true, unpublished: true });
+    await recordTodayFill(TUE, { ids: ["a"], room: 4 }, AT_9, db, "publish");
+    expect(await db.prefs.get(ID)).toMatchObject({ ids: ["a"], pickedAt: AT_9 });
+    expect(await own()).toEqual({ date: TUE, ids: ["a"], room: 4, touched: true });
+  });
+
+  it("back online, no other device's row: published, stamped from when it was published (not picked)", async () => {
+    await recordTodayFill(TUE, { ids: ["a"], room: 4 }, AT_7, db, "local");
+    await recordTodayFill(TUE, { ids: ["a"], room: 4 }, AT_9, db, "publish");
+    expect(await db.prefs.get(ID)).toMatchObject({ ids: ["a"], room: 4, pickedAt: AT_9, updatedAt: firstWinsStamp(TUE, AT_9, 1) });
+    expect(await own()).toEqual({ date: TUE, ids: ["a"], room: 4, touched: false });
+  });
+
+  it("back online, another device's row arrived: adopted (she hadn't used Today here); nothing published", async () => {
+    await recordTodayFill(TUE, { ids: ["stale"], room: 1 }, AT_7, db, "local");
+    await arrives(TUE, ["m1", "m2", "m3", "m4"], 4, AT_8);
+    await recordTodayFill(TUE, { ids: ["stale"], room: 1 }, AT_9, db, "publish");
+    expect(await db.prefs.get(ID)).toMatchObject({ ids: ["m1", "m2", "m3", "m4"], pickedAt: AT_8 });
+    expect(await own()).toEqual({ date: TUE, ids: ["m1", "m2", "m3", "m4"], room: 4, touched: false });
+    expect(await db.prefs.get(ID)).toMatchObject({ updatedAt: firstWinsStamp(TUE, AT_8, 4) }); // untouched
+  });
+
+  it("back online, another device's row arrived, she HAD used Today here: hers stays on this device, nothing published", async () => {
+    await recordTodayFill(TUE, { ids: ["stale"], room: 1 }, AT_7, db, "local");
+    await markTodayTouched(TUE, { ids: ["stale"], room: 1 });
+    await arrives(TUE, ["m1", "m2"], 2, AT_8);
+    await recordTodayFill(TUE, { ids: ["stale"], room: 1 }, AT_9, db, "publish");
+    expect(await db.prefs.get(ID)).toMatchObject({ ids: ["m1", "m2"], pickedAt: AT_8 });
+    expect(await own()).toEqual({ date: TUE, ids: ["stale"], room: 1, touched: true });
+    expect(await db.prefs.get(ID)).toMatchObject({ updatedAt: firstWinsStamp(TUE, AT_8, 2) }); // untouched
   });
 });

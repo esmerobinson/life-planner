@@ -39,18 +39,23 @@ export function TodayPanel({
   // Inactive goals don't count (goals redesign).
   // The day's picks are kept (synced): one she removes, moves or ticks off is never replaced;
   // the list just gets shorter (Esme, 2026-11-06 and 2026-11-18). The next day starts fresh.
-  // With sync on they are kept only after this session's first sync of the day (I2); until then
-  // the list is worked out as it stands (provisional).
+  // With sync on they are kept only after this session's first FULL sync of the day (I2, R-M1);
+  // until then the list is worked out as it stands (provisional).
   const kept = useTodayFill(today);
   const { rhythm, picks, alsoDue, doneToday } = useMemo(
     () => todayList(items, goals, today, kept.frozen),
     [items, goals, today, kept.frozen],
   );
+  // Offline before the day's full sync the picks stay on this device; once that sync is in they
+  // are published, or given up for a row another device kept first (re-review R-I1).
   useEffect(() => {
-    if (!loaded || error || !kept.loaded || !kept.ready) return;
+    if (!loaded || error || !kept.loaded || kept.mode === "wait") return;
     const next = todayFill(items, goals, today, kept.frozen);
-    if (shouldRecord(kept.frozen, next)) void recordTodayFill(today, next).catch(() => undefined);
-  }, [loaded, error, kept.loaded, kept.ready, kept.frozen, items, goals, today]);
+    const publishNow = kept.mode === "publish" && kept.unpublished;
+    if (shouldRecord(kept.frozen, next) || publishNow) {
+      void recordTodayFill(today, next, Date.now(), undefined, kept.mode).catch(() => undefined);
+    }
+  }, [loaded, error, kept.loaded, kept.mode, kept.unpublished, kept.frozen, items, goals, today]);
   useEffect(() => void pruneTodayFill(today).catch(() => undefined), [today]);
 
   async function tick(id: string, saved?: () => void): Promise<boolean> {

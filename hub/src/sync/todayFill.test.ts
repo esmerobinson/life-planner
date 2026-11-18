@@ -80,3 +80,46 @@ describe("two devices pick from different data before they sync", () => {
     expect(await shown(phone)).toEqual({ ids: ["a", "b"], room: 4 });
   });
 });
+
+describe("re-review R-I1: phone offline at 7am, Mac online at 8am, phone back at 9am", () => {
+  const AT_7 = AT_8 - 3600_000;
+  const AT_9 = AT_8 + 3600_000;
+  const stale = { ids: ["stale-1"], room: 1 }; // last night's copy: three overdue things she has since done
+
+  it("the Mac's row is already on the server when the phone comes back: the Mac keeps its list, the phone takes it", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const mac = await device();
+    const phone = await device();
+    await recordTodayFill(TUE, stale, AT_7, phone, "local"); // no signal: kept on the phone only
+    expect(await phone.prefs.get(todayFillRowId(TUE))).toBeUndefined();
+    await recordTodayFill(TUE, { ids: ["a", "b", "c", "d"], room: 4 }, AT_8, mac);
+    await sync(mac, server);
+    // 9am: the phone's full sync lands, then Home keeps the day's picks.
+    await sync(phone, server);
+    await recordTodayFill(TUE, stale, AT_9, phone, "publish");
+    await sync(phone, server);
+    await sync(mac, server);
+    for (const d of [mac, phone]) {
+      expect(await d.prefs.get(todayFillRowId(TUE))).toMatchObject({ ids: ["a", "b", "c", "d"], pickedAt: AT_8 });
+      expect(await shown(d)).toEqual({ ids: ["a", "b", "c", "d"], room: 4 });
+    }
+  });
+
+  it("the phone publishes before the Mac's row reaches the server: stamped 9am, so the Mac's 8am picks still win", async () => {
+    const server = new FakeSyncServer(TOKEN);
+    const mac = await device();
+    const phone = await device();
+    await recordTodayFill(TUE, stale, AT_7, phone, "local");
+    await recordTodayFill(TUE, { ids: ["a", "b", "c", "d"], room: 4 }, AT_8, mac); // not synced yet
+    await sync(phone, server);
+    await recordTodayFill(TUE, stale, AT_9, phone, "publish");
+    expect(await phone.prefs.get(todayFillRowId(TUE))).toMatchObject({ pickedAt: AT_9 });
+    await sync(phone, server);
+    await sync(mac, server);
+    await sync(phone, server);
+    for (const d of [mac, phone]) {
+      expect(await d.prefs.get(todayFillRowId(TUE))).toMatchObject({ ids: ["a", "b", "c", "d"], pickedAt: AT_8 });
+      expect(await shown(d)).toEqual({ ids: ["a", "b", "c", "d"], room: 4 });
+    }
+  });
+});

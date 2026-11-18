@@ -55,6 +55,11 @@ export interface OwnFill extends TodayFill {
   date: ISODate;
   /** She has ticked, moved or removed something on Today here today. */
   touched: boolean;
+  /**
+   * Picked while offline before the day's full sync (re-review R-I1): not the day's shared row
+   * yet. Published after that sync only if no other device's row has arrived by then.
+   */
+  unpublished?: true;
 }
 
 export const todayFillRowId = (date: ISODate): string => `${TODAY_FILL_PREFIX}${date}`;
@@ -104,7 +109,8 @@ export function validTodayFillRow(r: unknown): r is TodayFillRow {
 
 /** This device's own copy is well formed. */
 export function validOwnFill(r: unknown): r is OwnFill {
-  return isObj(r) && typeof r.date === "string" && isValidISODate(r.date) && typeof r.touched === "boolean" && validFill(r);
+  if (!isObj(r) || typeof r.date !== "string" || !isValidISODate(r.date) || typeof r.touched !== "boolean") return false;
+  return (r.unpublished === undefined || r.unpublished === true) && validFill(r);
 }
 
 const fillOf = (f: TodayFill): TodayFill => ({ ids: f.ids, room: f.room, ...(f.dues ? { dues: f.dues } : {}) });

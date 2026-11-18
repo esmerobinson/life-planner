@@ -528,6 +528,7 @@ describe("Today stops refilling, fix round 1", () => {
       { key: "token", value: "f".repeat(64) },
       { key: "firstPullDone", value: true },
       { key: "lastSyncedAt", value: Date.now() - 60_000 },
+      { key: "lastFullSyncAt", value: Date.now() - 60_000 },
     ]);
     // Last night's copy: three overdue things she has since done on her other device.
     const stale: Item[] = [];
@@ -542,7 +543,7 @@ describe("Today stops refilling, fix round 1", () => {
     expect(await keptRow()).toBeUndefined();
     // The pull lands: the three are done; the sync finishes.
     for (const it of stale) await db.items.update(it.id, { status: "done", completedAt: TODAY });
-    await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
+    await db.syncMeta.bulkPut([{ key: "lastSyncedAt", value: Date.now() }, { key: "lastFullSyncAt", value: Date.now() }]);
     await vi.waitFor(async () => expect(await keptRow()).toMatchObject({ room: 4, ids: ["Pretend p1 a", "Pretend p1 b", "Pretend p1 c", "Pretend p1 d"].map(() => expect.any(String)) }));
     await vi.waitFor(async () => expect(await titles()).toEqual(["Pretend p1 a", "Pretend p1 b", "Pretend p1 c", "Pretend p1 d"]));
     // From now on nothing refills.
@@ -589,5 +590,44 @@ describe("Today stops refilling, fix round 1", () => {
     await vi.waitFor(async () => expect((await keptRow())?.ids).toEqual(mine.slice(4).map((i) => i.id)));
     await new Promise((r) => setTimeout(r, 100));
     expect(await titles()).toEqual(["Pretend p1 2", "Pretend p1 3", "Pretend p1 4"]);
+  });
+});
+
+describe("re-review R-I1/R-M1: offline, and a pull of several pages", () => {
+  const rows = async () => within(await screen.findByRole("list", { name: "Today" })).getAllByRole("listitem");
+  const keptRow = () => db.prefs.get(todayFillRowId(TODAY)) as Promise<{ ids: string[]; room: number; pickedAt: number } | undefined>;
+  const syncOn = () =>
+    db.syncMeta.bulkPut([{ key: "token", value: "f".repeat(64) }, { key: "firstPullDone", value: true }, { key: "lastFullSyncAt", value: 1 }]);
+
+  it("offline before the day's sync: the picks are kept on this device only (no refill), published once the full sync lands", async () => {
+    await syncOn();
+    const offline = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    for (const t of ["a", "b", "c", "d", "e", "f"]) await task(`Pretend p1 ${t}`, { priority: 1 });
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect((await db.syncMeta.get("todayFillOwn"))?.value).toMatchObject({ unpublished: true }));
+    expect(await keptRow()).toBeUndefined();
+    // Ticking one off pulls nothing in, even offline.
+    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Pretend p1 a" }));
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(3));
+    // Back online; the day's full sync lands: published now, stamped from now.
+    offline.mockReturnValue(true);
+    window.dispatchEvent(new Event("online"));
+    const before = Date.now();
+    await db.syncMeta.put({ key: "lastFullSyncAt", value: Date.now() });
+    await vi.waitFor(async () => expect((await keptRow())?.ids).toHaveLength(4));
+    expect((await keptRow())!.pickedAt).toBeGreaterThanOrEqual(before);
+    expect(await rows()).toHaveLength(3);
+  });
+
+  it("a first page of the pull landing (lastSyncedAt) is not enough: nothing is kept until the last page", async () => {
+    await syncOn();
+    for (const t of ["a", "b", "c", "d", "e"]) await task(`Pretend p1 ${t}`, { priority: 1 });
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(4));
+    await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() }); // page 1 of 3
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await keptRow()).toBeUndefined();
+    await db.syncMeta.put({ key: "lastFullSyncAt", value: Date.now() }); // the last page
+    await vi.waitFor(async () => expect((await keptRow())?.ids).toHaveLength(4));
   });
 });

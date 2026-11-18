@@ -37,7 +37,15 @@ function grow(base: TodayFill, fill: TodayFill, room: number): TodayFill {
   return { ids, room, ...(Object.keys(dues).length > 0 ? { dues } : {}) };
 }
 
-const ownOf = (date: ISODate, f: TodayFill, touched: boolean): OwnFill => ({ date, ...f, touched });
+const ownOf = (date: ISODate, f: TodayFill, touched: boolean, unpublished = false): OwnFill => ({
+  date, ids: f.ids, room: f.room, ...(f.dues ? { dues: f.dues } : {}), touched, ...(unpublished ? { unpublished: true as const } : {}),
+});
+
+/**
+ * How today's picks may be kept now: "publish" as the day's shared row, "local" on this device
+ * only (offline before the day's full sync, re-review R-I1), or "wait" (provisional list).
+ */
+export type GateMode = "publish" | "local" | "wait";
 
 /**
  * Keeps `fill` as today's picks. No row for today yet: this device's picks become the day's
@@ -46,13 +54,39 @@ const ownOf = (date: ISODate, f: TodayFill, touched: boolean): OwnFill => ({ dat
  * its places. Once she has used Today on this device and an earlier device's row has replaced
  * the list she was working from, a place filled here goes into this device's copy only.
  */
-export async function recordTodayFill(today: ISODate, fill: TodayFill, now = Date.now(), d: HubDB = db): Promise<void> {
+export async function recordTodayFill(
+  today: ISODate, fill: TodayFill, now = Date.now(), d: HubDB = db, mode: Exclude<GateMode, "wait"> = "publish",
+): Promise<void> {
   const id = todayFillRowId(today);
   await d.transaction("rw", [d.prefs, d.syncMeta], async () => {
     const stored = await d.prefs.get(id);
     const shared = validTodayFillRow(stored) && stored.date === today ? stored : undefined;
     const ownRow = (await d.syncMeta.get(OWN_FILL_META))?.value;
     const own = validOwnFill(ownRow) && ownRow.date === today ? ownRow : undefined;
+
+    // Offline before the day's full sync (R-I1): this device's copy only, never the shared row.
+    if (mode === "local") {
+      if (shared && !own?.unpublished) return; // the day's row is already here: it is the list
+      const base: TodayFill = own ?? { ids: [], room: fill.room };
+      const next = grow(base, fill, base.room);
+      if (own && next.ids.length === own.ids.length) return;
+      await d.syncMeta.put({ key: OWN_FILL_META, value: ownOf(today, next, own?.touched ?? false, true) });
+      return;
+    }
+    // The day's full sync is in. Picks kept offline: another device's row arrived meanwhile, so
+    // it is adopted (or, if she has used Today here, her list stays on this device only), and
+    // nothing is published; else they are published now, stamped from now, not the offline pick.
+    if (own?.unpublished) {
+      if (shared) {
+        await d.syncMeta.put({ key: OWN_FILL_META, value: own.touched ? ownOf(today, own, true) : ownOf(today, shared, false) });
+        return;
+      }
+      const next = grow(own, fill, own.room);
+      keepOwnStamps();
+      await d.prefs.put({ ...todayFillRow(today, next, now), updatedAt: firstWinsStamp(today, now, next.ids.length) });
+      await d.syncMeta.put({ key: OWN_FILL_META, value: ownOf(today, next, own.touched) });
+      return;
+    }
 
     if (own?.touched && (!shared || own.ids.join() !== shared.ids.join() || own.room !== shared.room)) {
       const next = grow(own, fill, own.room);
@@ -79,8 +113,10 @@ export async function markTodayTouched(today: ISODate, fill: TodayFill | undefin
   if (!fill) return;
   await d.transaction("rw", d.syncMeta, async () => {
     const ownRow = (await d.syncMeta.get(OWN_FILL_META))?.value;
-    if (validOwnFill(ownRow) && ownRow.date === today && ownRow.touched) return;
-    await d.syncMeta.put({ key: OWN_FILL_META, value: ownOf(today, fill, true) });
+    const mine = validOwnFill(ownRow) && ownRow.date === today ? ownRow : undefined;
+    if (mine?.touched) return;
+    // Picks kept offline stay to publish (R-I1).
+    await d.syncMeta.put({ key: OWN_FILL_META, value: ownOf(today, fill, true, mine?.unpublished === true) });
   });
 }
 
@@ -112,12 +148,16 @@ export function forgetDaysSeen(): void {
 }
 
 /**
- * Whether today's picks may be kept now (fix round 1, I2): with sync off, or offline, at once;
- * with sync on, only once a sync with the full pull done has finished after the day began in
- * this app session, so the picks come from her other device's latest, not last night's copy.
+ * How today's picks may be kept now (fix round 1, I2; re-review R-I1, R-M1):
+ * - sync off, or this app session has had a sync whose WHOLE pull finished after the day began
+ *   here: "publish" (the picks come from her other device's latest, not last night's copy);
+ * - offline before that: "local", kept on this device only, published after that sync if no
+ *   other device's row has arrived by then;
+ * - else "wait": the list is provisional.
  * (The same "synced this session" signal the routine's suggested links wait for.)
  */
-export function syncGateOpen(s: { token: boolean; firstPull: boolean; lastSyncedAt: number | undefined; online: boolean; daySeen: number }): boolean {
-  if (!s.token || !s.online) return true;
-  return s.firstPull && typeof s.lastSyncedAt === "number" && s.lastSyncedAt >= s.daySeen;
+export function syncGate(s: { token: boolean; firstPull: boolean; lastFullSyncAt: number | undefined; online: boolean; daySeen: number }): GateMode {
+  if (!s.token) return "publish";
+  if (s.firstPull && typeof s.lastFullSyncAt === "number" && s.lastFullSyncAt >= s.daySeen) return "publish";
+  return s.online ? "wait" : "local";
 }
