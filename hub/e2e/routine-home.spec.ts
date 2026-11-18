@@ -60,6 +60,22 @@ const storedTicks = (page: Page) =>
     return rows.filter((r) => r.id.startsWith("routine-tick:") && r.done).length;
   });
 
+/** A step's stored title (undefined: no row, or no title of its own). */
+const storedTitle = (page: Page, stepId: string) =>
+  page.evaluate(async (id) => {
+    const db: IDBDatabase = await new Promise((res, rej) => {
+      const r = indexedDB.open("life-hub");
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    const row: { title?: string } | undefined = await new Promise((res) => {
+      const g = db.transaction("prefs").objectStore("prefs").get(`routine-step:${id}`);
+      g.onsuccess = () => res(g.result);
+    });
+    db.close();
+    return row?.title;
+  }, stepId);
+
 const routine = (page: Page) => page.getByRole("region", { name: "Today's routine" });
 const next = (page: Page) => routine(page).locator('[aria-current="step"]');
 
@@ -79,8 +95,8 @@ for (const width of [1280, 390]) {
       }
       await expect(next(page)).toContainText("Up between 8 and 9am");
       await expect(next(page)).toContainText("Minimum: out of bed in that window, even after a bad night");
-      await expect(routine(page).getByRole("list", { name: "Next steps" }).getByRole("listitem")).toHaveCount(3);
-      await expect(routine(page).getByText("More steps (7)")).toBeVisible();
+      await expect(routine(page).getByRole("list", { name: "Next steps" }).getByRole("listitem")).toHaveCount(1);
+      await expect(routine(page).getByText("More steps (9)")).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
 
       await routine(page).getByRole("checkbox", { name: "Mark done: Up between 8 and 9am" }).click();
@@ -90,13 +106,36 @@ for (const width of [1280, 390]) {
       await expect(routine(page).getByText("Done (1)")).toBeVisible();
     });
 
+    test("ticking with the keyboard keeps focus on the routine: the next step's box (review M4)", async ({ page }) => {
+      await open(page, width);
+      await routine(page).getByRole("checkbox", { name: "Mark done: Up between 8 and 9am" }).focus();
+      await page.keyboard.press("Space");
+      await expect(routine(page).getByText("1 of 10 today")).toBeVisible();
+      await expect(routine(page).getByRole("checkbox", { name: "Mark done: 5-minute meditation" })).toBeFocused();
+    });
+
+    // The phone's sheet fills the screen: no dimmed page to tap there.
+    for (const close of width === 390 ? (["Escape"] as const) : (["Escape", "the dimmed page"] as const)) {
+      test(`Edit routine: typed, then closed with ${close}, kept after a reload (review I2)`, async ({ page }) => {
+        await open(page, width);
+        await routine(page).getByRole("button", { name: "Edit routine" }).click();
+        const sheet = page.getByRole("dialog", { name: "Edit routine" });
+        await sheet.getByRole("listitem").nth(1).getByRole("textbox", { name: "Step" }).fill("Typed then closed (pretend)");
+        if (close === "Escape") await page.keyboard.press("Escape");
+        else await page.mouse.click(2, 2); // the dimmed page, outside the sheet
+        await expect(sheet).toHaveCount(0);
+        await expect.poll(() => storedTitle(page, "d2")).toBe("Typed then closed (pretend)"); // saved by the close
+        await page.reload();
+        await routine(page).getByText("More steps (9)").click();
+        await expect(routine(page).getByRole("checkbox", { name: "Mark done: Typed then closed (pretend)" })).toBeVisible();
+      });
+    }
+
     test("a linked step and its habit tick each other (one tick, same history)", async ({ page }) => {
       await open(page, width);
-      await routine(page).getByText("More steps (7)").click();
-      const step = routine(page).getByRole("listitem").filter({ hasText: "Vitamins with morning tea" });
-      await expect(step).toContainText("Linked to: Vitamins (pretend)");
+      await routine(page).getByText("More steps (9)").click();
       // Ticking the step ticks the habit on Today.
-      await step.getByRole("checkbox").click();
+      await routine(page).getByRole("checkbox", { name: "Mark done: Vitamins with morning tea" }).click();
       await expect(page.getByRole("checkbox", { name: "Done: Vitamins (pretend)" })).toBeChecked();
       await expect(routine(page).getByText("1 of 10 today")).toBeVisible();
       // Unticking the habit on Today unticks the step.
@@ -148,10 +187,40 @@ for (const width of [1280, 390]) {
       await page.reload();
       await expect(next(page)).toContainText("Sit quietly (pretend)");
       await expect(next(page)).toContainText("Minimum: one breath");
-      await routine(page).getByText("More steps (7)").click();
+      await routine(page).getByText("More steps (9)").click();
       await expect(routine(page).getByText("Stretch (pretend)")).toBeVisible();
       await expect(routine(page).getByText("Bed", { exact: true })).toHaveCount(0);
       await expect(routine(page).getByText("Linked to: Vitamins (pretend)")).toHaveCount(0);
     });
+  });
+}
+
+/* Review I3: the Mac Home must not scroll more than before the routine, with three goals on Home
+   and a full day of habits (made-up names). "Before" is the same page with the routine hidden. */
+for (const height of [900, 800]) {
+  test(`at 1280x${height} with three goals, Home is no taller than without the routine (review I3)`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date(`${DAY}T10:00:00`));
+    await page.setViewportSize({ width: 1280, height });
+    await page.goto("/");
+    await expect(routine(page)).toBeVisible();
+    const every = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+    const names = ["Plan my day", "Review my day", "Vitamins", "Up by 8am + light", "Wind down", "Stretch", "Water the plants", "Read a page", "Tidy the desk"];
+    const goal = (id: string, title: string, areaId: string): Row => ({
+      id, title, areaId, kind: "practice", monthlyTarget: 4, milestones: [], createdAt: "2026-11-01", onHome: true,
+    });
+    await seed(page, {
+      items: names.map((t, i) => ({
+        id: `h${i}`, kind: "task", title: `${t} (pretend)`, links: [], areaId: "mind", priority: 2, status: "open", createdAt: "2026-11-01", touchedAt: "2026-11-01", recur: every,
+      })),
+      goals: [goal("g1", "Learn pretend watercolour", "art"), goal("g2", "Post twice a week (pretend)", "content"), goal("g3", "Pretend calm", "mind")],
+    });
+    await page.reload();
+    await expect(page.locator(".home-goals .goal-mini")).toHaveCount(3);
+    await expect(routine(page).getByText("0 of 10 today")).toBeVisible();
+    const tall = () => page.evaluate(() => document.documentElement.scrollHeight);
+    const withRoutine = await tall();
+    await page.addStyleTag({ content: ".routine-home { display: none !important; }" });
+    const without = await tall();
+    expect(withRoutine).toBeLessThanOrEqual(without);
   });
 }

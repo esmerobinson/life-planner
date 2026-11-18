@@ -70,14 +70,14 @@ function useForm<F>(read: () => Promise<FormDay<F>>, deps: unknown[]): FormDay<F
   return day;
 }
 
+/** The daily log's day, for the routine hint under the schedule question. */
+const LogDate = createContext<ISODate | null>(null);
+
 /**
  * The daily log for `date`: today's (the app's day runs to 3am), or yesterday's (`yesterday`),
  * which she can still change until it is final (review I4). Yesterday's is folded until opened or
  * until something is in it.
  */
-/** The daily log's day, for the routine hint under the schedule question. */
-const LogDate = createContext<ISODate | null>(null);
-
 export function DailyLog({ jk, date, deviceId, yesterday = false, extra }: { jk: JournalKey; date: ISODate; deviceId: string; yesterday?: boolean; extra?: (day: FormDay<DayLogFields>) => ReactNode }) {
   const day = useForm(() => readDayLog(jk, date), [jk, date]);
   const started = !!day && (day.id !== "" || day.others.length > 0);

@@ -7,6 +7,7 @@ import { stepRowId, tickRowId } from "../domain/dailyRoutine";
 import type { Item } from "../domain/types";
 import { DailyRoutine, ROUTINE_HOME_WORDS as W } from "./DailyRoutine";
 import { HomePage } from "./HomePage";
+import { AUTOSAVE_MS } from "./useDraft";
 
 // "Today's routine" on Home, under the goals (Esme approved, 17 Nov 2026). All data is fictional.
 
@@ -31,17 +32,20 @@ function renderRoutine(today = TODAY) {
 const region = () => screen.getByRole("region", { name: W.heading });
 
 describe("Today's routine", () => {
-  it("shows the count, the next step highlighted with its minimum, two more, and the rest folded", async () => {
+  it("shows the count and only the next step in full (highlighted, with its minimum); the rest folded as titles", async () => {
     renderRoutine();
     expect(await screen.findByText("0 of 10 today")).toBeInTheDocument();
     const list = within(region()).getByRole("list", { name: W.listLabel });
     const shown = within(list).getAllByRole("listitem");
-    expect(shown).toHaveLength(3);
+    expect(shown).toHaveLength(1);
     expect(shown[0]).toHaveAttribute("aria-current", "step");
     expect(shown[0]).toHaveTextContent("Up between 8 and 9am");
     expect(shown[0]).toHaveTextContent(W.minimum("out of bed in that window, even after a bad night"));
-    expect(shown[1]).not.toHaveAttribute("aria-current");
-    expect(within(region()).getByText(W.more(7))).toBeInTheDocument();
+    expect(within(region()).getByText(W.more(9))).toBeInTheDocument();
+    // A folded step is its title only (no minimum line).
+    const meditation = screen.getByRole("checkbox", { name: "Mark done: 5-minute meditation" }).closest("li")!;
+    expect(meditation).not.toHaveAttribute("aria-current");
+    expect(meditation).toHaveTextContent(/^5-minute meditation$/);
     // Nothing red, nothing "missed".
     expect(region()).not.toHaveTextContent(/missed|late|overdue/i);
   });
@@ -67,9 +71,8 @@ describe("Today's routine", () => {
     renderRoutine();
     await waitFor(async () => expect((await db.prefs.get(stepRowId("d4")))?.id).toBeTruthy());
     expect(await db.items.count()).toBe(2); // no habit made
-    await user.click(await screen.findByText(W.more(7)));
-    const vit = (await screen.findByText(W.linked("Vitamins"))).closest("li")!;
-    await user.click(within(vit).getByRole("checkbox"));
+    await user.click(await screen.findByText(W.more(9)));
+    await user.click(screen.getByRole("checkbox", { name: "Mark done: Vitamins with morning tea" }));
     await waitFor(async () => expect((await db.items.get("h-vit"))!.doneDates).toEqual([TODAY]));
     expect(await db.prefs.get(tickRowId(TODAY, "d4"))).toBeUndefined();
   });
@@ -128,6 +131,55 @@ describe("Today's routine", () => {
     await user.click(within(sheet).getByRole("button", { name: W.close }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(await screen.findByText("0 of 10 today")).toBeInTheDocument();
+  });
+});
+
+describe("Edit routine saves however it closes (review I2)", () => {
+  for (const close of ["Escape", "the dimmed page", "Done"] as const) {
+    it(`a title and a minimum typed, then closed with ${close}: both saved`, async () => {
+      const user = userEvent.setup();
+      renderRoutine();
+      await user.click(await screen.findByRole("button", { name: W.edit }));
+      const sheet = await screen.findByRole("dialog", { name: W.editHeading });
+      const second = within(sheet).getAllByRole("listitem")[1]!;
+      await user.type(within(second).getByRole("textbox", { name: W.minLabel }), " (pretend)");
+      const title = within(second).getByRole("textbox", { name: W.stepLabel });
+      await user.clear(title);
+      await user.type(title, "Typed then closed");
+      if (close === "Escape") await user.keyboard("{Escape}");
+      else if (close === "Done") await user.click(within(sheet).getByRole("button", { name: W.close }));
+      else await user.pointer({ keys: "[MouseLeft]", target: sheet.parentElement! });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      // Saved by the close itself, well before a typing pause would have saved it.
+      await waitFor(
+        async () => expect(await db.prefs.get(stepRowId("d2"))).toMatchObject({ title: "Typed then closed", min: "three slow breaths on the edge of the bed (pretend)" }),
+        { timeout: AUTOSAVE_MS / 2 },
+      );
+    });
+  }
+
+  it("typing saves after a pause, with the sheet still open", async () => {
+    const user = userEvent.setup();
+    renderRoutine();
+    await user.click(await screen.findByRole("button", { name: W.edit }));
+    const sheet = await screen.findByRole("dialog", { name: W.editHeading });
+    await user.type(within(within(sheet).getAllByRole("listitem")[0]!).getByRole("textbox", { name: W.minLabel }), "!");
+    await waitFor(async () => expect(((await db.prefs.get(stepRowId("d1"))) as { min?: string } | undefined)?.min).toBe("out of bed in that window, even after a bad night!"), { timeout: 3000 });
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("a link to a habit that's gone shows as such, and Not linked really unlinks it (review M3)", async () => {
+    await db.items.put(habit("h-old", "Old pretend habit", { status: "archived" }));
+    await db.prefs.put({ id: stepRowId("d3"), habitId: "h-old" });
+    const user = userEvent.setup();
+    renderRoutine();
+    await user.click(await screen.findByRole("button", { name: W.edit }));
+    const sheet = await screen.findByRole("dialog", { name: W.editHeading });
+    const select = within(within(sheet).getAllByRole("listitem")[2]!).getByRole("combobox", { name: W.linkLabel });
+    expect(select).toHaveValue("h-old");
+    expect(within(select).getByRole("option", { name: W.goneHabit })).toBeInTheDocument();
+    await user.selectOptions(select, W.notLinked);
+    await waitFor(async () => expect(await db.prefs.get(stepRowId("d3"))).toMatchObject({ habitId: null }));
   });
 });
 

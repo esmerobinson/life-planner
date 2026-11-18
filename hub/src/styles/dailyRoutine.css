@@ -4,8 +4,10 @@
    goals sheet), and the one new thing, the next step's highlight, is the magenta placeholder.
    Composition calls made by the builder, for the Design session (Esme may veto):
    - the heading and the "6 of 10 today" count on one line, the count in the strips' small line;
-   - the next step and the two after it show; the other open steps fold into "More steps (N)";
-     finished steps fold into "Done (N)" (the Done fold-out's look, ticked and struck);
+   - only the next step shows in full (title, minimum, link); every other open step folds into
+     "More steps (N)" and finished ones into "Done (N)" (the Done fold-out's look, ticked and
+     struck), each as its title on one line (review I3: Home must not scroll more than before;
+     the coordinator's provisional call, for Design);
    - a section gap (--gap-section) above it, after the goals;
    - Edit routine is the Choose goals sheet: each step a --row box with its fields in two
      columns (one on the phone). */
@@ -41,6 +43,13 @@
 /* A step has no icons on its right: the tick box and the words. */
 .strip.routine-step {
   grid-template-columns: auto 1fr;
+}
+
+/* A folded step: its title on one line, cut with an ellipsis when too long (review I3). */
+.strip.routine-compact .strip-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* PLACEHOLDER (undecided): the next step's highlight. Obviously wrong on purpose. */

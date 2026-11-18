@@ -15,6 +15,7 @@ import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { playTickSparkle } from "./tickSparkle";
 import { useHubData } from "./useHubData";
+import { AUTOSAVE_MS, useHiddenFlush } from "./useDraft";
 
 /**
  * Every line of "Today's routine" (17 Nov 2026). PROVISIONAL WORDING, for Esme and the Design
@@ -37,6 +38,8 @@ export const ROUTINE_HOME_WORDS = {
   minLabel: "Minimum",
   linkLabel: "Linked habit",
   notLinked: "Not linked",
+  /** The linked habit is archived, in the Bin or no longer repeating. */
+  goneHabit: "A habit that's no longer active",
   up: (title: string) => `Move up: ${title}`,
   down: (title: string) => `Move down: ${title}`,
   remove: (title: string) => `Remove: ${title}`,
@@ -47,8 +50,6 @@ export const ROUTINE_HOME_WORDS = {
 };
 const W = ROUTINE_HOME_WORDS;
 
-/** How many unticked steps show before the rest fold away (the next one and two after it). */
-const SHOWN = 3;
 
 /** The routine's rows (steps and today's ticks), re-read on any change here, in another tab or from sync. */
 function useRoutineRows(today: ISODate) {
@@ -93,6 +94,7 @@ export function DailyRoutine({ today, headingLevel = 3 }: { today: ISODate; head
   const [editing, setEditing] = useState(false);
   // A box shows its new state at once; the re-read confirms it (a failed save puts it back).
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const section = useRef<HTMLElement>(null);
 
   const steps = useMemo(() => routineSteps(rows?.steps ?? []), [rows]);
   const day = useMemo(() => routineDay(steps, items, rows?.ticks ?? [], today), [steps, items, rows, today]);
@@ -112,11 +114,21 @@ export function DailyRoutine({ today, headingLevel = 3 }: { today: ISODate; head
 
   async function setDone(row: RoutineRowView, done: boolean, box: HTMLInputElement) {
     const was = box.getBoundingClientRect();
+    const focused = document.activeElement === box;
     setPending((p) => ({ ...p, [row.step.id]: done }));
     const ok = await attempt(() => setRoutineStepDone(row.step.id, today, done));
     if (ok && done) playTickSparkle(box.isConnected ? box : was); // unticking plays nothing
     if (ok) await changed();
     setPending(({ [row.step.id]: _drop, ...rest }) => rest);
+    // The ticked strip moves to another list: keep the keyboard on the routine (review M4), on
+    // the next step's box, else on Edit routine.
+    if (focused) {
+      requestAnimationFrame(() => {
+        const at = section.current;
+        const to = at?.querySelector<HTMLElement>('[aria-current="step"] input') ?? at?.querySelector<HTMLElement>(".routine-edit-link button");
+        to?.focus();
+      });
+    }
   }
 
   if (rows === null) return null;
@@ -124,16 +136,17 @@ export function DailyRoutine({ today, headingLevel = 3 }: { today: ISODate; head
   const view = day.rows.map((r) => (r.step.id in pending ? { ...r, done: pending[r.step.id]! } : r));
   const next = nextStepId(view);
   const open = view.filter((r) => !r.done);
-  const from = Math.max(0, open.findIndex((r) => r.step.id === next));
-  const shown = open.slice(from, from + SHOWN);
-  const more = open.filter((r) => !shown.includes(r));
+  // Only the next step in full; the rest fold away as one-line titles (review I3: Home must not
+  // scroll more than before; the coordinator's provisional call, for Design).
+  const shown = open.filter((r) => r.step.id === next);
+  const more = open.filter((r) => r.step.id !== next);
   const done = view.filter((r) => r.done);
   const strip = (r: RoutineRowView) => (
     <RoutineStrip key={r.step.id} row={r} next={r.step.id === next} onDone={(d, box) => void setDone(r, d, box)} />
   );
 
   return (
-    <section className="routine-home" aria-labelledby={headingId}>
+    <section ref={section} className="routine-home" aria-labelledby={headingId}>
       <div className="routine-top">
         <Heading id={headingId}>{W.heading}</Heading>
         {day.total > 0 && <span className="routine-count">{W.count(done.length, day.total)}</span>}
@@ -167,12 +180,15 @@ export function DailyRoutine({ today, headingLevel = 3 }: { today: ISODate; head
   );
 }
 
-/** One step: the strips' tick box, the title (with the habit symbol when linked), its minimum. */
+/**
+ * One step: the strips' tick box and the title (with the habit symbol when linked). The next step
+ * also shows its minimum and its link; every other step is its title on one line.
+ */
 function RoutineStrip({ row, next, onDone }: { row: RoutineRowView; next: boolean; onDone: (done: boolean, box: HTMLInputElement) => void }) {
   const { step, habit, done } = row;
   return (
     <li
-      className={["strip", "routine-step", next ? "routine-next" : "", done ? "crossed" : ""].filter(Boolean).join(" ")}
+      className={["strip", "routine-step", next ? "routine-next" : "routine-compact", done ? "crossed" : ""].filter(Boolean).join(" ")}
       aria-current={next ? "step" : undefined}
     >
       <input
@@ -191,8 +207,8 @@ function RoutineStrip({ row, next, onDone }: { row: RoutineRowView; next: boolea
           )}
           {step.title}
         </div>
-        {step.min && !done && <div className="strip-meta">{W.minimum(step.min)}</div>}
-        {habit && !done && <div className="strip-meta">{W.linked(habit.title)}</div>}
+        {next && step.min && <div className="strip-meta">{W.minimum(step.min)}</div>}
+        {next && habit && <div className="strip-meta">{W.linked(habit.title)}</div>}
       </div>
     </li>
   );
@@ -201,7 +217,8 @@ function RoutineStrip({ row, next, onDone }: { row: RoutineRowView; next: boolea
 /**
  * Edit routine, as a pop-up sheet (the Choose goals sheet's frame: Done, Escape or a click on
  * the dimmed page closes it). Each step: its title, its minimum, the habit it's linked to, move
- * up / down, remove. A new step at the bottom. Everything saves as she goes.
+ * up / down, remove. A new step at the bottom. Everything saves as she goes: typing saves after a
+ * pause, and whatever is still unsaved saves however the sheet closes (review I2).
  */
 function EditRoutineSheet({
   steps, items, onChanged, onClose,
@@ -293,35 +310,74 @@ function EditStep({
 }: { step: RoutineStep; habits: Item[]; first: boolean; last: boolean; save: (fn: () => Promise<unknown>) => Promise<void> }) {
   const [title, setTitle] = useState(step.title);
   const [min, setMin] = useState(step.min);
-  // A change saved elsewhere (or a refused blank title) shows here.
-  useEffect(() => setTitle(step.title), [step.title]);
-  useEffect(() => setMin(step.min), [step.min]);
-  const linked = typeof step.habitId === "string" && habits.some((h) => h.id === step.habitId) ? step.habitId : "";
+  /** What she has typed, and what is stored (or on its way): the difference is unsaved. */
+  const draft = useRef({ title: step.title, min: step.min });
+  const sent = useRef({ title: step.title, min: step.min });
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const latest = useRef({ save, id: step.id });
+  latest.current = { save, id: step.id };
 
-  function commitTitle() {
-    if (title.trim() === step.title) return;
-    if (title.trim() === "") {
-      setTitle(step.title); // a step keeps its title
-      return;
+  /** Saves whatever is unsaved now. A blank title is never saved (a step keeps its title). */
+  const flush = useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = undefined;
+    const t = draft.current.title.trim();
+    const m = draft.current.min.trim();
+    const change = {
+      ...(t !== "" && t !== sent.current.title ? { title: t } : {}),
+      ...(m !== sent.current.min ? { min: m } : {}),
+    };
+    if (Object.keys(change).length === 0) return;
+    sent.current = { title: change.title ?? sent.current.title, min: change.min ?? sent.current.min };
+    const { save: run, id } = latest.current;
+    void run(() => updateRoutineStep(id, change));
+  }, []);
+  useHiddenFlush(flush); // the app hidden or closed
+  useEffect(() => () => flush(), [flush]); // the sheet closed any way at all, or she went elsewhere
+
+  // A change stored elsewhere shows here, unless she is typing in that box.
+  const adopt = (key: "title" | "min", stored: string, set: (v: string) => void) => {
+    const mine = draft.current[key].trim();
+    const dirty = mine !== sent.current[key];
+    sent.current[key] = stored;
+    if (!dirty && mine !== stored) {
+      draft.current[key] = stored;
+      set(stored);
     }
-    void save(() => updateRoutineStep(step.id, { title }));
-  }
-  function commitMin() {
-    if (min.trim() !== step.min) void save(() => updateRoutineStep(step.id, { min }));
+  };
+  useEffect(() => adopt("title", step.title, setTitle), [step.title]);
+  useEffect(() => adopt("min", step.min, setMin), [step.min]);
+
+  const typed = (key: "title" | "min", v: string, set: (v: string) => void) => {
+    draft.current[key] = v;
+    set(v);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, AUTOSAVE_MS);
+  };
+  function leaveTitle() {
+    flush();
+    if (draft.current.title.trim() === "") {
+      draft.current.title = sent.current.title; // a step keeps its title
+      setTitle(sent.current.title);
+    }
   }
   const enterBlurs = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") e.currentTarget.blur();
   };
+  const live = typeof step.habitId === "string" && habits.some((h) => h.id === step.habitId);
+  // A link to a habit that's gone shows as such, so "Not linked" really unlinks it (review M3).
+  const stale = typeof step.habitId === "string" && !live ? step.habitId : null;
+  const linked = typeof step.habitId === "string" ? step.habitId : "";
 
   return (
     <li className="routine-edit-step">
       <label>
         <span>{W.stepLabel}</span>
-        <input type="text" value={title} maxLength={MAX_STEP_TITLE} onChange={(e) => setTitle(e.target.value)} onBlur={commitTitle} onKeyDown={enterBlurs} />
+        <input type="text" value={title} maxLength={MAX_STEP_TITLE} onChange={(e) => typed("title", e.target.value, setTitle)} onBlur={leaveTitle} onKeyDown={enterBlurs} />
       </label>
       <label>
         <span>{W.minLabel}</span>
-        <input type="text" value={min} maxLength={MAX_STEP_MIN} onChange={(e) => setMin(e.target.value)} onBlur={commitMin} onKeyDown={enterBlurs} />
+        <input type="text" value={min} maxLength={MAX_STEP_MIN} onChange={(e) => typed("min", e.target.value, setMin)} onBlur={flush} onKeyDown={enterBlurs} />
       </label>
       <label>
         <span>{W.linkLabel}</span>
@@ -333,6 +389,7 @@ function EditStep({
           }}
         >
           <option value="">{W.notLinked}</option>
+          {stale && <option value={stale}>{W.goneHabit}</option>}
           {habits.map((h) => (
             <option key={h.id} value={h.id}>
               {h.title}
