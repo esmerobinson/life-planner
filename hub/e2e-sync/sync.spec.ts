@@ -255,10 +255,13 @@ test("Today's routine: a step ticked on one device shows ticked on the other, th
   await ctxB.close();
 });
 
-/* Today stops refilling (small fixes 3, 2026-11-18): the day's picks (a today-fill prefs row) and
-   a "Remove from today" reach the other device, which shows the shorter list with nothing pulled
-   in to replace it; and back the other way. */
-test("Today: a to-do removed on one device is gone on the other too, with nothing replacing it", async ({ browser }) => {
+/* Today stops refilling (small fixes 3, 2026-11-18; fix round 1): the day's ONE shared picks row
+   and a "Remove from today" reach the other device. The other device opens Home in a new app
+   session BEFORE its first sync of the day has finished (the real morning path): it shows what
+   last night's copy has and writes no picks of its own; when the sync lands it shows the day's
+   first picks (the same row on both), without the removed one and with nothing pulled in.
+   (The tests share one server, so the day's first picks may come from an earlier test's device.) */
+test("Today: a phone that opens Home before its sync lands takes the Mac's picks; a removal on either is never replaced", async ({ browser }) => {
   const ctxA = await browser.newContext();
   const ctxB = await browser.newContext();
   const a = await ctxA.newPage();
@@ -276,17 +279,21 @@ test("Today: a to-do removed on one device is gone on the other too, with nothin
   });
   await a.getByRole("button", { name: "Merge" }).click();
   await expect(a.getByText(/^Added 6 tasks/)).toBeVisible();
+  await syncNow(a);
+  // The phone joins and has everything (last night).
+  await setUpSync(b);
 
   const list = (p: Page) => p.getByRole("list", { name: "Today", exact: true });
   const titles = async (p: Page) =>
     (await list(p).getByRole("checkbox").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""))).map((l) =>
       l.replace(/^Mark done: /, ""),
     );
-  const kept = async (p: Page) => (await readStore(p, "prefs")).filter((r) => r.id.startsWith("today-fill:")).length;
+  const kept = async (p: Page) => (await readStore(p, "prefs")).filter((r) => r.id.startsWith("today-fill:"));
 
+  // This morning on the Mac: Home keeps its picks; she removes one.
   await a.goto("/");
   await expect(list(a).getByRole("listitem")).toHaveCount(4);
-  await expect.poll(() => kept(a)).toBe(1);
+  await expect.poll(async () => (await kept(a)).length).toBe(1);
   const before = await titles(a);
   await a.getByRole("button", { name: `Move to: ${before[0]}` }).click();
   await a.getByRole("button", { name: "Remove from today" }).click();
@@ -294,13 +301,31 @@ test("Today: a to-do removed on one device is gone on the other too, with nothin
   await expect.poll(async () => (await readStore(a, "items")).find((r) => r.title === before[0])?.hiddenOn).toBeTruthy();
   await syncNow(a);
 
-  // B joins and opens Home only after its first sync: A's list, without the removed one.
-  await setUpSync(b);
+  // The phone opens fresh (a new app session) and its first sync is slow to land.
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await ctxB.route("**/v1/sync", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const keptBefore = await kept(b);
   await b.goto("/");
-  await expect(list(b).getByRole("listitem")).toHaveCount(3);
+  await expect(list(b).getByRole("listitem")).toHaveCount(4); // last night's copy: the removal hasn't arrived
+  await b.waitForTimeout(500);
+  // Nothing is kept from last night's copy: no picks written here, none waiting to send.
+  expect(await kept(b)).toEqual(keptBefore);
+  expect((await readStore(b, "pending")).filter((p) => String(p.id).startsWith("today-fill:"))).toEqual([]);
+  release();
+  // The sync lands: the Mac's list (the day's first picks, the same row on both), without the
+  // removed one, nothing pulled in.
+  await expect(list(b).getByRole("listitem")).toHaveCount(3, { timeout: 30_000 });
   expect(await titles(b)).toEqual(before.slice(1));
+  const [rowA] = await kept(a);
+  const [rowB] = await kept(b);
+  expect(rowB).toMatchObject({ id: rowA!.id, ids: rowA!.ids, pickedAt: rowA!.pickedAt });
+  await ctxB.unroute("**/v1/sync");
 
-  // B removes another; back on A it's gone and nothing new comes in.
+  // The phone removes another; back on the Mac it's gone and nothing new comes in.
   await b.getByRole("button", { name: `Move to: ${before[1]}` }).click();
   await b.getByRole("button", { name: "Remove from today" }).click();
   await expect(list(b).getByRole("listitem")).toHaveCount(2);
