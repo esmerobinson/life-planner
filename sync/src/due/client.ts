@@ -1,6 +1,10 @@
 // Talking to Due (Oliver's reminders server; due-integration.md in Esme's notes).
 //
-//   GET    /due/api/state          -> { state: { reminders: [...] } }
+//   GET    /due/api/reminders?type=esmeworld&from=<ISO with offset>
+//                                  -> { reminders: [{id, title, dueAt, completedAt, deletedAt, type}] }
+//                                  Oliver's filtered endpoint (17 Nov): our type only, due from
+//                                  `from` on, completed and deleted ones included (we rely on
+//                                  completedAt/deletedAt; reconcile.ts copes if they are left out)
 //   POST   /due/api/reminders      {id, title, dueAt, notes, type: "esmeworld"}; 400 "reminder
 //                                  already exists" when the id is taken (then DELETE, POST again)
 //   DELETE /due/reminder/<id>      cancels ({cancelled:false, reason:"unknown-id"} is fine too)
@@ -11,10 +15,11 @@
 // Due is down or refusing us (no answer, 5xx, 401, 403, 429) stops the whole run (`DueStop`):
 // it is tried again at the next cron run, never in a loop.
 //
-// Due's state lists every reminder it has ever held (all types, cancelled ones too), so it
-// grows every day. Only what's ours for the days that matter is read: a small answer is parsed
-// whole; a large one is scanned for our ids of those days (ids carry their day, rules.ts) and
-// only those reminders are parsed (review I3). Above MAX_STATE_BYTES the run stops.
+// The filtered list is small (a few days of ours). It is still read defensively, as the whole
+// state used to be: a small answer is parsed whole; a large one (a server ignoring the filter)
+// is scanned for our ids of the days that matter (ids carry their day, rules.ts) and only those
+// reminders are parsed (review I3). Above MAX_STATE_BYTES the run stops. An answer we can't read
+// stops the run with its status and its top-level shape (key names and types, never values).
 
 export const DUE_TIMEOUT_MS = 5_000;
 export const REMINDER_TYPE = "esmeworld";
@@ -55,7 +60,11 @@ export type StopCode =
   | "budget";
 
 export class DueStop extends Error {
-  constructor(readonly code: StopCode, readonly status = 0) {
+  /**
+   * `status`: the HTTP status, when there was an answer. `shape`: for an answer we couldn't
+   * read, its top-level shape (describeShape: key names and types only), safe to log.
+   */
+  constructor(readonly code: StopCode, readonly status = 0, readonly shape?: string) {
     super(code);
     this.name = "DueStop";
   }
@@ -109,14 +118,25 @@ export class DueClient {
     return res;
   }
 
-  /** Our reminders (type esmeworld) whose ids carry one of `days` ("yyyymmdd"), in any state. */
-  async state(days: readonly string[]): Promise<DueRemote[]> {
-    const res = await this.send("GET", "/due/api/state");
+  /**
+   * Our reminders (type esmeworld) whose ids carry one of `days` ("yyyymmdd"), in any state,
+   * from Due's list of those due from `from` (ISO-8601 with an offset) on.
+   */
+  async reminders(days: readonly string[], from: string): Promise<DueRemote[]> {
+    const res = await this.send("GET", `/due/api/reminders?type=${REMINDER_TYPE}&from=${encodeURIComponent(from)}`);
     if (!res.ok) {
       await res.body?.cancel();
       throw new DueStop("due_bad_state", res.status);
     }
-    return parseDueState(await readCapped(res, MAX_STATE_BYTES), days);
+    const text = await readCapped(res, MAX_STATE_BYTES);
+    try {
+      return parseDueState(text, days);
+    } catch (error) {
+      if (error instanceof DueStop && error.code === "due_bad_state") {
+        throw new DueStop("due_bad_state", res.status, describeShape(text, res.headers.get("Content-Type")));
+      }
+      throw error;
+    }
   }
 
   async create(reminder: NewReminder): Promise<CallResult> {
@@ -288,6 +308,42 @@ export function parseDueState(text: string, days: readonly string[]): DueRemote[
     }
   }
   return [...found.values()];
+}
+
+/** Keys that are plainly field names (a key with spaces or punctuation could be a title). */
+const SAFE_KEY = /^[A-Za-z_$][A-Za-z0-9_$]{0,31}$/;
+const SAFE_MIME = /^[A-Za-z0-9.+-]+\/[A-Za-z0-9.+-]+$/;
+/** The most keys named per object (the rest are counted). */
+const MAX_SHAPE_KEYS = 8;
+
+function shapeOf(v: unknown, depth: number): string {
+  if (v === null) return "null";
+  if (Array.isArray(v)) return "array";
+  if (typeof v !== "object") return typeof v;
+  if (depth <= 0) return "object";
+  const parts: string[] = [];
+  let unnamed = 0;
+  for (const [k, inner] of Object.entries(v)) {
+    if (parts.length < MAX_SHAPE_KEYS && SAFE_KEY.test(k)) parts.push(`${k}:${shapeOf(inner, depth - 1)}`);
+    else unnamed++;
+  }
+  if (unnamed) parts.push(`+${unnamed}`);
+  return `{${parts.join(",")}}`;
+}
+
+/**
+ * An answer's shape, safe to log: two levels of key names and value types, never a value, a
+ * title, or a key that isn't plainly a field name (those are only counted). Not JSON: its
+ * content type ("not_json(text/html)").
+ */
+export function describeShape(text: string, contentType: string | null): string {
+  if (text.trim() === "") return "empty";
+  try {
+    return shapeOf(JSON.parse(text), 2);
+  } catch {
+    const mime = (contentType ?? "").split(";")[0]!.trim();
+    return SAFE_MIME.test(mime) ? `not_json(${mime})` : "not_json";
+  }
 }
 
 function fallback(text: string, days: readonly string[]): DueRemote[] {

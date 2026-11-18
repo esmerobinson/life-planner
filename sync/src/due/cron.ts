@@ -13,16 +13,20 @@
 // - At most MAX_CALLS_PER_RUN calls to Due. Due down or refusing stops the run; after repeated
 //   refusals Due is left alone for BACKOFF_MS. Runs started by sync: at most one a minute.
 // - Turned Off and nothing left in Due: the run doesn't even ask Due.
-// - Logs are fixed codes only (never the token, a title or a Due answer).
+// - Logs are fixed codes only (never the token, a title or a Due answer), plus, when a run
+//   stops, the HTTP status and, for an answer it couldn't read, that answer's top-level shape
+//   (key names and types only: client.ts describeShape).
 // - D1 keeps, in `meta`, the ids this Worker cancelled (`due_x:<id>`, kept 3 days), so a
 //   reminder Esmeworld cancelled is never mistaken for one she dismissed (reconcile.ts).
+// - Due's list is asked from the start of yesterday in her zone (Oliver's filtered endpoint):
+//   every reminder of the three days looked at that can still go off is due after that.
 
 import type { Env } from "../env";
 import { DueClient } from "./client";
 import { DUE_PREFS_ID, PREFS_TABLE, readDuePrefs } from "./prefs";
 import { reconcile, type CancelLog, type RunReport } from "./reconcile";
 import { dayToken, wantedReminders, type DueItem } from "./rules";
-import { addDays, appDay, weekdayOf } from "./time";
+import { addDays, appDay, instantOf, isoInZone, weekdayOf } from "./time";
 
 /** Workers allow 50 subrequests per invocation; this leaves room. */
 export const MAX_CALLS_PER_RUN = 40;
@@ -242,14 +246,22 @@ export async function runDueReminders(env: Env, deps: DueDeps, fromSync = false)
       baseUrl: env.DUE_BASE_URL!, token: env.DUE_TOKEN!, fetch: deps.dueFetch, maxCalls: MAX_CALLS_PER_RUN,
       deadline: started + RUN_DEADLINE_MS, clock,
     });
+    const yesterday = addDays(day, -1);
     const report = await reconcile(client, wanted, {
       timeZone: prefs.timeZone,
       now,
-      days: [addDays(day, -1), day, addDays(day, 1)].map(dayToken),
+      days: [yesterday, day, addDays(day, 1)].map(dayToken),
+      from: isoInZone(instantOf(yesterday, "00:00", prefs.timeZone), prefs.timeZone),
       log: await cancelLog(env.DB, now),
     });
     // "budget" is the 3am changeover's normal case (the rest goes next run): not worth a log line.
-    if (report.stopped && report.stopped !== "budget") console.error("due_reminders_stopped", report.stopped);
+    // With the HTTP status, and an unreadable answer's shape (key names and types only).
+    if (report.stopped && report.stopped !== "budget") {
+      const status = `status=${report.stoppedStatus ?? 0}`;
+      if (report.stoppedShape !== undefined) console.error("due_reminders_stopped", report.stopped, status, `shape=${report.stoppedShape}`);
+      else if (report.stoppedStatus) console.error("due_reminders_stopped", report.stopped, status);
+      else console.error("due_reminders_stopped", report.stopped);
+    }
     if (report.stopped === "due_rejecting") await metaSet(env.DB, "due_backoff", now + BACKOFF_MS);
     // Off, and Due has nothing left of ours: later runs needn't ask Due until she turns it on.
     await metaSet(env.DB, "due_off_clean", !prefs.on && !report.stopped ? 1 : 0);

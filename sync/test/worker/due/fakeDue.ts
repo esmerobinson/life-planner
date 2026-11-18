@@ -1,5 +1,11 @@
 // A stand-in for Due's server, as due-integration.md describes it. Nothing here ever reaches
 // the network. It holds reminders in memory, records every call, and can be told to fail.
+//
+// Reading is Oliver's filtered endpoint (17 Nov): GET /due/api/reminders?type=…&from=… ->
+// {reminders:[{id,title,dueAt,completedAt,deletedAt,type}]}, only those fields, due from `from`
+// on. /due/api/state is not served here (a 404), so nothing can quietly go back to it.
+
+import { parseDueAt } from "../../../src/due/time";
 
 export const FAKE_DUE_URL = "https://due.example.test";
 export const FAKE_DUE_TOKEN = "fake-due-token-not-real";
@@ -17,6 +23,8 @@ export interface FakeReminder {
 export interface FakeCall {
   method: string;
   path: string;
+  /** The query string, as sent (still encoded). */
+  search: string;
   auth: string | null;
   body?: Record<string, unknown>;
 }
@@ -32,8 +40,12 @@ export class FakeDue {
   refuse: ((body: Record<string, unknown>) => boolean) | null = null;
   /** How Due stores what it was sent (an echo in another format). */
   echo: ((r: FakeReminder) => FakeReminder) | null = null;
-  /** Other reminders in the state (other apps, other days), sent as they are. */
+  /** Other reminders in the list (other apps, other days), sent as they are, unfiltered. */
   filler: unknown[] = [];
+  /** Leave completed and deleted reminders out of the list (in case the real endpoint does). */
+  omitDismissed = false;
+  /** Answer the list with this body instead (a string is sent as it is), status 200. */
+  listBody: unknown = undefined;
   /** Runs before every call (tests move a clock with it). */
   onCall: (() => void) | null = null;
 
@@ -58,7 +70,7 @@ export class FakeDue {
     const request = new Request(input, init);
     const url = new URL(request.url);
     const body = request.method === "POST" ? ((await request.json()) as Record<string, unknown>) : undefined;
-    this.calls.push({ method: request.method, path: url.pathname, auth: request.headers.get("Authorization"), body });
+    this.calls.push({ method: request.method, path: url.pathname, search: url.search, auth: request.headers.get("Authorization"), body });
     this.onCall?.();
     if (this.failWith !== null && (this.failOnly === null || this.failOnly.includes(request.method))) {
       if (this.failWith === "down") throw new TypeError("network down");
@@ -67,10 +79,20 @@ export class FakeDue {
     if (url.origin !== FAKE_DUE_URL) return new Response("wrong host", { status: 404 });
     if (request.headers.get("Authorization") !== `Bearer ${FAKE_DUE_TOKEN}`) return Response.json({ error: "unauthorized" }, { status: 401 });
 
-    if (request.method === "GET" && url.pathname === "/due/api/state") {
-      return Response.json({
-        state: { reminders: [...this.filler, ...this.reminders.values(), { id: "oliver-1", title: "Not ours", type: "manual", completedAt: null, deletedAt: null }] },
-      });
+    if (request.method === "GET" && url.pathname === "/due/api/reminders") {
+      if (this.listBody !== undefined) {
+        return typeof this.listBody === "string" ? new Response(this.listBody, { headers: { "Content-Type": "text/html" } }) : Response.json(this.listBody);
+      }
+      const type = url.searchParams.get("type");
+      const from = Date.parse(url.searchParams.get("from") ?? "");
+      if (!type || Number.isNaN(from)) return Response.json({ error: "bad query" }, { status: 400 });
+      const listed = [...this.reminders.values(), { id: "oliver-1", title: "Not ours", dueAt: "2026-11-16T09:00:00", type: "manual", completedAt: null, deletedAt: null }]
+        .filter((r) => r.type === type && parseDueAt(r.dueAt) >= from)
+        .filter((r) => !this.omitDismissed || (r.completedAt === null && r.deletedAt === null))
+        // Only the endpoint's own fields (no notes).
+        .map(({ id, title, dueAt, completedAt, deletedAt, type: t }) => ({ id, title, dueAt, completedAt, deletedAt, type: t }));
+      // `filler` is sent unfiltered: as if the server ignored the query.
+      return Response.json({ reminders: [...this.filler, ...listed] });
     }
     if (request.method === "POST" && url.pathname === "/due/api/reminders") {
       const b = body!;

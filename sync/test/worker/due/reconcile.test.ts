@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DueClient, FULL_PARSE_BYTES, parseDueState } from "../../../src/due/client";
+import { DueClient, DueStop, FULL_PARSE_BYTES, describeShape, parseDueState } from "../../../src/due/client";
 import { MAX_CANCELS_PER_KEY, MAX_REJECTIONS, NOTES, planCalls, reconcile, versionId, type CancelLog } from "../../../src/due/reconcile";
 import type { Wanted } from "../../../src/due/rules";
 import { FAKE_DUE_TOKEN, FAKE_DUE_URL, FakeDue } from "./fakeDue";
@@ -8,6 +8,8 @@ const NY = "America/New_York";
 const at = (local: string) => Date.parse(`${local}-05:00`);
 const NOW = at("2026-11-16T08:00:00");
 const DAYS = ["20261115", "20261116", "20261117"];
+/** The start of the first of DAYS in her zone: what the cron asks Due's list from. */
+const FROM = "2026-11-15T00:00:00-05:00";
 const w = (slot: string, local: string, title = `T ${slot}`): Wanted => ({ key: `esmeworld-20261116-${slot}`, kind: "plan", title, at: at(local) });
 
 /** The cron's log of the ids it cancelled, in memory, with the order of events. */
@@ -30,7 +32,7 @@ let clock: number;
 const client = (maxCalls = 40, deadline?: number) =>
   new DueClient({ baseUrl: FAKE_DUE_URL, token: FAKE_DUE_TOKEN, fetch: due.fetch, maxCalls, deadline, clock: () => clock });
 const go = (wanted: Wanted[], opts: { now?: number; maxCalls?: number; deadline?: number; timeZone?: string } = {}) =>
-  reconcile(client(opts.maxCalls, opts.deadline), wanted, { timeZone: opts.timeZone ?? NY, now: opts.now ?? NOW, days: DAYS, log: mem.log });
+  reconcile(client(opts.maxCalls, opts.deadline), wanted, { timeZone: opts.timeZone ?? NY, now: opts.now ?? NOW, days: DAYS, from: FROM, log: mem.log });
 
 beforeEach(() => {
   due = new FakeDue();
@@ -46,7 +48,7 @@ describe("Due diff and upsert, against a fake Due", () => {
     expect(versionId(plan)).toMatch(/^esmeworld-20261116-plan-v[0-9a-f]{8}$/);
     expect(due.mutations()).toEqual([
       {
-        method: "POST", path: "/due/api/reminders", auth: `Bearer ${FAKE_DUE_TOKEN}`,
+        method: "POST", path: "/due/api/reminders", search: "", auth: `Bearer ${FAKE_DUE_TOKEN}`,
         // In Due's own zone (US Eastern) dueAt is plain local time, exactly as Due's doc shows it.
         body: { id: versionId(plan), title: "Plan your day", dueAt: "2026-11-16T09:00:00", notes: NOTES, type: "esmeworld" },
       },
@@ -212,7 +214,7 @@ describe("Due diff and upsert, against a fake Due", () => {
     due.seed({ id: versionId(plan) });
     const realFetch = due.fetch;
     due.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (new Request(input, init).method === "GET") return Response.json({ state: { reminders: [] } });
+      if (new Request(input, init).method === "GET") return Response.json({ reminders: [] });
       return realFetch(input, init);
     }) as typeof fetch;
     const report = await go([plan]);
@@ -301,8 +303,100 @@ describe("reading Due's state (review I3)", () => {
   it("a state too large is refused (the run stops) rather than parsed", async () => {
     due.filler = Array.from({ length: 30_000 }, (_, i) => old(i)); // about 4 MB
     const tiny = new DueClient({ baseUrl: FAKE_DUE_URL, token: FAKE_DUE_TOKEN, fetch: due.fetch, maxCalls: 5 });
-    expect((await tiny.state(DAYS)).length).toBe(0);
+    expect((await tiny.reminders(DAYS, FROM)).length).toBe(0);
     due.filler = Array.from({ length: 70_000 }, (_, i) => old(i)); // about 9 MB
-    await expect(tiny.state(DAYS)).rejects.toMatchObject({ code: "due_state_too_large" });
+    await expect(tiny.reminders(DAYS, FROM)).rejects.toMatchObject({ code: "due_state_too_large" });
+  });
+});
+
+describe("Oliver's filtered endpoint (18 Nov)", () => {
+  const list = (maxCalls = 5) => new DueClient({ baseUrl: FAKE_DUE_URL, token: FAKE_DUE_TOKEN, fetch: due.fetch, maxCalls });
+  const stopOf = async (p: Promise<unknown>) => {
+    try {
+      await p;
+    } catch (error) {
+      if (error instanceof DueStop) return error;
+      throw error;
+    }
+    throw new Error("expected a stop");
+  };
+
+  it("reads GET /due/api/reminders?type=esmeworld&from=<her start of yesterday>, never /api/state", async () => {
+    await go([w("plan", "2026-11-16T09:00:00")]);
+    const gets = due.calls.filter((c) => c.method === "GET");
+    expect(gets).toHaveLength(1);
+    expect(gets[0]!.path).toBe("/due/api/reminders");
+    const q = new URLSearchParams(gets[0]!.search);
+    expect(q.get("type")).toBe("esmeworld");
+    expect(q.get("from")).toBe(FROM);
+  });
+
+  it("a + offset is sent encoded (a bare + would reach Due as a space)", async () => {
+    await list().reminders(DAYS, "2026-11-15T00:00:00+01:00");
+    expect(due.calls[0]!.search).toBe("?type=esmeworld&from=2026-11-15T00%3A00%3A00%2B01%3A00");
+    expect(new URLSearchParams(due.calls[0]!.search).get("from")).toBe("2026-11-15T00:00:00+01:00");
+  });
+
+  it("an empty list is fine: nothing of ours in Due, so today's are created", async () => {
+    due.listBody = { reminders: [] };
+    expect(await list().reminders(DAYS, FROM)).toEqual([]);
+    due.listBody = undefined;
+    const report = await go([w("plan", "2026-11-16T09:00:00")]);
+    expect(report.stopped).toBeUndefined();
+    expect(report.done.created).toBe(1);
+  });
+
+  it("works with exactly the endpoint's fields (no notes): a replay changes nothing", async () => {
+    const wanted = [w("plan", "2026-11-16T09:00:00"), w("d1-a", "2026-11-16T11:00:00")];
+    await go(wanted);
+    due.calls = [];
+    expect((await list().reminders(DAYS, FROM)).every((r) => !("notes" in r))).toBe(true);
+    due.calls = [];
+    expect((await go(wanted)).done).toEqual({ cancelled: 0, created: 0, rejected: 0 });
+    expect(due.mutations()).toEqual([]);
+  });
+
+  it("no reminders array: the run stops, nothing is created or cancelled, and the stop says status and shape", async () => {
+    due.seed({ id: "esmeworld-20261116-d1-old-v0000abcd" });
+    due.listBody = { state: { reminders: {} }, ok: true };
+    const report = await go([w("plan", "2026-11-16T09:00:00")]);
+    expect(report).toMatchObject({ stopped: "due_bad_state", stoppedStatus: 200, stoppedShape: "{state:{reminders:object},ok:boolean}" });
+    expect(due.mutations()).toEqual([]);
+    expect(due.activeIds()).toEqual(["esmeworld-20261116-d1-old-v0000abcd"]);
+  });
+
+  it("reminders that isn't an array, or a bare array, is a bad state too", async () => {
+    due.listBody = { reminders: "x" };
+    expect(await stopOf(list().reminders(DAYS, FROM))).toMatchObject({ code: "due_bad_state", status: 200, shape: "{reminders:string}" });
+    due.listBody = [];
+    expect(await stopOf(list().reminders(DAYS, FROM))).toMatchObject({ code: "due_bad_state", shape: "array" });
+  });
+
+  it("a body that isn't JSON (a login page): shape not_json with its content type, never the text", async () => {
+    due.listBody = "<html>Secret page</html>";
+    const stop = await stopOf(list().reminders(DAYS, FROM));
+    expect(stop).toMatchObject({ code: "due_bad_state", status: 200, shape: "not_json(text/html)" });
+    expect(JSON.stringify(stop)).not.toContain("Secret");
+  });
+
+  it("a non-2xx answer (404: endpoint not there) stops with its status and no shape; nothing changes", async () => {
+    due.seed({ id: "esmeworld-20261116-d1-old-v0000abcd" });
+    due.failWith = 404;
+    const report = await go([w("plan", "2026-11-16T09:00:00")]);
+    expect(report).toMatchObject({ stopped: "due_bad_state", stoppedStatus: 404 });
+    expect(report.stoppedShape).toBeUndefined();
+    expect(due.calls).toHaveLength(1);
+    expect(due.activeIds()).toEqual(["esmeworld-20261116-d1-old-v0000abcd"]);
+  });
+
+  it("the shape names keys and types only: never values, and never a key that could be a title", () => {
+    const text = JSON.stringify({ "Buy milk for Oliver": "private", data: { inner: "secret value", n: 3, list: [1] }, x: null });
+    const shape = describeShape(text, "application/json");
+    expect(shape).toBe("{data:{inner:string,n:number,list:array},x:null,+1}");
+    expect(shape).not.toMatch(/milk|private|secret/);
+    expect(describeShape("", null)).toBe("empty");
+    expect(describeShape("nope", "text/html; charset=utf-8")).toBe("not_json(text/html)");
+    expect(describeShape("nope", "weird type with spaces")).toBe("not_json");
+    expect(describeShape(JSON.stringify(Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`k${i}`, i]))), null)).toMatch(/,\+4}$/);
   });
 });

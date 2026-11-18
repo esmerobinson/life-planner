@@ -56,6 +56,10 @@ export interface Plan {
 export interface RunReport extends Plan {
   done: { cancelled: number; created: number; rejected: number };
   stopped?: DueStop["code"];
+  /** The HTTP status behind the stop, when there was one. */
+  stoppedStatus?: number;
+  /** An unreadable answer's shape (key names and types only): safe to log. */
+  stoppedShape?: string;
 }
 
 const isNullish = (v: unknown) => v === null || v === undefined;
@@ -137,6 +141,8 @@ export interface ReconcileOptions {
   now: number;
   /** The days ("yyyymmdd") whose reminders are looked at: yesterday, today and tomorrow. */
   days: readonly string[];
+  /** Due's list is asked from this moment on (ISO with offset): the start of the first of `days`. */
+  from: string;
   log: CancelLog;
 }
 
@@ -157,7 +163,7 @@ export async function reconcile(client: DueClient, wanted: readonly Wanted[], op
     }
   };
   try {
-    plan = planCalls(wanted, await client.state(opts.days), opts.log.cancelled, opts.now);
+    plan = planCalls(wanted, await client.reminders(opts.days, opts.from), opts.log.cancelled, opts.now);
     // What she ticked off goes first ("done means cancelled").
     await cancelAll(plan.cancel);
     const older = [...plan.replaced];
@@ -173,6 +179,13 @@ export async function reconcile(client: DueClient, wanted: readonly Wanted[], op
     await cancelAll(older);
     return { ...plan, done };
   } catch (error) {
-    return { ...plan, done, stopped: error instanceof DueStop ? error.code : "due_unreachable" };
+    if (!(error instanceof DueStop)) return { ...plan, done, stopped: "due_unreachable" };
+    return {
+      ...plan,
+      done,
+      stopped: error.code,
+      ...(error.status ? { stoppedStatus: error.status } : {}),
+      ...(error.shape !== undefined ? { stoppedShape: error.shape } : {}),
+    };
   }
 }

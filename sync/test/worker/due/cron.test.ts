@@ -146,7 +146,7 @@ describe("Due reminders: the cron run", () => {
     await runAt(MORNING);
     spy.mockRestore();
     expect(due.calls).toHaveLength(1);
-    expect(logged).toEqual([["due_reminders_stopped", "due_server_error"]]);
+    expect(logged).toEqual([["due_reminders_stopped", "due_server_error", "status=503"]]);
     expect(JSON.stringify(logged)).not.toContain(FAKE_DUE_TOKEN);
     due.failWith = null;
     await runAt(MORNING + 15 * 60_000);
@@ -354,5 +354,52 @@ describe("Due reminders: sync", () => {
       now: MORNING, envOverride: { DUE_TOKEN: FAKE_DUE_TOKEN, DUE_BASE_URL: FAKE_DUE_URL }, deps: { dueFetch: due.fetch, waitUntil: (p) => void later.push(p) },
     });
     expect(later).toHaveLength(0);
+  });
+});
+
+describe("Due reminders: the filtered endpoint (18 Nov)", () => {
+  const fromOf = () => new URLSearchParams(due.calls.find((c) => c.method === "GET")!.search).get("from");
+
+  it("asks for her reminders from the start of yesterday in her zone", async () => {
+    await put([{ table: "prefs", data: prefsRow() }]);
+    await runAt(MORNING);
+    expect(due.calls[0]).toMatchObject({ method: "GET", path: "/due/api/reminders" });
+    expect(new URLSearchParams(due.calls[0]!.search).get("type")).toBe("esmeworld");
+    expect(fromOf()).toBe("2026-11-15T00:00:00-05:00");
+  });
+
+  it("before 3am her day is still the day before, so `from` goes back one more", async () => {
+    await put([{ table: "prefs", data: prefsRow() }]);
+    await runAt(at("2026-11-17T02:00:00"));
+    expect(fromOf()).toBe("2026-11-15T00:00:00-05:00");
+  });
+
+  it("in another zone, `from` carries that zone's offset", async () => {
+    await put([{ table: "prefs", data: prefsRow({ timeZone: "Europe/Paris" }) }]);
+    await runAt(MORNING); // 14:00 in Paris
+    expect(fromOf()).toBe("2026-11-15T00:00:00+01:00");
+  });
+
+  it("a body it can't read: the stop log has the status and the shape, never values or the token", async () => {
+    await put([{ table: "prefs", data: prefsRow() }]);
+    due.listBody = { data: { items: [{ id: "esmeworld-x", title: "Private title" }] }, "Private key": 1 };
+    const logged: unknown[][] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...args) => void logged.push(args));
+    await runAt(MORNING);
+    spy.mockRestore();
+    expect(logged).toEqual([["due_reminders_stopped", "due_bad_state", "status=200", "shape={data:{items:array},+1}"]]);
+    expect(JSON.stringify(logged)).not.toMatch(/Private|esmeworld-x/);
+    expect(JSON.stringify(logged)).not.toContain(FAKE_DUE_TOKEN);
+    expect(due.mutations()).toEqual([]);
+  });
+
+  it("a non-2xx answer logs its status", async () => {
+    await put([{ table: "prefs", data: prefsRow() }]);
+    due.failWith = 404;
+    const logged: unknown[][] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...args) => void logged.push(args));
+    await runAt(MORNING);
+    spy.mockRestore();
+    expect(logged).toEqual([["due_reminders_stopped", "due_bad_state", "status=404"]]);
   });
 });
