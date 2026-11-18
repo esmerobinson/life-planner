@@ -179,3 +179,54 @@ test.describe("on a computer (Esme: \"do what's best\", 2026-11-17)", () => {
     await expect(sheet(page).getByRole("textbox", { name: "What's on your mind?" })).toHaveCount(0);
   });
 });
+
+// Esme, 2026-11-17: "needs to be add button on new smaller add task feature".
+for (const width of [390, 1280]) {
+  test.describe(`the Add button at ${width}px`, () => {
+    test.use({ viewport: { width, height: width === 390 ? 844 : 800 } });
+
+    test("disabled when empty; a tap saves with the chips, clears, stays open, keeps focus, says Added", async ({ page }) => {
+      await home(page);
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      const add = sheet(page).getByRole("button", { name: "Add to Inbox" });
+      await expect(add).toHaveText("Add");
+      await expect(add).toBeDisabled();
+      // Just after the box: on its row, or right under it.
+      const b = (await box(page).boundingBox())!;
+      const a = (await add.boundingBox())!;
+      const sameRow = Math.abs(a.y + a.height - (b.y + b.height)) < 2 && a.x >= b.x + b.width;
+      const under = a.y >= b.y + b.height && a.y - (b.y + b.height) < 24;
+      expect(sameRow || under, JSON.stringify({ a, b })).toBe(true);
+      if (width === 390) expect(sameRow).toBe(true); // it fits on the row at 390
+      const m = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, w: window.innerWidth }));
+      expect(m.sw).toBeLessThanOrEqual(m.w);
+
+      await page.keyboard.type("Pretend tapped Add");
+      await sheet(page).getByRole("button", { name: "Today" }).click();
+      await box(page).focus();
+      await expect(add).toBeEnabled();
+      await add.click();
+      await expect(sheet(page).getByRole("status")).toHaveText("Added");
+      await expect(box(page)).toHaveValue("");
+      await expect(box(page)).toBeFocused();
+      await expect(add).toBeDisabled();
+      await expect(sheet(page)).toBeVisible();
+      // Focus never left the box during the tap (the phone's keyboard stays up).
+      await page.keyboard.type("Pretend second tap");
+      await page.evaluate(() => {
+        const input = document.querySelector(".quick-capture input[type=text]")!;
+        (window as unknown as { blurred: boolean }).blurred = false;
+        input.addEventListener("blur", () => ((window as unknown as { blurred: boolean }).blurred = true));
+      });
+      await add.click();
+      await expect(sheet(page).getByRole("status")).toHaveText("Added");
+      expect(await page.evaluate(() => (window as unknown as { blurred: boolean }).blurred)).toBe(false);
+
+      await page.keyboard.press("Escape");
+      if (await sheet(page).count()) await sheet(page).getByRole("button", { name: "Close" }).click();
+      await expect(page.getByRole("list", { name: "Today" }).getByText("Pretend tapped Add")).toBeVisible();
+      await page.goto("/inbox");
+      await expect(page.getByText("Pretend second tap")).toBeVisible();
+    });
+  });
+}
