@@ -45,8 +45,12 @@ async function setUpByTyping(page: Page, passphrase = PASS) {
   await page.goto("/sync");
   await page.getByLabel("Sync address").fill(ADDRESS);
   await page.getByLabel("Passphrase", { exact: true }).fill(passphrase);
+  // Wait for the sync this Save starts (a "Last synced" line from before may already be there,
+  // and under load the first one can take a while: review RM7).
+  const synced = page.waitForResponse((r) => r.url().endsWith("/v1/sync") && r.request().method() === "POST", { timeout: 90_000 });
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText(/^Last synced /)).toBeVisible({ timeout: 30_000 });
+  await synced;
+  await expect(page.getByText(/^Last synced /)).toBeVisible({ timeout: 90_000 });
   // Save's journal step (three key derivations) finishes on this page before anything navigates.
   await expect
     .poll(() => page.evaluate(async () => {
@@ -54,7 +58,7 @@ async function setUpByTyping(page: Page, passphrase = PASS) {
       const { db } = await at("/src/data/db.ts");
       const keys = await at("/src/journal/keyStore.ts");
       return (await keys.confirmJournalKey(db)) === "confirmed" && !(await keys.loadCandidate(db));
-    }), { timeout: 30_000 })
+    }), { timeout: 90_000 })
     .toBe(true);
 }
 
@@ -198,7 +202,7 @@ const WORRY_B = "Pretend worry written on the phone";
 const STEADY_B = "Pretend steady words from the phone, about a pretend fern.";
 
 test("a fresh Sync page visit shows a code with no passphrase; the phone scans it, syncs, reads the Mac's journal and writes one back", async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const server = new FakeSyncServer(await deriveToken(PASS));
   const a = await device(browser, server);
   await setUpByTyping(a.page);
@@ -257,7 +261,7 @@ test("a fresh Sync page visit shows a code with no passphrase; the phone scans i
 });
 
 test("v1 codes still work both ways: a new phone reads an older Mac's code; a new Mac still shows one for an older phone", async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const server = new FakeSyncServer(await deriveToken(PASS));
   const a = await device(browser, server);
   await setUpByTyping(a.page);
@@ -302,7 +306,7 @@ test("a device whose passphrase was refused offers no code at all", async ({ bro
 });
 
 test("a journal set up before the re-key update: the code sets up sync only and says so; the passphrase typed once then brings the journal along", async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const server = new FakeSyncServer(await deriveToken(PASS));
   const a = await device(browser, server);
   await setUpByTyping(a.page);
@@ -363,7 +367,7 @@ test("a journal set up before the re-key update: the code sets up sync only and 
 });
 
 test("after a passphrase change, the Mac's code carries the new one; the paired phone later changes it again with no old-passphrase prompt", async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const NEWER = "fake-pair-v2-e2e-newer-passphrase-4b8f";
   const server = new FakeSyncServer(await deriveToken(PASS));
   const a = await device(browser, server);
@@ -398,7 +402,7 @@ test("after a passphrase change, the Mac's code carries the new one; the paired 
 });
 
 test("a device that already syncs refuses a code for another address or another journal, and changes nothing (review C1)", async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const server = new FakeSyncServer(await deriveToken(PASS));
   const a = await device(browser, server);
   await setUpByTyping(a.page);
