@@ -767,22 +767,25 @@ async function fromSecret(s: Uint8Array): Promise<{ jk: JournalKey; s: Uint8Arra
 }
 
 /**
- * Whether a pairing code's journal secret fits this device (review C1):
+ * Whether a pairing code's journal secret fits this device (review C1, RI1):
  * - "same": it makes this device's confirmed key (nothing to change);
- * - "other": this device has a confirmed key with another fingerprint, a verifier here that it
- *   doesn't open, or a retired key of another fingerprint (the verifier changed under it): the
- *   code is refused, so a scanned code can never re-seal a journal this device already knows;
- * - "new": none of that (it may become a candidate, confirmed only by the verifier).
+ * - "other": this device has a confirmed key with another fingerprint, or the journal's
+ *   verifier here doesn't open with it: the code is refused, so a scanned code can never
+ *   re-seal a journal this device already knows;
+ * - "new": the verifier here opens with it (proof, even if this device once retired another
+ *   key: the verifier has since moved on), or there is no verifier and nothing to contradict it
+ *   (then it waits as a candidate, confirmed only by the verifier);
+ * - "unproven": no verifier here to prove it, and this device retired a key of another
+ *   fingerprint: the journal part is left out (the passphrase opens it), the sync part may stay.
  */
-export async function pairingJournalCheck(db: HubDB, s: Uint8Array): Promise<"same" | "new" | "other"> {
+export async function pairingJournalCheck(db: HubDB, s: Uint8Array): Promise<"same" | "new" | "unproven" | "other"> {
   const m = await fromSecret(s);
   if (!m) return "other";
   const confirmed = await loadJournalKeyInfo(db);
   if (confirmed) return confirmed.fp === m.jk.fp ? "same" : "other";
-  if ((await loadRetired(db)).some((r) => r.fp !== m.jk.fp)) return "other";
   const verifier = await db.journal.get(VERIFIER_ID);
-  if (verifier && !(await verifierAccepts(m.jk, verifier))) return "other";
-  return "new";
+  if (verifier) return (await verifierAccepts(m.jk, verifier)) ? "new" : "other";
+  return (await loadRetired(db)).some((r) => r.fp !== m.jk.fp) ? "unproven" : "new";
 }
 
 /**
@@ -812,7 +815,8 @@ export async function unlockJournalWithSecret(db: HubDB, s: Uint8Array, codeToke
   if (typeof token !== "string" || !token) return "no-sync";
   if (codeToken !== token) return "code-refused";
   const fit = await pairingJournalCheck(db, s);
-  if (fit === "other") return (await db.journal.get(VERIFIER_ID)) && !(await loadRetired(db)).length ? "wrong" : "code-refused";
+  if (fit === "other") return (await db.journal.get(VERIFIER_ID)) ? "wrong" : "code-refused";
+  if (fit === "unproven") return "code-refused"; // nothing here proves it: the passphrase does
   if (fit === "same") return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "wrong";
   if (!(await storeCandidate(db, { ...m, fromCode: true }, null))) return "wrong";
   return (await confirmJournalKey(db)) === "confirmed" ? "ok" : "checking";

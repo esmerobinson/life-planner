@@ -229,7 +229,7 @@ describe("pairingJournalCheck: does a code's secret fit this device's journal?",
     expect(await pairingJournalCheck(mac, await deriveJournalSecret("pretend-other-journal"))).toBe("other");
   });
 
-  it("other when a verifier is here that it can't open, or this device retired a different key", async () => {
+  it("other only when a verifier here doesn't open with it; a retired key alone never makes it 'other' (review RI1)", async () => {
     const d = device();
     await d.journal.put(await verifierRow(await keyFor(A)));
     expect(await pairingJournalCheck(d, await deriveJournalSecret("pretend-other-journal"))).toBe("other");
@@ -240,7 +240,29 @@ describe("pairingJournalCheck: does a code's secret fit this device's journal?",
     const other = "pretend-other-journal";
     await mac.journal.put({ ...(await verifierRow(await keyFor(other))), updatedAt: Date.now() + 1000 });
     expect(await confirmJournalKey(mac)).toBe("locked"); // A retired
-    expect(await pairingJournalCheck(mac, await deriveJournalSecret(other))).toBe("other");
+    expect(await pairingJournalCheck(mac, await deriveJournalSecret(other))).toBe("new"); // the current verifier proves it
+    expect(await pairingJournalCheck(mac, await deriveJournalSecret(A))).toBe("other"); // the retired key's own secret doesn't open it
+    // No verifier here to prove anything, and a retired key of another fingerprint: unproven.
+    await mac.journal.delete(VERIFIER_ID);
+    expect(await pairingJournalCheck(mac, await deriveJournalSecret(other))).toBe("unproven");
+  });
+
+  it("the reviewer's case: a locked phone holding an older retired key takes her Mac's genuine code (review RI1)", async () => {
+    const server = new FakeSyncServer(await deriveToken(A));
+    const { mac, page } = await macWithPage(server);
+    // The phone once had a key the journal's verifier overruled (an old conflict): retired, locked.
+    const phone = device();
+    await saveSyncSettings(phone, { serverUrl: SERVER, token: await deriveToken(A) });
+    const older = await keyFor("pretend-older-losing-key");
+    await phone.syncMeta.put({ key: "journalRetired", value: [{ key: older.key, mac: older.mac, fp: older.fp }] });
+    expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");
+    expect(await confirmJournalKey(phone)).toBe("locked");
+    expect(await phone.syncMeta.get("journalRetired")).toBeTruthy();
+
+    const s = (await journalSecretForPairing(mac))!;
+    expect(await pairingJournalCheck(phone, s)).toBe("new");
+    expect(await saveJournalKeyFromPairing(phone, s, await deriveToken(A))).toBe("confirmed");
+    expect(await readPage(phone, page)).toBe("A pretend page from the Mac.");
   });
 
   it("saveJournalKeyFromPairing never touches a device that already has a working key", async () => {
@@ -289,7 +311,7 @@ describe("Unlock journal with a v2 code (Journal page)", () => {
     expect(await confirmJournalKey(d)).toBe("confirmed");
   });
 
-  it("refused after the verifier changed to another key on this device (its old key is retired)", async () => {
+  it("after the verifier changed under this device (its old key retired): a code whose secret opens the CURRENT verifier unlocks (review RI1)", async () => {
     const server = new FakeSyncServer(await deriveToken(A));
     const { mac } = await macWithPage(server);
     const token = await deriveToken(A);
@@ -297,7 +319,11 @@ describe("Unlock journal with a v2 code (Journal page)", () => {
     const other = "pretend-other-journal";
     await mac.journal.put({ ...(await verifierRow(await keyFor(other))), updatedAt: Date.now() + 1000 });
     expect(await confirmJournalKey(mac)).toBe("locked");
-    expect(await unlockJournalWithSecret(mac, await deriveJournalSecret(other), token)).toBe("code-refused");
-    expect(await loadJournalKey(mac)).toBeUndefined();
+    // A secret that opens neither: still refused, nothing stored.
+    expect(await unlockJournalWithSecret(mac, await deriveJournalSecret("pretend-third-journal"), token)).toBe("wrong");
+    expect(await mac.syncMeta.get("journalCandidate")).toBeUndefined();
+    // The verifier proves this one: it becomes the confirmed key.
+    expect(await unlockJournalWithSecret(mac, await deriveJournalSecret(other), token)).toBe("ok");
+    expect((await loadJournalKey(mac))!.fp).toBe((await keyFor(other)).fp);
   });
 });

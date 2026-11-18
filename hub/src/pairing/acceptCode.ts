@@ -26,6 +26,11 @@ export type CodeVerdict =
       journal: "same" | "new" | "none";
       /** A new device and an address other than this build's usual one: ask her first. */
       confirmAddress: boolean;
+      /**
+       * The code's secret couldn't be proven here (no verifier yet, and this device retired
+       * another key): sync only; her passphrase, typed once, opens the journal (review RI1).
+       */
+      journalNeedsPassphrase: boolean;
     }
   | { ok: false; why: "other-address" | "other-journal" | "bad-address"; serverUrl: string };
 
@@ -65,10 +70,14 @@ export async function checkPairingCode(
   if (!known && !codeAddressAllowed(serverUrl, { dev, typed: opts.typed })) return { ok: false, why: "bad-address", serverUrl };
   if (configured && current !== serverUrl) return { ok: false, why: "other-address", serverUrl };
   let journal: "same" | "new" | "none" = "none";
+  let journalNeedsPassphrase = false;
   if (code.secret) {
     const fit = await pairingJournalCheck(db, code.secret);
     if (fit === "other") return { ok: false, why: "other-journal", serverUrl };
-    journal = fit;
+    if (fit === "unproven") journalNeedsPassphrase = true;
+    else journal = fit;
   }
-  return { ok: true, serverUrl, configured, journal, confirmAddress: !configured && serverUrl !== buildDefaultAddress() };
+  return {
+    ok: true, serverUrl, configured, journal, confirmAddress: !configured && serverUrl !== buildDefaultAddress(), journalNeedsPassphrase,
+  };
 }

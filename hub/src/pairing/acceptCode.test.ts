@@ -66,7 +66,7 @@ describe("checkPairingCode (review C1)", () => {
   it("a new device: accepted; a non-default address must be confirmed, the usual one not", async () => {
     const d = device();
     expect(await checkPairingCode(d, await code(), { dev: false })).toEqual({
-      ok: true, serverUrl: HERS, configured: false, journal: "new", confirmAddress: true,
+      ok: true, serverUrl: HERS, configured: false, journal: "new", confirmAddress: true, journalNeedsPassphrase: false,
     });
     expect(await checkPairingCode(d, await code({ serverUrl: null }), { dev: false })).toMatchObject({
       ok: true, serverUrl: DEFAULT_SYNC_URL, confirmAddress: false,
@@ -91,7 +91,7 @@ describe("checkPairingCode (review C1)", () => {
       ok: false, why: "other-journal",
     });
     expect(await checkPairingCode(d, await code(), { dev: false })).toEqual({
-      ok: true, serverUrl: HERS, configured: true, journal: "same", confirmAddress: false,
+      ok: true, serverUrl: HERS, configured: true, journal: "same", confirmAddress: false, journalNeedsPassphrase: false,
     });
     expect(await checkPairingCode(d, await code({ secret: null }), { dev: false })).toMatchObject({ ok: true, journal: "none" });
   });
@@ -103,6 +103,16 @@ describe("checkPairingCode (review C1)", () => {
       ok: false, why: "other-journal",
     });
     expect(await checkPairingCode(d, await code(), { dev: false })).toMatchObject({ ok: true, journal: "new" });
+  });
+
+  it("a locked device with a retired key and no verifier to prove the code: sync only, never 'another journal' (review RI1)", async () => {
+    const d = device();
+    await saveSyncSettings(d, { serverUrl: HERS, token: await deriveToken(PASS) });
+    const older = await keyFor("pretend-older-losing-key");
+    await d.syncMeta.put({ key: "journalRetired", value: [{ key: older.key, mac: older.mac, fp: older.fp }] });
+    expect(await checkPairingCode(d, await code(), { dev: false })).toEqual({
+      ok: true, serverUrl: HERS, configured: true, journal: "none", confirmAddress: false, journalNeedsPassphrase: true,
+    });
   });
 
   it("an http address this device already syncs with is allowed (it isn't new)", async () => {
