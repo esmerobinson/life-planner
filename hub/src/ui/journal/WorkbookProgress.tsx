@@ -4,14 +4,17 @@ import type { Workbook } from "../../journal/workbooks";
 import { ProgressBar } from "../ProgressBar";
 import { JournalSheet } from "./JournalSheet";
 
-/** "Day 3 of 151" and "Chapter 1 of 22" (the second only when the book has chapters). */
-const position = (b: Workbook) => `${b.word} ${b.n} of ${b.total}`;
+/**
+ * "64 cards done · 87 to go" (Esme, 2026-11-09: cards, not "Day N of 151"; the counts the bar
+ * already shows) and "Chapter 1 of 22" (the second only when the book has chapters).
+ */
+const position = (b: Workbook) => `${b.done} ${b.done === 1 ? "card" : "cards"} done · ${b.total - b.done} to go`;
 const chapterOf = (b: Workbook) => (b.chapter !== null ? `Chapter ${b.chapter} of ${b.chapters}` : "");
 const barName = (b: Workbook) => [b.name, position(b), chapterOf(b)].filter(Boolean).join(" · ");
 
 /**
  * The workbook bars (journal v3, Esme's pick 2A; mockup cards-progress-reading.html): one slim
- * bar per book at the top of the Mental health exercise tab, "BPD workbook · Day N of 151" with
+ * bar per book at the top of the Mental health exercise tab, "BPD workbook · 64 cards done · 87 to go" with
  * "Chapter C of 22" on the right, over the normal progress bar. Each bar is a button opening
  * the chapter map on that book; "Chapter map" beside them opens it too.
  */

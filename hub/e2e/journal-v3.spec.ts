@@ -70,9 +70,12 @@ for (const width of [1280, 390]) {
       const today = s.getByRole("article", { name: "Today's card" });
       await today.getByLabel("Your response").fill("Pretend: a made-up answer");
       await today.getByRole("button", { name: "Submit" }).click();
-      const bpd = s.getByRole("button", { name: "BPD workbook · Day 2 of 4 · Chapter 1 of 2" });
+      // Cards done and to go (Esme, 2026-11-09), never "Day N of …".
+      const bpd = s.getByRole("button", { name: "BPD workbook · 1 card done · 3 to go · Chapter 1 of 2" });
       await expect(bpd).toBeVisible();
-      await expect(s.getByRole("button", { name: "DBT skills · Card 1 of 3 · Chapter 1 of 2" })).toBeVisible();
+      await expect(bpd.getByText("1 card done · 3 to go")).toBeVisible();
+      await expect(s.getByRole("button", { name: "DBT skills · 0 cards done · 3 to go · Chapter 1 of 2" })).toBeVisible();
+      await expect(s.locator(".wb-bars").getByText(/Day \d+ of|Card \d+ of/)).toHaveCount(0);
       await noSidewaysScroll(page);
       await shoot(page, `v3-bars-${width}`);
       await bpd.click();

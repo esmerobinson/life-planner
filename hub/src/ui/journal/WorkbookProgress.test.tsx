@@ -51,8 +51,11 @@ it("two slim bars at the top of the tab, worked out from the cards and progress"
   await someDone();
   renderApp("/journal/exercise", TODAY);
   const s = await section();
-  const bpd = await within(s).findByRole("button", { name: "BPD workbook · Day 2 of 4 · Chapter 1 of 2" });
-  const dbt = within(s).getByRole("button", { name: "DBT skills · Card 2 of 3 · Chapter 2 of 2" });
+  // Cards done and to go (Esme, 2026-11-09: "64 cards done · 87 to go", not "Day N of 151").
+  const bpd = await within(s).findByRole("button", { name: "BPD workbook · 1 card done · 3 to go · Chapter 1 of 2" });
+  const dbt = within(s).getByRole("button", { name: "DBT skills · 1 card done · 2 to go · Chapter 2 of 2" });
+  expect(within(bpd).getByText("1 card done · 3 to go")).toHaveClass("nowrap");
+  expect(within(s).queryByText(/Day \d+ of|Card \d+ of/)).toBeNull();
   expect(within(bpd).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "25");
   expect(within(dbt).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "33");
   expect(bpd.closest(".wb-bars")).not.toBeNull();
@@ -68,7 +71,7 @@ it("a book with no cards has no bar", async () => {
   await importExerciseCards(jk, onlyFirst, "2026-10-01");
   renderApp("/journal/exercise", TODAY);
   const s = await section();
-  expect(await within(s).findByRole("button", { name: /^BPD workbook · Day 1 of 4/ })).toBeInTheDocument();
+  expect(await within(s).findByRole("button", { name: /^BPD workbook · 0 cards done · 4 to go/ })).toBeInTheDocument();
   expect(within(s).queryByRole("button", { name: /DBT skills/ })).toBeNull();
 });
 
@@ -82,6 +85,8 @@ it("tapping a bar opens the chapter map on that book: a row per chapter, done/to
   const map = await screen.findByRole("dialog", { name: "Your workbooks" });
   expect(within(map).getByRole("button", { name: "DBT" })).toHaveAttribute("aria-pressed", "true");
   expect(within(map).getByRole("button", { name: "BPD" })).toHaveAttribute("aria-pressed", "false");
+  // The book's summary bar in the map says cards too.
+  expect(map.querySelector(".wb-summary-label b")?.textContent).toBe("1 card done · 2 to go");
   const chapters = () => within(within(map).getByRole("list", { name: /chapters$/ })).getAllByRole("listitem");
   const rows = chapters();
   expect(rows.map((r) => r.querySelector(".wb-ch-title")?.textContent)).toEqual(["1 · Pretend hilltop", "2 · Pretend valley"]);
