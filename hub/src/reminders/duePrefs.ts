@@ -9,12 +9,13 @@
 //
 // The Worker checks the same rules (sync/src/due/prefs.ts) and refuses a malformed row. A
 // later version may add fields (allowed here). The table also holds Today's routine rows
-// ("routine-step:…", "routine-tick:…", domain/dailyRoutine.ts), which the Worker stores without
-// reading. A `prefs` row with any other id is for a later version (refused here, so sync keeps
+// ("routine-step:…", "routine-tick:…", domain/dailyRoutine.ts) and Today's picks ("today-fill:…",
+// domain/todayFill.ts), which the Worker stores without reading. A `prefs` row with any other id is for a later version (refused here, so sync keeps
 // it in quarantine until an update reads it).
 // No database import here, so the change tracker can use the validator without a cycle.
 
 import { isRoutineRowId, validRoutineRow, type RoutineRow } from "../domain/dailyRoutine";
+import { isTodayFillRowId, validTodayFillRow, type TodayFillRow } from "../domain/todayFill";
 
 export const DUE_PREFS_ID = "due";
 export const MAX_LINES = 50;
@@ -77,12 +78,13 @@ export function isTimeZone(tz: unknown): tz is string {
   }
 }
 
-/** Every row the synced `prefs` table holds: the Due settings and Today's routine. */
-export type PrefsRow = DuePrefsRow | RoutineRow;
+/** Every row the synced `prefs` table holds: the Due settings, Today's routine and Today's picks. */
+export type PrefsRow = DuePrefsRow | RoutineRow | TodayFillRow;
 
-/** One prefs row is valid (sync, local writes): the "due" row, or a routine row. */
+/** One prefs row is valid (sync, local writes): the "due" row, a routine row, or a today-fill row. */
 export function validPrefs(r: unknown): r is PrefsRow {
   if (isObj(r) && isRoutineRowId(r.id)) return validRoutineRow(r);
+  if (isObj(r) && isTodayFillRowId(r.id)) return validTodayFillRow(r);
   return validDuePrefs(r);
 }
 

@@ -3,6 +3,7 @@ import { daysBetween, weekdayOf } from "./dates";
 import { monthlyProgress } from "./progress";
 import { doneToday, isHabit } from "./habits";
 import { doneTodayIndex, isProject, plannedToday } from "./projects";
+import type { TodayFill } from "./todayFill";
 
 /**
  * Ticked off today: a habit with today in its done log, a to-do completed today, or a
@@ -80,12 +81,13 @@ function behindPace(
   return (done[g.id] ?? 0) < (g.monthlyTarget * elapsed) / monthLen;
 }
 
-export function pickToday(
-  items: Item[],
-  goals: Goal[],
-  today: ISODate,
-  thisMonthDone: Record<string, number>,
-): { rhythm: Item[]; picks: Item[]; alsoDue: Item[] } {
+/**
+ * The parts of Today's list: the rhythm (habits due today); what always shows (pinned to today,
+ * a project session planned today, due today or overdue); the places left to fill (`room`) and
+ * the fill candidates in the order they would fill them (due in the next few days, then priority
+ * 1, then the priority 2 rotation; on Sunday only the first two due soon).
+ */
+function todayParts(items: Item[], goals: Goal[], today: ISODate, thisMonthDone: Record<string, number>) {
   const goalMap = new Map(goals.map((g) => [g.id, g]));
   const wd = weekdayOf(today);
   const behind = (it: Item) => (behindPace(it, goalMap, today, thisMonthDone) ? 0 : 1);
@@ -122,46 +124,91 @@ export function pickToday(
   // hidden in a dropdown menu that says also due").
   const dueNow = due.filter((i) => i.due! <= today);
   const dueSoon = due.filter((i) => i.due! > today);
-  const picks = [...pinned, ...dueNow];
+  const always = [...pinned, ...dueNow];
 
   if (wd === "sun") {
     const room = Math.max(0, SUNDAY_DUE_LIMIT - dueNow.length);
-    picks.push(...dueSoon.slice(0, room));
-    return { rhythm, picks, alsoDue: dueSoon.slice(room) };
+    return { rhythm, always, rest, dueSoon, room, candidates: dueSoon.slice(0, SUNDAY_DUE_LIMIT) };
   }
-
-  const dueRoom = Math.max(0, CAPACITY - picks.length);
-  picks.push(...dueSoon.slice(0, dueRoom));
-  const alsoDue = dueSoon.slice(dueRoom);
 
   const dueIds = new Set(due.map((i) => i.id));
   const p1 = rest
     .filter((i) => i.priority === 1 && !dueIds.has(i.id) && !isProject(i) && !inbox(i))
     .sort((a, b) => behind(a) - behind(b));
-  picks.push(...p1.slice(0, Math.max(0, CAPACITY - picks.length)));
+  const p2 = rest.filter((i) => i.priority === 2 && !dueIds.has(i.id) && !isProject(i) && !inbox(i));
+  const start = p2.length > 0 ? daysBetween("1970-01-01", today) % p2.length : 0;
+  const rotated = [...p2.slice(start), ...p2.slice(0, start)];
+  const room = Math.max(0, CAPACITY - always.length);
+  return { rhythm, always, rest, dueSoon, room, candidates: [...dueSoon, ...p1, ...rotated] };
+}
 
-  if (picks.length < CAPACITY) {
-    const p2 = rest.filter((i) => i.priority === 2 && !dueIds.has(i.id) && !isProject(i) && !inbox(i));
-    if (p2.length > 0) {
-      const start = daysBetween("1970-01-01", today) % p2.length;
-      const count = Math.min(CAPACITY - picks.length, p2.length);
-      for (let k = 0; k < count; k++) picks.push(p2[(start + k) % p2.length]);
-    }
-  }
+/**
+ * Today's list. `frozen`: the day's picks as first shown (domain/todayFill.ts). With them, the
+ * list keeps those picks while they are still open and on for today, and only a place that was
+ * never filled takes a new one: a pick removed, moved or ticked off is never replaced
+ * (Esme, 2026-11-06). Pins and what is due today or overdue always show either way.
+ */
+export function pickToday(
+  items: Item[],
+  goals: Goal[],
+  today: ISODate,
+  thisMonthDone: Record<string, number>,
+  frozen?: TodayFill,
+): { rhythm: Item[]; picks: Item[]; alsoDue: Item[] } {
+  const parts = todayParts(items, goals, today, thisMonthDone);
+  const { rhythm, always, dueSoon } = parts;
+  const fill = fillFrom(parts, frozen);
+  const picks = [...always, ...fill];
+  const shown = new Set(picks.map((i) => i.id));
+  return { rhythm, picks, alsoDue: dueSoon.filter((i) => !shown.has(i.id)) };
+}
 
-  return { rhythm, picks, alsoDue };
+/** The picks that fill the list: as the day first had them (still on), then any place never filled. */
+function fillFrom(
+  { always, rest, room, candidates }: { always: Item[]; rest: Item[]; room: number; candidates: Item[] },
+  frozen: TodayFill | undefined,
+): Item[] {
+  if (!frozen) return candidates.slice(0, room);
+  const alwaysIds = new Set(always.map((i) => i.id));
+  const kept = new Set(frozen.ids);
+  // A kept pick shows while it is still one Today could pick: open, not removed or moved off today.
+  const pickable = new Map(rest.map((i) => [i.id, i]));
+  const still = frozen.ids.map((id) => pickable.get(id)).filter((i): i is Item => i !== undefined && !alwaysIds.has(i.id));
+  const fresh = candidates.filter((i) => !kept.has(i.id) && !alwaysIds.has(i.id));
+  return [...still, ...fresh.slice(0, Math.max(0, frozen.room - frozen.ids.length))];
+}
+
+/** Each active goal's ticks this month (inactive goals don't count: goals redesign). */
+function pace(items: Item[], goals: Goal[], today: ISODate) {
+  const active = goals.filter((g) => g.active !== false);
+  const done = Object.fromEntries(active.map((g) => [g.id, monthlyProgress(g, items, today)?.done ?? 0]));
+  return { active, done };
 }
 
 /**
  * Today's list exactly as Home shows it (TodayPanel; the farm reads it too): the picks from
- * the active goals' pace, with what was ticked off today kept as withTickedOff says.
+ * the active goals' pace (kept for the day as `frozen` says), with what was ticked off today
+ * kept as withTickedOff says.
  */
 export function todayList(
   items: Item[],
   goals: Goal[],
   today: ISODate,
+  frozen?: TodayFill,
 ): { rhythm: Item[]; picks: Item[]; alsoDue: Item[]; doneToday: Item[] } {
-  const active = goals.filter((g) => g.active !== false); // inactive goals don't count (goals redesign)
-  const done = Object.fromEntries(active.map((g) => [g.id, monthlyProgress(g, items, today)?.done ?? 0]));
-  return withTickedOff(pickToday(items, active, today, done), items, today);
+  const { active, done } = pace(items, goals, today);
+  return withTickedOff(pickToday(items, active, today, done, frozen), items, today);
+}
+
+/**
+ * What Home records for the day (domain/todayFill.ts): the picks filling the list (`frozen`'s
+ * ids first, then any that took a place never filled) and how many places there were. With no
+ * `frozen`, the day's first: the picks as worked out now.
+ */
+export function todayFill(items: Item[], goals: Goal[], today: ISODate, frozen?: TodayFill): TodayFill {
+  const { active, done } = pace(items, goals, today);
+  const parts = todayParts(items, active, today, done);
+  const shown = fillFrom(parts, frozen).map((i) => i.id);
+  if (!frozen) return { ids: shown, room: parts.room };
+  return { ids: [...new Set([...frozen.ids, ...shown])], room: frozen.room };
 }

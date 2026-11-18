@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickToday, CAPACITY, DUE_HORIZON, tickedOffToday, withTickedOff } from "./triage";
+import { pickToday, CAPACITY, DUE_HORIZON, tickedOffToday, todayFill, todayList, withTickedOff } from "./triage";
 import type { Item, Goal } from "./types";
 
 let n = 0;
@@ -269,5 +269,147 @@ describe("project to-dos on Today", () => {
     const p = item({ id: "p", sessions: [{ id: "a", doneOn: MON }, { id: "b", plannedFor: MON }, { id: "c" }] });
     expect(tickedOffToday(p, MON)).toBe(false);
     expect(ids(pick([p]).picks)).toEqual(["p"]);
+  });
+});
+
+describe("Today stops refilling (Esme, 2026-11-06: a removed task was 'constantly replaced')", () => {
+  // The morning's picks, kept for the day (domain/todayFill.ts), then the list as Home shows it.
+  const morning = (items: Item[], day = TUE) => todayFill(items, [], day);
+  const shown = (items: Item[], frozen: ReturnType<typeof todayFill>, day = TUE) => {
+    const out = todayList(items, [], day, frozen);
+    return { picks: ids(out.picks), alsoDue: ids(out.alsoDue), doneToday: ids(out.doneToday) };
+  };
+  const pool = () => [
+    item({ id: "a1", priority: 1 }),
+    item({ id: "a2", priority: 1 }),
+    ...[1, 2, 3, 4, 5, 6].map((k) => item({ id: `b${k}`, priority: 2 })),
+  ];
+  const off = (xs: Item[], id: string, o: Partial<Item>) => xs.map((x) => (x.id === id ? { ...x, ...o } : x));
+
+  it("todayFill: the picks that filled the list and how many places there were (pins and due-today are not fill)", () => {
+    const items = [item({ id: "pin", pinnedDate: TUE }), item({ id: "now", due: TUE }), ...pool()];
+    const f = morning(items);
+    expect(f.room).toBe(2);
+    expect(f.ids).toHaveLength(2);
+    expect(f.ids).not.toContain("pin");
+    expect(f.ids).not.toContain("now");
+    expect(f.ids.slice(0, 2)).toEqual(["a1", "a2"]);
+  });
+
+  it("with no frozen picks the list is worked out as before", () => {
+    const items = pool();
+    expect(ids(todayList(items, [], TUE).picks)).toEqual(ids(todayList(items, [], TUE, undefined).picks));
+  });
+
+  it("removed from today: nothing replaces it, the list just gets shorter", () => {
+    const items = pool();
+    const f = morning(items);
+    const before = shown(items, f).picks;
+    expect(before).toHaveLength(CAPACITY);
+    const gone = off(items, before[0]!, { hiddenOn: TUE });
+    expect(shown(gone, f).picks).toEqual(before.slice(1));
+    // Removing another: still nothing new.
+    const twice = off(gone, before[1]!, { hiddenOn: TUE });
+    expect(shown(twice, f).picks).toEqual(before.slice(2));
+  });
+
+  it("removing a priority 2 pick doesn't reshuffle the others", () => {
+    const items = pool();
+    const f = morning(items);
+    const before = shown(items, f).picks;
+    const p2 = before.filter((x) => x.startsWith("b"));
+    const gone = off(items, p2[0]!, { hiddenOn: TUE });
+    expect(shown(gone, f).picks).toEqual(before.filter((x) => x !== p2[0]));
+  });
+
+  it("moved to tomorrow, to This week, archived, deleted or made an idea: never replaced", () => {
+    const items = pool();
+    const f = morning(items);
+    const before = shown(items, f).picks;
+    const [x0, x1, x2, x3] = before as [string, string, string, string];
+    let after = off(items, x0, { pinnedDate: WED });
+    after = off(after, x1, { status: "archived" });
+    after = off(after, x2, { status: "deleted", deletedAt: TUE });
+    after = off(after, x3, { kind: "idea" });
+    expect(shown(after, f).picks).toEqual([]);
+  });
+
+  it("ticked off: it goes to Done today and nothing takes its place; unticked, it comes back", () => {
+    const items = pool();
+    const f = morning(items);
+    const before = shown(items, f).picks;
+    const done = off(items, before[0]!, { status: "done", completedAt: TUE });
+    expect(shown(done, f)).toMatchObject({ picks: before.slice(1), doneToday: [before[0]] });
+    expect(shown(items, f).picks).toEqual(before);
+  });
+
+  it("due today or overdue always shows, however full the frozen list is", () => {
+    const items = pool();
+    const f = morning(items);
+    const later = [...items, item({ id: "late", due: "2026-10-20" }), item({ id: "now", due: TUE })];
+    const out = shown(later, f).picks;
+    expect(out).toContain("late");
+    expect(out).toContain("now");
+    expect(out).toHaveLength(CAPACITY + 2);
+  });
+
+  it("she can still add to Today herself: a pin shows and pushes nothing off", () => {
+    const items = pool();
+    const f = morning(items);
+    const before = shown(items, f).picks;
+    const added = [...items, item({ id: "mine", pinnedDate: TUE })];
+    expect(shown(added, f).picks).toEqual(["mine", ...before]);
+  });
+
+  it("removing a pin or a due-today item: nothing replaces it either", () => {
+    const items = [item({ id: "pin", pinnedDate: TUE }), item({ id: "now", due: TUE }), ...pool()];
+    const f = morning(items);
+    const before = shown(items, f).picks;
+    let after = off(items, "pin", { pinnedDate: undefined, hiddenOn: TUE });
+    after = off(after, "now", { hiddenOn: TUE });
+    expect(shown(after, f).picks).toEqual(before.filter((x) => x !== "pin" && x !== "now"));
+  });
+
+  it("a new priority 1 to-do never pushes a pick off; it waits when the list was full", () => {
+    const items = pool();
+    const f = morning(items);
+    const before = shown(items, f).picks;
+    const more = [...items, item({ id: "new-p1", priority: 1 })];
+    expect(shown(more, f).picks).toEqual(before);
+  });
+
+  it("a place that was never filled (too few to-dos that morning) can still take a new one", () => {
+    const items = [item({ id: "only", priority: 1 })];
+    const f = morning(items);
+    expect(f).toEqual({ ids: ["only"], room: CAPACITY });
+    const more = [...items, item({ id: "n1", priority: 1 }), item({ id: "n2", priority: 2 })];
+    expect(shown(more, f).picks).toEqual(["only", "n1", "n2"]);
+    // Once shown, they are kept too (Home records them), so removing one is never refilled.
+    const f2 = todayFill(more, [], TUE, f);
+    expect(f2).toEqual({ ids: ["only", "n1", "n2"], room: CAPACITY });
+    const fuller = [...more, item({ id: "n3", priority: 2 }), item({ id: "n4", priority: 2 })];
+    expect(shown(fuller, f2).picks).toHaveLength(CAPACITY);
+    const f3 = todayFill(fuller, [], TUE, f2);
+    const removed = off(off(fuller, "only", { hiddenOn: TUE }), "n1", { hiddenOn: TUE });
+    expect(shown(removed, f3).picks).toEqual(f3.ids.filter((x) => x !== "only" && x !== "n1"));
+    // Nothing new to record: the same ids come back.
+    expect(todayFill(removed, [], TUE, f3)).toEqual(f3);
+  });
+
+  it("something due in a few days that wasn't picked waits in the dropdown, none lost", () => {
+    const items = pool();
+    const f = morning(items);
+    const later = [...items, item({ id: "soon", due: "2026-10-29" })];
+    const out = shown(later, f);
+    expect(out.picks).not.toContain("soon");
+    expect(out.alsoDue).toEqual(["soon"]);
+  });
+
+  it("Sunday keeps its light list the same way", () => {
+    const soon = [1, 2, 3].map((k) => item({ id: `s${k}`, due: "2026-10-27" }));
+    const f = morning(soon, SUN);
+    expect(f).toEqual({ ids: ["s1", "s2"], room: 2 });
+    const gone = off(soon, "s1", { hiddenOn: SUN });
+    expect(shown(gone, f, SUN)).toMatchObject({ picks: ["s2"], alsoDue: ["s3"] });
   });
 });
