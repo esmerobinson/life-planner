@@ -238,9 +238,10 @@ test("Today's routine: a step ticked on one device shows ticked on the other, th
   const routineA = a.getByRole("region", { name: "Today's routine" });
   await routineA.getByRole("checkbox", { name: "Mark done: Up between 8 and 9am" }).click();
   await expect(routineA.getByText("1 of 10 today")).toBeVisible();
+  // The count shows the tap at once; wait for the tick to be stored before syncing.
+  const ticked = async () => (await readStore(a, "prefs")).some((r) => r.id.startsWith("routine-tick:") && r.step === "d1" && r.done === true);
+  await expect.poll(ticked).toBe(true);
   await syncNow(a);
-  // The Worker stored the tick as a plain prefs row (it reads only "due").
-  expect((await readStore(a, "prefs")).some((r) => r.id.startsWith("routine-tick:") && r.step === "d1" && r.done === true)).toBe(true);
 
   await syncNow(b);
   await b.goto("/");
