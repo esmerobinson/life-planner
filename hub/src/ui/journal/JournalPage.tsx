@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { db } from "../../data/db";
-import { isKeychainError, unlockJournal, type UnlockResult } from "../../journal/keyStore";
+import { isKeychainError, unlockJournal, unlockJournalWithSecret, type UnlockResult } from "../../journal/keyStore";
+import { checkPairingCode } from "../../pairing/acceptCode";
+import type { PairingPayload } from "../../pairing/pairingText";
 import type { RowStatus } from "../../journal/rows";
 import type { ISODate } from "../../domain/types";
 import { addDays } from "../../domain/dates";
@@ -49,6 +51,14 @@ export const UNLOCK_LINE =
 /** Placeholder wording (Esme may reword): a passphrase that opens neither the journal nor a wrap. */
 export const WRONG_PASSPHRASE_LINE =
   "That passphrase doesn't open your journal. If you've just changed it, type the new one first on a device where the journal is open, or use your old one. Try again.";
+/** Placeholder wording (Esme may reword), 2026-11-17: a v2 pairing code made without the journal. */
+export const CODE_WITHOUT_JOURNAL = "That pairing code doesn't include your journal. Type your passphrase instead.";
+/**
+ * Placeholder wording (Esme may reword), review C1: a code for another sync setup or another
+ * journal key than this device's. Nothing was changed.
+ */
+export const CODE_REFUSED_LINE =
+  "This device can't open your journal with that pairing code, so nothing was changed. Type your passphrase instead.";
 /** WebCrypto threw while reading or storing the journal key (Mac app). Nothing is deleted. */
 export const KEYCHAIN_LINE =
   "This Mac's keychain didn't let Esmeworld open your journal key. Quit and reopen Esmeworld, enter your Mac login password and choose Always Allow.";
@@ -220,8 +230,10 @@ function useDeviceId(): DeviceView & { retry: () => void } {
   return { ...view, retry };
 }
 
-const PROBLEMS: Record<Exclude<UnlockResult, "ok" | "checking"> | "failed" | "keychain", React.ReactNode> = {
+const PROBLEMS: Record<Exclude<UnlockResult, "ok" | "checking"> | "failed" | "keychain" | "no-journal", React.ReactNode> = {
   wrong: WRONG_PASSPHRASE_LINE,
+  "no-journal": CODE_WITHOUT_JOURNAL,
+  "code-refused": CODE_REFUSED_LINE,
   "no-sync": (
     <>
       Set up sync on this device first, then unlock the journal here. <Link to="/sync">Sync</Link>
@@ -254,17 +266,38 @@ function UnlockJournal({ again = false }: { again?: boolean }) {
   }
 
   /** Unlock: the one routine for a typed passphrase and for a scanned or pasted pairing code. */
-  async function unlock(secret: string) {
-    if (busy) return;
-    setProblem(null);
-    setBusy(true);
+  async function unlock(secret: string | Extract<PairingPayload, { v: 2 }>) {
+    const s = typeof secret === "string" ? null : secret.secret;
     try {
-      const result = await unlockJournal(db, secret);
-      if (result !== "ok" && result !== "checking") setProblem(result);
-    } catch (e) {
-      setProblem(isKeychainError(e) ? "keychain" : "failed");
+      if (busy) return;
+      setProblem(null);
+      if (typeof secret !== "string" && !s) {
+        setProblem("no-journal");
+        return;
+      }
+      setBusy(true);
+      try {
+        // A code must be for this device's own sync address and journal (review C1).
+        if (typeof secret !== "string") {
+          const v = await checkPairingCode(db, secret);
+          if (!v.ok) {
+            setProblem("code-refused");
+            return;
+          }
+          if (!v.configured) {
+            setProblem("no-sync");
+            return;
+          }
+        }
+        const result = typeof secret === "string" ? await unlockJournal(db, secret) : await unlockJournalWithSecret(db, s!, secret.token);
+        if (result !== "ok" && result !== "checking") setProblem(result);
+      } catch (e) {
+        setProblem(isKeychainError(e) ? "keychain" : "failed");
+      } finally {
+        setBusy(false);
+      }
     } finally {
-      setBusy(false);
+      s?.fill(0); // a v2 code's journal secret: wiped once used
     }
   }
 
@@ -294,7 +327,7 @@ function UnlockJournal({ again = false }: { again?: boolean }) {
           </button>
         </div>
       </form>
-      <ScanPairingCode busy={busy} onPassphrase={(secret) => unlock(secret)} />
+      <ScanPairingCode busy={busy} onCode={(code) => unlock(code.v === 1 ? code.passphrase : code)} />
       {problem && <p role="alert">{PROBLEMS[problem]}</p>}
     </section>
   );

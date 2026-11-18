@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { parsePairingText, pairingText } from "../pairing/pairingText";
+import { parsePairing, type PairingPayload } from "../pairing/pairingText";
 import { qrModules, qrPath, readFrame } from "../pairing/qr";
 
 /** Placeholder copy (Esme may reword). */
@@ -10,12 +10,21 @@ export const NOT_PAIRING = "That isn't an Esmeworld pairing code.";
 export const SCANNER_FAILED = "Couldn't start the scanner. Paste the code instead.";
 export const CODE_FAILED = "Couldn't make a pairing code for this passphrase.";
 export const TOO_LONG = "That passphrase is too long for a pairing code.";
+/**
+ * Placeholder copy (Esme may reword), 2026-11-17: under a code that sets up sync only (this
+ * device has no copy of the journal's secret to put in it).
+ */
+export const SYNC_ONLY_NOTE =
+  "This code sets up sync only. On the other device, your journal will ask for your passphrase once. To bring the journal along now, hide this and type your passphrase below.";
 
 /** How often a camera frame is read while scanning, in ms (a technical rate, not an animation). */
 const SCAN_EVERY_MS = 150;
 
-/** The shown code hides itself after this long (coordinator's rule, concern 1). */
-export const PAIRING_SHOW_MS = 60_000;
+/**
+ * The shown code hides itself after this long (coordinator's rule, concern 1; 2 minutes since
+ * 2026-11-17, review I2: one tap now shows it, so it never stays up for long).
+ */
+export const PAIRING_SHOW_MS = 120_000;
 
 /** "Hides in 0:45". */
 export function hidesIn(seconds: number): string {
@@ -24,22 +33,23 @@ export function hidesIn(seconds: number): string {
 }
 
 /**
- * The pairing code for `passphrase` as a black-on-white QR code (SVG), the warning, a countdown
- * and Hide. The passphrase is only in the drawn modules: never in an attribute, label or text.
- * It hides itself after 60 seconds, and at once when the page or app goes to the background
+ * The pairing code for `text` (a pairing text, v1 or v2) as a black-on-white QR code (SVG), the
+ * warning, an optional note, a countdown and Hide. The text is only in the drawn modules: never
+ * in an attribute, label or text.
+ * It hides itself after 2 minutes, and at once when the page or app goes to the background
  * (visibilitychange to hidden, pagehide, or the window losing focus, as the Mac app does).
  * Showing it again needs another tap.
  */
-export function PairingCode({ passphrase, onHide }: { passphrase: string; onHide: () => void }) {
+export function PairingCode({ text, note, onHide }: { text: string; note?: string; onHide: () => void }) {
   const code = useMemo(() => {
     // Too long for any QR code (or any other encoder failure): a plain error, never a throw.
     try {
-      const m = qrModules(pairingText(passphrase));
+      const m = qrModules(text);
       return { n: m.length, d: qrPath(m) };
     } catch {
       return null;
     }
-  }, [passphrase]);
+  }, [text]);
   const hide = useRef(onHide);
   hide.current = onHide;
   const [left, setLeft] = useState(PAIRING_SHOW_MS / 1000);
@@ -75,7 +85,7 @@ export function PairingCode({ passphrase, onHide }: { passphrase: string; onHide
       window.removeEventListener("pagehide", close);
       window.removeEventListener("blur", close);
     };
-  }, [passphrase]);
+  }, [text]);
 
   return (
     <div className="pairing-code">
@@ -95,6 +105,7 @@ export function PairingCode({ passphrase, onHide }: { passphrase: string; onHide
             <path d={code.d} fill="#000000" />
           </svg>
           <p>{PAIRING_WARNING}</p>
+          {note && <p>{note}</p>}
           <p className="journal-muted" aria-live="off">
             {hidesIn(left)}
           </p>
@@ -112,12 +123,13 @@ export function PairingCode({ passphrase, onHide }: { passphrase: string; onHide
 }
 
 /**
- * "Scan pairing code" (the camera) and "Paste pairing code" (a field). A valid code's
- * passphrase goes to `onPassphrase`, exactly as if it had been typed; nothing here keeps it.
+ * "Scan pairing code" (the camera) and "Paste pairing code" (a field). What a valid code holds
+ * (v1: the passphrase, exactly as if it had been typed; v2: token, journal secret, address)
+ * goes to `onCode`; nothing here keeps it.
  * The camera starts only from the button (a user gesture, as iOS needs) and stops as soon as a
  * pairing code is read, on Cancel, and when this leaves the page.
  */
-export function ScanPairingCode({ onPassphrase, busy = false }: { onPassphrase: (passphrase: string) => unknown; busy?: boolean }) {
+export function ScanPairingCode({ onCode, busy = false }: { onCode: (code: PairingPayload) => unknown; busy?: boolean }) {
   const [scanning, setScanning] = useState(false);
   // getUserMedia is pending: Scan is disabled, and a second tap never asks again.
   const [starting, setStarting] = useState(false);
@@ -129,27 +141,28 @@ export function ScanPairingCode({ onPassphrase, busy = false }: { onPassphrase: 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
   // The latest callback, so a code read by the camera loop uses the page as it is now.
-  const onPass = useRef(onPassphrase);
-  onPass.current = onPassphrase;
+  const onPass = useRef(onCode);
+  onPass.current = onCode;
   const busyRef = useRef(busy);
   busyRef.current = busy;
   // A code read while the page was busy: kept (in memory only) and used once busy clears.
-  const queued = useRef<string | null>(null);
+  const queued = useRef<PairingPayload | null>(null);
 
-  /** Hands a passphrase on now, or as soon as the page is no longer busy. */
-  function deliver(passphrase: string) {
+  /** Hands a code on now, or as soon as the page is no longer busy. */
+  function deliver(code: PairingPayload) {
     if (busyRef.current) {
-      queued.current = passphrase;
+      if (queued.current?.v === 2) queued.current.secret?.fill(0); // only the latest is kept
+      queued.current = code;
       return;
     }
-    void onPass.current(passphrase);
+    void onPass.current(code);
   }
 
   useEffect(() => {
     if (busy || queued.current === null) return;
-    const passphrase = queued.current;
+    const code = queued.current;
     queued.current = null;
-    void onPass.current(passphrase);
+    void onPass.current(code);
   }, [busy]);
 
   function release() {
@@ -169,6 +182,7 @@ export function ScanPairingCode({ onPassphrase, busy = false }: { onPassphrase: 
     mounted.current = true;
     return () => {
       mounted.current = false;
+      if (queued.current?.v === 2) queued.current.secret?.fill(0);
       queued.current = null;
       release();
     };
@@ -233,11 +247,11 @@ export function ScanPairingCode({ onPassphrase, busy = false }: { onPassphrase: 
       }
       if (stream.current !== s) return; // stopped meanwhile
       if (text !== null) {
-        const passphrase = parsePairingText(text);
-        if (passphrase !== null) {
+        const code = parsePairing(text);
+        if (code !== null) {
           stopCamera();
           setProblem("");
-          deliver(passphrase);
+          deliver(code);
           return;
         }
         setProblem(NOT_PAIRING);
@@ -254,15 +268,15 @@ export function ScanPairingCode({ onPassphrase, busy = false }: { onPassphrase: 
   function submitPasted(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
-    const passphrase = parsePairingText(pasted);
+    const code = parsePairing(pasted);
     setPasted("");
-    if (passphrase === null) {
+    if (code === null) {
       setProblem(NOT_PAIRING);
       return;
     }
     setProblem("");
     stopCamera();
-    deliver(passphrase);
+    deliver(code);
   }
 
   return (
@@ -286,7 +300,16 @@ export function ScanPairingCode({ onPassphrase, busy = false }: { onPassphrase: 
       <form onSubmit={submitPasted}>
         <label className="form-field">
           <span className="form-label">Paste pairing code</span>
-          <input type="password" autoComplete="off" value={pasted} onChange={(e) => setPasted(e.target.value)} />
+          {/* A plain field (review M5): a password field lets the browser offer to save the code. */}
+          <input
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+          />
         </label>
         <div className="form-actions">
           <button type="submit" className="btn-secondary" disabled={busy || !pasted}>
