@@ -1,5 +1,5 @@
 import { db } from "../data/db";
-import { ensureStart, markArrived, markSeen, markVisited, placeSticker, recordTodayDone, setOutfit } from "./farmRepo";
+import { ensureStart, markArrived, markSeen, markVisited, moveSticker, placeSticker, recordTodayDone, setHidden, setOutfit } from "./farmRepo";
 import { farmState } from "./state";
 
 beforeEach(async () => {
@@ -61,4 +61,32 @@ it("visiting an area is noted once (for the map's NEW badge); unknown areas are 
   expect((await state()).visited).toEqual(new Set(["lagoa-house"]));
   // A synced change, like every farm write.
   expect(await db.pending.get(["farm", "visited:lagoa-house"])).toBeTruthy();
+});
+
+it("hiding a sticker writes a hidden row and never deletes anything; showing it again writes the row back to false", async () => {
+  await placeSticker("hen", "2026-11-14");
+  await setHidden("hen", true, "2026-11-17");
+  expect(await db.farm.get("hidden:hen")).toMatchObject({ kind: "hidden", sticker: "hen", hidden: true, date: "2026-11-17" });
+  expect(await db.farm.get("placed:hen")).toBeTruthy();
+  expect(await db.farm.get("seen:hen")).toBeTruthy();
+  expect((await state()).hidden).toEqual(new Set(["hen"]));
+  await setHidden("hen", false, "2026-11-18");
+  expect(await db.farm.get("hidden:hen")).toMatchObject({ hidden: false, date: "2026-11-18" });
+  expect((await state()).hidden.size).toBe(0);
+  expect(await db.pending.get(["farm", "hidden:hen"])).toBeTruthy();
+  await setHidden("unicorn", true, "2026-11-17");
+  expect(await db.farm.get("hidden:unicorn")).toBeUndefined();
+});
+
+it("moving a sticker writes its slot (a spot row); unknown stickers and bad slot ids are never written", async () => {
+  await placeSticker("cow", "2026-11-14");
+  await moveSticker("cow", "cow-2", "2026-11-17");
+  expect(await db.farm.get("spot:cow")).toMatchObject({ kind: "spot", sticker: "cow", slot: "cow-2", date: "2026-11-17" });
+  await moveSticker("cow", "cow-1", "2026-11-18");
+  expect((await state()).spots.get("cow")).toBe("cow-1");
+  expect(await db.pending.get(["farm", "spot:cow"])).toBeTruthy();
+  await moveSticker("unicorn", "cow-2", "2026-11-17");
+  await expect(moveSticker("cow", "Not A Slot!", "2026-11-17")).rejects.toThrow();
+  expect(await db.farm.get("spot:unicorn")).toBeUndefined();
+  expect((await state()).spots.get("cow")).toBe("cow-1");
 });

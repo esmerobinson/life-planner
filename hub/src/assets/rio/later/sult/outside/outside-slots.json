@@ -109,6 +109,34 @@
   "esme_spot": {
    "x": 222,
    "y": 188
+  },
+  "door_in": {
+   "rect": [
+    112,
+    94,
+    162,
+    43
+   ],
+   "x": 112,
+   "y": 94,
+   "w": 162,
+   "h": 43,
+   "to": "inside",
+   "label": "Sult door"
+  },
+  "map_exit": {
+   "rect": [
+    0,
+    208,
+    384,
+    32
+   ],
+   "x": 0,
+   "y": 208,
+   "w": 384,
+   "h": 32,
+   "to": "map",
+   "label": "The street (back to the map)"
   }
  },
  "baked": {

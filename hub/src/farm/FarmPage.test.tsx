@@ -19,11 +19,12 @@ afterEach(() => vi.useRealTimers());
 
 const farmRows = () => db.farm.toArray();
 
-it("opening the farm the first time starts it (a fresh start); the Welcome sticker plays in the nook, then is kept", async () => {
+it("opening the farm the first time starts it (a fresh start); the Welcome sticker pops up top centre and is kept", async () => {
   renderApp("/farm", "2026-11-04");
   expect(await screen.findByRole("heading", { level: 1, name: "Esme's Rio" })).toBeInTheDocument();
   await waitFor(async () => expect((await farmRows()).some((r) => r.kind === "start" && "date" in r && r.date === "2026-11-04")).toBe(true));
-  // The earned moment plays in the nook, then Welcome is seen for good.
+  // The earned moment pops up on the game screen, and Welcome is seen for good.
+  expect(await screen.findByText("New sticker: Welcome")).toBeInTheDocument();
   await waitFor(async () => expect(await db.farm.get("seen:hi")).toBeTruthy(), { timeout: 3000 });
   await waitFor(() => expect(document.querySelector("[data-earned]")).toHaveAttribute("data-earned", "1"));
 });
@@ -70,8 +71,10 @@ it("the game takes the whole window: no sidebar, Inbox or +; Back goes Home when
   expect(screen.queryByRole("navigation", { name: "Main" })).toBeNull();
   expect(screen.queryByRole("link", { name: /^Inbox/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
-  // The nook stays with the game (its moments play there).
-  expect(document.querySelector(".farm-nook")).toBeTruthy();
+  // No nook box on the game screen (Esme, 2026-11-17: "Bottom left UI box seems to be redundant"):
+  // its moments pop up top centre, and the Collection is on the hotbar.
+  expect(document.querySelector(".farm-nook")).toBeNull();
+  expect(within(screen.getByRole("navigation", { name: "Game menu" })).getByRole("button", { name: "Collection" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Back" }));
   await waitFor(() => expect(currentUrl).toBe("/"));
   expect(await screen.findByRole("navigation", { name: "Main" })).toBeInTheDocument();
@@ -123,12 +126,10 @@ it("Back returns to the page she came from", async () => {
   await waitFor(() => expect(currentUrl).toBe("/goals"));
 });
 
-it("Back still leaves the game after the nook's collection icon was used there (review v2)", async () => {
+it("Back still leaves the game after it opened on the Collection (/farm?menu=collection, the nook's icon elsewhere) (review v2)", async () => {
   await db.farm.put(startRow("dev-a", "2026-11-02"));
-  renderApp(["/goals", "/farm"], "2026-11-04");
+  renderApp(["/goals", "/farm?menu=collection"], "2026-11-04");
   const user = userEvent.setup();
-  await screen.findByRole("list", { name: "Places in Rio" });
-  await user.click(await screen.findByRole("link", { name: "Your sticker collection" }));
   await screen.findByRole("dialog", { name: "Menu" });
   await user.keyboard("{Escape}");
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull());
@@ -136,13 +137,15 @@ it("Back still leaves the game after the nook's collection icon was used there (
   await waitFor(() => expect(currentUrl).toBe("/goals"));
 });
 
-it("in an area there is one way back, to the map (review v2)", async () => {
+it("in an area the way back to the map is its exit (Esme, 2026-11-17: \"the exit of an area to be the way to go back to map\")", async () => {
   renderApp("/farm", "2026-11-04");
   const user = userEvent.setup();
   await user.click(within(await screen.findByRole("list", { name: "Places in Rio" })).getByRole("button", { name: "Fazenda" }));
   await screen.findByRole("heading", { level: 2, name: "Fazenda" });
   expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Back to the map" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Back to the map" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Boat back to Rio" }));
+  expect(await screen.findByRole("list", { name: "Places in Rio" })).toBeInTheDocument();
 });
 
 it("there is no sticker book: the game screen holds the map and the menu's hotbar (Esme, 2026-11-17)", async () => {
@@ -307,7 +310,7 @@ describe("Esme's Rio on the farm page", () => {
     await waitFor(async () => expect(await db.farm.get(`placed:${fish.key}`)).toMatchObject({ spot: "rio" }));
     await user.keyboard("{Escape}{Escape}");
     await user.click(within(await places()).getByRole("button", { name: "Ipanema beach" }));
-    await user.click(await screen.findByRole("button", { name: "The sea off Arpoador" }));
+    await user.click(await screen.findByRole("button", { name: "Swim out to Arpoador" }));
     expect(within(await screen.findByRole("list", { name: "Stickers here" })).getByText(fish.name)).toBeInTheDocument();
   });
 

@@ -162,6 +162,36 @@
    "h": 64,
    "goes": "sit",
    "note": "the table under the ornate tasselled parasol"
+  },
+  {
+   "id": "door_in",
+   "rect": [
+    172,
+    92,
+    26,
+    62
+   ],
+   "x": 172,
+   "y": 92,
+   "w": 26,
+   "h": 62,
+   "to": "inside",
+   "label": "Blue doors"
+  },
+  {
+   "id": "map_exit",
+   "rect": [
+    168,
+    222,
+    40,
+    18
+   ],
+   "x": 168,
+   "y": 222,
+   "w": 40,
+   "h": 18,
+   "to": "map",
+   "label": "Forest path (back to the map)"
   }
  ],
  "walkable": [

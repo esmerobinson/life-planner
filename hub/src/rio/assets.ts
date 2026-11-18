@@ -153,6 +153,37 @@ export interface SceneData {
   /** Santa Teresa: the book spines and framed covers that fill its shelves. */
   books?: { spines: Sheet; covers: Sheet };
   overlays?: unknown;
+  /**
+   * The pack's doors, exits and stairs (and the noticeboard), as drawn: a rect, where it goes
+   * (`to`, as the pack writes it: "map", "inside", "outside", a scene…) or what it opens, and its
+   * label. Read in rio/doors.ts.
+   */
+  doors?: RawDoor[];
+}
+
+export interface RawDoor { id: string; rect: Rect; to?: string; opens?: string; label?: string }
+
+/** The pack's hotspots that are doors (a `rect` and a `to` or `opens`, not retired), from a list or keyed by id. */
+function readDoors(raw: unknown): RawDoor[] {
+  if (typeof raw !== "object" || raw === null) return [];
+  const entries: [string, unknown][] = Array.isArray(raw)
+    ? raw.map((v) => [String((v as { id?: unknown })?.id ?? ""), v])
+    : Object.entries(raw);
+  const out: RawDoor[] = [];
+  for (const [key, v] of entries) {
+    if (typeof v !== "object" || v === null || Array.isArray(v)) continue;
+    const d = v as Record<string, unknown>;
+    if (d.retired === true) continue;
+    const rect = d.rect;
+    if (!Array.isArray(rect) || rect.length !== 4 || !rect.every((n) => typeof n === "number")) continue;
+    if (typeof d.to !== "string" && typeof d.opens !== "string") continue;
+    out.push({
+      id: typeof d.id === "string" ? d.id : key, rect: rect as Rect,
+      ...(typeof d.to === "string" ? { to: d.to } : {}), ...(typeof d.opens === "string" ? { opens: d.opens } : {}),
+      ...(typeof d.label === "string" ? { label: d.label } : {}),
+    });
+  }
+  return out;
 }
 
 interface SceneSource {
@@ -224,6 +255,9 @@ interface RawScene {
   animations?: { goal?: { frames: Record<string, string[]>; frame_ms: number } };
   shelf_slots?: RawSheet;
   cover_slots?: RawSheet;
+  hotspots?: unknown;
+  /** The Lagoa house's doors (2026-11-17 redraw): read before its hotspots. */
+  doors?: unknown;
   overlays?: {
     rain?: RawStrip | { frames: string[]; frame_ms: number };
     tv?: { at: [number, number]; frame_ms: number; frames: Record<string, string[]> };
@@ -277,6 +311,9 @@ function readScene(src: SceneSource): SceneData {
   const raw = readJson<RawScene>(src.file);
   const at = (p: string) => `${src.root}/${p}`;
   const data: SceneData = { scene: raw.scene, base: readBase(raw.base, at), slots: readSlots(raw.slots ?? raw.sticker_slots ?? []), overlays: raw.overlays };
+  const own = readDoors(raw.doors);
+  const doors = own.length ? own : readDoors(raw.hotspots);
+  if (doors.length) data.doors = doors;
   if (raw.celebrations) {
     data.celebrations = [...raw.celebrations].sort((a, b) => a.step - b.step).map((c) => ({ id: c.id, layers: readLooks(c.layers, at) }));
   }

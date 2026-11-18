@@ -1044,6 +1044,20 @@
    "x": 86,
    "y": 212,
    "note": "where Esme stands in the full scenes (at the selling counter)"
+  },
+  "door_out": {
+   "rect": [
+    170,
+    216,
+    44,
+    24
+   ],
+   "x": 170,
+   "y": 216,
+   "w": 44,
+   "h": 24,
+   "to": "outside",
+   "label": "Out to the street"
   }
  },
  "baked": {

@@ -3,7 +3,8 @@
 // Usage: node scripts/import-rio-ui.mjs <esme-ui dir> [<rio-pack>/day1/ui/tab-icons]
 // The optional second folder adds the menu's tab icons drawn for Rio (gear, recipe book): only its
 // own *.png files, never previews/ or src/.
-// Never the review/ folder, samples or previews; never the screen-specific extra-* pieces.
+// Never the review/ folder, samples or previews; never the screen-specific extra-* pieces, except
+// the ones the game uses (EXTRAS: the hammer on the hotbar's Arrange, 2026-11-17).
 
 import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -17,9 +18,10 @@ if (!kitDir) {
 }
 const out = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "assets", "rio-ui");
 
+const EXTRAS = ["extra-s-hammer.png"];
 const files = [
   ...readdirSync(join(kitDir, "kit"))
-    .filter((f) => (f.endsWith(".png") && !f.startsWith("extra-")) || f === "kit.json")
+    .filter((f) => (f.endsWith(".png") && (!f.startsWith("extra-") || EXTRAS.includes(f))) || f === "kit.json")
     .map((f) => `kit/${f}`),
   "font/font-small.png",
   "font/fonts.json",

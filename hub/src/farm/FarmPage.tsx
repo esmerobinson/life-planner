@@ -4,11 +4,14 @@
 // book at all", 2026-11-17). Opening the page the first time starts the game (a fresh start:
 // nothing from before counts).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AreaView } from "../rio/AreaView";
 import { areaStatuses, sceneOpen } from "../rio/areas";
+import type { SceneId } from "../rio/assets";
+import { SCENE_AREA } from "../rio/doors";
 import { groupsOf } from "../rio/collection";
+import { GameMoments } from "../rio/GameMoments";
 import { GameScreen } from "../rio/GameScreen";
 import { Hotbar } from "../rio/Hotbar";
 import { devDay, devGoal, devLook, devNight, useRioLook } from "../rio/look";
@@ -56,16 +59,27 @@ export function FarmPage() {
   const visited = view?.state.visited;
   const statuses = useMemo(() => areaStatuses(day, visited ?? new Set()), [day, visited]);
   const placed = view?.state.placed;
+  // A sticker she hid stays placed and in the Collection; the scene counts it but doesn't draw it (AreaView `hidden`).
   const placedKeys = useMemo(() => STICKERS.filter((s) => placed?.has(s.key)).map((s) => s.key), [placed]);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => setEditing(false), [area]);
   const canPlace = useCallback((key: string) => {
     const home = homeOf(key);
     const s = home ? statuses.get(home.area) : undefined;
     return (s === "open" || s === "new") && sceneOpen(home!.scene, day);
   }, [statuses, day]);
-  const openArea = useCallback((a: string) => {
-    setArea(a);
+  const visit = useCallback((a: string) => {
     void view?.markVisited(a).catch(() => undefined);
   }, [view]);
+  const openArea = useCallback((a: string) => {
+    setArea(a);
+    visit(a);
+  }, [visit]);
+  // A door leads into a scene once its area is open, and the scene itself (the sea: day 30).
+  const canEnter = useCallback((scene: SceneId) => {
+    const s = statuses.get(SCENE_AREA[scene]);
+    return (s === "open" || s === "new") && sceneOpen(scene, day);
+  }, [statuses, day]);
 
   const openMenu = useCallback((t: MenuTab) => {
     if (t === "map") {
@@ -151,7 +165,7 @@ export function FarmPage() {
           {view.collected} of {COLLECTION.length} stickers
         </p>
         {view.loaded && view.state.start && <PhoneCollection view={view} canPlace={canPlace} />}
-        {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}
+        {arrivals.length > 0 && <TopPopups><Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} /></TopPopups>}
       </GameScreen>
     );
   }
@@ -163,11 +177,18 @@ export function FarmPage() {
       </p>
       <div className="rio-wrap">
         {area
-          ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} counts={counts} night={night} goal={goal} onBack={() => setArea(null)} />
+          ? <AreaView key={area} area={area} look={look} day={day} placed={placedKeys} counts={counts} night={night} goal={goal} onBack={() => setArea(null)}
+            canEnter={canEnter} onOpenMenu={openMenu} onVisit={visit} spots={view.state.spots} hidden={view.state.hidden} editing={editing && !menu}
+            onHide={(k) => void view.setHidden(k, true).catch(() => undefined)} onMove={(k, slot) => void view.moveTo(k, slot).catch(() => undefined)}
+            onEditDone={() => setEditing(false)} />
           : <RioMap statuses={statuses} look={look} onOpen={openArea} />}
       </div>
-      {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}
-      <Hotbar current={menu ?? (area ? null : "map")} onPick={openMenu} />
+      {/* Top centre: arrivals and earned stickers (the nook box is not on the game screen; Esme, 2026-11-17). */}
+      <TopPopups>
+        {arrivals.length > 0 && <Arrivals view={view} who={arrivals} onDone={() => setArrivals([])} />}
+        {view.loaded && view.state.start && <GameMoments queue={view.queue} markSeen={view.markSeen} />}
+      </TopPopups>
+      <Hotbar current={menu ?? (area ? null : "map")} onPick={openMenu} arrange={area ? { on: editing, toggle: () => setEditing((e) => !e) } : undefined} />
       {/* Only once the game has started and its rows are read: the notes and counts are then true. */}
       {menu && view.loaded && view.state.start && (
         <GameMenu view={view} tab={menu} onTab={openMenu} onClose={closeMenu} canPlace={canPlace} day={day} statuses={statuses}
@@ -177,20 +198,23 @@ export function FarmPage() {
   );
 }
 
+/** The game's small pop-ups, top centre, one under another. */
+function TopPopups({ children }: { children: ReactNode }) {
+  const { u } = useUi();
+  return <div className="rio-arrival" style={{ fontSize: `${u}px` }}>{children}</div>;
+}
+
 /** "<name> has moved in!" in a thin kit frame, top centre, until she presses OK. */
 function Arrivals({ view, who, onDone }: { view: NonNullable<ReturnType<typeof useFarm>>; who: CharacterId[]; onDone: () => void }) {
-  const { u } = useUi();
   return (
-    <div className="rio-arrival" style={{ fontSize: `${u}px` }}>
-      <div className="thin flow" role="status">
-        {who.map((c) => (
-          <p key={c}>
-            <CharacterPic view={view} c={c} pose="happy" size={em(32)} />
-            <BitmapText text={`${NAMES[c]} has moved in!`} heading />
-          </p>
-        ))}
-        <TextButton label="OK" w={24} onClick={onDone} />
-      </div>
+    <div className="thin flow" role="status">
+      {who.map((c) => (
+        <p key={c}>
+          <CharacterPic view={view} c={c} pose="happy" size={em(32)} />
+          <BitmapText text={`${NAMES[c]} has moved in!`} heading />
+        </p>
+      ))}
+      <TextButton label="OK" w={24} onClick={onDone} />
     </div>
   );
 }

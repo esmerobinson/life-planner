@@ -79,10 +79,24 @@ export const MAP_KEEP: Rect = within(
   RIO_MAP.canvas,
 );
 
-/** What an area scene may never trim: its sticker slots, a 16x16 sticker on each (the whole scene if none). */
-export function sceneKeep(slots: readonly { x: number; y: number; anchor?: string }[], scene: [number, number]): Rect {
-  if (slots.length === 0) return [0, 0, scene[0], scene[1]];
-  return within(union(slots.map((s): Rect => [s.x - 8, s.anchor === "top" ? s.y : s.y - 16, 16, 16])), scene);
+/** The 16x16 box of a sticker standing on a slot (foot point bottom-centre, or top-centre). */
+export const stickerBox = (s: { x: number; y: number; anchor?: string }): Rect => [s.x - 8, s.anchor === "top" ? s.y : s.y - 16, 16, 16];
+
+/** The part of a door that must stay on screen: its middle, at most 24x24 (a strip-wide exit can't stop a scene covering the view). */
+export function doorKeep([x, y, w, h]: Rect): Rect {
+  const kw = Math.min(w, 24);
+  const kh = Math.min(h, 24);
+  return [x + Math.floor((w - kw) / 2), y + Math.floor((h - kh) / 2), kw, kh];
+}
+
+/**
+ * What an area scene may never trim (Esme, 2026-11-17: every scene fills the game screen, nothing
+ * that matters cut): what is drawn there, its placed stickers' boxes and its doors' middles (free
+ * slots hold nothing). Nothing at all: the scene's middle, so it simply covers the view centred.
+ */
+export function sceneKeep(boxes: readonly Rect[], scene: [number, number]): Rect {
+  if (boxes.length === 0) return [scene[0] / 2, scene[1] / 2, 0, 0];
+  return within(union(boxes), scene);
 }
 
 export interface Cover { scale: number; x: number; y: number; mode: "cover" | "fit" }
@@ -103,8 +117,10 @@ function fractionalFit(box: { w: number; h: number }, canvas: [number, number], 
   const ah = canvas[1] * s;
   const place = (view: number, art: number, k0: number, k1: number): number => {
     if (art < view) return Math.round(((view - art) / 2) * d) / d; // the whole art, centred
-    const lo = Math.max(view - art, view - k1 * s);
-    const hi = Math.min(0, -k0 * s);
+    // Covering the view (offset <= 0, offset + art >= view) with `keep` inside it
+    // (offset + k0 s >= 0, offset + k1 s <= view).
+    const lo = Math.max(view - art, -k0 * s);
+    const hi = Math.min(0, view - k1 * s);
     const centred = Math.round((view / 2 - ((k0 + k1) / 2) * s) * d) / d;
     return Math.min(hi, Math.max(lo, centred));
   };
@@ -124,14 +140,17 @@ export function coverFit(box: { w: number; h: number }, canvas: [number, number]
   const d = dpr > 0 ? dpr : 1;
   if (fractional) return fractionalFit(box, canvas, keep, d);
   const [kx, ky, kw, kh] = keep;
-  const s = fitScale(box, [kw, kh], d);
+  // Never zoomed past the smallest crisp scale that covers the view (a scene's keep can be tiny,
+  // or empty: review M3).
+  const covers = Math.ceil(Math.max(box.w / canvas[0], box.h / canvas[1]) * d - EPS) / d;
+  const s = Math.min(fitScale(box, [kw, kh], d), covers > 0 ? covers : Infinity);
   const aw = canvas[0] * s;
   const ah = canvas[1] * s;
   if (box.w > 0 && box.h > 0 && aw >= box.w - EPS && ah >= box.h - EPS) {
     // The offsets that keep the art covering the view and `keep` inside it, on the device grid.
     const place = (view: number, art: number, k0: number, k1: number): number | null => {
-      const lo = Math.ceil(Math.max(view - art, view - k1 * s) * d - EPS) / d;
-      const hi = Math.floor(Math.min(0, -k0 * s) * d + EPS) / d;
+      const lo = Math.ceil(Math.max(view - art, -k0 * s) * d - EPS) / d;
+      const hi = Math.floor(Math.min(0, view - k1 * s) * d + EPS) / d;
       if (lo > hi) return null;
       const centred = Math.round((view / 2 - ((k0 + k1) / 2) * s) * d) / d;
       return Math.min(hi, Math.max(lo, centred));
@@ -147,4 +166,31 @@ export function coverFit(box: { w: number; h: number }, canvas: [number, number]
     y: Math.max(0, Math.floor(((box.h - canvas[1] * f) / 2) * d) / d),
     mode: "fit",
   };
+}
+
+const hits = (a: Rect, b: Rect) => a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+
+/**
+ * Where each open place's small label stands (its top-left, map pixels; Esme, 2026-11-17: "a little
+ * label subtle underneath"): centred under the place, or over its own foot when another place sits
+ * right under it, and only where it clears every other place and every label already placed, inside
+ * the map. A place left out is named by the hover tooltip. Worked out from the bboxes alone, so a
+ * redrawn map's labels follow it.
+ */
+export function placeLabels(open: readonly { key: string; name: string; bbox: Rect }[], all: readonly { key: string; bbox: Rect }[],
+  size: (name: string) => [number, number], canvas: [number, number]): Map<string, [number, number]> {
+  const out = new Map<string, [number, number]>();
+  const taken: Rect[] = [];
+  for (const p of open) {
+    const [w, h] = size(p.name);
+    const [bx, by, bw, bh] = p.bbox;
+    const x = Math.round(bx + bw / 2 - w / 2);
+    const clear = (r: Rect) => r[0] >= 0 && r[1] >= 0 && r[0] + r[2] <= canvas[0] && r[1] + r[3] <= canvas[1] &&
+      !all.some((q) => q.key !== p.key && hits(r, q.bbox)) && !taken.some((t) => hits(r, t));
+    const spot = ([[x, by + bh + 1, w, h], [x, by + bh - h, w, h]] as Rect[]).find(clear);
+    if (!spot) continue;
+    taken.push(spot);
+    out.set(p.key, [spot[0], spot[1]]);
+  }
+  return out;
 }

@@ -7,7 +7,7 @@ import { getDeviceId } from "../sync/engine";
 import { RIO_MAP } from "../rio/assets";
 import { STICKER_BY_KEY } from "./catalogue";
 import {
-  arrivedRow, outfitRow, placedRow, seenRow, startRow, todayRow, visitedRow, type CharacterId, type FarmRow,
+  arrivedRow, hiddenRow, outfitRow, placedRow, seenRow, spotRow, startRow, todayRow, validFarm, visitedRow, type CharacterId, type FarmRow,
 } from "./state";
 
 export const listFarmRows = (): Promise<FarmRow[]> => db.farm.toArray();
@@ -64,4 +64,18 @@ const RIO_PLACES: ReadonlySet<string> = new Set(RIO_MAP.places.map((p) => p.key)
 export async function markVisited(area: string, today: ISODate): Promise<void> {
   if (!RIO_PLACES.has(area) || (await db.farm.get(`visited:${area}`))) return;
   await db.farm.put(visitedRow(area, today));
+}
+
+/** She hid a placed sticker from its scene (true), or showed it again (false). Nothing is deleted. */
+export async function setHidden(sticker: string, hidden: boolean, today: ISODate): Promise<void> {
+  if (!STICKER_BY_KEY.has(sticker)) return;
+  await db.farm.put(hiddenRow(sticker, hidden, today));
+}
+
+/** She moved a placed sticker to another slot of its scene. A slot id that isn't one is refused. */
+export async function moveSticker(sticker: string, slot: string, today: ISODate): Promise<void> {
+  if (!STICKER_BY_KEY.has(sticker)) return;
+  const row = spotRow(sticker, slot, today);
+  if (!validFarm(row)) throw new Error(`Not a slot: ${slot}`);
+  await db.farm.put(row);
 }

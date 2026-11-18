@@ -1,6 +1,6 @@
 import { db } from "../data/db";
 import { exportBackup, INVALID_BACKUP, parseBackup, restoreBackup } from "../data/backup";
-import { outfitRow, placedRow, seenRow, startRow, visitedRow } from "./state";
+import { hiddenRow, outfitRow, placedRow, seenRow, spotRow, startRow, visitedRow } from "./state";
 
 // Esme's Farm is in backups and restores (review I6): the farm's start, what was seen and placed,
 // arrivals and outfits come back with everything else. Fictional data.
@@ -48,4 +48,25 @@ it("a backup with an invalid farm row is refused whole", async () => {
 it("a backup with a damaged visited row is refused whole", async () => {
   const file = await exportBackup("2026-11-05");
   expect(() => parseBackup({ ...file, farm: [{ id: "visited:fazenda", kind: "visited", area: "boteco", date: "2026-11-02" }] })).toThrow(INVALID_BACKUP);
+});
+
+it("hidden and moved stickers are in backups and come back on a replace or a merge (Esme's rule: never lose anything)", async () => {
+  await db.farm.bulkPut([placedRow("hen", "rio", "2026-11-03"), hiddenRow("hen", true, "2026-11-17"), spotRow("cow", "cow-2", "2026-11-17")]);
+  const file = await exportBackup("2026-11-18");
+  expect(file.farm?.map((r) => r.id).sort()).toEqual(["hidden:hen", "placed:hen", "spot:cow"]);
+  await db.farm.clear();
+  await restoreBackup(JSON.stringify(file), "replace");
+  expect(await db.farm.get("hidden:hen")).toMatchObject({ hidden: true });
+  expect(await db.farm.get("spot:cow")).toMatchObject({ slot: "cow-2" });
+  await db.farm.clear();
+  await db.farm.put(hiddenRow("hen", false, "2026-11-19")); // this device showed it again: its own stays
+  await restoreBackup(file, "merge");
+  expect(await db.farm.get("hidden:hen")).toMatchObject({ hidden: false });
+  expect(await db.farm.get("spot:cow")).toMatchObject({ slot: "cow-2" });
+});
+
+it("a backup with a damaged hidden or spot row is refused whole", async () => {
+  const file = await exportBackup("2026-11-18");
+  expect(() => parseBackup({ ...file, farm: [{ id: "hidden:hen", kind: "hidden", sticker: "hen", hidden: "yes", date: "2026-11-17" }] })).toThrow(INVALID_BACKUP);
+  expect(() => parseBackup({ ...file, farm: [{ id: "spot:hen", kind: "spot", sticker: "cow", slot: "cow-2", date: "2026-11-17" }] })).toThrow(INVALID_BACKUP);
 });

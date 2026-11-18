@@ -221,5 +221,21 @@
    ],
    "note": "up to 16x24"
   }
- ]
+ ],
+ "hotspots": {
+  "door_out": {
+   "rect": [
+    176,
+    224,
+    32,
+    16
+   ],
+   "x": 176,
+   "y": 224,
+   "w": 32,
+   "h": 16,
+   "to": "outside",
+   "label": "Street door"
+  }
+ }
 }

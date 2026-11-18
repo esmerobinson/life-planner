@@ -73,6 +73,21 @@
    "w": 72,
    "h": 24,
    "goes": "none"
+  },
+  {
+   "id": "door_out",
+   "rect": [
+    136,
+    176,
+    32,
+    16
+   ],
+   "x": 136,
+   "y": 176,
+   "w": 32,
+   "h": 16,
+   "to": "outside",
+   "label": "Path back to the clearing"
   }
  ],
  "walkable": [

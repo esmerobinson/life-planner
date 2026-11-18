@@ -181,6 +181,20 @@
    "w": 16,
    "h": 16,
    "note": "down the aisle, back out to the plaza"
+  },
+  "door_out": {
+   "rect": [
+    226,
+    224,
+    16,
+    16
+   ],
+   "x": 226,
+   "y": 224,
+   "w": 16,
+   "h": 16,
+   "to": "outside",
+   "label": "Out to the plaza"
   }
  },
  "baked": {

@@ -33,7 +33,7 @@
    "00000000000000000000",
    "00000000000000000000",
    "00000000000000000000",
-   "00111111100110011110",
+   "00111111100111110010",
    "00111111111111111110",
    "01111110000011111110",
    "01111111111111101110",
@@ -47,7 +47,7 @@
    "00000000000000000000",
    "00000000000000000000",
    "00000000000000000000",
-   "00111001000010011110",
+   "00111001000011110010",
    "00111111111111111110",
    "01111110000010111110",
    "01111111000111111110",
@@ -84,8 +84,179 @@
    "h": 58,
    "goes": "outside",
    "note": "the open glass wall onto the pool terrace"
+  },
+  {
+   "id": "door_out",
+   "rect": [
+    144,
+    176,
+    32,
+    16
+   ],
+   "to": "outside",
+   "to_key": "lagoa-house-garden",
+   "label": "Garden",
+   "kind": "door",
+   "walk_to": [
+    160,
+    170
+   ],
+   "pair": "outside.front_door",
+   "note": "the door notch at the bottom (the front door); comes out on the terrace at the front door",
+   "x": 144,
+   "y": 176,
+   "w": 32,
+   "h": 16,
+   "goes": "outside"
+  },
+  {
+   "id": "terrace_doors",
+   "rect": [
+    50,
+    66,
+    62,
+    14
+   ],
+   "to": "outside",
+   "to_key": "lagoa-house-garden",
+   "label": "Garden",
+   "kind": "door",
+   "walk_to": [
+    80,
+    88
+   ],
+   "pair": "outside.terrace_doors",
+   "note": "the open glass wall onto the pool terrace (floor level, in the opening)",
+   "x": 50,
+   "y": 66,
+   "w": 62,
+   "h": 14,
+   "goes": "outside"
+  },
+  {
+   "id": "stairs_up",
+   "rect": [
+    212,
+    66,
+    20,
+    16
+   ],
+   "to": "bedroom",
+   "to_key": "lagoa-bedroom",
+   "label": "Bedroom",
+   "kind": "stairs",
+   "walk_to": [
+    222,
+    88
+   ],
+   "pair": "bedroom.stairs_down",
+   "note": "the bottom tread of the floating concrete stair",
+   "x": 212,
+   "y": 66,
+   "w": 20,
+   "h": 16,
+   "goes": "inside/bedroom"
+  },
+  {
+   "id": "kitchen_door",
+   "rect": [
+    304,
+    104,
+    16,
+    26
+   ],
+   "to": "kitchen",
+   "to_key": "lagoa-kitchen",
+   "label": "Kitchen",
+   "kind": "door",
+   "walk_to": [
+    296,
+    117
+   ],
+   "pair": "kitchen.living_door",
+   "note": "the doorway in the right wall, through to the kitchen",
+   "x": 304,
+   "y": 104,
+   "w": 16,
+   "h": 26,
+   "goes": "inside/kitchen"
   }
  ],
+ "doors": {
+  "door_out": {
+   "rect": [
+    144,
+    176,
+    32,
+    16
+   ],
+   "to": "outside",
+   "to_key": "lagoa-house-garden",
+   "label": "Garden",
+   "kind": "door",
+   "walk_to": [
+    160,
+    170
+   ],
+   "pair": "outside.front_door",
+   "note": "the door notch at the bottom (the front door); comes out on the terrace at the front door"
+  },
+  "terrace_doors": {
+   "rect": [
+    50,
+    66,
+    62,
+    14
+   ],
+   "to": "outside",
+   "to_key": "lagoa-house-garden",
+   "label": "Garden",
+   "kind": "door",
+   "walk_to": [
+    80,
+    88
+   ],
+   "pair": "outside.terrace_doors",
+   "note": "the open glass wall onto the pool terrace (floor level, in the opening)"
+  },
+  "stairs_up": {
+   "rect": [
+    212,
+    66,
+    20,
+    16
+   ],
+   "to": "bedroom",
+   "to_key": "lagoa-bedroom",
+   "label": "Bedroom",
+   "kind": "stairs",
+   "walk_to": [
+    222,
+    88
+   ],
+   "pair": "bedroom.stairs_down",
+   "note": "the bottom tread of the floating concrete stair"
+  },
+  "kitchen_door": {
+   "rect": [
+    304,
+    104,
+    16,
+    26
+   ],
+   "to": "kitchen",
+   "to_key": "lagoa-kitchen",
+   "label": "Kitchen",
+   "kind": "door",
+   "walk_to": [
+    296,
+    117
+   ],
+   "pair": "kitchen.living_door",
+   "note": "the doorway in the right wall, through to the kitchen"
+  }
+ },
+ "doors_note": "Doors pass 2026-11-17: every way between scenes, keyed by id. rect = [x, y, w, h] in scene pixels, on the real door or stair opening and reaching down to floor level; to = the scene id (outside, living, bedroom, kitchen, map; the same names as the files), to_key = its manifest key; walk_to = the foot point on the floor in front of it, where a walking character stands to go through; pair = the matching door in the target scene (where she arrives).",
  "rain_overlay": {
   "file": "inside/living-rain-overlay.png",
   "json": "inside/living-rain-overlay.json"
