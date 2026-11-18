@@ -171,9 +171,16 @@ function fillFrom(
   if (!frozen) return candidates.slice(0, room);
   const alwaysIds = new Set(always.map((i) => i.id));
   const kept = new Set(frozen.ids);
-  // A kept pick shows while it is still one Today could pick: open, not removed or moved off today.
+  // A kept pick shows while it is still one Today could pick: open, not removed or moved off
+  // today, and its deadline not pushed out (or taken off) since it was picked (M1).
   const pickable = new Map(rest.map((i) => [i.id, i]));
-  const still = frozen.ids.map((id) => pickable.get(id)).filter((i): i is Item => i !== undefined && !alwaysIds.has(i.id));
+  const pushedOut = (i: Item) => {
+    const was = frozen.dues?.[i.id];
+    return was !== undefined && (i.due === undefined || i.due > was);
+  };
+  const still = frozen.ids
+    .map((id) => pickable.get(id))
+    .filter((i): i is Item => i !== undefined && !alwaysIds.has(i.id) && !pushedOut(i));
   const fresh = candidates.filter((i) => !kept.has(i.id) && !alwaysIds.has(i.id));
   return [...still, ...fresh.slice(0, Math.max(0, frozen.room - frozen.ids.length))];
 }
@@ -208,7 +215,15 @@ export function todayList(
 export function todayFill(items: Item[], goals: Goal[], today: ISODate, frozen?: TodayFill): TodayFill {
   const { active, done } = pace(items, goals, today);
   const parts = todayParts(items, active, today, done);
-  const shown = fillFrom(parts, frozen).map((i) => i.id);
-  if (!frozen) return { ids: shown, room: parts.room };
-  return { ids: [...new Set([...frozen.ids, ...shown])], room: frozen.room };
+  const shown = fillFrom(parts, frozen);
+  const dues = Object.fromEntries(shown.filter((i) => i.due !== undefined).map((i) => [i.id, i.due!]));
+  const withDues = (f: TodayFill): TodayFill => (Object.keys(f.dues ?? {}).length > 0 ? f : { ids: f.ids, room: f.room });
+  if (!frozen) return withDues({ ids: shown.map((i) => i.id), room: parts.room, dues });
+  const kept = new Set(frozen.ids);
+  const added = shown.filter((i) => !kept.has(i.id));
+  return withDues({
+    ids: [...frozen.ids, ...added.map((i) => i.id)],
+    room: frozen.room,
+    dues: { ...frozen.dues, ...Object.fromEntries(added.filter((i) => i.due !== undefined).map((i) => [i.id, i.due!])) },
+  });
 }

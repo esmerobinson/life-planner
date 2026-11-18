@@ -408,8 +408,42 @@ describe("Today stops refilling (Esme, 2026-11-06: a removed task was 'constantl
   it("Sunday keeps its light list the same way", () => {
     const soon = [1, 2, 3].map((k) => item({ id: `s${k}`, due: "2026-10-27" }));
     const f = morning(soon, SUN);
-    expect(f).toEqual({ ids: ["s1", "s2"], room: 2 });
+    expect(f).toEqual({ ids: ["s1", "s2"], room: 2, dues: { s1: "2026-10-27", s2: "2026-10-27" } });
     const gone = off(soon, "s1", { hiddenOn: SUN });
     expect(shown(gone, f, SUN)).toMatchObject({ picks: ["s2"], alsoDue: ["s3"] });
+  });
+});
+
+describe("Today stops refilling, fix round 1", () => {
+  const off = (xs: Item[], id: string, o: Partial<Item>) => xs.map((x) => (x.id === id ? { ...x, ...o } : x));
+  const shownIds = (items: Item[], f: ReturnType<typeof todayFill>, day = TUE) => ids(todayList(items, [], day, f).picks);
+
+  it("I1: a day already full of things due keeps an empty record, so ticking one off pulls nothing in", () => {
+    const late = [1, 2, 3, 4].map((k) => item({ id: `late${k}`, due: "2026-10-20" }));
+    const items = [...late, item({ id: "p1a", priority: 1 }), item({ id: "p1b", priority: 1 })];
+    const f = todayFill(items, [], TUE);
+    expect(f).toEqual({ ids: [], room: 0 });
+    const ticked = off(items, "late1", { status: "done", completedAt: TUE });
+    expect(shownIds(ticked, f)).toEqual(["late2", "late3", "late4"]);
+    const removed = off(ticked, "late2", { hiddenOn: TUE });
+    expect(shownIds(removed, f)).toEqual(["late3", "late4"]);
+  });
+
+  it("M1: a pick whose deadline she pushes out goes off Today, and nothing replaces it", () => {
+    const items = [item({ id: "soon", due: "2026-10-28" }), item({ id: "p1a", priority: 1 }), item({ id: "p1b", priority: 1 })];
+    const f = todayFill(items, [], TUE);
+    expect(f.dues).toEqual({ soon: "2026-10-28" });
+    expect(shownIds(items, f)).toContain("soon");
+    const pushed = off(items, "soon", { due: "2026-11-30" });
+    expect(shownIds(pushed, f)).toEqual(["p1a", "p1b"]);
+    const cleared = off(items, "soon", { due: undefined });
+    expect(shownIds(cleared, f)).toEqual(["p1a", "p1b"]);
+    // Brought forward (still due soon, or now due today) it stays.
+    expect(shownIds(off(items, "soon", { due: TUE }), f)).toContain("soon");
+  });
+
+  it("M2: never more picks shown from the record than places it had", () => {
+    const items = [1, 2, 3, 4, 5, 6].map((k) => item({ id: `q${k}`, priority: 1 }));
+    expect(shownIds(items, { ids: ["q1", "q2"], room: 2 })).toEqual(["q1", "q2"]);
   });
 });

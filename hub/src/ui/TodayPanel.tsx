@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, type ReactNode } from "react";
 import { tickItem, untickItem } from "../data/repo";
-import { recordTodayFill, shouldRecord } from "../data/todayFillRepo";
+import { markTodayTouched, pruneTodayFill, recordTodayFill, shouldRecord } from "../data/todayFillRepo";
 import { tickedOffToday, todayFill, todayList } from "../domain/triage";
 import type { ISODate, Item } from "../domain/types";
 import { DoneSection } from "./DoneSection";
@@ -24,8 +24,12 @@ export function TodayPanel({
   const { attempt, saveError } = useSaveError();
   const shell = useContext(ShellContext);
 
-  /** Re-read locally, then tell the shell so every other useHubData consumer re-reads too. */
+  /**
+   * Re-read locally, then tell the shell so every other useHubData consumer re-reads too. She
+   * has used Today here: the list she is working from stays this device's for the day (I3).
+   */
   async function changed() {
+    await markTodayTouched(today, kept.frozen).catch(() => undefined);
     await refresh();
     await shell?.refresh();
   }
@@ -33,18 +37,21 @@ export function TodayPanel({
   // Habits and started projects ticked today stay, crossed out, at the bottom of their list;
   // a to-do done today moves to the "Done today" dropdown.
   // Inactive goals don't count (goals redesign).
-  // The day's picks are kept once shown (synced): one she removes, moves or ticks off is never
-  // replaced; the list just gets shorter (Esme, 2026-11-06). The next day starts fresh.
+  // The day's picks are kept (synced): one she removes, moves or ticks off is never replaced;
+  // the list just gets shorter (Esme, 2026-11-06 and 2026-11-18). The next day starts fresh.
+  // With sync on they are kept only after this session's first sync of the day (I2); until then
+  // the list is worked out as it stands (provisional).
   const kept = useTodayFill(today);
   const { rhythm, picks, alsoDue, doneToday } = useMemo(
     () => todayList(items, goals, today, kept.frozen),
     [items, goals, today, kept.frozen],
   );
   useEffect(() => {
-    if (!loaded || error || !kept.loaded) return;
+    if (!loaded || error || !kept.loaded || !kept.ready) return;
     const next = todayFill(items, goals, today, kept.frozen);
     if (shouldRecord(kept.frozen, next)) void recordTodayFill(today, next).catch(() => undefined);
-  }, [loaded, error, kept.loaded, kept.frozen, items, goals, today]);
+  }, [loaded, error, kept.loaded, kept.ready, kept.frozen, items, goals, today]);
+  useEffect(() => void pruneTodayFill(today).catch(() => undefined), [today]);
 
   async function tick(id: string, saved?: () => void): Promise<boolean> {
     if (!(await attempt(() => tickItem(id, today)))) return false;

@@ -5,7 +5,11 @@ import * as repo from "../data/repo";
 import { db } from "../data/db";
 import { createItem } from "../data/repo";
 import { TodayPanel } from "./TodayPanel";
+import { forgetDaysSeen } from "../data/todayFillRepo";
+import { keepOwnStamps } from "../data/changeTracking";
+import { firstWinsStamp, todayFillRow, todayFillRowId } from "../domain/todayFill";
 import { addDays } from "../domain/dates";
+import type { Item } from "../domain/types";
 
 const TODAY = "2026-10-27"; // a Tuesday
 
@@ -17,6 +21,8 @@ beforeEach(async () => {
   await db.items.clear();
   await db.goals.clear();
   await db.prefs.clear(); // the day's kept picks (domain/todayFill.ts) are per test
+  await db.syncMeta.clear(); // this device's copy of them, and the sync signals
+  forgetDaysSeen(); // a fresh app session
 });
 
 afterEach(() => {
@@ -495,5 +501,93 @@ describe("Today stops refilling (Esme, 2026-11-06)", () => {
     unmount();
     render(<TodayPanel today={addDays(TODAY, 1)} />);
     await vi.waitFor(async () => expect(await rows()).toHaveLength(4));
+  });
+});
+
+describe("Today stops refilling, fix round 1", () => {
+  const rows = async () => within(await screen.findByRole("list", { name: "Today" })).getAllByRole("listitem");
+  const titles = async () => (await rows()).map((r) => within(r).getByRole("checkbox").getAttribute("aria-label")!.replace("Mark done: ", ""));
+  const keptRow = (day = TODAY) => db.prefs.get(todayFillRowId(day)) as Promise<{ ids: string[]; room: number } | undefined>;
+
+  it("I1: a day full of overdue things keeps 'no places', so ticking one off pulls no to-do in", async () => {
+    for (let k = 1; k <= 4; k++) await task(`Late ${k}`, { due: "2026-10-20" });
+    await task("Pretend p1 a", { priority: 1 });
+    await task("Pretend p1 b", { priority: 1 });
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect(await keptRow()).toMatchObject({ ids: [], room: 0 }));
+    expect(await titles()).toEqual(["Late 1", "Late 2", "Late 3", "Late 4"]);
+    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Late 1" }));
+    await vi.waitFor(async () => expect(await titles()).toEqual(["Late 2", "Late 3", "Late 4"]));
+    expect(await keptRow()).toMatchObject({ ids: [], room: 0 });
+  });
+
+  it("I2, the morning path: the app resumes on a new day, Home opens before the pull, then the pull lands", async () => {
+    const YESTERDAY = addDays(TODAY, -1);
+    // Sync is set up; last night's sync was before the day began here.
+    await db.syncMeta.bulkPut([
+      { key: "token", value: "f".repeat(64) },
+      { key: "firstPullDone", value: true },
+      { key: "lastSyncedAt", value: Date.now() - 60_000 },
+    ]);
+    // Last night's copy: three overdue things she has since done on her other device.
+    const stale: Item[] = [];
+    for (let k = 1; k <= 3; k++) stale.push(await task(`Done elsewhere ${k}`, { due: "2026-10-20" }));
+    for (const t of ["a", "b", "c", "d", "e", "f"]) await task(`Pretend p1 ${t}`, { priority: 1 });
+    const { rerender } = render(<TodayPanel today={YESTERDAY} />);
+    await rows();
+    rerender(<TodayPanel today={TODAY} />); // 3am passed while the app slept: it resumes on today
+    // The provisional list shows, and nothing is kept from last night's copy.
+    await vi.waitFor(async () => expect(await titles()).toEqual(["Done elsewhere 1", "Done elsewhere 2", "Done elsewhere 3", "Pretend p1 a"]));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await keptRow()).toBeUndefined();
+    // The pull lands: the three are done; the sync finishes.
+    for (const it of stale) await db.items.update(it.id, { status: "done", completedAt: TODAY });
+    await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
+    await vi.waitFor(async () => expect(await keptRow()).toMatchObject({ room: 4, ids: ["Pretend p1 a", "Pretend p1 b", "Pretend p1 c", "Pretend p1 d"].map(() => expect.any(String)) }));
+    await vi.waitFor(async () => expect(await titles()).toEqual(["Pretend p1 a", "Pretend p1 b", "Pretend p1 c", "Pretend p1 d"]));
+    // From now on nothing refills.
+    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Pretend p1 a" }));
+    await vi.waitFor(async () => expect(await titles()).toEqual(["Pretend p1 b", "Pretend p1 c", "Pretend p1 d"]));
+  });
+
+  it("I2: with sync on and the day's sync not finished, the provisional list shows and nothing is kept", async () => {
+    await db.syncMeta.bulkPut([{ key: "token", value: "f".repeat(64) }, { key: "firstPullDone", value: true }, { key: "lastSyncedAt", value: 1 }]);
+    for (const t of ["a", "b", "c", "d", "e"]) await task(`Pretend p1 ${t}`, { priority: 1 });
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(4));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await keptRow()).toBeUndefined();
+  });
+
+  /** A row from a device that picked EARLIER today arriving by sync (it wins the shared row). */
+  async function earlierDeviceRow(ids: string[], room: number) {
+    const pickedAt = Date.now() - 3600_000;
+    await db.transaction("rw", db.prefs, async () => {
+      keepOwnStamps();
+      await db.prefs.put({ ...todayFillRow(TODAY, { ids, room }, pickedAt), updatedAt: firstWinsStamp(TODAY, pickedAt, ids.length) });
+    });
+  }
+
+  it("I3: two devices picked from different data; she hasn't used Today here yet: this device takes the earlier list", async () => {
+    const mine: Item[] = [];
+    for (let k = 1; k <= 8; k++) mine.push(await task(`Pretend p1 ${k}`, { priority: 1 }));
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect((await keptRow())?.ids).toHaveLength(4));
+    expect(await titles()).toEqual(["Pretend p1 1", "Pretend p1 2", "Pretend p1 3", "Pretend p1 4"]);
+    await earlierDeviceRow(mine.slice(4).map((i) => i.id), 4);
+    await vi.waitFor(async () => expect(await titles()).toEqual(["Pretend p1 5", "Pretend p1 6", "Pretend p1 7", "Pretend p1 8"]));
+  });
+
+  it("I3: once she has used Today here, the earlier device's list never changes hers, and it never grows past its places", async () => {
+    const mine: Item[] = [];
+    for (let k = 1; k <= 8; k++) mine.push(await task(`Pretend p1 ${k}`, { priority: 1 }));
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect((await keptRow())?.ids).toHaveLength(4));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Pretend p1 1" }));
+    await vi.waitFor(async () => expect(await titles()).toEqual(["Pretend p1 2", "Pretend p1 3", "Pretend p1 4"]));
+    await earlierDeviceRow(mine.slice(4).map((i) => i.id), 4);
+    await vi.waitFor(async () => expect((await keptRow())?.ids).toEqual(mine.slice(4).map((i) => i.id)));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(await titles()).toEqual(["Pretend p1 2", "Pretend p1 3", "Pretend p1 4"]);
   });
 });

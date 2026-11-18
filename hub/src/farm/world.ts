@@ -334,3 +334,16 @@ export function todayListFinished(items: Item[], goals: Goal[], today: ISODate, 
   const ticked = current.filter((it) => it !== undefined && tickedOffToday(it, today)).length;
   return ticked > 0 && current.every((it) => it !== undefined && (tickedOffToday(it, today) || movedOn(it, today)));
 }
+
+/**
+ * todayListFinished, but only once the day's kept picks have been read (review M4): before then
+ * the rebuilt morning list could differ from Home's, and a "finished" is noted for good.
+ */
+export function todayListFinishedOnceRead(
+  kept: { loaded: boolean; frozen: TodayFill | undefined },
+  items: Item[],
+  goals: Goal[],
+  today: ISODate,
+): boolean {
+  return kept.loaded && todayListFinished(items, goals, today, kept.frozen);
+}

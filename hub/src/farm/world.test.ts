@@ -1,5 +1,6 @@
 import type { Item } from "../domain/types";
 import { todayFill, todayList } from "../domain/triage";
+import { todayListFinishedOnceRead } from "./world";
 import { COLLECTION, STICKERS, STICKER_BY_KEY, hintFor, stickersIn } from "./catalogue";
 import {
   ACCESSORIES, ARRIVES_AT, KEEPER, RETIRED, BED_STAGE_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, farmDay, momentQueue, nookHost,
@@ -245,6 +246,13 @@ describe("Today's list finished", () => {
     // Without the kept picks a stand-in for the deleted one would be counted (and never shown).
     expect(todayListFinished(after, [], T)).toBe(false);
     expect(todayListFinished(after, [], T, kept)).toBe(true);
+  });
+
+  it("M4: not judged until the day's kept picks have been read (a 'finished' is noted for good)", () => {
+    const items: Item[] = [t({ pinnedDate: T, touchedAt: "2026-11-01" })];
+    const done = [{ ...items[0]!, status: "done" as const, completedAt: T, touchedAt: T }];
+    expect(todayListFinishedOnceRead({ loaded: false, frozen: undefined }, done, [], T)).toBe(false);
+    expect(todayListFinishedOnceRead({ loaded: true, frozen: undefined }, done, [], T)).toBe(true);
   });
 
   it("its hint says ticked or moved (placeholder wording)", () => {
