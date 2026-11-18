@@ -204,6 +204,8 @@ test("Due settings and a to-do's time sync through the real server; the cron run
   await a.goto("/area/admin");
   await a.getByRole("button", { name: "To-dos", exact: true }).click();
   await a.getByRole("button", { name: "Add", exact: true }).click();
+  // The + opens the one-box quick add (2026-11-17); the full form, with Due and Time, is More options.
+  await a.getByRole("button", { name: "More options" }).click();
   const form = a.locator("form.quick-add");
   await form.getByLabel("Title").fill("Pretend appointment");
   await form.getByLabel("Due").fill("2026-12-01");

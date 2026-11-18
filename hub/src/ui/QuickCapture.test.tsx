@@ -41,6 +41,37 @@ describe("the quick add box", () => {
     await vi.waitFor(async () => expect(await open()).toHaveLength(2));
   });
 
+  it("the Add button does what Return does: saves with the chips, clears, keeps focus, says Added", async () => {
+    const onAdded = vi.fn();
+    render(<QuickCapture today={TODAY} onAdded={onAdded} onMore={() => {}} />);
+    const add = screen.getByRole("button", { name: "Add to Inbox" });
+    expect(add).toHaveTextContent("Add");
+    expect(add).toBeDisabled();
+    await userEvent.type(box(), "   ");
+    expect(add).toBeDisabled();
+    await userEvent.clear(box());
+    await userEvent.type(box(), "Pretend tapped in");
+    await userEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
+    box().focus();
+    expect(add).toBeEnabled();
+    await userEvent.click(add);
+    expect(await screen.findByRole("status")).toHaveTextContent("Added");
+    expect((await open())[0]).toMatchObject({ title: "Pretend tapped in", areaId: "inbox", pinnedDate: "2026-11-18" });
+    expect(box()).toHaveValue("");
+    expect(box()).toHaveFocus(); // tapping Add never takes the focus: the phone's keyboard stays up
+    expect(add).toBeDisabled();
+    expect(onAdded).toHaveBeenCalledTimes(1);
+  });
+
+  it("pressing on the Add button doesn't move the focus out of the box", async () => {
+    render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
+    await userEvent.type(box(), "Pretend");
+    const add = screen.getByRole("button", { name: "Add to Inbox" });
+    const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    add.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+  });
+
   it("an empty box: Return does nothing", async () => {
     render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
     await userEvent.type(box(), "   {Enter}");

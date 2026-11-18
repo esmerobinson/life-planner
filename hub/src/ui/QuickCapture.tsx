@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createItem } from "../data/repo";
 import { TIME_OF_DAY } from "../data/validate";
 import { addDays } from "../domain/dates";
@@ -11,7 +11,9 @@ import { SAVE_ERROR } from "./messages";
  * and the box is ready for the next one. Small optional chips: Today and Tomorrow pin it to that
  * day ("Do it on"), Time gives it the to-do's time on that day. "More options" opens the full
  * Add form. WORDING PROVISIONAL (for Esme / Design): "What's on your mind?", "Today", "Tomorrow",
- * "Time", "Added", "More options". The "Added" line's look is a placeholder.
+ * "Time", "Added", "More options", the Add button (named "Add to Inbox" for screen readers, as
+ * the round + is already "Add"). The "Added" line's look is a placeholder; the Add button's
+ * place (just after the box, on its row) is provisional for Design.
  */
 
 /** Where the half-typed entry is kept on this device (localStorage: written as she types, so a
@@ -73,7 +75,6 @@ export function QuickCapture({
   today,
   onAdded,
   onMore,
-  inputRef,
   autoFocus = false,
 }: {
   today: ISODate;
@@ -81,7 +82,6 @@ export function QuickCapture({
   onAdded: () => void;
   /** "More options": the full Add form, with what was typed. */
   onMore: (draft: QuickDraft) => void;
-  inputRef?: Ref<HTMLInputElement>;
   /** Focus the box when it appears (the + also focuses it within the tap, for iOS). */
   autoFocus?: boolean;
 }) {
@@ -90,6 +90,7 @@ export function QuickCapture({
   const [failed, setFailed] = useState(false);
   const saving = useRef(false);
   const timeRef = useRef<HTMLInputElement>(null);
+  const boxRef = useRef<HTMLInputElement>(null);
   const focusTime = useRef(false);
 
   function setDraft(next: QuickDraft) {
@@ -148,27 +149,45 @@ export function QuickCapture({
 
   return (
     <form className="quick-capture" noValidate onSubmit={(e) => void save(e)}>
-      <label className="form-field quick-capture-field">
-        <span className="form-label">What's on your mind?</span>
-        <input
-          ref={inputRef}
-          type="text"
-          data-focus-first=""
-          autoFocus={autoFocus}
-          autoComplete="off"
-          enterKeyHint="enter"
-          value={draft.text}
-          // Return saves. Not left to the form: with the Time field open there are two fields
-          // and no submit button, and a browser then sends nothing on Return.
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) void save(e);
+      <div className="quick-capture-row">
+        <label className="form-field quick-capture-field">
+          <span className="form-label">What's on your mind?</span>
+          <input
+            ref={boxRef}
+            type="text"
+            data-focus-first=""
+            autoFocus={autoFocus}
+            autoComplete="off"
+            enterKeyHint="enter"
+            value={draft.text}
+            // Return saves. Not left to the form: with the Time field open there are two fields
+            // and no submit button, and a browser then sends nothing on Return.
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) void save(e);
+            }}
+            onChange={(e) => {
+              setAdded(false);
+              setDraft({ ...draft, text: e.target.value });
+            }}
+          />
+        </label>
+        {/* Esme, 2026-11-17: "needs to be add button". Does what Return does. Pressing it never
+            takes the focus from the box (so the phone's keyboard stays up); the tap puts it back
+            too, within the tap. */}
+        <button
+          type="button"
+          className="quick-capture-add"
+          aria-label="Add to Inbox"
+          disabled={!draft.text.trim()}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            boxRef.current?.focus();
+            void save(e);
           }}
-          onChange={(e) => {
-            setAdded(false);
-            setDraft({ ...draft, text: e.target.value });
-          }}
-        />
-      </label>
+        >
+          Add
+        </button>
+      </div>
       <div className="quick-capture-chips" role="group" aria-label="When">
         <button type="button" aria-pressed={draft.day === "today"} onClick={() => chooseDay("today")}>
           Today
