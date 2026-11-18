@@ -108,7 +108,10 @@ describe("Today's routine across two devices", () => {
     await ok(phone, server);
     await ok(mac, server);
     // The Mac has been paired for weeks: its last sync was in an earlier session.
-    await mac.syncMeta.put({ key: "lastSyncedAt", value: SESSION_STARTED_AT - 60_000 });
+    await mac.syncMeta.bulkPut([
+      { key: "lastSyncedAt", value: SESSION_STARTED_AT - 60_000 },
+      { key: "lastFullSyncAt", value: SESSION_STARTED_AT - 60_000 },
+    ]);
 
     // The phone updates first: the links are suggested there; then she changes three of them.
     expect(await applySuggestedLinks(phone)).toBe(3);

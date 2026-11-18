@@ -147,7 +147,7 @@ export async function moveRoutineStep(stepId: string, dir: -1 | 1): Promise<void
 export async function applySuggestedLinks(d: HubDB = db): Promise<number> {
   return d.transaction("rw", [d.prefs, d.items, d.syncMeta], async () => {
     if (await d.prefs.get(AUTOLINK_ID)) return 0;
-    const [token, firstPull, last] = await Promise.all([d.syncMeta.get("token"), d.syncMeta.get("firstPullDone"), d.syncMeta.get("lastSyncedAt")]);
+    const [token, firstPull, last] = await Promise.all([d.syncMeta.get("token"), d.syncMeta.get("firstPullDone"), d.syncMeta.get("lastFullSyncAt")]);
     const syncedThisSession = firstPull?.value === true && typeof last?.value === "number" && last.value >= SESSION_STARTED_AT;
     if (token?.value && !syncedThisSession) return 0;
     const items = await d.items.toArray();

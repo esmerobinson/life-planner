@@ -86,6 +86,8 @@ export type MetaKey =
   | "cursorServerUrl"
   /** This device has pulled everything the server had at least once. */
   | "firstPullDone"
+  /** When a sync last finished its pull's LAST page (lastSyncedAt is after every page). */
+  | "lastFullSyncAt"
   /** Bumped every time a token is saved, so an old run's 401 cannot delete a newer token. */
   | "tokenVersion"
   /** The exact token the server last accepted in a whole run (confirms a journal key). */
@@ -498,6 +500,9 @@ async function applyReply(
     // Everything the server had has now been seen once: Merge and imports may run.
     if (!reply.hasMore) await db.syncMeta.put({ key: "firstPullDone", value: true });
     await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
+    // The whole pull has landed (its last page): what "synced this session" waits for (re-review
+    // R-M1), so Today's picks and the routine's suggested links never go by a part of it.
+    if (!reply.hasMore) await db.syncMeta.put({ key: "lastFullSyncAt", value: Date.now() });
     return written;
   });
 }

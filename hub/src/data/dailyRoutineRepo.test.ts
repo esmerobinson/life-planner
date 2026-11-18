@@ -100,11 +100,14 @@ describe("habit links", () => {
     await db.syncMeta.bulkPut([
       { key: "token", value: "f0f0".padEnd(64, "0") },
       { key: "firstPullDone", value: true },
-      { key: "lastSyncedAt", value: SESSION_STARTED_AT - 60_000 }, // an earlier session
+      { key: "lastFullSyncAt", value: SESSION_STARTED_AT - 60_000 }, // an earlier session
     ]);
     expect(await applySuggestedLinks()).toBe(0);
     expect(await db.prefs.count()).toBe(0);
+    // A first page landed this session, not the whole pull (re-review R-M1): still waits.
     await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
+    expect(await applySuggestedLinks()).toBe(0);
+    await db.syncMeta.put({ key: "lastFullSyncAt", value: Date.now() });
     expect(await applySuggestedLinks()).toBe(1);
   });
 
