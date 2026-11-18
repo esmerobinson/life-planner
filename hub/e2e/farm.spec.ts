@@ -122,22 +122,21 @@ for (const width of [1280, 390]) {
     test.use({ viewport: { width, height: width === 390 ? 844 : 1000 } });
     const phone = width === 390;
 
-    test("the first open starts the farm: Welcome plays in the nook and goes into the book", async ({ page }) => {
+    test("the first open starts the farm: Welcome pops up top centre (no nook box on the game screen) and is kept", async ({ page }) => {
       test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await page.goto("/farm");
       await expect(page.getByRole("heading", { level: 1, name: "Esme's Rio" })).toBeAttached();
       await expect.poll(() => farmRow(page, "seen:hi")).not.toBeNull();
       await expect(page.locator("[data-earned]")).toHaveAttribute("data-earned", "1");
-      // Pixel art is never smoothed. The nook stays at a whole-number scale; on the phone the menu's
-      // pixel text and the map do too. On the desktop the map and menu scale by fractions to fill
-      // the window (Esme, 2026-11-17: "a bit bigger"), still nearest-neighbour.
+      // Esme, 2026-11-17: "Bottom left UI box seems to be redundant": the moment is a kit pop-up.
+      await expect(page.locator(".farm-nook")).toHaveCount(0);
+      await expect(page.getByText("New sticker: Welcome")).toBeAttached();
+      // Pixel art is never smoothed. On the desktop the map and menu scale by fractions (the menu
+      // never above the kit's 3x), still nearest-neighbour.
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
-      for (const sel of [".rio-menu .bt canvas", ".farm-nook canvas"]) {
-        const p = await pixelated(page, sel);
-        expect(p.rendering).toBe("pixelated");
-        if (phone || sel === ".farm-nook canvas") expect(Number.isInteger(p.scale)).toBe(true);
-      }
+      const p = await pixelated(page, ".rio-menu .bt canvas");
+      expect(p.rendering).toBe("pixelated");
       const m = await pixelated(page, ".rio-map-layer > canvas");
       const dpr = await page.evaluate(() => window.devicePixelRatio);
       expect(m.rendering).toBe("pixelated");
@@ -232,7 +231,7 @@ for (const width of [1280, 390]) {
       await page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Ipanema beach" }).focus();
       await page.keyboard.press("Enter");
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "ipanema-beach/outside");
-      await page.getByRole("button", { name: "Noticeboard" }).click();
+      await page.getByRole("navigation", { name: "Ways in and out" }).getByRole("button", { name: "Noticeboard" }).click();
       const menu = page.getByRole("dialog", { name: "Menu" });
       await expect(menu.getByRole("tab", { name: "Noticeboard" })).toHaveAttribute("aria-selected", "true");
       await page.keyboard.press("Escape");
@@ -283,7 +282,9 @@ for (const width of [1280, 390]) {
       await expect(page.getByRole("tooltip")).toContainText("Opens on day 3");
       await expect(page.getByRole("tooltip")).toBeVisible();
       // A place she can visit wears its label and lifts when she points at it (Esme, 2026-11-17).
-      expect(await page.locator(".rio-place-label").count()).toBeLessThanOrEqual(1); // day 1: the Lagoa house only (labelled where it fits)
+      // Labels only on places she can visit (where they fit).
+      const open = await page.locator('[data-place][data-status="new"], [data-place][data-status="open"]').count();
+      expect(await page.locator(".rio-place-label").count()).toBeLessThanOrEqual(open);
       await canvas.hover({ position: await onMap(page, "lagoa-house") });
       await expect(page.locator(".rio-map")).toHaveAttribute("data-hover", "lagoa-house");
       await expect(page.getByRole("tooltip")).toContainText("Visit");
@@ -301,7 +302,8 @@ for (const width of [1280, 390]) {
       await expect(page.getByRole("tooltip")).toHaveText("Kitchen");
       await kitchen.click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/kitchen");
-      await page.getByRole("button", { name: "Garden" }).click();
+      // The kitchen's door is bottom centre, under the hotbar: it reaches up above the bar, where she clicks it.
+      await page.getByRole("button", { name: "Garden" }).click({ position: { x: 10, y: 4 } });
       await page.getByRole("button", { name: "Back to the map" }).click();
       await expect(page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Lagoa house" })).toHaveAttribute("data-status", "open");
     });
