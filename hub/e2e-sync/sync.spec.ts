@@ -386,12 +386,15 @@ test("Today: a phone that opens Home before its sync lands takes the Mac's picks
 
   // This morning on the Mac: Home keeps its picks; she removes one.
   await a.goto("/");
-  await expect(list(a).getByRole("listitem")).toHaveCount(4);
+  // The day's first picks may come from an earlier test's device on this shared server (the
+  // pairing test opens Home too), so the counts are relative to what the Mac shows (R-M6).
   await expect.poll(async () => (await kept(a)).length).toBe(1);
+  await expect.poll(async () => (await titles(a)).length).toBeGreaterThanOrEqual(2);
   const before = await titles(a);
+  const n = before.length;
   await a.getByRole("button", { name: `Move to: ${before[0]}` }).click();
   await a.getByRole("button", { name: "Remove from today" }).click();
-  await expect(list(a).getByRole("listitem")).toHaveCount(3);
+  await expect(list(a).getByRole("listitem")).toHaveCount(n - 1);
   await expect.poll(async () => (await readStore(a, "items")).find((r) => r.title === before[0])?.hiddenOn).toBeTruthy();
   await syncNow(a);
 
@@ -404,7 +407,9 @@ test("Today: a phone that opens Home before its sync lands takes the Mac's picks
   });
   const keptBefore = await kept(b);
   await b.goto("/");
-  await expect(list(b).getByRole("listitem")).toHaveCount(4); // last night's copy: the removal hasn't arrived
+  // Last night's copy shows (the Mac's removal hasn't arrived; whether a row for today was
+  // already here depends on earlier tests on this shared server, so no count here).
+  await expect(list(b).getByRole("listitem").first()).toBeVisible();
   await b.waitForTimeout(500);
   // Nothing is kept from last night's copy: no picks written here, none waiting to send.
   expect(await kept(b)).toEqual(keptBefore);
@@ -412,7 +417,7 @@ test("Today: a phone that opens Home before its sync lands takes the Mac's picks
   release();
   // The sync lands: the Mac's list (the day's first picks, the same row on both), without the
   // removed one, nothing pulled in.
-  await expect(list(b).getByRole("listitem")).toHaveCount(3, { timeout: 30_000 });
+  await expect(list(b).getByRole("listitem")).toHaveCount(n - 1, { timeout: 30_000 });
   expect(await titles(b)).toEqual(before.slice(1));
   const [rowA] = await kept(a);
   const [rowB] = await kept(b);
@@ -422,12 +427,12 @@ test("Today: a phone that opens Home before its sync lands takes the Mac's picks
   // The phone removes another; back on the Mac it's gone and nothing new comes in.
   await b.getByRole("button", { name: `Move to: ${before[1]}` }).click();
   await b.getByRole("button", { name: "Remove from today" }).click();
-  await expect(list(b).getByRole("listitem")).toHaveCount(2);
+  await expect(list(b).getByRole("listitem")).toHaveCount(n - 2);
   await expect.poll(async () => (await readStore(b, "items")).find((r) => r.title === before[1])?.hiddenOn).toBeTruthy();
   await syncNow(b);
   await syncNow(a);
   await a.goto("/");
-  await expect(list(a).getByRole("listitem")).toHaveCount(2);
+  await expect(list(a).getByRole("listitem")).toHaveCount(n - 2);
   expect(await titles(a)).toEqual(before.slice(2));
 
   await ctxA.close();
