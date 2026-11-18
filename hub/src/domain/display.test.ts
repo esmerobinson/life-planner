@@ -76,6 +76,11 @@ describe("addedLine: when a to-do was added (side panel)", () => {
     expect(addedLine({ ...base, source: { kind: "obsidian", key: "k" } }, "2026-11-18")?.key).toBe("Imported");
     expect(addedLine({ ...base, source: { kind: "manual", key: "k" } }, "2026-11-18")?.key).toBe("Added");
   });
+  it("a goal milestone the app turned into a to-do: nothing (its date is the goal's, not when it was added)", () => {
+    expect(addedLine({ id: "ms-g1-m1", milestone: true, createdAt: "2026-10-01" }, "2026-11-18")).toBeNull();
+    // A milestone she made as a to-do herself keeps its own date.
+    expect(addedLine({ id: "pretend-id", milestone: true, createdAt: "2026-10-01" }, "2026-11-18")).toEqual({ key: "Added", date: "1 Oct" });
+  });
   it("no date, or not a real one: nothing (never a wrong date)", () => {
     expect(addedLine({}, "2026-11-18")).toBeNull();
     expect(addedLine({ createdAt: "" }, "2026-11-18")).toBeNull();

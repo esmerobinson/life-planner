@@ -28,14 +28,17 @@ const IMPORTED = new Set(["backlog", "gtasks", "obsidian"]);
  * When a to-do was added, for its side panel (provisional wording for Design): "Added" and
  * "12 Nov" (the year too when it isn't this year); "Imported" for one an import brought in (its
  * date is the import's day). Null when there is no real date, or it is after today: never a
- * wrong date.
+ * wrong date; nothing for a milestone the app made from a goal's old checklist either.
  */
 export function addedLine(
-  it: { createdAt?: unknown; source?: { kind: string; key?: string } },
+  it: { id?: string; milestone?: boolean; createdAt?: unknown; source?: { kind: string; key?: string } },
   today: ISODate,
 ): { key: "Added" | "Imported"; date: string } | null {
   const d = it.createdAt;
   if (typeof d !== "string" || !isValidISODate(d) || d > today) return null;
+  // A goal's old milestone the app turned into a to-do (domain/milestones.ts, ids "ms-…") carries
+  // the goal's date, not the day she added it: nothing (review M5).
+  if (it.milestone && it.id?.startsWith("ms-")) return null;
   return { key: it.source && IMPORTED.has(it.source.kind) ? "Imported" : "Added", date: shortDate(d, today) };
 }
 
