@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayLabel, dueLine, monthName, nextFriday, nextMonday, shortDate } from "./display";
+import { addedLine, dayLabel, dueLine, monthName, nextFriday, nextMonday, shortDate } from "./display";
 import type { Item } from "./types";
 
 const TODAY = "2026-10-28"; // a Wednesday
@@ -61,5 +61,27 @@ describe("dueLine", () => {
       late: true,
       on: "On Thu 29 Oct",
     });
+  });
+});
+
+describe("addedLine: when a to-do was added (side panel)", () => {
+  const base = { createdAt: "2026-11-12" } as const;
+  it("'Added' and the day, with the year only when it isn't this year", () => {
+    expect(addedLine(base, "2026-11-18")).toEqual({ key: "Added", date: "12 Nov" });
+    expect(addedLine({ createdAt: "2025-03-04" }, "2026-11-18")).toEqual({ key: "Added", date: "4 Mar 2025" });
+  });
+  it("brought in by an import: says so (the day it came into Esmeworld, not when she first wrote it)", () => {
+    expect(addedLine({ ...base, source: { kind: "gtasks", key: "k" } }, "2026-11-18")).toEqual({ key: "Imported", date: "12 Nov" });
+    expect(addedLine({ ...base, source: { kind: "backlog", key: "k" } }, "2026-11-18")?.key).toBe("Imported");
+    expect(addedLine({ ...base, source: { kind: "obsidian", key: "k" } }, "2026-11-18")?.key).toBe("Imported");
+    expect(addedLine({ ...base, source: { kind: "manual", key: "k" } }, "2026-11-18")?.key).toBe("Added");
+  });
+  it("no date, or not a real one: nothing (never a wrong date)", () => {
+    expect(addedLine({}, "2026-11-18")).toBeNull();
+    expect(addedLine({ createdAt: "" }, "2026-11-18")).toBeNull();
+    expect(addedLine({ createdAt: "2026-02-30" }, "2026-11-18")).toBeNull();
+    expect(addedLine({ createdAt: "12 Nov" }, "2026-11-18")).toBeNull();
+    // Later than today (a clock that was wrong): nothing either.
+    expect(addedLine({ createdAt: "2026-11-19" }, "2026-11-18")).toBeNull();
   });
 });

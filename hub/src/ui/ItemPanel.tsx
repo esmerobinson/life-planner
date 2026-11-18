@@ -7,7 +7,7 @@ import { ProgressBar } from "./ProgressBar";
 import { RepeatBox } from "./RepeatBox";
 import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
-import { dayLabel, timeLabel } from "../domain/display";
+import { addedLine, dayLabel, timeLabel } from "../domain/display";
 import { isHabit } from "../domain/habits";
 import type { AreaId, Goal, ISODate, Item, Priority } from "../domain/types";
 import { GOAL_AREAS } from "./areas";
@@ -264,6 +264,7 @@ export function ItemPanel({
   const showBook = !inbox && (editing ? fields.kind === "book" : book);
   // A project's due date is its deadline (2C).
   const dueKey = (editing ? fields.kind === "project" : project) ? "Deadline" : "Due";
+  const added = addedLine(item, today);
 
   return (
     <div className="peek-body">
@@ -470,6 +471,13 @@ export function ItemPanel({
             ) : (
               <span>{item.priority}</span>
             )}
+          </>
+        )}
+        {/* When it was added (provisional wording and place, for Design): never a wrong date. */}
+        {added && (
+          <>
+            <span className="peek-key">{added.key}</span>
+            <span>{added.date}</span>
           </>
         )}
       </div>
