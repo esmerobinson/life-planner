@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "./db";
 import {
-  addRoutineStep, applySuggestedLinks, linkRoutineStep, moveRoutineStep, readRoutine, removeRoutineStep, setRoutineStepDone,
+  SESSION_STARTED_AT, addRoutineStep, applySuggestedLinks, linkRoutineStep, moveRoutineStep, readRoutine, removeRoutineStep, setRoutineStepDone,
   updateRoutineStep,
 } from "./dailyRoutineRepo";
 import { tickItem } from "./repo";
-import { routineDay, routineSteps, stepRowId, tickRowId } from "../domain/dailyRoutine";
+import { AUTOLINK_ID, routineDay, routineSteps, stepRowId, tickRowId } from "../domain/dailyRoutine";
 import type { Item } from "../domain/types";
 
 // "Today's routine" on Home: reads and writes (synced `prefs` rows). All data is fictional.
@@ -69,17 +69,42 @@ describe("habit links", () => {
     const steps = routineSteps((await readRoutine(TODAY)).steps);
     expect(Object.fromEntries(steps.filter((s) => s.habitId).map((s) => [s.id, s.habitId]))).toEqual({ d1: "h-up", d4: "h-vit", d9: "h-wind" });
     expect(await db.items.count()).toBe(3);
-    // A default step's row holds only the link (its words still follow the defaults).
-    expect(await db.prefs.get(stepRowId("d4"))).toEqual({ id: stepRowId("d4"), habitId: "h-vit", updatedAt: expect.any(Number) });
+    // A default step's row holds only the link (its words still follow the defaults), stamped 1 so
+    // any real edit, on any device, wins over it; and it goes to the server.
+    expect(await db.prefs.get(stepRowId("d4"))).toEqual({ id: stepRowId("d4"), habitId: "h-vit", updatedAt: 1 });
+    expect(await db.pending.get(["prefs", stepRowId("d4")])).toMatchObject({ updatedAt: 1 });
+    // Once, on any device: the marker (also stamped 1) says it's done.
+    expect(await db.prefs.get(AUTOLINK_ID)).toEqual({ id: AUTOLINK_ID, updatedAt: 1 });
+    await db.prefs.delete(stepRowId("d4"));
     expect(await applySuggestedLinks()).toBe(0);
   });
 
-  it("waits for a newly synced device's first full pull (her other device's routine may be on its way)", async () => {
+  it("nothing (not even the marker) before she has a daily habit to link", async () => {
+    expect(await applySuggestedLinks()).toBe(0);
+    expect(await db.prefs.get(AUTOLINK_ID)).toBeUndefined();
+  });
+
+  it("never auto-links a weekly habit; ticking a step linked to one on an unscheduled day uses the step's own tick", async () => {
+    await db.items.put(habit("h-med", "Meditation (pretend)", { recur: ["wed"] }));
+    expect(await applySuggestedLinks()).toBe(0);
+    await linkRoutineStep("d2", "h-med");
+    await setRoutineStepDone("d2", TODAY, true); // a Tuesday
+    expect((await db.items.get("h-med"))!.doneDates).toBeUndefined();
+    expect(await db.prefs.get(tickRowId(TODAY, "d2"))).toMatchObject({ done: true });
+    await setRoutineStepDone("d2", "2026-11-18", true); // a Wednesday: the habit's own tick
+    expect((await db.items.get("h-med"))!.doneDates).toEqual(["2026-11-18"]);
+  });
+
+  it("with sync set up, waits until a sync has finished in THIS session (even on a long-paired device)", async () => {
     await db.items.put(habit("h-vit", "Vitamins"));
-    await db.syncMeta.put({ key: "token", value: "f0f0".padEnd(64, "0") });
+    await db.syncMeta.bulkPut([
+      { key: "token", value: "f0f0".padEnd(64, "0") },
+      { key: "firstPullDone", value: true },
+      { key: "lastSyncedAt", value: SESSION_STARTED_AT - 60_000 }, // an earlier session
+    ]);
     expect(await applySuggestedLinks()).toBe(0);
     expect(await db.prefs.count()).toBe(0);
-    await db.syncMeta.put({ key: "firstPullDone", value: true });
+    await db.syncMeta.put({ key: "lastSyncedAt", value: Date.now() });
     expect(await applySuggestedLinks()).toBe(1);
   });
 

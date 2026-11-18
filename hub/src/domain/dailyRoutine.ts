@@ -13,14 +13,20 @@
 //     she unlinked it (never suggested again), a string = linked to that habit.
 //   routine-tick:<date>:<stepId> { date, step, done }
 //     An unlinked step's tick for one day (the app day, 3am to 3am). A linked step has no tick
-//     of its own: it is ticked exactly when its habit is done that day (doneDates).
+//     of its own: it is ticked exactly when its habit is done that day (doneDates). On a day its
+//     habit isn't scheduled, it uses its own tick (no off-day session is logged for the habit).
+//   routine-autolinked           {}
+//     The keyword links were suggested once, on some device: never again, on any device.
+//     Suggested links (and this marker) are stamped 1, so a real edit always wins over them.
 
 import { doneToday, isHabit } from "./habits";
-import { isValidISODate } from "./dates";
+import { isValidISODate, weekdayOf } from "./dates";
 import type { ISODate, Item } from "./types";
 
 export const STEP_PREFIX = "routine-step:";
 export const TICK_PREFIX = "routine-tick:";
+/** The one-time marker: the keyword links have been suggested (on some device). */
+export const AUTOLINK_ID = "routine-autolinked";
 export const MAX_STEPS = 40;
 export const MAX_STEP_TITLE = 120;
 export const MAX_STEP_MIN = 200;
@@ -50,7 +56,12 @@ export interface RoutineTickRow {
   updatedAt?: number;
 }
 
-export type RoutineRow = RoutineStepRow | RoutineTickRow;
+export interface RoutineMarkerRow {
+  id: typeof AUTOLINK_ID;
+  updatedAt?: number;
+}
+
+export type RoutineRow = RoutineStepRow | RoutineTickRow | RoutineMarkerRow;
 
 /** A step as shown. */
 export interface RoutineStep {
@@ -92,6 +103,7 @@ const isMin = (v: unknown): v is string => typeof v === "string" && v.length <= 
 /** One routine row is well formed (sync, local writes). Unknown fields are allowed (later versions). */
 export function validRoutineRow(r: unknown): r is RoutineRow {
   if (!isObj(r) || typeof r.id !== "string" || !isStamp(r.updatedAt)) return false;
+  if (r.id === AUTOLINK_ID) return true;
   if (r.id.startsWith(STEP_PREFIX)) {
     const stepId = r.id.slice(STEP_PREFIX.length);
     if (!STEP_ID.test(stepId)) return false;
@@ -116,7 +128,7 @@ export function validRoutineRow(r: unknown): r is RoutineRow {
 
 /** Is a `prefs` row id one of the routine's? */
 export const isRoutineRowId = (id: unknown): boolean =>
-  typeof id === "string" && (id.startsWith(STEP_PREFIX) || id.startsWith(TICK_PREFIX));
+  typeof id === "string" && (id.startsWith(STEP_PREFIX) || id.startsWith(TICK_PREFIX) || id === AUTOLINK_ID);
 
 /** The steps as shown: the defaults with their stored overrides, plus steps she added; in order. */
 export function routineSteps(rows: readonly RoutineStepRow[]): RoutineStep[] {
@@ -143,29 +155,37 @@ export function routineSteps(rows: readonly RoutineStepRow[]): RoutineStep[] {
 /** A habit a step can link to: a live recurring to-do. */
 export const isLinkableHabit = (it: Item) => isHabit(it) && it.status === "open";
 
+/** Every day of the week: the only habits a step is ever linked to automatically. */
+export const isDailyHabit = (it: Item) => isLinkableHabit(it) && new Set(it.recur).size === 7;
+
+/** A linked habit counts for the step on `day` only when it is scheduled that day. */
+const scheduledOn = (it: Item, day: ISODate) => it.recur?.includes(weekdayOf(day)) ?? false;
+
 /**
- * Links to suggest: for each default step never linked or unlinked, the first live habit whose
- * title has one of its keywords, never a habit another step has. Never makes a habit.
+ * Links to suggest (once: the caller checks the marker): for each default step with NO stored
+ * row (never renamed, linked, unlinked or removed, here or synced from her other device), the
+ * first live daily habit whose title has one of its keywords, never a habit any stored row
+ * holds (a removed step's too) nor one already suggested. Never makes a habit.
  */
-export function suggestLinks(steps: readonly RoutineStep[], items: readonly Item[]): { stepId: string; habitId: string }[] {
-  const habits = items.filter(isLinkableHabit).sort((a, b) => a.title.localeCompare(b.title) || (a.id < b.id ? -1 : 1));
-  const taken = new Set(steps.map((s) => s.habitId).filter((h): h is string => typeof h === "string"));
+export function suggestLinks(rows: readonly RoutineStepRow[], items: readonly Item[]): { stepId: string; habitId: string }[] {
+  const habits = items.filter(isDailyHabit).sort((a, b) => a.title.localeCompare(b.title) || (a.id < b.id ? -1 : 1));
+  const stored = rows.filter((r) => r.id.startsWith(STEP_PREFIX));
+  const has = new Set(stored.map((r) => r.id.slice(STEP_PREFIX.length)));
+  const taken = new Set(stored.map((r) => r.habitId).filter((h): h is string => typeof h === "string"));
   const out: { stepId: string; habitId: string }[] = [];
-  for (const s of steps) {
-    if (s.habitId !== undefined) continue;
-    const keywords = DEFAULT_BY_ID.get(s.id)?.keywords ?? [];
-    if (keywords.length === 0) continue;
-    const h = habits.find((it) => !taken.has(it.id) && keywords.some((k) => it.title.toLowerCase().includes(k)));
+  for (const def of DEFAULT_STEPS) {
+    if (has.has(def.id) || def.keywords.length === 0) continue;
+    const h = habits.find((it) => !taken.has(it.id) && def.keywords.some((k) => it.title.toLowerCase().includes(k)));
     if (!h) continue;
     taken.add(h.id);
-    out.push({ stepId: s.id, habitId: h.id });
+    out.push({ stepId: def.id, habitId: h.id });
   }
   return out;
 }
 
 export interface RoutineRowView {
   step: RoutineStep;
-  /** The live habit it is linked to (undefined: unlinked, or the habit is gone). */
+  /** The live habit it is linked to (undefined: unlinked, the habit is gone, or not scheduled today). */
   habit?: Item;
   done: boolean;
 }
@@ -182,7 +202,7 @@ export function routineDay(steps: readonly RoutineStep[], items: readonly Item[]
   const byId = new Map(items.map((it) => [it.id, it] as const));
   const rows = steps.map((step): RoutineRowView => {
     const h = typeof step.habitId === "string" ? byId.get(step.habitId) : undefined;
-    const habit = h && isLinkableHabit(h) ? h : undefined;
+    const habit = h && isLinkableHabit(h) && scheduledOn(h, today) ? h : undefined;
     return { step, ...(habit ? { habit } : {}), done: habit ? doneToday(habit, today) : own.get(step.id) === true };
   });
   return { rows, done: rows.filter((r) => r.done).length, total: rows.length };

@@ -1,5 +1,5 @@
 import {
-  DEFAULT_STEPS, nextStepId, routineDay, routineSteps, stepRowId, suggestLinks, tickRowId, validRoutineRow,
+  AUTOLINK_ID, DEFAULT_STEPS, nextStepId, routineDay, routineSteps, stepRowId, suggestLinks, tickRowId, validRoutineRow,
   type RoutineStepRow, type RoutineTickRow,
 } from "./dailyRoutine";
 import type { Item } from "./types";
@@ -93,23 +93,39 @@ describe("suggested habit links", () => {
     habit("h-wind", "Wind down"),
     habit("h-yoga", "Yoga", { recur: ["tue", "sat"] }),
     habit("h-med", "Meditate", { status: "archived" }), // not live: never suggested
+    habit("h-med2", "Meditation (pretend)", { recur: ["mon", "wed"] }), // weekly: never auto-linked
     { ...habit("h-task", "Vitamin shopping"), recur: undefined }, // a to-do, not a habit
   ];
 
-  it("links obvious steps by keyword, each habit to one step at most", () => {
-    expect(suggestLinks(routineSteps([]), habits)).toEqual([
+  it("links obvious steps by keyword, each habit to one step at most, daily habits only", () => {
+    expect(suggestLinks([], habits)).toEqual([
       { stepId: "d1", habitId: "h-up" }, // "up by"; step 3's "light" then has no habit left
       { stepId: "d4", habitId: "h-vit" },
       { stepId: "d9", habitId: "h-wind" },
     ]);
   });
 
-  it("never touches a step she linked or unlinked, nor a habit another step has", () => {
-    const steps = routineSteps([step("d1", { habitId: null }), step("d6", { habitId: "h-vit" })]);
-    expect(suggestLinks(steps, habits)).toEqual([
-      { stepId: "d3", habitId: "h-up" }, // "light", now that step 1 is unlinked on purpose
+  it("only for a step with no row of its own: never one she renamed, linked, unlinked or removed", () => {
+    expect(suggestLinks([step("d1", { title: "Up by 9 (mine)" }), step("d4", { removed: true }), step("d9", { habitId: null })], habits)).toEqual([
+      { stepId: "d3", habitId: "h-up" }, // the only step left without a row of its own that matches
+    ]);
+  });
+
+  it("a habit held by any stored row, a removed step's too, is never suggested again", () => {
+    // Removing step 1 (which held "Up by 8am + light") doesn't hand it to step 3 ("light").
+    expect(suggestLinks([step("d1", { removed: true, habitId: "h-up" })], habits)).toEqual([
+      { stepId: "d4", habitId: "h-vit" },
       { stepId: "d9", habitId: "h-wind" },
     ]);
+    expect(suggestLinks([step("d6", { habitId: "h-vit" })], habits)).toEqual([
+      { stepId: "d1", habitId: "h-up" },
+      { stepId: "d9", habitId: "h-wind" },
+    ]);
+  });
+
+  it("the one-time marker is a valid routine row", () => {
+    expect(validRoutineRow({ id: AUTOLINK_ID, updatedAt: 1 })).toBe(true);
+    expect(validRoutineRow({ id: AUTOLINK_ID })).toBe(true);
   });
 });
 
@@ -129,6 +145,17 @@ describe("the day's view", () => {
   it("another day's ticks don't count (the list starts fresh each day)", () => {
     const day = routineDay(steps, [habit("h-vit", "Vitamins", { doneDates: ["2026-11-16"] })], [tick("d2", true, "2026-11-16")], TODAY);
     expect(day.done).toBe(0);
+  });
+
+  it("a habit not scheduled today: the step keeps its own tick (no off-day session for the habit)", () => {
+    const yoga = habit("h-yoga", "Yoga", { recur: ["wed", "sun"], doneDates: [TODAY] }); // TODAY is a Tuesday
+    const linked = routineSteps([step("d2", { habitId: "h-yoga" })]);
+    const tue = routineDay(linked, [yoga], [tick("d2", false)], TODAY).rows.find((r) => r.step.id === "d2")!;
+    expect(tue.habit).toBeUndefined();
+    expect(tue.done).toBe(false);
+    const wed = routineDay(linked, [{ ...yoga, doneDates: ["2026-11-18"] }], [], "2026-11-18").rows.find((r) => r.step.id === "d2")!;
+    expect(wed.habit?.title).toBe("Yoga");
+    expect(wed.done).toBe(true);
   });
 
   it("a link to a habit that's gone (binned, stopped) falls back to the step's own tick", () => {
