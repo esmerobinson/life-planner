@@ -20,7 +20,7 @@ import { ArrowButton, KitIcon, StickerArt, TextButton, pos } from "./pieces";
 const CARD_W = 96;
 
 // PLACEHOLDER WORDING (the cells' names)
-const SAYS: Record<CellState, string> = { placed: "placed in Rio", ready: "ready to place", ghost: "not yet" };
+const SAYS: Record<CellState, string> = { placed: "placed in Rio", ready: "ready to place", kept: "kept in your collection", ghost: "not yet" };
 
 function firstArea(view: FarmView, startArea?: string | null): number {
   const start = COLLECTION_AREAS.findIndex((a) => a.key === startArea);
@@ -195,9 +195,17 @@ function Card({ view, stickerKey, state, times, placeable, narrow, cell, inner, 
       <i className="tipdiv" aria-hidden="true" />
       <BitmapText text={hintFor(st)} w={textW} />
       {/* PLACEHOLDER WORDING (the card's status lines) */}
-      {state === "placed" && <BitmapText text="Placed in Rio" colour={INK.green} w={textW} />}
+      {state === "placed" && !view.state.hidden.has(stickerKey) && <BitmapText text="Placed in Rio" colour={INK.green} w={textW} />}
+      {/* Hidden from its scene (edit mode), never lost: shown again from here. */}
+      {state === "placed" && view.state.hidden.has(stickerKey) && (
+        <div className="tip-row">
+          <TextButton label="Show in Rio" onClick={() => void view.setHidden(stickerKey, false).catch(() => undefined)} />
+          <BitmapText text="Hidden" colour={INK.brown} />
+        </div>
+      )}
       {times >= 2 && <BitmapText text={`Earned ×${times}`} colour={INK.green} w={textW} />}
       {state === "ghost" && <BitmapText text="Not yet" colour={INK.brown} w={textW} />}
+      {state === "kept" && <BitmapText text="Kept in your Collection" colour={INK.green} w={textW} />}
       {state === "ready" && placeable && (
         <div className="tip-row">
           <TextButton label="Place in Rio" onClick={() => void place()} />

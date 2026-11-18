@@ -1,5 +1,5 @@
 import { RIO_MAP } from "./assets";
-import { MAP_KEEP, coverFit, fitScale, hitPlace, sceneKeep } from "./mapMath";
+import { MAP_KEEP, coverFit, fitScale, hitPlace, doorKeep, placeLabels, sceneKeep, stickerBox } from "./mapMath";
 
 const CANVAS: [number, number] = [896, 504];
 
@@ -133,10 +133,16 @@ describe("coverFit: an even border, never trimming what matters (Esme, 2026-11-1
     }
   });
 
-  it("a scene's keep region is its sticker slots", () => {
-    const k = sceneKeep([{ x: 40, y: 60 }, { x: 100, y: 30 }], [320, 180]);
+  it("a scene's keep region is what's drawn there: its stickers and the middle of each door", () => {
+    const k = sceneKeep([stickerBox({ x: 40, y: 60 }), stickerBox({ x: 100, y: 30 })], [320, 180]);
     expect(k).toEqual([32, 14, 76, 46]);
-    expect(sceneKeep([], [320, 180])).toEqual([0, 0, 320, 180]);
+    // A strip-wide exit only keeps its middle (it can't stop the scene covering the view).
+    expect(doorKeep([0, 200, 384, 40])).toEqual([180, 208, 24, 24]);
+    expect(doorKeep([196, 96, 10, 54])).toEqual([196, 111, 10, 24]);
+    // Nothing drawn: the middle of the scene.
+    expect(sceneKeep([], [320, 180])).toEqual([160, 90, 0, 0]);
+    // Kept to the art.
+    expect(sceneKeep([stickerBox({ x: 2, y: 4 })], [320, 180])).toEqual([0, 0, 10, 4]);
   });
 });
 
@@ -171,8 +177,80 @@ describe("coverFit, fractional (desktop; Esme 2026-11-17: \"a bit bigger and bor
     expect(f.mode).toBe("cover");
   });
 
+  // Esme, 2026-11-17 ("store appearing like this, same with zona sul not full screen"): a protected
+  // area smaller than the view left planks below and to the right (its bounds were swapped).
+  it.each([[[150, 110, 60, 40]], [[10, 10, 30, 30]], [[300, 190, 60, 40]]] as const)(
+    "a scene covers the view whole, its protected area %j inside", (keep) => {
+      const box = { w: 1416, h: 876 };
+      const f = coverFit(box, [384, 240], [...keep], 1, true);
+      expect(f.mode).toBe("cover");
+      expect(f.x).toBeLessThanOrEqual(1e-6);
+      expect(f.y).toBeLessThanOrEqual(1e-6);
+      expect(f.x + 384 * f.scale).toBeGreaterThanOrEqual(box.w - 1e-6);
+      expect(f.y + 240 * f.scale).toBeGreaterThanOrEqual(box.h - 1e-6);
+      const [kx, ky, kw, kh] = keep;
+      expect(f.x + kx * f.scale).toBeGreaterThanOrEqual(-1e-6);
+      expect(f.y + ky * f.scale).toBeGreaterThanOrEqual(-1e-6);
+      expect(f.x + (kx + kw) * f.scale).toBeLessThanOrEqual(box.w + 1e-6);
+      expect(f.y + (ky + kh) * f.scale).toBeLessThanOrEqual(box.h + 1e-6);
+    });
+
+  it("the phone's crisp cover keeps a small protected area inside too", () => {
+    const f = coverFit({ w: 375, h: 600 }, [384, 240], [300, 190, 40, 40], 2);
+    const [kx, ky, kw, kh] = [300, 190, 40, 40];
+    expect(f.x + kx * f.scale).toBeGreaterThanOrEqual(-1e-6);
+    expect(f.x + (kx + kw) * f.scale).toBeLessThanOrEqual(375 + 1e-6);
+    expect(f.y + ky * f.scale).toBeGreaterThanOrEqual(-1e-6);
+    expect(f.y + (ky + kh) * f.scale).toBeLessThanOrEqual(600 + 1e-6);
+  });
+
   it("an empty box or protected area doesn't break it", () => {
     expect(Number.isFinite(coverFit({ w: 0, h: 0 }, CANVAS, MAP_KEEP, 2, true).scale)).toBe(true);
     expect(Number.isFinite(coverFit({ w: 800, h: 600 }, CANVAS, [10, 10, 0, 0], 2, true).x)).toBe(true);
   });
+});
+
+describe("placeLabels: a small label under each open place, only where it clears every other place and label", () => {
+  const size = (name: string): [number, number] => [name.length * 4, 8];
+  const box = (key: string, bbox: [number, number, number, number]) => ({ key, name: key, bbox });
+
+  it("under its place, centred, one pixel down", () => {
+    const at = placeLabels([box("aa", [10, 10, 20, 20])], [box("aa", [10, 10, 20, 20])], size, [200, 200]);
+    expect(at.get("aa")).toEqual([16, 31]);
+  });
+
+  it("over its own foot when another place sits right under it; left out when even that collides", () => {
+    const a = box("aa", [10, 10, 20, 20]);
+    const below = box("bb", [0, 31, 60, 30]);
+    expect(placeLabels([a], [a, below], size, [200, 200]).get("aa")).toEqual([16, 22]);
+    const tight = box("cc", [0, 20, 60, 30]);
+    expect(placeLabels([a], [a, tight], size, [200, 200]).has("aa")).toBe(false);
+  });
+
+  it("two labels never overlap, and never leave the map", () => {
+    const a = box("aaaa", [10, 10, 10, 10]);
+    const b = box("bbbb", [14, 2, 10, 10]);
+    const at = placeLabels([a, b], [a, b], size, [200, 200]);
+    expect(at.size).toBe(1);
+    expect(placeLabels([box("zzzzzzzz", [190, 190, 10, 10])], [box("zzzzzzzz", [190, 190, 10, 10])], size, [200, 200]).size).toBe(0);
+  });
+
+  it("the real map: no label overlaps another place or label", () => {
+    const places = RIO_MAP.places.map((p) => ({ key: p.key, name: p.name, bbox: p.bbox }));
+    const at = placeLabels(places, places, (n) => [n.length * 5, 8], RIO_MAP.canvas);
+    expect(at.size).toBeGreaterThan(5);
+    const rects = [...at].map(([k, [x, y]]) => ({ k, r: [x, y, places.find((p) => p.key === k)!.name.length * 5, 8] }));
+    for (const { k, r } of rects) {
+      for (const p of places) if (p.key !== k) expect(overlaps(r, p.bbox), `${k} on ${p.key}`).toBe(false);
+      for (const o of rects) if (o.k !== k) expect(overlaps(r, o.r), `${k} on ${o.k}`).toBe(false);
+    }
+  });
+});
+
+const overlaps = (a: readonly number[], b: readonly number[]) => a[0]! < b[0]! + b[2]! && b[0]! < a[0]! + a[2]! && a[1]! < b[1]! + b[3]! && b[1]! < a[1]! + a[3]!;
+
+it("M3: a small desktop window (crisp, not fractional) with nothing drawn still gets a finite scene scale", () => {
+  const f = coverFit({ w: 500, h: 380 }, [384, 240], sceneKeep([], [384, 240]), 2);
+  expect(Number.isFinite(f.scale)).toBe(true);
+  expect(f.scale).toBeLessThanOrEqual(2);
 });

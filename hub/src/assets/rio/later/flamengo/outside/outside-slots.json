@@ -122,6 +122,34 @@
   "esme_spot": {
    "x": 200,
    "y": 196
+  },
+  "door_in": {
+   "rect": [
+    132,
+    96,
+    120,
+    32
+   ],
+   "x": 132,
+   "y": 96,
+   "w": 120,
+   "h": 32,
+   "to": "inside",
+   "label": "Stadium gates"
+  },
+  "map_exit": {
+   "rect": [
+    0,
+    208,
+    384,
+    32
+   ],
+   "x": 0,
+   "y": 208,
+   "w": 384,
+   "h": 32,
+   "to": "map",
+   "label": "The street (back to the map)"
   }
  },
  "baked": {

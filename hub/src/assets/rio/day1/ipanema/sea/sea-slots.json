@@ -26,6 +26,23 @@
   "night": "night sea ramps, moonlit surface and shafts, plankton, glowing anemones"
  },
  "swim_note": "fish slots ('accepts': fish) are free-swimming: the game may bob them 1 px or drift them a few px left and right; no shadow",
+ "hotspots": {
+  "door_out": {
+   "rect": [
+    0,
+    0,
+    320,
+    14
+   ],
+   "x": 0,
+   "y": 0,
+   "w": 320,
+   "h": 14,
+   "label": "Swim up to the beach",
+   "to": "outside",
+   "note": "the surface: swim up to the beach by Arpoador (the sea has no door)"
+  }
+ },
  "slots": [
   {
    "id": "swim-1",

@@ -14,6 +14,7 @@ import { usePhone } from "./usePhone";
 import { JournalRows } from "./JournalCard";
 import { TodayPanel } from "./TodayPanel";
 import { useHubData } from "./useHubData";
+import { DailyRoutine } from "./DailyRoutine";
 
 export function HomePage({ today }: { today: ISODate }) {
   useAddDefaults("task", "inbox"); // Home: Add opens as a to-do (in the inbox, as before)
@@ -23,7 +24,7 @@ export function HomePage({ today }: { today: ISODate }) {
 /**
  * Phone Home (mockup-phone.html tab A, VISUAL-LANGUAGE.md "Phone layout"): the app grid
  * of every sidebar destination except Home, then Today's list (the three Journal rows first,
- * as on desktop), then the quiet footer links (the sidebar's own list). The "Esmeworld" title
+ * as on desktop), then Today's routine, then the quiet footer links (the sidebar's own list). The "Esmeworld" title
  * is in the shell's top bar.
  */
 function PhoneHome({ today }: { today: ISODate }) {
@@ -44,6 +45,9 @@ function PhoneHome({ today }: { today: ISODate }) {
         </ul>
       </nav>
       <TodayPanel today={today} headingLevel={2} lead={<JournalRows today={today} />} />
+      {/* The phone has no goals column: the routine follows Today, where the goals column
+          lands on a narrow window (placement for the Design session to confirm). */}
+      <DailyRoutine today={today} headingLevel={2} />
       <nav aria-label="More" className="phone-footer">
         <FooterLinks />
       </nav>
@@ -109,6 +113,8 @@ function DesktopHome({ today }: { today: ISODate }) {
               </button>
             </p>
           )}
+          {/* Today's routine, directly under the goals (Esme approved, 17 Nov 2026). */}
+          <DailyRoutine today={today} />
         </div>
       </aside>
       {choosing && (

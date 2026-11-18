@@ -99,6 +99,36 @@
    "h": 124,
    "goes": "none",
    "note": "the Cascatinha"
+  },
+  {
+   "id": "door_in",
+   "rect": [
+    0,
+    132,
+    22,
+    30
+   ],
+   "x": 0,
+   "y": 132,
+   "w": 22,
+   "h": 30,
+   "to": "inside",
+   "label": "Forest trail west"
+  },
+  {
+   "id": "map_exit",
+   "rect": [
+    314,
+    156,
+    48,
+    84
+   ],
+   "x": 314,
+   "y": 156,
+   "w": 48,
+   "h": 84,
+   "to": "map",
+   "label": "Park gate (back to the map)"
   }
  ],
  "walkable": [
@@ -119,7 +149,7 @@
   "011111111111111110111110"
  ],
  "walkable_note": "suggested, one string per tile row (1 = walkable: the trail, the bridge, the clearing; 0 = forest, cliff, pool, stream)",
- "baked": "the granite face and the falls, the pool, the stream, the stone bridge, the park gate (TIJUCA), the cobbled trail, the forest (tree ferns, ju\u00e7ara palms, the buttress-rooted giant, the quaresmeira, heliconias, lianas, bromeliads), mossy rocks, the signpost, the trail board, the bench, the mossy log; full adds the picnic table, the viewing deck, blooms, hikers and small wildlife",
+ "baked": "the granite face and the falls, the pool, the stream, the stone bridge, the park gate (TIJUCA), the cobbled trail, the forest (tree ferns, juçara palms, the buttress-rooted giant, the quaresmeira, heliconias, lianas, bromeliads), mossy rocks, the signpost, the trail board, the bench, the mossy log; full adds the picnic table, the viewing deck, blooms, hikers and small wildlife",
  "slots": [
   {
    "id": "branch-toucan",

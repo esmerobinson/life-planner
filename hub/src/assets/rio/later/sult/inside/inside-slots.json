@@ -160,6 +160,20 @@
    "x": 298,
    "y": 214,
    "note": "where Esme stands in the full scenes (at her celebration table)"
+  },
+  "door_out": {
+   "rect": [
+    172,
+    214,
+    40,
+    26
+   ],
+   "x": 172,
+   "y": 214,
+   "w": 40,
+   "h": 26,
+   "to": "outside",
+   "label": "Out to the street"
   }
  },
  "baked": {

@@ -3069,6 +3069,20 @@
    "x": 206,
    "y": 204,
    "note": "where Esme stands in the full scene (on the rug, facing the window)"
+  },
+  "door_out": {
+   "rect": [
+    176,
+    222,
+    32,
+    18
+   ],
+   "x": 176,
+   "y": 222,
+   "w": 32,
+   "h": 18,
+   "to": "outside",
+   "label": "Out to the street"
   }
  },
  "baked": {

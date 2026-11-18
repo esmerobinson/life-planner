@@ -97,6 +97,36 @@
    "h": 12,
    "goes": "sit",
    "note": "faces the pond (seen from behind)"
+  },
+  {
+   "id": "door_in",
+   "rect": [
+    58,
+    81,
+    20,
+    37
+   ],
+   "x": 58,
+   "y": 81,
+   "w": 20,
+   "h": 37,
+   "to": "inside",
+   "label": "Orchid house doors"
+  },
+  {
+   "id": "map_exit",
+   "rect": [
+    150,
+    191,
+    84,
+    49
+   ],
+   "x": 150,
+   "y": 191,
+   "w": 84,
+   "h": 49,
+   "to": "map",
+   "label": "Gate (back to the map)"
   }
  ],
  "host": {

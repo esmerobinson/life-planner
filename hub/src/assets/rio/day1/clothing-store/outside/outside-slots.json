@@ -216,5 +216,35 @@
     "clothing-store-outdoor:decor"
    ]
   }
- ]
+ ],
+ "hotspots": {
+  "door_in": {
+   "rect": [
+    196,
+    96,
+    26,
+    54
+   ],
+   "x": 196,
+   "y": 96,
+   "w": 26,
+   "h": 54,
+   "to": "inside",
+   "label": "Shop door"
+  },
+  "map_exit": {
+   "rect": [
+    120,
+    230,
+    180,
+    10
+   ],
+   "x": 120,
+   "y": 230,
+   "w": 180,
+   "h": 10,
+   "to": "map",
+   "label": "Back to the map"
+  }
+ }
 }

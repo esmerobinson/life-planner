@@ -108,7 +108,7 @@ html:has(.app-shell.is-game) body {
   pointer-events: none;
   z-index: 20;
 }
-/* Clear of the nook, which stands bottom left in the game (Nook.tsx), on a narrow screen. */
+/* Clear of the nook, which stands bottom left on the phone's game page (Nook.tsx), on a narrow screen. */
 .game-screen[data-layout="narrow"] .rio-hud-bottom {
   bottom: calc(96px + env(safe-area-inset-bottom));
 }
@@ -126,22 +126,90 @@ html:has(.app-shell.is-game) body {
   background-image: var(--k-slot-hover);
 }
 
-/* An area's buttons, top left; the overflow line under them. */
-/* Where Back stands on the map (in an area, "Back to the map" takes its place). */
-.rio-area-controls {
+/* An area's doors, stairs and exits (rio/doors.ts): invisible until she points at one (or tabs to
+   it), then a solid two-tone line, one art pixel each: the kit's ink outside, its cream inside (the
+   kit's text ink and focus-ring cream; one alone vanishes on white walls or dark wood; Esme's
+   light rule: solid, no glow haze), and its name in a small kit tooltip (ui/Tip.tsx). */
+.rio-ui .rio-door {
   position: absolute;
-  top: 4em;
-  left: 4em;
-  z-index: 20;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4em;
-  max-width: calc(100% - 8em);
+  box-sizing: border-box;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
 }
-.rio-area-controls [role="group"] {
+.rio-ui .rio-door:hover,
+.rio-ui .rio-door:focus-visible {
+  outline: var(--art-px, 3px) solid #56160c;
+  outline-offset: 0;
+  box-shadow: inset 0 0 0 var(--art-px, 3px) #fff3d6;
+}
+/* The small label under a place she can visit on the map (RioMap.tsx; placed by mapMath.ts placeLabels). */
+.rio-ui .rio-place-label {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* A placed sticker's hover area (its 16x16 box): the tooltip names it. */
+.rio-ui .rio-sticker {
+  position: absolute;
+}
+/* Edit mode (the hotbar's Arrange): each placed sticker is a button; the picked one wears the
+   doors' two-tone line; the free slots it can go to wear the kit's place target, pulsing as the
+   kit's own .pulse (none with reduced motion). */
+.rio-ui button.rio-sticker {
+  box-sizing: border-box;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: grab;
+}
+.rio-ui button.rio-sticker:hover,
+.rio-ui button.rio-sticker:focus-visible,
+.rio-ui button.rio-sticker.on {
+  outline: var(--art-px, 3px) solid #56160c;
+  box-shadow: inset 0 0 0 var(--art-px, 3px) #fff3d6;
+}
+.rio-ui .rio-target {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: var(--k-place-target) 0 0 / 100% 100% no-repeat;
+  cursor: pointer;
+}
+.rio-ui .rio-target:focus-visible {
+  outline: var(--art-px, 3px) solid #fff3d6;
+}
+.rio-ui .pulse {
+  animation: rio-pulse 1s ease-in-out infinite;
+}
+@keyframes rio-pulse {
+  50% {
+    transform: scale(1.12);
+    opacity: 0.7;
+  }
+}
+.rio-ui.is-still .pulse {
+  animation: none;
+}
+.rio-ui .rio-edit-actions {
+  position: absolute;
+  z-index: 3;
+}
+.rio-edit-note {
+  position: absolute;
+  top: 22em;
+  left: 0;
+  right: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4em;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 19;
+}
+
+.rio-ui .rio-tip {
+  white-space: nowrap;
+  pointer-events: none;
 }
 .rio-area-note {
   position: absolute;
@@ -157,7 +225,9 @@ html:has(.app-shell.is-game) body {
   left: 0;
   right: 0;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 4em;
   z-index: 21;
   pointer-events: none;
 }

@@ -16,7 +16,7 @@ const centreOf = (key: string): [number, number] => {
 
 /** A point on the map canvas, from map pixels to the page. */
 async function onMap(page: Page, key: string): Promise<{ x: number; y: number }> {
-  const box = (await page.locator(".rio-map canvas").boundingBox())!;
+  const box = (await page.locator(".rio-map-layer > canvas").boundingBox())!;
   const s = box.width / MAP.canvas[0];
   const [mx, my] = centreOf(key);
   return { x: mx * s, y: my * s };
@@ -86,7 +86,7 @@ async function expectFullWindowGame(page: Page) {
   const border = [v.x, v.y, vp.width - v.x - v.width, vp.height - v.y - v.height];
   for (const b of border) expect(Math.abs(b - border[0]!)).toBeLessThanOrEqual(1);
   expect(border[0]).toBeGreaterThan(0);
-  const box = (await page.locator(".rio-map canvas").boundingBox())!;
+  const box = (await page.locator(".rio-map-layer > canvas").boundingBox())!;
   for (const p of MAP.places) {
     const at = await onMap(page, p.key);
     expect(box.x + at.x, p.key).toBeGreaterThanOrEqual(v.x - 0.5);
@@ -122,23 +122,22 @@ for (const width of [1280, 390]) {
     test.use({ viewport: { width, height: width === 390 ? 844 : 1000 } });
     const phone = width === 390;
 
-    test("the first open starts the farm: Welcome plays in the nook and goes into the book", async ({ page }) => {
+    test("the first open starts the farm: Welcome pops up top centre (no nook box on the game screen) and is kept", async ({ page }) => {
       test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await page.goto("/farm");
       await expect(page.getByRole("heading", { level: 1, name: "Esme's Rio" })).toBeAttached();
       await expect.poll(() => farmRow(page, "seen:hi")).not.toBeNull();
       await expect(page.locator("[data-earned]")).toHaveAttribute("data-earned", "1");
-      // Pixel art is never smoothed. The nook stays at a whole-number scale; on the phone the menu's
-      // pixel text and the map do too. On the desktop the map and menu scale by fractions to fill
-      // the window (Esme, 2026-11-17: "a bit bigger"), still nearest-neighbour.
+      // Esme, 2026-11-17: "Bottom left UI box seems to be redundant": the moment is a kit pop-up.
+      await expect(page.locator(".farm-nook")).toHaveCount(0);
+      await expect(page.getByText("New sticker: Welcome")).toBeAttached();
+      // Pixel art is never smoothed. On the desktop the map and menu scale by fractions (the menu
+      // never above the kit's 3x), still nearest-neighbour.
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog", { name: "Menu" })).toBeVisible();
-      for (const sel of [".rio-menu .bt canvas", ".farm-nook canvas"]) {
-        const p = await pixelated(page, sel);
-        expect(p.rendering).toBe("pixelated");
-        if (phone || sel === ".farm-nook canvas") expect(Number.isInteger(p.scale)).toBe(true);
-      }
-      const m = await pixelated(page, ".rio-map canvas");
+      const p = await pixelated(page, ".rio-menu .bt canvas");
+      expect(p.rendering).toBe("pixelated");
+      const m = await pixelated(page, ".rio-map-layer > canvas");
       const dpr = await page.evaluate(() => window.devicePixelRatio);
       expect(m.rendering).toBe("pixelated");
       if (phone) {
@@ -189,7 +188,8 @@ for (const width of [1280, 390]) {
       await page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Fazenda" }).focus();
       await page.keyboard.press("Enter");
       await expect(page.getByRole("list", { name: "Stickers here" }).getByText("Mind: seeds")).toBeAttached();
-      await page.getByRole("button", { name: "Back to the map" }).click();
+      await page.getByRole("button", { name: "Boat back to Rio" }).click();
+      await expect(page.locator(".rio-map")).toBeVisible();
     });
 
     test("phase 2a: the new areas open on their days and draw their scenes (dev ?day= jumps the farm day)", async ({ page }) => {
@@ -202,10 +202,10 @@ for (const width of [1280, 390]) {
       await places.getByRole("button", { name: "Jardim Botânico" }).focus();
       await page.keyboard.press("Enter");
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "jardim-botanico/outside");
-      await page.getByRole("button", { name: "The orchid house" }).click();
+      await page.getByRole("button", { name: "Orchid house doors" }).click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "jardim-botanico/inside");
       // The scene is drawn (not blank) and nothing scrolls.
-      await expect.poll(() => page.locator(".rio-area-layer canvas").evaluate((c) => {
+      await expect.poll(() => page.locator(".rio-area-layer > canvas").evaluate((c) => {
         const x = (c as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, (c as HTMLCanvasElement).width, (c as HTMLCanvasElement).height).data;
         let n = 0;
         for (let i = 3; i < x.length; i += 4) if (x[i]! > 0) n++;
@@ -213,13 +213,35 @@ for (const width of [1280, 390]) {
       })).toBeGreaterThan(1000);
       expect(await page.evaluate(() => [document.documentElement.scrollHeight - innerHeight, document.documentElement.scrollWidth - innerWidth]))
         .toEqual([0, 0]);
-      await page.getByRole("button", { name: "Back to the map" }).click();
+      await page.getByRole("button", { name: "Out to the avenue" }).click();
+      await page.getByRole("button", { name: "Gate (back to the map)" }).click();
+      await expect(page.locator(".rio-map")).toBeVisible();
       // Day 200: every drawn area is open; Christ (drawn last) still waits.
       await page.goto("/farm?day=200");
       for (const name of ["Zona Sul", "Quilo", "Sult", "Santa Teresa", "Os Esquilos", "Museum", "Flamengo match"]) {
         const b = page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name, exact: true });
         await expect(b, name).toHaveAttribute("data-status", /new|open/);
       }
+    });
+
+    test("the noticeboard stands on Ipanema's promenade: clicking it opens the menu's Noticeboard; Tab and Enter reach the doors", async ({ page }) => {
+      test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
+      await startedFarm(page);
+      await page.goto("/farm?day=3");
+      await page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Ipanema beach" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "ipanema-beach/outside");
+      await page.getByRole("navigation", { name: "Ways in and out" }).getByRole("button", { name: "Noticeboard" }).click();
+      const menu = page.getByRole("dialog", { name: "Menu" });
+      await expect(menu.getByRole("tab", { name: "Noticeboard" })).toHaveAttribute("aria-selected", "true");
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+      // The keyboard way: Tab to the barraca's door, Enter goes in.
+      const barraca = page.getByRole("button", { name: "Barraca" });
+      for (let i = 0; i < 12 && !(await barraca.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+      await expect(barraca).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "barraca/inside");
     });
 
     test("the menu by keyboard: Esc opens it, arrows move along the tabs, Enter opens one, Esc closes it", async ({ page }) => {
@@ -247,7 +269,7 @@ for (const width of [1280, 390]) {
     test("the map: whole on screen; a tap opens the Lagoa house (the visit is noted); Barraca says when it opens", async ({ page }) => {
       test.skip(phone, "no game on the phone, only the collection (Esme, 2026-11-17)");
       await page.goto("/farm");
-      const canvas = page.locator(".rio-map canvas");
+      const canvas = page.locator(".rio-map-layer > canvas");
       await expect(canvas).toBeVisible();
       // The game takes the whole window (Esme, 2026-11-17), every place on screen, nothing scrolls.
       const vp = page.viewportSize()!;
@@ -256,17 +278,32 @@ for (const width of [1280, 390]) {
       // Day one: Barraca is next, with its tooltip on hover.
       await canvas.scrollIntoViewIfNeeded();
       await canvas.hover({ position: await onMap(page, "barraca") });
-      await expect(page.locator(".rio-tooltip")).toHaveText("Opens on day 3");
-      await expect(page.locator(".rio-tooltip")).toBeVisible();
+      await expect(page.getByRole("tooltip")).toContainText("Barraca");
+      await expect(page.getByRole("tooltip")).toContainText("Opens on day 3");
+      await expect(page.getByRole("tooltip")).toBeVisible();
+      // A place she can visit wears its label and lifts when she points at it (Esme, 2026-11-17).
+      // Labels only on places she can visit (where they fit).
+      const open = await page.locator('[data-place][data-status="new"], [data-place][data-status="open"]').count();
+      expect(await page.locator(".rio-place-label").count()).toBeLessThanOrEqual(open);
+      await canvas.hover({ position: await onMap(page, "lagoa-house") });
+      await expect(page.locator(".rio-map")).toHaveAttribute("data-hover", "lagoa-house");
+      await expect(page.getByRole("tooltip")).toContainText("Visit");
+      expect(await canvas.evaluate((el) => getComputedStyle(el).cursor)).toBe("pointer");
       // A tap on the Lagoa house opens it.
       await canvas.click({ position: await onMap(page, "lagoa-house") });
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/outside");
       await expect.poll(() => farmRow(page, "visited:lagoa-house")).toMatchObject({ kind: "visited", area: "lagoa-house" });
-      const sbox = (await page.locator(".rio-area-layer canvas").boundingBox())!;
+      const sbox = (await page.locator(".rio-area-layer > canvas").boundingBox())!;
       expect(sbox.x + sbox.width).toBeGreaterThan(0);
       expect(sbox.y).toBeLessThan(vp.height);
-      await page.getByRole("button", { name: "Kitchen" }).click();
+      // Doors, not buttons (Esme, 2026-11-17): the kitchen's door, named on hover, goes in.
+      const kitchen = page.getByRole("button", { name: "Kitchen" });
+      await kitchen.hover();
+      await expect(page.getByRole("tooltip")).toHaveText("Kitchen");
+      await kitchen.click();
       await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/kitchen");
+      // The kitchen's door is bottom centre, under the hotbar: it reaches up above the bar, where she clicks it.
+      await page.getByRole("button", { name: "Garden" }).click({ position: { x: 10, y: 4 } });
       await page.getByRole("button", { name: "Back to the map" }).click();
       await expect(page.getByRole("list", { name: "Places in Rio" }).getByRole("button", { name: "Lagoa house" })).toHaveAttribute("data-status", "open");
     });
@@ -347,7 +384,7 @@ for (const [w, h] of [[2560, 1080]] as const) {
   test(`a very wide window (${w}x${h}): the full-window game keeps every place on screen with an even border`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/farm");
-    await expect(page.locator(".rio-map canvas")).toBeVisible();
+    await expect(page.locator(".rio-map-layer > canvas")).toBeVisible();
     await expectFullWindowGame(page);
   });
 }
@@ -359,7 +396,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [2560, 1080]] as const) {
   test(`${w}x${h}: the map fills the view one way, every place on screen, taps still land`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/farm");
-    const canvas = page.locator(".rio-map canvas");
+    const canvas = page.locator(".rio-map-layer > canvas");
     await expect(canvas).toBeVisible();
     await expectFullWindowGame(page);
     const v = (await page.locator(".game-view").boundingBox())!;
@@ -369,7 +406,7 @@ for (const [w, h] of [[1440, 900], [1280, 800], [2560, 1080]] as const) {
     // The plank border is small: 4 UI px at 3x.
     expect(v.x).toBeLessThanOrEqual(13);
     await canvas.hover({ position: await onMap(page, "barraca") });
-    await expect(page.locator(".rio-tooltip")).toHaveText("Opens on day 3");
+    await expect(page.getByRole("tooltip")).toContainText("Opens on day 3");
     await canvas.click({ position: await onMap(page, "lagoa-house") });
     await expect(page.locator(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/outside");
   });

@@ -143,9 +143,11 @@ describe("HomePage", () => {
     await setGoalOnHome(admin.id, true);
     renderHome();
     const column = await screen.findByRole("complementary", { name: "Goals this month" });
-    await vi.waitFor(() => expect(within(column).getAllByRole("listitem")).toHaveLength(3));
+    // The goal cards only (Today's routine sits under them in the same column).
+    const cards = () => within(column).getAllByRole("listitem").filter((li) => li.classList.contains("goal-mini"));
+    await vi.waitFor(() => expect(cards()).toHaveLength(3));
     // Mind first; then Admin comes before Body in the sidebar. The inactive goal never shows.
-    expect(within(column).getAllByRole("listitem").map((li) => li.querySelector(".goal-mini-link")!.textContent)).toEqual([
+    expect(cards().map((li) => li.querySelector(".goal-mini-link")!.textContent)).toEqual([
       "Pretend calm",
       "Pretend tidy papers",
       "Pretend long run",

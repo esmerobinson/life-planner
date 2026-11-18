@@ -42,6 +42,23 @@
   "h": 58,
   "note": "the sand floor in front of the counter (the deck behind it is the barraqueiro's)"
  },
+ "hotspots": {
+  "door_out": {
+   "rect": [
+    0,
+    174,
+    320,
+    18
+   ],
+   "x": 0,
+   "y": 174,
+   "w": 320,
+   "h": 18,
+   "label": "Back to the beach",
+   "to": "outside",
+   "note": "the open front of the tent, at floor level: out onto the sand"
+  }
+ },
  "slots": [
   {
    "id": "floor-1",

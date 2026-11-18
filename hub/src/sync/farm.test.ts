@@ -1,6 +1,6 @@
 import Dexie from "dexie";
 import { HubDB } from "../data/db";
-import { outfitRow, placedRow, seenRow, startRow } from "../farm/state";
+import { hiddenRow, outfitRow, placedRow, seenRow, spotRow, startRow } from "../farm/state";
 import { FakeSyncServer } from "./fakeServer";
 import { saveSyncSettings, syncOnce } from "./engine";
 
@@ -164,4 +164,27 @@ it("a farm row this version can't read waits in quarantine (a later pack's kind)
   expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");
   expect(await phone.farm.count()).toBe(0);
   expect(await phone.quarantine.get(["farm", "coins:all"])).toBeTruthy();
+});
+
+it("hiding and moving a sticker go from one device to the other; showing it again later wins (never lost)", async () => {
+  const server = new FakeSyncServer(TOKEN);
+  const mac = await device();
+  const phone = await device();
+  await mac.farm.bulkPut([placedRow("hen", "rio", "2026-11-04"), hiddenRow("hen", true, "2026-11-17"), spotRow("cow", "cow-2", "2026-11-17")]);
+  expect((await syncOnce({ db: mac, fetch: server.fetch })).kind).toBe("ok");
+  expect((await syncOnce({ db: phone, fetch: server.fetch })).kind).toBe("ok");
+  expect(await phone.farm.get("hidden:hen")).toMatchObject({ hidden: true });
+  expect(await phone.farm.get("spot:cow")).toMatchObject({ slot: "cow-2" });
+  await phone.farm.put(hiddenRow("hen", false, "2026-11-18"));
+  await syncOnce({ db: phone, fetch: server.fetch });
+  await syncOnce({ db: mac, fetch: server.fetch });
+  expect(await mac.farm.get("hidden:hen")).toMatchObject({ hidden: false });
+  expect(await mac.farm.get("placed:hen")).toBeTruthy();
+});
+
+it("an invalid hidden or spot row is never stored", async () => {
+  const mac = await device();
+  await expect(mac.farm.put({ id: "hidden:hen", kind: "hidden", sticker: "hen", hidden: "yes", date: "2026-11-17" } as never)).rejects.toThrow(/farm change could not be saved/);
+  await expect(mac.farm.put({ id: "spot:hen", kind: "spot", sticker: "hen", slot: "BAD SLOT", date: "2026-11-17" } as never)).rejects.toThrow(/farm change could not be saved/);
+  expect(await mac.farm.count()).toBe(0);
 });

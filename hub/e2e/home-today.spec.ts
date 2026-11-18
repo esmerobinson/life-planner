@@ -88,6 +88,7 @@ async function measure(page: Page) {
     const grid = document.querySelector(".phone-apps");
     const footer = document.querySelector(".phone-footer");
     const done = panel.querySelector("details.done-fold");
+    const routine = document.querySelector(".routine-home");
     return {
       headingBottom: box(heading).bottom,
       headingTop: box(heading).top,
@@ -102,6 +103,8 @@ async function measure(page: Page) {
       gridBottom: grid ? box(grid).bottom : null,
       footerTop: footer ? box(footer).top : null,
       doneBottom: done ? box(done).bottom : null,
+      routineTop: routine ? box(routine).top : null,
+      routineBottom: routine ? box(routine).bottom : null,
       sideways: document.documentElement.scrollWidth > window.innerWidth,
     };
   });
@@ -168,8 +171,10 @@ test.describe("at 390px", () => {
     expect(Math.round(m.green[0]!.top - m.headingBottom)).toBe(16);
     expect(gaps(m.green)).toEqual([8, 8]);
     expect(Math.round(m.todos[0]!.top - m.green[2]!.bottom)).toBe(32);
-    // The footer links: a section gap under the list ("Done today" is last here).
-    expect(Math.round(m.footerTop! - m.doneBottom!)).toBe(32);
+    // Today's routine follows the list ("Done today" is last here) and the footer links follow
+    // the routine, a section gap each (routine on Home, 2026-11-17).
+    expect(Math.round(m.routineTop! - m.doneBottom!)).toBe(32);
+    expect(Math.round(m.footerTop! - m.routineBottom!)).toBe(32);
     expect(m.sideways).toBe(false);
     await shoot(page, "home-390");
   });

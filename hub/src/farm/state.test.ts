@@ -1,5 +1,5 @@
 import {
-  EMPTY_FARM, arrivedRow, farmState, outfitRow, placedRow, seenRow, startRow, todayRow, validFarm, visitedRow,
+  EMPTY_FARM, arrivedRow, farmState, hiddenRow, outfitRow, placedRow, seenRow, spotRow, startRow, todayRow, validFarm, visitedRow,
 } from "./state";
 
 describe("validFarm", () => {
@@ -14,6 +14,11 @@ describe("validFarm", () => {
     ["visited", visitedRow("lagoa-house", "2026-11-14")],
     ["visited (as written)", { id: "visited:lagoa-house", kind: "visited", area: "lagoa-house", date: "2026-11-14" }],
     ["with a stamp", { ...seenRow("hi", "2026-11-04"), updatedAt: 5 }],
+    ["hidden", hiddenRow("hen", true, "2026-11-17")],
+    ["hidden (shown again)", hiddenRow("hen", false, "2026-11-18")],
+    ["hidden (as written)", { id: "hidden:hen", kind: "hidden", sticker: "hen", hidden: true, date: "2026-11-17" }],
+    ["spot", spotRow("hen", "hen-2", "2026-11-17")],
+    ["spot (as written, an underscore slot id)", { id: "spot:seeds-mind", kind: "spot", sticker: "seeds-mind", slot: "bed_mind_3", date: "2026-11-17" }],
   ])("accepts a %s row", (_n, row) => {
     expect(validFarm(row)).toBe(true);
   });
@@ -34,6 +39,14 @@ describe("validFarm", () => {
     ["a visited row with a bad area key", { id: "visited:Lagoa House", kind: "visited", area: "Lagoa House", date: "2026-11-14" }],
     ["a visited row with an extra field", { ...visitedRow("lagoa-house", "2026-11-14"), note: "x" }],
     ["a visited row with a bad date", { id: "visited:lagoa-house", kind: "visited", area: "lagoa-house", date: "2026-02-30" }],
+    ["a hidden row whose id names another sticker", { id: "hidden:cow", kind: "hidden", sticker: "hen", hidden: true, date: "2026-11-17" }],
+    ["a hidden row that isn't true or false", { id: "hidden:hen", kind: "hidden", sticker: "hen", hidden: "yes", date: "2026-11-17" }],
+    ["a hidden row with no date", { id: "hidden:hen", kind: "hidden", sticker: "hen", hidden: true }],
+    ["a hidden row with an extra field", { ...hiddenRow("hen", true, "2026-11-17"), note: "x" }],
+    ["a spot row whose id names another sticker", { id: "spot:cow", kind: "spot", sticker: "hen", slot: "hen-2", date: "2026-11-17" }],
+    ["a spot row with a bad slot id", { id: "spot:hen", kind: "spot", sticker: "hen", slot: "Hen 2!", date: "2026-11-17" }],
+    ["a spot row with no slot", { id: "spot:hen", kind: "spot", sticker: "hen", date: "2026-11-17" }],
+    ["a spot row with an extra field", { ...spotRow("hen", "hen-2", "2026-11-17"), scene: "fazenda/outside" }],
   ])("refuses %s", (_n, row) => {
     expect(validFarm(row)).toBe(false);
   });
@@ -84,6 +97,22 @@ describe("farmState", () => {
     const { visited, ...rest2 } = after;
     expect(rest2).toEqual(rest1);
     expect([...visited].sort()).toEqual(["fazenda", "lagoa-house"]);
+  });
+
+  it("hidden and spot rows fill `hidden` and `spots` and change nothing else (Esme, 2026-11-17: move or hide, never lose)", () => {
+    const phase1 = [startRow("mac", "2026-11-04"), seenRow("hen", "2026-11-04"), placedRow("hen", "rio", "2026-11-05"), placedRow("cow", "rio", "2026-11-05")];
+    const before = farmState(phase1);
+    const after = farmState([...phase1, hiddenRow("hen", true, "2026-11-17"), hiddenRow("cow", false, "2026-11-17"), spotRow("cow", "cow-2", "2026-11-17"),
+      { id: "hidden:Bad", kind: "hidden", sticker: "Bad", hidden: true, date: "2026-11-17" }]);
+    const { hidden: _h1, spots: _s1, ...rest1 } = before;
+    const { hidden, spots, ...rest2 } = after;
+    expect(rest2).toEqual(rest1);
+    expect([...hidden]).toEqual(["hen"]); // cow was shown again: not hidden
+    expect([...spots]).toEqual([["cow", "cow-2"]]);
+    // Hidden stays earned and placed: nothing is taken away.
+    expect(after.placed.has("hen")).toBe(true);
+    expect(EMPTY_FARM.hidden.size).toBe(0);
+    expect(EMPTY_FARM.spots.size).toBe(0);
   });
 
   it("keeps the day each sticker went into the collection (the Noticeboard's 'Just earned')", () => {

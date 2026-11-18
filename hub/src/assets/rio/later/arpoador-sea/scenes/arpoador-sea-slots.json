@@ -68,6 +68,21 @@
    "w": 60,
    "h": 52,
    "goes": "none"
+  },
+  {
+   "id": "surface_out",
+   "rect": [
+    0,
+    0,
+    320,
+    14
+   ],
+   "x": 0,
+   "y": 0,
+   "w": 320,
+   "h": 14,
+   "to": "ipanema-beach",
+   "label": "Swim up to the beach"
   }
  ],
  "player": {

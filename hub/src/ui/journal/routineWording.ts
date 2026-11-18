@@ -10,6 +10,8 @@ export const ROUTINE_WORDS = {
   logHeading: "Daily log",
   schedule: "Stuck to my daily schedule?",
   todos: "Finished today's to-dos?",
+  /** Under the schedule question: Today's routine on Home that day, as a hint (never an answer). */
+  routineHint: (done: number, total: number) => `Your routine that day: ${done} of ${total} steps`,
   scheduleNote: "A short note about your schedule (optional)",
   todosNote: "A short note about your to-dos (optional)",
   choice: { yes: "Yes", partly: "Partly", no: "No" } satisfies Record<Choice, string>,

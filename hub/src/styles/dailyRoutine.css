@@ -1,0 +1,136 @@
+/* "Today's routine" on Home (Esme approved, 17 Nov 2026), directly under the goals (on the
+   phone, under Today). Its look is NOT decided: every value below is an existing one (the
+   strips, their tick box and small line, the Done fold-out, the --space-* scale, the Choose
+   goals sheet), and the one new thing, the next step's highlight, is the magenta placeholder.
+   Composition calls made by the builder, for the Design session (Esme may veto):
+   - the heading and the "6 of 10 today" count on one line, the count in the strips' small line;
+   - only the next step shows in full (title, minimum, link); every other open step folds into
+     "More steps (N)" and finished ones into "Done (N)" (the Done fold-out's look, ticked and
+     struck), each as its title on one line (review I3: Home must not scroll more than before;
+     the coordinator's provisional call, for Design);
+   - a section gap (--gap-section) above it, after the goals;
+   - Edit routine is the Choose goals sheet: each step a --row box with its fields in two
+     columns (one on the phone). */
+
+.routine-home {
+  margin-top: var(--gap-section);
+}
+
+.routine-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--gap-stack);
+}
+
+.routine-top > h2,
+.routine-top > h3 {
+  margin: 0;
+}
+
+/* The strips' small line (.strip-meta): 13px, 0.8 opacity. */
+.routine-count {
+  font-size: 13px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.routine-list {
+  margin: 0;
+}
+
+/* A step has no icons on its right: the tick box and the words. */
+.strip.routine-step {
+  grid-template-columns: auto 1fr;
+}
+
+/* A folded step: its title on one line, cut with an ellipsis when too long (review I3). */
+.strip.routine-compact .strip-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* PLACEHOLDER (undecided): the next step's highlight. Obviously wrong on purpose. */
+.strip.routine-next {
+  outline: 2px solid var(--placeholder);
+  outline-offset: -2px;
+}
+
+/* "More steps (N)": the Done fold-out's look (strips.css .done-fold), without striking through. */
+.routine-more {
+  margin-top: 12px;
+}
+
+.routine-more summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+.routine-more > .strip-list,
+.routine-done > .strip-list {
+  margin-top: var(--gap-rows);
+}
+
+.routine-edit-link {
+  margin: var(--gap-stack) 0 0;
+}
+
+/* ---- Edit routine (the Choose goals sheet, goals.css) ---- */
+.routine-edit-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--gap-stack) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-rows);
+}
+
+.routine-edit-step {
+  background: var(--row);
+  border-radius: var(--radius-tile);
+  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.is-phone .routine-edit-step {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.routine-edit-step label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-label);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.routine-edit-step input,
+.routine-edit-step select,
+.routine-add input {
+  width: 100%;
+  min-width: 0;
+}
+
+.routine-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-buttons);
+}
+
+.routine-add {
+  display: flex;
+  gap: var(--gap-buttons);
+}
+
+/* On the phone it is a Home section like Today: the same heading (phone.css .phone-home
+   .today-panel h2: 16px, 700). */
+.phone-home .routine-top > h2 {
+  font-size: 16px;
+  font-weight: 700;
+}

@@ -135,6 +135,8 @@ export function GameMenu({ view, tab, onTab, onClose, canPlace, day, statuses, s
         tabIndex={-1} data-tab={shown} data-layout={layout} onKeyDown={onKeyDown}
         // A click on the panel itself keeps focus in the menu (so Tab stays inside it).
         onMouseDown={(e) => { if (e.target === e.currentTarget || !(e.target as HTMLElement).closest(FOCUSABLE)) root.current?.focus(); }}
+        // The stage's empty corners (beside the tabs, left of the panel) are outside the panel too.
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         style={{ ...kitVars(), fontSize: `${u}px`, width: em(stage.w), height: em(stage.h) }}>
         {/* The panel (z 5), then the tabs that bite into it. */}
         <div className="pnl" style={{ ...pos(P.x, P.y, P.w, P.h), zIndex: 5 }} />

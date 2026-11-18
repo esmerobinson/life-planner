@@ -46,3 +46,11 @@ it("a cell is placed, ready to place, or not yet earned", () => {
   expect(cellState("cow", view)).toBe("ready");
   expect(cellState("sheep", view)).toBe("ghost");
 });
+
+it("an earned Kind note is kept in the Collection (no \"!\": it has no place in a scene), placed before or not", () => {
+  const view = (placed: string[]) => ({ earnedSet: new Set(["hi", "hen"]), state: { placed: new Map(placed.map((k) => [k, "rio"] as [string, string])) } });
+  expect(cellState("hi", view([]))).toBe("kept");
+  expect(cellState("hi", view(["hi"]))).toBe("kept");
+  expect(cellState("hen", view([]))).toBe("ready");
+  expect(cellState("ok", view([]))).toBe("ghost");
+});

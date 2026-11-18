@@ -1,7 +1,7 @@
 import { COLLECTION, STICKERS } from "../farm/catalogue";
-import { farmState, placedRow } from "../farm/state";
+import { farmState, placedRow, spotRow, validFarm } from "../farm/state";
 import { SCENES } from "./assets";
-import { HOME, accepts, homeOf, layout, sceneState, slotsIn, stickerTags } from "./placement";
+import { HOME, accepts, freeSlotsFor, homeOf, inScenes, layout, sceneState, slotsIn, stickerTags } from "./placement";
 
 const keysIn = (group: string) => COLLECTION.filter((s) => s.group === group).map((s) => s.key);
 
@@ -14,7 +14,7 @@ describe("where earned stickers sit", () => {
     expect(homeOf("seeds-mind")).toEqual({ area: "fazenda", scene: "fazenda/outside" });
     expect(homeOf("hen")).toEqual({ area: "fazenda", scene: "fazenda/outside" });
     expect(homeOf("daisy")).toEqual({ area: "tijuca-park", scene: "tijuca-park/outside" });
-    expect(homeOf("hi")).toEqual({ area: "lagoa-house", scene: "lagoa-house/outside" }); // Kind notes
+    expect(homeOf("hi")).toBeNull(); // Kind notes: kept in the Collection (their Rio family lives at the letterbox, not in a scene)
     const hedgerow = COLLECTION.find((s) => s.group === "lane" && s.set === "Hedgerow")!.key;
     expect(homeOf(hedgerow)).toEqual({ area: "tijuca-park", scene: "tijuca-park/inside" });
     expect(homeOf("lilypad")).toEqual({ area: "ipanema-beach", scene: "ipanema-beach/outside" });
@@ -183,4 +183,81 @@ describe("where earned stickers sit", () => {
     expect(sceneState("ipanema-beach/outside", m)).toBe("stage3");
     expect(sceneState("ipanema-beach/outside", m + 5)).toBe("stage3");
   });
+});
+
+describe("moving a placed sticker (Esme, 2026-11-17: \"Items should be movable\")", () => {
+  it("a sticker's chosen slot comes first; the rest fill the free slots in book order", () => {
+    const plain = layout("fazenda/outside", ["hen", "cow"]);
+    expect(plain.bySlot.get("hen-1")).toBe("hen");
+    expect(plain.bySlot.get("cow-1")).toBe("cow");
+    const moved = layout("fazenda/outside", ["hen", "cow"], [], new Map([["hen", "hen-3"], ["cow", "cow-2"]]));
+    expect(moved.bySlot.get("hen-3")).toBe("hen");
+    expect(moved.bySlot.get("cow-2")).toBe("cow");
+    expect(moved.bySlot.has("hen-1")).toBe(false);
+  });
+
+  it("a chosen slot that's gone, taken, or doesn't take the sticker is ignored: it falls back to book order, never vanishes", () => {
+    for (const slot of ["no-such-slot", "cow-1"]) {
+      const l = layout("fazenda/outside", ["hen"], [], new Map([["hen", slot]]));
+      expect([...l.bySlot.values()], slot).toEqual(["hen"]);
+      expect(l.bySlot.get("hen-1")).toBe("hen");
+    }
+    // Two stickers chose the same slot: the first in book order keeps it, the other goes to the next free one.
+    const both = layout("fazenda/outside", ["hen", "chick"].filter((k) => k === "hen"), [], new Map([["hen", "hen-2"]]));
+    expect(both.bySlot.get("hen-2")).toBe("hen");
+  });
+
+  it("where a placed sticker can move: the free slots of its scene that take it (not its own, not taken)", () => {
+    const placed = ["hen", "cow"];
+    expect(freeSlotsFor("fazenda/outside", "hen", placed).map((s) => s.id)).toEqual(["hen-2", "hen-3", "hen-4"]);
+    expect(freeSlotsFor("fazenda/outside", "cow", placed).map((s) => s.id)).toEqual(["cow-2"]);
+    expect(freeSlotsFor("fazenda/outside", "cow", placed, [], new Map([["cow", "cow-2"]])).map((s) => s.id)).toEqual(["cow-1"]);
+  });
+});
+
+describe("only Rio art in Rio scenes (Esme, 2026-11-17: the old \"HI!\" and \"OK\" notes and the \"]\" sign looked random in the garden)", () => {
+  const KIND_NOTES = ["hi", "door", "steps", "always-welcome", "ok", "feather", "candle", "back-to-it"];
+
+  it("the eight Kind notes stay in the Collection only: never laid out in a scene, never placed", () => {
+    expect(COLLECTION.filter((s) => !inScenes(s.key)).map((s) => s.key)).toEqual(KIND_NOTES);
+    for (const k of KIND_NOTES) expect(homeOf(k), k).toBeNull();
+    const l = layout("lagoa-house/outside", KIND_NOTES);
+    expect(l.bySlot.size).toBe(0);
+    expect(l.overflow).toBe(0);
+  });
+
+  it("every other sticker with a home still has its scene (nothing else changes)", () => {
+    for (const s of COLLECTION) {
+      if (KIND_NOTES.includes(s.key) || s.group === "bonus") continue;
+      expect(homeOf(s.key), s.key).not.toBeNull();
+    }
+  });
+});
+
+describe("review fixes: a move or a hide touches only that sticker", () => {
+  const beach = ["lilypad", "pebble", "cattail", "frogspawn"];
+
+  it("I2: moving one sticker leaves every other one where it was", () => {
+    const before = layout("ipanema-beach/outside", beach);
+    const slotOf = (m: Map<string, string>, k: string) => [...m].find(([, v]) => v === k)?.[0];
+    const to = freeSlotsFor("ipanema-beach/outside", "lilypad", beach)[0]!.id;
+    const after = layout("ipanema-beach/outside", beach, [], new Map([["lilypad", to]]));
+    expect(slotOf(after.bySlot, "lilypad")).toBe(to);
+    for (const k of beach.slice(1)) expect(slotOf(after.bySlot, k), k).toBe(slotOf(before.bySlot, k));
+  });
+
+  it("I3: a hidden sticker still counts and keeps its slot (the scene doesn't shrink, the others don't shift); its slot is free to move into", () => {
+    const placed = ["hen", "chick", "cow"];
+    const all = layout("fazenda/outside", placed);
+    const hidden = new Set(["hen"]);
+    const withHidden = layout("fazenda/outside", placed, [], undefined);
+    expect([...withHidden.bySlot]).toEqual([...all.bySlot]);
+    expect(freeSlotsFor("fazenda/outside", "hen", placed, [], undefined, hidden).map((s) => s.id)).toContain("hen-1");
+  });
+});
+
+it("I1: every slot id in the pack can be stored as a spot (Zona Sul's gondola-A-top-1, for one)", () => {
+  for (const [scene, data] of Object.entries(SCENES)) {
+    for (const s of data.slots) expect(validFarm(spotRow("hen", s.id, "2026-11-17")), `${scene} ${s.id}`).toBe(true);
+  }
 });

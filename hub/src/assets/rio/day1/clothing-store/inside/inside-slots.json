@@ -418,5 +418,35 @@
     "note": "hook on the rail bar: new pieces arrive here"
    }
   ]
+ },
+ "hotspots": {
+  "door_out": {
+   "rect": [
+    196,
+    176,
+    32,
+    16
+   ],
+   "x": 196,
+   "y": 176,
+   "w": 32,
+   "h": 16,
+   "to": "outside",
+   "label": "Shop door (out)"
+  },
+  "fitting_room": {
+   "rect": [
+    236,
+    70,
+    64,
+    22
+   ],
+   "x": 236,
+   "y": 70,
+   "w": 64,
+   "h": 22,
+   "to": "fitting_room",
+   "label": "Fitting room"
+  }
  }
 }

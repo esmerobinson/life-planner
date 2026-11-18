@@ -319,3 +319,32 @@ test("pairing with no passphrase: a code from a fresh Sync page sets up another 
   await ctxA.close();
   await ctxB.close();
 });
+
+test("Today's routine: a step ticked on one device shows ticked on the other, through the real server", async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+  await setUpSync(a);
+  await setUpSync(b);
+
+  await a.goto("/");
+  const routineA = a.getByRole("region", { name: "Today's routine" });
+  await routineA.getByRole("checkbox", { name: "Mark done: Up between 8 and 9am" }).click();
+  await expect(routineA.getByText("1 of 10 today")).toBeVisible();
+  // The count shows the tap at once; wait for the tick to be stored before syncing.
+  const ticked = async () => (await readStore(a, "prefs")).some((r) => r.id.startsWith("routine-tick:") && r.step === "d1" && r.done === true);
+  await expect.poll(ticked).toBe(true);
+  await syncNow(a);
+
+  await syncNow(b);
+  await b.goto("/");
+  const routineB = b.getByRole("region", { name: "Today's routine" });
+  await expect(routineB.getByText("1 of 10 today")).toBeVisible();
+  await routineB.getByText("Done (1)").click();
+  await expect(routineB.getByRole("checkbox", { name: "Done: Up between 8 and 9am" })).toBeChecked();
+  await expect(routineB.locator('[aria-current="step"]')).toContainText("5-minute meditation");
+
+  await ctxA.close();
+  await ctxB.close();
+});

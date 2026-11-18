@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import { db } from "../data/db";
-import { DEFAULT_DUE_PREFS, duePrefsRow } from "../reminders/duePrefs";
+import { DEFAULT_DUE_PREFS, duePrefsRow, type DuePrefsRow } from "../reminders/duePrefs";
 import { DUE_WORDS } from "./DueSection";
 import { RemindersPage } from "./RemindersPage";
 
@@ -24,7 +24,7 @@ const renderPage = () =>
     </MemoryRouter>,
   );
 const section = async () => within(await screen.findByRole("region", { name: DUE_WORDS.heading }));
-const stored = () => db.prefs.get("due");
+const stored = () => db.prefs.get("due") as Promise<DuePrefsRow | undefined>;
 
 describe("Reminders in Due", () => {
   it("says plainly what is stored on Due's server; off until she turns it on", async () => {

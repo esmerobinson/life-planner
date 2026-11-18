@@ -16,7 +16,7 @@ export const PARTNER_CHALLENGE = "pretend-partner-challenge";
 export const OTHER_COUPLE = "00000000-0000-4000-8000-00000000c0c1";
 
 export async function emptyDb(): Promise<void> {
-  await Promise.all([db.items.clear(), db.goals.clear(), db.files.clear(), db.journal.clear(), db.syncMeta.clear(), db.pending.clear(), db.quarantine.clear()]);
+  await Promise.all([db.items.clear(), db.goals.clear(), db.files.clear(), db.journal.clear(), db.syncMeta.clear(), db.pending.clear(), db.quarantine.clear(), db.prefs.clear()]);
 }
 
 const realNow = Date.now.bind(Date);

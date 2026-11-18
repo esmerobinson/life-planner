@@ -79,6 +79,21 @@
    "w": 80,
    "h": 84,
    "goes": "none"
+  },
+  {
+   "id": "door_out",
+   "rect": [
+    140,
+    178,
+    40,
+    14
+   ],
+   "x": 140,
+   "y": 178,
+   "w": 40,
+   "h": 14,
+   "to": "outside",
+   "label": "Out to the avenue"
   }
  ],
  "host": {

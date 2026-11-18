@@ -1,7 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { COLLECTION } from "../farm/catalogue";
 import * as hooks from "../farm/hooks";
+import { SCENES } from "./assets";
 import { layout } from "./placement";
 import { AreaView } from "./AreaView";
 
@@ -20,38 +21,91 @@ beforeEach(() => {
 const heading = () => screen.getByRole("heading", { level: 2 }).textContent;
 
 describe("an area, outside and inside", () => {
-  it("shows the outside first, with a button for each inside; pressing one goes in", async () => {
+  const doors = () => within(screen.getByRole("navigation", { name: "Ways in and out" }));
+
+  it("shows the outside first; its doors and stairs lead into the rooms, the rooms connect, and back out (no buttons)", async () => {
     render(<AreaView area="lagoa-house" look="day" day={1} placed={[]} onBack={() => undefined} />);
     expect(heading()).toBe("Lagoa house");
-    const insides = within(screen.getByRole("group", { name: "Go inside" })).getAllByRole("button");
-    expect(insides.map((b) => b.textContent)).toEqual(["Living room", "Bedroom", "Kitchen"]);
-    await userEvent.click(screen.getByRole("button", { name: "Bedroom" }));
+    expect(screen.queryByRole("group", { name: "Go inside" })).toBeNull();
+    expect(doors().getAllByRole("button").map((b) => b.getAttribute("aria-label")).sort())
+      .toEqual(["Back to the map", "Bedroom", "Kitchen", "Living room", "Living room"]);
+    await userEvent.click(doors().getByRole("button", { name: "Bedroom" }));
     expect(heading()).toBe("Bedroom");
     expect(document.querySelector(".rio-area")).toHaveAttribute("data-scene", "lagoa-house/bedroom");
-    await userEvent.click(screen.getByRole("button", { name: "Outside" }));
+    await userEvent.click(doors().getByRole("button", { name: "Living room" }));
+    expect(heading()).toBe("Living room");
+    await userEvent.click(doors().getByRole("button", { name: "Kitchen" }));
+    expect(heading()).toBe("Kitchen");
+    await userEvent.click(doors().getByRole("button", { name: "Garden" }));
     expect(heading()).toBe("Lagoa house");
+  });
+
+  it("hovering or focusing a door names it in a small tooltip", async () => {
+    render(<AreaView area="lagoa-house" look="day" day={1} placed={[]} onBack={() => undefined} />);
+    await userEvent.hover(doors().getByRole("button", { name: "Kitchen" }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Kitchen");
+    await userEvent.unhover(doors().getByRole("button", { name: "Kitchen" }));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => doors().getAllByRole("button", { name: "Living room" })[0]!.focus());
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Living room");
+  });
+
+  it("a door to a place that isn't open yet isn't there; stepping into another area's scene counts as a visit", async () => {
+    const onVisit = vi.fn();
+    const shut = render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} canEnter={(s) => s !== "barraca/inside"} />);
+    expect(doors().queryByRole("button", { name: "Barraca" })).toBeNull();
+    shut.unmount();
+    render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} onVisit={onVisit} />);
+    await userEvent.click(doors().getByRole("button", { name: "Barraca" }));
+    expect(document.querySelector(".rio-area")).toHaveAttribute("data-scene", "barraca/inside");
+    expect(onVisit).toHaveBeenCalledWith("barraca");
+  });
+
+  it("the beach noticeboard opens the menu's Noticeboard; the store's fitting room, the Wardrobe", async () => {
+    const onOpenMenu = vi.fn();
+    const r = render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} onOpenMenu={onOpenMenu} />);
+    await userEvent.click(doors().getByRole("button", { name: "Noticeboard" }));
+    expect(onOpenMenu).toHaveBeenLastCalledWith("noticeboard");
+    r.unmount();
+    render(<AreaView area="clothing-store" look="day" day={30} placed={[]} onBack={() => undefined} onOpenMenu={onOpenMenu} />);
+    await userEvent.click(doors().getByRole("button", { name: "Shop door" }));
+    await userEvent.click(doors().getByRole("button", { name: "Fitting room" }));
+    expect(onOpenMenu).toHaveBeenLastCalledWith("wardrobe");
   });
 
   it("Ipanema beach: no way into the sea before day 30; on day 30 it's a button away (Esme, 2026-11-16)", async () => {
     const { unmount } = render(<AreaView area="ipanema-beach" look="day" day={29} placed={[]} onBack={() => undefined} />);
-    expect(screen.queryByRole("group", { name: "Go inside" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "The sea off Arpoador" })).toBeNull();
+    expect(doors().queryByRole("button", { name: "Swim out to Arpoador" })).toBeNull();
     unmount();
     render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} />);
-    await userEvent.click(within(screen.getByRole("group", { name: "Go inside" })).getByRole("button", { name: "The sea off Arpoador" }));
+    await userEvent.click(doors().getByRole("button", { name: "Swim out to Arpoador" }));
     expect(document.querySelector(".rio-area")).toHaveAttribute("data-scene", "ipanema-beach/sea");
   });
 
-  it("the fazenda has no inside yet", () => {
-    render(<AreaView area="fazenda" look="day" day={1} placed={[]} onBack={() => undefined} />);
-    expect(screen.queryByRole("group", { name: "Go inside" })).toBeNull();
-  });
-
-  it("Back to the map", async () => {
+  it("the fazenda: its barn, coop and greenhouse wait for their insides; the boat is the way back to the map", async () => {
     const onBack = vi.fn();
     render(<AreaView area="fazenda" look="night" day={1} placed={[]} onBack={onBack} />);
-    await userEvent.click(screen.getByRole("button", { name: "Back to the map" }));
+    expect(doors().getAllByRole("button")).toHaveLength(1);
+    await userEvent.click(doors().getByRole("button", { name: "Boat back to Rio" }));
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it("hovering a placed sticker names it and says what it's for, beside it (never over it)", async () => {
+    render(<AreaView area="fazenda" look="day" day={1} placed={["seeds-mind"]} onBack={() => undefined} />);
+    const sticker = document.querySelector<HTMLElement>('.rio-sticker[data-sticker="seeds-mind"]')!;
+    expect(sticker).not.toBeNull();
+    await userEvent.hover(sticker);
+    const tip = screen.getByRole("tooltip");
+    expect(tip).toHaveTextContent("Mind: seeds");
+    expect(tip).toHaveTextContent("1 to-do ticked off in Mind");
+    const side = tip.getAttribute("data-side");
+    expect(["right", "left"]).toContain(side);
+    const s = { left: parseFloat(sticker.style.left), width: parseFloat(sticker.style.width) };
+    const t = parseFloat(tip.style.left);
+    if (side === "right") expect(t).toBeGreaterThan(s.left + s.width);
+    else expect(t).toBeLessThan(s.left);
+    await userEvent.unhover(sticker);
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("names every sticker drawn, and says how many more wait in the book", () => {
@@ -95,13 +149,13 @@ describe("phase 2a: the new areas", () => {
 
   it("each opens outside, with its inside a button away", async () => {
     const names: Record<string, [string, string]> = {
-      "zona-sul": ["Zona Sul", "The aisles"], "jardim-botanico": ["Jardim Botânico", "The orchid house"], quilo: ["Quilo", "The buffet"],
-      sult: ["Sult", "The dining room"], "os-esquilos": ["Os Esquilos", "The dining room"], "santa-teresa": ["Santa Teresa", "The studio"],
+      "zona-sul": ["Zona Sul", "Zona Sul sliding doors"], "jardim-botanico": ["Jardim Botânico", "Orchid house doors"], quilo: ["Quilo", "Quilo door"],
+      sult: ["Sult", "Sult door"], "os-esquilos": ["Os Esquilos", "Blue doors"], "santa-teresa": ["Santa Teresa", "Casarao door"],
     };
     for (const [key, [out, inside]] of Object.entries(names)) {
       const { unmount } = render(<AreaView area={key} look="night" day={200} placed={[]} onBack={() => undefined} />);
       expect(heading()).toBe(out);
-      await userEvent.click(within(screen.getByRole("group", { name: "Go inside" })).getByRole("button", { name: inside }));
+      await userEvent.click(screen.getByRole("button", { name: inside }));
       expect(area()).toHaveAttribute("data-scene", `${key}/inside`);
       unmount();
     }
@@ -115,7 +169,7 @@ describe("phase 2a: the new areas", () => {
 
   it("Santa Teresa's studio shows its milestones and books", async () => {
     render(<AreaView area="santa-teresa" look="rain" day={200} placed={[]} counts={counts({ readingBooks: 10 })} onBack={() => undefined} />);
-    await userEvent.click(screen.getByRole("button", { name: "The studio" }));
+    await userEvent.click(screen.getByRole("button", { name: "Casarao door" }));
     expect(area()).toHaveAttribute("data-milestones", "reading-lamp second-bookcase rug");
     expect(area()).toHaveAttribute("data-books", "10");
   });
@@ -150,7 +204,7 @@ describe("phase 2a: the new areas", () => {
 
 it("Esme swims in the sea off Arpoador (day 30), still with reduced motion", async () => {
   render(<AreaView area="ipanema-beach" look="day" day={30} placed={[]} onBack={() => undefined} />);
-  await userEvent.click(screen.getByRole("button", { name: "The sea off Arpoador" }));
+  await userEvent.click(screen.getByRole("button", { name: "Swim out to Arpoador" }));
   expect(document.querySelector(".rio-area")).toHaveAttribute("data-player", "esme");
 });
 
@@ -158,10 +212,82 @@ it("the goal moment plays in the stands at a full match only when asked (dev pre
   const full = { monthlyGoals: 0, wholeGoals: 0, readingBooks: 0, recipes: 0, weeklyReviews: 4 };
   const { unmount } = render(<AreaView area="flamengo-match" look="night" day={60} placed={[]} counts={full} goal onBack={() => undefined} />);
   expect(document.querySelector(".rio-area")).not.toHaveAttribute("data-goal"); // outside: no goal art
-  await userEvent.click(screen.getByRole("button", { name: "The stands" }));
+  await userEvent.click(screen.getByRole("button", { name: "Stadium gates" }));
   expect(document.querySelector(".rio-area")).toHaveAttribute("data-goal", "true");
   unmount();
   render(<AreaView area="flamengo-match" look="night" day={60} placed={[]} goal onBack={() => undefined} />);
-  await userEvent.click(screen.getByRole("button", { name: "The stands" }));
+  await userEvent.click(screen.getByRole("button", { name: "Stadium gates" }));
   expect(document.querySelector(".rio-area")).not.toHaveAttribute("data-goal"); // start: the goal is drawn for the full stands
+});
+
+describe("edit mode: move or hide a placed sticker (Esme, 2026-11-17)", () => {
+  const sticker = (k: string) => document.querySelector<HTMLElement>(`.rio-sticker[data-sticker="${k}"]`)!;
+
+  it("pick a sticker, then one of the free slots that takes it: it moves there", async () => {
+    const onMove = vi.fn();
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen", "cow"]} editing onMove={onMove} onBack={() => undefined} />);
+    expect(screen.queryByRole("button", { name: /Move Hen here/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Hen: move or hide" }));
+    const targets = screen.getAllByRole("button", { name: "Move Hen here" });
+    expect(targets.map((t) => t.getAttribute("data-slot"))).toEqual(["hen-2", "hen-3", "hen-4"]);
+    await userEvent.click(targets[1]!);
+    expect(onMove).toHaveBeenCalledWith("hen", "hen-3");
+    expect(screen.queryByRole("button", { name: "Move Hen here" })).toBeNull();
+  });
+
+  it("Hide hides the picked sticker (never deletes it)", async () => {
+    const onHide = vi.fn();
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} editing onHide={onHide} onBack={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "Hen: move or hide" }));
+    await userEvent.click(screen.getByRole("button", { name: "Hide" }));
+    expect(onHide).toHaveBeenCalledWith("hen");
+  });
+
+  it("a moved sticker stands on its chosen slot", () => {
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} spots={new Map([["hen", "hen-4"]])} onBack={() => undefined} />);
+    const four = layoutSlotX("hen-4");
+    expect(parseFloat(sticker("hen").style.left)).toBeCloseTo(four, 6);
+  });
+
+  it("Esc steps back: first the pick, then edit mode itself (before the game's own Esc opens the menu)", async () => {
+    const onEditDone = vi.fn();
+    const outer = vi.fn();
+    document.addEventListener("keydown", outer);
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} editing onEditDone={onEditDone} onBack={() => undefined} />);
+    await userEvent.click(screen.getByRole("button", { name: "Hen: move or hide" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: "Move Hen here" })).toBeNull();
+    expect(onEditDone).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Escape}");
+    expect(onEditDone).toHaveBeenCalled();
+    expect(outer.mock.calls.every(([e]) => (e as KeyboardEvent).defaultPrevented)).toBe(true);
+    document.removeEventListener("keydown", outer);
+  });
+
+  it("out of edit mode, stickers aren't buttons", () => {
+    render(<AreaView area="fazenda" look="day" day={1} placed={["hen"]} onBack={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "Hen: move or hide" })).toBeNull();
+  });
+});
+
+/** A fazenda slot's sticker box left edge, in the test DOM's scale (the scene's own pixels: scale 1). */
+function layoutSlotX(id: string): number {
+  const el = document.querySelector<HTMLElement>(".rio-area-layer")!;
+  const scale = parseFloat(el.style.width) / 512;
+  const slot = SCENES["fazenda/outside"].slots.find((s) => s.id === id)!;
+  return (slot.x - 8) * scale;
+}
+
+it("I3: a hidden sticker isn't drawn, but the scene keeps its stage and every other sticker keeps its place", () => {
+  const placed = ["lilypad", "pebble", "cattail", "frogspawn", "snail", "dragonfly"];
+  const { unmount } = render(<AreaView area="ipanema-beach" look="day" day={3} placed={placed} onBack={() => undefined} />);
+  const state = document.querySelector(".rio-area")!.getAttribute("data-state");
+  const left = (k: string) => document.querySelector<HTMLElement>(`.rio-sticker[data-sticker="${k}"]`)?.style.left;
+  const before = Object.fromEntries(placed.map((k) => [k, left(k)]));
+  unmount();
+  render(<AreaView area="ipanema-beach" look="day" day={3} placed={placed} hidden={new Set(["lilypad"])} onBack={() => undefined} />);
+  expect(document.querySelector(".rio-area")).toHaveAttribute("data-state", state!);
+  expect(document.querySelector('.rio-sticker[data-sticker="lilypad"]')).toBeNull();
+  for (const k of placed.slice(1)) expect(left(k), k).toBe(before[k]);
+  expect(within(screen.getByRole("list", { name: "Stickers here" })).queryByText("Lily pad")).toBeNull();
 });
