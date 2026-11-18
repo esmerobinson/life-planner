@@ -16,7 +16,9 @@ import { renderApp } from "../test/renderApp";
 import {
   CAMERA_DENIED, CODE_FAILED, NOT_PAIRING, PAIRING_WARNING, PairingCode, SCANNER_FAILED, SYNC_ONLY_NOTE, ScanPairingCode, TOO_LONG, hidesIn,
 } from "./Pairing";
-import { SyncPage, CONFIRM_ADDRESS_BUTTON, JOURNAL_MAY_ASK_NOTE, OTHER_JOURNAL, OWNER_REFUSED, OWNER_UNAVAILABLE, otherAddressLine } from "./SyncPage";
+import {
+  SyncPage, CONFIRM_ADDRESS_BUTTON, JOURNAL_MAY_ASK_NOTE, OTHER_JOURNAL, OWNER_REFUSED, OWNER_UNAVAILABLE, TYPE_PASSPHRASE_ONCE, otherAddressLine,
+} from "./SyncPage";
 import { CODE_REFUSED_LINE } from "./journal/JournalPage";
 
 // Pair a device by QR code. Fictional passphrases only; the camera and the frame decoder are
@@ -563,6 +565,8 @@ describe("a device that already syncs only takes a code that matches it (review 
     await user.type(screen.getByLabelText("Paste pairing code"), evil);
     await user.click(screen.getByRole("button", { name: "Use pairing code" }));
     expect(await screen.findByText(otherAddressLine("https://elsewhere.example.test"))).toBeInTheDocument();
+    // The way forward is said too (review RM4).
+    expect(otherAddressLine("https://elsewhere.example.test")).toContain("Stop syncing on this device");
     expect(screen.queryByRole("group", { name: "Sync address in the code" })).toBeNull();
     expect(await snapshot()).toBe(before);
   });
@@ -574,6 +578,20 @@ describe("a device that already syncs only takes a code that matches it (review 
     await user.click(screen.getByRole("button", { name: "Use pairing code" }));
     expect(await screen.findByText(OTHER_JOURNAL)).toBeInTheDocument();
     expect(await snapshot()).toBe(before);
+  });
+
+  it("locked, with an older retired key and nothing here to prove the code: sync is saved, and it says to type the passphrase once (review RI1)", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token: await deriveToken("fake-old-passphrase-before-a-change") });
+    const older = await keyFor("fake-older-losing-key");
+    await db.syncMeta.put({ key: "journalRetired", value: [{ key: older.key, mac: older.mac, fp: older.fp }] });
+    setup();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Paste pairing code"), pairingTextV2({ token, secret: await deriveJournalSecret(PASSPHRASE), serverUrl: ADDRESS }));
+    await user.click(screen.getByRole("button", { name: "Use pairing code" }));
+    expect(await screen.findByText(TYPE_PASSPHRASE_ONCE)).toBeInTheDocument();
+    expect(screen.queryByText(OTHER_JOURNAL)).toBeNull();
+    await waitFor(async () => expect(await getMeta(db, "token")).toBe(token));
+    expect(await db.syncMeta.get("journalCandidate")).toBeUndefined();
   });
 
   it("its own address and journal: accepted with no question; the journal key is left exactly as it was", async () => {
@@ -620,6 +638,15 @@ describe("showing a code in the Mac app needs Touch ID or the Mac password (revi
     expect(await screen.findByRole("img", { name: "Pairing code" })).toBeInTheDocument();
     expect(ask).not.toHaveBeenCalled();
   });
+
+  it("allowed, but the window doesn't get its focus back: the code is shown anyway, never nothing (review RM5)", async () => {
+    await saveSyncSettings(db, { serverUrl: ADDRESS, token });
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    macApp({ ok: true });
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Pair another device" }));
+    expect(await screen.findByRole("img", { name: "Pairing code" }, { timeout: 6000 })).toBeInTheDocument();
+  }, 15_000);
 
   it("a Mac app without the check never shows a one-tap code", async () => {
     await saveSyncSettings(db, { serverUrl: ADDRESS, token });

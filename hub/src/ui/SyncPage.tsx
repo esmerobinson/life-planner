@@ -23,7 +23,8 @@ export const BAD_CODE_ADDRESS = "That pairing code's sync address can't be used 
 // Placeholder copy (Esme may reword), fix round 1 (2026-11-17):
 /** Review C1: a device that syncs, and a code for another address. Nothing changes. */
 export const otherAddressLine = (address: string) =>
-  `That pairing code is for another sync address (${address}), so nothing was changed.`;
+  `That pairing code is for another sync address (${address}), so nothing was changed. ` +
+  "To move this device to that address, choose Stop syncing on this device first, then use the code again.";
 /** Review C1: a code whose journal secret isn't this device's journal. Nothing changes. */
 export const OTHER_JOURNAL = "That pairing code is for a different journal, so nothing was changed.";
 /** Review C1: a new device, a code with an address other than the usual one. */
@@ -34,6 +35,13 @@ export const CONFIRM_ADDRESS_BUTTON = "Use this address";
 export const OWNER_REFUSED = "The code is only shown once this Mac has checked it's you.";
 /** Review I2: a Mac app too old to have the check. */
 export const OWNER_UNAVAILABLE = "Update the Esmeworld app on this Mac to show a code here, or type your passphrase below.";
+/**
+ * Review RI1: her own code, but nothing on this device can prove its journal part (it once
+ * retired another key, and no verifier is here yet): sync is set up, the journal waits.
+ */
+export const TYPE_PASSPHRASE_ONCE = "Saved. Type your passphrase once to open your journal on this device.";
+/** Review RM5: the code was ready but the page went to the background. */
+export const TAP_AGAIN = "Tap Pair another device again to show the code.";
 /** Review M4: a v1 code whose passphrase didn't open the journal here. */
 export const JOURNAL_MAY_ASK_NOTE = "On the other device, your journal may ask for your passphrase once.";
 
@@ -204,7 +212,7 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
         setAddress(v.serverUrl);
         controller.clearError();
         await controller.reload();
-        setNote("Saved.");
+        setNote(v.journalNeedsPassphrase ? TYPE_PASSPHRASE_ONCE : "Saved.");
       } catch {
         setProblem("That did not save. Try again.");
         setBusy(false);
@@ -257,8 +265,9 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
         setShowProblem(owner === "refused" ? OWNER_REFUSED : OWNER_UNAVAILABLE);
         return;
       }
-      // After the Mac's sheet, the window gets focus back a moment later: shown only then.
-      if (owner === "ok" && !(await windowFocused(3000))) return;
+      // After the Mac's sheet, the window gets focus back a moment later: wait for it (a code
+      // shown before would be hidden at once by the "lost focus" rule), but never show nothing.
+      if (owner === "ok") await windowFocused(3000);
       const make = () => pairingCodeForDevice(controller.db).catch(() => null);
       let made = await make();
       let shownNext: { text: string; note?: string } | null = null;
@@ -268,8 +277,11 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
         else shownNext = { text: pairingText(savedSecret), note: JOURNAL_MAY_ASK_NOTE };
       }
       if (!shownNext && made) shownNext = { text: made.text, ...(made.journal ? {} : { note: SYNC_ONLY_NOTE }) };
-      // Gone to the background meanwhile: it is not shown behind her back.
-      if (backgrounded()) return;
+      // Gone to the background meanwhile: it is not shown behind her back, and she is told so.
+      if (backgrounded()) {
+        setShowProblem(TAP_AGAIN);
+        return;
+      }
       if (shownNext) setShown(shownNext);
       else setShowProblem(CODE_FAILED);
     } finally {
