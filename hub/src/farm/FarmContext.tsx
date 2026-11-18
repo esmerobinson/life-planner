@@ -13,6 +13,7 @@ import { counters, allEarned, derivedEarned, type Counters, type JournalFacts } 
 import * as repo from "./farmRepo";
 import { readJournalFacts } from "./journalFacts";
 import { EMPTY_FARM, farmState, type CharacterId, type FarmState } from "./state";
+import { useTodayFill } from "../ui/useTodayFill";
 import { RETIRED, arrivedAt, awakeZones, farmDay, momentQueue, stickerTotals, todayListFinished, unlockedAccessories } from "./world";
 
 export interface FarmView {
@@ -195,7 +196,8 @@ function FarmEngine({ items: listItems, goals, today, onView }: { items: Item[];
 
   // Today's list finished: not derivable later, so it is noted when seen (once the farm has started).
   const started = state.start !== null;
-  const finished = useMemo(() => started && todayListFinished(listItems, goals, today), [started, listItems, goals, today]);
+  const kept = useTodayFill(today).frozen;
+  const finished = useMemo(() => started && todayListFinished(listItems, goals, today, kept), [started, listItems, goals, today, kept]);
   const noted = state.todayDone.includes(today);
   useEffect(() => {
     if (finished && !noted) void repo.recordTodayDone(today).catch(() => undefined);

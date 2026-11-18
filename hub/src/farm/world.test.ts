@@ -1,5 +1,5 @@
 import type { Item } from "../domain/types";
-import { todayList } from "../domain/triage";
+import { todayFill, todayList } from "../domain/triage";
 import { COLLECTION, STICKERS, STICKER_BY_KEY, hintFor, stickersIn } from "./catalogue";
 import {
   ACCESSORIES, ARRIVES_AT, KEEPER, RETIRED, BED_STAGE_AT, SPOTS, SPREADS, arrivedAt, awakeZones, bedStage, bedStageEarned, farmDay, momentQueue, nookHost,
@@ -230,6 +230,21 @@ describe("Today's list finished", () => {
     const items: Item[] = [t({ recur: ["wed"], touchedAt: "2026-11-01" }), t({ recur: ["wed"], touchedAt: "2026-11-01" })];
     const after = [{ ...items[0]!, hiddenOn: T, touchedAt: T }, { ...items[1]!, doneDates: [T], touchedAt: T }];
     expect(todayListFinished(after, [], T)).toBe(true);
+  });
+
+  it("with the day's kept picks (Today no longer refills): a pick deleted today counts as off the list, never a stand-in", () => {
+    // Fictional: 10 open to-dos; this morning's 4 picks, kept for the day as Home records them.
+    const items: Item[] = Array.from({ length: 10 }, () => t({ touchedAt: "2026-11-01" }));
+    const kept = todayFill(items, [], T);
+    const [a, b, c, d] = todayList(items, [], T, kept).picks;
+    const after = items.map((i) => {
+      if (i.id === a!.id || i.id === b!.id || i.id === c!.id) return { ...i, status: "done" as const, completedAt: T, touchedAt: T };
+      if (i.id === d!.id) return { ...i, status: "deleted" as const, deletedAt: T, touchedAt: T }; // Delete, from Today
+      return i;
+    });
+    // Without the kept picks a stand-in for the deleted one would be counted (and never shown).
+    expect(todayListFinished(after, [], T)).toBe(false);
+    expect(todayListFinished(after, [], T, kept)).toBe(true);
   });
 
   it("its hint says ticked or moved (placeholder wording)", () => {

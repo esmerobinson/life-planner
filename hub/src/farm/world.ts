@@ -5,6 +5,7 @@
 
 import { daysBetween } from "../domain/dates";
 import { tickedOffToday, todayList } from "../domain/triage";
+import type { TodayFill } from "../domain/todayFill";
 import type { Goal, ISODate, Item } from "../domain/types";
 import rawSpots from "../assets/farm/sticker-spots.json";
 import { COLLECTION, GROUPS, MANIFEST, REPEATS, STICKERS, STICKER_BY_KEY, asset, stickersIn, type BookPage } from "./catalogue";
@@ -320,11 +321,13 @@ export const movedOn = (it: Item, today: ISODate): boolean =>
 /**
  * The day's list is finished (review C1; Esme, 2026-11-04): every item on the list as Home showed
  * it that morning (before today's ticks and moves) is ticked today or moved to another day, and
- * at least one was ticked. Rescheduling is never a failure. Home refills its picks from the
- * backlog as she goes, so the live list would almost never be empty; the morning's list counts.
+ * at least one was ticked. Rescheduling is never a failure. `kept`: the day's picks as Home
+ * keeps them (Home no longer refills, 2026-11-18); without them the morning's list is rebuilt.
  */
-export function todayListFinished(items: Item[], goals: Goal[], today: ISODate): boolean {
-  const morning = todayList(atDayStart(items, today), goals, today);
+export function todayListFinished(items: Item[], goals: Goal[], today: ISODate, kept?: TodayFill): boolean {
+  // With the day's kept picks (domain/todayFill.ts), the morning's list is exactly those (Home
+  // never refills them), so a pick deleted today is never swapped for one she never saw.
+  const morning = todayList(atDayStart(items, today), goals, today, kept);
   const listed = [...morning.rhythm, ...morning.picks];
   const now = new Map(items.map((it) => [it.id, it]));
   const current = listed.map((it) => now.get(it.id));

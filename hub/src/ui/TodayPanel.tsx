@@ -1,12 +1,14 @@
-import { useContext, useMemo, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, type ReactNode } from "react";
 import { tickItem, untickItem } from "../data/repo";
-import { tickedOffToday, todayList } from "../domain/triage";
+import { recordTodayFill, shouldRecord } from "../data/todayFillRepo";
+import { tickedOffToday, todayFill, todayList } from "../domain/triage";
 import type { ISODate, Item } from "../domain/types";
 import { DoneSection } from "./DoneSection";
 import { useSaveError } from "./messages";
 import { ShellContext } from "./shellContext";
 import { TaskRow } from "./TaskRow";
 import { useHubData } from "./useHubData";
+import { useTodayFill } from "./useTodayFill";
 
 /**
  * Today's list, on Home (there is no separate Today page since 2026-11-04). `lead` comes first
@@ -31,7 +33,18 @@ export function TodayPanel({
   // Habits and started projects ticked today stay, crossed out, at the bottom of their list;
   // a to-do done today moves to the "Done today" dropdown.
   // Inactive goals don't count (goals redesign).
-  const { rhythm, picks, alsoDue, doneToday } = useMemo(() => todayList(items, goals, today), [items, goals, today]);
+  // The day's picks are kept once shown (synced): one she removes, moves or ticks off is never
+  // replaced; the list just gets shorter (Esme, 2026-11-06). The next day starts fresh.
+  const kept = useTodayFill(today);
+  const { rhythm, picks, alsoDue, doneToday } = useMemo(
+    () => todayList(items, goals, today, kept.frozen),
+    [items, goals, today, kept.frozen],
+  );
+  useEffect(() => {
+    if (!loaded || error || !kept.loaded) return;
+    const next = todayFill(items, goals, today, kept.frozen);
+    if (shouldRecord(kept.frozen, next)) void recordTodayFill(today, next).catch(() => undefined);
+  }, [loaded, error, kept.loaded, kept.frozen, items, goals, today]);
 
   async function tick(id: string, saved?: () => void): Promise<boolean> {
     if (!(await attempt(() => tickItem(id, today)))) return false;

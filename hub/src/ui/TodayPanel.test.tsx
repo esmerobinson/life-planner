@@ -16,6 +16,7 @@ async function task(title: string, extra: Record<string, unknown> = {}) {
 beforeEach(async () => {
   await db.items.clear();
   await db.goals.clear();
+  await db.prefs.clear(); // the day's kept picks (domain/todayFill.ts) are per test
 });
 
 afterEach(() => {
@@ -441,5 +442,58 @@ describe("TodayPanel", () => {
     await userEvent.click(screen.getByRole("heading", { name: "Today" }));
     expect(screen.queryByRole("group", { name: "Schedule Outside for" })).toBeNull();
     expect(screen.getByRole("button", { name: "Schedule for: Outside" })).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("Today stops refilling (Esme, 2026-11-06)", () => {
+
+  async function sixToDos() {
+    await task("Pretend p1 alpha", { priority: 1 });
+    await task("Pretend p1 beta", { priority: 1 });
+    for (const t of ["gamma", "delta", "epsilon", "zeta"]) await task(`Pretend p2 ${t}`, { priority: 2 });
+  }
+  const rows = async () => within(await screen.findByRole("list", { name: "Today" })).getAllByRole("listitem");
+  const titles = async () => (await rows()).map((r) => within(r).getByRole("checkbox").getAttribute("aria-label")!.replace("Mark done: ", ""));
+
+  it("Remove from today: nothing replaces it, again and again; still so after a reload", async () => {
+    await sixToDos();
+    const { unmount } = render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(4));
+    const before = await titles();
+    // The day's picks are kept (synced) once Home has shown them.
+    await vi.waitFor(async () => expect(await db.prefs.where("id").startsWith("today-fill:").count()).toBe(1));
+    for (const [k, gone] of before.slice(0, 2).entries()) {
+      await userEvent.click(screen.getByRole("button", { name: `Move to: ${gone}` }));
+      await userEvent.click(choiceIn("Move to", "Remove from today"));
+      await vi.waitFor(async () => expect(await titles()).toEqual(before.slice(k + 1)));
+    }
+    unmount();
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect(await titles()).toEqual(before.slice(2)));
+  });
+
+  it("ticking one off: it goes to Done today and nothing takes its place", async () => {
+    await sixToDos();
+    render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(4));
+    const before = await titles();
+    await vi.waitFor(async () => expect(await db.prefs.count()).toBe(1));
+    await userEvent.click(screen.getByRole("checkbox", { name: `Mark done: ${before[0]}` }));
+    await vi.waitFor(async () => expect(await titles()).toEqual(before.slice(1)));
+    expect(screen.getByText(/Done today/)).toBeInTheDocument();
+  });
+
+  it("the next day starts fresh: a full list again", async () => {
+    await sixToDos();
+    const { unmount } = render(<TodayPanel today={TODAY} />);
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(4));
+    const first = await titles();
+    await vi.waitFor(async () => expect(await db.prefs.count()).toBe(1));
+    await userEvent.click(screen.getByRole("button", { name: `Move to: ${first[0]}` }));
+    await userEvent.click(choiceIn("Move to", "Remove from today"));
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(3));
+    unmount();
+    render(<TodayPanel today={addDays(TODAY, 1)} />);
+    await vi.waitFor(async () => expect(await rows()).toHaveLength(4));
   });
 });
