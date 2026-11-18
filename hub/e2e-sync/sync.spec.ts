@@ -254,3 +254,63 @@ test("Today's routine: a step ticked on one device shows ticked on the other, th
   await ctxA.close();
   await ctxB.close();
 });
+
+/* Today stops refilling (small fixes 3, 2026-11-18): the day's picks (a today-fill prefs row) and
+   a "Remove from today" reach the other device, which shows the shorter list with nothing pulled
+   in to replace it; and back the other way. */
+test("Today: a to-do removed on one device is gone on the other too, with nothing replacing it", async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+  await setUpSync(a);
+
+  // Six fictional to-dos (two priority 1), more than Today's four places, by a Merge import.
+  const mine = [1, 2, 3, 4, 5, 6].map((k) => ({
+    ...row(100 + k, `Pretend today job ${k}`), areaId: "writing", priority: k <= 2 ? 1 : 2,
+  }));
+  await a.goto("/backup");
+  await a.getByLabel("Backup file").setInputFiles({
+    name: "fictional-today.json", mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ app: "life-hub", schema: 1, exportedOn: "2026-09-02", items: mine, goals: [] })),
+  });
+  await a.getByRole("button", { name: "Merge" }).click();
+  await expect(a.getByText(/^Added 6 tasks/)).toBeVisible();
+
+  const list = (p: Page) => p.getByRole("list", { name: "Today", exact: true });
+  const titles = async (p: Page) =>
+    (await list(p).getByRole("checkbox").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""))).map((l) =>
+      l.replace(/^Mark done: /, ""),
+    );
+  const kept = async (p: Page) => (await readStore(p, "prefs")).filter((r) => r.id.startsWith("today-fill:")).length;
+
+  await a.goto("/");
+  await expect(list(a).getByRole("listitem")).toHaveCount(4);
+  await expect.poll(() => kept(a)).toBe(1);
+  const before = await titles(a);
+  await a.getByRole("button", { name: `Move to: ${before[0]}` }).click();
+  await a.getByRole("button", { name: "Remove from today" }).click();
+  await expect(list(a).getByRole("listitem")).toHaveCount(3);
+  await expect.poll(async () => (await readStore(a, "items")).find((r) => r.title === before[0])?.hiddenOn).toBeTruthy();
+  await syncNow(a);
+
+  // B joins and opens Home only after its first sync: A's list, without the removed one.
+  await setUpSync(b);
+  await b.goto("/");
+  await expect(list(b).getByRole("listitem")).toHaveCount(3);
+  expect(await titles(b)).toEqual(before.slice(1));
+
+  // B removes another; back on A it's gone and nothing new comes in.
+  await b.getByRole("button", { name: `Move to: ${before[1]}` }).click();
+  await b.getByRole("button", { name: "Remove from today" }).click();
+  await expect(list(b).getByRole("listitem")).toHaveCount(2);
+  await expect.poll(async () => (await readStore(b, "items")).find((r) => r.title === before[1])?.hiddenOn).toBeTruthy();
+  await syncNow(b);
+  await syncNow(a);
+  await a.goto("/");
+  await expect(list(a).getByRole("listitem")).toHaveCount(2);
+  expect(await titles(a)).toEqual(before.slice(2));
+
+  await ctxA.close();
+  await ctxB.close();
+});
