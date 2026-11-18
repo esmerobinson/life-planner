@@ -37,6 +37,17 @@ describe("recordTodayFill", () => {
     expect(await db.prefs.get(todayFillRowId(me))).toMatchObject({ date: TUE, ids: ["a", "c"], room: 4 });
   });
 
+  it("never more picks than there were places, even when two records overlap (to-dos arriving while Home is open)", async () => {
+    await recordTodayFill(TUE, { ids: ["a", "b"], room: 3 });
+    // Worked out from an older copy of the kept picks, so each brings a different new one.
+    await Promise.all([recordTodayFill(TUE, { ids: ["a", "c"], room: 3 }), recordTodayFill(TUE, { ids: ["a", "d"], room: 3 })]);
+    const me = await getDeviceId(db);
+    const row = await db.prefs.get(todayFillRowId(me));
+    expect(row).toMatchObject({ room: 3 });
+    expect((row as { ids: string[] }).ids).toHaveLength(3);
+    expect((row as { ids: string[] }).ids.slice(0, 2)).toEqual(["a", "b"]);
+  });
+
   it("a new day replaces yesterday's row (one row per device, never more)", async () => {
     await recordTodayFill(TUE, { ids: ["a"], room: 4 });
     await recordTodayFill(WED, { ids: ["z"], room: 2 });

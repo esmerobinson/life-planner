@@ -16,15 +16,23 @@ export function shouldRecord(frozen: TodayFill | undefined, next: TodayFill): bo
   return next.ids.some((id) => !kept.has(id));
 }
 
-/** Keeps `fill` as today's picks in this device's row (added to what it kept today already). */
+/**
+ * Keeps `fill` as today's picks in this device's row: added to what it kept today already, never
+ * past the places there were that morning.
+ */
 export async function recordTodayFill(today: ISODate, fill: TodayFill): Promise<void> {
   const deviceId = await getDeviceId(db);
   const id = todayFillRowId(deviceId);
   await db.transaction("rw", db.prefs, async () => {
     const stored = await db.prefs.get(id);
     const same = validTodayFillRow(stored) && stored.date === today ? stored : undefined;
-    const ids = [...new Set([...(same?.ids ?? []), ...fill.ids])].slice(0, MAX_FILL_IDS);
+    // Never more picks than there were places: a record worked out from an older copy (to-dos
+    // arriving while Home is open) adds only into places still free.
+    const room = same?.room ?? fill.room;
+    const ids = [...(same?.ids ?? [])];
+    for (const x of fill.ids) if (!ids.includes(x) && ids.length < Math.min(room, MAX_FILL_IDS)) ids.push(x);
     if (same && ids.length === same.ids.length) return; // nothing new
-    await db.prefs.put(todayFillRow(deviceId, today, ids, same?.room ?? fill.room));
+    if (ids.length === 0) return;
+    await db.prefs.put(todayFillRow(deviceId, today, ids, room));
   });
 }
