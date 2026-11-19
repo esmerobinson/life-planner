@@ -21,6 +21,7 @@ import { PageEditor } from "./PageEditor";
 import { ProjectSummary, SessionList } from "./ProjectPanel";
 import { DEFAULT_SESSIONS, isProject, newSessions, withSessions } from "../domain/projects";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
+import { useUpdateHold } from "../native/updateHolds";
 
 /** The Type property: a project is a to-do with sessions, a book an idea on the reading list, each shown as its own type. */
 type PanelKind = Item["kind"] | "project" | "book";
@@ -115,6 +116,8 @@ export function ItemPanel({
   const offerRowUndo = useRowUndo(today);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  // Edit mode keeps its changes only here until Done: the phone's automatic update waits.
+  useUpdateHold(editing, "editing");
   const [fields, setFields] = useState<Fields>(() => fieldsOf(item));
   const [snapshot, setSnapshot] = useState<Fields>(() => fieldsOf(item));
   const [busy, setBusy] = useState(false);

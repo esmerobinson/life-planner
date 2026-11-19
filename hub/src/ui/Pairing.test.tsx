@@ -13,6 +13,7 @@ import { pairingText, pairingTextV2 } from "../pairing/pairingText";
 import { qrModules, qrPath, readFrame } from "../pairing/qr";
 import { confirmedDevice, keyFor, verifierRow } from "../test/journalKey";
 import { renderApp } from "../test/renderApp";
+import { currentUpdateHold } from "../native/updateHolds";
 import {
   CAMERA_DENIED, CODE_FAILED, NOT_PAIRING, PAIRING_WARNING, PairingCode, SCANNER_FAILED, SYNC_ONLY_NOTE, ScanPairingCode, TOO_LONG, hidesIn,
 } from "./Pairing";
@@ -777,4 +778,24 @@ describe("scan a pairing code (Journal, Unlock journal)", () => {
     expect((await loadJournalKey(db))!.fp).toBe(jk.fp);
     expect(unlockJournal).not.toHaveBeenCalled();
   }, 20_000);
+});
+
+describe("the phone's automatic update waits (fix round 1, M2)", () => {
+  it("while a pairing code is shown for another device to scan", () => {
+    const { unmount } = render(<PairingCode text={pairingText(PASSPHRASE)} onHide={() => {}} />);
+    expect(currentUpdateHold()).toBe("pairing");
+    unmount();
+    expect(currentUpdateHold()).toBeNull();
+  });
+
+  it("while the camera scanner is on", async () => {
+    fakeCamera();
+    const { unmount } = render(<ScanPairingCode onCode={() => {}} />);
+    expect(currentUpdateHold()).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Scan pairing code" }));
+    await screen.findByLabelText("Camera");
+    expect(currentUpdateHold()).toBe("camera");
+    unmount();
+    expect(currentUpdateHold()).toBeNull();
+  });
 });

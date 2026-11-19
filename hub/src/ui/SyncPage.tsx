@@ -11,6 +11,7 @@ import { MAX_PAIRING_PASSPHRASE, pairingText, type PairingPayload } from "../pai
 import { CODE_FAILED, PairingCode, ScanPairingCode, SYNC_ONLY_NOTE, TOO_LONG } from "./Pairing";
 import { TogetherBox } from "./together/TogetherBox";
 import { OldPassphrasePrompt } from "./journal/OldPassphrasePrompt";
+import { useUpdateHold } from "../native/updateHolds";
 
 /** Placeholder copy (Esme may reword): the server limits wrong passphrases (5 per 15 minutes). */
 export const LOCKOUT_LINE =
@@ -89,6 +90,9 @@ export function SyncPage({ controller = syncController }: { controller?: SyncCon
   // A v2 code for a new device with an address other than the usual one, waiting for her
   // "Use this address" (review C1). Its secret is only in memory and wiped on Cancel or leaving.
   const [confirming, setConfirming] = useState<{ code: Extract<PairingPayload, { v: 2 }>; serverUrl: string } | null>(null);
+  // Saving settings or pairing runs several steps (a key derived between writes): no automatic
+  // update until they are done (fix round 1, M1).
+  useUpdateHold(busy || confirming !== null, "pairing");
   const confirmingRef = useRef(confirming);
   confirmingRef.current = confirming;
   useEffect(
