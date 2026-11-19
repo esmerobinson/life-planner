@@ -6,7 +6,7 @@
 import { addDays, isValidISODate, mondayOf } from "./dates";
 import { isHabit } from "./habits";
 import { isProject } from "./projects";
-import type { AreaId, DidEntry, DidFile, ISODate, Item } from "./types";
+import type { AreaId, DidEntry, DidFile, DidPhotos, ISODate, Item } from "./types";
 
 /** The longest note (characters). */
 export const MAX_DID_NOTE = 10_000;
@@ -14,6 +14,8 @@ export const MAX_DID_NOTE = 10_000;
 export const MAX_DID_ENTRIES = 60;
 /** The most files one note keeps. */
 export const MAX_DID_FILES = 100;
+/** The most photos one note keeps. */
+export const MAX_DID_PHOTOS = 20;
 /** The longest file name and folder path kept (macOS allows 255 bytes a name, 1024 a path). */
 export const MAX_FILE_NAME = 255;
 export const MAX_FOLDER = 1024;
@@ -53,6 +55,34 @@ export function validDid(v: unknown): boolean {
   return new Set(v.map((e) => (e as DidEntry).id)).size === v.length;
 }
 
+/** A picture id (files table): the characters a page's `![](file:<id>)` takes. */
+const PHOTO_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const PHOTOS_KEYS = new Set(["entry", "ids"]);
+
+/**
+ * An item's `didPhotos`: absent, or one set per note (distinct notes), each with 1 to
+ * MAX_DID_PHOTOS distinct picture ids. Never an empty list (the field goes instead).
+ */
+export function validDidPhotos(v: unknown): boolean {
+  if (v === undefined) return true;
+  if (!Array.isArray(v) || v.length === 0 || v.length > MAX_DID_ENTRIES) return false;
+  const ok = v.every(
+    (p) =>
+      isObj(p) &&
+      Object.keys(p).every((k) => PHOTOS_KEYS.has(k)) &&
+      isStr(p.entry) && p.entry !== "" && p.entry.length <= 64 &&
+      Array.isArray(p.ids) && p.ids.length > 0 && p.ids.length <= MAX_DID_PHOTOS &&
+      p.ids.every((id) => isStr(id) && PHOTO_ID.test(id)) &&
+      new Set(p.ids).size === p.ids.length,
+  );
+  return ok && new Set(v.map((p) => (p as DidPhotos).entry)).size === v.length;
+}
+
+/** One note's photo ids (none: []). */
+export function photosOf(it: Pick<Item, "didPhotos">, entryId: string): string[] {
+  return it.didPhotos?.find((p) => p.entry === entryId)?.ids ?? [];
+}
+
 /** What to change in one note. */
 export interface DidPatch {
   /** The whole note as typed; blank removes it. */
@@ -61,6 +91,10 @@ export interface DidPatch {
   addFiles?: DidFile[];
   /** Forget one file (by its place in the list). The file itself is never touched. */
   removeFile?: number;
+  /** Photos just stored (files table ids), added at the end. */
+  addPhotos?: string[];
+  /** Take one photo off the note (its file row follows the Bin's rules, like a page's picture). */
+  removePhoto?: string;
 }
 
 /**
@@ -69,6 +103,8 @@ export interface DidPatch {
  */
 export function withDidEntry(
   list: DidEntry[] | undefined, at: Pick<DidEntry, "id" | "on" | "session">, patch: DidPatch,
+  /** The note has photos: it stays even with no words and no files. */
+  keep = false,
 ): DidEntry[] | undefined {
   const all = [...(list ?? [])];
   const i = all.findIndex((e) => e.id === at.id);
@@ -84,12 +120,48 @@ export function withDidEntry(
   if (patch.addFiles?.length) files = [...files, ...patch.addFiles].slice(0, MAX_DID_FILES);
   if (files.length) next.files = files;
   else delete next.files;
-  const empty = next.note === undefined && next.files === undefined;
+  const empty = next.note === undefined && next.files === undefined && !keep;
   if (i >= 0) {
     if (empty) all.splice(i, 1);
     else all[i] = next;
   } else if (!empty) all.push(next);
   return all.length ? all : undefined;
+}
+
+/**
+ * One note changed, photos included: the to-do's new `did` and `didPhotos` (undefined: the field
+ * goes). A note with photos stays even with no words or files; the last photo gone from a note
+ * with nothing else takes the note with it.
+ */
+export function applyDidPatch(
+  it: Pick<Item, "did" | "didPhotos">, at: Pick<DidEntry, "id" | "on" | "session">, patch: DidPatch,
+): { did: DidEntry[] | undefined; didPhotos: DidPhotos[] | undefined } {
+  let ids = photosOf(it, at.id).filter((id) => id !== patch.removePhoto);
+  for (const id of patch.addPhotos ?? []) if (!ids.includes(id)) ids.push(id);
+  ids = ids.slice(0, MAX_DID_PHOTOS);
+  const others = (it.didPhotos ?? []).filter((p) => p.entry !== at.id);
+  const sets = ids.length ? [...(it.didPhotos ?? []).map((p) => (p.entry === at.id ? { entry: at.id, ids } : p))] : others;
+  if (ids.length && !sets.some((p) => p.entry === at.id)) sets.push({ entry: at.id, ids });
+  return { did: withDidEntry(it.did, at, patch, ids.length > 0), didPhotos: sets.length ? sets : undefined };
+}
+
+/** A note with its photos. */
+export type DidEntryWithPhotos = DidEntry & { photos: string[] };
+
+/**
+ * Every note on a to-do with its photos. Photos whose note is missing (an older app version
+ * removes a note it sees as empty) still show, as that note: a session's on the session's day,
+ * else on the day the to-do was done.
+ */
+export function didEntries(it: Item): DidEntryWithPhotos[] {
+  const out: DidEntryWithPhotos[] = (it.did ?? []).map((e) => ({ ...e, photos: photosOf(it, e.id) }));
+  for (const p of it.didPhotos ?? []) {
+    if (out.some((e) => e.id === p.entry)) continue;
+    const session = it.sessions?.find((s) => s.id === p.entry);
+    const on = session?.doneOn ?? it.completedAt ?? it.touchedAt;
+    out.push({ id: p.entry, on, ...(session ? { session: session.id } : {}), photos: p.ids });
+  }
+  return out;
 }
 
 /** The most a folder name may be (UTF-8 bytes; macOS allows 255, room kept for " (2)"). */
@@ -150,6 +222,8 @@ export interface LogEntry {
   areaLabel: string;
   note?: string;
   files: DidFile[];
+  /** The note's photos (files table ids). */
+  photos: string[];
 }
 
 /** What a note is on: a plain to-do, or a project's session. */
@@ -168,10 +242,11 @@ export function didLog(items: readonly Item[], areaLabel: (id: AreaId) => string
   const out: LogEntry[] = [];
   for (const it of items) {
     if (!live(it)) continue;
-    for (const e of it.did ?? []) {
+    for (const e of didEntries(it)) {
       out.push({
         key: `${it.id}:${e.id}`, itemId: it.id, entryId: e.id, on: e.on, ...noteTitle(it, e),
         area: it.areaId, areaLabel: areaLabel(it.areaId), ...(e.note ? { note: e.note } : {}), files: e.files ?? [],
+        photos: e.photos,
       });
     }
   }
@@ -207,6 +282,7 @@ export interface DoneRow {
   areaLabel: string;
   note?: string;
   files: DidFile[];
+  photos: string[];
 }
 
 /**
@@ -220,14 +296,14 @@ export function completedInWeek(items: readonly Item[], today: ISODate, areaLabe
   const inWeek = (d: ISODate | undefined): d is ISODate => d !== undefined && d >= monday && d <= sunday;
   const rows: DoneRow[] = [];
   const noteFor = (it: Item, session?: string) => {
-    const list = it.did ?? [];
+    const list = didEntries(it);
     return session ? list.find((e) => e.session === session) : (list.find((e) => !e.session) ?? list[0]);
   };
   const row = (it: Item, on: ISODate, key: string, session?: string): DoneRow => {
     const e = noteFor(it, session);
     return {
       key, on, ...noteTitle(it, { session }), area: it.areaId, areaLabel: areaLabel(it.areaId),
-      ...(e?.note ? { note: e.note } : {}), files: e?.files ?? [],
+      ...(e?.note ? { note: e.note } : {}), files: e?.files ?? [], photos: e?.photos ?? [],
     };
   };
   for (const it of items) {

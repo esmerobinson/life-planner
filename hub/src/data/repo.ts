@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT, MAX_MONTH_GOALS, MAX_MONTH_LOG, MAX_MONTH_TARGET, MAX_MONTH_TITLE } from "./validate";
 import { newId } from "../domain/ids";
-import { pictureIds } from "../domain/page";
+import { shownPictureIds } from "../domain/page";
 import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
 import { plannedFromLastMonth } from "../domain/goalCounts";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
@@ -878,7 +878,7 @@ export async function emptyBin(today: ISODate, only?: { items: string[]; goals: 
       status: "purged",
     }));
     if (goalTombs.length) await db.goals.bulkPut(goalTombs);
-    await purgePictures([...bin.map((i) => i.notes), ...goals.map((g) => g.notes)]);
+    await purgePictures([...bin, ...goals].flatMap(shownPictureIds));
     return tombs.length + goalTombs.length;
   });
 }
@@ -959,16 +959,16 @@ export async function putItemBack(snapshot: Item, today: ISODate): Promise<void>
 }
 
 /**
- * Pictures on pages that were just emptied from the Bin become content-free tombstones,
- * unless another page (anything not purged, the Bin included) still shows them. Runs inside
- * emptyBin's transaction, after the page tombstones are written.
+ * Pictures on pages (and photos on "What I did" notes) that were just emptied from the Bin
+ * become content-free tombstones, unless another page or note (anything not purged, the Bin
+ * included) still shows them. Runs inside emptyBin's transaction, after the tombstones are written.
  */
-async function purgePictures(pages: (string | undefined)[]): Promise<void> {
-  const gone = new Set(pages.flatMap((p) => pictureIds(p ?? "")));
+async function purgePictures(ids: string[]): Promise<void> {
+  const gone = new Set(ids);
   if (gone.size === 0) return;
   const stillShown = new Set<string>();
-  await db.items.each((i) => pictureIds(i.notes ?? "").forEach((id) => stillShown.add(id)));
-  await db.goals.each((g) => pictureIds(g.notes ?? "").forEach((id) => stillShown.add(id)));
+  await db.items.each((i) => shownPictureIds(i).forEach((id) => stillShown.add(id)));
+  await db.goals.each((g) => shownPictureIds(g).forEach((id) => stillShown.add(id)));
   const tombs: FileRow[] = [];
   for (const id of gone) {
     if (stillShown.has(id)) continue;

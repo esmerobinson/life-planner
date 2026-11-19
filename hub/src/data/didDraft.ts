@@ -7,7 +7,7 @@
 
 import { keepOwnStamps } from "./changeTracking";
 import { db } from "./db";
-import { withDidEntry } from "../domain/whatIDid";
+import { photosOf, withDidEntry } from "../domain/whatIDid";
 import type { DidEntry } from "../domain/types";
 
 const PREFIX = "esmeworld-what-i-did:";
@@ -100,7 +100,7 @@ export async function recoverDidDraft(): Promise<void> {
       if (!item || item.status === "deleted" || item.status === "purged") return;
       const saved = item.did?.find((e) => e.id === d.at.id)?.note ?? "";
       if (d.text.trim() === "" || d.text === saved || !(d.typedAt > (item.updatedAt ?? 0))) return;
-      const did = withDidEntry(item.did, d.at, { note: d.text });
+      const did = withDidEntry(item.did, d.at, { note: d.text }, photosOf(item, d.at.id).length > 0);
       const { did: _d, ...rest } = item;
       keepOwnStamps(); // the draft's own time, never "now"
       await db.items.put({ ...rest, ...(did ? { did } : {}), updatedAt: d.typedAt });

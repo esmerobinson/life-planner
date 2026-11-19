@@ -86,6 +86,13 @@ export interface Item {
    * validator ignores fields it doesn't know, and it spreads rows when it writes them).
    */
   did?: DidEntry[];
+  /**
+   * Photos on "What I did" notes (Esme, 19 Nov 2026), by note id: pictures in the synced files
+   * table, like a page's. Kept here, not inside a note, because an older app version refuses a
+   * note with a key it doesn't know (domain/whatIDid.ts validDid) but keeps an unknown item
+   * field as it is. A note left with only photos stays as `{ id, on }` in `did`.
+   */
+  didPhotos?: DidPhotos[];
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
@@ -107,6 +114,12 @@ export interface DidEntry {
   files?: DidFile[];
   /** A project's session this note is for (its id). */
   session?: string;
+}
+
+/** The photos on one "What I did" note: the note's id and its pictures' file ids, in order. */
+export interface DidPhotos {
+  entry: string;
+  ids: string[];
 }
 
 /** One file kept with a "What I did" note: its saved name and the folder it was copied into. */

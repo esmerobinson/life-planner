@@ -18,8 +18,8 @@
 
 import { applyUntracked } from "../data/changeTracking";
 import { carrySessionTicks, forgetAcceptedTicks, restampTicks } from "../data/sessionTicks";
-import { pictureIds } from "../domain/page";
-import type { FileRow, Item } from "../domain/types";
+import { shownPictureIds } from "../domain/page";
+import type { DidPhotos, FileRow, Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
 import { validFarm } from "../farm/state";
@@ -565,8 +565,8 @@ async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boole
  */
 async function keepPicturesStillShown(db: HubDB, emptied: Map<string, { local: FileRow; stamp: number }>): Promise<void> {
   const shown = new Set<string>();
-  const note = (r: { status?: string; notes?: string }) => {
-    if (r.status !== "purged") pictureIds(r.notes ?? "").forEach((id) => shown.add(id));
+  const note = (r: { status?: string; notes?: string; didPhotos?: DidPhotos[] }) => {
+    if (r.status !== "purged") shownPictureIds(r).forEach((id) => shown.add(id));
   };
   await db.items.each(note);
   await db.goals.each(note);

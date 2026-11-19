@@ -1,3 +1,5 @@
+import type { DidPhotos } from "./types";
+
 // The page (round 3b): a task's / idea's / goal's notes, read as Markdown blocks, ONE block
 // per line. Every block keeps its line's exact text as `prefix + text`, so turning notes
 // into blocks and back gives the same notes byte for byte (her older plain notes and the
@@ -102,6 +104,11 @@ export const pictureLine = (fileId: string): string => `![](file:${fileId})`;
 /** Every picture id a page refers to (anywhere in it). */
 export function pictureIds(md: string): string[] {
   return [...md.matchAll(PICTURE_ANYWHERE)].map((m) => m[1]!);
+}
+
+/** Every picture a row shows: its page's, then its "What I did" photos (the Bin's rules use these). */
+export function shownPictureIds(row: { notes?: string; didPhotos?: readonly DidPhotos[] }): string[] {
+  return [...pictureIds(row.notes ?? ""), ...(row.didPhotos ?? []).flatMap((p) => p.ids)];
 }
 
 /** The new-line markers the add-buttons and "/" menu use. */

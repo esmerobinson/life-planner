@@ -2,7 +2,7 @@
 // keeps a file, never by the tick itself.
 
 import { db } from "./db";
-import { withDidEntry, type DidPatch } from "../domain/whatIDid";
+import { applyDidPatch, type DidPatch } from "../domain/whatIDid";
 import type { DidEntry, ISODate } from "../domain/types";
 
 /**
@@ -15,13 +15,14 @@ export async function saveDid(
   return db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(itemId);
     if (!item || item.status === "deleted" || item.status === "purged") return false;
-    const { did: _d, ...rest } = item;
-    const did = withDidEntry(item.did, at, patch);
+    const { did: _d, didPhotos: _p, ...rest } = item;
+    const { did, didPhotos } = applyDidPatch(item, at, patch);
     // Nothing changed: nothing written, so no new stamp can beat another device's edit (review C1).
-    if (JSON.stringify(did ?? null) === JSON.stringify(item.did ?? null)) return true;
+    const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    if (same(did, item.did) && same(didPhotos, item.didPhotos)) return true;
     // touchedAt is left alone: a note isn't a change to the to-do (the farm and "not looked at"
     // read it; review M10).
-    await db.items.put({ ...rest, ...(did ? { did } : {}) });
+    await db.items.put({ ...rest, ...(did ? { did } : {}), ...(didPhotos ? { didPhotos } : {}) });
     return true;
   });
 }
