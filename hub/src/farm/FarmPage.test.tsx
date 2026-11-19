@@ -6,6 +6,9 @@ import { currentUrl, renderApp } from "../test/renderApp";
 import { StickerPopIn } from "./PopIn";
 import { COLLECTION } from "./catalogue";
 import { placedRow, seenRow, startRow } from "./state";
+// The game page is a lazily loaded chunk (App.tsx): loaded here up front, so the first test's
+// findBy waits aren't spent on the module's first transform.
+import "./FarmPage";
 
 // The farm page and nook in the whole app (fictional data). Canvases aren't drawn in the test
 // DOM; what they would show is checked through the page's buttons and data attributes.
