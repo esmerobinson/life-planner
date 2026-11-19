@@ -209,3 +209,27 @@ describe("search order (Esme, 2026-11-05: newest first)", () => {
   });
 });
 });
+
+describe("What I did notes (2026-11-19)", () => {
+  const did = item({
+    id: "chap", title: "Pretend chapter", areaId: "writing", status: "done", completedAt: "2026-11-03",
+    did: [{ id: "e1", on: "2026-11-03", note: "Pretend rewrote the lighthouse scene", files: [{ name: "lighthouse-v2.docx", folder: "~/Desktop/Writing" }] }],
+  });
+  it("a note's words and its file names find it, in its own group, and open the log at that entry", () => {
+    const index = buildIndex([did], [], TODAY);
+    const byNote = searchIndex(index, "lighthouse scene");
+    expect(byNote.map((g) => g.group)).toEqual(["did"]);
+    expect(byNote[0]!.hits[0]).toMatchObject({
+      title: "Pretend chapter", sub: "Pretend rewrote the lighthouse scene", tile: "writing",
+      meta: "What I did · Tue 3 Nov · Writing", open: { path: "/what-i-did?entry=chap%3Ae1" },
+    });
+    const byFile = searchIndex(index, "lighthouse-v2");
+    expect(byFile[0]!.group).toBe("did");
+    expect(byFile[0]!.hits[0]!.sub).toBe("lighthouse-v2.docx");
+  });
+  it("the to-do's own title still finds the to-do (not the note twice); a binned to-do's note is not found", () => {
+    const index = buildIndex([did, item({ status: "deleted", did: [{ id: "e9", on: "2026-11-03", note: "Pretend binned lighthouse" }] })], [], TODAY);
+    expect(searchIndex(index, "pretend chapter").map((g) => g.group)).toEqual(["todos"]);
+    expect(searchIndex(index, "binned")).toEqual([]);
+  });
+});

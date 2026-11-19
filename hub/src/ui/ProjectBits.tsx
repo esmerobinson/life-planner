@@ -4,6 +4,7 @@ import type { ISODate, Item } from "../domain/types";
 import { dueLine } from "../domain/display";
 import { TickBox } from "./GoalTile";
 import { useSaveError } from "./messages";
+import { useDidPrompt } from "./whatIDid/context";
 
 /** A session box's accessible name: "Session 3", or "Session 3: Market stalls" when named. */
 export const sessionBoxLabel = (title: string | undefined, index: number) =>
@@ -35,8 +36,12 @@ export function ProjectLine({ item, today, onToday }: { item: Item; today: ISODa
 /** One small tick box per session (the goal-step boxes), ticked ones filled; each ticks that session. */
 export function SessionBoxes({ item, today, onChanged }: { item: Item; today: ISODate; onChanged: () => void | Promise<void> }) {
   const { attempt, saveError } = useSaveError();
+  const askDid = useDidPrompt();
   async function set(sessionId: string, done: boolean) {
-    if (await attempt(() => setSessionDone(item.id, sessionId, done, today))) await onChanged();
+    const box = document.activeElement as HTMLElement | null; // the box stays: the focus comes back to it
+    if (!(await attempt(() => setSessionDone(item.id, sessionId, done, today)))) return;
+    if (done) askDid?.(item, sessionId, [box]); // "What did you do?" for that session
+    await onChanged();
   }
   return (
     <>

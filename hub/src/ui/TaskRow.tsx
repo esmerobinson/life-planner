@@ -7,7 +7,8 @@ import { FLAG_GLYPH, REPEAT_GLYPH } from "./IconPopover";
 import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
 import { ProjectEdge, ProjectLine, SessionBoxes } from "./ProjectBits";
-import { isProject } from "../domain/projects";
+import { isProject, lastTickedSession, nextSessionIndex } from "../domain/projects";
+import { asksWhatIDid, focusAfterTick, useDidPrompt } from "./whatIDid/context";
 import { isBook } from "../domain/books";
 import { usePanel } from "./panelContext";
 import { ScheduleMenu } from "./ScheduleMenu";
@@ -177,6 +178,7 @@ export function TaskRow({
     if (!crossed) setTicked(false);
   }, [crossed]);
   const openOnClick = useOpenOnBodyClick(item.id);
+  const askDid = useDidPrompt();
   const isTask = untyped || item.kind === "task";
   const habit = !untyped && isHabit(item);
   // A project (2C) stays on its list after a tick (it logs a session), so its box shows only `crossed`.
@@ -217,9 +219,18 @@ export function TaskRow({
               playTickSparkle(box.isConnected ? box : was);
             };
             setTicked(true);
+            const back = focusAfterTick(box); // worked out now, before the row moves
+            // The session this tick logs (a project), worked out before the tick changes it.
+            // Every session already done: the note goes with the last one ticked (review M9).
+            const k = project ? nextSessionIndex(item, today) : -1;
+            const session = k >= 0 ? item.sessions![k]!.id : project ? lastTickedSession(item)?.id : undefined;
             const ok = await onTick(item.id, celebrate);
             if (ok === false || project) setTicked(false);
-            if (ok !== false) celebrate();
+            if (ok !== false) {
+              celebrate();
+              // "What did you do?" (Esme, 19 Nov 2026): every to-do tick, skippable; never a habit.
+              if (askDid && asksWhatIDid(item)) askDid(item, session, back);
+            }
           }}
         />
       )}

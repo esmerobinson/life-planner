@@ -327,6 +327,306 @@ final class DeviceOwnerBridge: NSObject, WKScriptMessageHandlerWithReply {
     }
 }
 
+// MARK: - Files bridge ("What I did", 2026-11-19)
+
+/// "What I did": on ticking a to-do she can keep files with what she did. Attach files shows the
+/// Mac's own Open panel; each chosen file is COPIED (never moved, never deleted) into
+/// `<root>/<Area>` or `<root>/<Area>/<Project>`, folders made when missing, never overwriting
+/// (" (2)", " (3)"…). Only names and folder paths go back to the page, never contents.
+///
+/// Messages (window.webkit.messageHandlers.esmeworldFiles.postMessage → Promise):
+///   { action: "attach", root, parts } → { saved: [{ name, folder }], failed: [name] }
+///                                       | { cancelled: true } | { error: "permission" | "root" | "folder" }
+///      `root` must be the folder this app holds (below); `parts` the area (and project) folder
+///      names, made safe by the page (hub/src/domain/whatIDid.ts safeName) and checked again here.
+///   { action: "getRoot" }             → { root }
+///   { action: "chooseRoot" }          → { root } | { cancelled: true }   (the Mac's folder picker)
+///   { action: "resetRoot" }           → { root: "~/Desktop" }
+///   { action: "reveal", folder, name } → { ok: true } | { ok: false, missing: true } | { ok: false, refused: true }
+///
+/// The root is held HERE, never trusted from the page (review M1): "~/Desktop" until she chooses
+/// another folder in the native folder picker (UserDefaults `EsmeworldFilesRoot`). An attach with
+/// any other root is refused. Show in Finder only reveals files inside a root she has used
+/// (the Desktop or one she chose; `EsmeworldFilesRoots`), since file records come from synced rows (M2).
+///
+/// The app is not sandboxed, so no entitlement is needed; macOS still guards the Desktop,
+/// Documents and Downloads (privacy, "Files and Folders") and asks her once the first time the
+/// app writes there. A refusal comes back as { error: "permission" } and the page says how to
+/// allow it. The copying runs off the main thread, so the window never hangs while macOS asks.
+///
+/// Self-test: never shows a panel, never touches her folders or her settings (its root is held in
+/// memory, none until chosen). `chooseRoot` takes `selfTestRoot` (inside the temporary folder)
+/// instead of the picker; `attach` takes `selfTestSources` instead of the Open panel and only a
+/// root inside the temporary folder (anything else, the Desktop included, is refused before any
+/// file is looked at); `reveal` only says whether the file is there, never opens Finder.
+final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
+    static let name = "esmeworldFiles"
+    static let defaultRoot = "~/Desktop"
+    static let rootKey = "EsmeworldFilesRoot"
+    static let rootsKey = "EsmeworldFilesRoots"
+    weak var window: NSWindow?
+    /// The self-test's own root and roots (in memory; her settings are never read or written).
+    private var selfTestRoot: String?
+    private var selfTestRoots: [String] = []
+
+    /// The folder files go into ("~/Desktop" style). Self-test: nil until it chooses one.
+    var root: String? {
+        if isSelfTest { return selfTestRoot }
+        return UserDefaults.standard.string(forKey: Self.rootKey) ?? Self.defaultRoot
+    }
+
+    /// Every root she has used (the Desktop always): Show in Finder stays inside these.
+    var roots: [String] {
+        if isSelfTest { return selfTestRoots }
+        return [Self.defaultRoot] + (UserDefaults.standard.stringArray(forKey: Self.rootsKey) ?? [])
+    }
+
+    private func setRoot(_ r: String) {
+        if isSelfTest {
+            selfTestRoot = r
+            if !selfTestRoots.contains(r) { selfTestRoots.append(r) }
+            return
+        }
+        UserDefaults.standard.set(r, forKey: Self.rootKey)
+        var all = UserDefaults.standard.stringArray(forKey: Self.rootsKey) ?? []
+        if !all.contains(r) { all.append(r) }
+        UserDefaults.standard.set(all, forKey: Self.rootsKey)
+    }
+
+    /// `path` is `root` itself or inside it (both expanded, symlinks resolved).
+    static func isInside(_ path: URL, _ root: URL) -> Bool {
+        let p = path.resolvingSymlinksInPath().standardizedFileURL.path
+        let r = root.resolvingSymlinksInPath().standardizedFileURL.path
+        return p == r || p.hasPrefix(r.hasSuffix("/") ? r : r + "/")
+    }
+
+    struct Saved { let name: String; let folder: String }
+    struct CopyResult { var saved: [Saved] = []; var failed: [String] = []; var permission = false }
+
+    /// "~", "~/…" or an absolute path, as a file URL; nil for anything else (or "..").
+    static func expand(_ path: String) -> URL? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let full: String
+        if path == "~" { full = home }
+        else if path.hasPrefix("~/") { full = home + String(path.dropFirst(1)) }
+        else if path.hasPrefix("/") { full = path }
+        else { return nil }
+        if full.contains("\u{0}") || full.split(separator: "/").contains("..") { return nil }
+        return URL(fileURLWithPath: full, isDirectory: true).standardizedFileURL
+    }
+
+    /// A path shown with "~" for her home folder.
+    static func tilde(_ url: URL) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+        let p = url.standardizedFileURL.path
+        if p == home { return "~" }
+        return p.hasPrefix(home + "/") ? "~" + p.dropFirst(home.count) : p
+    }
+
+    /// One folder or file name: not empty, not "." or "..", no "/" or NUL, at most 255 bytes.
+    static func safePart(_ s: String) -> Bool {
+        !s.isEmpty && s != "." && s != ".." && !s.contains("/") && !s.contains("\u{0}") && s.utf8.count <= 255
+    }
+
+    /// "plan.pdf", then "plan (2).pdf", "plan (3).pdf"… : the first name not taken in `dir`.
+    static func candidate(_ name: String, _ n: Int) -> String {
+        if n == 1 { return name }
+        let ns = name as NSString
+        let ext = ns.pathExtension
+        let base = ext.isEmpty ? name : ns.deletingPathExtension
+        return ext.isEmpty ? "\(base) (\(n))" : "\(base) (\(n)).\(ext)"
+    }
+
+    static func isPermission(_ error: Error) -> Bool {
+        let e = error as NSError
+        if e.domain == NSCocoaErrorDomain && (e.code == NSFileWriteNoPermissionError || e.code == NSFileReadNoPermissionError) {
+            return true
+        }
+        if e.domain == NSPOSIXErrorDomain && (e.code == Int(EPERM) || e.code == Int(EACCES)) { return true }
+        if let under = e.userInfo[NSUnderlyingErrorKey] as? Error { return isPermission(under) }
+        return false
+    }
+
+    /// Copies each source into `<root>/<parts…>`, making the folders, never overwriting.
+    /// `folderShown` is how the folder is written back ("~/Desktop/Writing").
+    static func copy(_ sources: [URL], root: URL, rootShown: String, parts: [String]) -> CopyResult {
+        let fm = FileManager.default
+        var result = CopyResult()
+        var dir = root
+        for p in parts { dir.appendPathComponent(p, isDirectory: true) }
+        let folderShown = ([rootShown == "/" ? "" : rootShown.replacingOccurrences(of: "/+$", with: "", options: .regularExpression)] + parts)
+            .joined(separator: "/")
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            result.permission = isPermission(error)
+            result.failed = sources.map(\.lastPathComponent)
+            return result
+        }
+        for src in sources {
+            let name = src.lastPathComponent
+            var done = false
+            for n in 1...999 where !done {
+                let target = dir.appendingPathComponent(candidate(name, n), isDirectory: false)
+                if fm.fileExists(atPath: target.path) { continue }
+                do {
+                    try fm.copyItem(at: src, to: target) // fails if it appeared meanwhile: the next name
+                    result.saved.append(Saved(name: target.lastPathComponent, folder: folderShown))
+                    done = true
+                } catch {
+                    if fm.fileExists(atPath: target.path) { continue }
+                    if isPermission(error) { result.permission = true }
+                    break
+                }
+            }
+            if !done { result.failed.append(name) }
+        }
+        return result
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping @MainActor (Any?, String?) -> Void)
+    {
+        // Only the app's own page may ask.
+        let origin = message.frameInfo.securityOrigin
+        guard message.frameInfo.isMainFrame, origin.protocol == kScheme, origin.host == kHost,
+              let body = message.body as? [String: Any], let action = body["action"] as? String
+        else {
+            replyHandler(nil, "not allowed")
+            return
+        }
+        switch action {
+        case "attach": attach(body, replyHandler)
+        case "getRoot": replyHandler(["root": root ?? Self.defaultRoot], nil)
+        case "chooseRoot": chooseRoot(body, replyHandler)
+        case "resetRoot":
+            setRoot(Self.defaultRoot)
+            replyHandler(["root": Self.defaultRoot], nil)
+        case "reveal": reveal(body, replyHandler)
+        default: replyHandler(nil, "unknown action")
+        }
+    }
+
+    private func attach(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
+        // Only the folder this app holds (she chose it in the picker, or the Desktop): review M1.
+        guard let rootText = body["root"] as? String, let root = Self.expand(rootText),
+              let held = self.root, let heldURL = Self.expand(held),
+              root.standardizedFileURL.path == heldURL.standardizedFileURL.path
+        else {
+            reply(["error": "root"], nil)
+            return
+        }
+        guard let parts = body["parts"] as? [String], (1...2).contains(parts.count), parts.allSatisfy(Self.safePart) else {
+            reply(["error": "folder"], nil)
+            return
+        }
+        if isSelfTest {
+            // Never her folders: only a root inside the temporary folder, checked before anything.
+            let tmp = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath().path
+            guard root.resolvingSymlinksInPath().path.hasPrefix(tmp + "/"),
+                  let paths = body["selfTestSources"] as? [String]
+            else {
+                reply(["error": "selftest-root"], nil)
+                return
+            }
+            run(paths.map { URL(fileURLWithPath: $0) }, root: root, rootShown: rootText, parts: parts, reply)
+            return
+        }
+        var isDir: ObjCBool = false
+        // The root itself is never made: one that is gone (a folder she deleted) is a plain failure.
+        guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else {
+            reply(["error": "root"], nil)
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Attach" // placeholder wording (Esme may reword)
+        let done: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, !panel.urls.isEmpty else {
+                reply(["cancelled": true], nil)
+                return
+            }
+            self.run(panel.urls, root: root, rootShown: rootText, parts: parts, reply)
+        }
+        if let window { panel.beginSheetModal(for: window, completionHandler: done) } else { done(panel.runModal()) }
+    }
+
+    private func run(_ sources: [URL], root: URL, rootShown: String, parts: [String],
+                     _ reply: @escaping @MainActor (Any?, String?) -> Void)
+    {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let r = Self.copy(sources, root: root, rootShown: rootShown, parts: parts)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    if r.saved.isEmpty && r.permission {
+                        reply(["error": "permission"], nil)
+                    } else {
+                        reply(["saved": r.saved.map { ["name": $0.name, "folder": $0.folder] }, "failed": r.failed], nil)
+                    }
+                }
+            }
+        }
+    }
+
+    private func chooseRoot(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
+        if isSelfTest {
+            // Stands in for her choice in the picker: only a folder inside the temporary folder.
+            let tmp = FileManager.default.temporaryDirectory
+            guard let p = body["selfTestRoot"] as? String, let url = Self.expand(p), Self.isInside(url, tmp), url.path != tmp.path else {
+                reply(["cancelled": true, "selfTest": true], nil)
+                return
+            }
+            setRoot(p)
+            reply(["root": p, "selfTest": true], nil)
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use this folder" // placeholder wording (Esme may reword)
+        let done: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else {
+                reply(["cancelled": true], nil)
+                return
+            }
+            let chosen = Self.tilde(url)
+            self.setRoot(chosen)
+            reply(["root": chosen], nil)
+        }
+        if let window { panel.beginSheetModal(for: window, completionHandler: done) } else { done(panel.runModal()) }
+    }
+
+    private func reveal(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
+        guard let folderText = body["folder"] as? String, let folder = Self.expand(folderText),
+              let name = body["name"] as? String, Self.safePart(name)
+        else {
+            reply(["ok": false], nil)
+            return
+        }
+        // Only inside a root she has used (review M2): a synced row can't point Finder anywhere.
+        guard roots.contains(where: { r in Self.expand(r).map { Self.isInside(folder, $0) } ?? false }) else {
+            reply(["ok": false, "refused": true], nil)
+            return
+        }
+        let file = folder.appendingPathComponent(name, isDirectory: false)
+        let there = FileManager.default.fileExists(atPath: file.path)
+        if isSelfTest {
+            reply(["ok": there, "missing": !there, "selfTest": true], nil)
+            return
+        }
+        guard there else {
+            reply(["ok": false, "missing": true], nil)
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([file])
+        reply(["ok": true], nil)
+    }
+}
+
 final class RemindersBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "esmeworldReminders"
     /// Apple keeps at most 64 pending requests per app; the web app sends at most 60, which
@@ -621,6 +921,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     let console = ConsoleBridge()
     let reminders = RemindersBridge()
     let deviceOwner = DeviceOwnerBridge()
+    let files = FilesBridge()
     /// A reminder clicked before the window existed (the click launched the app): opened first.
     private var launchPath: String?
 
@@ -944,6 +1245,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         config.userContentController.addScriptMessageHandler(reminders, contentWorld: .page, name: RemindersBridge.name)
         // Pairing codes: Touch ID or the Mac password before one is shown (DeviceOwnerBridge).
         config.userContentController.addScriptMessageHandler(deviceOwner, contentWorld: .page, name: DeviceOwnerBridge.name)
+        // "What I did": attach files (copied into her area folders), choose that folder, show one in Finder.
+        config.userContentController.addScriptMessageHandler(files, contentWorld: .page, name: FilesBridge.name)
         if isSelfTest || isDebug {
             config.userContentController.add(console, name: ConsoleBridge.name)
             config.userContentController.addUserScript(
@@ -971,6 +1274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         window.delegate = self
         window.isReleasedWhenClosed = false
         window.center()
+        files.window = window
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -1513,6 +1817,84 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
     }
 
+    /// "What I did" files (FilesBridge): through the real bridge, files are COPIED into a
+    /// temporary root (never her Desktop): the area and project folders are made, the source
+    /// stays, a second copy is " (2)", unsafe folder names and any root outside the temporary
+    /// folder (the Desktop included) are refused before any file is looked at, and nothing
+    /// opens a panel or Finder. The temporary root is deleted at the end.
+    private func runFilesSelfTest(_ check: (Bool, String) -> Void) async {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("esmeworld-selftest-files-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: base) }
+        do {
+            try await load(kStartURL)
+            let srcDir = base.appendingPathComponent("source", isDirectory: true)
+            let root = base.appendingPathComponent("root", isDirectory: true)
+            try fm.createDirectory(at: srcDir, withIntermediateDirectories: true)
+            try fm.createDirectory(at: root, withIntermediateDirectories: true)
+            let src = srcDir.appendingPathComponent("pretend plan.txt")
+            try Data("pretend file for the self-test".utf8).write(to: src)
+            let rootJS = String(data: try JSONSerialization.data(withJSONObject: [root.path]), encoding: .utf8)!
+            let srcJS = String(data: try JSONSerialization.data(withJSONObject: [src.path]), encoding: .utf8)!
+            let other = base.appendingPathComponent("not-chosen", isDirectory: true)
+            try fm.createDirectory(at: other, withIntermediateDirectories: true)
+            let otherJS = String(data: try JSONSerialization.data(withJSONObject: [other.path]), encoding: .utf8)!
+            let r = try await js("""
+            const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(FilesBridge.name);
+            if (!h) return JSON.stringify({ bridge: false });
+            const root = \(rootJS)[0], other = \(otherJS)[0], sources = \(srcJS);
+            const before = await h.postMessage({ action: "attach", root, parts: ["Art"], selfTestSources: sources });
+            const chosen = await h.postMessage({ action: "chooseRoot", selfTestRoot: root });
+            const held = await h.postMessage({ action: "getRoot" });
+            const one = await h.postMessage({ action: "attach", root, parts: ["Tech projects", "App- v2"], selfTestSources: sources });
+            const two = await h.postMessage({ action: "attach", root, parts: ["Tech projects", "App- v2"], selfTestSources: sources });
+            const unchosen = await h.postMessage({ action: "attach", root: other, parts: ["Art"], selfTestSources: sources });
+            const desktop = await h.postMessage({ action: "attach", root: "~/Desktop", parts: ["Esmeworld self-test"], selfTestSources: sources });
+            const dots = await h.postMessage({ action: "attach", root, parts: ["..", "x"], selfTestSources: sources });
+            const slash = await h.postMessage({ action: "attach", root, parts: ["a/b"], selfTestSources: sources });
+            const up = await h.postMessage({ action: "attach", root: root + "/../..", parts: ["x"], selfTestSources: sources });
+            const pick = await h.postMessage({ action: "chooseRoot", selfTestRoot: "~/Desktop" });
+            const shown = await h.postMessage({ action: "reveal", folder: one.saved[0].folder, name: one.saved[0].name });
+            const gone = await h.postMessage({ action: "reveal", folder: one.saved[0].folder, name: "not there.txt" });
+            const outsideRoot = await h.postMessage({ action: "reveal", folder: other, name: "x.txt" });
+            const system = await h.postMessage({ action: "reveal", folder: "/etc", name: "hosts" });
+            const reset = await h.postMessage({ action: "resetRoot" });
+            const resetDesktop = await h.postMessage({ action: "attach", root: "~/Desktop", parts: ["Esmeworld self-test"], selfTestSources: sources });
+            return JSON.stringify({ bridge: true, before, chosen, held, one, two, unchosen, desktop, dots, slash, up, pick, shown, gone, outsideRoot, system, reset, resetDesktop });
+            """)
+            check(r["bridge"] as? Bool == true, "files bridge exists")
+            let one = (r["one"] as? [String: Any])?["saved"] as? [[String: String]] ?? []
+            let two = (r["two"] as? [String: Any])?["saved"] as? [[String: String]] ?? []
+            let folder = root.path + "/Tech projects/App- v2"
+            say("files.copy first=\(one.first?["name"] ?? "nil") second=\(two.first?["name"] ?? "nil") folder=\(one.first?["folder"] == folder)")
+            check(one.count == 1 && one[0]["name"] == "pretend plan.txt" && one[0]["folder"] == folder, "files: copied into <root>/<Area>/<Project>")
+            check(two.count == 1 && two[0]["name"] == "pretend plan (2).txt", "files: never overwrites (a second copy is \" (2)\")")
+            let copied = root.appendingPathComponent("Tech projects/App- v2/pretend plan.txt")
+            let copied2 = root.appendingPathComponent("Tech projects/App- v2/pretend plan (2).txt")
+            check(fm.contents(atPath: copied.path) == Data("pretend file for the self-test".utf8)
+                  && fm.fileExists(atPath: copied2.path), "files: the copies hold the file")
+            check(fm.fileExists(atPath: src.path), "files: the source is never moved or deleted")
+            let err = { (k: String) in (r[k] as? [String: Any])?["error"] as? String ?? "none" }
+            say("files.refused before=\(err("before")) unchosen=\(err("unchosen")) desktop=\(err("desktop")) dots=\(err("dots")) slash=\(err("slash")) up=\(err("up")) resetDesktop=\(err("resetDesktop"))")
+            check(err("before") == "root", "files: no root until one is chosen in the picker (self-test)")
+            check((r["held"] as? [String: Any])?["root"] as? String == root.path, "files: the bridge holds the chosen root")
+            check(err("unchosen") == "root", "files: a root the page sends that she didn't choose is refused (M1)")
+            check(err("desktop") == "root", "files: the self-test never writes to the real Desktop (not its chosen root)")
+            check((r["reset"] as? [String: Any])?["root"] as? String == "~/Desktop" && err("resetDesktop") == "selftest-root",
+                  "files: reset to the Desktop is held, and the self-test still never writes there")
+            check(err("dots") == "folder" && err("slash") == "folder", "files: unsafe folder names are refused")
+            check(err("up") == "root", "files: a root with .. is refused")
+            check((r["pick"] as? [String: Any])?["cancelled"] as? Bool == true, "files: no folder panel in the self-test, and it can't choose the Desktop")
+            let refused = { (k: String) in (r[k] as? [String: Any])?["refused"] as? Bool == true }
+            say("files.reveal outsideRoot=\(refused("outsideRoot")) system=\(refused("system"))")
+            check(refused("outsideRoot") && refused("system"), "files: Show in Finder only inside a root she used (M2)")
+            check((r["shown"] as? [String: Any])?["ok"] as? Bool == true
+                  && (r["gone"] as? [String: Any])?["missing"] as? Bool == true, "files: reveal knows a kept file from a gone one (no Finder in the self-test)")
+        } catch {
+            check(false, "files: \(error.localizedDescription)")
+        }
+    }
+
     private func waitUntil(seconds: Double, _ cond: () -> Bool) async -> Bool {
         let end = Date().addingTimeInterval(seconds)
         while Date() < end {
@@ -1952,6 +2334,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             await runVersionSelfTest(check)
             // (h) A page left in the middle of a write never keeps that write's lock.
             await runLeftPageSelfTest(check)
+            // (i) "What I did" files: copied into a temporary root, never her Desktop.
+            await runFilesSelfTest(check)
         } catch {
             check(false, "error \(error.localizedDescription)")
         }

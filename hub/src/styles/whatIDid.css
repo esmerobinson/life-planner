@@ -1,0 +1,121 @@
+/* "What I did" (Esme, 19 Nov 2026). Built from what exists; nothing here is a new look:
+   - the card after a tick: the Add card (add.css .add-pop) on a computer, the Add sheet's look at
+     the bottom on the phone, neither with a shade; its heading row is the Add card's (.add-head),
+     the to-do's name the muted line (.choose-muted), the buttons .form-actions;
+   - the box is the form field (controls.css); Attach files a soft pill (.btn-secondary);
+   - the log page's entries and the weekly review's "Completed this week" are strips (strips.css);
+     the area filter is the soft pills (button[aria-pressed]).
+   NEW and undecided, so placeholders (magenta, system font, no motion): the list of kept files,
+   and the entry search opened (its outline). For Esme / Design. */
+
+/* The card never covers the page with a shade (review I1): a click elsewhere still lands. Over
+   the side panel (20) and the shell's Undo (21), under the tick's sparkle (30): a tick in a goal's
+   panel asks too, and the sparkle stays seen. A layer order, not a look. */
+.add-pop.did-sheet {
+  z-index: 25;
+}
+
+/* The phone (review I3): the same card, full width inside the 16px gutter, just above the round +
+   (its 48px, its bottom offset, and the scale's 12px gap), so the + stays visible and tappable. */
+.add-pop.did-sheet.did-phone {
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
+  width: auto;
+  bottom: calc(max(28px, env(safe-area-inset-bottom)) + 48px + var(--space-3));
+  max-height: 45vh;
+}
+
+.did-phone .did-sheet-todo {
+  margin-bottom: var(--space-2);
+}
+
+/* While it is open the page gets room under its last row equal to the card (set by the card), so
+   every to-do can scroll clear of it. */
+.is-phone .app-content {
+  padding-bottom: calc(126px + var(--did-card-space, 0px) + env(safe-area-inset-bottom));
+}
+
+.did-sheet-todo {
+  margin: 0 0 var(--gap-field);
+}
+
+.did-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.did-box .choose-muted,
+.did-box .form-message {
+  margin: 0;
+}
+
+/* Save, Skip and Attach files (or "Attach files on your Mac") in one row. */
+.did-attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-buttons);
+}
+
+/* PLACEHOLDER: the kept files (undecided). */
+.did-files {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  outline: 2px solid var(--placeholder);
+  font-family: system-ui;
+}
+
+/* The side panel's section. */
+.did-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  margin-top: var(--gap-section);
+}
+
+.did-panel h3 {
+  margin: 0;
+}
+
+.did-panel-when {
+  margin: 0;
+}
+
+/* The log page. */
+.did-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-buttons);
+  margin-bottom: var(--gap-stack);
+}
+
+.did-note {
+  white-space: pre-wrap;
+  margin: var(--space-1) 0 0;
+}
+
+.did-entry .strip-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* PLACEHOLDER: the entry search opened. */
+.did-entry.is-target {
+  outline: 3px solid var(--placeholder);
+}
+
+.did-setting {
+  margin-top: var(--gap-section);
+}
+
+/* Text boxes run the full width of their space (Esme, 2026-11-05, "no blank space"). */
+.did-box .form-field,
+.did-box textarea {
+  width: 100%;
+}

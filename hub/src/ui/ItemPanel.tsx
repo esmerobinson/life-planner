@@ -22,6 +22,7 @@ import { ProjectSummary, SessionList } from "./ProjectPanel";
 import { DEFAULT_SESSIONS, isProject, newSessions, withSessions } from "../domain/projects";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
 import { useUpdateHold } from "../native/updateHolds";
+import { DidPanel } from "./whatIDid/DidPanel";
 
 /** The Type property: a project is a to-do with sessions, a book an idea on the reading list, each shown as its own type. */
 type PanelKind = Item["kind"] | "project" | "book";
@@ -491,6 +492,7 @@ export function ItemPanel({
         </>
       )}
       <PageEditor value={notes.value} onChange={notes.set} onBlur={notes.flush} today={today} />
+      <DidPanel item={item} today={today} onChanged={onChanged} />
       </div>
     </div>
   );

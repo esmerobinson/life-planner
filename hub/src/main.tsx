@@ -19,6 +19,7 @@ import "./styles/reminders.css";
 import "./styles/books.css";
 import "./styles/search.css";
 import "./styles/dailyRoutine.css";
+import "./styles/whatIDid.css";
 
 // Which build is running (no visible UI): e.g. to tell whether the phone has taken a new one.
 document.documentElement.dataset.build = __ESMEWORLD_BUILD__;

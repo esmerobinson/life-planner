@@ -145,3 +145,17 @@ describe("project to-dos (sessions)", () => {
     expect(validItem({ ...tomb, sessions: many(1) })).toBe(false);
   });
 });
+
+describe("What I did (did)", () => {
+  const did = [{ id: "e1", on: "2026-11-18", note: "Pretend note", files: [{ name: "a.pdf", folder: "~/Desktop/Art" }] }];
+  it("an optional list of notes, checked as domain/whatIDid.ts says", () => {
+    expect(validItem(row({ did }))).toBe(true);
+    expect(validItem(row({ did: [{ ...did[0], on: "nope" }] }))).toBe(false);
+    expect(validItem(row({ did: "Pretend" }))).toBe(false);
+  });
+  it("an emptied-from-the-Bin tombstone carries no notes", () => {
+    const tomb = { title: "", status: "purged" };
+    expect(validItem(row(tomb))).toBe(true);
+    expect(validItem(row({ ...tomb, did }))).toBe(false);
+  });
+});

@@ -116,3 +116,10 @@ export function withSessions(it: Item, sessions: Session[], today: ISODate): Ite
   }
   return { ...rest, sessions, status: "open" };
 }
+
+/** The session ticked most recently (latest doneOn; on a tie the later one), or undefined. */
+export function lastTickedSession(it: Item): Session | undefined {
+  let best: Session | undefined;
+  for (const s of it.sessions ?? []) if (s.doneOn !== undefined && (!best || s.doneOn >= best.doneOn!)) best = s;
+  return best;
+}

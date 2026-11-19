@@ -11,6 +11,7 @@ import { ProgressBar } from "./ProgressBar";
 import { SessionBoxes, sessionBoxLabel } from "./ProjectBits";
 import { DayPart } from "./ScheduleMenu";
 import { useDraft } from "./useDraft";
+import { useDidPrompt } from "./whatIDid/context";
 
 /** Details longer than this are cut short in the list with "See more" (a reading length, not a look). */
 export const DETAILS_SHORT = 140;
@@ -94,6 +95,7 @@ function SessionRow({
   const n = index + 1;
   const done = s.doneOn !== undefined;
   const offerUndo = useSessionRemovedUndo(today);
+  const askDid = useDidPrompt();
   const save = (patch: Parameters<typeof updateSession>[2]) => write(() => updateSession(item.id, s.id, patch, today));
   const title = useDraft(s.title ?? "", (t) => save({ title: t }));
   const meta = done
@@ -110,7 +112,14 @@ function SessionRow({
         className="tick"
         aria-label={sessionBoxLabel(s.title, index)}
         checked={done}
-        onChange={() => void write(() => setSessionDone(item.id, s.id, !done, today)).catch(() => {})}
+        onChange={(e) => {
+          const box = e.currentTarget;
+          void write(() => setSessionDone(item.id, s.id, !done, today))
+            .then(() => {
+              if (!done) askDid?.(item, s.id, [box]); // "What did you do?" for that session
+            })
+            .catch(() => {});
+        }}
       />
       <div className="strip-body">
         <input

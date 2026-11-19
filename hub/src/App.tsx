@@ -15,6 +15,7 @@ import { RemindersPage } from "./ui/RemindersPage";
 import { RepeatingPage } from "./ui/RepeatingPage";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
+import { WhatIDidPage } from "./ui/whatIDid/WhatIDidPage";
 import { GameLoading } from "./rio/GameLoading";
 // The game's styles stay in the main stylesheet, at the place they always had in it, so the cascade
 // (and so the game's look) is exactly as before. Its code and art data are a separate chunk below.
@@ -125,6 +126,7 @@ export function AppRoutes() {
           {import.meta.env.DEV && <Route path="/farm/popin-demo" element={<Suspense fallback={null}><PopInDemo /></Suspense>} />}
           <Route path="/reminders" element={<RemindersPage />} />
           <Route path="/repeating" element={<RepeatingRoute />} />
+          <Route path="/what-i-did" element={<WhatIDidPage />} />
         </Route>
       </Routes>
   );

@@ -16,6 +16,7 @@ import { DoneBox } from "./bits";
 import { RoutineCountHint } from "../DailyRoutine";
 import { ROUTINE_WORDS as W, WEEKDAY_NAMES } from "./routineWording";
 import "./routine.css";
+import { CompletedThisWeek } from "../whatIDid/CompletedThisWeek";
 
 // PLACEHOLDER look and placement (nothing here is designed: magenta, the system font, no easing):
 // the daily log under the Daily check-in, the weekly review under "what I learned" on the Mental
@@ -107,6 +108,9 @@ export function WeeklyReview({ jk, today, deviceId }: { jk: JournalKey; today: I
   const started = !!day && (day.id !== "" || day.others.length > 0);
   return (
     <Folded label={W.reviewSection} heading={sunday ? W.reviewHeadingSunday : W.reviewHeadingWeek} fold={!sunday && !started}>
+      {/* What she ticked off this week, with her notes (Esme, 19 Nov 2026). Read-only and never
+          part of the review's answers, so never sent to Together. */}
+      <CompletedThisWeek today={today} />
       {day && <FormBox key={week} jk={jk} deviceId={deviceId} day={day} newDate={today} spec={WEEK_REVIEW_SPEC} />}
     </Folded>
   );
