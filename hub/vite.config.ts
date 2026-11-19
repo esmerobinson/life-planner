@@ -6,12 +6,16 @@ import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-/** ESMEWORLD_BUILD if set (tests), else the git commit ("+" when built with uncommitted changes). */
+/**
+ * ESMEWORLD_BUILD if set (tests), else the git tree hash of hub/ ("+" when built with uncommitted
+ * changes): it changes only when the web code does, so a commit elsewhere (sync/, mac/, docs) gives
+ * the same chunk names and never makes her Mac or phone reload for nothing (review R-M1).
+ */
 function buildId(): string {
   if (process.env.ESMEWORLD_BUILD) return process.env.ESMEWORLD_BUILD;
   try {
     const git = (cmd: string) => execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
-    const sha = git("git rev-parse --short=12 HEAD");
+    const sha = git("git rev-parse --short=12 HEAD:./");
     return git("git status --porcelain --untracked-files=no -- .") ? `${sha}+` : sha;
   } catch {
     return process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) || "local";
@@ -20,7 +24,7 @@ function buildId(): string {
 
 export default defineConfig({
   // Which build this is (no visible UI: <html data-build>), so a device's version can be told
-  // apart: the git commit it was built from (deploys are a local `wrangler pages deploy`).
+  // apart: the hub/ tree it was built from (deploys are a local `wrangler pages deploy`).
   define: { __ESMEWORLD_BUILD__: JSON.stringify(buildId()) },
   plugins: [
     react(),
