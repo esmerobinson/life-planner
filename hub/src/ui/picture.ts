@@ -14,6 +14,16 @@ const SHRINK = 0.75;
 const MIN_SIDE = 64;
 
 export const PICTURE_UNREADABLE = "That picture could not be added. Try a JPEG or PNG photo.";
+/**
+ * An iPhone photo in Apple's HEIC format that this browser can't open (Chrome can't; Safari, the
+ * iPhone and the Mac app can, and are downscaled to JPEG like any photo). Provisional wording.
+ */
+export const PICTURE_HEIC =
+  "That photo is in the iPhone's HEIC format, which this browser can't open. It works in the Esmeworld app on your Mac or iPhone, or save it as a JPEG first.";
+
+/** Apple's HEIC/HEIF photo format (by its type, or by its name when the browser gives no type). */
+export const isHeic = (f: { type: string; name?: string }): boolean =>
+  /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name ?? "");
 
 /** Encodes the source at a size and quality; returns the encoded bytes. */
 export type Encode = (width: number, height: number, quality: number) => Promise<Blob>;

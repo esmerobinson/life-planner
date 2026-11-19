@@ -1,14 +1,15 @@
 import Dexie from "dexie";
 import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
-import { addPicture, getFile } from "../data/repo";
+import { getFile } from "../data/repo";
 import { MAX_NOTES_TEXT } from "../data/validate";
 import {
   cleanLink, continuation, linkify, NEW_LINE, parseLine, pictureLine, toggleCheckLine, withText, type Block, type BlockType,
 } from "../domain/page";
 import type { FileRow, ISODate } from "../domain/types";
-import { downscalePicture, PICTURE_UNREADABLE } from "./picture";
+import { PICTURE_UNREADABLE } from "./picture";
 import { ShellContext } from "./shellContext";
+import { imageFiles, PHOTO_NOT_SAVED, storePhotos } from "./storePhotos";
 
 // The page (round 3b): a small block editor over the item's / goal's Markdown notes. One
 // block per line (domain/page.ts). A line shows formatted (headings, ticks, links,
@@ -16,10 +17,12 @@ import { ShellContext } from "./shellContext";
 // the words after its marker, so typing never touches the Markdown around it. Typing a
 // marker ("# ", "- [ ] ", "- ") at the start of a line turns it into that block, and the
 // add-buttons and the "/" menu do the same. Every change goes out as the whole notes text.
+// Photos (Esme, 19 Nov 2026): the Photo button, a photo pasted in, or one dropped on the page go
+// in at the cursor (a line is split around it), after the line dropped on, or at the end.
 
 /** Wording (provisional, one place). */
 export const PAGE_WORDS = {
-  placeholder: "Start typing… use / for a heading, checklist, link or picture.",
+  placeholder: "Start typing… use / for a heading, checklist, link or photo.",
   add: "Add:",
   linkLabel: "Link",
   linkPlaceholder: "Paste a link",
@@ -28,7 +31,7 @@ export const PAGE_WORDS = {
   notALink: "That is not a web or Obsidian link.",
   full: (max: number) => `This page is full (${max.toLocaleString("en-GB")} characters).`,
   adding: "Adding the picture…",
-  notSaved: "That picture could not be saved. Try again.",
+  notSaved: PHOTO_NOT_SAVED,
   removePicture: "Remove picture",
   pictureWaiting: "Picture on its way",
   pictureGone: "Picture deleted",
@@ -40,7 +43,8 @@ const COMMANDS: { id: Command; label: string }[] = [
   { id: "heading", label: "Heading" },
   { id: "checklist", label: "Checklist" },
   { id: "link", label: "Link" },
-  { id: "picture", label: "Picture" },
+  // "Photo" (was "Picture"): Esme asked for photos without noticing it (19 Nov 2026). Provisional.
+  { id: "picture", label: "Photo" },
 ];
 
 const LINE_NAME: Record<BlockType, string> = {
@@ -56,6 +60,12 @@ let keySeq = 0;
 const newKey = () => `line-${++keySeq}`;
 const rowsOf = (md: string): Row[] => md.split("\n").map((line) => ({ key: newKey(), line }));
 const textOf = (rows: Row[]) => rows.map((r) => r.line).join("\n");
+
+/** Where photos go: at a line's cursor, after a line (no caret), or at the end (no line). */
+interface PictureAt {
+  key: string | null;
+  caret?: number;
+}
 
 interface Slash {
   key: string;
@@ -102,7 +112,7 @@ export function PageEditor({
   const [full, setFull] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const pictureAfter = useRef<string | null>(null);
+  const pictureAt = useRef<PictureAt>({ key: null });
   const root = useRef<HTMLDivElement>(null);
   /** An empty line opened below a last picture: only written once something is typed. */
   const draftKey = useRef<string | null>(null);
@@ -244,8 +254,15 @@ export function PageEditor({
       setLinkForm(at ? { key: at.key, at: at.caret } : { key: lastKey.current });
       return;
     }
-    pictureAfter.current = at ? at.key : lastKey.current;
+    pictureAt.current = at ? { key: at.key, caret: at.caret } : here();
     fileInput.current?.click();
+  }
+
+  /** The cursor in the line being typed in; else after the line last typed in (or the end). */
+  function here(): PictureAt {
+    const key = activeRef.current;
+    const caret = key ? areas.current.get(key)?.selectionStart : undefined;
+    return key ? { key, ...(caret != null ? { caret } : {}) } : { key: lastKey.current };
   }
 
   function addLink() {
@@ -270,27 +287,55 @@ export function PageEditor({
     placeLine(url, form?.key ?? null);
   }
 
-  async function pickedPicture(file: File | undefined) {
-    if (!file) return;
+  /** Stores photos (the one picture pipeline, ui/storePhotos.ts) and puts them on the page. */
+  async function addPictures(files: File[], at: PictureAt) {
+    if (!files.length) return;
     setBusy(true);
     setMessage(null);
     try {
-      let picture;
-      try {
-        picture = await downscalePicture(file);
-      } catch {
-        setMessage(PICTURE_UNREADABLE);
-        return;
-      }
-      try {
-        const id = await addPicture(picture, today);
-        placeLine(pictureLine(id), pictureAfter.current);
-      } catch {
-        setMessage(PAGE_WORDS.notSaved);
-      }
+      const { ids, message: why } = await storePhotos(files, today);
+      if (ids.length) insertPictures(ids, at);
+      if (why) setMessage(why);
     } finally {
       setBusy(false);
       if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  /**
+   * Puts picture lines in: at a cursor inside a line's words, the line is split around them; at
+   * the very start of a line with words, above it; otherwise after the line (an empty line is
+   * used), or at the end.
+   */
+  function insertPictures(ids: string[], at: PictureAt) {
+    const rs = rowsRef.current;
+    const i = indexOf(at.key);
+    const row = rs[i];
+    const block = row ? parseLine(row.line) : null;
+    if (row && block && block.type !== "picture" && at.caret !== undefined && block.text !== "") {
+      const caret = Math.min(Math.max(0, at.caret), block.text.length);
+      // The space at the split goes (it was between two words, now a photo is).
+      const before = block.text.slice(0, caret).replace(/[ \t]+$/, "");
+      const rest = block.text.slice(caret).replace(/^[ \t]+/, "");
+      if (rest !== "") {
+        const eol = rs.some((r) => r.line.endsWith("\r")) ? "\r" : "";
+        const pics = ids.map((id) => ({ key: newKey(), line: pictureLine(id) + eol }));
+        const middle =
+          before === ""
+            ? [...pics, row]
+            : [
+                { key: row.key, line: withText({ ...block, eol }, before) },
+                ...pics,
+                { key: newKey(), line: continuation(block) + rest + block.eol },
+              ];
+        if (commit([...rs.slice(0, i), ...middle, ...rs.slice(i + 1)])) lastKey.current = pics[pics.length - 1]!.key;
+        return;
+      }
+    }
+    let after = at.key;
+    for (const id of ids) {
+      placeLine(pictureLine(id), after);
+      after = lastKey.current;
     }
   }
 
@@ -477,17 +522,47 @@ export function PageEditor({
         if (root.current && e.relatedTarget instanceof Node && root.current.contains(e.relatedTarget)) return;
         onBlur();
       }}
+      // A photo pasted (on the Mac: copied from Photos, a screenshot…) goes in at the cursor. Words
+      // pasted stay words, even when the clipboard also holds a picture of them (Word does that).
+      onPaste={(e) => {
+        const cd = e.clipboardData;
+        if (!cd || cd.getData("text/plain") !== "") return;
+        const files = imageFiles(cd.files);
+        if (!files.length) return;
+        e.preventDefault();
+        void addPictures(files, here());
+      }}
+      // A file dragged onto the page is taken here (the browser would otherwise open it in place).
+      onDragOver={(e) => {
+        if (!hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDrop={(e) => {
+        if (!hasFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        const files = imageFiles(e.dataTransfer.files);
+        if (!files.length) {
+          setMessage(PICTURE_UNREADABLE);
+          return;
+        }
+        const onRow = (e.target as Element).closest?.("[data-row]")?.getAttribute("data-row");
+        void addPictures(files, { key: onRow ?? lastKey.current });
+      }}
     >
       <div className="page-lines" onClick={clickedPage}>
         {rows.map((row, i) => {
           const block = parseLine(row.line);
           if (block.type === "picture") {
-            return <PictureLine key={row.key} id={block.fileId!} alt={row.line.slice(2, row.line.indexOf("]"))} onRemove={() => removeLine(row.key)} />;
+            return (
+              <PictureLine key={row.key} row={row.key} id={block.fileId!} alt={row.line.slice(2, row.line.indexOf("]"))} onRemove={() => removeLine(row.key)} />
+            );
           }
           const editing = active === row.key;
           return (
             <div
               key={row.key}
+              data-row={row.key}
               className={`page-line page-${block.type}${block.done ? " is-done" : ""}`}
               style={block.indent ? { paddingLeft: `${block.indent}ch` } : undefined}
             >
@@ -611,11 +686,13 @@ export function PageEditor({
         <input
           ref={fileInput}
           type="file"
+          // image/* and no `capture`: the iPhone offers Take Photo or Photo Library (and Files).
           accept="image/*"
+          multiple
           className="page-file"
           aria-label="Choose a picture"
           tabIndex={-1}
-          onChange={(e) => void pickedPicture(e.target.files?.[0])}
+          onChange={(e) => void addPictures(Array.from(e.target.files ?? []), pictureAt.current)}
         />
       </div>
       {(busy || message || (full && !active)) && (
@@ -757,12 +834,12 @@ function caretAt(container: HTMLElement, x: number, y: number, fallback: number)
 }
 
 /** A picture line: the photo, or a quiet placeholder until its file row has arrived. */
-function PictureLine({ id, alt, onRemove }: { id: string; alt: string; onRemove: () => void }) {
+function PictureLine({ id, row, alt, onRemove }: { id: string; row: string; alt: string; onRemove: () => void }) {
   const file = useFile(id);
   const shown = file && file.status !== "purged" && file.data !== "";
   return (
     // Focusable, so Tab reaches it and shows its (otherwise hover-only) Remove button.
-    <figure className="page-pic" tabIndex={0}>
+    <figure className="page-pic" tabIndex={0} data-row={row}>
       {shown ? (
         <img src={`data:${file.mime};base64,${file.data}`} alt={alt || "Picture"} width={file.width} height={file.height} />
       ) : file === undefined ? (
@@ -779,8 +856,13 @@ function PictureLine({ id, alt, onRemove }: { id: string; alt: string; onRemove:
   );
 }
 
+/** A drag that carries files (not words dragged within the page). */
+function hasFiles(dt: DataTransfer | null): dt is DataTransfer {
+  return !!dt && Array.from(dt.types ?? []).includes("Files");
+}
+
 /** A file row, re-read when anything is written (sync brings it later on another device). */
-function useFile(id: string): FileRow | null | undefined {
+export function useFile(id: string): FileRow | null | undefined {
   const version = useContext(ShellContext)?.version ?? 0;
   const [file, setFile] = useState<FileRow | null | undefined>(undefined);
   useEffect(() => {

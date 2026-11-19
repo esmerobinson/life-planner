@@ -11,8 +11,8 @@ vi.mock("./picture", async (importOriginal) => {
   const real = await importOriginal<typeof import("./picture")>();
   return {
     ...real,
-    downscalePicture: async () => {
-      if (shrink.fail) throw new Error("no");
+    downscalePicture: async (f: File) => {
+      if (shrink.fail || f.name.startsWith("bad")) throw new Error("no");
       return { mime: "image/jpeg" as const, data: "/9j/4AAQ", width: 1600, height: 1200 };
     },
   };
@@ -203,10 +203,10 @@ describe("add-buttons", () => {
     expect(page.queryByRole("textbox", { name: "Link" })).toBeNull();
   });
 
-  it("Picture stores the downscaled photo in files and puts its line on the page", async () => {
+  it("Photo stores the downscaled photo in files and puts its line on the page", async () => {
     const { page, last } = setup("Look:");
     await userEvent.click(page.getByText("Look:"));
-    await userEvent.click(page.getByRole("button", { name: "Picture" }));
+    await userEvent.click(page.getByRole("button", { name: "Photo" }));
     const input = page.getByLabelText("Choose a picture") as HTMLInputElement;
     await userEvent.upload(input, new File(["x"], "photo.jpg", { type: "image/jpeg" }));
     await vi.waitFor(() => expect(last()).toMatch(/^Look:\n!\[\]\(file:[0-9a-f-]{36}\)$/));
@@ -219,7 +219,7 @@ describe("add-buttons", () => {
   it("a picture that cannot be read says so and changes nothing", async () => {
     shrink.fail = true;
     const { page, changes } = setup("x");
-    await userEvent.upload(page.getByLabelText("Choose a picture") as HTMLInputElement, new File(["x"], "a.heic", { type: "image/heic" }));
+    await userEvent.upload(page.getByLabelText("Choose a picture") as HTMLInputElement, new File(["x"], "a.png", { type: "image/png" }));
     expect(await page.findByRole("status")).toHaveTextContent(/could not be added/);
     expect(changes).toEqual([]);
     expect(await db.files.count()).toBe(0);
@@ -263,7 +263,7 @@ describe("the / menu", () => {
     await userEvent.keyboard("/");
     const list = page.getByRole("listbox", { name: PAGE_WORDS.menu });
     const menu = within(list);
-    expect(menu.getAllByRole("option").map((b) => b.textContent)).toEqual(["Heading", "Checklist", "Link", "Picture"]);
+    expect(menu.getAllByRole("option").map((b) => b.textContent)).toEqual(["Heading", "Checklist", "Link", "Photo"]);
     await userEvent.keyboard("ch");
     expect(menu.getAllByRole("option").map((b) => b.textContent)).toEqual(["Checklist"]);
     // The field points at the highlighted choice for screen readers (m6).
@@ -308,5 +308,82 @@ describe("the / menu", () => {
     fireEvent.change(page.getByRole("textbox", { name: "Link" }), { target: { value: "https://example.com/x" } });
     await userEvent.click(page.getByRole("button", { name: PAGE_WORDS.linkAdd }));
     expect(last()).toBe("Read https://example.com/x");
+  });
+});
+
+describe("photos (Esme, 19 Nov 2026: add photos to to-do and idea pages)", () => {
+  const PIC = /!\[\]\(file:[0-9a-f-]{36}\)/;
+  const choose = (page: ReturnType<typeof setup>["page"], ...files: File[]) =>
+    userEvent.upload(page.getByLabelText("Choose a picture") as HTMLInputElement, files);
+  const jpg = (name = "photo.jpg") => new File(["x"], name, { type: "image/jpeg" });
+
+  it("an Add photo button is always on the page; its picker takes photos, several at once, and lets the phone offer camera or library", () => {
+    const { page } = setup("");
+    expect(page.getByRole("button", { name: "Photo" })).toBeVisible();
+    const input = page.getByLabelText("Choose a picture");
+    expect(input).toHaveAttribute("accept", "image/*");
+    expect(input).toHaveAttribute("multiple");
+    // No `capture`: with it the iPhone opens only the camera; without it, Take Photo or Photo Library.
+    expect(input).not.toHaveAttribute("capture");
+  });
+
+  it("with nothing typed in, photos go at the end, in the order chosen", async () => {
+    const { page, last } = setup("one\ntwo");
+    await choose(page, jpg("a.jpg"), jpg("b.jpg"));
+    await vi.waitFor(() => expect(last()).toMatch(new RegExp(`^one\\ntwo\\n${PIC.source}\\n${PIC.source}$`)));
+    expect(await db.files.count()).toBe(2);
+  });
+
+  it("goes at the cursor: mid-line splits the line around the photo; at a line's start, it goes above", async () => {
+    const { page, last } = setup("before after\n- [ ] step two");
+    await userEvent.click(page.getByText("before after"));
+    const box = page.getByRole("textbox", { name: /text 1/ }) as HTMLTextAreaElement;
+    box.setSelectionRange(7, 7);
+    await userEvent.click(page.getByRole("button", { name: "Photo" }));
+    await choose(page, jpg());
+    await vi.waitFor(() => expect(last()).toMatch(new RegExp(`^before\\n${PIC.source}\\nafter\\n- \\[ \\] step two$`)));
+
+    await userEvent.click(page.getByText("step two"));
+    const step = page.getByRole("textbox", { name: /checklist item/ }) as HTMLTextAreaElement;
+    step.setSelectionRange(0, 0);
+    await userEvent.click(page.getByRole("button", { name: "Photo" }));
+    await choose(page, jpg());
+    await vi.waitFor(() => expect(last()!.split("\n")).toHaveLength(5));
+    expect(last()!.split("\n")[3]).toMatch(PIC);
+    expect(last()!.split("\n")[4]).toBe("- [ ] step two");
+  });
+
+  it("a photo pasted into a line goes in at the cursor; pasted words stay words", async () => {
+    const { page, last } = setup("ab");
+    await userEvent.click(page.getByText("ab"));
+    const box = page.getByRole("textbox", { name: /text 1/ }) as HTMLTextAreaElement;
+    box.setSelectionRange(1, 1);
+    fireEvent.paste(box, { clipboardData: { files: [jpg()], getData: () => "" } });
+    await vi.waitFor(() => expect(last()).toMatch(new RegExp(`^a\\n${PIC.source}\\nb$`)));
+    const pasteText = fireEvent.paste(page.getByRole("textbox", { name: /text/ }), {
+      clipboardData: { files: [jpg()], getData: (t: string) => (t === "text/plain" ? "words" : "") },
+    });
+    expect(pasteText).toBe(true); // not taken: the browser pastes the words
+  });
+
+  it("a photo dropped on a line goes in after it; a dropped file that isn't a photo says so", async () => {
+    const { page, last, changes } = setup("first\nsecond");
+    const drop = (target: Element, files: File[]) =>
+      fireEvent.drop(target, { dataTransfer: { files, types: ["Files"] } });
+    const over = fireEvent.dragOver(page.getByText("first"), { dataTransfer: { types: ["Files"] } });
+    expect(over).toBe(false); // the drop is allowed (the browser would otherwise open the file)
+    drop(page.getByText("first"), [jpg()]);
+    await vi.waitFor(() => expect(last()).toMatch(new RegExp(`^first\\n${PIC.source}\\nsecond$`)));
+    const before = changes.length;
+    drop(page.getByText("second"), [new File(["x"], "plan.pdf", { type: "application/pdf" })]);
+    expect(await page.findByRole("status")).toHaveTextContent(/could not be added/);
+    expect(changes).toHaveLength(before);
+  });
+
+  it("an iPhone HEIC photo this browser can't open gets a kind line saying why", async () => {
+    const { page, changes } = setup("x");
+    await choose(page, new File(["x"], "bad-IMG_0001.HEIC", { type: "image/heic" }));
+    expect(await page.findByRole("status")).toHaveTextContent(/HEIC/);
+    expect(changes).toEqual([]);
   });
 });
