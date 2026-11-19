@@ -184,7 +184,16 @@ for (const width of [1280, 390]) {
       // Search: ⌘K on the Mac, 🔍 on the phone.
       await page.goto("/");
       if (width < 700) await page.getByRole("button", { name: "Search" }).click();
-      else await page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
+      else {
+        // ⌘K straight after loading can land before the shell's shortcut is listening (it was
+        // flaky about 1 in 3). Press until the dialog is open: the shortcut only ever opens it, so
+        // a second press is harmless. A condition, not a sleep.
+        const dialog = page.getByRole("dialog", { name: "Search" });
+        await expect(async () => {
+          await page.keyboard.press("ControlOrMeta+k");
+          await expect(dialog).toBeVisible({ timeout: 1000 });
+        }).toPass();
+      }
       await page.getByRole("combobox").fill("brindle");
       const hit = page.getByRole("option", { name: /Pretend tax/ });
       await expect(hit).toContainText("What I did");
