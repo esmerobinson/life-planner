@@ -23,6 +23,15 @@ describe("starting the phone's automatic updates", () => {
     expect(getAppUpdater()).toBeNull();
   });
 
+  it("looks for a new version as soon as the service worker is registered (on start)", async () => {
+    const stop = startPwaUpdates();
+    const update = vi.fn(async () => {});
+    await new Promise((r) => setTimeout(r, 20)); // registering takes a moment
+    registered.options!.onRegisteredSW!("/sw.js", { update } as unknown as ServiceWorkerRegistration);
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    stop();
+  });
+
   it("switches by itself on the web, asking the Mac's save-first check", async () => {
     const prepare = vi.fn(async () => ({ ready: true, reason: "" }));
     w[NATIVE_PREPARE_RELOAD] = prepare;

@@ -49,6 +49,8 @@ export function startPwaUpdates(where: { protocol: string } = window.location): 
     onNeedReload: () => updater.needReload(),
     onRegisteredSW: (_url, r) => {
       registration = r;
+      // On start: register() alone does not look again for an already registered worker.
+      updater.checkNow();
     },
   });
 

@@ -216,6 +216,10 @@ export function createAutoUpdater(env: AutoUpdateEnv) {
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
+    /** Looks for a new version now (e.g. once the service worker is registered, on start). */
+    checkNow(): void {
+      check(true);
+    },
     /** A new version is waiting (the plugin's onNeedRefresh). */
     needRefresh(): void {
       set({ waiting: true });
