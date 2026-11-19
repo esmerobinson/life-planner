@@ -78,6 +78,14 @@ export interface Item {
    * it is a to-do or an idea. Never shown. An older app version keeps it as it is.
    */
   stash?: ItemStash;
+  /**
+   * "What I did" (Esme, 19 Nov 2026): what she actually did when she ticked the to-do off, and
+   * the files she kept with it. A plain to-do has at most one entry; a project one per session
+   * ticked (`session`). Only names and folder paths of files, never their contents. Synced like
+   * any to-do field (not end-to-end encrypted). An older app version keeps it as it is (its
+   * validator ignores fields it doesn't know, and it spreads rows when it writes them).
+   */
+  did?: DidEntry[];
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };
@@ -86,6 +94,27 @@ export interface Item {
    * (data/changeTracking.ts). Optional only so older backups still load.
    */
   updatedAt?: number;
+}
+
+/** One "What I did" note on a to-do (domain/whatIDid.ts). */
+export interface DidEntry {
+  id: string;
+  /** The day it was done (the tick's day). */
+  on: ISODate;
+  /** What she did, in her words. Absent when nothing is typed. */
+  note?: string;
+  /** Files copied into her folders on the Mac (names and where; never the contents). */
+  files?: DidFile[];
+  /** A project's session this note is for (its id). */
+  session?: string;
+}
+
+/** One file kept with a "What I did" note: its saved name and the folder it was copied into. */
+export interface DidFile {
+  /** The file's name as saved (after " (2)" etc.). */
+  name: string;
+  /** The folder it was saved in, "~/Desktop/Writing/Book" style ("~" is her home folder). */
+  folder: string;
 }
 
 /** The to-do-only fields a book keeps put away. */

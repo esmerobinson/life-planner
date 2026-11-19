@@ -16,6 +16,7 @@ import { BOOK_AREA, BOOK_FIELDS, BOOK_LIMITS, isBook, isWebLink } from "../domai
 export * from "./journalRepo";
 export * from "./highlightRepo";
 export * from "./routineRepo";
+export * from "./didRepo";
 import {
   AREA_IDS, type AreaId, type BookStatus, type CountSource, type FileRow, type Goal, type ISODate, type Item, type Milestone, type MonthGoal,
   type Session,
