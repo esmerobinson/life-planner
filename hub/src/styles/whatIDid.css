@@ -119,3 +119,77 @@
 .did-box textarea {
   width: 100%;
 }
+
+/* PLACEHOLDER (19 Nov 2026, undecided): a note's photos, for Esme / Design. Magenta outline and
+   the system font; the thumbnail height, the Remove link under each, and the larger view (the
+   panel colour, full window, Close under the photo) are the builder's stand-ins, not a look.
+   Add photo itself is the soft pill Attach files already is. */
+.did-photos {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  outline: 2px solid var(--placeholder);
+  font-family: system-ui;
+}
+
+.did-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+button.did-photo-open {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  line-height: 0;
+}
+
+.did-photo-img,
+.did-photo-wait {
+  display: block;
+  height: 72px;
+  width: auto;
+  max-width: 160px;
+  object-fit: cover;
+}
+
+.did-photo-wait {
+  width: 72px;
+  background: var(--placeholder);
+  font-size: 12px;
+  line-height: 1.2;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+/* Over everything the page has (the card after a tick is 25, the sparkle 30). A layer order. */
+.did-photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--pad-sheet);
+  background: var(--panel);
+  outline: 3px solid var(--placeholder);
+  outline-offset: -3px;
+  font-family: system-ui;
+}
+
+.did-photo-viewer img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100% - 64px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}

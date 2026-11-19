@@ -16,11 +16,15 @@ export function imageFiles(files: Iterable<File> | ArrayLike<File> | null | unde
 }
 
 /**
- * Stores each photo in order. Returns the ids stored, and a kind line when one could not be read
+ * Stores each photo in order. Returns the ids stored (and which files they were), and a kind line when one could not be read
  * (HEIC: why) or saved; the rest still go in.
  */
-export async function storePhotos(files: readonly File[], today: ISODate): Promise<{ ids: string[]; message: string | null }> {
+export async function storePhotos(
+  files: readonly File[], today: ISODate,
+): Promise<{ ids: string[]; stored: File[]; message: string | null }> {
   const ids: string[] = [];
+  /** The files stored, in the same order as `ids`. */
+  const stored: File[] = [];
   let message: string | null = null;
   for (const file of files) {
     let picture;
@@ -32,9 +36,10 @@ export async function storePhotos(files: readonly File[], today: ISODate): Promi
     }
     try {
       ids.push(await addPicture(picture, today));
+      stored.push(file);
     } catch {
       message ??= PHOTO_NOT_SAVED;
     }
   }
-  return { ids, message };
+  return { ids, stored, message };
 }

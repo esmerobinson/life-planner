@@ -9,6 +9,8 @@ import { DEFAULT_FILES_ROOT, safeName } from "../domain/whatIDid";
 import type { DidFile } from "../domain/types";
 
 export const FILES_HANDLER = "esmeworldFiles";
+/** The largest photo the Mac app copies into her folder (mac/Esmeworld/main.swift maxPhotoBytes). */
+export const MAX_PHOTO_COPY_BYTES = 100_000_000;
 
 interface ReplyHandler {
   postMessage(message: unknown): Promise<unknown>;
@@ -50,6 +52,11 @@ export async function attachFiles(to: { root: string; area: string; project?: st
   } catch {
     return { kind: "error" };
   }
+  return savedReply(reply);
+}
+
+/** The bridge's answer to attach or savePhoto. */
+function savedReply(reply: unknown): AttachResult {
   const r = obj(reply);
   if (!r) return { kind: "error" };
   if (r.cancelled === true) return { kind: "cancelled" };
@@ -65,6 +72,31 @@ export async function attachFiles(to: { root: string; area: string; project?: st
   const failed = (Array.isArray(r.failed) ? r.failed.length : 0) + (saved.length - files.length);
   if (files.length === 0 && failed === 0) return { kind: "cancelled" };
   return { kind: "saved", files, failed };
+}
+
+/**
+ * A photo added to a "What I did" note on the Mac (Esme, 19 Nov 2026): its own bytes (base64, as
+ * chosen, not the downscaled copy) are saved into the area's (or project's) folder like an
+ * attached file, never overwriting. An older Mac app without `savePhoto` answers an error.
+ */
+export async function savePhotoCopy(to: {
+  root: string; area: string; project?: string; name: string; data: string;
+}): Promise<AttachResult> {
+  const h = handler();
+  if (!h) return { kind: "unavailable" };
+  try {
+    return savedReply(
+      await h.postMessage({
+        action: "savePhoto",
+        root: to.root,
+        parts: [safeName(to.area), ...(to.project !== undefined ? [safeName(to.project)] : [])],
+        name: to.name.trim() ? safeName(to.name) : "Photo.jpg",
+        data: to.data,
+      }),
+    );
+  } catch {
+    return { kind: "error" };
+  }
 }
 
 /** The Mac's folder picker, for the folder setting. Null when cancelled or not on the Mac. */

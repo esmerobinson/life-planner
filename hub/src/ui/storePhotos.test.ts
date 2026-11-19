@@ -40,13 +40,13 @@ it("an unreadable photo is skipped with a kind word; an iPhone HEIC one says why
   expect(r.message).toBe(PICTURE_UNREADABLE);
   shrink.fail.add("IMG_0001.HEIC");
   r = await storePhotos([new File(["x"], "IMG_0001.HEIC", { type: "" })], DAY);
-  expect(r).toEqual({ ids: [], message: PICTURE_HEIC });
+  expect(r).toEqual({ ids: [], stored: [], message: PICTURE_HEIC });
 });
 
 it("a photo that cannot be stored says so", async () => {
   vi.spyOn(db.files, "add").mockRejectedValueOnce(new Error("full"));
   const r = await storePhotos([jpg("a.jpg")], DAY);
-  expect(r).toEqual({ ids: [], message: PHOTO_NOT_SAVED });
+  expect(r).toEqual({ ids: [], stored: [], message: PHOTO_NOT_SAVED });
   vi.restoreAllMocks();
 });
 

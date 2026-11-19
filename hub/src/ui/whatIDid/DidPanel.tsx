@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { dayLabel } from "../../domain/display";
 import { isProject, lastTickedSession } from "../../domain/projects";
 import type { ISODate, Item } from "../../domain/types";
-import { didTarget } from "../../domain/whatIDid";
+import { didEntries, didTarget } from "../../domain/whatIDid";
 import { asksWhatIDid } from "./context";
 import { DidBox } from "./DidBox";
 import { DID_WORDS as W } from "./words";
@@ -13,13 +13,14 @@ import { DID_WORDS as W } from "./words";
  * for. Placement under the page is provisional (for Design).
  */
 export function DidPanel({ item, today, onChanged }: { item: Item; today: ISODate; onChanged: () => Promise<void> }) {
-  const ids = (item.did ?? []).map((e) => e.id).join(",");
+  const entries = didEntries(item);
+  const ids = entries.map((e) => e.id).join(",");
   // Which notes show: every one it has; with none, one new box (it is written once she types).
   const last = isProject(item) ? lastTickedSession(item) : undefined;
   const targets = useMemo(
     () =>
-      item.did?.length
-        ? item.did.map((e) => ({ id: e.id, on: e.on, ...(e.session ? { session: e.session } : {}) }))
+      entries.length
+        ? entries.map((e) => ({ id: e.id, on: e.on, ...(e.session ? { session: e.session } : {}) }))
         : last
           ? [didTarget(item, last.doneOn!, last.id)]
           : [didTarget(item, item.completedAt ?? today)],
@@ -30,7 +31,7 @@ export function DidPanel({ item, today, onChanged }: { item: Item; today: ISODat
   if (!asksWhatIDid(item)) return null;
   // Only once something is done (review M8: "did", not "doing"): a to-do ticked, a session
   // ticked, or a note it already has.
-  if (!item.did?.length && item.status !== "done" && !last) return null;
+  if (!entries.length && item.status !== "done" && !last) return null;
   const project = isProject(item);
   return (
     <section className="did-panel" aria-label={W.panelHeading}>
@@ -41,7 +42,7 @@ export function DidPanel({ item, today, onChanged }: { item: Item; today: ISODat
         const when = `${session ? `${session} · ` : ""}${dayLabel(at.on, today)}`;
         return (
           <div key={at.id}>
-            {(project || item.did?.length) && <p className="choose-muted did-panel-when">{when}</p>}
+            {(project || entries.length > 0) && <p className="choose-muted did-panel-when">{when}</p>}
             <DidBox item={item} at={at} today={today} label={W.panelBox} onSaved={onChanged} />
           </div>
         );

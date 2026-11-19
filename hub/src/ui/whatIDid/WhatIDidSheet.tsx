@@ -181,6 +181,7 @@ export function WhatIDidSheet({
         label={W.sheetBox}
         labelHidden
         compact={phone}
+        enlarge={false}
         autoFocus
         onSaved={onSaved}
         onEnter={() => close("button")}

@@ -11,6 +11,7 @@ import { DATA_ERROR } from "../messages";
 import { usePanel } from "../panelContext";
 import { useShellToday } from "../shellContext";
 import { areaName, FileList } from "./DidBox";
+import { PhotoStrip } from "./DidPhotos";
 import { DID_WORDS as W } from "./words";
 
 /** The search parameter that marks one entry (⌘K search opens the log at it). */
@@ -21,7 +22,7 @@ function useDidItems(): { items: Item[] | null; error: boolean } {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
-    const sub = liveQuery(() => db.items.filter((i) => (i.did?.length ?? 0) > 0).toArray()).subscribe({
+    const sub = liveQuery(() => db.items.filter((i) => (i.did?.length ?? 0) > 0 || (i.didPhotos?.length ?? 0) > 0).toArray()).subscribe({
       next: (rows) => {
         setItems(rows);
         setError(false);
@@ -113,6 +114,7 @@ function Entry({ e, today, marked, onOpen }: { e: LogEntry; today: string; marke
           {e.project && ` · ${W.project(e.project)}`}
         </div>
         {e.note && <p className="did-note">{e.note}</p>}
+        <PhotoStrip ids={e.photos} />
         {e.files.length > 0 && <FileList files={e.files} />}
       </div>
     </li>

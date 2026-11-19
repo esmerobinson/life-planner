@@ -1,5 +1,5 @@
 import { db } from "../data/db";
-import { attachFiles, chooseFilesRoot, FILES_HANDLER, hasFileBridge, loadFilesRoot, resetFilesRoot, revealFile } from "./files";
+import { attachFiles, chooseFilesRoot, FILES_HANDLER, hasFileBridge, loadFilesRoot, resetFilesRoot, revealFile, savePhotoCopy } from "./files";
 
 // The Mac app's file bridge for "What I did" (mac/Esmeworld/main.swift, esmeworldFiles). In a
 // browser or on the iPhone there is no bridge and nothing here does anything.
@@ -74,4 +74,20 @@ it("the folder is the Mac app's own (review M1): read from it, chosen through it
   expect(await resetFilesRoot()).toBe("~/Desktop");
   expect(sent.map((m) => (m as { action: string }).action)).toEqual(["getRoot", "chooseRoot", "getRoot", "resetRoot"]);
   expect(await db.syncMeta.count()).toBe(0); // nothing kept by the page
+});
+
+it("a photo added on the Mac: its bytes are copied into the area's folder under a safe name", async () => {
+  expect(await savePhotoCopy({ root: "~/Desktop", area: "Art", name: "IMG_0001.HEIC", data: "AAAA" })).toEqual({ kind: "unavailable" });
+  pretendMac(() => ({ saved: [{ name: "IMG_0001 (2).HEIC", folder: "~/Desktop/Art/Mural- v2" }], failed: [] }));
+  const r = await savePhotoCopy({ root: "~/Desktop", area: "Art", project: "Mural: v2", name: "IMG_0001.HEIC", data: "AAAA" });
+  expect(sent).toEqual([{ action: "savePhoto", root: "~/Desktop", parts: ["Art", "Mural- v2"], name: "IMG_0001.HEIC", data: "AAAA" }]);
+  expect(r).toEqual({ kind: "saved", files: [{ name: "IMG_0001 (2).HEIC", folder: "~/Desktop/Art/Mural- v2" }], failed: 0 });
+  sent.length = 0;
+  pretendMac(() => ({ error: "permission" }));
+  expect(await savePhotoCopy({ root: "~/Desktop", area: "Art", name: "a/b:.png", data: "AAAA" })).toEqual({ kind: "permission" });
+  expect((sent[0] as { name: string }).name).toBe("a-b-.png");
+  // An older Mac app (no savePhoto yet) answers "unknown action": nothing is copied, nothing breaks.
+  pretendMac(() => new Error("unknown action"));
+  expect(await savePhotoCopy({ root: "~/Desktop", area: "Art", name: "", data: "AAAA" })).toEqual({ kind: "error" });
+  expect((sent[sent.length - 1] as { name: string }).name).toBe("Photo.jpg");
 });

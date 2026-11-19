@@ -24,6 +24,24 @@ export const DID_WORDS = {
   savedTo: (folder: string) => `Copied to ${folder}`,
   revealHint: "Show in Finder",
   missing: "That file isn't there any more.",
+  /** Photos on a note (Esme, 19 Nov 2026: "add option to add photos"). Builder's words, provisional. */
+  addPhoto: "Add photo",
+  addingPhoto: "Adding the photo…",
+  /** The hidden picker's name (Take Photo or Photo Library on the iPhone). */
+  choosePhoto: "Choose a photo",
+  photos: "Photos",
+  photo: (n: number) => `Photo ${n}`,
+  showPhoto: (n: number) => `Photo ${n}: show it larger`,
+  remove: "Remove",
+  removePhoto: (n: number) => `Remove photo ${n}`,
+  photoViewer: "Photo",
+  close: "Close",
+  photoWaiting: "Photo on its way",
+  photoGone: "Photo deleted",
+  /** The Mac: the photo is on the note, but its copy in her folder failed. */
+  photoNotCopied: "The photo is added, but it couldn't be copied into your folder.",
+  photoPermission:
+    "The photo is added, but your Mac didn't let Esmeworld copy it into the folder. You can allow it in System Settings, Privacy & Security, Files and Folders, Esmeworld.",
   /** The side panel's section and its box. */
   panelHeading: "What I did",
   panelBox: "What I did",

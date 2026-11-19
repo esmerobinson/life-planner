@@ -1,14 +1,17 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { saveDid } from "../../data/didRepo";
 import { clearDidDraft, forgetDidDraft, keepDidDraft } from "../../data/didDraft";
 import { isProject } from "../../domain/projects";
 import type { DidEntry, DidFile, ISODate, Item } from "../../domain/types";
-import { MAX_DID_NOTE } from "../../domain/whatIDid";
-import { attachFiles, hasFileBridge, loadFilesRoot, revealFile } from "../../native/files";
+import { MAX_DID_NOTE, photosOf } from "../../domain/whatIDid";
+import { attachFiles, hasFileBridge, loadFilesRoot, MAX_PHOTO_COPY_BYTES, revealFile, savePhotoCopy } from "../../native/files";
 import { AREA_CHOICES } from "../areas";
 import { useSaveError } from "../messages";
+import { blobToBase64 } from "../picture";
+import { storePhotos } from "../storePhotos";
 import { AutoGrowTextarea } from "../useAutoGrow";
 import { AUTOSAVE_MS, useDraft } from "../useDraft";
+import { PhotoStrip } from "./DidPhotos";
 import { DID_WORDS as W } from "./words";
 
 /** Remembered on this device once a file was kept (the "first time" line then goes). */
@@ -27,10 +30,13 @@ export const areaName = (id: string) => AREA_CHOICES.find((a) => a.id === id)?.l
  * One "What I did" note being written: the box (saved as she types, after a pause, on leaving it,
  * on closing, on hiding the app and before the Mac's update; every key is also kept on this device
  * at once, data/didDraft.ts), the files kept with it, and Attach files on the Mac (elsewhere:
- * "Attach files on your Mac"). `item` is the to-do as stored now; `at` the note it writes.
+ * "Attach files on your Mac"). Add photo everywhere (19 Nov 2026): the photo goes in the synced
+ * files table like a page's (ui/storePhotos.ts), and on the Mac a copy also goes into the area's
+ * folder like an attached file. `item` is the to-do as stored now; `at` the note it writes.
  */
 export function DidBox({
   item, at, today, label, labelHidden = false, autoFocus = false, onSaved, onEnter, actions, compact = false, onTyped,
+  enlarge = true,
 }: {
   item: Item;
   at: Pick<DidEntry, "id" | "on" | "session">;
@@ -49,6 +55,8 @@ export function DidBox({
   compact?: boolean;
   /** She typed something. */
   onTyped?: () => void;
+  /** Its photos open larger when tapped (not in the card after a tick: a tap outside closes it). */
+  enlarge?: boolean;
 }) {
   const { attempt, saveError } = useSaveError();
   const entry = item.did?.find((e) => e.id === at.id);
@@ -66,6 +74,48 @@ export function DidBox({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [firstTime] = useState(() => !attachedOnce());
+  const photos = photosOf(item, at.id);
+  const [adding, setAdding] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+
+  /** Stores the chosen photos on the note; on the Mac, also copies each into the area's folder. */
+  async function addPhotos(chosen: File[]) {
+    if (!chosen.length) return;
+    setAdding(true);
+    setMessage(null);
+    note.flush(); // the words first, so they are never behind the photos
+    try {
+      const { ids, stored, message: why } = await storePhotos(chosen, today);
+      if (why) setMessage(why);
+      if (!ids.length) return;
+      if (!(await attempt(() => saveDid(item.id, at, { addPhotos: ids }, today)))) return;
+      await onSaved();
+      if (!mac) return;
+      const root = await loadFilesRoot();
+      const kept: DidFile[] = [];
+      for (const f of stored) {
+        if (f.size > MAX_PHOTO_COPY_BYTES) {
+          setMessage(W.photoNotCopied);
+          continue;
+        }
+        const r = await savePhotoCopy({
+          root, area: areaName(item.areaId), ...(isProject(item) ? { project: item.title } : {}),
+          name: f.name, data: await blobToBase64(f),
+        });
+        if (r.kind === "saved") kept.push(...r.files);
+        else if (r.kind === "permission") setMessage(W.photoPermission);
+        else setMessage(W.photoNotCopied);
+      }
+      if (kept.length && (await attempt(() => saveDid(item.id, at, { addFiles: kept }, today)))) await onSaved();
+    } finally {
+      setAdding(false);
+      if (photoInput.current) photoInput.current.value = "";
+    }
+  }
+
+  async function removePhoto(id: string) {
+    if (await attempt(() => saveDid(item.id, at, { removePhoto: id }, today))) await onSaved();
+  }
 
   async function attach() {
     if (busy) return;
@@ -122,9 +172,25 @@ export function DidBox({
         />
       </label>
       {saveError && <p className="form-message">{saveError}</p>}
+      <PhotoStrip ids={photos} enlarge={enlarge} onRemove={(id) => void removePhoto(id)} />
       {files.length > 0 && <FileList files={files} mac={mac} />}
       <div className="did-attach">
         {actions}
+        {/* Placement provisional (for Esme / Design): with Save, Skip and Attach files. */}
+        <button type="button" className="btn-secondary" disabled={adding} onClick={() => photoInput.current?.click()}>
+          {adding ? W.addingPhoto : W.addPhoto}
+        </button>
+        <input
+          ref={photoInput}
+          type="file"
+          // image/* and no `capture`: the iPhone offers Take Photo or Photo Library.
+          accept="image/*"
+          multiple
+          className="page-file"
+          aria-label={W.choosePhoto}
+          tabIndex={-1}
+          onChange={(e) => void addPhotos(Array.from(e.target.files ?? []))}
+        />
         {mac ? (
           <button type="button" className="btn-secondary" disabled={busy} onClick={() => void attach()}>
             {busy ? W.attaching : W.attach}

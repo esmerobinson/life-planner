@@ -1,15 +1,13 @@
-import Dexie from "dexie";
-import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
-import { getFile } from "../data/repo";
 import { MAX_NOTES_TEXT } from "../data/validate";
 import {
   cleanLink, continuation, linkify, NEW_LINE, parseLine, pictureLine, toggleCheckLine, withText, type Block, type BlockType,
 } from "../domain/page";
-import type { FileRow, ISODate } from "../domain/types";
+import type { ISODate } from "../domain/types";
 import { PICTURE_UNREADABLE } from "./picture";
-import { ShellContext } from "./shellContext";
 import { imageFiles, PHOTO_NOT_SAVED, storePhotos } from "./storePhotos";
+import { useFile } from "./useFile";
 
 // The page (round 3b): a small block editor over the item's / goal's Markdown notes. One
 // block per line (domain/page.ts). A line shows formatted (headings, ticks, links,
@@ -859,29 +857,4 @@ function PictureLine({ id, row, alt, onRemove }: { id: string; row: string; alt:
 /** A drag that carries files (not words dragged within the page). */
 function hasFiles(dt: DataTransfer | null): dt is DataTransfer {
   return !!dt && Array.from(dt.types ?? []).includes("Files");
-}
-
-/** A file row, re-read when anything is written (sync brings it later on another device). */
-export function useFile(id: string): FileRow | null | undefined {
-  const version = useContext(ShellContext)?.version ?? 0;
-  const [file, setFile] = useState<FileRow | null | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    const load = () =>
-      getFile(id).then(
-        (f) => {
-          if (!live) return;
-          setFile((had) => (had && f && had.updatedAt === f.updatedAt && had.status === f.status ? had : (f ?? null)));
-        },
-        () => live && setFile(null),
-      );
-    void load();
-    const onMutated = () => void load();
-    Dexie.on.storagemutated.subscribe(onMutated);
-    return () => {
-      live = false;
-      Dexie.on.storagemutated.unsubscribe(onMutated);
-    };
-  }, [id, version]);
-  return file;
 }
