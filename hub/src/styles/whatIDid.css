@@ -98,3 +98,9 @@
 .did-setting {
   margin-top: var(--gap-section);
 }
+
+/* Text boxes run the full width of their space (Esme, 2026-11-05, "no blank space"). */
+.did-box .form-field,
+.did-box textarea {
+  width: 100%;
+}

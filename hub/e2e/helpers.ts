@@ -33,3 +33,13 @@ export async function openReadBackPart(page: Page, name: string): Promise<Locato
   await expect(part.getByRole("heading", { level: 3, name, exact: true })).toBeVisible();
   return part;
 }
+
+/**
+ * Closes "What did you do?", which opens after every to-do tick (Esme, 19 Nov 2026), with Skip:
+ * for tests that tick a to-do and then carry on with the page.
+ */
+export async function skipWhatIDid(page: Page): Promise<void> {
+  const sheet = page.getByRole("dialog", { name: "What did you do?" });
+  await sheet.getByRole("button", { name: "Skip" }).click();
+  await expect(sheet).toHaveCount(0);
+}

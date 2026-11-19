@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { pageDate } from "./helpers";
+import { pageDate, skipWhatIDid } from "./helpers";
 
 /* Round 3a in a real browser: the side panel (open, resize, remembered width), the goal
    view and its Edit mode, the Habits box, Today keeping crossed-off items, and the legacy
@@ -148,6 +148,7 @@ test.describe("at 1280px", () => {
     await page.goto("/");
     const list = page.getByRole("list", { name: "Today" });
     await list.getByRole("checkbox", { name: "Mark done: Book a pretend writing day" }).click();
+    await skipWhatIDid(page);
     // The ticked to-do moves to the closed "Done today" dropdown; the one done earlier is already there.
     const fold = page.locator("details.done-fold").filter({ hasText: "Done today (2)" });
     await expect(fold).not.toHaveAttribute("open", "");

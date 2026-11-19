@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { pageDate } from "./helpers";
+import { pageDate, skipWhatIDid } from "./helpers";
 
 /* The tick celebration (Esme, 2026-11-17, option C "Pixel sparkles") in a real browser: it plays
    on the ticked strip's box, three bursts, and is gone after 0.5 s; calm: one still frame for
@@ -130,6 +130,7 @@ test.describe("tick sparkle", () => {
     await seedToday(page);
     await page.getByRole("checkbox", { name: "Mark done: Pretend second thing" }).click();
     await expect(page.getByTestId("tick-sparkle")).toHaveCount(0, { timeout: 2000 });
+    await skipWhatIDid(page);
     await page.locator("summary", { hasText: "Done today" }).click();
     await watchSparkle(page);
     await page.getByRole("checkbox", { name: "Done: Pretend second thing" }).click();
