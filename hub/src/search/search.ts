@@ -10,9 +10,10 @@ import { isProject } from "../domain/projects";
 import type { Goal, ISODate, Item } from "../domain/types";
 import { MORNING_LOCK_DAYS } from "../journal/entries";
 import { AREA_CHOICES } from "../ui/areas";
+import { didLog, type LogEntry } from "../domain/whatIDid";
 
 /** The result groups, in the order they show. */
-export const GROUPS = ["todos", "projects", "ideas", "books", "goals", "notes", "journal"] as const;
+export const GROUPS = ["todos", "projects", "ideas", "books", "goals", "notes", "did", "journal"] as const;
 export type Group = (typeof GROUPS)[number];
 export const GROUP_LABEL: Record<Group, string> = {
   todos: "To-dos",
@@ -21,6 +22,7 @@ export const GROUP_LABEL: Record<Group, string> = {
   books: "Books",
   goals: "Goals",
   notes: "Notes",
+  did: "What I did",
   journal: "Journal",
 };
 
@@ -65,6 +67,8 @@ interface Doc {
   lowNotes: string;
   /** When it was made: newer things come first (Esme, 2026-11-05). */
   made: ISODate;
+  /** Where it opens, when not its own side panel (a "What I did" note: the log at that entry). */
+  open?: Open;
 }
 
 const areaName = (id: string) => (id === "inbox" ? "Inbox" : (AREA_CHOICES.find((a) => a.id === id)?.label ?? id));
@@ -165,11 +169,28 @@ function goalDoc(g: Goal, today: ISODate): Doc {
   };
 }
 
+/**
+ * A "What I did" note (2026-11-19): found by its words and its files' names (the to-do's own
+ * title finds the to-do), opening the log at that entry.
+ */
+function didDoc(e: LogEntry, today: ISODate): Doc {
+  const title = e.project ? `${e.project}: ${e.todo}` : e.todo;
+  const notes = e.note ?? "";
+  const extra = e.files.map((f) => f.name);
+  return {
+    id: e.key, group: "did", noun: "note", title, extra, notes, tile: e.area, areaLabel: e.areaLabel,
+    meta: `What I did · ${dayLabel(e.on, today)} · ${e.areaLabel}`,
+    lowTitle: fold(title), lowExtra: extra.map(fold), lowNotes: fold(notes), made: e.on,
+    open: { path: `/what-i-did?entry=${encodeURIComponent(e.key)}` },
+  };
+}
+
 /** The search index: built once per open (or when the lists change), then queried as she types. */
 export function buildIndex(items: Item[], goals: Goal[], today: ISODate): Doc[] {
   return [
     ...items.filter((i) => i.status === "open" || i.status === "done").map((i) => itemDoc(i, today)),
     ...goals.filter((g) => g.status === undefined).map((g) => goalDoc(g, today)),
+    ...didLog(items, areaName).map((e) => didDoc(e, today)),
   ];
 }
 
@@ -189,7 +210,10 @@ export function searchIndex(index: Doc[], query: string, cap = GROUP_CAP, capFor
   const found = new Map<Group, { d: Doc; rank: number; i: number }[]>();
   for (const d of index) {
     let group: Group;
-    if (allIn(words, [d.lowTitle, ...d.lowExtra])) group = d.group;
+    if (d.group === "did") {
+      if (!allIn(words, [d.lowNotes, ...d.lowExtra])) continue;
+      group = "did";
+    } else if (allIn(words, [d.lowTitle, ...d.lowExtra])) group = d.group;
     else if (d.lowNotes && allIn(words, [d.lowTitle, ...d.lowExtra, d.lowNotes])) group = "notes";
     else continue;
     const list = found.get(group) ?? [];
@@ -207,6 +231,10 @@ export function searchIndex(index: Doc[], query: string, cap = GROUP_CAP, capFor
 /** One kept result, with its second line: the author, the session that matched, or the words around a note match. */
 function toHit(d: Doc, group: Group, words: string[]): Hit {
   let sub: string | undefined;
+  if (group === "did") {
+    sub = d.lowNotes && allIn(words, [d.lowNotes]) ? snippet(d.notes, words) : d.extra.find((_, i) => words.some((w) => d.lowExtra[i].includes(w))) ?? (d.notes ? snippet(d.notes, words) : undefined);
+    return { id: d.id, title: d.title, ...(sub ? { sub } : {}), meta: d.meta, tile: d.tile, open: d.open! };
+  }
   if (group === "notes") sub = snippet(d.notes, words);
   else sub = d.group === "books" ? d.extra[0] : d.extra.find((_, i) => words.some((w) => d.lowExtra[i].includes(w)));
   const meta = group === "notes" ? `Note on a${d.noun === "idea" ? "n" : ""} ${d.noun} · ${d.areaLabel}` : d.meta;

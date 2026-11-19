@@ -15,6 +15,7 @@ import { RepeatingPage } from "./ui/RepeatingPage";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
 import { FarmPage, PopInDemo } from "./farm/FarmPage";
+import { WhatIDidPage } from "./ui/whatIDid/WhatIDidPage";
 
 /**
  * There is no Today page (Esme, 2026-11-04: "today page is a little redundant with the
@@ -109,6 +110,7 @@ export function AppRoutes() {
           {import.meta.env.DEV && <Route path="/farm/popin-demo" element={<PopInDemo />} />}
           <Route path="/reminders" element={<RemindersPage />} />
           <Route path="/repeating" element={<RepeatingRoute />} />
+          <Route path="/what-i-did" element={<WhatIDidPage />} />
         </Route>
       </Routes>
   );

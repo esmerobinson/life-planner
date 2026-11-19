@@ -20,6 +20,7 @@ export function FooterLinks() {
   const sync = useSyncState();
   return (
     <>
+      <NavLink to="/what-i-did">What I did</NavLink>{" "}
       <NavLink to="/repeating">Repeating</NavLink>{" "}
       <NavLink to="/reminders">Reminders</NavLink>{" "}
       <NavLink to="/backup">Backup</NavLink>{" "}

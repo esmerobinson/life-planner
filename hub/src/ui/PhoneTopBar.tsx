@@ -10,6 +10,7 @@ const TITLES: Record<string, string> = {
   "/backup": "Backup",
   "/sync": "Sync",
   "/bin": "Bin",
+  "/what-i-did": "What I did",
 };
 
 /**
