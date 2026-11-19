@@ -4,7 +4,7 @@
 import { db } from "../data/db";
 import type { ISODate } from "../domain/types";
 import { getDeviceId } from "../sync/engine";
-import { RIO_MAP } from "../rio/assets";
+import { RIO_PLACE_KEYS } from "../rio/places";
 import { STICKER_BY_KEY } from "./catalogue";
 import {
   arrivedRow, hiddenRow, outfitRow, placedRow, seenRow, spotRow, startRow, todayRow, validFarm, visitedRow, type CharacterId, type FarmRow,
@@ -58,7 +58,7 @@ export async function recordTodayDone(today: ISODate): Promise<void> {
   await db.farm.put(todayRow(today));
 }
 
-const RIO_PLACES: ReadonlySet<string> = new Set(RIO_MAP.places.map((p) => p.key));
+const RIO_PLACES: ReadonlySet<string> = new Set(RIO_PLACE_KEYS);
 
 /** She opened an area of Esme's Rio (once: the map's NEW badge goes for good). */
 export async function markVisited(area: string, today: ISODate): Promise<void> {
