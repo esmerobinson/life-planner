@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { inflateSync } from "node:zlib";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -110,6 +110,16 @@ describe("built service worker", () => {
     expect(urls).toContain("manifest.webmanifest");
     expect(urls.filter((u) => /\.json$/i.test(u))).toEqual([]);
     expect(urls.filter((u) => /indexeddb|backup/i.test(u))).toEqual([]);
+  });
+
+  it("precaches every script and stylesheet (none over Workbox's 2 MB limit, so the app still starts offline)", () => {
+    const urls = new Set(precached());
+    const assets = readdirSync(resolve(dist, "assets")).filter((f) => /\.(js|css)$/.test(f));
+    expect(assets.length).toBeGreaterThan(0);
+    for (const f of assets) {
+      expect(statSync(resolve(dist, "assets", f)).size).toBeLessThan(2 * 1024 * 1024);
+      expect(urls.has(`assets/${f}`)).toBe(true);
+    }
   });
 
   it("has no runtime caching and falls back to index.html for navigation", () => {
