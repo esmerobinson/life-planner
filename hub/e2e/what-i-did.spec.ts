@@ -57,6 +57,7 @@ async function pretendMac(page: Page) {
           postMessage: async (m: { action: string; root?: string; parts?: string[] }) => {
             sent.push(m);
             if (m.action === "attach") return { saved: [{ name: "pretend draft.docx", folder: `${m.root}/${m.parts!.join("/")}` }], failed: [] };
+            if (m.action === "getRoot") return { root: "~/Desktop" };
             if (m.action === "reveal") return { ok: true };
             return { cancelled: true };
           },
@@ -111,6 +112,31 @@ for (const width of [1280, 390]) {
       await shoot(page, `what-i-did-panel-${width}`);
     });
 
+    test("never costs a click (review I1): three to-dos ticked quickly in a row are all done", async ({ page }) => {
+      await page.goto("/");
+      const day = await pageDate(page);
+      await seed(page, [item("one", day), item("two", day), item("three", day)]);
+      await page.goto("/area/writing");
+      for (const t of ["one", "two", "three"]) await page.getByRole("checkbox", { name: `Mark done: Pretend ${t}` }).click();
+      for (const t of ["one", "two", "three"]) await expect.poll(async () => (await readItem(page, t)).status).toBe("done");
+      // Only the last one's card is open, about that one.
+      await expect(sheet(page)).toHaveCount(1);
+      await expect(sheet(page).getByText("Pretend three")).toBeVisible();
+      await noSidewaysScroll(page);
+      await shoot(page, `what-i-did-three-ticks-${width}`);
+    });
+
+    test("typed, then the page reloads at once (before the pause save): the words are kept (review R5)", async ({ page }) => {
+      await page.goto("/");
+      const day = await pageDate(page);
+      await seed(page, [item("fast", day)]);
+      await page.goto("/area/writing");
+      await page.getByRole("checkbox", { name: "Mark done: Pretend fast" }).click();
+      await sheet(page).getByRole("textbox").pressSequentially("Pretend fast words", { delay: 5 });
+      await page.reload();
+      await expect.poll(async () => (await readItem(page, "fast")).did?.[0]?.note).toBe("Pretend fast words");
+    });
+
     test("in the Mac app (bridge pretended): Attach files copies into the area's folder and lists the file", async ({ page }) => {
       await pretendMac(page);
       await page.goto("/");
@@ -121,7 +147,7 @@ for (const width of [1280, 390]) {
       await sheet(page).getByRole("button", { name: "Attach files" }).click();
       await expect(sheet(page).getByRole("button", { name: "pretend draft.docx" })).toBeVisible();
       const sent = await page.evaluate(() => (window as unknown as { __files: unknown[] }).__files);
-      expect(sent[0]).toEqual({ action: "attach", root: "~/Desktop", parts: ["Art", "Pretend zine"] });
+      expect(sent.find((m) => (m as { action: string }).action === "attach")).toEqual({ action: "attach", root: "~/Desktop", parts: ["Art", "Pretend zine"] });
       await sheet(page).getByRole("button", { name: "Save" }).click();
       await expect.poll(async () => (await readItem(page, "zine")).did?.[0]).toMatchObject({
         session: "s1", files: [{ name: "pretend draft.docx", folder: "~/Desktop/Art/Pretend zine" }],

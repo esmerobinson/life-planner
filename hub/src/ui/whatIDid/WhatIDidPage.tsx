@@ -5,9 +5,9 @@ import { db } from "../../data/db";
 import { dayLabel, shortDate } from "../../domain/display";
 import type { AreaId, Item } from "../../domain/types";
 import { DEFAULT_FILES_ROOT, didLog, logWeeks, type LogEntry } from "../../domain/whatIDid";
-import { chooseFilesRoot, hasFileBridge, loadFilesRoot, saveFilesRoot } from "../../native/files";
+import { chooseFilesRoot, hasFileBridge, loadFilesRoot, resetFilesRoot } from "../../native/files";
 import { AREA_CHOICES } from "../areas";
-import { DATA_ERROR, useSaveError } from "../messages";
+import { DATA_ERROR } from "../messages";
 import { usePanel } from "../panelContext";
 import { useShellToday } from "../shellContext";
 import { areaName, FileList } from "./DidBox";
@@ -119,21 +119,19 @@ function Entry({ e, today, marked, onOpen }: { e: LogEntry; today: string; marke
   );
 }
 
-/** Where kept files go, this Mac's own setting: the Desktop until she chooses another folder. */
+/**
+ * Where kept files go: the Mac app keeps it (review M1), the Desktop until she chooses another
+ * folder in the Mac's own folder picker.
+ */
 function FolderSetting() {
   const [root, setRoot] = useState<string | null>(null);
-  const { attempt, saveError } = useSaveError();
   useEffect(() => {
     let live = true;
-    void loadFilesRoot().then((r) => live && setRoot(r), () => live && setRoot(DEFAULT_FILES_ROOT));
+    void loadFilesRoot().then((r) => live && setRoot(r));
     return () => {
       live = false;
     };
   }, []);
-
-  async function use(next: string) {
-    if (await attempt(() => saveFilesRoot(next))) setRoot(next);
-  }
 
   return (
     <section className="did-setting" aria-label={W.settingHeading}>
@@ -146,18 +144,17 @@ function FolderSetting() {
           className="btn-secondary"
           onClick={async () => {
             const picked = await chooseFilesRoot();
-            if (picked) await use(picked);
+            if (picked) setRoot(picked);
           }}
         >
           {W.chooseFolder}
         </button>
-        {root !== DEFAULT_FILES_ROOT && (
-          <button type="button" className="btn-secondary" onClick={() => void use(DEFAULT_FILES_ROOT)}>
+        {root !== null && root !== DEFAULT_FILES_ROOT && (
+          <button type="button" className="btn-secondary" onClick={async () => setRoot(await resetFilesRoot())}>
             {W.useDesktop}
           </button>
         )}
       </div>
-      {saveError && <p className="form-message">{saveError}</p>}
     </section>
   );
 }

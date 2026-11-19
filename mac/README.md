@@ -171,8 +171,10 @@ page's address, which is `esmeworld://app`.
   moves or deletes it) into `~/Desktop/<Area>/` or `~/Desktop/<Area>/<Project>/`
   (`FilesBridge`, `esmeworldFiles`), making the folders when missing and never
   overwriting (`plan (2).pdf`). Only the saved names and folders go back to the page.
-  The folder (`~/Desktop`) can be changed on the What I did page ("Where files go"),
-  and is this Mac's own setting. Clicking a kept file shows it in Finder. The app is
+  The folder (`~/Desktop`) can be changed on the What I did page ("Where files go").
+  The app holds it itself (UserDefaults `EsmeworldFilesRoot`), only ever set through the
+  Mac's own folder picker, and refuses any other folder the page names. Show in Finder
+  only opens files inside the Desktop or a folder she chose. Clicking a kept file shows it in Finder. The app is
   not sandboxed, so no entitlement is needed, but macOS guards the Desktop: the first
   time, it asks whether Esmeworld may use it (choose Allow). If that was refused, the
   page says how to allow it: System Settings, Privacy & Security, Files and Folders,
@@ -254,9 +256,12 @@ takes notification clicks (no delegate in self-test mode).
 
 "What I did" files: through the real bridge, two copies of a made-up file go into a
 temporary root (never your Desktop): the area and project folders are made, the source
-stays, the second copy is `pretend plan (2).txt`. Unsafe folder names, a root with `..`
-and any root outside the temporary folder (the Desktop included) are refused before any
-file is looked at. No Open panel, folder panel or Finder window is ever shown in the
+stays, the second copy is `pretend plan (2).txt`. Nothing is accepted before a root is
+chosen; a root the page names that wasn't chosen (another temporary folder, the Desktop)
+is refused; unsafe folder names, a root with `..` and any root outside the temporary
+folder are refused before any file is looked at. Show in Finder refuses a folder outside
+the chosen roots (`/etc`). The self-test's root lives in memory: your setting is never
+read or changed. No Open panel, folder panel or Finder window is ever shown in the
 self-test. The temporary root is deleted afterwards.
 
 Needs macOS 14 or later (the app itself still runs on macOS 13).

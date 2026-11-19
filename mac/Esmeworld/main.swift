@@ -337,23 +337,68 @@ final class DeviceOwnerBridge: NSObject, WKScriptMessageHandlerWithReply {
 /// Messages (window.webkit.messageHandlers.esmeworldFiles.postMessage → Promise):
 ///   { action: "attach", root, parts } → { saved: [{ name, folder }], failed: [name] }
 ///                                       | { cancelled: true } | { error: "permission" | "root" | "folder" }
-///      `root` is "~/Desktop" style (or absolute); `parts` the area (and project) folder names, made
-///      safe by the page (hub/src/domain/whatIDid.ts safeName) and checked again here.
-///   { action: "chooseRoot" }          → { root } | { cancelled: true }   (a folder picker)
-///   { action: "reveal", folder, name } → { ok: true } | { ok: false, missing: true }   (Finder)
+///      `root` must be the folder this app holds (below); `parts` the area (and project) folder
+///      names, made safe by the page (hub/src/domain/whatIDid.ts safeName) and checked again here.
+///   { action: "getRoot" }             → { root }
+///   { action: "chooseRoot" }          → { root } | { cancelled: true }   (the Mac's folder picker)
+///   { action: "resetRoot" }           → { root: "~/Desktop" }
+///   { action: "reveal", folder, name } → { ok: true } | { ok: false, missing: true } | { ok: false, refused: true }
+///
+/// The root is held HERE, never trusted from the page (review M1): "~/Desktop" until she chooses
+/// another folder in the native folder picker (UserDefaults `EsmeworldFilesRoot`). An attach with
+/// any other root is refused. Show in Finder only reveals files inside a root she has used
+/// (the Desktop or one she chose; `EsmeworldFilesRoots`), since file records come from synced rows (M2).
 ///
 /// The app is not sandboxed, so no entitlement is needed; macOS still guards the Desktop,
 /// Documents and Downloads (privacy, "Files and Folders") and asks her once the first time the
 /// app writes there. A refusal comes back as { error: "permission" } and the page says how to
 /// allow it. The copying runs off the main thread, so the window never hangs while macOS asks.
 ///
-/// Self-test: never shows a panel and never touches her folders. `attach` takes
-/// `selfTestSources` (paths) instead of the panel and only a root inside the temporary folder
-/// (anything else, the Desktop included, is refused before any file is looked at); `chooseRoot`
-/// answers { cancelled: true, selfTest: true }; `reveal` only says whether the file is there.
+/// Self-test: never shows a panel, never touches her folders or her settings (its root is held in
+/// memory, none until chosen). `chooseRoot` takes `selfTestRoot` (inside the temporary folder)
+/// instead of the picker; `attach` takes `selfTestSources` instead of the Open panel and only a
+/// root inside the temporary folder (anything else, the Desktop included, is refused before any
+/// file is looked at); `reveal` only says whether the file is there, never opens Finder.
 final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "esmeworldFiles"
+    static let defaultRoot = "~/Desktop"
+    static let rootKey = "EsmeworldFilesRoot"
+    static let rootsKey = "EsmeworldFilesRoots"
     weak var window: NSWindow?
+    /// The self-test's own root and roots (in memory; her settings are never read or written).
+    private var selfTestRoot: String?
+    private var selfTestRoots: [String] = []
+
+    /// The folder files go into ("~/Desktop" style). Self-test: nil until it chooses one.
+    var root: String? {
+        if isSelfTest { return selfTestRoot }
+        return UserDefaults.standard.string(forKey: Self.rootKey) ?? Self.defaultRoot
+    }
+
+    /// Every root she has used (the Desktop always): Show in Finder stays inside these.
+    var roots: [String] {
+        if isSelfTest { return selfTestRoots }
+        return [Self.defaultRoot] + (UserDefaults.standard.stringArray(forKey: Self.rootsKey) ?? [])
+    }
+
+    private func setRoot(_ r: String) {
+        if isSelfTest {
+            selfTestRoot = r
+            if !selfTestRoots.contains(r) { selfTestRoots.append(r) }
+            return
+        }
+        UserDefaults.standard.set(r, forKey: Self.rootKey)
+        var all = UserDefaults.standard.stringArray(forKey: Self.rootsKey) ?? []
+        if !all.contains(r) { all.append(r) }
+        UserDefaults.standard.set(all, forKey: Self.rootsKey)
+    }
+
+    /// `path` is `root` itself or inside it (both expanded, symlinks resolved).
+    static func isInside(_ path: URL, _ root: URL) -> Bool {
+        let p = path.resolvingSymlinksInPath().standardizedFileURL.path
+        let r = root.resolvingSymlinksInPath().standardizedFileURL.path
+        return p == r || p.hasPrefix(r.hasSuffix("/") ? r : r + "/")
+    }
 
     struct Saved { let name: String; let folder: String }
     struct CopyResult { var saved: [Saved] = []; var failed: [String] = []; var permission = false }
@@ -452,14 +497,22 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
         }
         switch action {
         case "attach": attach(body, replyHandler)
-        case "chooseRoot": chooseRoot(replyHandler)
+        case "getRoot": replyHandler(["root": root ?? Self.defaultRoot], nil)
+        case "chooseRoot": chooseRoot(body, replyHandler)
+        case "resetRoot":
+            setRoot(Self.defaultRoot)
+            replyHandler(["root": Self.defaultRoot], nil)
         case "reveal": reveal(body, replyHandler)
         default: replyHandler(nil, "unknown action")
         }
     }
 
     private func attach(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
-        guard let rootText = body["root"] as? String, let root = Self.expand(rootText) else {
+        // Only the folder this app holds (she chose it in the picker, or the Desktop): review M1.
+        guard let rootText = body["root"] as? String, let root = Self.expand(rootText),
+              let held = self.root, let heldURL = Self.expand(held),
+              root.standardizedFileURL.path == heldURL.standardizedFileURL.path
+        else {
             reply(["error": "root"], nil)
             return
         }
@@ -517,9 +570,16 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
         }
     }
 
-    private func chooseRoot(_ reply: @escaping @MainActor (Any?, String?) -> Void) {
+    private func chooseRoot(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
         if isSelfTest {
-            reply(["cancelled": true, "selfTest": true], nil)
+            // Stands in for her choice in the picker: only a folder inside the temporary folder.
+            let tmp = FileManager.default.temporaryDirectory
+            guard let p = body["selfTestRoot"] as? String, let url = Self.expand(p), Self.isInside(url, tmp), url.path != tmp.path else {
+                reply(["cancelled": true, "selfTest": true], nil)
+                return
+            }
+            setRoot(p)
+            reply(["root": p, "selfTest": true], nil)
             return
         }
         let panel = NSOpenPanel()
@@ -533,7 +593,9 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
                 reply(["cancelled": true], nil)
                 return
             }
-            reply(["root": Self.tilde(url)], nil)
+            let chosen = Self.tilde(url)
+            self.setRoot(chosen)
+            reply(["root": chosen], nil)
         }
         if let window { panel.beginSheetModal(for: window, completionHandler: done) } else { done(panel.runModal()) }
     }
@@ -543,6 +605,11 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
               let name = body["name"] as? String, Self.safePart(name)
         else {
             reply(["ok": false], nil)
+            return
+        }
+        // Only inside a root she has used (review M2): a synced row can't point Finder anywhere.
+        guard roots.contains(where: { r in Self.expand(r).map { Self.isInside(folder, $0) } ?? false }) else {
+            reply(["ok": false, "refused": true], nil)
             return
         }
         let file = folder.appendingPathComponent(name, isDirectory: false)
@@ -1769,20 +1836,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             try Data("pretend file for the self-test".utf8).write(to: src)
             let rootJS = String(data: try JSONSerialization.data(withJSONObject: [root.path]), encoding: .utf8)!
             let srcJS = String(data: try JSONSerialization.data(withJSONObject: [src.path]), encoding: .utf8)!
+            let other = base.appendingPathComponent("not-chosen", isDirectory: true)
+            try fm.createDirectory(at: other, withIntermediateDirectories: true)
+            let otherJS = String(data: try JSONSerialization.data(withJSONObject: [other.path]), encoding: .utf8)!
             let r = try await js("""
             const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(FilesBridge.name);
             if (!h) return JSON.stringify({ bridge: false });
-            const root = \(rootJS)[0], sources = \(srcJS);
+            const root = \(rootJS)[0], other = \(otherJS)[0], sources = \(srcJS);
+            const before = await h.postMessage({ action: "attach", root, parts: ["Art"], selfTestSources: sources });
+            const chosen = await h.postMessage({ action: "chooseRoot", selfTestRoot: root });
+            const held = await h.postMessage({ action: "getRoot" });
             const one = await h.postMessage({ action: "attach", root, parts: ["Tech projects", "App- v2"], selfTestSources: sources });
             const two = await h.postMessage({ action: "attach", root, parts: ["Tech projects", "App- v2"], selfTestSources: sources });
+            const unchosen = await h.postMessage({ action: "attach", root: other, parts: ["Art"], selfTestSources: sources });
             const desktop = await h.postMessage({ action: "attach", root: "~/Desktop", parts: ["Esmeworld self-test"], selfTestSources: sources });
             const dots = await h.postMessage({ action: "attach", root, parts: ["..", "x"], selfTestSources: sources });
             const slash = await h.postMessage({ action: "attach", root, parts: ["a/b"], selfTestSources: sources });
             const up = await h.postMessage({ action: "attach", root: root + "/../..", parts: ["x"], selfTestSources: sources });
-            const pick = await h.postMessage({ action: "chooseRoot" });
+            const pick = await h.postMessage({ action: "chooseRoot", selfTestRoot: "~/Desktop" });
             const shown = await h.postMessage({ action: "reveal", folder: one.saved[0].folder, name: one.saved[0].name });
             const gone = await h.postMessage({ action: "reveal", folder: one.saved[0].folder, name: "not there.txt" });
-            return JSON.stringify({ bridge: true, one, two, desktop, dots, slash, up, pick, shown, gone });
+            const outsideRoot = await h.postMessage({ action: "reveal", folder: other, name: "x.txt" });
+            const system = await h.postMessage({ action: "reveal", folder: "/etc", name: "hosts" });
+            const reset = await h.postMessage({ action: "resetRoot" });
+            const resetDesktop = await h.postMessage({ action: "attach", root: "~/Desktop", parts: ["Esmeworld self-test"], selfTestSources: sources });
+            return JSON.stringify({ bridge: true, before, chosen, held, one, two, unchosen, desktop, dots, slash, up, pick, shown, gone, outsideRoot, system, reset, resetDesktop });
             """)
             check(r["bridge"] as? Bool == true, "files bridge exists")
             let one = (r["one"] as? [String: Any])?["saved"] as? [[String: String]] ?? []
@@ -1797,11 +1875,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                   && fm.fileExists(atPath: copied2.path), "files: the copies hold the file")
             check(fm.fileExists(atPath: src.path), "files: the source is never moved or deleted")
             let err = { (k: String) in (r[k] as? [String: Any])?["error"] as? String ?? "none" }
-            say("files.refused desktop=\(err("desktop")) dots=\(err("dots")) slash=\(err("slash")) up=\(err("up"))")
-            check(err("desktop") == "selftest-root", "files: the self-test never writes to the real Desktop")
+            say("files.refused before=\(err("before")) unchosen=\(err("unchosen")) desktop=\(err("desktop")) dots=\(err("dots")) slash=\(err("slash")) up=\(err("up")) resetDesktop=\(err("resetDesktop"))")
+            check(err("before") == "root", "files: no root until one is chosen in the picker (self-test)")
+            check((r["held"] as? [String: Any])?["root"] as? String == root.path, "files: the bridge holds the chosen root")
+            check(err("unchosen") == "root", "files: a root the page sends that she didn't choose is refused (M1)")
+            check(err("desktop") == "root", "files: the self-test never writes to the real Desktop (not its chosen root)")
+            check((r["reset"] as? [String: Any])?["root"] as? String == "~/Desktop" && err("resetDesktop") == "selftest-root",
+                  "files: reset to the Desktop is held, and the self-test still never writes there")
             check(err("dots") == "folder" && err("slash") == "folder", "files: unsafe folder names are refused")
             check(err("up") == "root", "files: a root with .. is refused")
-            check((r["pick"] as? [String: Any])?["selfTest"] as? Bool == true, "files: no folder panel in the self-test")
+            check((r["pick"] as? [String: Any])?["cancelled"] as? Bool == true, "files: no folder panel in the self-test, and it can't choose the Desktop")
+            let refused = { (k: String) in (r[k] as? [String: Any])?["refused"] as? Bool == true }
+            say("files.reveal outsideRoot=\(refused("outsideRoot")) system=\(refused("system"))")
+            check(refused("outsideRoot") && refused("system"), "files: Show in Finder only inside a root she used (M2)")
             check((r["shown"] as? [String: Any])?["ok"] as? Bool == true
                   && (r["gone"] as? [String: Any])?["missing"] as? Bool == true, "files: reveal knows a kept file from a gone one (no Finder in the self-test)")
         } catch {

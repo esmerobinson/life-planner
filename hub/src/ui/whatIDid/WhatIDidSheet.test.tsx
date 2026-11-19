@@ -151,7 +151,7 @@ it("in the Mac app: Attach files copies through the bridge and the names show; m
   const sheet = await tickOn("/area/writing", "Pretend story");
   await userEvent.click(within(sheet).getByRole("button", { name: "Attach files" }));
   expect(await within(sheet).findByRole("button", { name: "draft.docx" })).toBeInTheDocument();
-  expect(calls[0]).toEqual({ action: "attach", root: "~/Desktop", parts: ["Writing"] });
+  expect(calls.find((c) => c.action === "attach")).toEqual({ action: "attach", root: "~/Desktop", parts: ["Writing"] });
   expect((await db.items.get("story"))!.did![0]!.files).toEqual([{ name: "draft.docx", folder: "~/Desktop/Writing" }]);
   answer = { error: "permission" };
   await userEvent.click(await within(sheet).findByRole("button", { name: "Attach files" }));

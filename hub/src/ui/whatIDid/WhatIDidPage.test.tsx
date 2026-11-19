@@ -82,15 +82,23 @@ it("the folder setting shows only in the Mac app, and changes through the Mac's 
   expect(screen.queryByRole("region", { name: "Where files go" })).toBeNull();
   first.unmount();
   vi.useRealTimers();
+  let root = "~/Desktop";
   (window as unknown as { webkit: unknown }).webkit = {
-    messageHandlers: { [FILES_HANDLER]: { postMessage: async () => ({ root: "~/Documents/Pretend work" }) } },
+    messageHandlers: {
+      [FILES_HANDLER]: {
+        postMessage: async (m: { action: string }) => {
+          if (m.action === "chooseRoot") root = "~/Documents/Pretend work";
+          if (m.action === "resetRoot") root = "~/Desktop";
+          return { root };
+        },
+      },
+    },
   };
   renderApp("/what-i-did", TODAY);
   const setting = await screen.findByRole("region", { name: "Where files go" });
   expect(await within(setting).findByText(/~\/Desktop/)).toBeInTheDocument();
   await userEvent.click(within(setting).getByRole("button", { name: "Choose folder…" }));
   expect(await within(setting).findByText(/~\/Documents\/Pretend work/)).toBeInTheDocument();
-  expect((await db.syncMeta.get("whatIDidRoot"))!.value).toBe("~/Documents/Pretend work");
   await userEvent.click(within(setting).getByRole("button", { name: "Use the Desktop" }));
   expect(await within(setting).findByText(/~\/Desktop/)).toBeInTheDocument();
 });

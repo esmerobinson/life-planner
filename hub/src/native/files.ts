@@ -5,13 +5,10 @@
 // and folders come back; no file contents ever reach the page. In a browser or on the iPhone
 // there is no bridge: every call here is a no-op.
 
-import { db } from "../data/db";
 import { DEFAULT_FILES_ROOT, safeName } from "../domain/whatIDid";
 import type { DidFile } from "../domain/types";
 
 export const FILES_HANDLER = "esmeworldFiles";
-/** This device's folder for kept files (syncMeta: never synced, never in a backup). */
-export const FILES_ROOT_KEY = "whatIDidRoot";
 
 interface ReplyHandler {
   postMessage(message: unknown): Promise<unknown>;
@@ -95,12 +92,29 @@ export async function revealFile(f: DidFile): Promise<"ok" | "missing" | "error"
   }
 }
 
-/** This device's folder for kept files ("~/Desktop" until she chooses another). */
+/**
+ * Where kept files go: the Mac app's own setting (review M1: it only takes a folder she chose in
+ * its folder picker, and refuses any other root the page sends). "~/Desktop" elsewhere.
+ */
 export async function loadFilesRoot(): Promise<string> {
-  const v = (await db.syncMeta.get(FILES_ROOT_KEY))?.value;
-  return typeof v === "string" && v.trim() ? v : DEFAULT_FILES_ROOT;
+  const h = handler();
+  if (!h) return DEFAULT_FILES_ROOT;
+  try {
+    const r = obj(await h.postMessage({ action: "getRoot" }));
+    return r && typeof r.root === "string" && r.root ? r.root : DEFAULT_FILES_ROOT;
+  } catch {
+    return DEFAULT_FILES_ROOT;
+  }
 }
 
-export async function saveFilesRoot(root: string): Promise<void> {
-  await db.syncMeta.put({ key: FILES_ROOT_KEY, value: root });
+/** Back to the Desktop (the Mac app's default). Returns the folder now in use. */
+export async function resetFilesRoot(): Promise<string> {
+  const h = handler();
+  if (!h) return DEFAULT_FILES_ROOT;
+  try {
+    const r = obj(await h.postMessage({ action: "resetRoot" }));
+    return r && typeof r.root === "string" && r.root ? r.root : DEFAULT_FILES_ROOT;
+  } catch {
+    return DEFAULT_FILES_ROOT;
+  }
 }

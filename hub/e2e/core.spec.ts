@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { pageDate, skipWhatIDid } from "./helpers";
+import { pageDate } from "./helpers";
 
 async function expectCalm(page: Page, text: string) {
   await expect(page.getByText(text).first()).toBeVisible();
@@ -92,7 +92,6 @@ test("first run, import, file, tick, move, persist and backup round trip", async
     await expect(row.getByText(/· 3 days late$/)).toBeVisible();
     await expect(row.getByText("OVERDUE", { exact: true })).toHaveCount(0);
     await row.getByRole("checkbox", { name: "Mark done: Overdue pretend errand" }).click();
-    await skipWhatIDid(page);
     // It leaves the Today list at once and waits, ticked and crossed out, in a closed "Done today (1)" dropdown.
     await expect(page.getByRole("list", { name: "Today" }).getByText("Overdue pretend errand")).toHaveCount(0);
     const fold = page.locator("details.done-fold").filter({ hasText: "Done today (1)" });

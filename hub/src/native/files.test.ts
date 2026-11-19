@@ -1,5 +1,5 @@
 import { db } from "../data/db";
-import { attachFiles, chooseFilesRoot, FILES_HANDLER, hasFileBridge, loadFilesRoot, revealFile, saveFilesRoot } from "./files";
+import { attachFiles, chooseFilesRoot, FILES_HANDLER, hasFileBridge, loadFilesRoot, resetFilesRoot, revealFile } from "./files";
 
 // The Mac app's file bridge for "What I did" (mac/Esmeworld/main.swift, esmeworldFiles). In a
 // browser or on the iPhone there is no bridge and nothing here does anything.
@@ -60,10 +60,18 @@ it("choose a folder and reveal a file", async () => {
   expect(sent[1]).toEqual({ action: "reveal", folder: "~/Desktop/Art", name: "here.txt" });
 });
 
-it("the folder setting is this device's own, the Desktop until changed", async () => {
+it("the folder is the Mac app's own (review M1): read from it, chosen through its picker, reset to the Desktop", async () => {
+  expect(await loadFilesRoot()).toBe("~/Desktop"); // no bridge: the default
+  let root = "~/Desktop";
+  pretendMac((m) => {
+    if (m.action === "chooseRoot") root = "~/Documents/Work";
+    if (m.action === "resetRoot") root = "~/Desktop";
+    return { root };
+  });
   expect(await loadFilesRoot()).toBe("~/Desktop");
-  await saveFilesRoot("~/Documents/Work");
+  expect(await chooseFilesRoot()).toBe("~/Documents/Work");
   expect(await loadFilesRoot()).toBe("~/Documents/Work");
-  await db.syncMeta.put({ key: "whatIDidRoot", value: 42 });
-  expect(await loadFilesRoot()).toBe("~/Desktop");
+  expect(await resetFilesRoot()).toBe("~/Desktop");
+  expect(sent.map((m) => (m as { action: string }).action)).toEqual(["getRoot", "chooseRoot", "getRoot", "resetRoot"]);
+  expect(await db.syncMeta.count()).toBe(0); // nothing kept by the page
 });
