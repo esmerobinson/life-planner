@@ -1,18 +1,27 @@
 /// <reference types="vitest/config" />
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+/** ESMEWORLD_BUILD if set (tests), else the git commit ("+" when built with uncommitted changes). */
+function buildId(): string {
+  if (process.env.ESMEWORLD_BUILD) return process.env.ESMEWORLD_BUILD;
+  try {
+    const git = (cmd: string) => execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    const sha = git("git rev-parse --short=12 HEAD");
+    return git("git status --porcelain --untracked-files=no -- .") ? `${sha}+` : sha;
+  } catch {
+    return process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) || "local";
+  }
+}
+
 export default defineConfig({
   // Which build this is (no visible UI: <html data-build>), so a device's version can be told
-  // apart. Deterministic unless set: the Mac app's build id hashes these files.
-  define: {
-    __ESMEWORLD_BUILD__: JSON.stringify(
-      process.env.ESMEWORLD_BUILD || process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) || "local",
-    ),
-  },
+  // apart: the git commit it was built from (deploys are a local `wrangler pages deploy`).
+  define: { __ESMEWORLD_BUILD__: JSON.stringify(buildId()) },
   plugins: [
     react(),
     VitePWA({
