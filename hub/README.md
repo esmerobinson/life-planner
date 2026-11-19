@@ -275,18 +275,26 @@ Honest limits:
 - The offline copy holds only the app itself (page, scripts, styles, icons). Your
   tasks live in IndexedDB and the service worker never reads or caches them.
 - The app updates itself (`src/native/pwaUpdate.ts`). It looks for a new version
-  on start, each time it comes back into view, and every 30 minutes while in view.
-  It switches only at a safe moment: right on opening or coming back (before
-  anything is touched), or after 30 s untouched. First it saves every draft (the
-  Mac app's own check). It never switches while you type, with a sheet open that
-  has text in it, on the Journal, while a sync runs, or with the full Add form's
-  draft kept. It tries again every 10 s.
+  on start, on leaving the app, each time it comes back into view, and every 30
+  minutes while in view.
+- When to switch, one rule (`src/native/updateHolds.ts`): never once anything has
+  been edited on the current page (any typing, choice or paste in a field), until
+  you go to another page. Also never while a sheet or dialog is open, a to-do or
+  goal is in Edit mode, a sync or pairing runs, a pairing code is shown, the camera
+  is on, or the full Add form keeps a draft. On top of that, the Mac app's own
+  check: not while typing, and every draft saved first.
+- A field that saves the moment it changes can opt out with `data-reload-safe`
+  (tick boxes, the quick box, search). Anything unmarked counts as an edit.
+- It switches as you come back to the app (before anything is touched) or after
+  30 s untouched, and checks everything once more right before the reload. A
+  version already waiting when you open the app is taken before anything is drawn,
+  so the old version never flashes up. It tries again every 10 s.
 - "A new version is ready." with a Reload button shows only as a fallback, when
   the switch has been refused for 5 minutes in view. It also shows straight after
   an automatic update if yet another version is waiting (no reload loops).
 - In the Mac app none of this applies: its shell reloads onto new versions itself.
-- `<html data-build>` names the build (`ESMEWORLD_BUILD`, or the Pages commit, or
-  `local`).
+- `<html data-build>` names the build: the git commit it was built from (with `+`
+  when built with uncommitted changes), or `ESMEWORLD_BUILD` if set.
 - App icon: Esme's chosen artwork (house outline with her photo, Home-tile blue
   background, cream behind her), chosen 2026-10-28. No theme or background
   colour is set in the manifest.
