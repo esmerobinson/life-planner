@@ -30,6 +30,11 @@ import { Nook } from "../farm/Nook";
 import { ErrorGuard } from "./ErrorGuard";
 import { useReminderScheduler } from "../reminders/scheduler";
 import { useNativeNavigate } from "../reminders/nativeNavigate";
+import { WhatIDidContext } from "./whatIDid/context";
+import { WhatIDidSheet } from "./whatIDid/WhatIDidSheet";
+import { didTarget } from "../domain/whatIDid";
+import { recoverDidDraft } from "../data/didDraft";
+import type { DidEntry, Item } from "../domain/types";
 
 /** How often the shell re-reads the clock (a technical check, not a motion timing). */
 const CLOCK_CHECK_MS = 60_000;
@@ -212,6 +217,20 @@ export function AppShell() {
     return () => document.removeEventListener("keydown", onKey);
   }, [openSearch]);
 
+  // "What did you do?" after a to-do tick (Esme, 19 Nov 2026). One pop-up at a time.
+  const [didAsk, setDidAsk] = useState<{ item: Item; at: Pick<DidEntry, "id" | "on" | "session">; n: number } | null>(null);
+  const askDid = useCallback((item: Item, session?: string) => {
+    setAdding(false);
+    setSearching(false);
+    setDidAsk((was) => ({ item, at: didTarget(item, todayISO(), session), n: (was?.n ?? 0) + 1 }));
+  }, []);
+  // Words typed in it when the app was closed mid-word are saved on start.
+  useEffect(() => {
+    void recoverDidDraft(todayISO())
+      .then(() => changed())
+      .catch(() => undefined);
+  }, [changed]);
+
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);
 
   return (
@@ -219,6 +238,7 @@ export function AppShell() {
       <AddDefaultsContext.Provider value={setAddDefaults}>
       <OpenAddContext.Provider value={openAddWith}>
       <ShellUndoContext.Provider value={setUndoNote}>
+      <WhatIDidContext.Provider value={askDid}>
       <PanelProvider>
       <FarmProvider items={items} goals={goals} today={today}>
       {/* /farm is the game: a fixed screen beside the sidebar (rio/GameScreen.tsx, game-screen.css). */}
@@ -242,6 +262,17 @@ export function AppShell() {
           <SidePanel items={items} goals={goals} today={today} onChanged={changed} />
           {searching && (
             <SearchDialog items={items} goals={goals} today={today} phone={phone} onClose={() => setSearching(false)} />
+          )}
+          {didAsk && (
+            <WhatIDidSheet
+              key={didAsk.n}
+              item={items.find((i) => i.id === didAsk.item.id) ?? didAsk.item}
+              at={didAsk.at}
+              today={today}
+              phone={phone}
+              onClose={() => setDidAsk(null)}
+              onSaved={changed}
+            />
           )}
           {/* Only while there is something to undo: an always-there status region would be a
               second "status" on pages that have their own. */}
@@ -294,6 +325,7 @@ export function AppShell() {
       </div>
       </FarmProvider>
       </PanelProvider>
+      </WhatIDidContext.Provider>
       </ShellUndoContext.Provider>
       </OpenAddContext.Provider>
       </AddDefaultsContext.Provider>

@@ -18,6 +18,7 @@ import "./styles/reminders.css";
 import "./styles/books.css";
 import "./styles/search.css";
 import "./styles/dailyRoutine.css";
+import "./styles/whatIDid.css";
 
 // The Mac app flushes through these before reloading onto a new version (bug #39).
 installAppUpdateHooks();
