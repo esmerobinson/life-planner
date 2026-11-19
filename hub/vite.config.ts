@@ -6,6 +6,13 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // Which build this is (no visible UI: <html data-build>), so a device's version can be told
+  // apart. Deterministic unless set: the Mac app's build id hashes these files.
+  define: {
+    __ESMEWORLD_BUILD__: JSON.stringify(
+      process.env.ESMEWORLD_BUILD || process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) || "local",
+    ),
+  },
   plugins: [
     react(),
     VitePWA({
@@ -40,7 +47,7 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, "e2e/**", "e2e-sync/**"],
     // The plugin's virtual module only exists inside a Vite build; tests use a stub.
     alias: {
-      "virtual:pwa-register/react": fileURLToPath(new URL("./src/test/pwa-register-stub.ts", import.meta.url)),
+      "virtual:pwa-register": fileURLToPath(new URL("./src/test/pwa-register-stub.ts", import.meta.url)),
     },
   },
 });
