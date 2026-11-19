@@ -31,6 +31,8 @@ it("the to-dos done this week, Monday to Sunday, with their notes; nothing to ed
   expect(screen.queryByText("Pretend old")).toBeNull();
   expect(screen.queryByRole("textbox")).toBeNull();
   expect(screen.queryByRole("checkbox")).toBeNull();
+  // True words (review I2): never sent to Together, and not locked like the journal.
+  expect(screen.getByText("Just for you: this list never goes to Together. These notes aren't locked like your journal.")).toBeInTheDocument();
 });
 
 it("nothing yet: a calm line", async () => {

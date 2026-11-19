@@ -7,7 +7,7 @@ import { FLAG_GLYPH, REPEAT_GLYPH } from "./IconPopover";
 import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
 import { ProjectEdge, ProjectLine, SessionBoxes } from "./ProjectBits";
-import { isProject, nextSessionIndex } from "../domain/projects";
+import { isProject, lastTickedSession, nextSessionIndex } from "../domain/projects";
 import { asksWhatIDid, useDidPrompt } from "./whatIDid/context";
 import { isBook } from "../domain/books";
 import { usePanel } from "./panelContext";
@@ -219,8 +219,9 @@ export function TaskRow({
             };
             setTicked(true);
             // The session this tick logs (a project), worked out before the tick changes it.
+            // Every session already done: the note goes with the last one ticked (review M9).
             const k = project ? nextSessionIndex(item, today) : -1;
-            const session = k >= 0 ? item.sessions![k]!.id : undefined;
+            const session = k >= 0 ? item.sessions![k]!.id : project ? lastTickedSession(item)?.id : undefined;
             const ok = await onTick(item.id, celebrate);
             if (ok === false || project) setTicked(false);
             if (ok !== false) {

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { dayLabel } from "../../domain/display";
-import { isProject } from "../../domain/projects";
+import { isProject, lastTickedSession } from "../../domain/projects";
 import type { ISODate, Item } from "../../domain/types";
 import { didTarget } from "../../domain/whatIDid";
 import { asksWhatIDid } from "./context";
@@ -15,13 +15,22 @@ import { DID_WORDS as W } from "./words";
 export function DidPanel({ item, today, onChanged }: { item: Item; today: ISODate; onChanged: () => Promise<void> }) {
   const ids = (item.did ?? []).map((e) => e.id).join(",");
   // Which notes show: every one it has; with none, one new box (it is written once she types).
+  const last = isProject(item) ? lastTickedSession(item) : undefined;
   const targets = useMemo(
-    () => (item.did?.length ? item.did.map((e) => ({ id: e.id, on: e.on, ...(e.session ? { session: e.session } : {}) })) : [didTarget(item, item.completedAt ?? today)]),
+    () =>
+      item.did?.length
+        ? item.did.map((e) => ({ id: e.id, on: e.on, ...(e.session ? { session: e.session } : {}) }))
+        : last
+          ? [didTarget(item, last.doneOn!, last.id)]
+          : [didTarget(item, item.completedAt ?? today)],
     // Only when its notes change (not on every edit of the to-do), so a new box keeps its id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [item.id, ids],
+    [item.id, ids, last?.id],
   );
   if (!asksWhatIDid(item)) return null;
+  // Only once something is done (review M8: "did", not "doing"): a to-do ticked, a session
+  // ticked, or a note it already has.
+  if (!item.did?.length && item.status !== "done" && !last) return null;
   const project = isProject(item);
   return (
     <section className="did-panel" aria-label={W.panelHeading}>

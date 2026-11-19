@@ -1,6 +1,6 @@
 import type { Item } from "./types";
 import {
-  completedInWeek, didLog, folderFor, logWeeks, safeName, validDid, withDidEntry, MAX_DID_NOTE,
+  completedInWeek, didLog, didTarget, folderFor, logWeeks, safeName, validDid, withDidEntry, MAX_DID_NOTE,
 } from "./whatIDid";
 
 // "What I did" (Esme, 19 Nov 2026). Made-up to-dos only.
@@ -116,5 +116,30 @@ describe("completedInWeek: the weekly review's read-only list", () => {
       ["Pretend a", "2026-11-16", "Pretend A note"],
     ]);
     expect(rows[1]!.project).toBe("Pretend zine");
+  });
+});
+
+describe("didTarget (review M4, M7)", () => {
+  it("a plain to-do's note always has the same id, so the side panel and a tick never make two", () => {
+    expect(didTarget(todo("a"), "2026-11-18")).toEqual({ id: "note", on: "2026-11-18" });
+    expect(didTarget(todo("a"), "2026-11-19").id).toBe(didTarget(todo("a"), "2026-11-18").id);
+    expect(didTarget(todo("p", { sessions: [{ id: "s1" }] }), "2026-11-18", "s1")).toEqual({ id: "s1", on: "2026-11-18", session: "s1" });
+  });
+  it("an existing note keeps its id; a re-tick moves it to the new day, the side panel keeps its day", () => {
+    const it = todo("a", { did: [{ id: "old-id", on: "2026-11-10", note: "Pretend" }] });
+    expect(didTarget(it, "2026-11-18")).toEqual({ id: "old-id", on: "2026-11-10" });
+    expect(didTarget(it, "2026-11-18", undefined, true)).toEqual({ id: "old-id", on: "2026-11-18" });
+    expect(withDidEntry(it.did, { id: "old-id", on: "2026-11-18" }, { note: "Pretend more" })).toEqual([{ id: "old-id", on: "2026-11-18", note: "Pretend more" }]);
+  });
+});
+
+describe("safeName in bytes (review M3)", () => {
+  it("at most 200 UTF-8 bytes, never splitting a character", () => {
+    const emoji = safeName("🎨".repeat(80));
+    expect(new TextEncoder().encode(emoji).length).toBeLessThanOrEqual(200);
+    expect(emoji).toBe("🎨".repeat(50));
+    const cjk = safeName("漫".repeat(90));
+    expect(new TextEncoder().encode(cjk).length).toBeLessThanOrEqual(200);
+    expect([...cjk].every((c) => c === "漫")).toBe(true);
   });
 });

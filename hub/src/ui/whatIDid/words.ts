@@ -7,6 +7,8 @@ export const DID_WORDS = {
   sheetTitle: "What did you do?",
   /** The text box's name for screen readers in the sheet. */
   sheetBox: "What did you do?",
+  /** The sheet's first use on a device (review I2): notes sync like to-dos, not encrypted. */
+  notLocked: "These notes aren't locked like your journal.",
   save: "Save",
   skip: "Skip",
   attach: "Attach files",
@@ -42,7 +44,7 @@ export const DID_WORDS = {
   useDesktop: "Use the Desktop",
   /** The weekly review's read-only list (from the brief). */
   completedHeading: "Completed this week",
-  completedLine: "Just for you: this list stays here and never goes to Together.",
+  completedLine: "Just for you: this list never goes to Together. These notes aren't locked like your journal.",
   completedEmpty: "Nothing ticked off yet this week.",
   /** ⌘K search's group. */
   searchGroup: "What I did",

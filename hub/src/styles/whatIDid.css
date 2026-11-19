@@ -1,24 +1,28 @@
 /* "What I did" (Esme, 19 Nov 2026). Built from what exists; nothing here is a new look:
-   - the sheet after a tick: the Choose goals pop-up (goals.css .choose-shade / .choose-sheet) at the
-     Add card's 440px width on a computer, the Add sheet from the bottom (add.css) on the phone; its
-     heading row is the Add card's (.add-head), the to-do's name the muted line (.choose-muted), the
-     buttons .form-actions;
+   - the card after a tick: the Add card (add.css .add-pop) on a computer, the Add sheet's look at
+     the bottom on the phone, neither with a shade; its heading row is the Add card's (.add-head),
+     the to-do's name the muted line (.choose-muted), the buttons .form-actions;
    - the box is the form field (controls.css); Attach files a soft pill (.btn-secondary);
    - the log page's entries and the weekly review's "Completed this week" are strips (strips.css);
      the area filter is the soft pills (button[aria-pressed]).
    NEW and undecided, so placeholders (magenta, system font, no motion): the list of kept files,
    and the entry search opened (its outline). For Esme / Design. */
 
-/* Over the side panel (20) and the shell's Undo (21), under the tick's sparkle (30): a tick in a
-   goal's panel asks too, and the sparkle stays seen. A layer order, not a look. */
-.choose-shade.did-shade,
-.add-shade.did-shade {
+/* The card never covers the page with a shade (review I1): a click elsewhere still lands. Over
+   the side panel (20) and the shell's Undo (21), under the tick's sparkle (30): a tick in a goal's
+   panel asks too, and the sparkle stays seen. A layer order, not a look. */
+.add-pop.did-sheet {
   z-index: 25;
 }
 
-.app-shell:not(.is-phone) .choose-sheet.did-sheet {
-  width: min(440px, 100%);
-  padding: var(--pad-card);
+/* The phone: the Add sheet's look at the bottom of the screen, without its shade. */
+.add-sheet.did-bottom {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 25;
+  max-height: 70vh;
 }
 
 .did-sheet-todo {

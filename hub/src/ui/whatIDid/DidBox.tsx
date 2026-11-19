@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { saveDid } from "../../data/didRepo";
-import { clearDidDraft, keepDidDraft } from "../../data/didDraft";
+import { clearDidDraft, forgetDidDraft, keepDidDraft } from "../../data/didDraft";
 import { isProject } from "../../domain/projects";
 import type { DidEntry, DidFile, ISODate, Item } from "../../domain/types";
 import { MAX_DID_NOTE } from "../../domain/whatIDid";
@@ -98,8 +98,11 @@ export function DidBox({
           autoFocus={autoFocus}
           value={note.value}
           onChange={(e) => {
-            keepDidDraft({ itemId: item.id, at, text: e.target.value });
-            note.set(e.target.value);
+            const text = e.target.value;
+            // Back to what is saved (typed and deleted): nothing to keep (review C1).
+            if (text === (entry?.note ?? "")) forgetDidDraft(item.id, at.id);
+            else keepDidDraft({ itemId: item.id, at, text, typedAt: Date.now() });
+            note.set(text);
           }}
           onBlur={note.flush}
           onKeyDown={(e) => {

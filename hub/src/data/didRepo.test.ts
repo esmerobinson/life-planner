@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { emptyBin, deleteItem, saveDid, tickItem, untickItem, updateItem } from "./repo";
 import { clearDidDraft, keepDidDraft, readDidDraft, recoverDidDraft } from "./didDraft";
+import { vi } from "vitest";
 import { didTarget } from "../domain/whatIDid";
 import type { Item } from "../domain/types";
 
@@ -65,26 +66,70 @@ it("a to-do gone from the list (or in the Bin) is not written to", async () => {
   await expect(saveDid("t3", { id: "e1", on: DAY }, { note: "x" }, DAY)).resolves.toBe(false);
 });
 
-describe("the kept draft (this device, as she types)", () => {
-  it("kept until the same words are saved; a later draft replaces it", () => {
-    keepDidDraft({ itemId: "t1", at: { id: "e1", on: DAY }, text: "Pretend half" });
-    expect(readDidDraft()).toEqual({ itemId: "t1", at: { id: "e1", on: DAY }, text: "Pretend half" });
-    clearDidDraft("t1", "e1", "Pretend other");
-    expect(readDidDraft()).not.toBeNull();
-    clearDidDraft("t1", "e1", "Pretend half");
-    expect(readDidDraft()).toBeNull();
+describe("the kept draft (this device, as she types; review C1)", () => {
+  const at = { id: "note", on: DAY };
+  const stamp = async (id: string) => (await db.items.get(id))!.updatedAt!;
+
+  it("one draft per note: kept until the same words are saved; another note's draft is separate (M5)", () => {
+    keepDidDraft({ itemId: "t1", at, text: "Pretend half", typedAt: 5 });
+    keepDidDraft({ itemId: "t2", at, text: "Pretend other", typedAt: 6 });
+    expect(readDidDraft("t1", "note")).toEqual({ itemId: "t1", at, text: "Pretend half", typedAt: 5 });
+    clearDidDraft("t1", "note", "Pretend different");
+    expect(readDidDraft("t1", "note")).not.toBeNull();
+    clearDidDraft("t1", "note", "Pretend half");
+    expect(readDidDraft("t1", "note")).toBeNull();
+    expect(readDidDraft("t2", "note")).not.toBeNull();
   });
 
-  it("a draft left behind (the app closed mid-word) is written to the to-do on the next start", async () => {
+  it("left behind and typed after the to-do last changed: saved on the next start, with its own typed-at time (not now)", async () => {
     await db.items.put(todo("t4", { status: "done", completedAt: DAY }));
-    keepDidDraft({ itemId: "t4", at: { id: "e9", on: DAY }, text: "Pretend last words" });
-    await recoverDidDraft(DAY);
-    expect((await db.items.get("t4"))!.did).toEqual([{ id: "e9", on: DAY, note: "Pretend last words" }]);
-    expect(readDidDraft()).toBeNull();
+    const before = await stamp("t4");
+    keepDidDraft({ itemId: "t4", at, text: "Pretend last words", typedAt: before + 10 });
+    vi.spyOn(Date, "now").mockReturnValue(before + 1_000_000);
+    await recoverDidDraft();
+    vi.restoreAllMocks();
+    const row = (await db.items.get("t4"))!;
+    expect(row.did).toEqual([{ id: "note", on: DAY, note: "Pretend last words" }]);
+    expect(row.updatedAt).toBe(before + 10);
+    expect(readDidDraft("t4", "note")).toBeNull();
+  });
+
+  it("R2: a phone draft older than the Mac's later note never overwrites it", async () => {
+    // The phone typed at T; the Mac then extended the note and that synced in (stamp > T).
+    keepDidDraft({ itemId: "t5", at, text: "Pretend first words", typedAt: 1_000 });
+    await db.items.put(todo("t5", { status: "done", completedAt: DAY, did: [{ id: "note", on: DAY, note: "Pretend first words, and the whole ending" }] }));
+    const was = await db.items.get("t5");
+    await recoverDidDraft();
+    expect(await db.items.get("t5")).toEqual(was);
+    expect(readDidDraft("t5", "note")).toBeNull();
+  });
+
+  it("R1: an empty or unchanged draft never writes the to-do, so an untick or rename made elsewhere survives", async () => {
+    await db.items.put(todo("t6", { title: "Pretend renamed on the Mac", status: "open", did: [{ id: "note", on: DAY, note: "Pretend kept" }] }));
+    const was = await db.items.get("t6");
+    keepDidDraft({ itemId: "t6", at, text: "", typedAt: Date.now() + 60_000 });
+    await recoverDidDraft();
+    keepDidDraft({ itemId: "t6", at, text: "Pretend kept", typedAt: Date.now() + 60_000 });
+    await recoverDidDraft();
+    expect(await db.items.get("t6")).toEqual(was);
+    expect(readDidDraft("t6", "note")).toBeNull();
+  });
+
+  it("saving the same words again writes nothing (no new stamp)", async () => {
+    await db.items.put(todo("t7", { did: [{ id: "note", on: DAY, note: "Pretend same" }] }));
+    const was = await db.items.get("t7");
+    await saveDid("t7", at, { note: "Pretend same" }, DAY);
+    expect(await db.items.get("t7")).toEqual(was);
+  });
+
+  it("writing a note never changes touchedAt (review M10: the farm and 'not looked at' read it)", async () => {
+    await db.items.put(todo("t8", { touchedAt: "2026-11-01" }));
+    await saveDid("t8", at, { note: "Pretend words" }, DAY);
+    expect((await db.items.get("t8"))!.touchedAt).toBe("2026-11-01");
   });
 
   it("a broken or blocked store is just no draft", () => {
-    localStorage.setItem("esmeworld-what-i-did", "{not json");
-    expect(readDidDraft()).toBeNull();
+    localStorage.setItem("esmeworld-what-i-did:t1:note", "{not json");
+    expect(readDidDraft("t1", "note")).toBeNull();
   });
 });

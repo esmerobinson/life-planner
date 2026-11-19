@@ -222,11 +222,11 @@ export function AppShell() {
   const askDid = useCallback((item: Item, session?: string) => {
     setAdding(false);
     setSearching(false);
-    setDidAsk((was) => ({ item, at: didTarget(item, todayISO(), session), n: (was?.n ?? 0) + 1 }));
+    setDidAsk((was) => ({ item, at: didTarget(item, todayISO(), session, true), n: (was?.n ?? 0) + 1 }));
   }, []);
   // Words typed in it when the app was closed mid-word are saved on start.
   useEffect(() => {
-    void recoverDidDraft(todayISO())
+    void recoverDidDraft()
       .then(() => changed())
       .catch(() => undefined);
   }, [changed]);

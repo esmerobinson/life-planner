@@ -56,6 +56,13 @@ it("a project: one box per session's note, named by its session", async () => {
   expect(within(s).getAllByRole("textbox")).toHaveLength(2);
 });
 
+it("an open to-do without a note: no box yet (review M8: 'did', not 'doing')", async () => {
+  await db.items.put(todo("later", { status: "open", completedAt: undefined }));
+  renderApp("/area/writing?open=later", TODAY);
+  await screen.findByRole("textbox", { name: "Title" });
+  expect(screen.queryByRole("region", { name: "What I did" })).toBeNull();
+});
+
 it("not on habits or ideas", async () => {
   await db.items.put(todo("yoga", { status: "open", completedAt: undefined, recur: ["mon"] }));
   await db.items.put(todo("idea", { kind: "idea", status: "open", completedAt: undefined }));

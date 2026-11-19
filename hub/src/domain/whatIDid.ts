@@ -5,7 +5,6 @@
 
 import { addDays, isValidISODate, mondayOf } from "./dates";
 import { isHabit } from "./habits";
-import { newId } from "./ids";
 import { isProject } from "./projects";
 import type { AreaId, DidEntry, DidFile, ISODate, Item } from "./types";
 
@@ -74,7 +73,8 @@ export function withDidEntry(
   const all = [...(list ?? [])];
   const i = all.findIndex((e) => e.id === at.id);
   const was: DidEntry = i >= 0 ? all[i]! : { id: at.id, on: at.on, ...(at.session ? { session: at.session } : {}) };
-  const next: DidEntry = { ...was };
+  // The day is the caller's: the side panel keeps the note's own, a re-tick moves it (review M7).
+  const next: DidEntry = { ...was, on: at.on };
   if (patch.note !== undefined) {
     if (patch.note.trim()) next.note = patch.note.slice(0, MAX_DID_NOTE);
     else delete next.note;
@@ -92,19 +92,39 @@ export function withDidEntry(
   return all.length ? all : undefined;
 }
 
+/** The most a folder name may be (UTF-8 bytes; macOS allows 255, room kept for " (2)"). */
+const MAX_NAME_BYTES = 200;
+
+/** Whole characters (graphemes where the browser can tell them, else code points). */
+function chars(s: string): string[] {
+  const Seg = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: string }) => { segment(t: string): Iterable<{ segment: string }> } }).Segmenter;
+  return Seg ? [...new Seg(undefined, { granularity: "grapheme" }).segment(s)].map((x) => x.segment) : [...s];
+}
+
 /**
  * A name macOS takes for a file or folder: "/" and ":" become "-", control characters and
- * leading dots go, spaces trimmed, at most 100 characters; "Untitled" when nothing is left.
+ * leading dots go, spaces trimmed, at most 100 characters and 200 UTF-8 bytes, never cutting a
+ * character in two (review M3); "Untitled" when nothing is left.
  */
 export function safeName(name: string): string {
-  const s = name
+  const clean = name
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/[/:]/g, "-")
     .trim()
     .replace(/^\.+/, "")
-    .trim()
-    .slice(0, 100)
     .trim();
+  const enc = new TextEncoder();
+  let out = "";
+  let bytes = 0;
+  let n = 0;
+  for (const c of chars(clean)) {
+    const b = enc.encode(c).length;
+    if (n + 1 > 100 || bytes + b > MAX_NAME_BYTES) break;
+    out += c;
+    bytes += b;
+    n++;
+  }
+  const s = out.trim();
   return s === "" ? "Untitled" : s;
 }
 
@@ -222,12 +242,14 @@ export function completedInWeek(items: readonly Item[], today: ISODate, areaLabe
 }
 
 /**
- * Which note a tick (or the side panel) writes to: a plain to-do's one note (any it has), a
- * session's own note; otherwise a new one on `today`. Nothing is written until she types.
+ * Which note a tick (or the side panel) writes to: a plain to-do's one note (any it has, else id
+ * "note"), a session's own note (else the session's id). The ids are fixed, so two boxes on the
+ * same to-do never make two notes (review M4). Nothing is written until she types. `onTick`: a
+ * re-tick moves an existing note to `today` once she writes (review M7); the side panel keeps its day.
  */
-export function didTarget(it: Item, today: ISODate, session?: string): Pick<DidEntry, "id" | "on" | "session"> {
+export function didTarget(it: Item, today: ISODate, session?: string, onTick = false): Pick<DidEntry, "id" | "on" | "session"> {
   const list = it.did ?? [];
   const found = session ? list.find((e) => e.session === session) : (list.find((e) => !e.session) ?? (isProject(it) ? undefined : list[0]));
-  if (found) return { id: found.id, on: found.on, ...(found.session ? { session: found.session } : {}) };
-  return { id: newId(), on: today, ...(session ? { session } : {}) };
+  if (found) return { id: found.id, on: onTick ? today : found.on, ...(found.session ? { session: found.session } : {}) };
+  return session ? { id: session, on: today, session } : { id: "note", on: today };
 }
