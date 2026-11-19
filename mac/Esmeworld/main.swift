@@ -343,6 +343,9 @@ final class DeviceOwnerBridge: NSObject, WKScriptMessageHandlerWithReply {
 ///   { action: "chooseRoot" }          → { root } | { cancelled: true }   (the Mac's folder picker)
 ///   { action: "resetRoot" }           → { root: "~/Desktop" }
 ///   { action: "reveal", folder, name } → { ok: true } | { ok: false, missing: true } | { ok: false, refused: true }
+///   { action: "savePhoto", root, parts, name, data } → as attach (19 Nov 2026: a photo added to a
+///      "What I did" note on the page: `data` its bytes as base64, at most 100 MB, `name` one safe
+///      file name). Written to a private temporary file, then copied exactly as attach copies.
 ///
 /// The root is held HERE, never trusted from the page (review M1): "~/Desktop" until she chooses
 /// another folder in the native folder picker (UserDefaults `EsmeworldFilesRoot`). An attach with
@@ -358,12 +361,14 @@ final class DeviceOwnerBridge: NSObject, WKScriptMessageHandlerWithReply {
 /// memory, none until chosen). `chooseRoot` takes `selfTestRoot` (inside the temporary folder)
 /// instead of the picker; `attach` takes `selfTestSources` instead of the Open panel and only a
 /// root inside the temporary folder (anything else, the Desktop included, is refused before any
-/// file is looked at); `reveal` only says whether the file is there, never opens Finder.
+/// file is looked at); `savePhoto` likewise; `reveal` only says whether the file is there, never opens Finder.
 final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "esmeworldFiles"
     static let defaultRoot = "~/Desktop"
     static let rootKey = "EsmeworldFilesRoot"
     static let rootsKey = "EsmeworldFilesRoots"
+    /// The largest photo savePhoto takes (bytes, decoded).
+    static let maxPhotoBytes = 100_000_000
     weak var window: NSWindow?
     /// The self-test's own root and roots (in memory; her settings are never read or written).
     private var selfTestRoot: String?
@@ -503,23 +508,37 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
             setRoot(Self.defaultRoot)
             replyHandler(["root": Self.defaultRoot], nil)
         case "reveal": reveal(body, replyHandler)
+        case "savePhoto": savePhoto(body, replyHandler)
         default: replyHandler(nil, "unknown action")
         }
     }
 
-    private func attach(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
-        // Only the folder this app holds (she chose it in the picker, or the Desktop): review M1.
+    /// Where an attach or savePhoto may write: the folder this app holds (she chose it in the
+    /// picker, or the Desktop: review M1) and one or two safe folder names. Else the error to answer.
+    private func target(_ body: [String: Any]) -> (root: URL, rootText: String, parts: [String])? {
+        guard let rootText = body["root"] as? String, let root = Self.expand(rootText),
+              let held = self.root, let heldURL = Self.expand(held),
+              root.standardizedFileURL.path == heldURL.standardizedFileURL.path,
+              let parts = body["parts"] as? [String], (1...2).contains(parts.count), parts.allSatisfy(Self.safePart)
+        else { return nil }
+        return (root, rootText, parts)
+    }
+
+    /// Why `target` refused: the root first, then the folder names.
+    private func targetError(_ body: [String: Any]) -> String {
         guard let rootText = body["root"] as? String, let root = Self.expand(rootText),
               let held = self.root, let heldURL = Self.expand(held),
               root.standardizedFileURL.path == heldURL.standardizedFileURL.path
-        else {
-            reply(["error": "root"], nil)
+        else { return "root" }
+        return "folder"
+    }
+
+    private func attach(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
+        guard let t = target(body) else {
+            reply(["error": targetError(body)], nil)
             return
         }
-        guard let parts = body["parts"] as? [String], (1...2).contains(parts.count), parts.allSatisfy(Self.safePart) else {
-            reply(["error": "folder"], nil)
-            return
-        }
+        let (root, rootText, parts) = (t.root, t.rootText, t.parts)
         if isSelfTest {
             // Never her folders: only a root inside the temporary folder, checked before anything.
             let tmp = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath().path
@@ -558,15 +577,62 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
     {
         DispatchQueue.global(qos: .userInitiated).async {
             let r = Self.copy(sources, root: root, rootShown: rootShown, parts: parts)
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    if r.saved.isEmpty && r.permission {
-                        reply(["error": "permission"], nil)
-                    } else {
-                        reply(["saved": r.saved.map { ["name": $0.name, "folder": $0.folder] }, "failed": r.failed], nil)
-                    }
-                }
+            DispatchQueue.main.async { MainActor.assumeIsolated { Self.answer(r, reply) } }
+        }
+    }
+
+    @MainActor static func answer(_ r: CopyResult, _ reply: @escaping @MainActor (Any?, String?) -> Void) {
+        if r.saved.isEmpty && r.permission {
+            reply(["error": "permission"], nil)
+        } else {
+            reply(["saved": r.saved.map { ["name": $0.name, "folder": $0.folder] }, "failed": r.failed], nil)
+        }
+    }
+
+    /// A photo added on the page: its bytes go to a private temporary file named as she knows it,
+    /// which is then copied like any attached file (never overwriting), and the temporary file goes.
+    private func savePhoto(_ body: [String: Any], _ reply: @escaping @MainActor (Any?, String?) -> Void) {
+        guard let t = target(body) else {
+            reply(["error": targetError(body)], nil)
+            return
+        }
+        let (root, rootText, parts) = (t.root, t.rootText, t.parts)
+        guard let name = body["name"] as? String, Self.safePart(name), !name.hasPrefix("."),
+              let text = body["data"] as? String, text.count <= Self.maxPhotoBytes / 3 * 4 + 4,
+              let data = Data(base64Encoded: text), !data.isEmpty
+        else {
+            reply(["error": "photo"], nil)
+            return
+        }
+        if isSelfTest {
+            // Never her folders: only a root inside the temporary folder.
+            let tmp = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath().path
+            guard root.resolvingSymlinksInPath().path.hasPrefix(tmp + "/") else {
+                reply(["error": "selftest-root"], nil)
+                return
             }
+        } else {
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else {
+                reply(["error": "root"], nil)
+                return
+            }
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let fm = FileManager.default
+            let dir = fm.temporaryDirectory.appendingPathComponent("esmeworld-photo-\(UUID().uuidString)", isDirectory: true)
+            defer { try? fm.removeItem(at: dir) }
+            var r = CopyResult()
+            do {
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                let src = dir.appendingPathComponent(name, isDirectory: false)
+                try data.write(to: src)
+                r = Self.copy([src], root: root, rootShown: rootText, parts: parts)
+            } catch {
+                r.failed = [name]
+            }
+            let done = r
+            DispatchQueue.main.async { MainActor.assumeIsolated { Self.answer(done, reply) } }
         }
     }
 
@@ -1860,7 +1926,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             const system = await h.postMessage({ action: "reveal", folder: "/etc", name: "hosts" });
             const reset = await h.postMessage({ action: "resetRoot" });
             const resetDesktop = await h.postMessage({ action: "attach", root: "~/Desktop", parts: ["Esmeworld self-test"], selfTestSources: sources });
-            return JSON.stringify({ bridge: true, before, chosen, held, one, two, unchosen, desktop, dots, slash, up, pick, shown, gone, outsideRoot, system, reset, resetDesktop });
+            const photoDesktop = await h.postMessage({ action: "savePhoto", root: "~/Desktop", parts: ["Esmeworld self-test"], name: "pretend.jpg", data: btoa("pretend photo") });
+            await h.postMessage({ action: "chooseRoot", selfTestRoot: root });
+            const photo = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "pretend photo.jpg", data: btoa("pretend photo bytes") });
+            const photo2 = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "pretend photo.jpg", data: btoa("pretend photo bytes") });
+            const photoBadName = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "../up.jpg", data: btoa("x") });
+            const photoBadData = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "x.jpg", data: "%%%" });
+            return JSON.stringify({ bridge: true, before, chosen, held, one, two, unchosen, desktop, dots, slash, up, pick, shown, gone, outsideRoot, system, reset, resetDesktop,
+              photoDesktop, photo, photo2, photoBadName, photoBadData });
             """)
             check(r["bridge"] as? Bool == true, "files bridge exists")
             let one = (r["one"] as? [String: Any])?["saved"] as? [[String: String]] ?? []
@@ -1890,6 +1963,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             check(refused("outsideRoot") && refused("system"), "files: Show in Finder only inside a root she used (M2)")
             check((r["shown"] as? [String: Any])?["ok"] as? Bool == true
                   && (r["gone"] as? [String: Any])?["missing"] as? Bool == true, "files: reveal knows a kept file from a gone one (no Finder in the self-test)")
+            // savePhoto (19 Nov 2026): a photo's bytes from the page, saved like an attached file.
+            let photo = (r["photo"] as? [String: Any])?["saved"] as? [[String: String]] ?? []
+            let photo2 = (r["photo2"] as? [String: Any])?["saved"] as? [[String: String]] ?? []
+            say("files.photo first=\(photo.first?["name"] ?? "nil") second=\(photo2.first?["name"] ?? "nil") desktop=\(err("photoDesktop")) badName=\(err("photoBadName")) badData=\(err("photoBadData"))")
+            check(photo.count == 1 && photo[0]["name"] == "pretend photo.jpg" && photo[0]["folder"] == root.path + "/Art"
+                  && fm.contents(atPath: root.appendingPathComponent("Art/pretend photo.jpg").path) == Data("pretend photo bytes".utf8),
+                  "files: a photo from the page is saved into <root>/<Area> with its bytes")
+            check(photo2.count == 1 && photo2[0]["name"] == "pretend photo (2).jpg", "files: a second photo of the same name is \" (2)\"")
+            check(err("photoDesktop") == "root" || err("photoDesktop") == "selftest-root", "files: the self-test never saves a photo to the real Desktop")
+            check(err("photoBadName") == "photo" && err("photoBadData") == "photo", "files: an unsafe photo name or unreadable bytes are refused")
         } catch {
             check(false, "files: \(error.localizedDescription)")
         }
