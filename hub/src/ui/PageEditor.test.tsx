@@ -380,6 +380,14 @@ describe("photos (Esme, 19 Nov 2026: add photos to to-do and idea pages)", () =>
     expect(changes).toHaveLength(before);
   });
 
+  it("a photo put on the page is saved at once (not after the typing pause), so leaving straight away keeps it", async () => {
+    let saves = 0;
+    render(<PageEditor value="x" onChange={() => {}} onBlur={() => saves++} today={TODAY} />);
+    // Pasted with nothing focused (a file picker's focus changes would blur the page anyway).
+    fireEvent.paste(screen.getByRole("group", { name: "Notes" }), { clipboardData: { files: [jpg()], getData: () => "" } });
+    await vi.waitFor(() => expect(saves).toBe(1));
+  });
+
   it("an iPhone HEIC photo this browser can't open gets a kind line saying why", async () => {
     const { page, changes } = setup("x");
     await choose(page, new File(["x"], "bad-IMG_0001.HEIC", { type: "image/heic" }));

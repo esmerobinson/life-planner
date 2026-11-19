@@ -292,7 +292,11 @@ export function PageEditor({
     setMessage(null);
     try {
       const { ids, message: why } = await storePhotos(files, today);
-      if (ids.length) insertPictures(ids, at);
+      if (ids.length) {
+        insertPictures(ids, at);
+        // Saved now, not after the typing pause: the picture row is stored, so its line follows at once.
+        onBlur();
+      }
       if (why) setMessage(why);
     } finally {
       setBusy(false);

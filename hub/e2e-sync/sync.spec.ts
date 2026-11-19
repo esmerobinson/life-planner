@@ -30,7 +30,7 @@ const BACKUP = {
 type Row = { id: string; title: string; status: string; updatedAt?: number; [field: string]: unknown };
 
 /** Reads one object store of this device's database directly. */
-function readStore(page: Page, store: "items" | "goals" | "pending" | "prefs"): Promise<Row[]> {
+function readStore(page: Page, store: "items" | "goals" | "pending" | "prefs" | "files"): Promise<Row[]> {
   return page.evaluate(
     (name) =>
       new Promise<Row[]>((resolve, reject) => {
@@ -434,6 +434,77 @@ test("Today: a phone that opens Home before its sync lands takes the Mac's picks
   await a.goto("/");
   await expect(list(a).getByRole("listitem")).toHaveCount(n - 2);
   expect(await titles(a)).toEqual(before.slice(2));
+
+  await ctxA.close();
+  await ctxB.close();
+});
+
+/* Photos (Esme, 19 Nov 2026): a photo on a to-do's page and one on its "What I did" note, added
+   on one device through the real buttons and the real canvas, reach the other device through the
+   real server and show there. The image is generated here; the to-do is fictional. */
+test("photos: one on a to-do's page and one on its What I did note reach the other device and show there", async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const a = await ctxA.newPage();
+  const b = await ctxB.newPage();
+  await setUpSync(a);
+  await a.goto("/backup");
+  const todo = { ...row(901, "Paint the pretend shop sign"), id: "e2e-photo-1" };
+  await a.getByLabel("Backup file").setInputFiles({
+    name: "fictional-photo-backup.json", mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ app: "life-hub", schema: 1, exportedOn: "2026-11-19", items: [todo], goals: [] })),
+  });
+  await a.getByRole("button", { name: "Merge" }).click();
+  await expect.poll(async () => (await readStore(a, "items")).some((r) => r.id === "e2e-photo-1")).toBe(true);
+
+  const png = async () => {
+    const b64 = await a.evaluate(async () => {
+      const c = document.createElement("canvas");
+      c.width = 1200;
+      c.height = 800;
+      const ctx = c.getContext("2d")!;
+      ctx.fillStyle = "#b9d3ee";
+      ctx.fillRect(0, 0, 1200, 800);
+      ctx.fillStyle = "#8fb27a";
+      ctx.fillRect(0, 520, 1200, 280);
+      const blob: Blob = await new Promise((r) => c.toBlob((x) => r(x!), "image/png"));
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      let s = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(s);
+    });
+    return { name: "pretend-sign.png", mimeType: "image/png", buffer: Buffer.from(b64, "base64") };
+  };
+
+  // On A: a photo on the page with the Photo button, then the tick's card's Add photo.
+  await a.goto(`/area/${AREA}?open=e2e-photo-1`);
+  let chooser = a.waitForEvent("filechooser");
+  await a.locator(".peek").getByRole("button", { name: "Photo" }).click();
+  await (await chooser).setFiles(await png());
+  await expect(a.locator(".peek .page-pic img")).toBeVisible();
+  await expect.poll(async () => (await readStore(a, "items")).find((r) => r.id === "e2e-photo-1")?.notes).toMatch(/file:/);
+  await a.goto(`/area/${AREA}`);
+  await a.getByRole("checkbox", { name: "Mark done: Paint the pretend shop sign" }).click();
+  const sheet = a.getByRole("dialog", { name: "What did you do?" });
+  chooser = a.waitForEvent("filechooser");
+  await sheet.getByRole("button", { name: "Add photo" }).click();
+  await (await chooser).setFiles(await png());
+  await expect(sheet.getByRole("img", { name: "Photo 1" })).toBeVisible();
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect.poll(async () => ((await readStore(a, "items")).find((r) => r.id === "e2e-photo-1")?.didPhotos as unknown[] | undefined)?.length).toBe(1);
+  await syncNow(a);
+
+  // On B: both arrive and show.
+  await setUpSync(b);
+  await syncNow(b);
+  const there = (await readStore(b, "items")).find((r) => r.id === "e2e-photo-1")!;
+  const pageId = /file:([0-9a-f-]{36})/.exec(there.notes as string)![1]!;
+  const noteId = (there.didPhotos as { ids: string[] }[])[0]!.ids[0]!;
+  const files = await readStore(b, "files");
+  for (const id of [pageId, noteId]) expect(files.find((f) => f.id === id)).toMatchObject({ mime: "image/jpeg", width: 1200, height: 800 });
+  await b.goto(`/area/${AREA}?open=e2e-photo-1`);
+  await expect(b.locator(".peek .page-pic img")).toBeVisible();
+  await expect(b.getByRole("region", { name: "What I did" }).getByRole("button", { name: "Photo 1: show it larger" }).locator("img")).toBeVisible();
 
   await ctxA.close();
   await ctxB.close();
