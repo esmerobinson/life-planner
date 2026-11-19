@@ -26,6 +26,7 @@ import { useJournalKey } from "./useJournalKey";
 import { useJournalRows } from "./useJournalRows";
 import { useTabsStacked } from "./useTabsFit";
 import { usePhone } from "../usePhone";
+import { useUpdateHold } from "../../native/updateHolds";
 import { LearnedToday } from "../together/LearnedToday";
 import { PrivateDayTick } from "../together/PrivateDayTick";
 import { DailyLog, WeeklyReview } from "./RoutineForms";
@@ -86,6 +87,8 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
   const stacked = useTabsStacked(tabsRef, usePhone());
   // "Hard moment": her notes, open over the page.
   const [hard, setHard] = useState(false);
+  // The phone's automatic update never reloads the journal from under her (native/pwaUpdate.ts).
+  useUpdateHold(true, "journal");
 
   // A candidate key is confirmed by a successful sync: ask for one (once per visit).
   useEffect(() => {

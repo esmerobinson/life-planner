@@ -16,6 +16,7 @@ import { DEFAULT_SESSIONS } from "../domain/projects";
 import { CHECK_DATE_EVENT, ShellContext } from "./shellContext";
 import { Sidebar } from "./Sidebar";
 import { UpdatePrompt } from "./UpdatePrompt";
+import { addUpdateHold } from "../native/updateHolds";
 import { DbClosedNotice } from "./DbClosedNotice";
 import { db } from "../data/db";
 import { migrateMilestones } from "../data/migrateMilestones";
@@ -44,6 +45,9 @@ export function AppShell() {
   const [addOpened, setAddOpened] = useState(0);
   const addButton = useRef<HTMLButtonElement>(null);
   const addDraft = useRef<AddDraft | null>(null);
+  // The full Add form's kept draft lives only in this page: the phone's automatic update waits
+  // until it is added or cancelled (native/pwaUpdate.ts; the quick box's draft is on the device).
+  useEffect(() => addUpdateHold(() => (addDraft.current && draftHasContent(addDraft.current) ? "draft" : null)), []);
   const [version, setVersion] = useState(0);
   const [persistence, setPersistence] = useState<PersistenceStatus | null>(null);
   const unsorted = items.filter((i) => i.areaId === "inbox" && i.status === "open").length;
