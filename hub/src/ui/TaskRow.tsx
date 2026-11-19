@@ -197,6 +197,7 @@ export function TaskRow({
         <input
           type="checkbox"
           className="tick"
+          data-reload-safe=""
           aria-label={crossed ? `Done: ${item.title}` : project ? `Log a session: ${item.title}` : `Mark done: ${item.title}`}
           checked={checked}
           onChange={async (e) => {

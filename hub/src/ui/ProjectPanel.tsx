@@ -106,6 +106,7 @@ function SessionRow({
     <li className={done ? "strip session-row crossed" : "strip session-row"}>
       <input
         type="checkbox"
+        data-reload-safe=""
         className="tick"
         aria-label={sessionBoxLabel(s.title, index)}
         checked={done}

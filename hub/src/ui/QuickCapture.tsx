@@ -148,7 +148,7 @@ export function QuickCapture({
   }
 
   return (
-    <form className="quick-capture" noValidate onSubmit={(e) => void save(e)}>
+    <form className="quick-capture" data-reload-safe="" noValidate onSubmit={(e) => void save(e)}>
       <div className="quick-capture-row">
         <label className="form-field quick-capture-field">
           <span className="form-label">What's on your mind?</span>

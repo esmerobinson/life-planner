@@ -193,6 +193,7 @@ function RoutineStrip({ row, next, onDone }: { row: RoutineRowView; next: boolea
     >
       <input
         type="checkbox"
+        data-reload-safe=""
         className="tick"
         aria-label={done ? `Done: ${step.title}` : `Mark done: ${step.title}`}
         checked={done}

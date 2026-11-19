@@ -1,11 +1,20 @@
 import { useEffect, useRef } from "react";
 
 /**
- * What the phone's automatic update (pwaUpdate.ts) must not interrupt. Each hold answers, when
- * asked, why not now ("syncing", "journal", ...) or null. On top of the typing/saving check the
- * Mac app also uses (window.esmeworldPrepareReload), these are the PWA's own extra rules:
- * an open sheet with text, a field being edited, the journal, a sync in progress.
- * The Mac app's path does not ask these (its behaviour is unchanged).
+ * What the phone's automatic update (pwaUpdate.ts) must not interrupt (fix round 1: one rule,
+ * not a list of editors to keep up to date).
+ *
+ * The rule: no automatic update once ANYTHING has been edited on the current page. Any input,
+ * change, key or paste in a form control (input, textarea, select) or an editable area marks the
+ * page edited; only a route change clears it (a route change already drops unsaved form state,
+ * the same way the app always has). Controls that save the moment they change may opt out with
+ * `data-reload-safe` on them or an ancestor (a tick box, the quick box, which keeps its draft on
+ * the device); an unmarked control always counts.
+ *
+ * Also held, edited or not: any open sheet or dialog (role="dialog" / aria-modal), and the
+ * registered holds (a panel in Edit mode, a sync or pairing in progress, the camera scanner, the
+ * full Add form's kept draft). window.esmeworldPrepareReload (typing, saves settling) is asked
+ * on top of all this. The Mac app's path does not ask these (its behaviour is unchanged).
  */
 
 type Hold = () => string | null;
@@ -21,45 +30,67 @@ export function addUpdateHold(hold: Hold): () => void {
   };
 }
 
-/** Holds updates while mounted and `active` (e.g. the journal page). */
+/** Holds updates while mounted and `active` (e.g. a panel in Edit mode). */
 export function useUpdateHold(active: boolean, reason: string): void {
   const state = useRef({ active, reason });
   state.current = { active, reason };
   useEffect(() => addUpdateHold(() => (state.current.active ? state.current.reason : null)), []);
 }
 
-const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "hidden", "range", "color", "file", "image"]);
+let edited = false;
+let activity = 0;
 
-/** The text typed in a field, or "" if it is not a text field. */
-function typed(el: Element): string {
-  if (el instanceof HTMLTextAreaElement) return el.value;
-  if (el instanceof HTMLInputElement) return NOT_TEXT.has(el.type) ? "" : el.value;
-  if (el instanceof HTMLElement && editable(el)) return el.textContent ?? "";
-  return "";
+/** Something was edited on this page (since it was shown). */
+export function pageEdited(): boolean {
+  return edited;
 }
 
-/** contenteditable (the attribute too: not every engine reports isContentEditable). */
-function editable(el: HTMLElement): boolean {
+/** A route change: the page's form state is gone, so its edits no longer hold. */
+export function clearPageEdits(): void {
+  edited = false;
+}
+
+/** Counts every key, tap and input: any change since a decision cancels a reload (pwaUpdate). */
+export function userActivity(): number {
+  return activity;
+}
+
+/** Keys that move around or close, never change a value. */
+const NOT_EDITING_KEYS = new Set(["Tab", "Escape", "Shift", "Control", "Alt", "Meta", "CapsLock"]);
+
+function isEditable(el: Element): boolean {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return true;
+  if (!(el instanceof HTMLElement)) return false;
   if (el.isContentEditable) return true;
-  const v = el.getAttribute("contenteditable");
-  return v !== null && v !== "false";
+  // (not every engine reports isContentEditable)
+  const host = el.closest("[contenteditable]");
+  return !!host && host.getAttribute("contenteditable") !== "false";
 }
 
-const FIELDS = 'input, textarea, [contenteditable]:not([contenteditable="false"])';
+function onEdit(e: Event): void {
+  const t = e.target;
+  if (!(t instanceof Element) || !isEditable(t)) return;
+  if (e instanceof KeyboardEvent && NOT_EDITING_KEYS.has(e.key)) return;
+  if (t.closest("[data-reload-safe]")) return;
+  edited = true;
+}
 
-/**
- * What the page shows right now that a reload would interrupt: a pop-up sheet (role="dialog")
- * with something typed in it ("sheet"), or a field with text in it that has the focus
- * ("editing"). Pages themselves are saved and come back after a reload (the open panel is in
- * the address), so text on a page alone does not hold.
- */
-export function pageHold(doc: Document = document): string | null {
-  const active = doc.activeElement;
-  if (active && active !== doc.body && typed(active).trim()) return "editing";
-  for (const sheet of doc.querySelectorAll('[role="dialog"], [aria-modal="true"]')) {
-    for (const f of sheet.querySelectorAll(FIELDS)) if (typed(f).trim()) return "sheet";
-  }
-  return null;
+const onActivity = () => {
+  activity++;
+};
+
+const EDIT_EVENTS = ["input", "change", "keydown", "paste", "cut", "drop"] as const;
+const ACTIVITY_EVENTS = ["keydown", "pointerdown", "input", "change", "paste", "compositionstart"] as const;
+
+/** Starts noticing edits and activity on `doc` (main.tsx, via pwaRegister). Returns stop. */
+export function installEditTracker(doc: Document = document): () => void {
+  const opts = { capture: true, passive: true } as const;
+  for (const ev of EDIT_EVENTS) doc.addEventListener(ev, onEdit, opts);
+  for (const ev of ACTIVITY_EVENTS) doc.addEventListener(ev, onActivity, opts);
+  return () => {
+    for (const ev of EDIT_EVENTS) doc.removeEventListener(ev, onEdit, opts);
+    for (const ev of ACTIVITY_EVENTS) doc.removeEventListener(ev, onActivity, opts);
+  };
 }
 
 /** The first reason not to reload now, or null when nothing is in the way. */
@@ -73,5 +104,7 @@ export function currentUpdateHold(doc: Document = document): string | null {
     }
     if (reason) return reason;
   }
-  return pageHold(doc);
+  if (edited) return "edited";
+  if (doc.querySelector('[role="dialog"], [aria-modal="true"]')) return "sheet";
+  return null;
 }
