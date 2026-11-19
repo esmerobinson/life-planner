@@ -95,14 +95,60 @@ it("typed and deleted again: no draft is left behind (review C1, R1)", async () 
   expect((await db.items.get("nap"))!.did).toBeUndefined();
 });
 
-it("first use: it says plainly these notes aren't locked like the journal (review I2)", async () => {
-  await db.items.bulkPut([todo("one", { areaId: "admin" }), todo("two", { areaId: "admin" })]);
+it("first use: it says plainly these notes aren't locked like the journal (review I2); seen only once she types (N4)", async () => {
+  await db.items.bulkPut([todo("one", { areaId: "admin" }), todo("two", { areaId: "admin" }), todo("three", { areaId: "admin" })]);
   const sheet = await tickOn("/area/admin", "Pretend one");
   expect(within(sheet).getByText("These notes aren't locked like your journal.")).toBeInTheDocument();
+  // Gone at once (a quick tick): not counted as seen.
   await userEvent.click(within(sheet).getByRole("button", { name: "Skip" }));
   await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Pretend two" }));
   const again = await screen.findByRole("dialog", { name: "What did you do?" });
-  expect(within(again).queryByText("These notes aren't locked like your journal.")).toBeNull();
+  expect(within(again).getByText("These notes aren't locked like your journal.")).toBeInTheDocument();
+  // She types: seen.
+  await userEvent.type(within(again).getByRole("textbox"), "Pretend");
+  await userEvent.click(within(again).getByRole("button", { name: "Save" }));
+  await userEvent.click(screen.getByRole("checkbox", { name: "Mark done: Pretend three" }));
+  const third = await screen.findByRole("dialog", { name: "What did you do?" });
+  expect(within(third).queryByText("These notes aren't locked like your journal.")).toBeNull();
+});
+
+describe("keyboard (review N2)", () => {
+  beforeEach(async () => {
+    await db.items.bulkPut([todo("k1", { areaId: "mind" }), todo("k2", { areaId: "mind" }), todo("k3", { areaId: "mind" })]);
+  });
+
+  it("Escape closes it from anywhere, and the focus goes to the next to-do's tick box", async () => {
+    const sheet = await tickOn("/area/mind", "Pretend k1");
+    await userEvent.type(within(sheet).getByRole("textbox"), "Pretend breathed");
+    (document.activeElement as HTMLElement).blur(); // focus on the page, not in the card
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(async () => expect((await db.items.get("k1"))!.did?.[0]?.note).toBe("Pretend breathed"));
+  });
+
+  it("Save: the focus goes to the next to-do's tick box, not lost", async () => {
+    const sheet = await tickOn("/area/mind", "Pretend k1");
+    await userEvent.click(within(sheet).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Mark done: Pretend k2" })).toHaveFocus());
+  });
+
+  it("the last to-do: the focus goes to the one before it", async () => {
+    const sheet = await tickOn("/area/mind", "Pretend k3");
+    await userEvent.keyboard("{Escape}");
+    expect(sheet).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Mark done: Pretend k2" })).toHaveFocus());
+  });
+
+  it("tabbing out of the card saves and closes it; the focus stays where she tabbed", async () => {
+    const sheet = await tickOn("/area/mind", "Pretend k2");
+    await userEvent.type(within(sheet).getByRole("textbox"), "Pretend tabbed away");
+    const outsideTarget = screen.getByRole("checkbox", { name: "Mark done: Pretend k3" });
+    // Focus leaving the card for something on the page (what Tab past its last button does).
+    outsideTarget.focus();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(outsideTarget).toHaveFocus();
+    await waitFor(async () => expect((await db.items.get("k2"))!.did?.[0]?.note).toBe("Pretend tabbed away"));
+  });
 });
 
 it("habits never ask", async () => {

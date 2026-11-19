@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { saveDid } from "../../data/didRepo";
 import { clearDidDraft, forgetDidDraft, keepDidDraft } from "../../data/didDraft";
 import { isProject } from "../../domain/projects";
@@ -30,7 +30,7 @@ export const areaName = (id: string) => AREA_CHOICES.find((a) => a.id === id)?.l
  * "Attach files on your Mac"). `item` is the to-do as stored now; `at` the note it writes.
  */
 export function DidBox({
-  item, at, today, label, labelHidden = false, autoFocus = false, onSaved, onEnter,
+  item, at, today, label, labelHidden = false, autoFocus = false, onSaved, onEnter, actions, compact = false, onTyped,
 }: {
   item: Item;
   at: Pick<DidEntry, "id" | "on" | "session">;
@@ -43,6 +43,12 @@ export function DidBox({
   onSaved: () => void | Promise<void>;
   /** ⌘/Ctrl + Return in the box (the sheet: Save). */
   onEnter?: () => void;
+  /** Buttons put in the same row as Attach files (the sheet's Save and Skip). */
+  actions?: ReactNode;
+  /** The phone's card (review I3): a one-line box that grows as she types, its name as its hint. */
+  compact?: boolean;
+  /** She typed something. */
+  onTyped?: () => void;
 }) {
   const { attempt, saveError } = useSaveError();
   const entry = item.did?.find((e) => e.id === at.id);
@@ -93,12 +99,14 @@ export function DidBox({
       <label className="form-field">
         <span className={labelHidden ? "visually-hidden" : "form-label"}>{label}</span>
         <AutoGrowTextarea
-          rows={3}
+          rows={compact ? 1 : 3}
+          placeholder={compact ? label : undefined}
           maxLength={MAX_DID_NOTE}
           autoFocus={autoFocus}
           value={note.value}
           onChange={(e) => {
             const text = e.target.value;
+            onTyped?.();
             // Back to what is saved (typed and deleted): nothing to keep (review C1).
             if (text === (entry?.note ?? "")) forgetDidDraft(item.id, at.id);
             else keepDidDraft({ itemId: item.id, at, text, typedAt: Date.now() });
@@ -115,16 +123,17 @@ export function DidBox({
       </label>
       {saveError && <p className="form-message">{saveError}</p>}
       {files.length > 0 && <FileList files={files} mac={mac} />}
-      {mac ? (
-        <div className="did-attach">
+      <div className="did-attach">
+        {actions}
+        {mac ? (
           <button type="button" className="btn-secondary" disabled={busy} onClick={() => void attach()}>
             {busy ? W.attaching : W.attach}
           </button>
-          {firstTime && files.length === 0 && <p className="choose-muted">{W.firstTime}</p>}
-        </div>
-      ) : (
-        <p className="choose-muted">{W.attachOnMac}</p>
-      )}
+        ) : (
+          <span className="choose-muted">{W.attachOnMac}</span>
+        )}
+      </div>
+      {mac && firstTime && files.length === 0 && <p className="choose-muted">{W.firstTime}</p>}
       {message && <p className="form-message" role="status">{message}</p>}
     </div>
   );

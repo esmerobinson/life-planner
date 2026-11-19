@@ -38,8 +38,9 @@ export function SessionBoxes({ item, today, onChanged }: { item: Item; today: IS
   const { attempt, saveError } = useSaveError();
   const askDid = useDidPrompt();
   async function set(sessionId: string, done: boolean) {
+    const box = document.activeElement as HTMLElement | null; // the box stays: the focus comes back to it
     if (!(await attempt(() => setSessionDone(item.id, sessionId, done, today)))) return;
-    if (done) askDid?.(item, sessionId); // "What did you do?" for that session
+    if (done) askDid?.(item, sessionId, [box]); // "What did you do?" for that session
     await onChanged();
   }
   return (

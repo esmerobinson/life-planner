@@ -8,7 +8,7 @@ import { useSaveError } from "./messages";
 import { MoveToMenu } from "./MoveToMenu";
 import { ProjectEdge, ProjectLine, SessionBoxes } from "./ProjectBits";
 import { isProject, lastTickedSession, nextSessionIndex } from "../domain/projects";
-import { asksWhatIDid, useDidPrompt } from "./whatIDid/context";
+import { asksWhatIDid, focusAfterTick, useDidPrompt } from "./whatIDid/context";
 import { isBook } from "../domain/books";
 import { usePanel } from "./panelContext";
 import { ScheduleMenu } from "./ScheduleMenu";
@@ -218,6 +218,7 @@ export function TaskRow({
               playTickSparkle(box.isConnected ? box : was);
             };
             setTicked(true);
+            const back = focusAfterTick(box); // worked out now, before the row moves
             // The session this tick logs (a project), worked out before the tick changes it.
             // Every session already done: the note goes with the last one ticked (review M9).
             const k = project ? nextSessionIndex(item, today) : -1;
@@ -227,7 +228,7 @@ export function TaskRow({
             if (ok !== false) {
               celebrate();
               // "What did you do?" (Esme, 19 Nov 2026): every to-do tick, skippable; never a habit.
-              if (askDid && asksWhatIDid(item)) askDid(item, session);
+              if (askDid && asksWhatIDid(item)) askDid(item, session, back);
             }
           }}
         />

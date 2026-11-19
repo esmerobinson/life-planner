@@ -218,11 +218,13 @@ export function AppShell() {
   }, [openSearch]);
 
   // "What did you do?" after a to-do tick (Esme, 19 Nov 2026). One pop-up at a time.
-  const [didAsk, setDidAsk] = useState<{ item: Item; at: Pick<DidEntry, "id" | "on" | "session">; n: number } | null>(null);
-  const askDid = useCallback((item: Item, session?: string) => {
+  const [didAsk, setDidAsk] = useState<{
+    item: Item; at: Pick<DidEntry, "id" | "on" | "session">; n: number; back: readonly (HTMLElement | null | undefined)[];
+  } | null>(null);
+  const askDid = useCallback((item: Item, session?: string, back: readonly (HTMLElement | null | undefined)[] = []) => {
     setAdding(false);
     setSearching(false);
-    setDidAsk((was) => ({ item, at: didTarget(item, todayISO(), session, true), n: (was?.n ?? 0) + 1 }));
+    setDidAsk((was) => ({ item, at: didTarget(item, todayISO(), session, true), n: (was?.n ?? 0) + 1, back }));
   }, []);
   // Words typed in it when the app was closed mid-word are saved on start.
   useEffect(() => {
@@ -268,6 +270,7 @@ export function AppShell() {
               key={didAsk.n}
               item={items.find((i) => i.id === didAsk.item.id) ?? didAsk.item}
               at={didAsk.at}
+              back={didAsk.back}
               today={today}
               phone={phone}
               onClose={() => setDidAsk(null)}

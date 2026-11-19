@@ -268,3 +268,53 @@ for (const width of [1280, 390]) {
     });
   });
 }
+
+test.describe("the phone card never covers a to-do or the round + (review I3)", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("12 to-dos: tick one, then the last visible one and the + with no extra tap; the end of the list scrolls clear", async ({ page }) => {
+    await page.goto("/");
+    const day = await pageDate(page);
+    const names = Array.from({ length: 12 }, (_, i) => `t${String(i + 1).padStart(2, "0")}`);
+    await seed(page, names.map((n) => item(n, day)));
+    await page.goto("/area/writing");
+    const add = page.getByRole("button", { name: "Add", exact: true });
+    await page.getByRole("checkbox", { name: "Mark done: Pretend t01" }).click();
+    await expect(sheet(page)).toBeVisible();
+    await shoot(page, "what-i-did-phone-card");
+
+    // The card sits above the round +, which stays visible.
+    const card = (await sheet(page).boundingBox())!;
+    const fab = (await add.boundingBox())!;
+    expect(card.y + card.height).toBeLessThanOrEqual(fab.y);
+    expect(card.height).toBeLessThan(200);
+
+    // The last to-do fully on screen above the card: one tap ticks it.
+    const boxes = page.getByRole("checkbox", { name: /^Mark done: Pretend t/ });
+    let last = "";
+    for (let i = 0; i < (await boxes.count()); i++) {
+      const b = (await boxes.nth(i).boundingBox())!;
+      if (b.y >= 0 && b.y + b.height <= card.y) last = (await boxes.nth(i).getAttribute("aria-label"))!;
+    }
+    expect(last).not.toBe("");
+    await page.getByRole("checkbox", { name: last }).click({ noWaitAfter: true, timeout: 3000 });
+    await expect.poll(async () => (await readItem(page, last.replace("Mark done: Pretend ", ""))).status).toBe("done");
+    await expect(sheet(page)).toHaveCount(1);
+
+    // Scrolled to the end, the last to-do clears the card and ticks with one tap.
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const t12 = page.getByRole("checkbox", { name: "Mark done: Pretend t12" });
+    const b12 = (await t12.boundingBox())!;
+    const card2 = (await sheet(page).boundingBox())!;
+    expect(b12.y + b12.height).toBeLessThanOrEqual(card2.y);
+    await t12.click({ timeout: 3000 });
+    await expect.poll(async () => (await readItem(page, "t12")).status).toBe("done");
+
+    // And the + opens Add with one tap while a card is open.
+    await expect(sheet(page)).toHaveCount(1);
+    await add.click({ timeout: 3000 });
+    await expect(page.getByLabel("What's on your mind?")).toBeVisible();
+    await expect(sheet(page)).toHaveCount(0);
+    await noSidewaysScroll(page);
+  });
+});

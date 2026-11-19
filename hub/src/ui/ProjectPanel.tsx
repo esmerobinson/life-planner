@@ -111,13 +111,14 @@ function SessionRow({
         className="tick"
         aria-label={sessionBoxLabel(s.title, index)}
         checked={done}
-        onChange={() =>
+        onChange={(e) => {
+          const box = e.currentTarget;
           void write(() => setSessionDone(item.id, s.id, !done, today))
             .then(() => {
-              if (!done) askDid?.(item, s.id); // "What did you do?" for that session
+              if (!done) askDid?.(item, s.id, [box]); // "What did you do?" for that session
             })
-            .catch(() => {})
-        }
+            .catch(() => {});
+        }}
       />
       <div className="strip-body">
         <input
