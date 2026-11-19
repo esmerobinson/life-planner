@@ -124,6 +124,19 @@ test("an old build is open, a new one is deployed: coming back to the app, it up
   await expect(page.getByRole("navigation").first()).toBeVisible();
 });
 
+test("a new build is deployed while the app is closed: opening it updates by itself", async ({ page, context }) => {
+  test.setTimeout(60_000);
+  await openOldBuild(page);
+  await page.close();
+  deployed = "new";
+  // Opening the app again: the old version starts from its offline copy, finds the new one, takes it.
+  const again = await context.newPage();
+  await again.goto(`${base}/`);
+  await expect(build(again)).toHaveAttribute("data-build", "e2e-new", { timeout: 20_000 });
+  await expect(again.getByText("A new version is ready.")).toHaveCount(0);
+  await expect(again.getByRole("navigation").first()).toBeVisible();
+});
+
 test("typing in the quick box: it waits, then updates once she stops, and the text survives", async ({ page }) => {
   test.setTimeout(120_000);
   await openOldBuild(page);
