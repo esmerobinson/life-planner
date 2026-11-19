@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useShellToday } from "./ui/shellContext";
 import { AppShell } from "./ui/AppShell";
@@ -14,7 +15,22 @@ import { RemindersPage } from "./ui/RemindersPage";
 import { RepeatingPage } from "./ui/RepeatingPage";
 import { VisionPage } from "./ui/VisionPage";
 import { JournalPage } from "./ui/journal/JournalPage";
-import { FarmPage, PopInDemo } from "./farm/FarmPage";
+import { GameLoading } from "./rio/GameLoading";
+// The game's styles stay in the main stylesheet, at the place they always had in it, so the cascade
+// (and so the game's look) is exactly as before. Its code and art data are a separate chunk below.
+import "./rio/menu/menu.css";
+import "./rio/game-screen.css";
+
+/**
+ * Esme's Rio (/farm) is its own lazily loaded chunk: the game's code and its art data are most of
+ * the app, and the main chunk has to stay under the service worker's 2 MB per-file precache limit
+ * (vite.config.ts). Everything the other pages need (the farm's data and earning, the nook, the
+ * pop-ins) stays in the main chunk. A chunk that fails to load: native/appUpdate.ts reloads once,
+ * then the page's error guard (ui/AppShell.tsx) shows its problem note.
+ */
+const FarmPage = lazy(() => import("./farm/FarmPage").then((m) => ({ default: m.FarmPage })));
+/** Development builds only (its route is too). */
+const PopInDemo = import.meta.env.DEV ? lazy(() => import("./farm/FarmPage").then((m) => ({ default: m.PopInDemo }))) : () => null;
 
 /**
  * There is no Today page (Esme, 2026-11-04: "today page is a little redundant with the
@@ -104,9 +120,9 @@ export function AppRoutes() {
           <Route path="/bin" element={<BinRoute />} />
           <Route path="/backup" element={<BackupRoute />} />
           <Route path="/sync" element={<SyncPage />} />
-          <Route path="/farm" element={<FarmPage />} />
+          <Route path="/farm" element={<Suspense fallback={<GameLoading />}><FarmPage /></Suspense>} />
           {/* The monthly pop-in's demo: development builds only (review M8; StickerPopIn is unit-tested). */}
-          {import.meta.env.DEV && <Route path="/farm/popin-demo" element={<PopInDemo />} />}
+          {import.meta.env.DEV && <Route path="/farm/popin-demo" element={<Suspense fallback={null}><PopInDemo /></Suspense>} />}
           <Route path="/reminders" element={<RemindersPage />} />
           <Route path="/repeating" element={<RepeatingRoute />} />
         </Route>
