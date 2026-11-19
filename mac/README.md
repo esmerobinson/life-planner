@@ -166,6 +166,18 @@ page's address, which is `esmeworld://app`.
   Center: if it was done on the phone while the Mac app was not running, the
   Mac may still remind once.
 
+- "What I did" files (the sheet after ticking a to-do, its side panel section):
+  **Attach files** opens the standard Open panel and COPIES each chosen file (never
+  moves or deletes it) into `~/Desktop/<Area>/` or `~/Desktop/<Area>/<Project>/`
+  (`FilesBridge`, `esmeworldFiles`), making the folders when missing and never
+  overwriting (`plan (2).pdf`). Only the saved names and folders go back to the page.
+  The folder (`~/Desktop`) can be changed on the What I did page ("Where files go"),
+  and is this Mac's own setting. Clicking a kept file shows it in Finder. The app is
+  not sandboxed, so no entitlement is needed, but macOS guards the Desktop: the first
+  time, it asks whether Esmeworld may use it (choose Allow). If that was refused, the
+  page says how to allow it: System Settings, Privacy & Security, Files and Folders,
+  Esmeworld. With an ad hoc signature macOS may ask again after an update (see Signing).
+
 The web app's offline service worker is bundled but has no job here (the files
 are already inside the app); its "new version" prompt will not appear in the Mac
 app. A new version arrives by rebuilding and reinstalling.
@@ -239,6 +251,13 @@ and never touch yours; the page's own scheduler is ignored during a self-test
 self-test's reminders are removed at the start (leftovers of a killed run)
 and at the end, through the bridge's queue, then checked to be 0. It never
 takes notification clicks (no delegate in self-test mode).
+
+"What I did" files: through the real bridge, two copies of a made-up file go into a
+temporary root (never your Desktop): the area and project folders are made, the source
+stays, the second copy is `pretend plan (2).txt`. Unsafe folder names, a root with `..`
+and any root outside the temporary folder (the Desktop included) are refused before any
+file is looked at. No Open panel, folder panel or Finder window is ever shown in the
+self-test. The temporary root is deleted afterwards.
 
 Needs macOS 14 or later (the app itself still runs on macOS 13).
 
