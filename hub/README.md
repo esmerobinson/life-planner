@@ -274,9 +274,19 @@ Honest limits:
   data. Use Backup to move data between them.
 - The offline copy holds only the app itself (page, scripts, styles, icons). Your
   tasks live in IndexedDB and the service worker never reads or caches them.
-- An installed window only checks for a new version when it next loads the app.
-- When a newer build exists the app shows "A new version is ready." with a
-  Reload button; nothing updates under you until you press it.
+- The app updates itself (`src/native/pwaUpdate.ts`). It looks for a new version
+  on start, each time it comes back into view, and every 30 minutes while in view.
+  It switches only at a safe moment: right on opening or coming back (before
+  anything is touched), or after 30 s untouched. First it saves every draft (the
+  Mac app's own check). It never switches while you type, with a sheet open that
+  has text in it, on the Journal, while a sync runs, or with the full Add form's
+  draft kept. It tries again every 10 s.
+- "A new version is ready." with a Reload button shows only as a fallback, when
+  the switch has been refused for 5 minutes in view. It also shows straight after
+  an automatic update if yet another version is waiting (no reload loops).
+- In the Mac app none of this applies: its shell reloads onto new versions itself.
+- `<html data-build>` names the build (`ESMEWORLD_BUILD`, or the Pages commit, or
+  `local`).
 - App icon: Esme's chosen artwork (house outline with her photo, Home-tile blue
   background, cream behind her), chosen 2026-10-28. No theme or background
   colour is set in the manifest.
