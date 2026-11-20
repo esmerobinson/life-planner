@@ -67,20 +67,26 @@ uses 4) runs `src/due/cron.ts`:
 1. Nothing happens unless the **`DUE_TOKEN`** and **`DUE_BASE_URL`** (https) secrets are both set.
 2. Reads her settings: the synced `prefs` table, row `due` (plain JSON, not encrypted; the app writes it
    from its Reminders page). Off unless `on` is `true`. Fields: `on`, `timeZone`, `plan`, `review`,
-   `dueFirst`, `dueSecond`, `nudge` ("HH:MM"), `leadMinutes` (0-240), `lines` (up to 50, 1-120 chars).
+   `countNudge`, `nudge` ("HH:MM"), `leadMinutes` (0-240), `lines` (up to 50, 1-120 chars), and where she
+   is for sunset: `lat`, `lon` (both or neither; else her time zone's city: New York, Rio, London) and
+   `place` (the page's choice). The old `dueFirst`/`dueSecond` are still accepted, no longer read.
    `POST /v1/sync` refuses a malformed `due` row (`400 bad_change`); unknown fields are allowed.
-3. Reads her open items (only the fields the rules need, via `json_extract`) and works out today's
-   reminders (`src/due/rules.ts`; her day runs 3am to 3am in her zone): "Plan your day", "Review your
-   day", due today / overdue / pinned today / habits planned today (priority 1 and habits first, at most 8
-   per pass, two passes), timed to-dos (`time` minus her lead, at most 10), and the motivation nudge
-   (only if nothing was ticked off today; one of her lines a day, in turn). Titles only: never notes,
+3. Reads her open items (only the fields the rules need, via `json_extract`) and the day's kept picks on
+   Today (`prefs` row `today-fill:<day>`), and works out today's reminders (`src/due/rules.ts`; her day
+   runs 3am to 3am in her zone): "Plan your day", "Review your day", timed to-dos (`time` minus her
+   lead, at most 10), **Remind me** (an item's `remindAt`: "HH:MM", or "sunset-N" minutes before sunset,
+   NOAA formula in `src/due/sun.ts`; on a day it is on Today and not done; at most 10), **one count** at
+   `countNudge` (default 14:00) of what is left on Today without a reminder of its own ("N to-dos left
+   today, pick one"; nothing when 0; replaced as she ticks things off until it goes off, then left for
+   her snooze), and the motivation nudge (only if nothing was ticked off today; one of her lines a day,
+   in turn). Untimed to-dos and habits get no reminder each (20 Nov 2026). Titles only: never notes,
    pages or the journal.
 4. Diffs against Due (`GET /due/api/state`, ours = `type:"esmeworld"`) and makes the fewest calls
    (`src/due/reconcile.ts`). Ids are never reused: `esmeworld-<yyyymmdd>-<what>-v<hash of title and
    time>` (`g2`, `g3` when made again). A change is a new version, created before the old one is
    cancelled. Every id the Worker cancels is logged in `meta` (`due_x:<id>`, 3 days) before the DELETE,
    so only a reminder SHE completed or deleted in Due counts as dismissed for the day. At most 3 of
-   our own cancellations per reminder per day (no flapping). A reminder whose time has passed is never
+   our own cancellations per reminder per day (12 for the count; no flapping). A reminder whose time has passed is never
    sent (Due drops them). "Already exists" means that version is there. Compared by id, never by
    Due's echo, so a different format there causes no churn. dueAt is plain local time in Due's own
    zone (US Eastern), with the offset elsewhere.

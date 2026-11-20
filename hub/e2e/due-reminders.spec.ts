@@ -62,3 +62,38 @@ test("the Reminders page's Due settings are saved in the synced row", async ({ p
   await page.reload();
   await expect(page.getByRole("region", { name: "Reminders in Due" }).getByRole("button", { name: "Reminders in Due: On" })).toBeVisible();
 });
+
+/* Calmer reminders (20 Nov 2026): Remind me on a to-do from its side panel, and the Reminders
+   page's one count time and Where you are (for sunset). */
+test("Remind me before sunset, set in the side panel, is saved on the to-do", async ({ page }) => {
+  await page.goto("/area/admin");
+  await page.getByRole("button", { name: "To-dos", exact: true }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "More options" }).click();
+  const form = page.locator("form.quick-add");
+  await form.getByLabel("Title").fill("Pretend stretches");
+  await form.getByRole("button", { name: "Add item" }).click();
+  await expect(page.getByRole("list", { name: "To-dos" }).getByText("Pretend stretches")).toBeVisible();
+  const id = (await readStore(page, "items")).find((i) => i.title === "Pretend stretches")!.id as string;
+  await page.goto(`/area/admin?open=${id}`);
+  const panel = page.getByRole("complementary", { name: "Pretend stretches" });
+  await expect(panel.getByText("Remind me")).toBeVisible();
+  await panel.getByRole("button", { name: "Edit" }).click();
+  await panel.getByLabel("Remind me", { exact: true }).selectOption("sunset");
+  await panel.getByLabel("Minutes before sunset").fill("90");
+  await panel.getByRole("button", { name: "Done" }).click();
+  await expect(panel.getByText("90 min before sunset")).toBeVisible();
+  await expect.poll(async () => (await readStore(page, "items")).find((i) => i.id === id)?.remindAt).toBe("sunset-90");
+});
+
+test("the Reminders page: one count time instead of two per-item times, and Where you are", async ({ page }) => {
+  await page.goto("/reminders");
+  const due = page.getByRole("region", { name: "Reminders in Due" });
+  await expect(due.getByLabel("Due today and not done")).toHaveCount(0);
+  await expect(due.getByLabel("How many to-dos are left (one reminder)")).toHaveValue("14:00");
+  await due.getByLabel("How many to-dos are left (one reminder)").fill("15:00");
+  await due.getByLabel("Where you are (for sunset)").selectOption("london");
+  await expect
+    .poll(async () => (await readStore(page, "prefs"))[0])
+    .toMatchObject({ id: "due", countNudge: "15:00", place: "london", lat: 51.5074, lon: -0.1278 });
+});

@@ -200,6 +200,10 @@ test("Due settings and a to-do's time sync through the real server; the cron run
   await due.getByLabel("New motivation line").fill("A pretend line for the nudge");
   await due.getByRole("button", { name: "Add line" }).click();
   await expect.poll(async () => (await readStore(a, "prefs"))[0]?.lines).toEqual(["A pretend line for the nudge"]);
+  // Calmer reminders (20 Nov): the count time and Where you are go with the row.
+  await due.getByLabel("How many to-dos are left (one reminder)").fill("14:30");
+  await due.getByLabel("Where you are (for sunset)").selectOption("rio");
+  await expect.poll(async () => (await readStore(a, "prefs"))[0]).toMatchObject({ countNudge: "14:30", place: "rio" });
 
   await a.goto("/area/admin");
   await a.getByRole("button", { name: "To-dos", exact: true }).click();
@@ -212,12 +216,28 @@ test("Due settings and a to-do's time sync through the real server; the cron run
   await form.getByLabel("Time").fill("09:30");
   await form.getByRole("button", { name: "Add item" }).click();
   await expect(a.getByText("9:30am")).toBeVisible();
+  // Remind me on a to-do without a time (side panel), 90 minutes before sunset.
+  await a.getByRole("button", { name: "Add", exact: true }).click();
+  await a.getByRole("button", { name: "More options" }).click();
+  await a.locator("form.quick-add").getByLabel("Title").fill("Pretend stretches");
+  await a.locator("form.quick-add").getByRole("button", { name: "Add item" }).click();
+  await expect(a.getByText("Pretend stretches")).toBeVisible();
+  const stretchId = (await readStore(a, "items")).find((i) => i.title === "Pretend stretches")!.id as string;
+  await a.goto(`/area/admin?open=${stretchId}`);
+  const panel = a.getByRole("complementary", { name: "Pretend stretches" });
+  await panel.getByRole("button", { name: "Edit" }).click();
+  await panel.getByLabel("Remind me", { exact: true }).selectOption("sunset");
+  await panel.getByLabel("Minutes before sunset").fill("90");
+  await panel.getByRole("button", { name: "Done" }).click();
+  await expect(panel.getByText("90 min before sunset")).toBeVisible();
   await syncNow(a);
 
   await setUpSync(b);
   await syncNow(b);
   expect((await readStore(b, "prefs"))[0]).toMatchObject({ id: "due", on: true, lines: ["A pretend line for the nudge"] });
   expect((await readStore(b, "items")).find((i) => i.title === "Pretend appointment")).toMatchObject({ due: "2026-12-01", time: "09:30" });
+  expect((await readStore(b, "prefs"))[0]).toMatchObject({ countNudge: "14:30", place: "rio", lat: -22.9068, lon: -43.1729 });
+  expect((await readStore(b, "items")).find((i) => i.title === "Pretend stretches")).toMatchObject({ remindAt: "sunset-90" });
 
   // The cron handler: no DUE_TOKEN here, so it runs and does nothing (no crash, nothing reached).
   const cron = await request.get(`${SYNC_URL}/__scheduled?cron=*/15+*+*+*+*`);
