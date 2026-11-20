@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { parseDueState, type DueRemote } from "../../src/due/client";
 import { planCalls } from "../../src/due/reconcile";
 import { wantedReminders } from "../../src/due/rules";
-import { ACTIVE_PER_DAY, bigItems, bigState, CASES, MATCHING_PER_DAY, PREFS } from "./fixtures";
+import { ACTIVE_PER_DAY, bigItems, bigState, CASES, FILL, MATCHING_PER_DAY, PREFS } from "./fixtures";
 
 // The CPU of one run's own work (re-review R-I1); the free plan allows 10 ms per invocation.
 // A year of Due (about 10,000 earlier reminders, ids sharing the needle's start, plus the
@@ -39,8 +39,8 @@ describe("Due reminders: CPU of one run, warm", () => {
       const remote = parseDueState(state, c.days);
       expect(errors).not.toHaveBeenCalled();
       errors.mockRestore();
-      const rules = best(() => void wantedReminders({ items, prefs: PREFS, now: c.now, tickedToday: false }));
-      const wanted = wantedReminders({ items, prefs: PREFS, now: c.now, tickedToday: false });
+      const rules = best(() => void wantedReminders({ items, prefs: PREFS, now: c.now, tickedToday: false, fill: FILL }));
+      const wanted = wantedReminders({ items, prefs: PREFS, now: c.now, tickedToday: false, fill: FILL });
       const plan = best(() => void planCalls(wanted, remote, new Set(), c.now));
       const total = parse + rules + plan;
       console.info(`due cpu warm ${c.name}: state ${(state.length / 1e6).toFixed(1)} MB parse ${parse.toFixed(2)} rules ${rules.toFixed(2)} plan ${plan.toFixed(2)} total ${total.toFixed(2)} ms`);

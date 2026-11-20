@@ -50,7 +50,7 @@ export interface SyncRequest {
   changes: ValidChange[];
   /**
    * The request may change today's reminders: something ticked off, binned or archived, a
-   * to-do with a time, a day or a deadline, or the Due settings. Due reminders are brought up
+   * to-do with a time, Remind me, a day or a deadline, or the Due settings. Due reminders are brought up
    * to date soon after (due/cron.ts), instead of at the next quarter hour (review M2).
    */
   touchesDue: boolean;
@@ -63,6 +63,7 @@ function touchesDue(table: string, id: string, data: Record<string, unknown>): b
   return (
     (typeof data.status === "string" && data.status !== "open") ||
     data.time !== undefined ||
+    data.remindAt !== undefined ||
     data.pinnedDate !== undefined ||
     data.due !== undefined ||
     (Array.isArray(data.doneDates) && data.doneDates.length > 0) ||

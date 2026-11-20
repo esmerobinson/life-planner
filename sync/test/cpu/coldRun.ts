@@ -6,7 +6,7 @@
 import { parseDueState } from "../../src/due/client";
 import { planCalls } from "../../src/due/reconcile";
 import { wantedReminders } from "../../src/due/rules";
-import { bigItems, bigState, CASES, PREFS } from "./fixtures";
+import { bigItems, bigState, CASES, FILL, PREFS } from "./fixtures";
 
 const c = CASES.find((x) => x.name === process.argv[2]) ?? CASES[0]!;
 const state = bigState(c);
@@ -17,7 +17,7 @@ console.error = (...args: unknown[]) => void fallbacks.push(args);
 const t0 = performance.now();
 const remote = parseDueState(state, c.days);
 const t1 = performance.now();
-const wanted = wantedReminders({ items, prefs: PREFS, now: c.now, tickedToday: false });
+const wanted = wantedReminders({ items, prefs: PREFS, now: c.now, tickedToday: false, fill: FILL });
 const t2 = performance.now();
 planCalls(wanted, remote, new Set(), c.now);
 const t3 = performance.now();

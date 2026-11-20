@@ -14,11 +14,13 @@ export interface Case {
   nested: boolean;
 }
 
+// 13:45: inside both the nudge's and the count's half hour, so every rule runs (the count over
+// every item, sunset for the "Before sunset" ones).
 export const CASES: Case[] = [
-  { name: "mid-month", now: Date.parse("2026-11-16T12:45:00-05:00"), days: ["20261115", "20261116", "20261117"], nested: false },
-  { name: "month-end", now: Date.parse("2026-11-30T12:45:00-05:00"), days: ["20261129", "20261130", "20261201"], nested: false },
-  { name: "year-end", now: Date.parse("2026-12-31T12:45:00-05:00"), days: ["20261230", "20261231", "20270101"], nested: false },
-  { name: "nested", now: Date.parse("2026-12-31T12:45:00-05:00"), days: ["20261230", "20261231", "20270101"], nested: true },
+  { name: "mid-month", now: Date.parse("2026-11-16T13:45:00-05:00"), days: ["20261115", "20261116", "20261117"], nested: false },
+  { name: "month-end", now: Date.parse("2026-11-30T13:45:00-05:00"), days: ["20261129", "20261130", "20261201"], nested: false },
+  { name: "year-end", now: Date.parse("2026-12-31T13:45:00-05:00"), days: ["20261230", "20261231", "20270101"], nested: false },
+  { name: "nested", now: Date.parse("2026-12-31T13:45:00-05:00"), days: ["20261230", "20261231", "20270101"], nested: true },
 ];
 
 /** How many of the searched days' reminders are in the state (most cancelled versions); real use is about 30-40 a day. */
@@ -72,7 +74,13 @@ export function bigItems(n = 5000): DueItem[] {
     due: i % 2 ? "2026-12-31" : "2026-11-10",
     ...(i % 7 === 0 ? { recur: ["mon", "thu"] } : {}),
     ...(i % 50 === 0 ? { time: `1${i % 10}:30` } : {}),
+    // Remind me: every 20th, half at a time and half before sunset.
+    ...(i % 20 === 5 ? { remindAt: i % 40 === 5 ? "sunset-90" : "22:00" } : {}),
+    ...(i % 11 === 0 ? { sessionPlannedToday: true } : {}),
   }));
 }
 
-export const PREFS: DuePrefs = { ...DEFAULT_DUE_PREFS, on: true, lines: ["One", "Two"] };
+/** The day's kept picks (the most a today-fill row holds). */
+export const FILL = { ids: Array.from({ length: 50 }, (_, i) => `0190a1b2-c3d4-7e5f-8a9b-${pad(i * 3, 12)}`), dues: { x: "2026-11-20" } };
+
+export const PREFS: DuePrefs = { ...DEFAULT_DUE_PREFS, on: true, lines: ["One", "Two"], lat: 40.7128, lon: -74.006 };
