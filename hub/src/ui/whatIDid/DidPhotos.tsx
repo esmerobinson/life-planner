@@ -85,6 +85,12 @@ function PhotoViewer({ id, onClose }: { id: string; onClose: () => void }) {
   useEffect(() => {
     close.current?.focus();
     const onKey = (e: KeyboardEvent) => {
+      // It is modal: Tab stays on its one button (review M7).
+      if (e.key === "Tab") {
+        e.preventDefault();
+        close.current?.focus();
+        return;
+      }
       if (e.key !== "Escape") return;
       // First, so the side panel under it stays open.
       e.preventDefault();

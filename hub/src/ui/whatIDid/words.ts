@@ -35,6 +35,8 @@ export const DID_WORDS = {
   remove: "Remove",
   removePhoto: (n: number) => `Remove photo ${n}`,
   photoViewer: "Photo",
+  /** More photos chosen than a note keeps (review M1). */
+  photoLimit: (max: number, left: number) => `A note keeps up to ${max} photos, so ${left} ${left === 1 ? "wasn't" : "weren't"} added.`,
   close: "Close",
   photoWaiting: "Photo on its way",
   photoGone: "Photo deleted",

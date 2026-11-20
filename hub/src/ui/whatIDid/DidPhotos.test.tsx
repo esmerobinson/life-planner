@@ -112,3 +112,51 @@ it("the log page shows each note's photos; tapped, one shows larger", async () =
   await userEvent.click(within(viewer).getByRole("button", { name: "Close" }));
   expect(screen.queryByRole("dialog", { name: "Photo" })).toBeNull();
 });
+
+it("a note keeps up to 20 photos: past that she is told plainly, and nothing extra is stored (review M1)", async () => {
+  const nineteen = Array.from({ length: 19 }, (_, i) => `old${i}`);
+  await db.items.put(todo("mural", { did: [{ id: "note", on: "2026-11-17" }], didPhotos: [{ entry: "note", ids: nineteen }] }));
+  renderApp("/area/art?open=mural", TODAY);
+  const s = await section();
+  await userEvent.upload(within(s).getByLabelText("Choose a photo") as HTMLInputElement, [jpg(), jpg()]);
+  expect(await within(s).findByRole("status")).toHaveTextContent("A note keeps up to 20 photos, so 1 wasn't added.");
+  await waitFor(async () => expect((await db.items.get("mural"))!.didPhotos![0]!.ids).toHaveLength(20));
+  expect(await db.files.count()).toBe(1);
+  await userEvent.upload(within(s).getByLabelText("Choose a photo") as HTMLInputElement, jpg());
+  expect(await within(s).findByText("A note keeps up to 20 photos, so 1 wasn't added.")).toBeInTheDocument();
+  expect(await db.files.count()).toBe(1);
+});
+
+it("the larger photo keeps the focus inside it (review M7)", async () => {
+  await db.files.add(file("p1"));
+  await db.items.put(todo("mural", { did: [{ id: "note", on: "2026-11-17" }], didPhotos: [{ entry: "note", ids: ["p1"] }] }));
+  renderApp("/area/art?open=mural", TODAY);
+  await userEvent.click(await within(await section()).findByRole("button", { name: "Photo 1: show it larger" }));
+  const close = within(await screen.findByRole("dialog", { name: "Photo" })).getByRole("button", { name: "Close" });
+  await waitFor(() => expect(close).toHaveFocus());
+  await userEvent.tab();
+  expect(close).toHaveFocus();
+  await userEvent.tab({ shift: true });
+  expect(close).toHaveFocus();
+});
+
+it("an older Mac app (no savePhoto yet): the photo is added and nothing complains (review M8)", async () => {
+  (window as unknown as { webkit: unknown }).webkit = {
+    messageHandlers: {
+      [FILES_HANDLER]: {
+        postMessage: async (m: Record<string, unknown>) => {
+          if (m.action === "getRoot") return { root: "~/Desktop" };
+          if (m.action === "savePhoto") throw new Error("unknown action");
+          return { cancelled: true };
+        },
+      },
+    },
+  };
+  await db.items.put(todo("mural"));
+  renderApp("/area/art?open=mural", TODAY);
+  const s = await section();
+  await userEvent.upload(within(s).getByLabelText("Choose a photo") as HTMLInputElement, jpg());
+  await waitFor(async () => expect((await db.items.get("mural"))!.didPhotos?.[0]?.ids).toHaveLength(1));
+  await within(s).findByRole("button", { name: "Add photo" }); // finished
+  expect(within(s).queryByRole("status")).toBeNull();
+});

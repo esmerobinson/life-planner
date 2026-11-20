@@ -63,6 +63,8 @@ const textOf = (rows: Row[]) => rows.map((r) => r.line).join("\n");
 interface PictureAt {
   key: string | null;
   caret?: number;
+  /** The line's words when the cursor was taken: if they change meanwhile, the photo goes after the line. */
+  text?: string;
 }
 
 interface Slash {
@@ -252,7 +254,7 @@ export function PageEditor({
       setLinkForm(at ? { key: at.key, at: at.caret } : { key: lastKey.current });
       return;
     }
-    pictureAt.current = at ? { key: at.key, caret: at.caret } : here();
+    pictureAt.current = at ? { key: at.key, caret: at.caret, text: at.text } : here();
     fileInput.current?.click();
   }
 
@@ -260,7 +262,8 @@ export function PageEditor({
   function here(): PictureAt {
     const key = activeRef.current;
     const caret = key ? areas.current.get(key)?.selectionStart : undefined;
-    return key ? { key, ...(caret != null ? { caret } : {}) } : { key: lastKey.current };
+    const row = key ? rowsRef.current.find((r) => r.key === key) : undefined;
+    return key && row && caret != null ? { key, caret, text: parseLine(row.line).text } : { key: key ?? lastKey.current };
   }
 
   function addLink() {
@@ -305,16 +308,19 @@ export function PageEditor({
   }
 
   /**
-   * Puts picture lines in: at a cursor inside a line's words, the line is split around them; at
-   * the very start of a line with words, above it; otherwise after the line (an empty line is
-   * used), or at the end.
+   * Puts picture lines in: at a cursor between two words, the line is split around them; at the
+   * very start of a line with words, above it; otherwise after the line (an empty line is used), or
+   * at the end. A word is never split, and if the line was typed in while the photo was on its way
+   * (review M3), the photo goes after the line as it is now.
    */
   function insertPictures(ids: string[], at: PictureAt) {
     const rs = rowsRef.current;
     const i = indexOf(at.key);
     const row = rs[i];
     const block = row ? parseLine(row.line) : null;
-    if (row && block && block.type !== "picture" && at.caret !== undefined && block.text !== "") {
+    const t = block?.text ?? "";
+    const atBreak = (c: number) => c === 0 || c >= t.length || /\s/.test(t[c - 1]!) || /\s/.test(t[c]!);
+    if (row && block && block.type !== "picture" && at.caret !== undefined && t !== "" && t === at.text && atBreak(at.caret)) {
       const caret = Math.min(Math.max(0, at.caret), block.text.length);
       // The space at the split goes (it was between two words, now a photo is).
       const before = block.text.slice(0, caret).replace(/[ \t]+$/, "");

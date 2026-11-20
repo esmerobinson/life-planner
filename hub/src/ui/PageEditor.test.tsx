@@ -353,11 +353,32 @@ describe("photos (Esme, 19 Nov 2026: add photos to to-do and idea pages)", () =>
     expect(last()!.split("\n")[4]).toBe("- [ ] step two");
   });
 
-  it("a photo pasted into a line goes in at the cursor; pasted words stay words", async () => {
-    const { page, last } = setup("ab");
-    await userEvent.click(page.getByText("ab"));
+  it("never splits a word: a cursor inside one puts the photo after the line (review M3)", async () => {
+    const { page, last } = setup("hello world");
+    await userEvent.click(page.getByText("hello world"));
+    (page.getByRole("textbox", { name: /text 1/ }) as HTMLTextAreaElement).setSelectionRange(3, 3);
+    await userEvent.click(page.getByRole("button", { name: "Photo" }));
+    await choose(page, jpg());
+    await vi.waitFor(() => expect(last()).toMatch(new RegExp(`^hello world\\n${PIC.source}$`)));
+  });
+
+  it("typed in that line while the photo was on its way: it goes after the line's words as they are now (review M3)", async () => {
+    const { page, last } = setup("hello world\nnext");
+    await userEvent.click(page.getByText("hello world"));
     const box = page.getByRole("textbox", { name: /text 1/ }) as HTMLTextAreaElement;
-    box.setSelectionRange(1, 1);
+    box.setSelectionRange(6, 6);
+    await userEvent.click(page.getByRole("button", { name: "Photo" }));
+    box.setSelectionRange(0, 0);
+    await userEvent.type(box, "AAA ", { initialSelectionStart: 0, initialSelectionEnd: 0 });
+    await choose(page, jpg());
+    await vi.waitFor(() => expect(last()).toMatch(new RegExp(`^AAA hello world\\n${PIC.source}\\nnext$`)));
+  });
+
+  it("a photo pasted into a line goes in at the cursor; pasted words stay words", async () => {
+    const { page, last } = setup("a b");
+    await userEvent.click(page.getByText("a b"));
+    const box = page.getByRole("textbox", { name: /text 1/ }) as HTMLTextAreaElement;
+    box.setSelectionRange(2, 2);
     fireEvent.paste(box, { clipboardData: { files: [jpg()], getData: () => "" } });
     await vi.waitFor(() => expect(last()).toMatch(new RegExp(`^a\\n${PIC.source}\\nb$`)));
     const pasteText = fireEvent.paste(page.getByRole("textbox", { name: /text/ }), {

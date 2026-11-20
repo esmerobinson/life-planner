@@ -86,8 +86,8 @@ it("a photo added on the Mac: its bytes are copied into the area's folder under 
   pretendMac(() => ({ error: "permission" }));
   expect(await savePhotoCopy({ root: "~/Desktop", area: "Art", name: "a/b:.png", data: "AAAA" })).toEqual({ kind: "permission" });
   expect((sent[0] as { name: string }).name).toBe("a-b-.png");
-  // An older Mac app (no savePhoto yet) answers "unknown action": nothing is copied, nothing breaks.
+  // An older Mac app (no savePhoto yet) answers "unknown action": like no bridge (review M8).
   pretendMac(() => new Error("unknown action"));
-  expect(await savePhotoCopy({ root: "~/Desktop", area: "Art", name: "", data: "AAAA" })).toEqual({ kind: "error" });
+  expect(await savePhotoCopy({ root: "~/Desktop", area: "Art", name: "", data: "AAAA" })).toEqual({ kind: "unavailable" });
   expect((sent[sent.length - 1] as { name: string }).name).toBe("Photo.jpg");
 });

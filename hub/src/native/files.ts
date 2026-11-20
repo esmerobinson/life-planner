@@ -77,7 +77,7 @@ function savedReply(reply: unknown): AttachResult {
 /**
  * A photo added to a "What I did" note on the Mac (Esme, 19 Nov 2026): its own bytes (base64, as
  * chosen, not the downscaled copy) are saved into the area's (or project's) folder like an
- * attached file, never overwriting. An older Mac app without `savePhoto` answers an error.
+ * attached file, never overwriting. An older Mac app without `savePhoto` counts as "unavailable".
  */
 export async function savePhotoCopy(to: {
   root: string; area: string; project?: string; name: string; data: string;
@@ -94,8 +94,9 @@ export async function savePhotoCopy(to: {
         data: to.data,
       }),
     );
-  } catch {
-    return { kind: "error" };
+  } catch (e) {
+    // A Mac app older than this page has no savePhoto: as if there were no bridge (review M8).
+    return /unknown action/.test(String((e as Error)?.message ?? e)) ? { kind: "unavailable" } : { kind: "error" };
   }
 }
 

@@ -3,7 +3,7 @@ import { saveDid } from "../../data/didRepo";
 import { clearDidDraft, forgetDidDraft, keepDidDraft } from "../../data/didDraft";
 import { isProject } from "../../domain/projects";
 import type { DidEntry, DidFile, ISODate, Item } from "../../domain/types";
-import { MAX_DID_NOTE, photosOf } from "../../domain/whatIDid";
+import { MAX_DID_NOTE, MAX_DID_PHOTOS, photosOf } from "../../domain/whatIDid";
 import { attachFiles, hasFileBridge, loadFilesRoot, MAX_PHOTO_COPY_BYTES, revealFile, savePhotoCopy } from "../../native/files";
 import { AREA_CHOICES } from "../areas";
 import { useSaveError } from "../messages";
@@ -79,14 +79,19 @@ export function DidBox({
   const photoInput = useRef<HTMLInputElement>(null);
 
   /** Stores the chosen photos on the note; on the Mac, also copies each into the area's folder. */
-  async function addPhotos(chosen: File[]) {
-    if (!chosen.length) return;
+  async function addPhotos(picked: File[]) {
+    if (!picked.length) return;
     setAdding(true);
     setMessage(null);
     note.flush(); // the words first, so they are never behind the photos
     try {
-      const { ids, stored, message: why } = await storePhotos(chosen, today);
-      if (why) setMessage(why);
+      // Only as many as the note has room for; the rest are never stored, and she is told (M1).
+      const room = Math.max(0, MAX_DID_PHOTOS - photos.length);
+      const chosen = picked.slice(0, room);
+      const over = picked.length - chosen.length;
+      const { ids, stored, message: why } = chosen.length ? await storePhotos(chosen, today) : { ids: [], stored: [], message: null };
+      const limit = over > 0 ? W.photoLimit(MAX_DID_PHOTOS, over) : null;
+      if (why || limit) setMessage([why, limit].filter(Boolean).join(" "));
       if (!ids.length) return;
       if (!(await attempt(() => saveDid(item.id, at, { addPhotos: ids }, today)))) return;
       await onSaved();
@@ -104,7 +109,7 @@ export function DidBox({
         });
         if (r.kind === "saved") kept.push(...r.files);
         else if (r.kind === "permission") setMessage(W.photoPermission);
-        else setMessage(W.photoNotCopied);
+        else if (r.kind !== "unavailable") setMessage(W.photoNotCopied); // an older Mac app can't: no copy, no fuss (M8)
       }
       if (kept.length && (await attempt(() => saveDid(item.id, at, { addFiles: kept }, today)))) await onSaved();
     } finally {
