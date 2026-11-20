@@ -1,4 +1,5 @@
 import { isValidISODate } from "../domain/dates";
+import { forgetRemovedPhotos } from "./photoPurge";
 import { db } from "./db";
 import { keepOwnStamps } from "./changeTracking";
 import { retireDeviceId } from "./deviceIds";
@@ -205,6 +206,8 @@ async function writeBackup(file: BackupFile, mode: "merge" | "replace") {
       // never over them: an edit made before the next sync can't win over words it never saw
       // (bug #31, deviceIds.ts). The rows restored here keep the file's stamps, so a newer copy wins.
       await retireDeviceId(db.syncMeta);
+      // Removals noted here were checked against rows that are gone now (re-review RM3).
+      await forgetRemovedPhotos();
       await db.items.bulkAdd(file.items);
       await db.goals.bulkAdd(file.goals);
       await db.files.bulkAdd(file.files ?? []);

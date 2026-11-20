@@ -129,8 +129,8 @@ export function GoalPanel({
 
   const notes = useDraft(
     goal.notes ?? "",
-    async (t) => {
-      if (!(await write(() => saveGoalNotes(goal.id, t)))) throw new Error("not saved");
+    async (t, shown) => {
+      if (!(await write(() => saveGoalNotes(goal.id, t, shown)))) throw new Error("not saved");
     },
     AUTOSAVE_MS,
   );

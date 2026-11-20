@@ -49,7 +49,12 @@ export const AUTOSAVE_MS = 800;
  * nothing typed is lost. While nothing is unsaved, a new stored value (e.g. from sync)
  * replaces the draft.
  */
-export function useDraft(stored: string, save: (text: string) => Promise<unknown>, debounceMs?: number) {
+export function useDraft(
+  stored: string,
+  /** `shown`: the text the field last loaded or saved, the base this edit was made on (re-review RI1). */
+  save: (text: string, shown: string) => Promise<unknown>,
+  debounceMs?: number,
+) {
   const [value, setValue] = useState(stored);
   const latest = useRef(stored);
   const saved = useRef(stored);
@@ -73,7 +78,7 @@ export function useDraft(stored: string, save: (text: string) => Promise<unknown
     const before = saved.current;
     if (text === before) return;
     saved.current = text;
-    void saveRef.current(text).catch(() => {
+    void saveRef.current(text, before).catch(() => {
       // Still unsaved, so the next flush tries again (the caller shows its save message).
       if (saved.current === text) saved.current = before;
     });

@@ -2,7 +2,7 @@ import { db } from "./db";
 import { MAX_GOAL_NOTES, MAX_GOAL_TEXT, MAX_MONTH_GOALS, MAX_MONTH_LOG, MAX_MONTH_TARGET, MAX_MONTH_TITLE } from "./validate";
 import { newId } from "../domain/ids";
 import { pictureIds, shownPictureIds } from "../domain/page";
-import { noteRemovedPhotos, sweepIn } from "./photoPurge";
+import { deferBinPhotos, noteRemovedPhotos, purgeAllowed, sweepIn } from "./photoPurge";
 import { addDays, isValidISODate, mondayOf, monthOf } from "../domain/dates";
 import { plannedFromLastMonth } from "../domain/goalCounts";
 import { isHabit, withDoneDate, withoutDoneDate } from "../domain/habits";
@@ -748,15 +748,15 @@ export async function addSuggestedGoal(id: string, today: ISODate): Promise<void
   });
 }
 
-/** Saves a goal's notes (the panel's page); blank text removes them. */
-export async function saveGoalNotes(id: string, notes: string): Promise<void> {
+/** Saves a goal's notes (the panel's page); blank text removes them. `shown`: as saveItemNotes. */
+export async function saveGoalNotes(id: string, notes: string, shown?: string): Promise<void> {
   if (notes.length > MAX_GOAL_NOTES) throw new Error(`at most ${MAX_GOAL_NOTES} characters`);
   await db.transaction("rw", db.goals, db.syncMeta, async () => {
     const goal = await db.goals.get(id);
     if (!goal || goal.status !== undefined) return;
     const { notes: _n, ...rest } = goal;
     await db.goals.put(notes.trim() ? { ...rest, notes } : rest);
-    await noteRemovedPhotos(id, gonePictures(goal.notes, notes));
+    await noteRemovedPhotos(id, shown === undefined ? [] : gonePictures(shown, notes));
   });
 }
 
@@ -886,10 +886,17 @@ export async function emptyBin(today: ISODate, only?: { items: string[]; goals: 
       status: "purged",
     }));
     if (goalTombs.length) await db.goals.bulkPut(goalTombs);
+    const rows = new Set([...bin.map((i) => i.id), ...goals.map((g) => g.id)]);
+    const gone = bin.flatMap((i) => i.didPhotosGone ?? []);
+    if (!(await purgeAllowed())) {
+      // Sync set up and not caught up yet this session: the photos wait (re-review RM1).
+      await deferBinPhotos(rows, [...[...bin, ...goals].flatMap(shownPictureIds), ...gone]);
+      return tombs.length + goalTombs.length;
+    }
     await purgePictures([...bin, ...goals].flatMap(shownPictureIds));
     // Photos removed earlier from what was just emptied go too, grace period or not (review I1),
     // with the ones its notes list as removed (on any device).
-    await sweepIn(Date.now(), new Set([...bin.map((i) => i.id), ...goals.map((g) => g.id)]), bin.flatMap((i) => i.didPhotosGone ?? []));
+    await sweepIn(Date.now(), rows, gone);
     return tombs.length + goalTombs.length;
   });
 }
@@ -948,14 +955,18 @@ export async function fileItem(id: string, type: SortType, areaId: AreaId, today
   });
 }
 
-/** Saves an item's notes; blank text removes them. */
-export async function saveItemNotes(id: string, notes: string, today: ISODate): Promise<void> {
+/**
+ * Saves an item's notes; blank text removes them. `shown`: the text the editor last loaded or saved
+ * (useDraft). Only a picture in `shown` and not in `notes` counts as removed (its photo is deleted
+ * later, data/photoPurge.ts): never one the stored row gained meanwhile from another device (RI1).
+ */
+export async function saveItemNotes(id: string, notes: string, today: ISODate, shown?: string): Promise<void> {
   await db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(id);
     if (!item) return;
     const { notes: _n, ...rest } = item;
     await db.items.put(notes.trim() ? { ...rest, notes, touchedAt: today } : { ...rest, touchedAt: today });
-    await noteRemovedPhotos(id, gonePictures(item.notes, notes));
+    await noteRemovedPhotos(id, shown === undefined ? [] : gonePictures(shown, notes));
   });
 }
 

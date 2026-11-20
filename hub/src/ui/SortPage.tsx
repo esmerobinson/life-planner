@@ -212,7 +212,8 @@ function SortCard({
   async function saveNotes(): Promise<boolean> {
     const text = draftRef.current;
     if (text === saved.current) return true;
-    const ok = await attempt(() => saveItemNotes(item.id, text, today));
+    const shown = saved.current;
+    const ok = await attempt(() => saveItemNotes(item.id, text, today, shown));
     if (ok) saved.current = text;
     return ok;
   }
@@ -230,7 +231,7 @@ function SortCard({
     () => () => {
       const { item: it, today: d, attempt: tryIt } = latest.current;
       const text = draftRef.current;
-      if (text !== saved.current) void tryIt(() => saveItemNotes(it.id, text, d));
+      if (text !== saved.current) void tryIt(() => saveItemNotes(it.id, text, d, saved.current));
     },
     [],
   );

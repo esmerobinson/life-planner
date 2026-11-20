@@ -17,7 +17,8 @@ import {
 import type { ISODate } from "../domain/types";
 
 /** When this app session started: suggested links wait for a sync that finished after it. */
-export const SESSION_STARTED_AT = Date.now();
+import { SESSION_STARTED_AT } from "./session";
+export { SESSION_STARTED_AT };
 /** The stamp of a suggested link and of the marker: older than any real edit on any device. */
 const SUGGESTED_STAMP = 1;
 

@@ -134,7 +134,7 @@ export function ItemPanel({
     if (!t.trim()) return; // a blank title is not saved; the stored one comes back on reopen
     await write(() => updateItem(item.id, { title: t.trim() }, today));
   });
-  const notes = useDraft(item.notes ?? "", (t) => write(() => saveItemNotes(item.id, t, today)), AUTOSAVE_MS);
+  const notes = useDraft(item.notes ?? "", (t, shown) => write(() => saveItemNotes(item.id, t, today, shown)), AUTOSAVE_MS);
 
   // Escape while editing discards the field changes instead of closing the panel.
   useEffect(() => {
