@@ -118,3 +118,11 @@ it("deleted by itself once the grace period has passed (no later action needed)"
     vi.useRealTimers();
   }
 });
+
+it("emptying the Bin also deletes photos another device removed from the binned to-do's notes (its didPhotosGone)", async () => {
+  await db.files.add(file("elsewhere"));
+  await db.items.add(todo("t", { did: [{ id: "note", on: DAY, note: "Pretend" }], didPhotosGone: ["elsewhere"] }));
+  await deleteItem("t", DAY);
+  await emptyBin(DAY);
+  expect(await isPurged("elsewhere")).toBe(true);
+});

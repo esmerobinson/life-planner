@@ -7,7 +7,7 @@ import { isValidISODate } from "../domain/dates";
 import { MAX_DONE_DATES } from "../domain/habits";
 import { MAX_SESSION_DETAILS, MAX_SESSION_TITLE, MAX_SESSIONS, MIN_SESSIONS } from "../domain/projects";
 import { BOOK_LIMITS, isWebLink } from "../domain/books";
-import { validDid, validDidPhotos } from "../domain/whatIDid";
+import { validDid, validDidPhotos, validDidPhotosGone } from "../domain/whatIDid";
 import { AREA_IDS, BOOK_STATUSES, COUNT_SOURCE_KINDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 
 /** The longest goal why / cadence text (characters). */
@@ -78,10 +78,11 @@ export function validItem(r: unknown): r is Item {
     // "What I did" notes (2026-11-19).
     validDid(r.did) &&
     validDidPhotos(r.didPhotos) &&
+    validDidPhotosGone(r.didPhotosGone) &&
     // An emptied-from-the-Bin tombstone carries no content.
     (r.status !== "purged" ||
       (r.title === "" && r.notes === undefined && r.tags === undefined && r.sessions === undefined && r.did === undefined &&
-        r.didPhotos === undefined &&
+        r.didPhotos === undefined && r.didPhotosGone === undefined &&
         (r.links as unknown[]).length === 0))
   );
 }

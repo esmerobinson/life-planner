@@ -16,6 +16,8 @@ export const MAX_DID_ENTRIES = 60;
 export const MAX_DID_FILES = 100;
 /** The most photos one note keeps. */
 export const MAX_DID_PHOTOS = 20;
+/** The most removed photo ids a to-do remembers (review M2; the oldest are forgotten first). */
+export const MAX_DID_GONE = 200;
 /** The longest file name and folder path kept (macOS allows 255 bytes a name, 1024 a path). */
 export const MAX_FILE_NAME = 255;
 export const MAX_FOLDER = 1024;
@@ -78,6 +80,15 @@ export function validDidPhotos(v: unknown): boolean {
   return ok && new Set(v.map((p) => (p as DidPhotos).entry)).size === v.length;
 }
 
+/** An item's `didPhotosGone`: absent, or 1 to MAX_DID_GONE distinct picture ids. */
+export function validDidPhotosGone(v: unknown): boolean {
+  if (v === undefined) return true;
+  return (
+    Array.isArray(v) && v.length > 0 && v.length <= MAX_DID_GONE &&
+    v.every((id) => isStr(id) && PHOTO_ID.test(id)) && new Set(v).size === v.length
+  );
+}
+
 /** One note's photo ids (none: []). */
 export function photosOf(it: Pick<Item, "didPhotos">, entryId: string): string[] {
   return it.didPhotos?.find((p) => p.entry === entryId)?.ids ?? [];
@@ -134,15 +145,64 @@ export function withDidEntry(
  * with nothing else takes the note with it.
  */
 export function applyDidPatch(
-  it: Pick<Item, "did" | "didPhotos">, at: Pick<DidEntry, "id" | "on" | "session">, patch: DidPatch,
-): { did: DidEntry[] | undefined; didPhotos: DidPhotos[] | undefined } {
+  it: Pick<Item, "did" | "didPhotos" | "didPhotosGone">, at: Pick<DidEntry, "id" | "on" | "session">, patch: DidPatch,
+): { did: DidEntry[] | undefined; didPhotos: DidPhotos[] | undefined; didPhotosGone: string[] | undefined } {
   let ids = photosOf(it, at.id).filter((id) => id !== patch.removePhoto);
   for (const id of patch.addPhotos ?? []) if (!ids.includes(id)) ids.push(id);
   ids = ids.slice(0, MAX_DID_PHOTOS);
   const others = (it.didPhotos ?? []).filter((p) => p.entry !== at.id);
   const sets = ids.length ? [...(it.didPhotos ?? []).map((p) => (p.entry === at.id ? { entry: at.id, ids } : p))] : others;
   if (ids.length && !sets.some((p) => p.entry === at.id)) sets.push({ entry: at.id, ids });
-  return { did: withDidEntry(it.did, at, patch, ids.length > 0), didPhotos: sets.length ? sets : undefined };
+  // A removed photo is listed as gone, so a device that syncs later doesn't bring it back (M2).
+  let gone = it.didPhotosGone ?? [];
+  if (patch.removePhoto !== undefined && photosOf(it, at.id).includes(patch.removePhoto)) {
+    gone = [...gone.filter((id) => id !== patch.removePhoto), patch.removePhoto].slice(-MAX_DID_GONE);
+  }
+  return {
+    did: withDidEntry(it.did, at, patch, ids.length > 0),
+    didPhotos: sets.length ? sets : undefined,
+    didPhotosGone: gone.length ? gone : undefined,
+  };
+}
+
+/**
+ * A newer row from another device is about to replace this device's copy of a to-do (sync). Rows
+ * are last-write-wins, so photos added here meanwhile would vanish (review M2). The merge: every
+ * photo either copy has, minus every photo either has removed (`didPhotosGone`), each in its own
+ * note (made if the newer row lacks it, with this copy's day and session). Returns the changed
+ * fields, or null when nothing changes (or the newer row was emptied from the Bin).
+ */
+export function mergeDidPhotos(
+  incoming: Item, local: Item | undefined,
+): Pick<Item, "did" | "didPhotos" | "didPhotosGone"> | null {
+  if (!local || incoming.status === "purged" || (!local.didPhotos && !local.didPhotosGone)) return null;
+  const goneHere = local.didPhotosGone ?? [];
+  let row: Pick<Item, "did" | "didPhotos" | "didPhotosGone"> = {
+    did: incoming.did, didPhotos: incoming.didPhotos,
+    didPhotosGone: [...(incoming.didPhotosGone ?? []), ...goneHere.filter((id) => !(incoming.didPhotosGone ?? []).includes(id))].slice(-MAX_DID_GONE),
+  };
+  if (!row.didPhotosGone!.length) row.didPhotosGone = undefined;
+  const gone = new Set([...(incoming.didPhotosGone ?? []), ...goneHere]);
+  const theirs = new Set((incoming.didPhotos ?? []).flatMap((p) => p.ids));
+  // Removed here: taken off theirs.
+  for (const p of incoming.didPhotos ?? []) {
+    for (const id of p.ids) {
+      if (!goneHere.includes(id)) continue;
+      const e = didEntries({ ...incoming, ...row } as Item).find((x) => x.id === p.entry)!;
+      row = { ...row, ...applyDidPatch(row, { id: e.id, on: e.on, ...(e.session ? { session: e.session } : {}) }, { removePhoto: id }) };
+    }
+  }
+  // Added here: put on theirs.
+  for (const e of didEntries(local)) {
+    const add = e.photos.filter((id) => !theirs.has(id) && !gone.has(id));
+    if (!add.length) continue;
+    const there = didEntries({ ...incoming, ...row } as Item).find((x) => x.id === e.id);
+    const at = there ?? e;
+    row = { ...row, ...applyDidPatch(row, { id: at.id, on: at.on, ...(at.session ? { session: at.session } : {}) }, { addPhotos: add }) };
+  }
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  if (same(row.did, incoming.did) && same(row.didPhotos, incoming.didPhotos) && same(row.didPhotosGone, incoming.didPhotosGone)) return null;
+  return row;
 }
 
 /** A note with its photos. */

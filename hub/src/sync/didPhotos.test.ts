@@ -4,6 +4,7 @@ import { HubDB } from "../data/db";
 import type { FileRow, Item } from "../domain/types";
 import { FakeSyncServer } from "./fakeServer";
 import { saveSyncSettings, syncOnce } from "./engine";
+import { applyDidPatch } from "../domain/whatIDid";
 
 // Photos on "What I did" notes sync like a page's pictures: the to-do carries the ids, the
 // files table the image. Made-up rows only, through the fake server.
@@ -68,4 +69,64 @@ it("an emptied picture a note on this device still shows is kept and sent back",
   await syncOnce({ db: phone, fetch: server.fetch });
   expect((await phone.files.get("p2"))!.data).toBe("/9j/4AAQ");
   expect(server.data("files", "p2")).toMatchObject({ data: "/9j/4AAQ" });
+});
+
+describe("two devices adding or removing photos on the same note between syncs (review M2)", () => {
+  const at = { id: "note", on: "2026-11-18" };
+  /** A device's own Add photo / Remove, as its repo writes it (a tracked write of the whole row). */
+  async function change(d: HubDB, patch: { addPhotos?: string[]; removePhoto?: string }) {
+    const row = (await d.items.get("t9"))!;
+    await d.items.put({ ...row, ...applyDidPatch(row, at, patch) });
+  }
+  const ids = async (d: HubDB) => ((await d.items.get("t9"))!.didPhotos ?? []).flatMap((p) => p.ids).sort();
+
+  async function setUp() {
+    const server = new FakeSyncServer(TOKEN);
+    const mac = await device("mac");
+    const phone = await device("phone");
+    await mac.items.add(todo("t9"));
+    await syncOnce({ db: mac, fetch: server.fetch });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    return { server, mac, phone };
+  }
+  async function settle(server: FakeSyncServer, ...ds: HubDB[]) {
+    for (let k = 0; k < 3; k++) for (const d of ds) await syncOnce({ db: d, fetch: server.fetch });
+  }
+
+  it("the older change syncs second: both photos are kept everywhere", async () => {
+    const { server, mac, phone } = await setUp();
+    clock += 60_000;
+    await change(phone, { addPhotos: ["pp"] });
+    clock += 60_000;
+    await change(mac, { addPhotos: ["pm"] });
+    await settle(server, mac, phone);
+    expect(await ids(mac)).toEqual(["pm", "pp"]);
+    expect(await ids(phone)).toEqual(["pm", "pp"]);
+  });
+
+  it("the newer change syncs second (the server never shows it the older one): both photos are kept", async () => {
+    const { server, mac, phone } = await setUp();
+    clock += 60_000;
+    await change(phone, { addPhotos: ["pp"] });
+    await syncOnce({ db: phone, fetch: server.fetch });
+    clock += 60_000;
+    await change(mac, { addPhotos: ["pm"] });
+    await settle(server, mac, phone);
+    expect(await ids(mac)).toEqual(["pm", "pp"]);
+    expect(await ids(phone)).toEqual(["pm", "pp"]);
+  });
+
+  it("a photo removed on one device is never brought back by the other", async () => {
+    const { server, mac, phone } = await setUp();
+    clock += 60_000;
+    await change(phone, { addPhotos: ["pp", "keep"] });
+    await settle(server, phone, mac);
+    clock += 60_000;
+    await change(mac, { removePhoto: "pp" });
+    clock += 60_000;
+    await change(phone, { addPhotos: ["later"] }); // the phone hasn't seen the removal yet
+    await settle(server, mac, phone);
+    expect(await ids(mac)).toEqual(["keep", "later"]);
+    expect(await ids(phone)).toEqual(["keep", "later"]);
+  });
 });

@@ -19,6 +19,7 @@
 import { applyUntracked } from "../data/changeTracking";
 import { carrySessionTicks, forgetAcceptedTicks, restampTicks } from "../data/sessionTicks";
 import { shownPictureIds } from "../domain/page";
+import { mergeDidPhotos } from "../domain/whatIDid";
 import type { DidPhotos, FileRow, Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
@@ -535,10 +536,25 @@ async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boole
   }
   // A project this device ticked sessions on, replaced by a newer row from another device:
   // its ticks go back on and the result is a new local change, sent next (I-4, sessionTicks.ts).
+  // Photos on its "What I did" notes are merged too: added on either device, minus removed on
+  // either (review M2, domain/whatIDid.ts mergeDidPhotos).
   if (c.table === "items") {
-    const merged = await carrySessionTicks(db, row as unknown as Item);
+    const ticked = await carrySessionTicks(db, row as unknown as Item);
     // This write skips the change tracker, so carrySessionTicks has checked it as every local
     // write is (an unreadable merge is dropped there, with its notes, and the row applies as it is).
+    let merged = ticked;
+    const base = ticked ?? (row as unknown as Item);
+    const photos = mergeDidPhotos(base, local as Item | undefined);
+    if (photos) {
+      const { did: _d, didPhotos: _p, didPhotosGone: _g, ...rest } = base;
+      const next: Item = {
+        ...rest,
+        ...(photos.did ? { did: photos.did } : {}),
+        ...(photos.didPhotos ? { didPhotos: photos.didPhotos } : {}),
+        ...(photos.didPhotosGone ? { didPhotosGone: photos.didPhotosGone } : {}),
+      };
+      if (VALID_ROW.items({ ...next, updatedAt: c.updatedAt + 1 })) merged = next; // checked like any local write
+    }
     if (merged) {
       const stamp = Math.max(Date.now(), c.updatedAt + 1);
       await db.items.put({ ...merged, updatedAt: stamp });

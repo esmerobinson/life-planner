@@ -16,14 +16,14 @@ export async function saveDid(
   return db.transaction("rw", db.items, db.syncMeta, async () => {
     const item = await db.items.get(itemId);
     if (!item || item.status === "deleted" || item.status === "purged") return false;
-    const { did: _d, didPhotos: _p, ...rest } = item;
-    const { did, didPhotos } = applyDidPatch(item, at, patch);
+    const { did: _d, didPhotos: _p, didPhotosGone: _g, ...rest } = item;
+    const { did, didPhotos, didPhotosGone } = applyDidPatch(item, at, patch);
     // Nothing changed: nothing written, so no new stamp can beat another device's edit (review C1).
     const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-    if (same(did, item.did) && same(didPhotos, item.didPhotos)) return true;
+    if (same(did, item.did) && same(didPhotos, item.didPhotos) && same(didPhotosGone, item.didPhotosGone)) return true;
     // touchedAt is left alone: a note isn't a change to the to-do (the farm and "not looked at"
     // read it; review M10).
-    await db.items.put({ ...rest, ...(did ? { did } : {}), ...(didPhotos ? { didPhotos } : {}) });
+    await db.items.put({ ...rest, ...(did ? { did } : {}), ...(didPhotos ? { didPhotos } : {}), ...(didPhotosGone ? { didPhotosGone } : {}) });
     // Photos taken off (Remove, or past the cap) are deleted once nothing shows them (review I1).
     const kept = new Set((didPhotos ?? []).flatMap((p) => p.ids));
     const had = [...(item.didPhotos ?? []).flatMap((p) => p.ids), ...(patch.addPhotos ?? [])];

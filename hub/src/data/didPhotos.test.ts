@@ -33,6 +33,9 @@ describe("the validator", () => {
     const tomb = { ...todo("d"), title: "", status: "purged" as const, completedAt: undefined };
     expect(validItem(tomb)).toBe(true);
     expect(validItem({ ...tomb, didPhotos: [{ entry: "note", ids: ["p1"] }] })).toBe(false);
+    expect(validItem(todo("e", { didPhotosGone: ["p1"] }))).toBe(true);
+    expect(validItem(todo("f", { didPhotosGone: ["p1", "p1"] }))).toBe(false);
+    expect(validItem({ ...tomb, didPhotosGone: ["p1"] })).toBe(false);
   });
 });
 
@@ -55,6 +58,7 @@ describe("saveDid with photos", () => {
     it = (await db.items.get("t"))!;
     expect("did" in it).toBe(false);
     expect("didPhotos" in it).toBe(false);
+    expect(it.didPhotosGone).toEqual(["p1", "p2"]); // so a device that syncs later doesn't bring them back
   });
 });
 

@@ -1,7 +1,7 @@
 import type { Item } from "./types";
 import { shownPictureIds } from "./page";
 import {
-  applyDidPatch, completedInWeek, didEntries, didLog, validDidPhotos, MAX_DID_PHOTOS,
+  applyDidPatch, completedInWeek, didEntries, didLog, mergeDidPhotos, validDidPhotos, validDidPhotosGone, MAX_DID_GONE, MAX_DID_PHOTOS,
 } from "./whatIDid";
 
 // Photos on "What I did" notes (Esme, 19 Nov 2026: "add option to add photos"). The ids live in
@@ -40,6 +40,7 @@ describe("applyDidPatch: photos", () => {
     expect(applyDidPatch(todo("t"), at, { addPhotos: ["p1"] })).toEqual({
       did: [{ id: "note", on: DAY }],
       didPhotos: [{ entry: "note", ids: ["p1"] }],
+      didPhotosGone: undefined,
     });
   });
   it("adds at the end, never twice; removes one; the last one gone takes the empty note with it", () => {
@@ -49,12 +50,12 @@ describe("applyDidPatch: photos", () => {
     it = { ...it, ...applyDidPatch(it, at, { removePhoto: "p1" }) };
     expect(it.didPhotos).toEqual([{ entry: "note", ids: ["p2"] }]);
     const gone = applyDidPatch(it, at, { removePhoto: "p2" });
-    expect(gone).toEqual({ did: undefined, didPhotos: undefined });
+    expect(gone).toEqual({ did: undefined, didPhotos: undefined, didPhotosGone: ["p1", "p2"] });
   });
   it("a note with words keeps them when its photos go, and keeps its photos when its words go", () => {
     const it = todo("t", { did: [{ id: "note", on: DAY, note: "Pretend words" }], didPhotos: [{ entry: "note", ids: ["p1"] }] });
-    expect(applyDidPatch(it, at, { removePhoto: "p1" })).toEqual({ did: [{ id: "note", on: DAY, note: "Pretend words" }], didPhotos: undefined });
-    expect(applyDidPatch(it, at, { note: "" })).toEqual({ did: [{ id: "note", on: DAY }], didPhotos: [{ entry: "note", ids: ["p1"] }] });
+    expect(applyDidPatch(it, at, { removePhoto: "p1" })).toEqual({ did: [{ id: "note", on: DAY, note: "Pretend words" }], didPhotos: undefined, didPhotosGone: ["p1"] });
+    expect(applyDidPatch(it, at, { note: "" })).toEqual({ did: [{ id: "note", on: DAY }], didPhotos: [{ entry: "note", ids: ["p1"] }], didPhotosGone: undefined });
   });
   it("other notes' photos are left as they are; at most MAX_DID_PHOTOS a note", () => {
     const it = todo("t", { didPhotos: [{ entry: "s1", ids: ["x"] }] });
@@ -89,5 +90,50 @@ describe("shownPictureIds", () => {
   it("a page's pictures and its notes' photos", () => {
     expect(shownPictureIds({ notes: "a\n![](file:pg1)", didPhotos: [{ entry: "note", ids: ["p1", "p2"] }] })).toEqual(["pg1", "p1", "p2"]);
     expect(shownPictureIds({})).toEqual([]);
+  });
+});
+
+describe("removals are kept in the row (review M2)", () => {
+  const at = { id: "note", on: DAY };
+  it("Remove lists the photo as gone (newest last, at most MAX_DID_GONE); validDidPhotosGone checks the list", () => {
+    const it = todo("t", { did: [{ id: "note", on: DAY }], didPhotos: [{ entry: "note", ids: ["p1", "p2"] }] });
+    expect(applyDidPatch(it, at, { removePhoto: "p1" }).didPhotosGone).toEqual(["p1"]);
+    const full = Array.from({ length: MAX_DID_GONE }, (_, i) => `g${i}`);
+    const r = applyDidPatch({ ...it, didPhotosGone: full }, at, { removePhoto: "p2" });
+    expect(r.didPhotosGone).toHaveLength(MAX_DID_GONE);
+    expect(r.didPhotosGone!.at(-1)).toBe("p2");
+    expect(validDidPhotosGone(undefined)).toBe(true);
+    expect(validDidPhotosGone(["a", "b"])).toBe(true);
+    expect(validDidPhotosGone([])).toBe(false);
+    expect(validDidPhotosGone(["a/b"])).toBe(false);
+    expect(validDidPhotosGone([...full, "x"])).toBe(false);
+  });
+});
+
+describe("mergeDidPhotos: a newer row from another device meets this device's copy (review M2)", () => {
+  const withPhotos = (ids: string[], extra: Partial<Item> = {}) =>
+    todo("t", { did: [{ id: "note", on: DAY }], didPhotos: [{ entry: "note", ids }], ...extra });
+
+  it("photos added on both devices are both kept", () => {
+    const merged = mergeDidPhotos(withPhotos(["pm"]), withPhotos(["pp"]))!;
+    expect(merged.didPhotos).toEqual([{ entry: "note", ids: ["pm", "pp"] }]);
+  });
+  it("a photo the other device removed stays removed; one removed here is taken off theirs", () => {
+    expect(mergeDidPhotos(withPhotos(["a"], { didPhotosGone: ["b"] }), withPhotos(["a", "b"]))).toBeNull();
+    const r = mergeDidPhotos(withPhotos(["a", "b"]), withPhotos(["a"], { didPhotosGone: ["b"] }))!;
+    expect(r.didPhotos).toEqual([{ entry: "note", ids: ["a"] }]);
+    expect(r.didPhotosGone).toEqual(["b"]);
+  });
+  it("a note this device has and the other doesn't comes along (its day and session kept)", () => {
+    const local = todo("t", { did: [{ id: "s1", on: "2026-11-17", session: "s1" }], didPhotos: [{ entry: "s1", ids: ["x"] }] });
+    const r = mergeDidPhotos(todo("t", { title: "Pretend renamed" }), local)!;
+    expect(r.did).toEqual([{ id: "s1", on: "2026-11-17", session: "s1" }]);
+    expect(r.didPhotos).toEqual([{ entry: "s1", ids: ["x"] }]);
+  });
+  it("nothing to add: null; an emptied (purged) row is never merged into", () => {
+    expect(mergeDidPhotos(withPhotos(["a"]), withPhotos(["a"]))).toBeNull();
+    expect(mergeDidPhotos(withPhotos(["a"]), undefined)).toBeNull();
+    const tomb = { ...todo("t"), title: "", status: "purged" as const, completedAt: undefined };
+    expect(mergeDidPhotos(tomb, withPhotos(["a"]))).toBeNull();
   });
 });
