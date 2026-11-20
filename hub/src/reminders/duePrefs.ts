@@ -5,7 +5,15 @@
 // has to read it, and her motivation lines and the reminder titles go to Due's server anyway
 // (the Reminders page says so). Never put anything from the journal here.
 //
-//   { id: "due", on, timeZone, plan, review, dueFirst, dueSecond, nudge, leadMinutes, lines, updatedAt }
+//   { id: "due", on, timeZone, plan, review, countNudge, nudge, leadMinutes, lines, place?, lat?,
+//     lon?, updatedAt }
+//
+// 20 Nov 2026 (Esme: too many reminders at once): `countNudge` is the time of the ONE daily
+// "N to-dos left today" reminder, replacing the per-item 11:00 and 17:00 passes. `dueFirst` and
+// `dueSecond` are no longer used but still checked (an older version writes them, and a row
+// keeps them). `place`, `lat`, `lon`: where she is, for "Before sunset" reminders (one of
+// CITIES, or "here" from this device's location, rounded to 0.1°, about 10 km). Without them
+// the Worker uses her time zone's city (zoneCity).
 //
 // The Worker checks the same rules (sync/src/due/prefs.ts) and refuses a malformed row. A
 // later version may add fields (allowed here). The table also holds Today's routine rows
@@ -22,6 +30,20 @@ export const MAX_LINES = 50;
 export const MAX_LINE_LENGTH = 120;
 export const MAX_LEAD_MINUTES = 240;
 export const DEFAULT_TIME_ZONE = "America/New_York";
+export const MAX_PLACE_LENGTH = 32;
+
+/** The places the Reminders page offers for sunset (the Worker's sun.ts CITIES: same values). */
+export const CITIES = {
+  nyc: { lat: 40.7128, lon: -74.006 },
+  rio: { lat: -22.9068, lon: -43.1729 },
+  london: { lat: 51.5074, lon: -0.1278 },
+} as const;
+export type City = keyof typeof CITIES;
+
+const ZONE_CITY: Record<string, City> = { "America/New_York": "nyc", "America/Sao_Paulo": "rio", "Europe/London": "london" };
+
+/** Her time zone's city, used for sunset until she chooses (as the Worker does). */
+export const zoneCity = (timeZone: string): City | undefined => ZONE_CITY[timeZone];
 
 export interface DuePrefs {
   /** Esmeworld puts reminders into Due. Off until she turns it on. */
@@ -32,15 +54,18 @@ export interface DuePrefs {
   plan: string;
   /** "Review your day". */
   review: string;
-  /** Due today and not done: the first pass, then the second for what's still open. */
-  dueFirst: string;
-  dueSecond: string;
+  /** The one daily count of what is left on Today. */
+  countNudge: string;
   /** The motivation nudge, if nothing has been ticked off by then. */
   nudge: string;
   /** Timed to-dos: minutes before. */
   leadMinutes: number;
   /** Her own motivation lines (one a day, in turn). */
   lines: string[];
+  /** Where she is, for sunset: which choice, and its latitude and longitude (both or neither). */
+  place?: string;
+  lat?: number;
+  lon?: number;
 }
 
 export interface DuePrefsRow extends DuePrefs {
@@ -54,15 +79,19 @@ export const DEFAULT_DUE_PREFS: DuePrefs = {
   timeZone: DEFAULT_TIME_ZONE,
   plan: "09:00",
   review: "21:00",
-  dueFirst: "11:00",
-  dueSecond: "17:00",
+  countNudge: "14:00",
   nudge: "13:00",
   leadMinutes: 15,
   lines: [],
 };
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-const TIME_KEYS = ["plan", "review", "dueFirst", "dueSecond", "nudge"] as const;
+const TIME_KEYS = ["plan", "review", "countNudge", "nudge"] as const;
+/** No longer used; still checked (an older version writes them). */
+const LEGACY_TIME_KEYS = ["dueFirst", "dueSecond"] as const;
+const isLat = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= -90 && v <= 90;
+const isLon = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= -180 && v <= 180;
+const isPlace = (v: unknown): v is string => typeof v === "string" && v.length <= MAX_PLACE_LENGTH;
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isLead = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_LEAD_MINUTES;
 export const isLine = (v: unknown): v is string => typeof v === "string" && v.trim() !== "" && v.length <= MAX_LINE_LENGTH;
@@ -94,7 +123,10 @@ export function validDuePrefs(r: unknown): r is DuePrefsRow {
   if (r.updatedAt !== undefined && !(typeof r.updatedAt === "number" && Number.isSafeInteger(r.updatedAt) && r.updatedAt >= 0)) return false;
   if (r.on !== undefined && typeof r.on !== "boolean") return false;
   if (r.timeZone !== undefined && !isTimeZone(r.timeZone)) return false;
-  for (const k of TIME_KEYS) if (r[k] !== undefined && !(typeof r[k] === "string" && HHMM.test(r[k]))) return false;
+  for (const k of [...TIME_KEYS, ...LEGACY_TIME_KEYS]) if (r[k] !== undefined && !(typeof r[k] === "string" && HHMM.test(r[k]))) return false;
+  if (r.lat !== undefined && !isLat(r.lat)) return false;
+  if (r.lon !== undefined && !isLon(r.lon)) return false;
+  if (r.place !== undefined && !isPlace(r.place)) return false;
   if (r.leadMinutes !== undefined && !isLead(r.leadMinutes)) return false;
   if (r.lines !== undefined && !(Array.isArray(r.lines) && r.lines.length <= MAX_LINES && r.lines.every(isLine))) return false;
   return true;
@@ -110,11 +142,12 @@ export function normalizeDuePrefs(raw: unknown): DuePrefs {
     timeZone: isTimeZone(raw.timeZone) ? raw.timeZone : d.timeZone,
     plan: time("plan"),
     review: time("review"),
-    dueFirst: time("dueFirst"),
-    dueSecond: time("dueSecond"),
+    countNudge: time("countNudge"),
     nudge: time("nudge"),
     leadMinutes: isLead(raw.leadMinutes) ? raw.leadMinutes : d.leadMinutes,
     lines: Array.isArray(raw.lines) ? raw.lines.filter(isLine).slice(0, MAX_LINES) : [],
+    // Both or neither: half a place is no place.
+    ...(isLat(raw.lat) && isLon(raw.lon) ? { ...(isPlace(raw.place) ? { place: raw.place } : {}), lat: raw.lat, lon: raw.lon } : {}),
   };
 }
 

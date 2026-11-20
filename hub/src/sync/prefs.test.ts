@@ -39,6 +39,18 @@ describe("the Due settings row", () => {
     expect(validPrefs({ ...on(), id: "other" })).toBe(false);
   });
 
+  it("the count time and where she is (20 Nov); the old 11:00/17:00 times still pass (an older version writes them)", () => {
+    expect(validPrefs({ ...on(), countNudge: "14:00", place: "london", lat: 51.5074, lon: -0.1278 })).toBe(true);
+    expect(validPrefs({ ...on(), dueFirst: "11:00", dueSecond: "17:00" })).toBe(true);
+    for (const bad of [{ countNudge: "2pm" }, { dueFirst: "11" }, { lat: 91 }, { lon: -181 }, { lat: "40" }, { lon: Number.NaN }, { place: "x".repeat(33) }, { place: 1 }]) {
+      expect(validPrefs({ ...on(), ...bad })).toBe(false);
+    }
+    expect(normalizeDuePrefs(undefined).countNudge).toBe("14:00");
+    // Half a place is no place.
+    expect(normalizeDuePrefs({ lat: 51.5 })).toEqual(DEFAULT_DUE_PREFS);
+    expect(normalizeDuePrefs({ place: "here", lat: 51.5, lon: -0.1 })).toMatchObject({ place: "here", lat: 51.5, lon: -0.1 });
+  });
+
   it("is made whole when read (defaults; off unless on is true)", () => {
     expect(normalizeDuePrefs(undefined)).toEqual(DEFAULT_DUE_PREFS);
     expect(normalizeDuePrefs({ on: "true", plan: "8:00", lines: ["ok", 3] })).toEqual({ ...DEFAULT_DUE_PREFS, lines: ["ok"] });

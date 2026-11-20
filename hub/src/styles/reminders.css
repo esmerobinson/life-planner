@@ -114,3 +114,14 @@
   gap: 8px;
   margin: 12px 0;
 }
+
+/* Remind me in the side panel (Due, 20 Nov 2026). PLACEHOLDER LOOK: obviously not designed yet
+   (VISUAL-LANGUAGE.md has nothing for it; Design decides). */
+.remind-me {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  outline: 2px dashed magenta;
+  font-family: system-ui, sans-serif;
+}

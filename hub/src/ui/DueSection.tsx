@@ -1,6 +1,8 @@
 import { liveQuery } from "dexie";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isLine, MAX_LEAD_MINUTES, MAX_LINE_LENGTH, MAX_LINES, normalizeDuePrefs, type DuePrefs } from "../reminders/duePrefs";
+import {
+  CITIES, isLine, MAX_LEAD_MINUTES, MAX_LINE_LENGTH, MAX_LINES, normalizeDuePrefs, zoneCity, type City, type DuePrefs,
+} from "../reminders/duePrefs";
 import { readDueSettingsView, updateDuePrefs, type DueSettingsView } from "../reminders/dueSettings";
 
 // Reminders in Due (2026-11-16): the settings the sync Worker reads to put her reminders into
@@ -12,16 +14,22 @@ export const DUE_WORDS = {
   heading: "Reminders in Due",
   intro: "Esmeworld can put your reminders into Due. They change by themselves as you tick things off.",
   stored:
-    "Stored on Due's server: the reminder titles (your to-do and habit titles, “Plan your day”, “Review your day”), when each one goes off (meeting times too), and your motivation lines. Due can also see when a reminder is cancelled because you ticked something off. Nothing from your journal is ever sent.",
+    "Stored on Due's server: the reminder titles (“Plan your day”, “Review your day”, how many to-dos are left today, and the titles of to-dos and habits that have a time or Remind me), when each one goes off (meeting times too), and your motivation lines. Due can also see when a reminder is cancelled because you ticked something off. Nothing from your journal is ever sent.",
   when: "Changes reach Due after Esmeworld syncs, within about 15 minutes.",
   toggle: "Reminders in Due",
   plan: "Plan your day",
   review: "Review your day",
-  dueFirst: "Due today and not done",
-  dueSecond: "Still not done",
+  countNudge: "How many to-dos are left (one reminder)",
   nudge: "Nudge if nothing's ticked off",
   lead: "Minutes before a timed to-do",
   timeZone: "Time zone",
+  where: "Where you are (for sunset)",
+  places: { nyc: "New York City", rio: "Rio de Janeiro", london: "London", here: "Use my location" } as Record<City | "here", string>,
+  notSet: "Not set",
+  noPlace: "“Before sunset” reminders need a place: choose where you are.",
+  locationFailed: "Your location couldn't be read, so it wasn't changed.",
+  whereNote:
+    "Where you are is kept with these settings on Esmeworld's sync server (your own location is rounded to about 10 km), only to work out sunset. Due only gets the reminder's time.",
   linesHeading: "Your motivation lines",
   linesHelp: "One goes with the nudge each day, in turn. Without any, Esmeworld sends “One small thing is enough to start.”",
   newLine: "New motivation line",
@@ -35,8 +43,7 @@ export const DUE_WORDS = {
 const TIME_ROWS = [
   ["plan", DUE_WORDS.plan],
   ["review", DUE_WORDS.review],
-  ["dueFirst", DUE_WORDS.dueFirst],
-  ["dueSecond", DUE_WORDS.dueSecond],
+  ["countNudge", DUE_WORDS.countNudge],
   ["nudge", DUE_WORDS.nudge],
 ] as const;
 
@@ -53,12 +60,23 @@ function zones(current: string): string[] {
   return ZONES.includes(current) ? ZONES : [current, ...ZONES];
 }
 
+const CITY_IDS = Object.keys(CITIES) as City[];
+/** About 10 km: plenty for sunset (a minute's difference), and no closer than that. */
+const roundPlace = (v: number) => Math.round(v * 10) / 10;
+
+/** What the "Where you are" choice shows: her choice, else her time zone's city, else nothing. */
+function whereValue(p: DuePrefs): string {
+  if (p.lat !== undefined && p.lon !== undefined) return p.place && (p.place === "here" || p.place in CITIES) ? p.place : "here";
+  return zoneCity(p.timeZone) ?? "";
+}
+
 export function DueSection() {
   const [view, setView] = useState<DueSettingsView | null>(null);
   const [readFailed, setReadFailed] = useState(false);
   const [problem, setProblem] = useState("");
   const [draft, setDraft] = useState("");
   const [lead, setLead] = useState<string | null>(null);
+  const [locationFailed, setLocationFailed] = useState(false);
 
   // Read live: a change synced in from another device shows at once (review I5).
   useEffect(() => {
@@ -94,6 +112,27 @@ export function DueSection() {
     change((cur) => (cur.lines.length < MAX_LINES ? { lines: [...cur.lines, line] } : {}));
   };
   const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const where = whereValue(prefs);
+  const choosePlace = (choice: string) => {
+    setLocationFailed(false);
+    if (choice in CITIES) {
+      const c = CITIES[choice as City];
+      set({ place: choice, lat: c.lat, lon: c.lon });
+      return;
+    }
+    if (choice !== "here") return;
+    // Optional: only when she picks it, and only this once (never watched).
+    const geo = typeof navigator !== "undefined" ? navigator.geolocation : undefined;
+    if (!geo) {
+      setLocationFailed(true);
+      return;
+    }
+    geo.getCurrentPosition(
+      (pos) => set({ place: "here", lat: roundPlace(pos.coords.latitude), lon: roundPlace(pos.coords.longitude) }),
+      () => setLocationFailed(true),
+      { maximumAge: 24 * 3_600_000, timeout: 20_000 },
+    );
+  };
 
   return (
     <section className="due-section" aria-labelledby="due-heading">
@@ -148,6 +187,20 @@ export function DueSection() {
             </select>
           </label>
           <p>{DUE_WORDS.deviceZone(deviceZone)}</p>
+          <label>
+            {DUE_WORDS.where}{" "}
+            <select value={where} onChange={(e) => choosePlace(e.target.value)}>
+              {where === "" && <option value="">{DUE_WORDS.notSet}</option>}
+              {[...CITY_IDS, "here" as const].map((p) => (
+                <option key={p} value={p}>
+                  {DUE_WORDS.places[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {where === "" && <p>{DUE_WORDS.noPlace}</p>}
+          {locationFailed && <p role="alert">{DUE_WORDS.locationFailed}</p>}
+          <p>{DUE_WORDS.whereNote}</p>
         </div>
         <h3>{DUE_WORDS.linesHeading}</h3>
         <p>{DUE_WORDS.linesHelp}</p>

@@ -59,6 +59,55 @@ describe("Reminders in Due", () => {
     );
   });
 
+  it("one count time (default 14:00) replaces the two per-item times (20 Nov)", async () => {
+    renderPage();
+    const s = await section();
+    expect(s.getByLabelText(DUE_WORDS.countNudge)).toHaveValue("14:00");
+    expect(s.queryByLabelText("Due today and not done")).toBeNull();
+    expect(s.queryByLabelText("Still not done")).toBeNull();
+    fireEvent.change(s.getByLabelText(DUE_WORDS.countNudge), { target: { value: "15:30" } });
+    await vi.waitFor(async () => expect((await stored())?.countNudge).toBe("15:30"));
+  });
+
+  it("where she is, for sunset: her time zone's city until she chooses; a city saves its place", async () => {
+    renderPage();
+    const s = await section();
+    const where = s.getByLabelText(DUE_WORDS.where);
+    expect(where).toHaveValue("nyc");
+    await userEvent.selectOptions(where, "rio");
+    await vi.waitFor(async () => expect(await stored()).toMatchObject({ place: "rio", lat: -22.9068, lon: -43.1729 }));
+  });
+
+  it("Use my location: the browser's position, rounded, kept with the settings; refused: nothing changes", async () => {
+    const getCurrentPosition = vi.fn((ok: PositionCallback) =>
+      ok({ coords: { latitude: 40.71283, longitude: -73.98765 } } as GeolocationPosition),
+    );
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: { getCurrentPosition } });
+    renderPage();
+    const s = await section();
+    await userEvent.selectOptions(s.getByLabelText(DUE_WORDS.where), "here");
+    await vi.waitFor(async () => expect(await stored()).toMatchObject({ place: "here", lat: 40.7, lon: -74 }));
+    expect(s.getByLabelText(DUE_WORDS.where)).toHaveValue("here");
+
+    getCurrentPosition.mockImplementation(((_ok: PositionCallback, fail: PositionErrorCallback) =>
+      fail({ code: 1, message: "denied" } as GeolocationPositionError)) as never);
+    await userEvent.selectOptions(s.getByLabelText(DUE_WORDS.where), "london");
+    await vi.waitFor(async () => expect((await stored())?.place).toBe("london"));
+    await userEvent.selectOptions(s.getByLabelText(DUE_WORDS.where), "here");
+    expect(await s.findByText(DUE_WORDS.locationFailed)).toBeInTheDocument();
+    expect(await stored()).toMatchObject({ place: "london", lat: 51.5074 });
+    // @ts-expect-error tidy up the test's stand-in
+    delete navigator.geolocation;
+  });
+
+  it("a time zone without a city and no place chosen: it says Before sunset reminders need one", async () => {
+    await db.prefs.put(duePrefsRow({ ...DEFAULT_DUE_PREFS, timeZone: "Asia/Tokyo" }));
+    renderPage();
+    const s = await section();
+    expect(s.getByLabelText(DUE_WORDS.where)).toHaveValue("");
+    expect(s.getByText(DUE_WORDS.noPlace)).toBeInTheDocument();
+  });
+
   it("a lead outside 0 to 240 minutes isn't saved", async () => {
     renderPage();
     const s = await section();

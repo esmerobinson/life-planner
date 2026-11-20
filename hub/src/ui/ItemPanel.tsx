@@ -9,6 +9,7 @@ import { needsALook } from "../domain/attention";
 import { daysBetween } from "../domain/dates";
 import { addedLine, dayLabel, timeLabel } from "../domain/display";
 import { isHabit } from "../domain/habits";
+import { formatRemindAt, MAX_BEFORE_SUNSET, parseRemindAt, REMIND_WORDS, remindAtLabel } from "../domain/remindAt";
 import type { AreaId, Goal, ISODate, Item, Priority } from "../domain/types";
 import { GOAL_AREAS } from "./areas";
 import { areaLabel } from "./GoalProgress";
@@ -37,6 +38,10 @@ interface Fields {
   due: string;
   /** A to-do's time ("HH:MM"), or "". */
   time: string;
+  /** Remind me (domain/remindAt.ts): off, at a time, or minutes before sunset, as typed. */
+  remindMode: RemindMode;
+  remindTime: string;
+  remindMinutes: string;
   goalId: string;
   priority: Priority;
   milestone: boolean;
@@ -47,11 +52,41 @@ interface Fields {
   link: string;
 }
 
+type RemindMode = "off" | "time" | "sunset";
+/** The Remind me minutes offered first (PROVISIONAL). */
+const DEFAULT_BEFORE_SUNSET = "60";
+
+function remindFields(v: string | undefined): Pick<Fields, "remindMode" | "remindTime" | "remindMinutes"> {
+  const r = parseRemindAt(v);
+  if (!r) return { remindMode: "off", remindTime: "", remindMinutes: DEFAULT_BEFORE_SUNSET };
+  return "time" in r
+    ? { remindMode: "time", remindTime: r.time, remindMinutes: DEFAULT_BEFORE_SUNSET }
+    : { remindMode: "sunset", remindTime: "", remindMinutes: String(r.beforeSunset) };
+}
+
+/** Remind me as typed: the value to store (undefined: off), or what to fix. */
+function remindValue(f: Fields): { value: string | undefined } | { message: string } {
+  if (f.remindMode === "off") return { value: undefined };
+  if (f.remindMode === "time") {
+    const t = f.remindTime.slice(0, 5);
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? { value: formatRemindAt({ time: t }) } : { message: REMIND_WORDS.needTime };
+  }
+  const n = Number(f.remindMinutes.trim());
+  if (f.remindMinutes.trim() === "" || !Number.isInteger(n) || n < 0 || n > MAX_BEFORE_SUNSET) return { message: REMIND_WORDS.badMinutes };
+  return { value: formatRemindAt({ beforeSunset: n }) };
+}
+
+const sameRemind = (a: Fields, b: Fields) =>
+  a.remindMode === b.remindMode &&
+  (a.remindMode !== "time" || a.remindTime === b.remindTime) &&
+  (a.remindMode !== "sunset" || a.remindMinutes === b.remindMinutes);
+
 const fieldsOf = (it: Item): Fields => ({
   kind: kindOf(it),
   areaId: it.areaId,
   due: it.due ?? "",
   time: it.time ?? "",
+  ...remindFields(it.remindAt),
   goalId: it.goalId ?? "",
   priority: it.priority,
   milestone: it.milestone === true,
@@ -227,12 +262,20 @@ export function ItemPanel({
       }
       if (f.time !== was.time) patch.time = f.time.slice(0, 5) || undefined;
       if (!hasDay && item.time !== undefined) patch.time = undefined;
+      if (!sameRemind(f, was)) {
+        const remind = remindValue(f);
+        if ("message" in remind) {
+          setFieldError(remind.message);
+          return;
+        }
+        patch.remindAt = remind.value;
+      }
       if (f.goalId !== was.goalId) patch.goalId = f.goalId || undefined;
       const flag = Boolean(f.goalId && f.milestone);
       if (flag !== was.milestone) patch.milestone = flag ? true : undefined;
     } else if (patch.kind === "idea") {
       // An idea has no due date, repeat or day on Today (as Change to → Idea does).
-      Object.assign(patch, { due: undefined, time: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, milestone: undefined });
+      Object.assign(patch, { due: undefined, time: undefined, remindAt: undefined, recur: undefined, pinnedDate: undefined, hiddenOn: undefined, milestone: undefined });
     }
     if (Object.keys(patch).length === 0) {
       setEditing(false);
@@ -402,6 +445,52 @@ export function ItemPanel({
                   <input type="time" aria-label="Time" value={fields.time} onChange={(e) => setFields({ ...fields, time: e.target.value })} />
                 ) : (
                   <span>{item.time && (item.due !== undefined || item.pinnedDate !== undefined) ? timeLabel(item.time) : "None"}</span>
+                )}
+              </>
+            )}
+            {/* Remind me (Due, 20 Nov 2026): a to-do or habit's own reminder. A to-do with a
+                time uses that instead. PLACEHOLDER LOOK and PROVISIONAL wording, for Design. */}
+            {(editing
+              ? (fields.kind === "task" || fields.kind === "project") && !(fields.time && !isHabit(item))
+              : item.kind === "task" && !(item.time && !isHabit(item))) && (
+              <>
+                <span className="peek-key">{REMIND_WORDS.key}</span>
+                {editing ? (
+                  <span className="remind-me">
+                    <select
+                      aria-label={REMIND_WORDS.key}
+                      value={fields.remindMode}
+                      onChange={(e) => setFields({ ...fields, remindMode: e.target.value as RemindMode })}
+                    >
+                      <option value="off">{REMIND_WORDS.off}</option>
+                      <option value="time">{REMIND_WORDS.atTime}</option>
+                      <option value="sunset">{REMIND_WORDS.beforeSunset}</option>
+                    </select>
+                    {fields.remindMode === "time" && (
+                      <input
+                        type="time"
+                        aria-label={REMIND_WORDS.atLabel}
+                        value={fields.remindTime}
+                        onChange={(e) => setFields({ ...fields, remindTime: e.target.value })}
+                      />
+                    )}
+                    {fields.remindMode === "sunset" && (
+                      <>
+                        <input
+                          type="number"
+                          aria-label={REMIND_WORDS.minutesLabel}
+                          min={0}
+                          max={MAX_BEFORE_SUNSET}
+                          step={1}
+                          value={fields.remindMinutes}
+                          onChange={(e) => setFields({ ...fields, remindMinutes: e.target.value })}
+                        />
+                        <span>{REMIND_WORDS.minutesSuffix}</span>
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="remind-me">{remindAtLabel(item.remindAt)}</span>
                 )}
               </>
             )}

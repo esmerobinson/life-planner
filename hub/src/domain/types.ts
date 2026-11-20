@@ -41,6 +41,13 @@ export interface Item {
    * (its validator ignores fields it doesn't know, and it updates rows field by field).
    */
   time?: string;
+  /**
+   * "Remind me" (Esme, 20 Nov 2026), on a to-do or habit: "HH:MM", or "sunset-N" (N minutes
+   * before sunset). Its own Due reminder on each day it is on Today and not done (domain/
+   * remindAt.ts). A to-do with a `time` keeps its timed alert instead. An older app version
+   * keeps it as it is.
+   */
+  remindAt?: string;
   weekOf?: ISODate;
   hiddenOn?: ISODate;
   completedAt?: ISODate;

@@ -8,6 +8,7 @@ import { MAX_DONE_DATES } from "../domain/habits";
 import { MAX_SESSION_DETAILS, MAX_SESSION_TITLE, MAX_SESSIONS, MIN_SESSIONS } from "../domain/projects";
 import { BOOK_LIMITS, isWebLink } from "../domain/books";
 import { validDid, validDidPhotos, validDidPhotosGone } from "../domain/whatIDid";
+import { isRemindAt } from "../domain/remindAt";
 import { AREA_IDS, BOOK_STATUSES, COUNT_SOURCE_KINDS, JOURNAL_KINDS, SOURCE_KINDS, WEEKDAYS, type FileRow, type Goal, type Item, type JournalRow } from "../domain/types";
 
 /** The longest goal why / cadence text (characters). */
@@ -56,6 +57,7 @@ export function validItem(r: unknown): r is Item {
     (r.recur === undefined || (Array.isArray(r.recur) && r.recur.every((d) => WEEKDAY_LIST.includes(d as string)))) &&
     optDate(r.pinnedDate) &&
     (r.time === undefined || (isStr(r.time) && TIME_OF_DAY.test(r.time))) &&
+    (r.remindAt === undefined || isRemindAt(r.remindAt)) &&
     optDate(r.weekOf) &&
     optDate(r.hiddenOn) &&
     optDate(r.completedAt) &&
