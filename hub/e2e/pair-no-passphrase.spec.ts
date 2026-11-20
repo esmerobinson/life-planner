@@ -43,7 +43,19 @@ async function device(browser: Browser, server: FakeSyncServer, phone = false) {
 /** Sync page Save with the passphrase typed (how the first device is set up). */
 async function setUpByTyping(page: Page, passphrase = PASS) {
   await page.goto("/sync");
-  await page.getByLabel("Sync address").fill(ADDRESS);
+  const field = page.getByLabel("Sync address");
+  // A device that already syncs puts its stored address in the field once its settings load.
+  // Typing before then can be overwritten mid-fill (Playwright selects all, the page sets the
+  // value, the typed text lands after it: the address came out doubled and the sync never ran,
+  // 2026-11-19). Wait for it, as a person would see it, then type.
+  const stored = await page.evaluate(async () => {
+    const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+    const { db } = await at("/src/data/db.ts");
+    return ((await at("/src/sync/engine.ts")).getMeta(db, "serverUrl")) as Promise<string | undefined>;
+  });
+  if (stored) await expect(field).toHaveValue(stored, { timeout: 30_000 });
+  await field.fill(ADDRESS);
+  await expect(field).toHaveValue(ADDRESS);
   await page.getByLabel("Passphrase", { exact: true }).fill(passphrase);
   // Wait for the sync this Save starts (a "Last synced" line from before may already be there,
   // and under load the first one can take a while: review RM7).
