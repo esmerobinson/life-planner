@@ -93,6 +93,12 @@ export interface Item {
    * field as it is. A note left with only photos stays as `{ id, on }` in `did`.
    */
   didPhotos?: DidPhotos[];
+  /**
+   * Photos taken off this to-do's notes (review M2, 20 Nov 2026): kept in the row so a device that
+   * syncs later merges its own new photos in without bringing back one removed elsewhere. Newest
+   * last, at most MAX_DID_GONE. An older app version keeps it as it is.
+   */
+  didPhotosGone?: string[];
   createdAt: ISODate;
   touchedAt: ISODate;
   source?: { kind: SourceKind; key: string };

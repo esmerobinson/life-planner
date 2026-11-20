@@ -35,6 +35,7 @@ import { WhatIDidContext } from "./whatIDid/context";
 import { WhatIDidSheet } from "./whatIDid/WhatIDidSheet";
 import { didTarget } from "../domain/whatIDid";
 import { recoverDidDraft } from "../data/didDraft";
+import { schedulePhotoSweep, sweepRemovedPhotos } from "../data/photoPurge";
 import type { DidEntry, Item } from "../domain/types";
 
 /** How often the shell re-reads the clock (a technical check, not a motion timing). */
@@ -234,11 +235,14 @@ export function AppShell() {
     setSearching(false);
     setDidAsk((was) => ({ item, at: didTarget(item, todayISO(), session, true), n: (was?.n ?? 0) + 1, back }));
   }, []);
-  // Words typed in it when the app was closed mid-word are saved on start.
+  // Words typed in it when the app was closed mid-word are saved on start; photos removed before
+  // the app was closed are deleted once their grace period is over (review I1).
   useEffect(() => {
     void recoverDidDraft()
       .then(() => changed())
       .catch(() => undefined);
+    void sweepRemovedPhotos().catch(() => undefined);
+    schedulePhotoSweep();
   }, [changed]);
 
   const ctx = useMemo(() => ({ refresh: changed, version, today, persistence }), [changed, version, today, persistence]);

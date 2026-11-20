@@ -2,6 +2,7 @@
 // keeps a file, never by the tick itself.
 
 import { db } from "./db";
+import { noteRemovedPhotos } from "./photoPurge";
 import { applyDidPatch, type DidPatch } from "../domain/whatIDid";
 import type { DidEntry, ISODate } from "../domain/types";
 
@@ -23,6 +24,10 @@ export async function saveDid(
     // touchedAt is left alone: a note isn't a change to the to-do (the farm and "not looked at"
     // read it; review M10).
     await db.items.put({ ...rest, ...(did ? { did } : {}), ...(didPhotos ? { didPhotos } : {}) });
+    // Photos taken off (Remove, or past the cap) are deleted once nothing shows them (review I1).
+    const kept = new Set((didPhotos ?? []).flatMap((p) => p.ids));
+    const had = [...(item.didPhotos ?? []).flatMap((p) => p.ids), ...(patch.addPhotos ?? [])];
+    await noteRemovedPhotos(itemId, had.filter((id) => !kept.has(id)));
     return true;
   });
 }
