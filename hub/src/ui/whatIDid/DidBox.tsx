@@ -105,7 +105,7 @@ export function DidBox({
         }
         const r = await savePhotoCopy({
           root, area: areaName(item.areaId), ...(isProject(item) ? { project: item.title } : {}),
-          name: f.name, data: await blobToBase64(f),
+          name: f.name, type: f.type, data: await blobToBase64(f),
         });
         if (r.kind === "saved") kept.push(...r.files);
         else if (r.kind === "permission") setMessage(W.photoPermission);

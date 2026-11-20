@@ -1,5 +1,5 @@
 import { db } from "../data/db";
-import { attachFiles, chooseFilesRoot, FILES_HANDLER, hasFileBridge, loadFilesRoot, resetFilesRoot, revealFile, savePhotoCopy } from "./files";
+import { attachFiles, chooseFilesRoot, FILES_HANDLER, hasFileBridge, loadFilesRoot, photoFileName, resetFilesRoot, revealFile, savePhotoCopy } from "./files";
 
 // The Mac app's file bridge for "What I did" (mac/Esmeworld/main.swift, esmeworldFiles). In a
 // browser or on the iPhone there is no bridge and nothing here does anything.
@@ -90,4 +90,13 @@ it("a photo added on the Mac: its bytes are copied into the area's folder under 
   pretendMac(() => new Error("unknown action"));
   expect(await savePhotoCopy({ root: "~/Desktop", area: "Art", name: "", data: "AAAA" })).toEqual({ kind: "unavailable" });
   expect((sent[sent.length - 1] as { name: string }).name).toBe("Photo.jpg");
+});
+
+it("a photo's name always ends in a photo's extension (the Mac app only writes those)", () => {
+  expect(photoFileName("IMG_0001.HEIC", "image/heic")).toBe("IMG_0001.HEIC");
+  expect(photoFileName("image.png", "image/png")).toBe("image.png");
+  expect(photoFileName("Scan", "image/png")).toBe("Scan.png");
+  expect(photoFileName("notes.txt", "image/jpeg")).toBe("notes.txt.jpg");
+  expect(photoFileName("", "")).toBe("Photo.jpg");
+  expect(photoFileName("a/b:.webp", "image/webp")).toBe("a-b-.webp");
 });

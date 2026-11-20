@@ -345,7 +345,8 @@ final class DeviceOwnerBridge: NSObject, WKScriptMessageHandlerWithReply {
 ///   { action: "reveal", folder, name } → { ok: true } | { ok: false, missing: true } | { ok: false, refused: true }
 ///   { action: "savePhoto", root, parts, name, data } → as attach (19 Nov 2026: a photo added to a
 ///      "What I did" note on the page: `data` its bytes as base64, at most 100 MB, `name` one safe
-///      file name). Written to a private temporary file, then copied exactly as attach copies.
+///      file name with a photo's extension, jpg jpeg png heic heif gif webp tif tiff). Written to a
+///      private temporary file, then copied exactly as attach copies.
 ///
 /// The root is held HERE, never trusted from the page (review M1): "~/Desktop" until she chooses
 /// another folder in the native folder picker (UserDefaults `EsmeworldFilesRoot`). An attach with
@@ -369,6 +370,18 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let rootsKey = "EsmeworldFilesRoots"
     /// The largest photo savePhoto takes (bytes, decoded).
     static let maxPhotoBytes = 100_000_000
+    /// The only kinds of file savePhoto writes (review M4): photos, by their name's extension.
+    static let photoExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "tif", "tiff"]
+
+    /// A photo's file name savePhoto takes: one safe name, not hidden, with a photo's extension.
+    static func photoName(_ name: String) -> Bool {
+        safePart(name) && !name.hasPrefix(".") && photoExtensions.contains((name as NSString).pathExtension.lowercased())
+    }
+
+    /// The base64 text is no longer than `max` bytes would make (checked before decoding; utf8.count, not a character walk).
+    static func photoTextFits(_ text: String, max: Int = maxPhotoBytes) -> Bool {
+        text.utf8.count <= (max + 2) / 3 * 4
+    }
     weak var window: NSWindow?
     /// The self-test's own root and roots (in memory; her settings are never read or written).
     private var selfTestRoot: String?
@@ -597,9 +610,8 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
             return
         }
         let (root, rootText, parts) = (t.root, t.rootText, t.parts)
-        guard let name = body["name"] as? String, Self.safePart(name), !name.hasPrefix("."),
-              let text = body["data"] as? String, text.count <= Self.maxPhotoBytes / 3 * 4 + 4,
-              let data = Data(base64Encoded: text), !data.isEmpty
+        guard let name = body["name"] as? String, Self.photoName(name),
+              let text = body["data"] as? String, Self.photoTextFits(text)
         else {
             reply(["error": "photo"], nil)
             return
@@ -618,7 +630,12 @@ final class FilesBridge: NSObject, WKScriptMessageHandlerWithReply {
                 return
             }
         }
+        // Decoding (up to about 133 MB of text) happens off the main thread, so the window never stalls (M5).
         DispatchQueue.global(qos: .userInitiated).async {
+            guard let data = Data(base64Encoded: text), !data.isEmpty else {
+                DispatchQueue.main.async { MainActor.assumeIsolated { reply(["error": "photo"], nil) } }
+                return
+            }
             let fm = FileManager.default
             let dir = fm.temporaryDirectory.appendingPathComponent("esmeworld-photo-\(UUID().uuidString)", isDirectory: true)
             defer { try? fm.removeItem(at: dir) }
@@ -1932,8 +1949,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             const photo2 = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "pretend photo.jpg", data: btoa("pretend photo bytes") });
             const photoBadName = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "../up.jpg", data: btoa("x") });
             const photoBadData = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "x.jpg", data: "%%%" });
+            const photoNotPhoto = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "pretend.sh", data: btoa("echo hi") });
+            const photoNoExt = await h.postMessage({ action: "savePhoto", root, parts: ["Art"], name: "pretend", data: btoa("x") });
+            const photoUnchosen = await h.postMessage({ action: "savePhoto", root: other, parts: ["Art"], name: "x.jpg", data: btoa("x") });
             return JSON.stringify({ bridge: true, before, chosen, held, one, two, unchosen, desktop, dots, slash, up, pick, shown, gone, outsideRoot, system, reset, resetDesktop,
-              photoDesktop, photo, photo2, photoBadName, photoBadData });
+              photoDesktop, photo, photo2, photoBadName, photoBadData, photoNotPhoto, photoNoExt, photoUnchosen });
             """)
             check(r["bridge"] as? Bool == true, "files bridge exists")
             let one = (r["one"] as? [String: Any])?["saved"] as? [[String: String]] ?? []
@@ -1973,6 +1993,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             check(photo2.count == 1 && photo2[0]["name"] == "pretend photo (2).jpg", "files: a second photo of the same name is \" (2)\"")
             check(err("photoDesktop") == "root" || err("photoDesktop") == "selftest-root", "files: the self-test never saves a photo to the real Desktop")
             check(err("photoBadName") == "photo" && err("photoBadData") == "photo", "files: an unsafe photo name or unreadable bytes are refused")
+            say("files.photoRefused notPhoto=\(err("photoNotPhoto")) noExt=\(err("photoNoExt")) unchosen=\(err("photoUnchosen"))")
+            check(err("photoNotPhoto") == "photo" && err("photoNoExt") == "photo", "files: savePhoto writes only photos (by extension, M4)")
+            check(err("photoUnchosen") == "root", "files: savePhoto refuses a root she didn't choose (M6)")
+            check(!fm.fileExists(atPath: root.appendingPathComponent("Art/pretend.sh").path), "files: the refused file was never written")
+            // The size cap (M6), at a small cap so the self-test needn't send 100 MB.
+            let fits = FilesBridge.photoTextFits(String(repeating: "A", count: 136), max: 100)
+            let over = FilesBridge.photoTextFits(String(repeating: "A", count: 140), max: 100)
+            let real = FilesBridge.photoTextFits(String(repeating: "A", count: 133_333_336))
+            let realOver = FilesBridge.photoTextFits(String(repeating: "A", count: 133_333_340))
+            say("files.photoCap small=\(fits)/\(over) real=\(real)/\(realOver)")
+            check(fits && !over && real && !realOver, "files: savePhoto's size cap (100 MB) is checked before decoding")
         } catch {
             check(false, "files: \(error.localizedDescription)")
         }

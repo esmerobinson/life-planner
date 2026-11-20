@@ -74,6 +74,17 @@ function savedReply(reply: unknown): AttachResult {
   return { kind: "saved", files, failed };
 }
 
+const PHOTO_EXT = /\.(jpe?g|png|hei[cf]|gif|webp|tiff?)$/i;
+const EXT_OF: Record<string, string> = {
+  "image/png": "png", "image/heic": "heic", "image/heif": "heif", "image/gif": "gif", "image/webp": "webp", "image/tiff": "tiff",
+};
+
+/** A safe file name for a photo that ends in a photo's extension (from its type; else .jpg). */
+export function photoFileName(name: string, type: string): string {
+  const base = name.trim() ? safeName(name) : "Photo";
+  return PHOTO_EXT.test(base) ? base : `${base}.${EXT_OF[type] ?? "jpg"}`;
+}
+
 /**
  * A photo added to a "What I did" note on the Mac (Esme, 19 Nov 2026): its own bytes (base64, as
  * chosen, not the downscaled copy) are saved into the area's (or project's) folder like an
@@ -81,6 +92,8 @@ function savedReply(reply: unknown): AttachResult {
  */
 export async function savePhotoCopy(to: {
   root: string; area: string; project?: string; name: string; data: string;
+  /** The photo's type, for its extension when the name has none. */
+  type?: string;
 }): Promise<AttachResult> {
   const h = handler();
   if (!h) return { kind: "unavailable" };
@@ -90,7 +103,7 @@ export async function savePhotoCopy(to: {
         action: "savePhoto",
         root: to.root,
         parts: [safeName(to.area), ...(to.project !== undefined ? [safeName(to.project)] : [])],
-        name: to.name.trim() ? safeName(to.name) : "Photo.jpg",
+        name: photoFileName(to.name, to.type ?? ""),
         data: to.data,
       }),
     );
