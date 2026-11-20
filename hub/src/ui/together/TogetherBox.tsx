@@ -10,6 +10,7 @@ import { useRunner, useTogetherMeta } from "./useTogether";
 import { SEND_ROUTINE_CHALLENGES } from "../../together/routineChallenges";
 import { TOGETHER_WORDS as W } from "./wording";
 import "./together.css";
+import { useUpdateHold } from "../../native/updateHolds";
 
 const browserFetch: Fetch = (input, init) => fetch(input, init);
 
@@ -25,6 +26,8 @@ export function TogetherBox({ runner = togetherRunner, fetchFn = browserFetch }:
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  // Signing in runs several steps: no automatic update meanwhile.
+  useUpdateHold(busy, "pairing");
   const [problem, setProblem] = useState("");
   const [note, setNote] = useState("");
   const [stopping, setStopping] = useState(false);

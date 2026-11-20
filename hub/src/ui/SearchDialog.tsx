@@ -262,6 +262,7 @@ export function SearchDialog({
       ref={input}
       type="search"
       className="search-in"
+      data-reload-safe=""
       role="combobox"
       aria-label="Search"
       aria-expanded={flat.length > 0}

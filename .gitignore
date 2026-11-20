@@ -14,6 +14,7 @@ native/EsmeDay
 hub/node_modules/
 hub/dist/
 hub/dist-test/
+hub/dist-e2e-*/
 hub/test-results/
 hub/playwright-report/
 mac/build/

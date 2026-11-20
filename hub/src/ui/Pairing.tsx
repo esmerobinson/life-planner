@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parsePairing, type PairingPayload } from "../pairing/pairingText";
 import { qrModules, qrPath, readFrame } from "../pairing/qr";
+import { useUpdateHold } from "../native/updateHolds";
 
 /** Placeholder copy (Esme may reword). */
 export const PAIRING_WARNING = "Anyone who scans this can open your Esmeworld. Only show it to your own devices.";
@@ -53,6 +54,8 @@ export function PairingCode({ text, note, onHide }: { text: string; note?: strin
   const hide = useRef(onHide);
   hide.current = onHide;
   const [left, setLeft] = useState(PAIRING_SHOW_MS / 1000);
+  // Shown for another device to scan (untouched for up to 2 minutes): no automatic update.
+  useUpdateHold(true, "pairing");
 
   useEffect(() => {
     // Measured against the clock, so a throttled background timer can't stretch the minute.
@@ -134,6 +137,8 @@ export function ScanPairingCode({ onCode, busy = false }: { onCode: (code: Pairi
   // getUserMedia is pending: Scan is disabled, and a second tap never asks again.
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
+  // The camera is on (or starting): no automatic update.
+  useUpdateHold(scanning || starting, "camera");
   const [pasted, setPasted] = useState("");
   const [problem, setProblem] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);

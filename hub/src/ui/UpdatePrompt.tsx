@@ -1,22 +1,23 @@
-import { useRegisterSW as pluginUseRegisterSW } from "virtual:pwa-register/react";
+import { useSyncExternalStore } from "react";
+import { getAppUpdater, type AutoUpdater, type UpdateState } from "../native/pwaUpdate";
 
-/** The part of the plugin's hook this component needs (so tests can inject a fake). */
-export type UseRegisterSW = () => {
-  needRefresh: readonly [boolean, ...unknown[]];
-  updateServiceWorker: (reloadPage?: boolean) => Promise<void> | void;
-};
+/** The part of the updater (native/pwaUpdate.ts) this component needs (tests pass a fake). */
+export type PromptUpdater = Pick<AutoUpdater, "getState" | "subscribe" | "reloadNow">;
 
-/** Shown only when a newer build is waiting; Reload switches to it. */
-export function UpdatePrompt({ useRegisterSW = pluginUseRegisterSW }: { useRegisterSW?: UseRegisterSW }) {
-  const {
-    needRefresh: [needRefresh],
-    updateServiceWorker,
-  } = useRegisterSW();
-  if (!needRefresh) return null;
+const NONE: UpdateState = { waiting: false, showNote: false };
+const noSubscribe = () => () => {};
+
+/**
+ * "A new version is ready · Reload": the fallback when the automatic update (native/pwaUpdate.ts)
+ * keeps being refused. Reload saves everything, then switches to the new version.
+ */
+export function UpdatePrompt({ updater = getAppUpdater() }: { updater?: PromptUpdater | null }) {
+  const { showNote } = useSyncExternalStore(updater?.subscribe ?? noSubscribe, updater?.getState ?? (() => NONE));
+  if (!updater || !showNote) return null;
   return (
     <p role="status" className="update-prompt">
       A new version is ready.{" "}
-      <button type="button" className="btn-secondary" onClick={() => void updateServiceWorker(true)}>
+      <button type="button" className="btn-secondary" onClick={() => void updater.reloadNow()}>
         Reload
       </button>
     </p>

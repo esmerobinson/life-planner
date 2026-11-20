@@ -8,7 +8,7 @@ export function DoneStrip({ item: it, today, onUndo }: { item: Item; today: ISOD
   const openOnClick = useOpenOnBodyClick(it.id);
   return (
     <li className="strip crossed">
-      <input type="checkbox" className="tick" aria-label={`Done: ${it.title}`} checked onChange={() => onUndo(it.id)} />
+      <input type="checkbox" className="tick" data-reload-safe="" aria-label={`Done: ${it.title}`} checked onChange={() => onUndo(it.id)} />
       <div className={openOnClick ? "strip-body openable" : "strip-body"} onClick={openOnClick}>
         <StripTitle item={it} />
       </div>

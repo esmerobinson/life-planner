@@ -22,6 +22,7 @@ import type { EscapeHandler } from "./SidePanel";
 import { TaskRow, useTick } from "./TaskRow";
 import { AUTOSAVE_MS, useDraft } from "./useDraft";
 import { useGoalSources } from "./useGoalSources";
+import { useUpdateHold } from "../native/updateHolds";
 
 /** How many completed tasks show before "Show all" (round-3 brief). */
 export const COMPLETED_CAP = 10;
@@ -102,6 +103,9 @@ export function GoalPanel({
   const undoNote = useShellUndo();
   const { tick, message } = useTick(today, onChanged);
   const [editing, setEditing] = useState(false);
+  // Edit mode saves month goals as it goes and undoes them on Cancel from memory: the phone's
+  // automatic update waits until Done or Cancel (fix round 1, I2).
+  useUpdateHold(editing, "editing");
   const [fields, setFields] = useState<Fields>(() => fieldsOf(goal));
   const [snapshot, setSnapshot] = useState<Fields>(() => fieldsOf(goal));
   const [formMessage, setFormMessage] = useState("");
