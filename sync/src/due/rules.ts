@@ -6,29 +6,58 @@
 // to Due, so tomorrow's are new reminders and yesterday's are no longer wanted:
 //   esmeworld-<day>-plan          "Plan your day" at her morning time
 //   esmeworld-<day>-review        "Review your day" at her evening time
-//   esmeworld-<day>-d1-<item>     due today / overdue / pinned today / a habit planned today,
-//   esmeworld-<day>-d2-<item>     at the first and the second pass (at most MAX_DUE_TODAY each)
 //   esmeworld-<date>-t-<item>     a timed to-do, its lead before; <date> is the meeting's own date,
 //                                 so the alert keeps one key across the 3am change
+//   esmeworld-<day>-r-<item>      "Remind me" on a to-do or habit (remindAt): at its time, or
+//                                 minutes before sunset, on a day it is on Today and not done
+//   esmeworld-<day>-count         ONE count of what is left on Today ("N to-dos left today, pick
+//                                 one") at her count time (14:00), if anything is left
 //   esmeworld-<day>-nudge         the motivation nudge, if nothing was ticked off today
 //
-// Titles are the to-do's or habit's title, the two fixed words, or one of her motivation
-// lines: never notes, pages or anything from the journal (the Worker can't read the journal).
+// Untimed to-dos and habits get no reminder of their own (Esme, 20 Nov 2026: one reminder per
+// item at 11:00 and 17:00 was "too many to dos at once"; the old -d1-/-d2- keys are no longer
+// wanted, so reconcile cancels any still in Due on its first run). Every item on Today either
+// has its own reminder (a time, or Remind me) or is in the count.
+//
+// "On Today" (onToday below) follows the app's Today list (hub/src/domain/triage.ts todayParts
+// and withTickedOff) as far as the Worker can see it: what always shows (pinned for today, a
+// project session planned for today, due today or overdue), the habits planned for today, and
+// the day's kept picks from the today-fill row (hub/src/domain/todayFill.ts) still open and on
+// for today; never hidden today, never an undated Inbox item, never one ticked off. NOT
+// followed: a place on Today that was never filled taking a new pick later (that needs her
+// goals' pace), and a device's own copy of the picks once she has used Today there.
+//
+// Titles are the to-do's or habit's title, the fixed words, or one of her motivation lines:
+// never notes, pages or anything from the journal (the Worker can't read the journal).
 // WORDING IS PROVISIONAL (hers to change).
 
 import type { DuePrefs } from "./prefs";
+import { placeFor, sunsetUtc } from "./sun";
 import { addDays, appDay, HHMM, instantOf, settingsInstant, weekdayOf } from "./time";
 
 export const PLAN_TITLE = "Plan your day";
 export const REVIEW_TITLE = "Review your day";
 /** The nudge when she has written no lines of her own. */
 export const GENERIC_LINE = "One small thing is enough to start.";
-/** The most due-today reminders at each pass. */
-export const MAX_DUE_TODAY = 8;
 /** The most timed to-do alerts in a day. */
 export const MAX_TIMED = 10;
-/** The nudge is only put in Due this long before it goes off (it isn't needed sooner). */
+/** The most Remind me reminders in a day. */
+export const MAX_OWN = 10;
+/** The longest "Before sunset" (minutes). */
+export const MAX_BEFORE_SUNSET = 360;
+/**
+ * The nudge and the count are only put in Due this long before they go off: they aren't needed
+ * sooner, and ticks before then cost no calls to Due.
+ */
 export const NUDGE_AHEAD_MS = 30 * 60_000;
+/**
+ * The count is replaced each time it changes before it goes off (a new title is a new
+ * version); it may be replaced this many times a day before it is left as it is.
+ */
+export const COUNT_MAX_CANCELS = 12;
+
+/** The count's words (PROVISIONAL, Esme 20 Nov 2026). */
+export const countTitle = (n: number) => (n === 1 ? "1 to-do left today, do it" : `${n} to-dos left today, pick one`);
 export const MAX_TITLE = 100;
 
 /** One to-do or habit, as the cron reads it from the items table (only what the rules need). */
@@ -49,9 +78,19 @@ export interface DueItem {
   doneToday?: boolean;
   /** A project with a session ticked today. */
   sessionDoneToday?: boolean;
+  /** A project with a session (not ticked) planned for today. */
+  sessionPlannedToday?: boolean;
+  /** "Remind me": "HH:MM", or "sunset-N" (N minutes before sunset). */
+  remindAt?: string;
 }
 
-export type WantedKind = "plan" | "review" | "due1" | "due2" | "timed" | "nudge";
+/** Today's kept picks (the today-fill row, hub/src/domain/todayFill.ts): ids, and their due dates when picked. */
+export interface TodayPicks {
+  ids: readonly string[];
+  dues?: Readonly<Record<string, string>>;
+}
+
+export type WantedKind = "plan" | "review" | "timed" | "own" | "count" | "nudge";
 
 export interface Wanted {
   /** What it is and for which day (reconcile.ts adds the version). */
@@ -65,6 +104,8 @@ export interface Wanted {
    * at this moment instead (a minute from now). Not part of its version, so it is sent once.
    */
   sendAt?: number;
+  /** How many of our own cancellations a day before it is left as it is (reconcile.ts; default 3). */
+  maxCancels?: number;
 }
 
 export interface RulesInput {
@@ -73,6 +114,20 @@ export interface RulesInput {
   now: number;
   /** Something was ticked off today (worked out in SQL by the cron); else from `items`. */
   tickedToday?: boolean;
+  /** Today's kept picks, when a device has shown Today today. */
+  fill?: TodayPicks;
+}
+
+const REMIND_AT = /^(?:(([01]\d|2[0-3]):[0-5]\d)|sunset-(\d{1,3}))$/;
+
+/** A remindAt as stored: a time, or minutes before sunset; null when it isn't one. */
+export function parseRemindAt(v: unknown): { time: string } | { beforeSunset: number } | null {
+  if (typeof v !== "string") return null;
+  const m = REMIND_AT.exec(v);
+  if (!m) return null;
+  if (m[1]) return { time: m[1] };
+  const n = Number(m[3]);
+  return n <= MAX_BEFORE_SUNSET ? { beforeSunset: n } : null;
 }
 
 /** "2026-11-16" -> "20261116". */
@@ -99,6 +154,7 @@ function shortTitle(t: string): string {
 
 const isHabit = (it: DueItem) => (it.recur?.length ?? 0) > 0;
 const isOpenTodo = (it: DueItem) => it.kind === "task" && it.status === "open" && it.title.trim() !== "";
+const hasTime = (it: DueItem) => it.time !== undefined && HHMM.test(it.time);
 
 /**
  * The day a timed to-do's time is on: its "Do it on" day, else its due date. A pin before `day`
@@ -113,7 +169,7 @@ function tickedToday(items: readonly DueItem[], day: string): boolean {
   );
 }
 
-export function wantedReminders({ items, prefs, now, tickedToday: ticked }: RulesInput): Wanted[] {
+export function wantedReminders({ items, prefs, now, tickedToday: ticked, fill }: RulesInput): Wanted[] {
   if (!prefs.on) return [];
   const tz = prefs.timeZone;
   const day = appDay(now, tz);
@@ -125,17 +181,15 @@ export function wantedReminders({ items, prefs, now, tickedToday: ticked }: Rule
 
   // Timed to-dos whose meeting or alert falls in today (a 1am meeting on tomorrow's date is
   // tonight's; a 03:05 meeting's 02:50 alert is wanted before 3am, under the meeting's date).
-  const timed: Wanted[] = [];
-  const timedIds = new Set<string>();
+  const timed: (Wanted & { id: string })[] = [];
   for (const it of items) {
     const on = timedDay(it, day);
-    if (!isOpenTodo(it) || isHabit(it) || !it.time || !HHMM.test(it.time) || !on) continue;
+    if (!isOpenTodo(it) || isHabit(it) || !hasTime(it) || !on) continue;
     if (on !== day && on !== addDays(day, 1)) continue;
-    const moment = instantOf(on, it.time, tz);
+    const moment = instantOf(on, it.time!, tz);
     const alert = moment - prefs.leadMinutes * 60_000;
     if (appDay(moment, tz) !== day && appDay(alert, tz) !== day) continue;
-    timedIds.add(it.id);
-    const w: Wanted = { key: `esmeworld-${dayToken(on)}-t-${safeId(it.id)}`, kind: "timed", title: shortTitle(it.title), at: alert };
+    const w: Wanted & { id: string } = { id: it.id, key: `esmeworld-${dayToken(on)}-t-${safeId(it.id)}`, kind: "timed", title: shortTitle(it.title), at: alert };
     // Added late (the lead has passed, the meeting hasn't): a minute from now.
     if (alert <= now) {
       if (moment <= now + 60_000) continue;
@@ -144,34 +198,68 @@ export function wantedReminders({ items, prefs, now, tickedToday: ticked }: Rule
     timed.push(w);
   }
   timed.sort((a, b) => a.at - b.at || (a.key < b.key ? -1 : 1));
-  out.push(...timed.slice(0, MAX_TIMED));
-
-  // Due today and not done: priority 1 and habits first.
-  const weekday = weekdayOf(day);
-  const dueToday = items.filter((it) => {
-    if (!isOpenTodo(it) || it.hiddenOn === day || timedIds.has(it.id)) return false;
-    if (isHabit(it)) return it.areaId !== "inbox" && it.recur!.includes(weekday) && it.doneToday !== true;
-    if (it.pinnedDate === day) return true;
-    return it.due !== undefined && it.due <= day && !(it.pinnedDate !== undefined && it.pinnedDate > day);
-  });
-  const first = (it: DueItem) => (it.priority === 1 || isHabit(it) ? 0 : 1);
-  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
-  const order = (a: DueItem, b: DueItem) =>
-    first(a) - first(b) || a.priority - b.priority || cmp(a.due ?? "~", b.due ?? "~") || cmp(a.title, b.title) || cmp(a.id, b.id);
-  // Only the first MAX_DUE_TODAY are needed: kept in order as the list goes by (no full sort).
-  const top: DueItem[] = [];
-  for (const it of dueToday) {
-    if (top.length === MAX_DUE_TODAY && order(it, top[MAX_DUE_TODAY - 1]!) >= 0) continue;
-    let i = top.length;
-    while (i > 0 && order(it, top[i - 1]!) < 0) i--;
-    top.splice(i, 0, it);
-    if (top.length > MAX_DUE_TODAY) top.pop();
+  // Items with a reminder of their own today: never in the count.
+  const own = new Set<string>();
+  for (const { id, ...w } of timed.slice(0, MAX_TIMED)) {
+    own.add(id);
+    out.push(w);
   }
-  for (const [kind, slot, time] of [["due1", "d1", prefs.dueFirst], ["due2", "d2", prefs.dueSecond]] as const) {
-    const when = settingsInstant(day, time, tz);
-    for (const it of top) {
-      out.push({ key: `${prefix}-${slot}-${safeId(it.id)}`, kind, title: shortTitle(it.title), at: when });
+
+  // What is left on Today (see the top of this file).
+  const weekday = weekdayOf(day);
+  const kept = new Set(fill?.ids ?? []);
+  const onToday = (it: DueItem): boolean => {
+    if (!isOpenTodo(it) || it.hiddenOn === day) return false;
+    if (isHabit(it)) return it.areaId !== "inbox" && it.recur!.includes(weekday) && it.doneToday !== true;
+    // A project whose session for today is ticked is crossed out (unless another is planned).
+    if (it.sessionDoneToday === true && it.sessionPlannedToday !== true) return false;
+    if (it.pinnedDate === day || it.sessionPlannedToday === true) return true;
+    // Moved to a later day on purpose: not today.
+    if (it.pinnedDate !== undefined && it.pinnedDate > day) return false;
+    if (it.due !== undefined && it.due <= day) return true;
+    if (!kept.has(it.id) || (it.areaId === "inbox" && it.pinnedDate === undefined && it.due === undefined)) return false;
+    // A kept pick whose deadline was pushed out (or taken off) since it was picked has left Today.
+    const was = fill?.dues?.[it.id];
+    return was === undefined || (it.due !== undefined && it.due <= was);
+  };
+  const left = items.filter(onToday);
+
+  // Remind me: at its time, or minutes before sunset; a to-do with a time of its own uses that.
+  let place: ReturnType<typeof placeFor> | undefined;
+  let sunset: number | null | undefined;
+  const sunsetToday = () => {
+    if (sunset === undefined) {
+      place ??= placeFor(prefs);
+      sunset = place ? sunsetUtc(day, place.lat, place.lon) : null;
     }
+    return sunset;
+  };
+  const mine: (Wanted & { id: string })[] = [];
+  for (const it of left) {
+    if (it.remindAt === undefined || (!isHabit(it) && hasTime(it))) continue;
+    const r = parseRemindAt(it.remindAt);
+    if (!r) continue;
+    let when: number;
+    if ("time" in r) when = settingsInstant(day, r.time, tz);
+    else {
+      const s = sunsetToday();
+      if (s === null) continue; // no place known, or no sunset there today: counted instead
+      when = s - r.beforeSunset * 60_000;
+    }
+    mine.push({ id: it.id, key: `${prefix}-r-${safeId(it.id)}`, kind: "own", title: shortTitle(it.title), at: when });
+  }
+  mine.sort((a, b) => a.at - b.at || (a.key < b.key ? -1 : 1));
+  for (const { id, ...w } of mine.slice(0, MAX_OWN)) {
+    own.add(id);
+    out.push(w);
+  }
+
+  // The count: once a day, only near its time, only when something is left.
+  const countAt = settingsInstant(day, prefs.countNudge, tz);
+  if (now >= countAt - NUDGE_AHEAD_MS) {
+    let n = 0;
+    for (const it of left) if (!own.has(it.id)) n++;
+    if (n > 0) out.push({ key: `${prefix}-count`, kind: "count", title: countTitle(n), at: countAt, maxCancels: COUNT_MAX_CANCELS });
   }
 
   // The motivation nudge: only near its time, and only if nothing was ticked off today.

@@ -191,6 +191,15 @@ describe("Due diff and upsert, against a fake Due", () => {
       const posts = due.mutations().filter((c) => c.method === "POST");
       expect(posts).toHaveLength(MAX_CANCELS_PER_KEY);
     });
+
+    it("a reminder that may be replaced more often (the count, as she ticks things off) follows each change up to its own cap", async () => {
+      const count = (n: number, maxCancels?: number): Wanted => ({ ...w("count", "2026-11-16T14:00:00", `${n} left`), kind: "count", maxCancels });
+      for (let n = 9; n >= 1; n--) await go([count(n, 5)]);
+      expect(due.mutations().filter((c) => c.method === "POST").map((c) => (c.body as { title: string }).title)).toEqual(
+        ["9 left", "8 left", "7 left", "6 left", "5 left", "4 left"],
+      );
+      expect(due.active().map((r) => r.title)).toEqual(["4 left"]);
+    });
   });
 
   it("never sends one whose alert time has passed (Due drops them)", async () => {

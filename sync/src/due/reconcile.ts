@@ -17,8 +17,9 @@
 //   skips every id we ever sent or cancelled, listed or not, so an id is never sent twice.
 // - Active in Due but no longer wanted (done, moved, yesterday's, Due turned off): cancelled.
 // - Never sent if its time has passed (Due drops those): an active older version is kept.
-// - At most MAX_CANCELS_PER_KEY of our own cancellations per reminder per day; after that it is
-//   left as it is (no flapping).
+// - At most MAX_CANCELS_PER_KEY of our own cancellations per reminder per day (or the reminder's
+//   own `maxCancels`: the count follows her ticks, rules.ts); after that it is left as it is
+//   (no flapping).
 // - A POST answered "already exists" means that exact version is there: nothing more to do.
 // The run stops after MAX_REJECTIONS refusals, and never goes over the client's budget or deadline.
 
@@ -138,7 +139,7 @@ export function planCalls(
     }
     const at = w.sendAt ?? w.at;
     if (at <= now) continue; // gone off already: Due would drop it; an older version stays
-    if (mine.filter((id) => cancelledByUs.has(id)).length >= MAX_CANCELS_PER_KEY) continue;
+    if (mine.filter((id) => cancelledByUs.has(id)).length >= (w.maxCancels ?? MAX_CANCELS_PER_KEY)) continue;
     let g = 1;
     while (here.has(generation(base, g))) g++;
     create.push({ id: generation(base, g), key: w.key, title: w.title, at, replaces: active.map((r) => r.id) });

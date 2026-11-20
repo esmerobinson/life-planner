@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_DUE_PREFS, type DuePrefs } from "../../../src/due/prefs";
-import { GENERIC_LINE, MAX_DUE_TODAY, MAX_TIMED, wantedReminders, type DueItem } from "../../../src/due/rules";
+import {
+  COUNT_MAX_CANCELS, countTitle, GENERIC_LINE, MAX_OWN, MAX_TIMED, parseRemindAt, wantedReminders, type DueItem,
+} from "../../../src/due/rules";
+import { CITIES, sunsetUtc } from "../../../src/due/sun";
 
 // Monday 16 November 2026, New York (UTC-5).
 const at = (local: string) => Date.parse(`${local}-05:00`);
@@ -11,6 +14,9 @@ const todo = (id: string, p: Partial<DueItem> = {}): DueItem => ({
 });
 const keys = (list: { key: string }[]) => list.map((r) => r.key);
 const run = (items: DueItem[], now = MORNING, p: Partial<DuePrefs> = {}) => wantedReminders({ items, prefs: prefs(p), now });
+/** Half an hour before the 14:00 count nudge: from then on it is wanted. */
+const COUNT_WINDOW = at("2026-11-16T13:30:00");
+const countOf = <T extends { kind: string }>(list: T[]) => list.find((r) => r.kind === "count");
 
 describe("Due reminder rules", () => {
   it("nothing at all while Due is off", () => {
@@ -36,46 +42,166 @@ describe("Due reminder rules", () => {
     expect(list.find((r) => r.key.endsWith("-plan"))!.at).toBe(Date.parse("2026-11-16T09:00:00-03:00"));
   });
 
-  it("due today, overdue and pinned today, each at the first and second pass", () => {
-    const list = run([
-      todo("today", { due: "2026-11-16" }),
+  it("untimed to-dos and habits get no reminders of their own any more (20 Nov: too many at once)", () => {
+    const items = [
+      todo("today", { due: "2026-11-16", priority: 1 }),
       todo("late", { due: "2026-11-10" }),
       todo("pinned", { pinnedDate: "2026-11-16" }),
-      todo("later", { due: "2026-11-18" }),
-      todo("moved", { due: "2026-11-10", pinnedDate: "2026-11-20" }),
-      todo("hidden", { due: "2026-11-16", hiddenOn: "2026-11-16" }),
-      todo("done", { due: "2026-11-16", status: "done", completedAt: "2026-11-15" }),
-      todo("idea", { due: "2026-11-16", kind: "idea" }),
-    ]);
-    const first = list.filter((r) => r.kind === "due1");
-    expect(keys(first).sort()).toEqual(["esmeworld-20261116-d1-late", "esmeworld-20261116-d1-pinned", "esmeworld-20261116-d1-today"]);
-    expect(first[0]!.at).toBe(at("2026-11-16T11:00:00"));
-    const second = list.filter((r) => r.kind === "due2");
-    expect(second).toHaveLength(3);
-    expect(second[0]!.at).toBe(at("2026-11-16T17:00:00"));
-    expect(list.find((r) => r.key.endsWith("d1-today"))!.title).toBe("Pretend today");
+      todo("habit", { recur: ["mon"] }),
+    ];
+    for (const now of [MORNING, COUNT_WINDOW, at("2026-11-16T16:50:00")]) {
+      const list = run(items, now);
+      expect(list.every((r) => ["plan", "review", "count", "nudge"].includes(r.kind))).toBe(true);
+      expect(keys(list).some((k) => /-d[12]-/.test(k))).toBe(false);
+    }
   });
 
-  it("habits planned for today and not yet done today", () => {
-    const list = run([
-      todo("mon", { recur: ["mon", "wed"] }),
-      todo("tue", { recur: ["tue"] }),
-      todo("doneToday", { recur: ["mon"], doneToday: true }),
-      todo("inboxHabit", { recur: ["mon"], areaId: "inbox" }),
-    ]);
-    expect(keys(list.filter((r) => r.kind === "due1"))).toEqual(["esmeworld-20261116-d1-mon"]);
+  describe("the 14:00 count nudge", () => {
+    it("one reminder at 14:00 counting what is left on Today", () => {
+      const list = run([
+        todo("today", { due: "2026-11-16" }),
+        todo("late", { due: "2026-11-10" }),
+        todo("pinned", { pinnedDate: "2026-11-16" }),
+        todo("habit", { recur: ["mon", "wed"] }),
+        todo("session", { sessionPlannedToday: true }),
+        todo("datedInbox", { areaId: "inbox", due: "2026-11-16" }),
+        // Not on Today, or not left:
+        todo("later", { due: "2026-11-18" }),
+        todo("moved", { due: "2026-11-10", pinnedDate: "2026-11-20" }),
+        todo("hidden", { due: "2026-11-16", hiddenOn: "2026-11-16" }),
+        todo("done", { due: "2026-11-16", status: "done", completedAt: "2026-11-15" }),
+        todo("idea", { due: "2026-11-16", kind: "idea" }),
+        todo("habitDone", { recur: ["mon"], doneToday: true }),
+        todo("habitTue", { recur: ["tue"] }),
+        todo("inboxHabit", { recur: ["mon"], areaId: "inbox" }),
+        todo("someday"),
+        // A project whose session for today is ticked: crossed out on Today.
+        todo("sessionTicked", { due: "2026-11-16", sessionDoneToday: true }),
+      ], COUNT_WINDOW);
+      expect(countOf(list)).toMatchObject({ key: "esmeworld-20261116-count", title: "6 to-dos left today, pick one", at: at("2026-11-16T14:00:00") });
+      expect(list.filter((r) => r.kind === "count")).toHaveLength(1);
+    });
+
+    it("its own words for one, and nothing at all for none", () => {
+      expect(countTitle(1)).toBe("1 to-do left today, do it");
+      expect(countTitle(3)).toBe("3 to-dos left today, pick one");
+      expect(countOf(run([todo("one", { due: "2026-11-16" })], COUNT_WINDOW))!.title).toBe(countTitle(1));
+      expect(countOf(run([todo("d", { due: "2026-11-16", status: "done", completedAt: "2026-11-16" })], COUNT_WINDOW))).toBeUndefined();
+      expect(countOf(run([], COUNT_WINDOW))).toBeUndefined();
+    });
+
+    it("is only wanted from half an hour before (so ticks before then cost Due nothing), and at her time", () => {
+      const items = [todo("a", { due: "2026-11-16" })];
+      expect(countOf(run(items, at("2026-11-16T13:29:00")))).toBeUndefined();
+      expect(countOf(run(items, COUNT_WINDOW))).toBeDefined();
+      // Still wanted after it went off (so it isn't cancelled while she snoozes it).
+      expect(countOf(run(items, at("2026-11-16T16:00:00")))).toBeDefined();
+      expect(countOf(run(items, at("2026-11-16T15:40:00"), { countNudge: "16:00" }))!.at).toBe(at("2026-11-16T16:00:00"));
+    });
+
+    it("the count follows her ticks (a new title is a new version), with room for more replacements than other reminders", () => {
+      const two = [todo("a", { due: "2026-11-16" }), todo("b", { due: "2026-11-16" })];
+      const one = [todo("a", { due: "2026-11-16" }), todo("b", { due: "2026-11-16", status: "done", completedAt: "2026-11-16" })];
+      expect(countOf(run(two, COUNT_WINDOW))!.title).toBe(countTitle(2));
+      expect(countOf(run(one, COUNT_WINDOW))!.title).toBe(countTitle(1));
+      expect(countOf(run(two, COUNT_WINDOW))).toMatchObject({ maxCancels: COUNT_MAX_CANCELS });
+      expect(COUNT_MAX_CANCELS).toBeGreaterThan(3);
+    });
+
+    it("counts Today's kept picks (the day's today-fill row) while they are still open and on for today", () => {
+      const fill = { ids: ["pick", "pushed", "laterPin", "gone", "inboxPick"], dues: { pushed: "2026-11-17" } };
+      const items = [
+        todo("pick", { priority: 1 }),
+        todo("pushed", { due: "2026-11-20" }), // its deadline was pushed out since it was picked
+        todo("laterPin", { pinnedDate: "2026-11-18" }),
+        todo("inboxPick", { areaId: "inbox" }), // an undated Inbox item is never on Today
+        todo("notPicked", { priority: 1 }),
+      ];
+      const list = wantedReminders({ items, prefs: prefs(), now: COUNT_WINDOW, fill });
+      expect(countOf(list)!.title).toBe(countTitle(1));
+      // Without the row (no device has shown Today yet), only what always shows is counted.
+      expect(countOf(run(items, COUNT_WINDOW))).toBeUndefined();
+    });
+
+    it("leaves out what has its own reminder: timed to-dos and Remind me items", () => {
+      const list = run([
+        todo("a", { due: "2026-11-16" }),
+        todo("meeting", { due: "2026-11-16", time: "17:00" }),
+        todo("habit", { recur: ["mon"], remindAt: "22:00" }),
+        todo("todo", { due: "2026-11-16", remindAt: "sunset-30" }),
+      ], COUNT_WINDOW);
+      expect(countOf(list)!.title).toBe(countTitle(1));
+    });
   });
 
-  it("priority 1 and habits first, and never more than the cap", () => {
-    const many = Array.from({ length: 12 }, (_, i) => todo(`p3-${String(i).padStart(2, "0")}`, { priority: 3, due: "2026-11-16" }));
-    const list = run([...many, todo("habit", { recur: ["mon"], priority: 3 }), todo("urgent", { priority: 1, due: "2026-11-16" })]);
-    const first = list.filter((r) => r.kind === "due1");
-    expect(first).toHaveLength(MAX_DUE_TODAY);
-    expect(keys(first).slice(0, 2).sort()).toEqual(["esmeworld-20261116-d1-habit", "esmeworld-20261116-d1-urgent"]);
-    expect(list.filter((r) => r.kind === "due2")).toHaveLength(MAX_DUE_TODAY);
+  describe("Remind me (remindAt) on a to-do or habit", () => {
+    it("reads HH:MM and sunset-N, nothing else", () => {
+      expect(parseRemindAt("22:00")).toEqual({ time: "22:00" });
+      expect(parseRemindAt("sunset-90")).toEqual({ beforeSunset: 90 });
+      expect(parseRemindAt("sunset-0")).toEqual({ beforeSunset: 0 });
+      for (const bad of ["24:00", "9:00", "sunset", "sunset+30", "sunset-", "sunset-1000", "sunset--5", 5, null, undefined, ""]) {
+        expect(parseRemindAt(bad)).toBeNull();
+      }
+    });
+
+    it("a habit due today gets one reminder at its time", () => {
+      const list = run([todo("wind", { title: "Wind down", recur: ["mon"], remindAt: "22:00" })]);
+      expect(list.filter((r) => r.kind === "own")).toEqual([{ key: "esmeworld-20261116-r-wind", kind: "own", title: "Wind down", at: at("2026-11-16T22:00:00") }]);
+    });
+
+    it("before sunset: her time zone's city by default (New York), minutes before", () => {
+      const list = run([todo("cal", { title: "Calisthenics", recur: ["mon"], remindAt: "sunset-90" })]);
+      const own = list.find((r) => r.kind === "own")!;
+      const sunset = sunsetUtc("2026-11-16", CITIES.nyc.lat, CITIES.nyc.lon)!;
+      expect(own.at).toBe(sunset - 90 * 60_000);
+      // About 15:05 in New York in mid November.
+      expect(Math.abs(own.at - at("2026-11-16T15:06:00"))).toBeLessThan(4 * 60_000);
+    });
+
+    it("before sunset where she says she is", () => {
+      const london = run([todo("cal", { recur: ["mon"], remindAt: "sunset-90" })], MORNING, { lat: CITIES.london.lat, lon: CITIES.london.lon });
+      expect(london.find((r) => r.kind === "own")!.at).toBe(sunsetUtc("2026-11-16", CITIES.london.lat, CITIES.london.lon)! - 90 * 60_000);
+    });
+
+    it("with no place known (a zone without a city, none chosen), no sunset reminder: it is counted instead", () => {
+      const list = run([todo("cal", { recur: ["mon"], remindAt: "sunset-90" })], at("2026-11-16T13:30:00"), { timeZone: "Asia/Tokyo" });
+      expect(list.some((r) => r.kind === "own")).toBe(false);
+    });
+
+    it("only on a day it is on Today and not done", () => {
+      const list = run([
+        todo("habitTue", { recur: ["tue"], remindAt: "22:00" }),
+        todo("habitDone", { recur: ["mon"], doneToday: true, remindAt: "22:00" }),
+        todo("later", { due: "2026-11-18", remindAt: "22:00" }),
+        todo("done", { due: "2026-11-16", status: "done", completedAt: "2026-11-16", remindAt: "22:00" }),
+        todo("undated", { remindAt: "22:00" }),
+        todo("late", { due: "2026-11-12", remindAt: "10:00" }),
+        todo("pinned", { pinnedDate: "2026-11-16", remindAt: "10:00" }),
+      ]);
+      expect(keys(list.filter((r) => r.kind === "own")).sort()).toEqual(["esmeworld-20261116-r-late", "esmeworld-20261116-r-pinned"]);
+    });
+
+    it("a to-do with its own time keeps its timed alert; Remind me is not used for it", () => {
+      const list = run([todo("m", { due: "2026-11-16", time: "15:00", remindAt: "10:00" })]);
+      expect(list.filter((r) => r.kind === "own")).toEqual([]);
+      expect(list.filter((r) => r.kind === "timed")).toHaveLength(1);
+    });
+
+    it("a broken remindAt is ignored (the item is counted)", () => {
+      const list = run([todo("x", { due: "2026-11-16", remindAt: "soon" })], COUNT_WINDOW);
+      expect(list.some((r) => r.kind === "own")).toBe(false);
+      expect(countOf(list)!.title).toBe(countTitle(1));
+    });
+
+    it("capped, soonest first; one over the cap is counted", () => {
+      const many = Array.from({ length: MAX_OWN + 2 }, (_, i) => todo(`o${String(i).padStart(2, "0")}`, { due: "2026-11-16", remindAt: `${10 + i}:00` }));
+      const list = run(many, COUNT_WINDOW);
+      expect(list.filter((r) => r.kind === "own")).toHaveLength(MAX_OWN);
+      expect(countOf(list)!.title).toBe(countTitle(2));
+    });
   });
 
-  it("a timed to-do: an alert its lead before, and not in the due-today passes", () => {
+  it("a timed to-do: an alert its lead before, and not in the count", () => {
     const list = run([todo("dentist", { pinnedDate: "2026-11-16", time: "15:00" }), todo("call", { due: "2026-11-16", time: "09:30" })], MORNING, { leadMinutes: 20 });
     const timed = list.filter((r) => r.kind === "timed");
     expect(timed.map((r) => [r.key, r.at])).toEqual([
@@ -83,7 +209,7 @@ describe("Due reminder rules", () => {
       ["esmeworld-20261116-t-dentist", at("2026-11-16T14:40:00")],
     ]);
     expect(timed[1]!.title).toBe("Pretend dentist");
-    expect(list.filter((r) => r.kind === "due1")).toEqual([]);
+    expect(run([todo("dentist", { pinnedDate: "2026-11-16", time: "15:00" })], COUNT_WINDOW).some((r) => r.kind === "count")).toBe(false);
   });
 
   it("a timed to-do on another day, done, or without a day makes no timed alert", () => {
@@ -94,8 +220,8 @@ describe("Due reminder rules", () => {
       todo("bad", { due: "2026-11-16", time: "25:00" }),
     ]);
     expect(list.filter((r) => r.kind === "timed")).toEqual([]);
-    // A broken time is just a to-do due today.
-    expect(keys(list.filter((r) => r.kind === "due1"))).toEqual(["esmeworld-20261116-d1-bad"]);
+    // A broken time is just a to-do due today: counted.
+    expect(run([todo("bad", { due: "2026-11-16", time: "25:00" })], COUNT_WINDOW).find((r) => r.kind === "count")!.title).toBe(countTitle(1));
   });
 
   it("a 1am meeting tomorrow (calendar) belongs to tonight", () => {
@@ -158,15 +284,15 @@ describe("Due reminder rules", () => {
   });
 
   it("titles are short and plain; odd ids are made safe", () => {
-    const list = run([todo("weird id/with spaces", { due: "2026-11-16", title: `  ${"Long ".repeat(40)}\nline ` })]);
-    const r = list.find((x) => x.kind === "due1")!;
-    expect(r.key).toMatch(/^esmeworld-20261116-d1-h[0-9a-f]{8}$/);
+    const list = run([todo("weird id/with spaces", { due: "2026-11-16", remindAt: "18:00", title: `  ${"Long ".repeat(40)}\nline ` })]);
+    const r = list.find((x) => x.kind === "own")!;
+    expect(r.key).toMatch(/^esmeworld-20261116-r-h[0-9a-f]{8}$/);
     expect(r.title.length).toBeLessThanOrEqual(100);
     expect(r.title).not.toMatch(/\n|^\s/);
   });
 
   it("is the same every time for the same moment (pure)", () => {
-    const items = [todo("a", { due: "2026-11-16" }), todo("b", { recur: ["mon"] })];
-    expect(run(items)).toEqual(run(items));
+    const items = [todo("a", { due: "2026-11-16" }), todo("b", { recur: ["mon"], remindAt: "sunset-90" })];
+    expect(run(items, COUNT_WINDOW)).toEqual(run(items, COUNT_WINDOW));
   });
 });
