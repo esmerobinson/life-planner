@@ -20,6 +20,7 @@ import { applyUntracked } from "../data/changeTracking";
 import { carrySessionTicks, forgetAcceptedTicks, restampTicks } from "../data/sessionTicks";
 import { shownPictureIds } from "../domain/page";
 import { mergeDidPhotos } from "../domain/whatIDid";
+import { noteGoneFromSync } from "../data/photoPurge";
 import type { DidPhotos, FileRow, Item } from "../domain/types";
 import { withSyncLock } from "../data/syncGate";
 import { validFile, validGoal, validItem, validJournal } from "../data/validate";
@@ -470,6 +471,8 @@ async function applyReply(
       if (p && p.updatedAt === pendingVersions.get(keyOf(c.table, c.id))) await db.pending.delete([c.table, c.id]);
     }
     let written = 0;
+    /** Applied to-dos whose notes list removed photos (checked once the page is in, RM2). */
+    const gone: Item[] = [];
     for (const c of reply.changes) {
       // A table only a later app version knows: never fatal, so this device keeps syncing.
       // The row waits in quarantine; after the update, retryQuarantine applies it.
@@ -478,13 +481,17 @@ async function applyReply(
         continue;
       }
       const before = c.table === "files" && c.data.status === "purged" ? ((await db.files.get(c.id)) as FileRow | undefined) : undefined;
-      if (await applyRow(db, c, reply.cursor)) {
+      if (await applyRow(db, c, reply.cursor, gone)) {
         written++;
         if (before && before.status !== "purged" && before.encrypted !== true && before.data && !emptied.has(c.id)) {
           emptied.set(c.id, { local: before, stamp: c.updatedAt });
         }
       }
     }
+    // Photos those to-dos list as removed but still stored here are noted, to be deleted after their
+    // grace period (re-review RM2: a device that hadn't seen the removal may have put one back).
+    // Only when there are any: awaiting a helper that does no IndexedDB work would commit early.
+    if (gone.length) await noteGoneFromSync(db, gone);
     // Only on the last page (a page in between may hold the picture's page still in the Bin,
     // its "emptied" row on a later page), and only when needed: awaiting an async helper that
     // does no IndexedDB work would let this Dexie transaction commit early (PrematureCommitError).
@@ -518,7 +525,7 @@ async function applyReply(
  * - An old copy never replaces a newer synced local row.
  * - A row this app version cannot read goes to quarantine instead of being dropped.
  */
-async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boolean> {
+async function applyRow(db: HubDB, c: WireChange, cursor: number, gone: Item[]): Promise<boolean> {
   const waiting = await db.pending.get([c.table, c.id]);
   if (waiting && waiting.updatedAt >= c.updatedAt) return false;
   const local = (await db.table(c.table).get(c.id)) as { updatedAt?: number } | undefined;
@@ -558,12 +565,14 @@ async function applyRow(db: HubDB, c: WireChange, cursor: number): Promise<boole
     if (merged) {
       const stamp = Math.max(Date.now(), c.updatedAt + 1);
       await db.items.put({ ...merged, updatedAt: stamp });
+      if (merged.didPhotosGone?.length) gone.push(merged);
       await db.pending.put({ table: "items", id: c.id, updatedAt: stamp });
       if (held && held.updatedAt <= c.updatedAt) await db.quarantine.delete([c.table, c.id]);
       return true;
     }
   }
   await db.table(c.table).put(row);
+  if (c.table === "items" && (row as unknown as Item).didPhotosGone?.length) gone.push(row as unknown as Item);
   if (waiting) await db.pending.delete([c.table, c.id]);
   if (held && held.updatedAt <= c.updatedAt) await db.quarantine.delete([c.table, c.id]);
   return true;
@@ -622,7 +631,7 @@ async function retryQuarantine(db: HubDB): Promise<number> {
       const row = { ...q.data, id: q.id, updatedAt: q.updatedAt };
       if (!VALID_ROW[q.table](row)) continue; // still unreadable
       await db.quarantine.delete([q.table, q.id]);
-      if (await applyRow(db, { table: q.table, id: q.id, updatedAt: q.updatedAt, data: q.data }, q.cursor)) {
+      if (await applyRow(db, { table: q.table, id: q.id, updatedAt: q.updatedAt, data: q.data }, q.cursor, [])) {
         written++;
         if (q.fromBackup) await db.pending.put({ table: q.table, id: q.id, updatedAt: q.updatedAt });
       }
