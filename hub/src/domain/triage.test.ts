@@ -58,13 +58,15 @@ describe("pickToday", () => {
     expect(out).toEqual({ rhythm: [], picks: [], alsoDue: [] });
   });
 
-  it("overdue and due within 3 days come first, ordered by due then priority", () => {
+  it("overdue and due within 3 days are picked first; shown by priority, then deadline", () => {
     const far = item({ id: "far", due: "2026-11-30", priority: 1 });
     const a = item({ id: "a", due: "2026-10-30", priority: 1 });
     const b = item({ id: "b", due: "2026-10-25", priority: 3 });
     const c = item({ id: "c", due: "2026-10-25", priority: 1 });
     const out = pickToday([far, a, b, c], [], TUE, {});
-    expect(ids(out.picks).slice(0, 3)).toEqual(["c", "b", "a"]);
+    // Picked: c, b, a (due), then far by priority. Shown: priority 1s by deadline, then b
+    // (Esme, 2026-11-23: "in order of priority/deadlines").
+    expect(ids(out.picks)).toEqual(["c", "a", "far", "b"]);
   });
 
   it("fills to 4 with p1 then rotates p2 by date", () => {
@@ -75,8 +77,10 @@ describe("pickToday", () => {
     const day1 = pickToday(items, [], TUE, {});
     const day2 = pickToday(items, [], WED, {});
     expect(day1.picks).toHaveLength(CAPACITY);
-    expect(ids(day1.picks).slice(0, 2)).toEqual(["d", "p1"]);
-    expect(ids(day1.picks).slice(2)).not.toEqual(ids(day2.picks).slice(2));
+    // Shown by priority: p1, the two priority 2s of the day, then d (priority 3, due today).
+    expect(ids(day1.picks)[0]).toBe("p1");
+    expect(ids(day1.picks)[3]).toBe("d");
+    expect(ids(day1.picks).slice(1, 3)).not.toEqual(ids(day2.picks).slice(1, 3));
   });
 
   it("seven overdue items: all seven on the list, never in the dropdown (Esme, 2026-11-06)", () => {
@@ -106,7 +110,7 @@ describe("pickToday", () => {
     const pin = item({ id: "pin", pinnedDate: TUE, priority: 3 });
     const dues = [1, 2, 3, 4].map((k) => item({ id: `d${k}`, due: "2026-10-29" }));
     const out = pickToday([...dues, pin], [], TUE, {});
-    expect(out.picks[0].id).toBe("pin");
+    expect(ids(out.picks)).toContain("pin");
     expect(out.picks).toHaveLength(4);
     expect(out.alsoDue).toHaveLength(1);
   });
@@ -126,7 +130,7 @@ describe("pickToday", () => {
       item({ id: "inbox-pin", areaId: "inbox", pinnedDate: TUE }),
     ];
     const out = pickToday(items, [], TUE, {});
-    expect(ids([...out.picks, ...out.alsoDue, ...out.rhythm])).toEqual(["inbox-pin", "inbox-due"]);
+    expect(ids([...out.picks, ...out.alsoDue, ...out.rhythm])).toEqual(["inbox-due", "inbox-pin"]);
   });
 
   it("undated inbox, ideas, done and archived items never picked", () => {
@@ -147,10 +151,10 @@ describe("pickToday", () => {
     const soon = [1, 2, 3].map((k) => item({ id: `s${k}`, due: "2026-10-27" }));
     const p1 = item({ id: "p1", priority: 1 });
     const out = pickToday([pin, ...dues, ...soon, p1], [], SUN, {});
-    expect(ids(out.picks)).toEqual(["pin", "d1", "d2", "d3"]);
+    expect(ids(out.picks)).toEqual(["d1", "d2", "d3", "pin"]); // all priority 3: deadline first
     expect(ids(out.alsoDue)).toEqual(["s1", "s2", "s3"]);
     const light = pickToday([pin, ...soon, p1], [], SUN, {});
-    expect(ids(light.picks)).toEqual(["pin", "s1", "s2"]);
+    expect(ids(light.picks)).toEqual(["s1", "s2", "pin"]);
     expect(ids(light.alsoDue)).toEqual(["s3"]);
   });
 
@@ -358,7 +362,8 @@ describe("Today stops refilling (Esme, 2026-11-06: a removed task was 'constantl
     const f = morning(items);
     const before = shown(items, f).picks;
     const added = [...items, item({ id: "mine", pinnedDate: TUE })];
-    expect(shown(added, f).picks).toEqual(["mine", ...before]);
+    expect(shown(added, f).picks).toContain("mine");
+    expect(shown(added, f).picks.filter((id) => id !== "mine")).toEqual(before);
   });
 
   it("removing a pin or a due-today item: nothing replaces it either", () => {
@@ -445,5 +450,60 @@ describe("Today stops refilling, fix round 1", () => {
   it("M2: never more picks shown from the record than places it had", () => {
     const items = [1, 2, 3, 4, 5, 6].map((k) => item({ id: `q${k}`, priority: 1 }));
     expect(shownIds(items, { ids: ["q1", "q2"], room: 2 })).toEqual(["q1", "q2"]);
+  });
+});
+
+// Esme, 2026-11-23: "To dos appear above habits, and in order of priority/deadlines". Only the
+// order changes: what shows is as before.
+describe("Today's to-dos in order of priority, then deadline", () => {
+  const order = (picks: Item[]) => picks.map((i) => i.id);
+
+  it("priority 1 first; within a priority the earliest deadline (overdue first), none last; else as picked", () => {
+    const items = [
+      item({ id: "p3-due-today", priority: 3, due: TUE }),
+      item({ id: "p2-pinned", priority: 2, pinnedDate: TUE }),
+      item({ id: "p2-overdue", priority: 2, due: "2026-10-20" }),
+      item({ id: "p1-pinned", priority: 1, pinnedDate: TUE }),
+      item({ id: "p2-due-today", priority: 2, due: TUE }),
+      item({ id: "p2-pinned-b", priority: 2, pinnedDate: TUE }),
+      item({ id: "p1-overdue", priority: 1, due: "2026-10-26" }),
+    ];
+    expect(order(pickToday(items, [], TUE, {}).picks)).toEqual([
+      "p1-overdue",
+      "p1-pinned",
+      "p2-overdue",
+      "p2-due-today",
+      "p2-pinned",
+      "p2-pinned-b",
+      "p3-due-today",
+    ]);
+  });
+
+  it("the same order on Home's list (todayList), with a frozen day too; what shows is unchanged", () => {
+    const a = item({ id: "a", priority: 3, due: TUE });
+    const b = item({ id: "b", priority: 2 });
+    const c = item({ id: "c", priority: 1 });
+    const d = item({ id: "d", priority: 2, due: "2026-10-29" });
+    const items = [a, b, c, d];
+    const shown = (f?: Parameters<typeof todayList>[3]) => todayList(items, [], TUE, f).picks;
+    expect(order(shown())).toEqual(["c", "d", "b", "a"]);
+    expect(new Set(order(shown()))).toEqual(new Set(order(pickToday(items, [], TUE, {}).picks)));
+    expect(order(shown({ ids: ["b", "d", "c"], room: 4 }))).toEqual(["c", "d", "b", "a"]);
+  });
+
+  it("project sessions take their place among the to-dos; a ticked-off one still goes to the bottom", () => {
+    const todo = item({ id: "todo-p2", priority: 2, pinnedDate: TUE });
+    const project = item({ id: "proj-p1", priority: 1, sessions: [{ id: "a", plannedFor: TUE }, { id: "b" }] });
+    const late = item({ id: "proj-p3", priority: 3, due: TUE, sessions: [{ id: "a" }] });
+    expect(order(todayList([late, todo, project], [], TUE).picks)).toEqual(["proj-p1", "todo-p2", "proj-p3"]);
+    const other = item({ id: "todo-p3", priority: 3, pinnedDate: TUE });
+    const ticked = item({ id: "proj-ticked", priority: 1, sessions: [{ id: "a", doneOn: TUE }, { id: "b" }] });
+    expect(order(todayList([ticked, todo, other], [], TUE).picks)).toEqual(["todo-p2", "todo-p3", "proj-ticked"]);
+  });
+
+  it("habits keep their own order", () => {
+    const h1 = item({ id: "h1", priority: 3, recur: ["tue"] });
+    const h2 = item({ id: "h2", priority: 1, recur: ["tue"] });
+    expect(order(pickToday([h1, h2], [], TUE, {}).rhythm)).toEqual(["h1", "h2"]);
   });
 });

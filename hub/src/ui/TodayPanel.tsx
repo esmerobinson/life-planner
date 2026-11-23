@@ -104,10 +104,12 @@ export function TodayPanel({
         {lead}
         {saveError && <p className="form-message">{saveError}</p>}
         {empty && <p>Nothing planned for today.</p>}
+        {/* The to-dos (and project sessions) above the habits, by priority then deadline
+            (Esme, 2026-11-23: "To dos appear above habits, and in order of priority/deadlines"). */}
+        {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
         {rhythm.length > 0 && (
           <ul aria-label="Rhythm" className="strip-list">{rhythm.map(row)}</ul>
         )}
-        {picks.length > 0 && <ul aria-label="Today" className="strip-list">{picks.map(row)}</ul>}
         {doneToday.length > 0 && <DoneSection title="Done today" items={doneToday} today={today} onUndo={untick} />}
         {/* Only things due in the next few days that didn't fit: anything due today or overdue is
             always on the list above (Esme, 2026-11-06). Wording provisional, for Esme / Design. */}

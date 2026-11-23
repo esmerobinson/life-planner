@@ -538,7 +538,7 @@ describe("Today stops refilling, fix round 1", () => {
     await rows();
     rerender(<TodayPanel today={TODAY} />); // 3am passed while the app slept: it resumes on today
     // The provisional list shows, and nothing is kept from last night's copy.
-    await vi.waitFor(async () => expect(await titles()).toEqual(["Done elsewhere 1", "Done elsewhere 2", "Done elsewhere 3", "Pretend p1 a"]));
+    await vi.waitFor(async () => expect(await titles()).toEqual(["Pretend p1 a", "Done elsewhere 1", "Done elsewhere 2", "Done elsewhere 3"]));
     await new Promise((r) => setTimeout(r, 100));
     expect(await keptRow()).toBeUndefined();
     // The pull lands: the three are done; the sync finishes.

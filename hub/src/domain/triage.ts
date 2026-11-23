@@ -43,10 +43,21 @@ export function withTickedOff(
   ];
   return {
     rhythm: lastIfTicked([...pick.rhythm, ...extraHabits]),
-    picks: lastIfTicked([...pick.picks, ...startedProjects]),
+    picks: lastIfTicked(byPriorityThenDeadline([...pick.picks, ...startedProjects])),
     alsoDue: pick.alsoDue,
     doneToday: finishedToday,
   };
+}
+
+/**
+ * Today's to-dos (project sessions with them) in order (Esme, 2026-11-23: "in order of
+ * priority/deadlines"): priority 1 first; within a priority the earliest deadline (so overdue
+ * first), no deadline last; otherwise as they were picked (pins, then due now, then the fill).
+ * Only the order: what shows is pickToday's.
+ */
+export function byPriorityThenDeadline(list: Item[]): Item[] {
+  const due = (i: Item) => i.due ?? "\uffff";
+  return [...list].sort((a, b) => a.priority - b.priority || (due(a) < due(b) ? -1 : due(a) > due(b) ? 1 : 0));
 }
 
 /**
@@ -158,7 +169,7 @@ export function pickToday(
   const parts = todayParts(items, goals, today, thisMonthDone);
   const { rhythm, always, dueSoon } = parts;
   const fill = fillFrom(parts, frozen);
-  const picks = [...always, ...fill];
+  const picks = byPriorityThenDeadline([...always, ...fill]);
   const shown = new Set(picks.map((i) => i.id));
   return { rhythm, picks, alsoDue: dueSoon.filter((i) => !shown.has(i.id)) };
 }

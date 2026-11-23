@@ -45,7 +45,7 @@ describe("Bin rows and unsorted Inbox items are not counted anywhere", () => {
     const pinned = item("inbox-pinned", { areaId: "inbox", pinnedDate: today });
     const late = item("inbox-late", { areaId: "inbox", due: "2026-10-20" });
     const t = pickToday([...all, pinned, late], [goal], today, {});
-    expect([...t.rhythm, ...t.picks, ...t.alsoDue].map((i) => i.id)).toEqual(["inbox-pinned", "inbox-late"]);
+    expect([...t.rhythm, ...t.picks, ...t.alsoDue].map((i) => i.id)).toEqual(["inbox-late", "inbox-pinned"]); // the deadline first (2026-11-23)
     const l = needsALook([...all, pinned, late], today);
     expect(l.overdue.map((i) => i.id)).toEqual(["inbox-late"]);
     expect([...l.dueSoon, ...l.stale]).toEqual([]);

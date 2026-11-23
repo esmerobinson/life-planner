@@ -110,6 +110,27 @@ describe("HomePage", () => {
     expect(screen.queryByRole("region", { name: "Journal" })).toBeNull();
   });
 
+  // Esme, 2026-11-23: "To dos appear above habits, and in order of priority/deadlines".
+  it("Today: the Journal rows first as before, then the to-dos (by priority, then deadline), then the habits", async () => {
+    await createItem({ kind: "task", title: "Pretend habit", areaId: "body", priority: 1, recur: ["tue"] }, TODAY);
+    await createItem({ kind: "task", title: "Pretend p3 overdue", areaId: "admin", priority: 3, due: "2026-10-20" }, TODAY);
+    await createItem({ kind: "task", title: "Pretend p2 pinned", areaId: "admin", priority: 2, pinnedDate: TODAY }, TODAY);
+    await createItem({ kind: "task", title: "Pretend p2 due today", areaId: "admin", priority: 2, due: TODAY }, TODAY);
+    await createItem({ kind: "task", title: "Pretend p1 pinned", areaId: "admin", priority: 1, pinnedDate: TODAY }, TODAY);
+    renderHome();
+    const todos = await screen.findByRole("list", { name: "Today" });
+    await within(todos).findByText("Pretend p3 overdue");
+    expect([...todos.querySelectorAll(".strip-title")].map((t) => t.textContent)).toEqual([
+      "Pretend p1 pinned", "Pretend p2 due today", "Pretend p2 pinned", "Pretend p3 overdue",
+    ]);
+    const journal = screen.getByRole("list", { name: "Journal" });
+    const habits = screen.getByRole("list", { name: "Rhythm" });
+    expect(within(habits).getByText("Pretend habit")).toBeInTheDocument();
+    const follows = (a: Node, b: Node) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(journal, todos)).toBe(true);
+    expect(follows(todos, habits)).toBe(true);
+  });
+
   it("daily goals chosen for Home are not green rows: they show in the Goals column only", async () => {
     await addSuggestedGoal("suggested-bpd-practice", TODAY);
     await addSuggestedGoal("suggested-journal-daily", TODAY);
