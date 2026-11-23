@@ -1,18 +1,18 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { db } from "../../data/db";
-import { readDayLog, readWeekReview, reviewDoneDays, saveDayLog } from "../../data/repo";
+import { readDayLog, saveDayLog } from "../../data/repo";
 import { EMPTY_DAY_LOG } from "../../journal/routine";
 import { confirmedDevice, keyFor } from "../../test/journalKey";
-import { clock, emptyDb } from "../../together/testKit";
-import { DailyLog, WeeklyReview } from "./RoutineForms";
+import { emptyDb } from "../../together/testKit";
+import { DailyLog } from "./RoutineForms";
 import { ROUTINE_WORDS as W } from "./routineWording";
 
-// The daily log and the weekly review boxes: saved as she goes, Done, Edit, nothing lost.
+// The daily log box (and the pieces the weekly review tab shares): saved as she goes, Done, Edit,
+// nothing lost. The weekly review's own tests: WeeklyReviewTab.test.tsx.
 // Made-up words only.
 
 const DAY = "2026-11-12"; // a Thursday
-const SUNDAY = "2026-11-15";
 const MAC = "device-pretend-mac-01";
 const PHONE = "device-pretend-phone-1";
 
@@ -168,57 +168,3 @@ describe("the daily log", () => {
   });
 });
 
-describe("the weekly review", () => {
-  it("I3: on a Thursday, typing on across an autosave keeps focus and every key (the box is never rebuilt)", async () => {
-    const jk = await key();
-    render(<WeeklyReview jk={jk} today={DAY} deviceId={MAC} />);
-    await userEvent.click(await screen.findByRole("button", { name: W.reviewHeadingWeek }));
-    const box = screen.getByLabelText(W.well);
-    await userEvent.type(box, "Pretend first");
-    await waitFor(async () => expect((await readWeekReview(jk, DAY)).fields.well).toBe("Pretend first"), { timeout: 3000 });
-    await new Promise((r) => setTimeout(r, 100)); // the re-read after the save lands
-    expect(document.activeElement).toBe(screen.getByLabelText(W.well));
-    expect(screen.getByLabelText(W.well)).toBe(box); // the same box
-    await userEvent.keyboard(" more words"); // no click: she just keeps typing
-    expect(screen.getByLabelText(W.well)).toHaveValue("Pretend first more words");
-    await waitFor(async () => expect((await readWeekReview(jk, DAY)).fields.well).toBe("Pretend first more words"), { timeout: 3000 });
-  });
-
-  it("is open on Sunday: every box saved, Done shows it done for the week and counts as a Mental health day", async () => {
-    clock(`${SUNDAY}T18:00:00`); // she presses Done on Sunday
-    const jk = await key();
-    render(<WeeklyReview jk={jk} today={SUNDAY} deviceId={MAC} />);
-    await screen.findByText(W.reviewHeadingSunday);
-    await userEvent.type(await screen.findByLabelText(W.well), "Pretend Larkspur went well");
-    await userEvent.type(screen.getByLabelText(W.inWay), "Pretend fog");
-    await userEvent.click(within(group(W.values)).getByRole("button", { name: "7" }));
-    await userEvent.type(screen.getByLabelText(W.ifThen), "If pretend rain, then a pretend indoor walk");
-    await userEvent.click(screen.getByLabelText("Wednesday"));
-    await userEvent.click(screen.getByLabelText("Monday"));
-    await userEvent.click(screen.getByRole("button", { name: W.done }));
-    await screen.findByText(W.reviewDone);
-    expect(await screen.findByText("7 out of 10")).toBeInTheDocument();
-    expect(await screen.findByText("Monday, Wednesday")).toBeInTheDocument();
-    await waitFor(async () =>
-      expect(await readWeekReview(jk, SUNDAY)).toMatchObject({
-        done: true, date: SUNDAY,
-        fields: { well: "Pretend Larkspur went well", inWay: "Pretend fog", values: 7, ifThen: "If pretend rain, then a pretend indoor walk", minDays: ["mon", "wed"] },
-      }),
-    );
-    expect([...(await reviewDoneDays(jk))]).toEqual([SUNDAY]);
-  });
-
-  it("any other day of the week it is folded until opened, then works the same; once started it stays open", async () => {
-    const jk = await key();
-    const { unmount } = render(<WeeklyReview jk={jk} today={DAY} deviceId={MAC} />);
-    const fold = await screen.findByRole("button", { name: W.reviewHeadingWeek });
-    expect(screen.getByLabelText(W.well)).not.toBeVisible();
-    await userEvent.click(fold);
-    await userEvent.type(await screen.findByLabelText(W.well), "Pretend Thursday words");
-    unmount();
-    await waitFor(async () => expect((await readWeekReview(jk, DAY)).fields.well).toBe("Pretend Thursday words"));
-    // Sunday of the same week: the same review, open.
-    render(<WeeklyReview jk={jk} today={SUNDAY} deviceId={MAC} />);
-    expect(await screen.findByDisplayValue("Pretend Thursday words")).toBeInTheDocument();
-  });
-});

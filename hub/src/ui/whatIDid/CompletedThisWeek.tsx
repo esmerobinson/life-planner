@@ -8,13 +8,13 @@ import { areaName } from "./DidBox";
 import { DID_WORDS as W } from "./words";
 
 /**
- * "Completed this week" in the Sunday weekly review (Esme, 19 Nov 2026): the to-dos ticked done
- * this week (Monday to Sunday) and project sessions, each with what she wrote, read-only.
- * DISPLAY ONLY: it is not part of the review's answers, so it never goes to Together (the note
- * there is built from the review's own fields, together/journalNotes.ts reviewQAs) or anywhere
- * else. Strips (strips.css), no tick box; the place in the review is provisional (for Design).
+ * "Completed this week" in the weekly review (Esme, 19 Nov 2026): the to-dos ticked done that week
+ * (Monday to Sunday; `week`, any day in it, else today's) and project sessions, each with what she
+ * wrote, read-only. DISPLAY ONLY: it is not part of the review's answers, so it never goes to
+ * Together (only "Weekly review done" ever goes, together/journalNotes.ts) or anywhere else. Strips
+ * (strips.css), no tick box; the place in the review is provisional (for Design).
  */
-export function CompletedThisWeek({ today }: { today: ISODate }) {
+export function CompletedThisWeek({ today, week }: { today: ISODate; week?: ISODate }) {
   const [items, setItems] = useState<Item[] | null>(null);
   useEffect(() => {
     const sub = liveQuery(() => db.items.where("status").anyOf("open", "done").toArray()).subscribe({
@@ -24,7 +24,7 @@ export function CompletedThisWeek({ today }: { today: ISODate }) {
     return () => sub.unsubscribe();
   }, []);
   if (!items) return null;
-  const rows = completedInWeek(items, today, areaName);
+  const rows = completedInWeek(items, week ?? today, areaName);
   return (
     <section className="did-week" aria-label={W.completedHeading}>
       <p className="journal-q">{W.completedHeading}</p>

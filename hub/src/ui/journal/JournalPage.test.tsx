@@ -50,7 +50,7 @@ describe("locked", () => {
     expect(await screen.findByRole("heading", { name: "Unlock journal" })).toBeInTheDocument();
     const tabs = screen.getByRole("navigation", { name: "Journal parts" });
     expect(within(tabs).getAllByRole("link").map((l) => l.textContent)).toEqual([
-      "Mental health exercise", "Morning pages", "Daily check-in", "Read back", "Notes to myself",
+      "Mental health exercise", "Weekly review", "Morning pages", "Daily check-in", "Read back", "Notes to myself",
     ]);
     expect(within(tabs).queryByRole("checkbox")).toBeNull();
     expect(tabs.querySelectorAll(".tick-auto.is-done")).toHaveLength(0);

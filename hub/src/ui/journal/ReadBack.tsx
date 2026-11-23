@@ -2,8 +2,8 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   answeredPrompts, CANT_OPEN, shownPrompts, listCheckinDays, listDayLogs, listExerciseEntries, listLearned, listNotes, listReadBack,
-  listWeekReviews, morningOpensOn, readExerciseCards, readMorningPage, type CheckinDay, type DayLogFields, type ExerciseResponse,
-  type FormDay, type Learned, type MorningText, type Note, type WeekReviewFields,
+  listWeekReviews, listWeeklyReviews, morningOpensOn, readExerciseCards, readMorningPage, type CheckinDay, type DayLogFields, type ExerciseResponse,
+  type FormDay, type Learned, type MorningText, type Note, type WeekReviewFields, type WeeklyReviewFields,
 } from "../../data/repo";
 import { addDays } from "../../domain/dates";
 import type { ISODate } from "../../domain/types";
@@ -16,7 +16,9 @@ import { READ_BACK_PARTS, tabPath, type ReadBackPart } from "./tabs";
 import { useDbChanges } from "./useJournalKey";
 import { HighlightsPart, useHighlightsTile } from "./HighlightsReadBack";
 import { LearnedInReadBack } from "../together/LearnedInReadBack";
-import { DayLogView, WeekReviewView } from "./RoutineForms";
+import { DayLogView, FormReadOnly, readBackSummary, WeekReviewView } from "./RoutineForms";
+import { WeeklyReviewView } from "./WeeklyReviewTab";
+import { reviewTitle } from "../../journal/weeklyReview";
 import { ROUTINE_WORDS as RW } from "./routineWording";
 
 /** The line at the top of Read back (the approved mockup, 2026-11-05 option B). */
@@ -36,7 +38,12 @@ type Page = { id: string; date: ISODate; n: number };
  * One item in the Mental health exercise list: a card's response (with that day's "what I
  * learned" words on the day's first card), or a day with learned words and no card (bug #45).
  */
-type ExerciseItem = { date: ISODate; entry: ExerciseResponse | null; title: string; learned: Learned | null; review?: FormDay<WeekReviewFields> };
+type ExerciseItem = {
+  date: ISODate; entry: ExerciseResponse | null; title: string; learned: Learned | null;
+  /** A weekly review: the first kind, or v2 (its own tab) with its week's Monday. */
+  review?: FormDay<WeekReviewFields>;
+  review2?: { week: ISODate; day: FormDay<WeeklyReviewFields> };
+};
 /** One item in the Daily check-in list: a day's check-in, or a day's daily log (PLACEHOLDER placement). */
 type CheckinItem = { date: ISODate; checkin: CheckinDay } | { date: ISODate; log: FormDay<DayLogFields> };
 type Loaded = {
@@ -71,7 +78,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
   const load = useCallback(async () => {
     const id = ++latest.current;
     try {
-      const [exercises, checkins, pages, cards, notes, learned, logs, reviews] = await Promise.all([
+      const [exercises, checkins, pages, cards, notes, learned, logs, reviews, reviews2] = await Promise.all([
         listExerciseEntries(jk, addDays(today, 1)),
         listCheckinDays(jk),
         listReadBack(),
@@ -80,6 +87,7 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         listLearned(jk, addDays(today, 1)),
         listDayLogs(jk, addDays(today, 1)),
         listWeekReviews(jk, addDays(today, 1)),
+        listWeeklyReviews(jk),
       ]);
       // Each response's title: its own card (by its full id), with that card's book.
       const set = cards.state === "ok" ? cards.set : null;
@@ -95,6 +103,8 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
           ...exerciseItems(exercises.entries, learned, title),
           // Each week's review (Mental health work), on the day she pressed Done (review C1).
           ...reviews.map((r): ExerciseItem => ({ date: r.day || r.week, entry: null, title: "", learned: null, review: r })),
+          // Weekly review v2, the same way (filed under its Monday; belongs to its Done day).
+          ...reviews2.map((r): ExerciseItem => ({ date: r.day || r.week, entry: null, title: "", learned: null, review2: { week: r.week, day: r } })),
         ].sort((a, b) => b.date.localeCompare(a.date)),
         // Every day she checked in, even if its words were lost; only a day of skips isn't listed
         // (Esme, 2026-11-04 and 2026-11-06). Each day's daily log after that day's check-in.
@@ -109,7 +119,9 @@ export function ReadBack({ jk, today }: { jk: JournalKey; today: ISODate }) {
         }),
         notes: [...notes.notes].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt),
         unreadable: {
-          exercise: exercises.unreadable + learned.reduce((n, d) => n + d.unreadable, 0) + reviews.reduce((n, d) => n + d.unreadable, 0),
+          exercise:
+            exercises.unreadable + learned.reduce((n, d) => n + d.unreadable, 0) + reviews.reduce((n, d) => n + d.unreadable, 0) +
+            reviews2.reduce((n, d) => n + d.unreadable, 0),
           "check-in": checkins.reduce((n, d) => n + d.unreadable, 0) + logs.reduce((n, d) => n + d.unreadable, 0),
           notes: notes.unreadable,
         },
@@ -217,9 +229,11 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
   const months = (() => {
     if (part === "exercise") {
       return byMonth(data.exercises, (x) => x.date).map(([m, xs]) => [m, xs.map((x) => (
-        <li key={x.entry ? `${x.entry.date}|${x.entry.id}|${x.entry.theme}` : x.review ? `${x.date}|review` : `${x.date}|learned`}>
+        <li key={x.entry ? `${x.entry.date}|${x.entry.id}|${x.entry.theme}` : x.review ? `${x.date}|review` : x.review2 ? `${x.review2.week}|review2` : `${x.date}|learned`}>
           {x.review ? (
-            <FormItem date={x.date} line={RW.readBackReview} day={x.review} View={WeekReviewView} />
+            <FormReadOnly summary={readBackSummary(x.date, RW.readBackReview)} day={x.review} View={WeekReviewView} />
+          ) : x.review2 ? (
+            <FormReadOnly summary={readBackSummary(x.date, reviewTitle(x.review2.week))} day={x.review2.day} View={WeeklyReviewView} />
           ) : (
           <details>
             <summary>{x.entry ? `${longDate(x.entry.date)} · ${x.title}` : `${longDate(x.date)} · ${LEARNED_ONLY}`}</summary>
@@ -237,7 +251,7 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
         if ("log" in item) {
           return (
             <li key={`${item.date}|log`}>
-              <FormItem date={item.date} line={RW.readBackLog} day={item.log} View={DayLogView} />
+              <FormReadOnly summary={readBackSummary(item.date, RW.readBackLog)} day={item.log} View={DayLogView} />
             </li>
           );
         }
@@ -302,26 +316,6 @@ function PartView({ jk, today, part, data, focus }: { jk: JournalKey; today: ISO
         );
       })}
     </section>
-  );
-}
-
-/**
- * A daily log or weekly review in Read back (PLACEHOLDER placement): its answers, "Not done yet"
- * when Done wasn't pressed, and every other version not replaced (nothing hidden).
- */
-function FormItem<F>({ date, line, day, View }: { date: ISODate; line: string; day: FormDay<F>; View: (p: { fields: F }) => React.ReactNode }) {
-  return (
-    <details className="routine-placeholder routine-readback">
-      <summary>{`${longDate(date)} · ${line}`}</summary>
-      <View fields={day.fields} />
-      {!day.done && <p className="journal-muted">{RW.notSubmitted}</p>}
-      {day.others.map((o) => (
-        <div key={o.id} className="routine-other">
-          <p className="journal-muted">{o.settled ? RW.earlierVersion : RW.alsoSaved}</p>
-          <View fields={o.fields} />
-        </div>
-      ))}
-    </details>
   );
 }
 

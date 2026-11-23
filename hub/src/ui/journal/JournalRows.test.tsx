@@ -277,7 +277,11 @@ describe("Journal tabs", () => {
     await waitFor(() => expect(currentUrl).toBe("/journal/exercise"));
     const nav = await tabs();
     const links = within(nav).getAllByRole("link");
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/journal/exercise", "/journal/morning", "/journal/check-in", "/journal/read-back", "/journal/notes"]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual([
+      "/journal/exercise", "/journal/weekly-review", "/journal/morning", "/journal/check-in", "/journal/read-back", "/journal/notes",
+    ]);
+    // The weekly review (v2: its own tab) has no tick or streak of its own: a done one ticks the exercise.
+    expect(links.splice(1, 1)[0]!.querySelector(".tick-auto, .tick-auto-space, .streak")).toBeNull();
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveClass("journal-tab", "is-selected");
     await waitFor(() => expect(links[1]!.querySelector(".tick-auto.is-done")).not.toBeNull());

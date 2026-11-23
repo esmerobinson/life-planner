@@ -55,3 +55,27 @@ it("daily logs are in the Daily check-in part and weekly reviews in the Mental h
   expect(within(review).getByText("6 out of 10")).toBeVisible();
   expect(within(review).getByText("Friday")).toBeVisible();
 });
+
+it("weekly review v2: in the Mental health exercise part on the day she pressed Done, under its title, beside an earlier review (nothing lost)", async () => {
+  const { saveWeeklyReview } = await import("../../data/repo");
+  const { EMPTY_WEEKLY_REVIEW } = await import("../../journal/weeklyReview");
+  const c = clock("2026-11-15T18:00:00");
+  const jk = await keyFor("fake-journal-routine-readback");
+  const me = await getDeviceId(db);
+  await saveWeekReview(jk, me, { ...EMPTY_WEEK_REVIEW, well: "Pretend Hollowfern old week" }, { date: "2026-11-15", seen: [], submittedAt: null }, true);
+  c.set("2026-11-16T10:00:00"); // Monday: last week's v2 review, Done
+  await saveWeeklyReview(jk, me, { ...EMPTY_WEEKLY_REVIEW, selfHarm: "no", fight: "yes", fightAbout: "Pretend Hollowfern dishes", more: "Pretend Hollowfern reflections" }, { date: "2026-11-09", seen: [], submittedAt: null }, true);
+
+  renderApp("/journal/read-back", TODAY);
+  const exercise = await openReadBackPart("Mental health exercise");
+  const line = "Monday 16 November · Weekly Review [11-09-2026-11-15-2026]";
+  const v2 = within(exercise).getByText(line).closest("details")!;
+  await userEvent.click(within(v2).getByText(line));
+  await waitFor(() => expect(within(v2).getByText("Pretend Hollowfern dishes")).toBeVisible());
+  expect(within(v2).getByText("Pretend Hollowfern reflections")).toBeVisible();
+  expect(within(v2).getByText("Did you fight with Oliver?")).toBeVisible();
+  expect(within(v2).queryByText(W.notSubmitted)).toBeNull();
+  const old = within(exercise).getByText(`Sunday 15 November · ${W.readBackReview}`).closest("details")!;
+  await userEvent.click(within(old).getByText(`Sunday 15 November · ${W.readBackReview}`));
+  expect(within(old).getByText("Pretend Hollowfern old week")).toBeVisible();
+});

@@ -28,7 +28,8 @@ import { useTabsStacked } from "./useTabsFit";
 import { usePhone } from "../usePhone";
 import { LearnedToday } from "../together/LearnedToday";
 import { PrivateDayTick } from "../together/PrivateDayTick";
-import { DailyLog, WeeklyReview } from "./RoutineForms";
+import { DailyLog } from "./RoutineForms";
+import { WeeklyReviewTab } from "./WeeklyReviewTab";
 import { RoutineDayLine } from "../together/RoutineDayLine";
 import { TOGETHER_WORDS } from "../together/wording";
 
@@ -67,7 +68,8 @@ const isTab = (t: string | undefined): t is JournalTabId => JOURNAL_TABS.some((x
 
 /**
  * The Journal (journal brief; Journal v2): big tabs, in her order: Mental health exercise ·
- * Morning pages · Daily check-in · Read back · Notes to myself, each at its own address (`/journal`
+ * Weekly review (v2, its own tab) · Morning pages · Daily check-in · Read back · Notes to myself,
+ * each at its own address (`/journal`
  * opens the exercise); stacked when they don't fit in a row. Once the journal is open, "Hard
  * moment" (top right, every tab) opens her notes to herself at once. Each of the first three shows a small read-only tick when that part is done
  * today, and its streak. Everything here is end-to-end encrypted. Only a CONFIRMED key shows
@@ -178,8 +180,8 @@ export function JournalPage({ today, controller = syncController }: { today: ISO
           </h2>
           {tab === "exercise" && <MentalHealthExercise jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "exercise" && <LearnedToday jk={open.jk} today={today} deviceId={open.deviceId} />}
-          {tab === "exercise" && <WeeklyReview jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "exercise" && <PrivateDayTick jk={open.jk} date={today} part="exercise" />}
+          {tab === "weekly-review" && <WeeklyReviewTab jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "morning" && <MorningPages jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && <DailyCheckIn jk={open.jk} today={today} deviceId={open.deviceId} />}
           {tab === "check-in" && (

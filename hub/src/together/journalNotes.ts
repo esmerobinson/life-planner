@@ -28,6 +28,10 @@
 //   definition (its columns, fields, steps and scale labels); without it, plainly. Research
 //   notes: that day's "What I learned" (the newest version) and the highlights made that day and
 //   not removed (bug #57: that day's own rows).
+// - Weekly review (either kind, Done pressed): ONLY the line "Weekly review done", after the cards
+//   (and "· Weekly review done" in the summary), on the day she pressed Done (Esme, 23 Nov 2026:
+//   "Oliver must see ONLY that it was done"). Never a question, an answer, a count or a yes/no,
+//   with or without the private tick. Research notes still go only on a day with a card.
 // - Check-in: a day she finished ("Checked in for today"): each question she answered.
 // - Skipped: any question whose answer is "n/a" (any case or punctuation, Esme 2026-11-09), and
 //   n/a lines or cells within an answer. A part with nothing left is left out; a day with nothing

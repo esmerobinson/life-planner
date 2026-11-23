@@ -185,6 +185,29 @@ describe("sent, with every request recorded", () => {
   });
 });
 
+describe("the daily log's challenge days (switch on, Oliver's challenges ready)", () => {
+  it("only the daily log goes there; nothing of the review, in any request", async () => {
+    const { ROUTINE_CHALLENGES } = await import("./routineChallenges");
+    const { saveDayLog } = await import("../data/repo");
+    const { COUPLE, ME } = await import("./testKit");
+    const c = clock(`${MON}T10:00:00`);
+    const fake = await signedIn(c);
+    for (const ch of [ROUTINE_CHALLENGES.schedule.id, ROUTINE_CHALLENGES.todos.id]) {
+      fake.addChallenge({ id: ch, couple_id: COUPLE, name: `Pretend ${ch}`, for_user: ME, accepted_at: "2026-11-01T10:00:00Z", breaks_on: "goal" });
+    }
+    const { jk } = await journalDay(MON, {});
+    await saveDayLog(jk, DEVICE, { schedule: "yes", scheduleNote: "", todos: "partly", todosNote: "" }, session(MON), true);
+    await saveWeeklyReview(jk, DEVICE, ANSWERS, session(LAST), true);
+    c.set("2026-11-25T10:00:00"); // the log's day is final (a day after its 3am)
+    const rec = guardedFetch(fake.fetch, () => FORBIDDEN, c.now);
+    await sendToTogether({ fetch: rec.fetch, now: c.now, routineChallenges: true, batchPauseMs: 0 });
+    expect(fake.dayRow(ROUTINE_CHALLENGES.schedule.id, MON)).toBeTruthy(); // the path really ran
+    expect(liveNote(fake, MON)).toBe("Weekly review done\n\n## Mental Health Exercise\n\nWeekly review done");
+    expect(rec.violations).toEqual([]);
+    expect(JSON.stringify(fake.requests)).not.toContain("Sablewick");
+  });
+});
+
 describe("a day already sent with the earlier review's words", () => {
   it("the next automatic run takes them out, leaving everything else of the day as it was", async () => {
     // What an earlier build sent: the old review's questions and answers. Built here by hand from
