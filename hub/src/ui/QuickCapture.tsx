@@ -188,7 +188,10 @@ export function QuickCapture({
               if (isImePick(e, composition.current)) return;
               composition.current = "";
               e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
+              const form = e.currentTarget.form;
+              // requestSubmit: Safari 16 and later; an older WebKit saves straight away.
+              if (form && typeof form.requestSubmit === "function") form.requestSubmit();
+              else void save(e);
             }}
             onChange={(e) => {
               setAdded(false);
