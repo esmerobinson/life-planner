@@ -40,7 +40,8 @@ it("a done weekly review goes; the week's to-dos and their notes never do", asyn
   c.set("2026-11-16T09:00:00");
   expect(await sendToTogether({ fetch: rec.fetch, now: c.now })).toMatchObject({ kind: "ok" });
   expect(rec.violations).toEqual([]);
-  // It did send the review itself.
-  expect(liveNote(fake, SUN)).toContain("Pretend review words");
+  // It did send that the review was done (only that: weekly review v2).
+  expect(liveNote(fake, SUN)).toContain("Weekly review done");
+  expect(liveNote(fake, SUN)).not.toContain("Pretend review words");
   expect(fake.todos.size + fake.events.size).toBe(0);
 });

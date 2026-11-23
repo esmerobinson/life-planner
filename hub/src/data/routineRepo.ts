@@ -25,8 +25,9 @@ import {
   DAY_LOG_RULES, MAX_LOG_NOTE, MAX_REVIEW_TEXT, mergeVersions, seenToken, WEEK_REVIEW_RULES, dayLogFields, weekReviewFields,
   type DayLogFields, type FormDay, type FormRules, type FormVersion, type RawVersion, type WeekReviewFields,
 } from "../journal/routine";
+import { WEEKLY_REVIEW_RULES, WEEKLY_TEXTS, weeklyReviewFields, type WeeklyReviewFields } from "../journal/weeklyReview";
 
-export type { DayLogFields, FormDay, FormVersion, WeekReviewFields };
+export type { DayLogFields, FormDay, FormVersion, WeekReviewFields, WeeklyReviewFields };
 
 /** Thrown for answers longer than a box holds. */
 export const TOO_LONG = "That's too long to save. Nothing was changed.";
@@ -56,6 +57,13 @@ const WEEK_REVIEW: Spec<WeekReviewFields> = {
   rules: WEEK_REVIEW_RULES,
   fields: weekReviewFields as (e: never) => WeekReviewFields,
   tooLong: (f) => [f.well, f.inWay, f.ifThen].some((t) => t.length > MAX_REVIEW_TEXT),
+};
+
+const WEEKLY_REVIEW: Spec<WeeklyReviewFields> = {
+  kind: "weekly-review",
+  rules: WEEKLY_REVIEW_RULES,
+  fields: weeklyReviewFields as (e: never) => WeeklyReviewFields,
+  tooLong: (f) => (Object.keys(WEEKLY_TEXTS) as (keyof typeof WEEKLY_TEXTS)[]).some((k) => f[k].length > WEEKLY_TEXTS[k]),
 };
 
 const suffixOf = (row: JournalRow) => row.id.slice(`${row.kind}:${row.date}:`.length);
@@ -212,18 +220,78 @@ export async function listWeekReviews(jk: JournalKey, before: ISODate): Promise<
   return out;
 }
 
-/**
- * The days a weekly review was done (Done pressed, something answered): Mental health work, like a
- * card done (the Journal's green row, its week bars, the farm). One per week: the day she pressed Done.
- */
-export async function reviewDoneDays(jk: JournalKey): Promise<Set<ISODate>> {
-  const out = new Set<ISODate>();
-  for (const w of await listWeekReviews(jk, "9999-12-31")) if (w.done && w.day) out.add(w.day);
-  return out;
-}
-
 export const saveWeekReview = (jk: JournalKey, deviceId: string, fields: WeekReviewFields, session: FormSession, submit = false) =>
   saveForm(jk, WEEK_REVIEW, deviceId, fields, session, submit);
 
 export const removeWeekReviewVersion = (jk: JournalKey, deviceId: string, version: FormVersion<WeekReviewFields>) =>
   removeForm(jk, WEEK_REVIEW, deviceId, version);
+
+// ---- the weekly review v2 (its own tab; journal/weeklyReview.ts) ---------------------------------
+
+/** A week's v2 review (by its Monday): the newest version, and every other one not replaced. */
+export async function readWeeklyReview(jk: JournalKey, monday: ISODate): Promise<FormDay<WeeklyReviewFields>> {
+  return merged(jk, WEEKLY_REVIEW, (await db.journal.where("date").equals(monday).toArray()).filter((r) => r.kind === "weekly-review"));
+}
+
+/** Every week with a v2 review, by its Monday, newest first (empty weeks left out). */
+export async function listWeeklyReviews(jk: JournalKey): Promise<({ week: ISODate } & FormDay<WeeklyReviewFields>)[]> {
+  const rows = await rowsOf("weekly-review");
+  const out: ({ week: ISODate } & FormDay<WeeklyReviewFields>)[] = [];
+  for (const week of [...new Set(rows.map((r) => r.date))].sort((a, b) => b.localeCompare(a))) {
+    const day = await merged(jk, WEEKLY_REVIEW, rows.filter((r) => r.date === week));
+    if (shows(day, WEEKLY_REVIEW.rules)) out.push({ ...day, week });
+  }
+  return out;
+}
+
+/** Only ever filed under the week's Monday (the week is chosen, so the day written can't say it). */
+export async function saveWeeklyReview(jk: JournalKey, deviceId: string, fields: WeeklyReviewFields, session: FormSession, submit = false): Promise<string> {
+  if (weekOf(session.date) !== session.date) throw new Error("A weekly review is filed under its week's Monday.");
+  return saveForm(jk, WEEKLY_REVIEW, deviceId, fields, session, submit);
+}
+
+export const removeWeeklyReviewVersion = (jk: JournalKey, deviceId: string, version: FormVersion<WeeklyReviewFields>) =>
+  removeForm(jk, WEEKLY_REVIEW, deviceId, version);
+
+// ---- both kinds of weekly review, together ---------------------------------------------------------
+
+/**
+ * One week's reviews: the v2 one and the earlier one (either, both or, never, neither). `day`: the
+ * one day the week counts as Mental health work (null: neither is done). Old and new never count
+ * twice: a done v2 review is the week's, else a done earlier one.
+ */
+export interface ReviewWeek {
+  week: ISODate;
+  v2?: FormDay<WeeklyReviewFields>;
+  v1?: FormDay<WeekReviewFields>;
+  day: ISODate | null;
+}
+
+/** Every week with a review of either kind, by its Monday, newest first. */
+export async function listReviewWeeks(jk: JournalKey, before: ISODate = "9999-12-31"): Promise<ReviewWeek[]> {
+  const byWeek = new Map<ISODate, ReviewWeek>();
+  const at = (week: ISODate) => byWeek.get(week) ?? (byWeek.set(week, { week, day: null }), byWeek.get(week)!);
+  for (const r of await listWeeklyReviews(jk)) if (r.week < before) at(r.week).v2 = r;
+  for (const r of await listWeekReviews(jk, before)) at(r.week).v1 = r;
+  for (const w of byWeek.values()) {
+    const counts = w.v2?.done ? w.v2 : w.v1?.done ? w.v1 : null;
+    w.day = counts ? counts.day : null;
+  }
+  return [...byWeek.values()].sort((a, b) => b.week.localeCompare(a.week));
+}
+
+/** Whether the week (by its Monday) has a done review of either kind. */
+export async function reviewWeekDone(jk: JournalKey, monday: ISODate): Promise<boolean> {
+  return (await listReviewWeeks(jk)).some((w) => w.week === monday && w.day !== null);
+}
+
+/**
+ * The days a weekly review was done (Done pressed, something answered): Mental health work, like a
+ * card done (the Journal's green row, its week bars, the farm). One per week, whichever kind: the
+ * day she pressed Done.
+ */
+export async function reviewDoneDays(jk: JournalKey): Promise<Set<ISODate>> {
+  const out = new Set<ISODate>();
+  for (const w of await listReviewWeeks(jk)) if (w.day) out.add(w.day);
+  return out;
+}

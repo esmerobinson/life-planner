@@ -39,7 +39,7 @@
 
 import { db } from "../data/db";
 import {
-  answeredPrompts, highlightRows, listExerciseEntries, listWeekReviews, readCheckinDay, readSharePrivate, readExerciseCards, readExerciseProgress, readLearned,
+  answeredPrompts, highlightRows, listExerciseEntries, listReviewWeeks, readCheckinDay, readSharePrivate, readExerciseCards, readExerciseProgress, readLearned,
   unreadableExerciseDates, type WeekReviewFields,
   type ExerciseResponse, type PartAnswer,
 } from "../data/repo";
@@ -75,6 +75,13 @@ export interface DayNote {
   full: string;
   /** Its words in the summary line: "N exercises" (never the titles), or "Check In". */
   summary: string;
+  /**
+   * The exercise part as an earlier build could have sent it, with the first weekly review's
+   * questions (and answers) in it: what an automatic run may replace with this note, if one of
+   * these is exactly what is there (weekly review v2: only "Weekly review done" goes). `answers`:
+   * the cards went with her answers (so `full` replaces it), else titles only (`titles`).
+   */
+  earlier?: { summary: string; text: string; answers: boolean }[];
 }
 
 /**
@@ -133,18 +140,30 @@ export function researchBullets(learned: string, highlights: { words: string; no
 }
 
 /**
+ * Weekly review v2 (Esme, 23 Nov 2026): "Oliver must see ONLY that it was done." All a done weekly
+ * review (either kind) ever puts in Together: this line, in the exercise part and in the summary.
+ * Never an answer, a question, a count or a yes or no; the same whatever she answered, whether
+ * the day is ticked private or not.
+ */
+export const REVIEW_DONE = "Weekly review done";
+
+/**
  * The exercise part's words in the summary line: how many cards she did ("1 exercise", "6
- * exercises"), and "Weekly review" on a day with one (PROVISIONAL wording).
+ * exercises"), and "Weekly review done" on a day with one.
  */
 export const exerciseSummary = (cards: number, review = false): string =>
-  [cards <= 0 ? "" : cards === 1 ? "1 exercise" : `${cards} exercises`, review ? REVIEW_SUMMARY : ""].filter((x) => x !== "").join(SEP);
+  [cards <= 0 ? "" : cards === 1 ? "1 exercise" : `${cards} exercises`, review ? REVIEW_DONE : ""].filter((x) => x !== "").join(SEP);
 
-/** The weekly review's heading in the note and its words in the summary line (PROVISIONAL, Esme 16 Nov 2026). */
-export const REVIEW_HEADING = "### Weekly review";
-export const REVIEW_SUMMARY = "Weekly review";
+// ---- what an earlier build sent: ONLY to recognise it in Together and replace it -----------------
 
-/** A weekly review's questions and her answers, as the note writes them. */
-export function reviewQAs(f: WeekReviewFields): QA[] {
+/** The first review's heading and summary words as an earlier build sent them. */
+const EARLIER_REVIEW_HEADING = "### Weekly review";
+const EARLIER_REVIEW_SUMMARY = "Weekly review";
+const earlierSummary = (cards: number): string =>
+  [cards <= 0 ? "" : cards === 1 ? "1 exercise" : `${cards} exercises`, EARLIER_REVIEW_SUMMARY].filter((x) => x !== "").join(SEP);
+
+/** The first review's questions and her answers, as an earlier build wrote them. */
+function reviewQAs(f: WeekReviewFields): QA[] {
   const w = ROUTINE_WORDS;
   const n = weekReviewFields(f);
   return [
@@ -159,27 +178,36 @@ export function reviewQAs(f: WeekReviewFields): QA[] {
 /** A card's own heading in the note. */
 export const CARD_HEADING = "### ";
 
-/**
- * The exercise part (Esme, 2026-11-09: her days have 5-8 cards): its heading, research notes,
- * then each card as a block: "### <title>", then its questions and answers (blank lines between
- * them, and between cards). A card with nothing kept (all n/a), or on a titles-only or private
- * day, still shows its title (and, titles-only, its questions).
- */
-export function exerciseSection(
-  cards: { title: string; qas: QA[] }[], research: string[], answers: boolean, review?: QA[] | null, reviewAnswers = answers,
-): string {
-  if (cards.length === 0 && !review) return "";
+/** The cards' blocks: the heading, research notes (with answers, on a day with a card), each card. */
+function cardBlocks(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean): string[] {
   const blocks = [PART_HEADINGS.exercise];
   if (answers && research.length > 0 && cards.length > 0) blocks.push([RESEARCH_HEADING, ...research.map((b) => `${BULLET}${b}`)].join("\n"));
   for (const c of cards) {
     const qa = qaBlock(kept(c.qas), answers);
     blocks.push(qa ? `${CARD_HEADING}${oneLine(c.title)}\n${qa}` : `${CARD_HEADING}${oneLine(c.title)}`);
   }
-  // The weekly review (Mental health work), after the cards: like a card, its heading always.
-  if (review) {
-    const qa = qaBlock(kept(review), answers && reviewAnswers);
-    blocks.push(qa ? `${REVIEW_HEADING}\n${qa}` : REVIEW_HEADING);
-  }
+  return blocks;
+}
+
+/**
+ * The exercise part (Esme, 2026-11-09: her days have 5-8 cards): its heading, research notes,
+ * then each card as a block: "### <title>", then its questions and answers (blank lines between
+ * them, and between cards). A card with nothing kept (all n/a), or on a titles-only or private
+ * day, still shows its title (and, titles-only, its questions). A done weekly review adds only
+ * "Weekly review done" after the cards (v2: nothing of it, with or without answers).
+ */
+export function exerciseSection(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean, review = false): string {
+  if (cards.length === 0 && !review) return "";
+  const blocks = cardBlocks(cards, research, answers);
+  if (review) blocks.push(REVIEW_DONE);
+  return blocks.join("\n\n");
+}
+
+/** The exercise part with the first review as an earlier build wrote it (only to recognise it). */
+function earlierSection(cards: { title: string; qas: QA[] }[], research: string[], answers: boolean, review: QA[], reviewAnswers: boolean): string {
+  const blocks = cardBlocks(cards, research, answers);
+  const qa = qaBlock(kept(review), answers && reviewAnswers);
+  blocks.push(qa ? `${EARLIER_REVIEW_HEADING}\n${qa}` : EARLIER_REVIEW_HEADING);
   return blocks.join("\n\n");
 }
 
@@ -378,19 +406,25 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
   const { entries, unreadable } = await listExerciseEntries(jk, today);
   if (unreadable > 0) for (const d of await unreadableExerciseDates(jk)) bad.add(d);
   for (const d of bad) if (d < today) unknown.add(d);
-  // Each week's review she pressed Done on, under the day she pressed it (review C1; a draft never
-  // goes). A week with a review row that won't open here goes titles-only on that day. Its words
-  // are held back (questions only) if any day of that week holding a version of it is ticked
-  // private: a version may have been written under that day's tick.
-  const reviews = new Map<ISODate, { qas: QA[]; partial: boolean; words: boolean }>();
+  // Each week's review she pressed Done on (either kind; one per week, never both: listReviewWeeks),
+  // under the day she pressed it (review C1; a draft never goes). It adds only "Weekly review done"
+  // (v2). A week with a review row that won't open here holds that day to titles only.
+  const reviews = new Map<ISODate, { partial: boolean }>();
+  // The first kind's done reviews, on their own Done day, as an earlier build sent them (with the
+  // questions, and her words unless a day of that week holding a version was ticked private):
+  // only so an automatic run can recognise that in Together and replace it.
+  const earlier = new Map<ISODate, { qas: QA[]; words: boolean }>();
   const reviewRows = await db.journal.where("kind").equals("week-review").toArray();
-  for (const r of await listWeekReviews(jk, today)) {
-    if (!r.done || !r.day || !(r.day < today)) continue;
-    const days = new Set(reviewRows.filter((x) => mondayOf(x.date) === r.week).map((x) => x.date));
-    days.delete(r.day); // the day itself: its own tick decides, as for every part
+  for (const w of await listReviewWeeks(jk, today)) {
+    const unreadable = (w.v1?.unreadable ?? 0) + (w.v2?.unreadable ?? 0);
+    if (w.day && w.day < today) reviews.set(w.day, { partial: unreadable > 0 || (reviews.get(w.day)?.partial ?? false) });
+    const r = w.v1;
+    if (!r?.done || !r.day || !(r.day < today)) continue;
+    const days = new Set(reviewRows.filter((x) => mondayOf(x.date) === w.week).map((x) => x.date));
+    days.delete(r.day);
     let words = true;
     for (const d of days) if ((await readSharePrivate(jk, d)).exercise) words = false;
-    reviews.set(r.day, { qas: reviewQAs(r.fields), partial: r.unreadable > 0, words });
+    earlier.set(r.day, { qas: reviewQAs(r.fields), words });
   }
   if (ids.size === 0 && reviews.size === 0) return { notes, unknown, partial };
   const twins = await noteTwins(jk);
@@ -422,10 +456,20 @@ async function exerciseDays(jk: JournalKey, today: ISODate): Promise<DayNotes | 
       done.push({ title, qas: entry ? cardQAs(entry, card?.parts) : [] });
     }
     const research = researchBullets(learned.text, hl.list);
+    const old = earlier.get(date);
     notes.set(date, {
-      titles: exerciseSection(done, [], false, review?.qas),
-      full: exerciseSection(done, research, true, review?.qas, review?.words ?? true),
+      titles: exerciseSection(done, [], false, !!review),
+      full: exerciseSection(done, research, true, !!review),
       summary: exerciseSummary(done.length, !!review),
+      ...(old
+        ? {
+            earlier: [
+              { summary: earlierSummary(done.length), text: earlierSection(done, research, true, old.qas, old.words), answers: true },
+              { summary: earlierSummary(done.length), text: earlierSection(done, research, true, old.qas, false), answers: true },
+              { summary: earlierSummary(done.length), text: earlierSection(done, [], false, old.qas, false), answers: false },
+            ],
+          }
+        : {}),
     });
   }
   return { notes, unknown, partial };

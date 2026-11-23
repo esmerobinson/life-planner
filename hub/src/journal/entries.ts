@@ -5,6 +5,7 @@
 import { isObj, isStr } from "../data/validate";
 import { isHighlightEntry } from "./highlights";
 import { isDayLogEntry, isWeekReviewEntry } from "./routine";
+import { isWeeklyReviewEntry } from "./weeklyReview";
 import { MAX_CARD_DAY, MAX_CARD_ID, MAX_PARTS, PART_KINDS, readStoredSet, type PartKind, type PartValue } from "./exercise";
 
 /** One finished morning page ("I'm done"). Hidden for MORNING_LOCK_DAYS from its date. */
@@ -308,6 +309,8 @@ export const ENTRY_CHECK = {
   // One version of a day's daily log, or of a week's review (journal/routine.ts).
   "day-log": isDayLogEntry,
   "week-review": isWeekReviewEntry,
+  // One version of a week's review in its own tab (v2; journal/weeklyReview.ts).
+  "weekly-review": isWeeklyReviewEntry,
 } as const;
 
 /** Words in a text (for "N of 1,000 words"). */

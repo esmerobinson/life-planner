@@ -42,8 +42,8 @@ export interface WeekReviewFields {
   minDays: Weekday[];
 }
 
-/** What every version row of either kind also holds. */
-interface VersionStamp {
+/** What every version row of either kind (and the v2 review: journal/weeklyReview.ts) also holds. */
+export interface VersionStamp {
   v: 1;
   /** When she pressed Done (null: not yet). An edit after Done keeps it. */
   submittedAt: number | null;

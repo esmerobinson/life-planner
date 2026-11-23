@@ -305,7 +305,10 @@ export interface FileRow {
  * - "learned"  `learned:<date>:<deviceId>` one device's "what I learned today" words (Mental health exercise)
  * - "day-log"  `day-log:<date>:<deviceId>_<vid>` one version of a day's daily log (schedule / to-dos;
  *                                          journal/routine.ts, data/routineRepo.ts)
- * - "week-review" `week-review:<date>:<deviceId>_<vid>` one version of a week's Sunday review
+ * - "week-review" `week-review:<date>:<deviceId>_<vid>` one version of a week's Sunday review (the
+ *                                          first one: read, never offered for new weeks)
+ * - "weekly-review" `weekly-review:<monday>:<deviceId>_<vid>` one version of a week's review in its
+ *                                          own tab (v2; journal/weeklyReview.ts), filed under its Monday
  *
  * An app version that doesn't know a kind refuses the row (validJournal), so sync keeps it in
  * quarantine until an update can read it: never stored, never fatal.
@@ -313,7 +316,7 @@ export interface FileRow {
 export const JOURNAL_KINDS = [
   "page", "photo", "draft", "answer", "set", "settings", "verifier", "morning", "checkin", "cards", "exercise", "stars",
   "exercise-entry", "note", "note-read", "keywrap", "share", "learned",
-  "highlight", "day-log", "week-review",
+  "highlight", "day-log", "week-review", "weekly-review",
 ] as const;
 export type JournalKind = (typeof JOURNAL_KINDS)[number];
 

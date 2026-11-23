@@ -636,17 +636,44 @@ async function sendDay(ctx: Ctx, date: ISODate, parts: Record<Part, PartView>): 
     return out.length ? { note: dayNote(out), parts: held } : null;
   };
 
+  /**
+   * Weekly review v2 (Esme, 23 Nov 2026: Oliver sees only that it was done): a day whose note in
+   * Together is exactly what an earlier build sent with the first weekly review's questions (and
+   * answers) in it gets the same note with only "Weekly review done" instead. Recognised only by
+   * its hash, built from what is here now, so everything else in it is unchanged: it only takes
+   * words out. null: not such a day.
+   */
+  const earlierReview = async (): Promise<Want> => {
+    const ex = parts.exercise;
+    if (!rec?.live || rec.hash === "" || !ex || ex === "unknown" || !ex.note.earlier) return null;
+    const ci = parts.checkin;
+    const checkins: (string | null)[] = ci && ci !== "unknown" ? [ci.note.full, ci.note.titles, null] : [null];
+    for (const old of ex.note.earlier) {
+      for (const c of checkins) {
+        const with_ = (exText: string, exSummary: string) => [
+          { summary: exSummary, text: exText },
+          ...(c !== null && ci && ci !== "unknown" ? [{ summary: ci.note.summary, text: c }] : []),
+        ];
+        if ((await ctx.hash(dayNote(with_(old.text, old.summary)))) !== rec.hash) continue;
+        const now = old.answers ? ex.note.full : ex.note.titles;
+        return { note: dayNote(with_(now, ex.note.summary)), parts: { ...rec.parts } };
+      }
+    }
+    return null;
+  };
+
   /** The note that may go right now (the ticks are read again each time: bug #42). */
   const want = async (): Promise<Want> => {
     const ticks = await readSharePrivate(ctx.jk!, date);
     const hide = !!rec?.live && PARTS.some((p) => rec.parts[p] === "answers" && ticks[p]);
     if (constrained) return hide ? titlesOnly() : "skip";
     if (ctx.mode === "hide") {
-      // An automatic run only takes words out: a private tick (titles and questions only) or a
-      // day with nothing left (marked deleted). Anything new waits for "Send now".
+      // An automatic run only takes words out: a private tick (titles and questions only), a day
+      // with nothing left (marked deleted), or an earlier build's weekly review words. Anything
+      // new waits for "Send now".
       if (!rec?.live) return "skip";
       if (PARTS.every((p) => parts[p] === null)) return null;
-      return hide ? titlesOnly() : "skip";
+      return hide ? titlesOnly() : ((await earlierReview()) ?? "skip");
     }
     // A press: answers at once (after a Replace, only once sync has caught up).
     const due = !ctx.restoredUnpulled;
