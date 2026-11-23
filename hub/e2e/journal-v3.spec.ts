@@ -47,7 +47,7 @@ for (const width of [1280, 390]) {
     test("the tabs never scroll sideways; stacked as full-width rows on the phone", async ({ page }) => {
       await unlocked(page);
       const nav = tabsNav(page);
-      await expect(nav.getByRole("link")).toHaveCount(5);
+      await expect(nav.getByRole("link")).toHaveCount(6); // with the Weekly review tab (v2)
       const m = await nav.evaluate((el) => ({ s: el.scrollWidth, c: el.clientWidth, stacked: el.classList.contains("is-stacked") }));
       expect(m.s).toBeLessThanOrEqual(m.c);
       if (width === 390) {
