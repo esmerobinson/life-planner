@@ -4,7 +4,7 @@ import { pageDate } from "./helpers";
 
 /* "What I did" (Esme, 19 Nov 2026) in a real browser, at the Mac's width and the phone's: a
    to-do tick asks "What did you do?" (Save, Skip, Escape keeps the typing), the log by week, ⌘K /
-   🔍 search finds a note, the Sunday weekly review shows "Completed this week", and none of it
+   🔍 search finds a note, the weekly review (its own tab) shows "Completed this week", and none of it
    goes to Together (a FAKE Together server, made-up address and words). The Mac app's file
    bridge is pretended with an init script. All data is fictional. Set SHOTS_DIR for screenshots. */
 
@@ -202,7 +202,7 @@ for (const width of [1280, 390]) {
       await expect(page.locator('[id="did-tax:e2"]')).toHaveClass(/is-target/);
     });
 
-    test("the Sunday weekly review shows Completed this week; none of it goes to Together", async ({ page }) => {
+    test("the weekly review shows Completed this week; none of it goes to Together", async ({ page }) => {
       test.setTimeout(120_000);
       const fake = new FakeSupabase();
       fake.addUser(EMAIL, PASSWORD, ME, COUPLE);
@@ -241,7 +241,7 @@ for (const width of [1280, 390]) {
         item("mapping", tuesday, { title: "Pretend Quorrel mapping", status: "done", completedAt: tuesday, did: [{ id: "e1", on: tuesday, note: "Pretend drew the Quorrel coast", files: [{ name: "quorrel.png", folder: "~/Desktop/Art" }] }], areaId: "art" }),
       ]);
 
-      await page.goto("/journal/exercise");
+      await page.goto("/journal/weekly-review");
       const review = page.getByRole("region", { name: "Weekly review" });
       const done = review.getByRole("list", { name: "Completed this week" });
       await expect(done.getByRole("listitem")).toHaveCount(1);
@@ -255,7 +255,7 @@ for (const width of [1280, 390]) {
       await review.getByLabel("What went well?").fill("Pretend Vellwick week went well");
       await review.getByLabel("What went well?").blur();
       await review.getByRole("button", { name: "Done" }).click();
-      await expect(review.getByText("Weekly review done for this week")).toBeVisible();
+      await expect(review.getByText("Weekly review done", { exact: true })).toBeVisible();
 
       await page.goto("/sync");
       const box = page.getByRole("region", { name: "Together" });
@@ -268,7 +268,9 @@ for (const width of [1280, 390]) {
       await box.getByRole("button", { name: "Send now" }).click();
       await expect(box.getByText(/^Last copied/)).toBeVisible();
       await expect.poll(() => fake.dayRows(CHALLENGE).length).toBe(1);
-      expect(String(fake.dayRows(CHALLENGE)[0]!.note)).toContain("Pretend Vellwick week went well");
+      // Only that it was done (weekly review v2): never her words.
+      expect(String(fake.dayRows(CHALLENGE)[0]!.note)).toBe("Weekly review done\n\n## Mental Health Exercise\n\nWeekly review done");
+      expect(JSON.stringify(fake.requests)).not.toContain("Vellwick");
       expect(fake.dayRows(CHALLENGE)[0]!.day).toBe(day);
       // Not a word of the list, in any request.
       const everything = JSON.stringify(fake.requests);

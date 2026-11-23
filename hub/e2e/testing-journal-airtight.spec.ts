@@ -1143,7 +1143,7 @@ test.describe("Daily log across 3am at 1280px", () => {
   });
 });
 
-// ================================================================ Weekly review (Sundays)
+// ================================================================ Weekly review (its own tab, v2)
 
 const REVIEW = {
   well: "Pretend Mossgrove went well: the made-up garden got watered",
@@ -1161,23 +1161,32 @@ function nextSundayNoon(): Date {
   return d;
 }
 
+/** The review's title for the week of the app's today (+ offset days), as the app writes it. */
+async function reviewTitleOf(page: Page, offset = 0): Promise<string> {
+  return page.evaluate(async (off) => {
+    const at = (p: string): Promise<any> => import(/* @vite-ignore */ p);
+    const dates = await at("/src/domain/dates.ts");
+    const wr = await at("/src/journal/weeklyReview.ts");
+    return wr.reviewTitle(dates.addDays(dates.todayISO(), off)) as string;
+  }, offset);
+}
+
 async function reviewShown(where: Locator) {
-  const items = where.locator("ol.routine-answers > li");
-  await expect(items).toHaveCount(5);
-  await expect(items.locator(".journal-past-answer")).toHaveText([REVIEW.well, REVIEW.inWay, "7 out of 10", REVIEW.ifThen, "Monday, Thursday"]);
+  for (const a of [REVIEW.well, REVIEW.inWay, "7 out of 10", REVIEW.ifThen, "Monday, Thursday"]) await expect(where.getByText(a, { exact: true })).toBeVisible();
 }
 
 test.describe("Weekly review at 1280px", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test(`${ENGINE}: on Sunday, typed and paused, it survives a reload; Done counts as Mental health work and is in Read back`, async ({ page }) => {
+  test(`${ENGINE}: on Sunday, in its own tab, typed and paused, it survives a reload; Done counts as Mental health work and is in Read back`, async ({ page }) => {
     test.setTimeout(150_000);
     await page.clock.install({ time: nextSundayNoon() });
-    await unlocked(page, "/journal/exercise");
+    await unlocked(page, "/journal/weekly-review");
     const { long } = await appDay(page);
+    const title = await reviewTitleOf(page);
     const s = reviewBox(page);
-    await expect(s.getByRole("heading", { name: "It's Sunday: your weekly review" })).toBeVisible();
-    const away = s.getByRole("heading", { name: "It's Sunday: your weekly review" });
+    await expect(s.getByRole("heading", { name: title })).toBeVisible();
+    const away = s.getByRole("heading", { name: title });
     await typeLikeAPerson(page, s.getByLabel("What went well?"), REVIEW.well, away);
     await typeLikeAPerson(page, s.getByLabel("What got in the way?"), REVIEW.inWay, away);
     await s.getByRole("group", { name: "Am I living my values? (1–10)" }).getByRole("button", { name: "7", exact: true }).click();
@@ -1193,14 +1202,14 @@ test.describe("Weekly review at 1280px", () => {
     await expect(reviewBox(page).getByLabel("Thursday")).toBeChecked();
 
     await reviewBox(page).getByRole("button", { name: "Done" }).click();
-    await expect(reviewBox(page).getByText("Weekly review done for this week")).toBeVisible();
+    await expect(reviewBox(page).getByText("Weekly review done", { exact: true })).toBeVisible();
     await reviewShown(reviewBox(page));
     await tabDone(page, "Mental health exercise"); // Mental health work: the green row ticks
 
     await page.reload();
     await reviewShown(reviewBox(page));
     await tabDone(page, "Mental health exercise");
-    await reviewShown(await readBackItem(page, "Mental health exercise", `${long} · Weekly review`));
+    await reviewShown(await readBackItem(page, "Mental health exercise", `${long} · ${title}`));
     await noWordsInClear(page, [REVIEW.well, REVIEW.inWay, REVIEW.ifThen, "Mossgrove"]);
   });
 });
@@ -1213,9 +1222,10 @@ test.describe("Weekly review on a weekday at 1280px (review I3)", () => {
     const thursday = nextSundayNoon();
     thursday.setDate(thursday.getDate() - 3);
     await page.clock.install({ time: thursday });
-    await unlocked(page, "/journal/exercise");
+    await unlocked(page, "/journal/weekly-review");
     const s = reviewBox(page);
-    await s.getByRole("button", { name: "Weekly review (any day this week)" }).click();
+    // Thursday, last week's not done: last week's opens.
+    await expect(s.getByRole("heading", { name: await reviewTitleOf(page, -7) })).toBeVisible();
     const box = s.getByLabel("What went well?");
     await box.click();
     await box.pressSequentially("Pretend Brackenfold first thought", { delay: 25 });
