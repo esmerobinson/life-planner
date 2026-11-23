@@ -185,12 +185,29 @@ for (const width of [390, 1280]) {
   test.describe(`the Add button at ${width}px`, () => {
     test.use({ viewport: { width, height: width === 390 ? 844 : 800 } });
 
-    test("disabled when empty; a tap saves with the chips, clears, stays open, keeps focus, says Added", async ({ page }) => {
+    test("always there; a tap saves with the chips, clears, stays open, keeps focus, says Added", async ({ page }) => {
       await home(page);
       await page.getByRole("button", { name: "Add", exact: true }).click();
       const add = sheet(page).getByRole("button", { name: "Add to Inbox" });
       await expect(add).toHaveText("Add");
-      await expect(add).toBeDisabled();
+      // Esme, 2026-11-23: "the submit button needs to be there": the plain primary pill even
+      // with the box empty, not the greyed-out disabled look.
+      await expect(add).toBeEnabled();
+      await expect(add).toBeVisible();
+      const look = await add.evaluate((el) => {
+        const probe = document.createElement("button");
+        document.body.append(probe);
+        const want = getComputedStyle(probe);
+        const got = getComputedStyle(el);
+        const r = { bg: got.backgroundColor === want.backgroundColor, color: got.color === want.color };
+        probe.remove();
+        return r;
+      });
+      expect(look).toEqual({ bg: true, color: true });
+      // A tap with nothing typed: nothing added, the focus stays in the box.
+      await add.click();
+      await expect(box(page)).toBeFocused();
+      await expect(sheet(page).getByRole("status")).toHaveCount(0);
       // Just after the box: on its row, or right under it.
       const b = (await box(page).boundingBox())!;
       const a = (await add.boundingBox())!;
@@ -209,7 +226,7 @@ for (const width of [390, 1280]) {
       await expect(sheet(page).getByRole("status")).toHaveText("Added");
       await expect(box(page)).toHaveValue("");
       await expect(box(page)).toBeFocused();
-      await expect(add).toBeDisabled();
+      await expect(add).toBeEnabled();
       await expect(sheet(page)).toBeVisible();
       // Focus never left the box during the tap (the phone's keyboard stays up).
       await page.keyboard.type("Pretend second tap");
@@ -227,6 +244,49 @@ for (const width of [390, 1280]) {
       await expect(page.getByRole("list", { name: "Today" }).getByText("Pretend tapped Add")).toBeVisible();
       await page.goto("/inbox");
       await expect(page.getByText("Pretend second tap")).toBeVisible();
+      await expect(page.getByText("Pretend tapped Add")).toHaveCount(1);
+    });
+
+    // Esme, 2026-11-23: "pressing enter on keyboard doesnt submit really".
+    test("Return adds: from the box, from the Time field, and while a Latin word is still being composed", async ({ page, browserName }) => {
+      await home(page);
+      await page.getByRole("button", { name: "Add", exact: true }).click();
+      await page.keyboard.type("Pretend return one");
+      await page.keyboard.press("Enter");
+      await expect(sheet(page).getByRole("status")).toHaveText("Added");
+      await expect(box(page)).toHaveValue("");
+      await expect(box(page)).toBeFocused();
+
+      // Two fields (Time open): Return in either still adds.
+      await page.keyboard.type("Pretend return two");
+      await sheet(page).getByRole("button", { name: "Time" }).click();
+      const time = sheet(page).getByLabel("Time", { exact: true });
+      await time.fill("09:30");
+      await time.press("Enter");
+      await expect(box(page)).toHaveValue("");
+      await expect(sheet(page).getByRole("status")).toHaveText("Added");
+
+      // A word the keyboard still holds as composing (as iOS predictive text can): Return adds,
+      // once. (Composing needs Chrome's DevTools protocol; the unit tests cover the key itself.)
+      const composing = browserName === "chromium";
+      if (composing) {
+        await box(page).focus();
+        await page.keyboard.type("Pretend return ");
+        const cdp = await page.context().newCDPSession(page);
+        await cdp.send("Input.imeSetComposition", { text: "three", selectionStart: 5, selectionEnd: 5 });
+        await expect(box(page)).toHaveValue("Pretend return three");
+        await page.keyboard.press("Enter");
+        await expect(box(page)).toHaveValue("");
+        await expect(sheet(page).getByRole("status")).toHaveText("Added");
+      }
+
+      await page.keyboard.press("Escape");
+      if (await sheet(page).count()) await sheet(page).getByRole("button", { name: "Close" }).click();
+      await expect(page.getByRole("list", { name: "Today" }).getByText("Pretend return two")).toBeVisible();
+      await page.goto("/inbox");
+      for (const t of ["Pretend return one", "Pretend return two", ...(composing ? ["Pretend return three"] : [])]) {
+        await expect(page.getByText(t, { exact: true })).toHaveCount(1);
+      }
     });
   });
 }

@@ -34,6 +34,18 @@ export interface QuickDraft {
 
 const EMPTY: QuickDraft = { text: "", day: null, time: "", timeOn: false };
 
+/** Letters only an IME picks for (Japanese kana, CJK ideographs, Hangul, Bopomofo). */
+const IME_SCRIPT = /[\u3040-\u30ff\u3100-\u312f\u31a0-\u31ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\u1100-\u11ff\u3130-\u318f\uff66-\uff9f]/;
+
+/** A Return that a real IME (Japanese, Chinese, Korean) uses to pick its characters: keyCode 229
+ *  with those letters in the composition. Chrome sends it while composing; Safari and the Mac's
+ *  WebKit just after the composition ends, so isComposing alone misses it there. iOS predictive
+ *  text and autocorrect can mark a plain Return as composing too (Esme, 2026-11-23: "pressing
+ *  enter on keyboard doesnt submit really"): that one adds. */
+export function isImePick(e: { keyCode: number }, composition: string): boolean {
+  return e.keyCode === 229 && IME_SCRIPT.test(composition);
+}
+
 /** The kept draft (an empty one if there is none, it can't be read, or storage is blocked). */
 export function readQuickDraft(): QuickDraft {
   try {
@@ -92,6 +104,8 @@ export function QuickCapture({
   const timeRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLInputElement>(null);
   const focusTime = useRef(false);
+  /** The IME's text in the box: being composed, or just picked (cleared by the next ordinary key). */
+  const composition = useRef("");
 
   function setDraft(next: QuickDraft) {
     writeQuickDraft(next);
@@ -158,12 +172,23 @@ export function QuickCapture({
             data-focus-first=""
             autoFocus={autoFocus}
             autoComplete="off"
-            enterKeyHint="enter"
+            enterKeyHint="done"
             value={draft.text}
-            // Return saves. Not left to the form: with the Time field open there are two fields
-            // and no submit button, and a browser then sends nothing on Return.
+            onCompositionStart={(e) => (composition.current = e.data ?? "")}
+            onCompositionUpdate={(e) => (composition.current = e.data ?? "")}
+            onCompositionEnd={(e) => (composition.current = e.data ?? "")}
+            // Return submits the form (the one way to save: the form's Add button is its submit
+            // button, so the browser's own Return works from the Time field too). Done here as
+            // well so a Return iOS marks as composing still submits; a real IME's pick doesn't.
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) void save(e);
+              if (e.key !== "Enter") {
+                if (e.keyCode !== 229) composition.current = "";
+                return;
+              }
+              if (isImePick(e, composition.current)) return;
+              composition.current = "";
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
             }}
             onChange={(e) => {
               setAdded(false);
@@ -171,19 +196,17 @@ export function QuickCapture({
             }}
           />
         </label>
-        {/* Esme, 2026-11-17: "needs to be add button". Does what Return does. Pressing it never
-            takes the focus from the box (so the phone's keyboard stays up); the tap puts it back
-            too, within the tap. */}
+        {/* Esme, 2026-11-17: "needs to be add button"; 2026-11-23: "the submit button needs to be
+            there": always the plain primary pill, never greyed out. The form's submit button, so
+            it does what Return does; with the box empty it only puts the focus in the box.
+            Pressing it never takes the focus from the box (so the phone's keyboard stays up);
+            the tap puts it back too, within the tap. */}
         <button
-          type="button"
+          type="submit"
           className="quick-capture-add"
           aria-label="Add to Inbox"
-          disabled={!draft.text.trim()}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            boxRef.current?.focus();
-            void save(e);
-          }}
+          onClick={() => boxRef.current?.focus()}
         >
           Add
         </button>

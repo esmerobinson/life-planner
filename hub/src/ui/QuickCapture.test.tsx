@@ -46,21 +46,104 @@ describe("the quick add box", () => {
     render(<QuickCapture today={TODAY} onAdded={onAdded} onMore={() => {}} />);
     const add = screen.getByRole("button", { name: "Add to Inbox" });
     expect(add).toHaveTextContent("Add");
-    expect(add).toBeDisabled();
-    await userEvent.type(box(), "   ");
-    expect(add).toBeDisabled();
-    await userEvent.clear(box());
+    // Esme, 2026-11-23: "the submit button needs to be there": never greyed out, and the
+    // form's own submit button (so the browser's Return submits through it too).
+    expect(add).toBeEnabled();
+    expect(add).toHaveAttribute("type", "submit");
     await userEvent.type(box(), "Pretend tapped in");
     await userEvent.click(screen.getByRole("button", { name: "Tomorrow" }));
     box().focus();
-    expect(add).toBeEnabled();
     await userEvent.click(add);
     expect(await screen.findByRole("status")).toHaveTextContent("Added");
     expect((await open())[0]).toMatchObject({ title: "Pretend tapped in", areaId: "inbox", pinnedDate: "2026-11-18" });
     expect(box()).toHaveValue("");
     expect(box()).toHaveFocus(); // tapping Add never takes the focus: the phone's keyboard stays up
-    expect(add).toBeDisabled();
+    expect(add).toBeEnabled();
     expect(onAdded).toHaveBeenCalledTimes(1);
+  });
+
+  it("the Add button with an empty box: just puts the focus in the box, adds nothing", async () => {
+    const onAdded = vi.fn();
+    render(
+      <>
+        <button>Elsewhere</button>
+        <QuickCapture today={TODAY} onAdded={onAdded} onMore={() => {}} />
+      </>,
+    );
+    screen.getByRole("button", { name: "Elsewhere" }).focus();
+    await userEvent.type(box(), "   ");
+    screen.getByRole("button", { name: "Elsewhere" }).focus();
+    await userEvent.click(screen.getByRole("button", { name: "Add to Inbox" }));
+    expect(box()).toHaveFocus();
+    expect(await open()).toHaveLength(0);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(SAVE_ERROR)).toBeNull();
+    expect(onAdded).not.toHaveBeenCalled();
+  });
+
+  it("the keyboard's Return key is labelled as doing something (enterkeyhint done)", () => {
+    render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
+    expect(box()).toHaveAttribute("enterkeyhint", "done");
+  });
+
+  // Esme, 2026-11-23: "pressing enter on keyboard doesnt submit really". iOS's predictive text
+  // and autocorrect can mark the Return as composing; only a real IME (Japanese, Chinese,
+  // Korean) picking its characters holds Return back.
+  it("Return marked as composing by a non-IME keyboard (iOS predictive text) still adds", async () => {
+    render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
+    fireEvent.change(box(), { target: { value: "Pretend predictive" } });
+    fireEvent.keyDown(box(), { key: "Enter", code: "Enter", keyCode: 13, isComposing: true });
+    expect(await screen.findByRole("status")).toHaveTextContent("Added");
+    expect((await open())[0]).toMatchObject({ title: "Pretend predictive" });
+  });
+
+  it("Return as keyCode 229 while iOS holds a Latin word (inline prediction) still adds", async () => {
+    render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
+    fireEvent.compositionStart(box(), { data: "" });
+    fireEvent.compositionUpdate(box(), { data: "plumber" });
+    fireEvent.change(box(), { target: { value: "Pretend plumber" } });
+    fireEvent.keyDown(box(), { key: "Enter", keyCode: 229, isComposing: true });
+    expect(await screen.findByRole("status")).toHaveTextContent("Added");
+    expect(await open()).toHaveLength(1);
+  });
+
+  it("Return that picks a Japanese IME's characters doesn't add (Chrome and Safari's order)", async () => {
+    render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
+    fireEvent.compositionStart(box(), { data: "" });
+    fireEvent.compositionUpdate(box(), { data: "にほん" });
+    fireEvent.change(box(), { target: { value: "にほん" } });
+    // Chrome: the Return arrives while composing.
+    fireEvent.keyDown(box(), { key: "Enter", keyCode: 229, isComposing: true });
+    // Safari / the Mac's WebKit: the composition has already ended, but the keyCode is 229.
+    fireEvent.compositionEnd(box(), { data: "日本" });
+    fireEvent.change(box(), { target: { value: "日本" } });
+    fireEvent.keyDown(box(), { key: "Enter", keyCode: 229, isComposing: false });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await open()).toHaveLength(0);
+    // The next Return, the composition over, adds it.
+    fireEvent.keyDown(box(), { key: "Enter", keyCode: 13 });
+    expect(await screen.findByRole("status")).toHaveTextContent("Added");
+    expect((await open())[0]).toMatchObject({ title: "日本" });
+  });
+
+  it("Return in the Time field adds too (the form submits through its Add button)", async () => {
+    render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
+    await userEvent.type(box(), "Pretend timed");
+    await userEvent.click(screen.getByRole("button", { name: "Time" }));
+    const time = screen.getByLabelText("Time", { selector: "input" });
+    fireEvent.change(time, { target: { value: "10:00" } });
+    time.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("status")).toHaveTextContent("Added");
+    expect((await open())[0]).toMatchObject({ title: "Pretend timed", time: "10:00", pinnedDate: TODAY });
+  });
+
+  it("one Return adds it once", async () => {
+    render(<QuickCapture today={TODAY} onAdded={() => {}} onMore={() => {}} />);
+    await userEvent.type(box(), "Pretend once{Enter}");
+    await screen.findByRole("status");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await open()).toHaveLength(1);
   });
 
   it("pressing on the Add button doesn't move the focus out of the box", async () => {
